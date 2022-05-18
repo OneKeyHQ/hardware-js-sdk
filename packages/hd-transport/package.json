@@ -5,16 +5,11 @@
   "author": "Leon <lixiao.dev@gmail.com>",
   "homepage": "",
   "license": "ISC",
-  "main": "lib/transport.js",
-  "directories": {
-    "lib": "lib",
-    "test": "__tests__"
-  },
-  "files": [
-    "lib"
-  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: run tests from root\" && exit 1"
+    "test": "echo \"Error: run tests from root\" && exit 1",
+    "build": "rollup -c ./rollup.config.js"
   },
   "devDependencies": {
     "@types/bytebuffer": "^5.0.42"

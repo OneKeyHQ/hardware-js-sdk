@@ -3,8 +3,8 @@ export type OneKeyDeviceInfo = {
 };
 
 export type OneKeyDeviceInfoWithSession = OneKeyDeviceInfo & {
-  session?: string;
-  debugSession?: string;
+  session?: string | null;
+  debugSession?: string | null;
   debug: boolean;
 };
 

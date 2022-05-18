@@ -1,4 +1,5 @@
 import { buildOne, receiveOne } from './serialization';
+import * as check from './utils/highlevel-checks';
 import * as protobuf from 'protobufjs/light';
 import * as Long from 'long';
 
@@ -15,6 +16,7 @@ export type {
 export * from './constants';
 
 export default {
+  check,
   buildOne,
   receiveOne,
 };
