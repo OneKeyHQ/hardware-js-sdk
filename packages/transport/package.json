@@ -15,5 +15,13 @@
   ],
   "scripts": {
     "test": "echo \"Error: run tests from root\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/bytebuffer": "^5.0.42"
+  },
+  "dependencies": {
+    "bytebuffer": "^5.0.1",
+    "long": "^4.0.0",
+    "protobufjs": "^6.11.2"
   }
 }
