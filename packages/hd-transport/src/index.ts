@@ -12,6 +12,8 @@ export type {
   MessageFromOneKey,
 } from './types';
 
+export * from './constants';
+
 export default {
   buildOne,
   receiveOne,
