@@ -1,0 +1,19 @@
+{
+  "name": "transport",
+  "version": "1.0.0",
+  "description": "> TODO: description",
+  "author": "Leon <lixiao.dev@gmail.com>",
+  "homepage": "",
+  "license": "ISC",
+  "main": "lib/transport.js",
+  "directories": {
+    "lib": "lib",
+    "test": "__tests__"
+  },
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "test": "echo \"Error: run tests from root\" && exit 1"
+  }
+}
