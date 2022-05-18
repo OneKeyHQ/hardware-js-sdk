@@ -1,4 +1,4 @@
-import { buildOne, receiveOne } from './serialization';
+import { buildOne, receiveOne, parseConfigure } from './serialization';
 import * as check from './utils/highlevel-checks';
 import * as protobuf from 'protobufjs/light';
 import * as Long from 'long';
@@ -19,4 +19,5 @@ export default {
   check,
   buildOne,
   receiveOne,
+  parseConfigure,
 };

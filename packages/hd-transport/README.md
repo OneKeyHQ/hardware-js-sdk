@@ -1,11 +1,3 @@
-# `transport`
+# @onekeyfe/transport
 
-> TODO: description
-
-## Usage
-
-```
-const transport = require('transport');
-
-// TODO: DEMONSTRATE API
-```
+用于与 onekey 固件低级别通信的库
