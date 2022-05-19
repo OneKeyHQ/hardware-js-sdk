@@ -2,18 +2,21 @@
   "name": "@onekeyfe/hd-transport-http",
   "version": "1.0.0",
   "description": "hardware http transport",
-  "author": "Leon <lixiao.dev@gmail.com>",
-  "homepage": "https://github.com/originalix/hardware-js-sdk#readme",
+  "author": "OneKey",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/originalix/hardware-js-sdk.git"
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
   },
   "scripts": {
-    "test": "echo \"Error: run tests from root\" && exit 1"
+    "test": "echo \"Error: run tests from root\" && exit 1",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "bugs": {
-    "url": "https://github.com/originalix/hardware-js-sdk/issues"
+    "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
     "@onekeyfe/hd-transport": "*"

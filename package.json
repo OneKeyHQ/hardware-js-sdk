@@ -11,7 +11,9 @@
     "packages/*"
   ],
   "scripts": {
-    "bootstrap": "lerna bootstrap"
+    "bootstrap": "lerna bootstrap",
+    "build": "lerna run build",
+    "lint": "lerna run lint"
   },
   "devDependencies": {
     "@rollup/plugin-babel": "^5.3.1",
@@ -30,6 +32,7 @@
     "lerna": "^4.0.0",
     "prettier": "^2.6.2",
     "prettier-eslint": "^14.0.2",
+    "rimraf": "^3.0.2",
     "rollup": "^2.73.0",
     "rollup-plugin-dts": "^4.2.1",
     "typescript": "^4.6.4"
