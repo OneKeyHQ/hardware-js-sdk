@@ -7,16 +7,16 @@ export type HttpRequestOptions = {
 
 // slight hack to make Flow happy, but to allow Node to set its own fetch
 // Request, RequestOptions and Response are built-in types of Flow for fetch API
-let _fetch: (input: string | Request, init?: any) => Promise<Response> =
+let innerFetch: (input: string | Request, init?: any) => Promise<Response> =
   typeof window === 'undefined'
     ? () => Promise.reject(new Error('Not Browser environment'))
     : window.fetch;
 
-let _isNode = false;
+let isNode = false;
 
-export function setFetch(fetch: any, isNode?: boolean) {
-  _fetch = fetch;
-  _isNode = !!isNode;
+export function setFetch(fetch: any, node?: boolean) {
+  innerFetch = fetch;
+  isNode = !!node;
 }
 
 function contentType(body: any) {
@@ -61,14 +61,14 @@ export async function request(options: HttpRequestOptions) {
   }
 
   // Node applications must spoof origin for bridge CORS
-  if (_isNode) {
+  if (isNode) {
     fetchOptions.headers = {
       ...fetchOptions.headers,
       Origin: 'https://node.onekey.so',
     };
   }
 
-  const res = await _fetch(options.url, fetchOptions);
+  const res = await innerFetch(options.url, fetchOptions);
   const resText = await res.text();
   if (res.ok) {
     return parseResult(resText);

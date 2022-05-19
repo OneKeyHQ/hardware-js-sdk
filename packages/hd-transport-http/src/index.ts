@@ -1,7 +1,7 @@
 import transport from '@onekeyfe/hd-transport';
+import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
 import { DEFAULT_URL, DEFAULT_VERSION_URL } from './constants';
-import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 
 const { check, buildOne, receiveOne, parseConfigure } = transport;
 
@@ -12,13 +12,21 @@ type IncompleteRequestOptions = {
 
 export default class HttpTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+
   bridgeVersion?: string;
+
   configured = false;
+
   debug = false;
+
   isOutdated?: boolean;
+
   newestVersionUrl: string;
+
   stopped = false;
+
   url: string;
+
   version = '';
 
   constructor(url?: string, newestVersionUrl?: string) {
@@ -58,7 +66,7 @@ export default class HttpTransport {
             await http({
               url: `${this.newestVersionUrl}?${Date.now()}`,
               method: 'GET',
-            }),
+            })
           );
     // TODO: 这里需要进行版本比较，可以使用 semver 比较，不引入其他工具类
     // this.isOutdated = versionUtils.isNewer(newVersion, this.version);
@@ -154,6 +162,7 @@ export default class HttpTransport {
     return check.call(jsonData);
   }
 
+  // eslint-disable-next-line class-methods-use-this
   requestDevice() {
     // eslint-disable-next-line prefer-promise-reject-errors
     return Promise.reject();
