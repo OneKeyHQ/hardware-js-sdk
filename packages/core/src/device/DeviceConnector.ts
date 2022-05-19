@@ -15,6 +15,7 @@ export default class DeviceConnector {
       const diff = this._reportDevicesChange();
       return diff;
     } catch (error) {
+      throw new Error(error);
       // empty
     }
   }
