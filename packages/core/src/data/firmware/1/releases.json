@@ -1,0 +1,37 @@
+[
+  {
+    "required": false,
+    "version": [
+      2,
+      1,
+      6
+    ],
+    "bootloader_version": [
+      1,
+      8,
+      6
+    ],
+    "min_bridge_version": [
+      2,
+      0,
+      25
+    ],
+    "min_firmware_version": [
+      1,
+      6,
+      2
+    ],
+    "min_bootloader_version": [
+      1,
+      5,
+      0
+    ],
+    "url": "https://onekey-asset.com/onekey/hw/v2.1.6/bixin-2.1.6.bin",
+    "url_bitcoinonly": "",
+    "fingerprint": "fbcb149427dd74c3fba48bcbe55799168f252a4e08c053aa2b98c78fba6ef8f7",
+    "fingerprint_bitcoinonly": "",
+    "changelog": "此更新包含一些错误修复和性能提升。",
+    "changelog_cn": "此更新包含一些错误修复和性能提升。",
+    "changelog_en": "This update contains several bug fixes and performance enhancements."
+  }
+]
