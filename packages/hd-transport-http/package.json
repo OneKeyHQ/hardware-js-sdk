@@ -21,6 +21,6 @@
     "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
-    "@onekeyfe/hd-transport": "*"
+    "@onekeyfe/hd-transport": "file:../hd-transport"
   }
 }
