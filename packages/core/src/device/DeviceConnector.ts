@@ -1,6 +1,6 @@
 import { Transport, OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
 
-export default class DeviceConnecter {
+export default class DeviceConnector {
   transport: Transport;
   current: DeviceDescriptor[] | null = null;
   upcoming: DeviceDescriptor[] = [];

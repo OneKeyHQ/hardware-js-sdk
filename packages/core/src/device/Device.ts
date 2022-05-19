@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { Transport, OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
-import DeviceConnecter from './DeviceConnecter';
+import DeviceConnector from './DeviceConnector';
 
 export class Device extends EventEmitter {
   /**
@@ -18,14 +18,14 @@ export class Device extends EventEmitter {
   /**
    * 通信管道，向设备发送请求
    */
-  deviceConnecter: DeviceConnecter;
+  deviceConnector: DeviceConnector;
 
   constructor(transport: Transport, descriptor: DeviceDescriptor) {
     super();
     this.transport = transport;
     this.originalDescriptor = descriptor;
-    // TODO: connecter 可以设计成单例，重复创建有点啰嗦
-    this.deviceConnecter = new DeviceConnecter(this.transport);
+    // TODO: Connector 可以设计成单例，重复创建有点啰嗦
+    this.deviceConnector = new DeviceConnector(this.transport);
   }
 
   static fromDescriptor(transport: Transport, originalDescriptor: DeviceDescriptor) {
@@ -37,7 +37,7 @@ export class Device extends EventEmitter {
     let device;
     // 不存在 Session ID 创建连接
     if (!this.activitySessionID) {
-      const devices = await this.deviceConnecter.enumerate();
+      const devices = await this.deviceConnector.enumerate();
       device = devices?.connected?.find(k => k.path === this.originalDescriptor.path);
       if (!device) {
         return false;
