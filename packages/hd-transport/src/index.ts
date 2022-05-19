@@ -1,7 +1,7 @@
-import { buildOne, receiveOne, parseConfigure } from './serialization';
-import * as check from './utils/highlevel-checks';
 import * as protobuf from 'protobufjs/light';
 import * as Long from 'long';
+import { buildOne, receiveOne, parseConfigure } from './serialization';
+import * as check from './utils/highlevel-checks';
 
 protobuf.util.Long = Long;
 protobuf.configure();

@@ -12,6 +12,7 @@ function encode(data: ByteBuffer, options: Options<true>): Buffer[];
 function encode(data: ByteBuffer, options: Options<false>): Buffer;
 function encode(data: any, options: any): any {
   const { addTrezorHeaders, chunked, messageType } = options;
+  // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
   const fullSize = (addTrezorHeaders ? HEADER_SIZE : HEADER_SIZE - 2) + data.limit;
 
   const encodedByteBuffer = new ByteBuffer(fullSize);
