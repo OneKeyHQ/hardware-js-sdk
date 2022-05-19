@@ -32,4 +32,8 @@ export default class DataManager {
     // parse bridge JSON
     parseBridgeJSON(this.assets.bridge);
   }
+
+  static getProtobufMessages() {
+    return this.messages.default;
+  }
 }

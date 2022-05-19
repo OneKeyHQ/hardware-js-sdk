@@ -1,25 +1,25 @@
 import EventEmitter from 'events';
-import { Transport } from '@onekeyfe/hd-transport';
-import HttpBridge from '@onekeyfe/hd-transport-http';
-import DataManager from '../data-manager/DataManager';
-import { getBridgeInfo } from '../data-manager/transportInfo';
-// import { Transport } from '@onekeyfe/hd-transport';
+import TransportManager from '../data-manager/TransportManager';
 
 export class DeviceList extends EventEmitter {
-  // transport: Transport;
-  // devices: { [path: string]: Device } = {};
-
   constructor() {
     super();
-    const transports: Transport[] = [];
-    const bridgeLatestVersion = getBridgeInfo().version.join('.');
-    const bridge = new HttpBridge();
-    bridge.setBridgeLatestVersion(bridgeLatestVersion);
-    transports.push(bridge as any);
-    // this.transport = new Fallback(transports);
-    // this.defaultMessages = DataManager.getProtobufMessages();
-    // this.currentMessages = this.defaultMessages;
+    TransportManager.load();
+  }
 
-    // TODO: inject transport
+  // eslint-disable-next-line class-methods-use-this
+  async init() {
+    const transport = TransportManager.getTransport();
+    const defaultMessages = TransportManager.getDefaultMessages();
+    try {
+      console.log('Initializing transports');
+      await transport.init(true);
+      console.log('Configuring transports');
+      await transport.configure(JSON.stringify(defaultMessages));
+      console.log('Configuring transports done');
+      await transport.init();
+    } catch (error) {
+      console.log(error);
+    }
   }
 }
