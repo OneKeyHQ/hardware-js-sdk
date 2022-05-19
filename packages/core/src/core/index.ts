@@ -1,10 +1,11 @@
 import DataManager from '../data-manager/DataManager';
 import { DeviceList } from '../device/DeviceList';
 
-function init() {
-  DataManager.load({});
+async function init() {
+  await DataManager.load({});
   const deviceList = new DeviceList();
-  deviceList.init();
+  await deviceList.init();
+  await deviceList.getDeviceLists();
 }
 
 export default {

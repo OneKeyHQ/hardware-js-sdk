@@ -20,6 +20,8 @@ export const httpRequest = (url: string, _type: string): any => {
       return firmware2;
     case './data/messages/messages.json':
       return messages;
+    default:
+      break;
   }
 
   return browserHttpRequest(url);

@@ -2,14 +2,18 @@ import './App.css';
 import {  Device, DeviceList, DeviceConnector, Core  } from '@onekeyfe/hd-core'
 
 function App() {
-  Core.default.init()
+
+  const sdkInit = () => {
+    Core.default.init()
+  }
 
   const usbConnect = () => {
     console.log(Device)
   }
 
   const getDevicesList = () => {
-    console.log(DeviceList)
+    const deviceList = new DeviceList()
+    console.log(deviceList)
   }
 
   const enumerate = () => {
@@ -20,6 +24,7 @@ function App() {
   return (
     <div className="App">
       <header>Connect Browser Example</header>
+      <button onClick={sdkInit}>SDK init</button>
       <button onClick={usbConnect}>USB Connect</button>
       <button onClick={getDevicesList}>GetDeviceList</button>
       <button onClick={enumerate}>Enumerate</button>
