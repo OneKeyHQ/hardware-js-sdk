@@ -25,7 +25,7 @@ export type Transport = {
     session: string,
     name: string,
     data: Record<string, any>,
-    debugLink: boolean,
+    debugLink: boolean
   ): Promise<MessageFromOneKey>;
   post(session: string, name: string, data: Record<string, any>, debugLink: boolean): Promise<void>;
   read(session: string, debugLink: boolean): Promise<MessageFromOneKey>;
