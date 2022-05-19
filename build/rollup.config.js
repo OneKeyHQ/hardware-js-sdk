@@ -1,4 +1,5 @@
 import typescript from '@rollup/plugin-typescript';
+import json from '@rollup/plugin-json'
 import dts from 'rollup-plugin-dts';
 import path from 'path';
 
@@ -11,7 +12,7 @@ const config = [
         format: 'cjs',
       },
     ],
-    plugins: [typescript()],
+    plugins: [typescript(), json()],
   },
   {
     input: path.resolve('./src/index.ts'),

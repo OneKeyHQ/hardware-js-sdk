@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+      "module": "commonjs",
+      "target": "es6",
+
+      "composite": false,
+      "incremental": false,
+      "declarationMap": true,
+      "outDir": "./dist",
+      "esModuleInterop": false
+  },
+  "exclude": [
+      "**/node_modules",
+      "**/lib",
+      "**/libDev",
+      "**/build",
+      "**/build-electron",
+      "**/dist",
+      "**/coverage",
+      "**/public",
+      "**/tests",
+      "**/__tests__",
+      "**/__mocks__/**",
+      "**/*.test.ts"
+  ]
+}

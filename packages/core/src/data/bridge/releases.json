@@ -1,0 +1,41 @@
+[
+	{
+		"version": [2, 0, 28],
+		"directory": "v{version}-onekey/",
+		"packages": [
+			{
+				"platform": ["deb64"],
+				"name": "Linux 64-bit (deb)",
+				"url": "onekey-bridge_{version}_amd64.deb"
+			},
+			{
+				"platform": ["rpm64"],
+				"name": "Linux 64-bit (rpm)",
+				"url": "onekey-bridge-{version}-1.x86_64.rpm"
+			},
+			{
+				"platform": ["deb32"],
+				"name": "Linux 32-bit (deb)",
+				"url": "onekey-bridge_{version}_i386.deb"
+			},
+			{
+				"platform": ["rpm32"],
+				"name": "Linux 32-bit (rpm)",
+				"url": "onekey-bridge-{version}-1.i386.rpm"
+			},
+			{
+				"platform": ["mac"],
+				"name": "Mac OS X",
+				"url": "onekey-bridge-{version}.pkg",
+				"signature": "onekey-bridge-{version}.pkg.asc"
+			},
+			{
+				"platform": ["win32", "win64"],
+				"name": "Windows",
+				"url": "onekey-bridge-{version}-win32-install.exe",
+				"signature": "onekey-bridge-{version}-win32-install.exe.asc"
+			}
+		],
+		"changelog": "* Fix: change default install folder & title description"
+	}
+]

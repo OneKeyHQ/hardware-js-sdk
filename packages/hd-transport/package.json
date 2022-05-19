@@ -2,14 +2,15 @@
   "name": "@onekeyfe/hd-transport",
   "version": "1.0.0",
   "description": "> TODO: description",
-  "author": "Leon <lixiao.dev@gmail.com>",
-  "homepage": "",
+  "author": "OneKey",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: run tests from root\" && exit 1",
-    "build": "rollup -c ./rollup.config.js"
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "devDependencies": {
     "@types/bytebuffer": "^5.0.42"
