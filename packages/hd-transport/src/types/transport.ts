@@ -10,7 +10,7 @@ export type OneKeyDeviceInfoWithSession = OneKeyDeviceInfo & {
 
 export type AcquireInput = {
   path: string;
-  previous?: string;
+  previous?: string | null;
 };
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };

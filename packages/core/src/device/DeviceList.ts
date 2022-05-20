@@ -27,13 +27,12 @@ export class DeviceList extends EventEmitter {
     }
   }
 
+  /**
+   * 获取已连接的设备列表
+   * @returns {OneKeyDeviceInfoWithSession[]}
+   */
   async getDeviceLists() {
     const deviceDiff = await this.connector.enumerate();
-    console.log(deviceDiff);
-    if (deviceDiff.connected.length > 0) {
-      // await this.connector.
-      await this.connector.listen();
-    }
-    return deviceDiff.connected;
+    return deviceDiff.connected ?? [];
   }
 }

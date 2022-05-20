@@ -108,6 +108,15 @@ export default class DeviceConnector {
     }
   }
 
+  async acquire(path: string, session?: string | null) {
+    try {
+      const res = await this.transport.acquire({ path, previous: session }, false);
+      console.log(res);
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
   _reportDevicesChange() {
     const diff = getDiff(this.current || [], this.upcoming);
     this.current = this.upcoming;
