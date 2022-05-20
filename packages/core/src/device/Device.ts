@@ -16,7 +16,7 @@ export class Device extends EventEmitter {
   /**
    * 通信管道，向设备发送请求
    */
-  deviceConnector: DeviceConnector | null = null;
+  deviceConnector?: DeviceConnector | null = null;
 
   constructor(descriptor: DeviceDescriptor) {
     super();
@@ -35,20 +35,24 @@ export class Device extends EventEmitter {
   }
 
   connect() {
-    let device;
-    // 不存在 Session ID 创建连接
-    if (!this.activitySessionID) {
-      return false;
-    }
-    // 存在 Session ID 不可用则获取新的 Session I
-    if (!this.isUsedHere() && this.originalDescriptor) {
-      // TODO: acquire
-    }
-    // 存在 Session ID 当前是否可用
-    if (this.isUsedHere()) {
-      return true;
-    }
-    return false;
+    // eslint-disable-next-line no-async-promise-executor
+    return new Promise<boolean>(async resolve => {
+      // 不存在 Session ID 或存在 Session ID 但设备在别处使用，都需要 acquire 获取最新 sessionID
+      if (!this.activitySessionID || (!this.isUsedHere() && this.originalDescriptor)) {
+        try {
+          await this.acquire();
+          resolve(true);
+        } catch (error) {
+          resolve(error);
+        }
+        return;
+      }
+      if (this.isUsedHere()) {
+        resolve(true);
+        return;
+      }
+      resolve(false);
+    });
   }
 
   isUsed() {
@@ -57,5 +61,33 @@ export class Device extends EventEmitter {
 
   isUsedHere() {
     return this.isUsed() && this.originalDescriptor.session === this.activitySessionID;
+  }
+
+  async acquire() {
+    try {
+      const sessionID = await this.deviceConnector?.acquire(
+        this.originalDescriptor.path,
+        this.originalDescriptor.session
+      );
+      console.log('Expected session id:', sessionID);
+      this.activitySessionID = sessionID;
+      this.updateDescriptor({ session: sessionID } as DeviceDescriptor);
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+  /**
+   * 暂时只在 acquire 后更新 Session ID
+   * 后续看是否有需要依据 listen 返回结果更新
+   * @param descriptor
+   */
+  updateDescriptor(descriptor: DeviceDescriptor) {
+    const originalSession = this.originalDescriptor.session;
+    const upcomingSession = descriptor.session;
+
+    if (originalSession !== upcomingSession) {
+      this.originalDescriptor.session = upcomingSession;
+    }
   }
 }

@@ -1,21 +1,25 @@
 import { useState } from 'react'
-import {  Device, DeviceList, Core  } from '@onekeyfe/hd-core'
+import { DeviceList, Core } from '@onekeyfe/hd-core'
 import './App.css';
+
+let core
 
 function App() {
   const [devices, setDevices] = useState([])
   const [currentDevice, setCurrentDevice] = useState(null)
   const [initialize, setInitialize] = useState(false)
 
-  let core
-  const sdkInit = () => {
+  const sdkInit = async () => {
     core = new Core()
-    core.initCore()
+    await core.initCore()
+    await core.initDeviceList()
     setInitialize(true)
   }
 
   const usbConnect = () => {
-    console.log(Device)
+    if (currentDevice) {
+      core.initDevice(currentDevice.path)
+    }
   }
 
   const getDevicesList = async () => {

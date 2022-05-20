@@ -16,6 +16,7 @@ export default class Core {
   }
 
   async initDevice(path?: string) {
+    console.log('initDevice', path);
     let device;
     if (!this.deviceList) {
       await this.initDeviceList();
@@ -37,6 +38,12 @@ export default class Core {
       throw new Error('设备列表中有多个设备，请先选择设备');
     }
 
+    if (device) {
+      device.deviceConnector = this.deviceList?.connector;
+    }
+
     // TODO: 获取 device 后测试连接部分逻辑
+    const connectRes = await device?.connect();
+    console.log('connect result: ', connectRes);
   }
 }
