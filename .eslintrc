@@ -31,6 +31,9 @@
         "leadingUnderscore": "allow",
         "trailingUnderscore": "allow"
       }
-    ]
+    ],
+    // valid case of class method overloads in typescript
+    "no-dupe-class-members": "off",
+    "@typescript-eslint/ban-ts-comment": "off"
   }
 }
