@@ -1,8 +1,12 @@
 import EventEmitter from 'events';
+import { OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from './DeviceConnector';
+import { Device } from './Device';
 
 export class DeviceList extends EventEmitter {
+  devices: Record<string, Device> = {};
+
   connector: DeviceConnector;
 
   constructor() {
@@ -33,6 +37,20 @@ export class DeviceList extends EventEmitter {
    */
   async getDeviceLists() {
     const deviceDiff = await this.connector.enumerate();
-    return deviceDiff.connected ?? [];
+    const deviceList = deviceDiff.connected ?? [];
+    this.devices = deviceList.reduce<Record<string, Device>>((prev, device) => {
+      prev[device.path] = Device.fromDescriptor(device);
+      return prev;
+    }, {});
+
+    return deviceList;
+  }
+
+  allDevices(): Device[] {
+    return Object.keys(this.devices).map(key => this.devices[key]);
+  }
+
+  getDevice(devicePath: string) {
+    return this.devices[devicePath];
   }
 }

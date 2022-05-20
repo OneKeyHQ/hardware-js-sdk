@@ -7,8 +7,10 @@ function App() {
   const [currentDevice, setCurrentDevice] = useState(null)
   const [initialize, setInitialize] = useState(false)
 
+  let core
   const sdkInit = () => {
-    Core.default.init()
+    core = new Core()
+    core.initCore()
     setInitialize(true)
   }
 
