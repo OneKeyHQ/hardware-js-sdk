@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import DeviceConnector from './DeviceConnector';
+import { DeviceCommands } from './DeviceCommands';
 
 export class Device extends EventEmitter {
   /**
@@ -17,6 +18,11 @@ export class Device extends EventEmitter {
    * 通信管道，向设备发送请求
    */
   deviceConnector?: DeviceConnector | null = null;
+
+  /**
+   * 固件命令
+   */
+  commands: DeviceCommands | undefined;
 
   constructor(descriptor: DeviceDescriptor) {
     super();
@@ -72,6 +78,12 @@ export class Device extends EventEmitter {
       console.log('Expected session id:', sessionID);
       this.activitySessionID = sessionID;
       this.updateDescriptor({ session: sessionID } as DeviceDescriptor);
+      if (this.commands) {
+        // TODO: disposed
+        // this.commands.disposed();
+      }
+
+      this.commands = new DeviceCommands(this, sessionID ?? '');
     } catch (error) {
       throw new Error(error);
     }
@@ -89,5 +101,10 @@ export class Device extends EventEmitter {
     if (originalSession !== upcomingSession) {
       this.originalDescriptor.session = upcomingSession;
     }
+  }
+
+  async getFeatures() {
+    const res = await this.commands?.typedCall('GetFeatures', 'Features', {});
+    console.log(res);
   }
 }

@@ -32,6 +32,10 @@ function App() {
     setDevices(devices)
   }
 
+  const onGetFeatures = () => {
+    core.getFeatures()
+  }
+
   return (
     <div className="App">
       <header>Connect Browser Example</header>
@@ -39,6 +43,7 @@ function App() {
         <button onClick={sdkInit}>SDK init</button>
         <button onClick={getDevicesList}>GetDeviceList</button>
         <button onClick={usbConnect}>Device Connect</button>
+        <button onClick={onGetFeatures}>GetFeatures</button>
       </div>
       <div style={{textAlign: 'left', margin: '20px'}}>
         当前选取设备：{currentDevice ? JSON.stringify(currentDevice) : '无'}

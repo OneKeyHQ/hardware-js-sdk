@@ -1,7 +1,7 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
 import TransportManager from '../data-manager/TransportManager';
 import { ERRORS } from '../constants';
-import { Device } from './Device';
+import type { Device } from './Device';
 
 type MessageType = Messages.MessageType;
 type MessageKey = keyof MessageType;
@@ -107,9 +107,57 @@ export class DeviceCommands {
     return this._filterCommonTypes(resp);
   }
 
-  // @ts-ignore
   // eslint-disable-next-line class-methods-use-this
   _filterCommonTypes(res: DefaultMessageResponse): Promise<DefaultMessageResponse> {
-    console.log(res);
+    if (res.type === 'Failure') {
+      const { code } = res.message;
+      let { message } = res.message;
+      // Model One does not send any message in firmware update
+      if (code === 'Failure_FirmwareError' && !message) {
+        message = 'Firmware installation failed';
+      }
+      // Failure_ActionCancelled message could be also missing
+      if (code === 'Failure_ActionCancelled' && !message) {
+        message = 'Action cancelled by user';
+      }
+      // pass code and message from firmware error
+      return Promise.reject(
+        new ERRORS.OneKeyError(
+          (code as any) || 'Failure_UnknownCode',
+          message || 'Failure_UnknownMessage'
+        )
+      );
+    }
+
+    if (res.type === 'Features') {
+      return Promise.resolve(res);
+    }
+
+    if (res.type === 'ButtonRequest') {
+      // TODO: ButtonRequest
+    }
+
+    if (res.type === 'EntropyRequest') {
+      // TODO: EntropyRequest
+    }
+
+    if (res.type === 'PinMatrixRequest') {
+      // TODO: PinMatrixRequest
+    }
+
+    if (res.type === 'PassphraseRequest') {
+      // TODO: PassphraseRequest
+    }
+
+    // TT fw lower than 2.3.0, device send his current state
+    // new passphrase design set this value from `features.session_id`
+    if (res.type === 'Deprecated_PassphraseStateRequest') {
+      // TODO: Deprecated_PassphraseStateRequest
+    }
+
+    if (res.type === 'WordRequest') {
+      // TODO: WordRequest
+    }
+    return Promise.resolve(res);
   }
 }

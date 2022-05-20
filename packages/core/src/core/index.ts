@@ -1,23 +1,22 @@
 import DataManager from '../data-manager/DataManager';
 import { DeviceList } from '../device/DeviceList';
 
+let device: any;
 export default class Core {
   deviceList?: DeviceList;
 
+  // eslint-disable-next-line class-methods-use-this
   async initCore() {
     await DataManager.load({});
-    this.deviceList = new DeviceList();
   }
 
   async initDeviceList() {
     this.deviceList = new DeviceList();
-    await this.deviceList.init();
     await this.deviceList.getDeviceLists();
   }
 
   async initDevice(path?: string) {
     console.log('initDevice', path);
-    let device;
     if (!this.deviceList) {
       await this.initDeviceList();
     }
@@ -45,5 +44,11 @@ export default class Core {
     // TODO: 获取 device 后测试连接部分逻辑
     const connectRes = await device?.connect();
     console.log('connect result: ', connectRes);
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async getFeatures() {
+    console.log('Core getFeatures, ', device);
+    await device?.getFeatures();
   }
 }

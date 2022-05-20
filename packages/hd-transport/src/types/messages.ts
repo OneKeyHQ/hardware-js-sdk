@@ -970,7 +970,7 @@ export enum FailureType {
 
 // Failure
 export type Failure = {
-  code?: FailureType;
+  code?: FailureType | string;
   message?: string;
 };
 
