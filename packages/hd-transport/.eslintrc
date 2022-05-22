@@ -1,6 +1,6 @@
 {
   "rules": {
-      "no-console": "error",
+      "no-console": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/ban-ts-ignore": "off",

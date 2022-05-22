@@ -13,6 +13,8 @@ export type {
   MessageFromOneKey,
 } from './types';
 
+export { Messages } from './types';
+
 export * from './constants';
 
 export default {

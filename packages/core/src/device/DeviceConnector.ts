@@ -1,32 +1,5 @@
 import { Transport, OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
-
-export default class DeviceConnector {
-  transport: Transport;
-  current: DeviceDescriptor[] | null = null;
-  upcoming: DeviceDescriptor[] = [];
-
-  constructor(transport: Transport) {
-    this.transport = transport;
-  }
-
-  async enumerate() {
-    try {
-      this.upcoming = await this.transport.enumerate();
-      const diff = this._reportDevicesChange();
-      return diff;
-    } catch (error) {
-      throw new Error(error);
-      // empty
-    }
-  }
-
-  _reportDevicesChange() {
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define
-    const diff = getDiff(this.current || [], this.upcoming);
-    this.current = this.upcoming;
-    return diff;
-  }
-}
+import TransportManager from '../data-manager/TransportManager';
 
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;
@@ -43,7 +16,7 @@ export type DeviceDescriptorDiff = {
 
 const getDiff = (
   current: DeviceDescriptor[],
-  descriptors: DeviceDescriptor[],
+  descriptors: DeviceDescriptor[]
 ): DeviceDescriptorDiff => {
   const connected = descriptors.filter(d => current.find(x => x.path === d.path) === undefined);
   const disconnected = current.filter(d => descriptors.find(x => x.path === d.path) === undefined);
@@ -59,7 +32,7 @@ const getDiff = (
   const released = changedSessions.filter(
     d =>
       // const session = descriptor.debug ? descriptor.debugSession : descriptor.session;
-      typeof d.session !== 'string',
+      typeof d.session !== 'string'
   );
 
   const changedDebugSessions = descriptors.filter(d => {
@@ -89,3 +62,64 @@ const getDiff = (
     descriptors,
   };
 };
+
+export default class DeviceConnector {
+  transport: Transport;
+
+  current: DeviceDescriptor[] | null = null;
+
+  upcoming: DeviceDescriptor[] = [];
+
+  listening = false;
+
+  constructor() {
+    this.transport = TransportManager.getTransport();
+  }
+
+  async enumerate() {
+    try {
+      this.upcoming = await this.transport.enumerate();
+      const diff = this._reportDevicesChange();
+      return diff;
+    } catch (error) {
+      throw new Error(error);
+      // empty
+    }
+  }
+
+  async listen() {
+    if (this.listening) {
+      return;
+    }
+    this.listening = true;
+
+    if (!this.current || !Array.isArray(this.current)) {
+      return {};
+    }
+
+    try {
+      this.upcoming = await this.transport.listen(this.current);
+      const diff = this._reportDevicesChange();
+      return diff;
+    } catch (error) {
+      throw new Error(error);
+    } finally {
+      this.listening = false;
+    }
+  }
+
+  async acquire(path: string, session?: string | null) {
+    try {
+      const res = await this.transport.acquire({ path, previous: session }, false);
+      return res;
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+  _reportDevicesChange() {
+    const diff = getDiff(this.current || [], this.upcoming);
+    this.current = this.upcoming;
+    return diff;
+  }
+}

@@ -19,8 +19,6 @@ export default class HttpTransport {
 
   debug = false;
 
-  isOutdated?: boolean;
-
   newestVersionUrl: string;
 
   stopped = false;
@@ -59,17 +57,6 @@ export default class HttpTransport {
     });
     const info = check.info(infoS);
     this.version = info.version;
-    const newVersion =
-      typeof this.bridgeVersion === 'string'
-        ? this.bridgeVersion
-        : check.version(
-            await http({
-              url: `${this.newestVersionUrl}?${Date.now()}`,
-              method: 'GET',
-            })
-          );
-    // TODO: 这里需要进行版本比较，可以使用 semver 比较，不引入其他工具类
-    // this.isOutdated = versionUtils.isNewer(newVersion, this.version);
   }
 
   configure(signedData: any) {
@@ -122,6 +109,16 @@ export default class HttpTransport {
       throw new Error('Transport not configured.');
     }
     const messages = this._messages;
+    console.log(
+      'transport-http',
+      'call-',
+      'messages: ',
+      messages,
+      ' name: ',
+      name,
+      ' data: ',
+      data
+    );
     const o = buildOne(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({

@@ -21,6 +21,21 @@ export default class TransportManager {
     this.transport.setBridgeLatestVersion(bridgeLatestVersion);
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
+
+    this.configure();
+  }
+
+  static async configure() {
+    try {
+      console.log('Initializing transports');
+      await this.transport.init(true);
+      console.log('Configuring transports');
+      await this.transport.configure(JSON.stringify(this.defaultMessages));
+      console.log('Configuring transports done');
+      await this.transport.init();
+    } catch (error) {
+      console.log('Initializing transports error: ', error);
+    }
   }
 
   static getTransport() {

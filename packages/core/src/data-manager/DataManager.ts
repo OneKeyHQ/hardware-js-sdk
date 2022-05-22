@@ -1,4 +1,4 @@
-import config from '../data/config.json';
+import * as config from '../data/config.json';
 import { httpRequest } from '../utils';
 import { parseBridgeJSON } from './transportInfo';
 
@@ -7,11 +7,13 @@ type AssetCollection = { [key: string]: JSON };
 export default class DataManager {
   static assets: AssetCollection = {};
 
+  // TODO: settings 类型补全
   static settings: any;
 
   static messages: { [key: string]: JSON } = {};
 
   static async load(settings: any, withAssets = true) {
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     const ts = `?r=${settings.timestamp}`;
     this.settings = settings;
 
