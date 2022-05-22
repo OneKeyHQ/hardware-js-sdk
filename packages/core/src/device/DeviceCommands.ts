@@ -1,6 +1,7 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
 import TransportManager from '../data-manager/TransportManager';
 import { ERRORS } from '../constants';
+import { initLog } from '../utils';
 import type { Device } from './Device';
 
 type MessageType = Messages.MessageType;
@@ -30,6 +31,8 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
   }
 };
 
+const Log = initLog('DeviceCommands');
+
 export class DeviceCommands {
   device: Device;
 
@@ -41,11 +44,18 @@ export class DeviceCommands {
 
   callPromise?: Promise<DefaultMessageResponse>;
 
+  _cancelableRequest?: (error?: any) => void;
+
   constructor(device: Device, sessionId: string) {
     this.device = device;
     this.sessionId = sessionId;
     this.transport = TransportManager.getTransport();
     this.disposed = false;
+  }
+
+  dispose() {
+    this.disposed = true;
+    this._cancelableRequest = undefined;
   }
 
   // Sends an async message to the opened device.
@@ -56,14 +66,13 @@ export class DeviceCommands {
     console.log('[DeviceCommands] [call] Sending', type, this.transport);
 
     try {
-      const promise = this.transport.call(this.sessionId, type, msg, false) as any;
+      const promise = this.transport.call(this.sessionId, type, msg) as any;
       this.callPromise = promise;
       const res = await promise;
-      this.callPromise = promise;
-      console.log('[DeviceCommands] [call] Received', res.type);
+      Log.debug('[DeviceCommands] [call] Received', res.type);
       return res;
     } catch (error) {
-      console.warn('[DeviceCommands] [call] Received error', error);
+      Log.debug('[DeviceCommands] [call] Received error', error);
       throw error;
     }
   }
@@ -95,7 +104,7 @@ export class DeviceCommands {
     } catch (error) {
       // handle possible race condition
       // Bridge may have some unread message in buffer, read it
-      await this.transport.read(this.sessionId, false);
+      await this.transport.read(this.sessionId);
       // throw error anyway, next call should be resolved properly
       throw error;
     }

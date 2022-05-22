@@ -1491,6 +1491,7 @@ export type Capability = keyof typeof Enum_Capability;
 // Features
 export type Features = {
   vendor: string;
+  serial_no: string;
   major_version: number;
   minor_version: number;
   patch_version: number;
