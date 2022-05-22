@@ -1,7 +1,10 @@
 import { Transport } from '@onekeyfe/hd-transport';
 import HttpBridge from '@onekeyfe/hd-transport-http';
+import { initLog } from '../utils';
 import DataManager from './DataManager';
 import { getBridgeInfo } from './transportInfo';
+
+const Log = initLog('Transport');
 
 /**
  * transport 在同一个环境中只会存在一个
@@ -27,14 +30,15 @@ export default class TransportManager {
 
   static async configure() {
     try {
-      console.log('Initializing transports');
+      console.log(1);
+      Log.debug('Initializing transports');
       await this.transport.init(true);
-      console.log('Configuring transports');
+      Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));
-      console.log('Configuring transports done');
+      Log.debug('Configuring transports done');
       await this.transport.init();
     } catch (error) {
-      console.log('Initializing transports error: ', error);
+      Log.debug('Initializing transports error: ', error);
     }
   }
 

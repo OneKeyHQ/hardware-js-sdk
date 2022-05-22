@@ -1,5 +1,8 @@
 import DataManager from '../data-manager/DataManager';
 import { DeviceList } from '../device/DeviceList';
+import { initLog } from '../utils';
+
+const Log = initLog('Core');
 
 let device: any;
 export default class Core {
@@ -16,7 +19,7 @@ export default class Core {
   }
 
   async initDevice(path?: string) {
-    console.log('initDevice', path);
+    Log.debug('initDevice', path);
     if (!this.deviceList) {
       await this.initDeviceList();
     }
@@ -43,12 +46,12 @@ export default class Core {
 
     // TODO: 获取 device 后测试连接部分逻辑
     const connectRes = await device?.connect();
-    console.log('connect result: ', connectRes);
+    Log.debug('connect result: ', connectRes);
   }
 
   // eslint-disable-next-line class-methods-use-this
   async getFeatures() {
-    console.log('Core getFeatures, ', device);
+    Log.debug('Core getFeatures, ', device);
     await device?.getFeatures();
   }
 }

@@ -1,5 +1,6 @@
 import * as config from '../data/config.json';
 import { httpRequest } from '../utils';
+import { enableLog } from '../utils/logger';
 import { parseBridgeJSON } from './transportInfo';
 
 type AssetCollection = { [key: string]: JSON };
@@ -16,6 +17,8 @@ export default class DataManager {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     const ts = `?r=${settings.timestamp}`;
     this.settings = settings;
+
+    enableLog(true);
 
     if (!withAssets) return;
 
