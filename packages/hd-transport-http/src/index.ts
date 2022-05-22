@@ -83,20 +83,20 @@ export default class HttpTransport {
     return devices;
   }
 
-  _acquireMixed(input: AcquireInput, debugLink: boolean) {
+  _acquireMixed(input: AcquireInput) {
     const previousStr = input.previous == null ? 'null' : input.previous;
-    const url = `${debugLink ? '/debug' : ''}/acquire/${input.path}/${previousStr}`;
+    const url = `/acquire/${input.path}/${previousStr}`;
     return this._post({ url });
   }
 
-  async acquire(input: AcquireInput, debugLink: boolean) {
-    const acquireS = await this._acquireMixed(input, debugLink);
+  async acquire(input: AcquireInput) {
+    const acquireS = await this._acquireMixed(input);
     return check.acquire(acquireS);
   }
 
-  async release(session: string, onclose: boolean, debugLink: boolean) {
+  async release(session: string, onclose: boolean) {
     const res = this._post({
-      url: `${debugLink ? '/debug' : ''}/release/${session}`,
+      url: `/release/${session}`,
     });
     if (onclose) {
       return;
@@ -104,7 +104,7 @@ export default class HttpTransport {
     await res;
   }
 
-  async call(session: string, name: string, data: Record<string, unknown>, debugLink: boolean) {
+  async call(session: string, name: string, data: Record<string, unknown>) {
     if (this._messages == null) {
       throw new Error('Transport not configured.');
     }
@@ -122,7 +122,7 @@ export default class HttpTransport {
     const o = buildOne(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
-      url: `${debugLink ? '/debug' : ''}/call/${session}`,
+      url: `/call/${session}`,
       body: outData,
     });
     if (typeof resData !== 'string') {
@@ -132,25 +132,25 @@ export default class HttpTransport {
     return check.call(jsonData);
   }
 
-  async post(session: string, name: string, data: Record<string, unknown>, debugLink: boolean) {
+  async post(session: string, name: string, data: Record<string, unknown>) {
     if (this._messages == null) {
       throw new Error('Transport not configured.');
     }
     const messages = this._messages;
     const outData = buildOne(messages, name, data).toString('hex');
     await this._post({
-      url: `${debugLink ? '/debug' : ''}/post/${session}`,
+      url: `/post/${session}`,
       body: outData,
     });
   }
 
-  async read(session: string, debugLink: boolean) {
+  async read(session: string) {
     if (this._messages == null) {
       throw new Error('Transport not configured.');
     }
     const messages = this._messages;
     const resData = await this._post({
-      url: `${debugLink ? '/debug' : ''}/read/${session}`,
+      url: `/read/${session}`,
     });
     if (typeof resData !== 'string') {
       throw new Error('Returning data is not string.');
