@@ -5,7 +5,8 @@ import { DeviceCommands } from './DeviceCommands';
 import { initLog, versionCompare } from '../utils';
 import { parseCapabilities } from '../utils/deviceFeaturesUtils';
 import { getFirmwareStatus, getRelease } from '../data-manager/FirmwareInfo';
-import type { Features, DeviceFirmwareStatus, FirmwareRelease, ReleaseInfo } from '../types';
+import type { Features, DeviceFirmwareStatus, ReleaseInfo } from '../types';
+import { getBLEFirmwareStatus, getBLERelease } from '../data-manager/BLEFirmwareInfo';
 
 const Log = initLog('Device');
 export class Device extends EventEmitter {
@@ -49,6 +50,17 @@ export class Device extends EventEmitter {
    * 固件版本信息
    */
   firmwareRelease?: ReleaseInfo;
+
+  /**
+   * 蓝牙固件状态
+   */
+  bleFirmwareStatus?: DeviceFirmwareStatus;
+
+  /**
+   * 蓝牙固件版本信息
+   * TODO: 完善蓝牙固件类型
+   */
+  bleFirmwareRelease?: any;
 
   /**
    * 执行 API 方法后是否保留 SessionID
@@ -151,7 +163,8 @@ export class Device extends EventEmitter {
     if (versionCompare(version, this.getVersion()) !== 0 || capabilitiesDidChange) {
       this.firmwareStatus = getFirmwareStatus(feat);
       this.firmwareRelease = getRelease(feat);
-      // TODO: 获取蓝牙固件信息
+      this.bleFirmwareStatus = getBLEFirmwareStatus(feat);
+      this.bleFirmwareRelease = getBLERelease(feat);
     }
 
     // GetFeatures doesn't return 'session_id'

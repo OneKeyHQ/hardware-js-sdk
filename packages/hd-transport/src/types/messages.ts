@@ -1495,6 +1495,8 @@ export type Features = {
   se_ver: string;
   serial_no: string;
   onekey_version: string;
+  ble_ver: string;
+  ble_enable: boolean;
   major_version: number;
   minor_version: number;
   patch_version: number;
