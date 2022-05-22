@@ -109,6 +109,16 @@ export default class HttpTransport {
       throw new Error('Transport not configured.');
     }
     const messages = this._messages;
+    console.log(
+      'transport-http',
+      'call-',
+      'messages: ',
+      messages,
+      ' name: ',
+      name,
+      ' data: ',
+      data
+    );
     const o = buildOne(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
