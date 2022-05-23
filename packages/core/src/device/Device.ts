@@ -114,7 +114,7 @@ export class Device extends EventEmitter {
         this.originalDescriptor.path,
         this.originalDescriptor.session
       );
-      console.log('Expected session id:', sessionID);
+      Log.debug('Expected session id:', sessionID);
       this.activitySessionID = sessionID;
       this.updateDescriptor({ session: sessionID } as DeviceDescriptor);
       if (this.commands) {

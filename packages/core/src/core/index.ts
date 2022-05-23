@@ -1,3 +1,4 @@
+import { ERRORS } from '../constants';
 import DataManager from '../data-manager/DataManager';
 import { DeviceList } from '../device/DeviceList';
 import { initLog } from '../utils';
@@ -55,3 +56,35 @@ export default class Core {
     await device?.getFeatures();
   }
 }
+
+interface CommonParams {
+  device?: {
+    path: string;
+    state?: string;
+    instance?: number;
+  };
+  useEmptyPassphrase?: boolean;
+  useEventListener?: boolean; // this param is set automatically in factory
+  allowSeedlessDevice?: boolean;
+  keepSession?: boolean;
+  skipFinalReload?: boolean;
+  useCardanoDerivation?: boolean;
+}
+type CallAPIParams = {
+  type: string;
+  payload: CommonParams;
+  id: string;
+};
+
+let _deviceList: DeviceList | undefined;
+const callApiQueue = [];
+let _preferredDevice: CommonParams['device'];
+
+export const callAPI = async (params: CallAPIParams) => {
+  if (!params.id || !params.payload || !params.type) {
+    throw ERRORS.TypedError(
+      'Method_InvalidParameter',
+      'onCall: message.id or message.payload is missing'
+    );
+  }
+};

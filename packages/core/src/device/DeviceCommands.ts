@@ -131,7 +131,7 @@ export class DeviceCommands {
       }
       // pass code and message from firmware error
       return Promise.reject(
-        new ERRORS.OneKeyError(
+        new ERRORS.OnekeyError(
           (code as any) || 'Failure_UnknownCode',
           message || 'Failure_UnknownMessage'
         )
