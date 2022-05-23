@@ -28,8 +28,6 @@ type CallAPIParams = {
   id: string;
 };
 
-type Method = any;
-
 let _deviceList: DeviceList | undefined;
 let _preferredDevice: CommonParams['device'];
 const callApiQueue = [];
@@ -121,6 +119,7 @@ export const callAPI = async (params: CallAPIParams) => {
         method.dispose();
       }
     }
+    // TODO: 方法执行后，检查队列内是否有等待调用的 API，依次调用
   }
 };
 
@@ -130,7 +129,7 @@ async function initDeviceList() {
   await _deviceList.getDeviceLists();
 }
 
-function initDevice(method: Method) {
+function initDevice(method: BaseMethod) {
   if (!_deviceList) {
     throw ERRORS.TypedError('Call_API', 'DeviceList is not initialized');
   }
