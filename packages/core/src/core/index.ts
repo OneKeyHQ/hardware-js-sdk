@@ -1,5 +1,9 @@
+import { ERRORS } from '../constants';
 import DataManager from '../data-manager/DataManager';
 import { DeviceList } from '../device/DeviceList';
+import { initLog } from '../utils';
+
+const Log = initLog('Core');
 
 let device: any;
 export default class Core {
@@ -16,7 +20,7 @@ export default class Core {
   }
 
   async initDevice(path?: string) {
-    console.log('initDevice', path);
+    Log.debug('initDevice', path);
     if (!this.deviceList) {
       await this.initDeviceList();
     }
@@ -43,12 +47,44 @@ export default class Core {
 
     // TODO: 获取 device 后测试连接部分逻辑
     const connectRes = await device?.connect();
-    console.log('connect result: ', connectRes);
+    Log.debug('connect result: ', connectRes);
   }
 
   // eslint-disable-next-line class-methods-use-this
   async getFeatures() {
-    console.log('Core getFeatures, ', device);
+    Log.debug('Core getFeatures, ', device);
     await device?.getFeatures();
   }
 }
+
+interface CommonParams {
+  device?: {
+    path: string;
+    state?: string;
+    instance?: number;
+  };
+  useEmptyPassphrase?: boolean;
+  useEventListener?: boolean; // this param is set automatically in factory
+  allowSeedlessDevice?: boolean;
+  keepSession?: boolean;
+  skipFinalReload?: boolean;
+  useCardanoDerivation?: boolean;
+}
+type CallAPIParams = {
+  type: string;
+  payload: CommonParams;
+  id: string;
+};
+
+let _deviceList: DeviceList | undefined;
+const callApiQueue = [];
+let _preferredDevice: CommonParams['device'];
+
+export const callAPI = async (params: CallAPIParams) => {
+  if (!params.id || !params.payload || !params.type) {
+    throw ERRORS.TypedError(
+      'Method_InvalidParameter',
+      'onCall: message.id or message.payload is missing'
+    );
+  }
+};

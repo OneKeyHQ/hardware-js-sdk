@@ -1,8 +1,9 @@
 export const ERROR_CODES = {
+  Method_InvalidParameter: '',
   Runtime: '',
 };
 
-export class OneKeyError extends Error {
+export class OnekeyError extends Error {
   code: string;
 
   message: string;
@@ -15,7 +16,7 @@ export class OneKeyError extends Error {
 }
 
 export const TypedError = (id: keyof typeof ERROR_CODES, message?: string) =>
-  new OneKeyError(id, message || ERROR_CODES[id]);
+  new OnekeyError(id, message || ERROR_CODES[id]);
 
 // serialize Error/TypeError object into payload error type (Error object/class is converted to string while sent via postMessage)
 export const serializeError = (payload: any) => {

@@ -110,7 +110,16 @@ export default class DeviceConnector {
 
   async acquire(path: string, session?: string | null) {
     try {
-      const res = await this.transport.acquire({ path, previous: session }, false);
+      const res = await this.transport.acquire({ path, previous: session });
+      return res;
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+  async release(session: string, onclose: boolean) {
+    try {
+      const res = await this.transport.release(session, onclose);
       return res;
     } catch (error) {
       throw new Error(error);
