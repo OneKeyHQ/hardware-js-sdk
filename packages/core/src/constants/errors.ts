@@ -1,6 +1,8 @@
 export const ERROR_CODES = {
   Method_InvalidParameter: '',
   Runtime: '',
+  Transport_InvalidProtobuf: '',
+  Call_API: '',
 };
 
 export class OnekeyError extends Error {

@@ -1,7 +1,7 @@
 import * as ApiMethods from './index';
 import { TypedError } from '../constants/errors';
 
-export function findMethods(payload: any) {
+export function findMethod(payload: any) {
   const { method } = payload;
   if (typeof method !== 'string') {
     throw TypedError('Method_InvalidParameter', 'Method is not set');
@@ -10,7 +10,7 @@ export function findMethods(payload: any) {
   // @ts-expect-error
   const MethodConstructor = ApiMethods[method];
   if (MethodConstructor) {
-    return new MethodConstructor();
+    return new MethodConstructor(payload);
   }
 
   throw TypedError('Method_InvalidParameter', `Method ${method} is not set`);
