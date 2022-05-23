@@ -1,6 +1,13 @@
 export const ERROR_CODES = {
   Method_InvalidParameter: '',
   Runtime: '',
+  Transport_InvalidProtobuf: '',
+  Call_API: '',
+  Device_FwException: '',
+  Device_UnexpectedMode: '',
+  Device_CallInProgress: '',
+  Device_InitializeFailed: '',
+  Not_Use_Onekey_Device: 'Please use onekey device',
 };
 
 export class OnekeyError extends Error {

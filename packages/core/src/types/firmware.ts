@@ -1,3 +1,14 @@
+export interface FirmwareRange {
+  '1': {
+    min: string;
+    max: string;
+  };
+  '2': {
+    min: string;
+    max: string;
+  };
+}
+
 export type VersionArray = [1 | 2, number, number];
 
 export type FirmwareRelease = {

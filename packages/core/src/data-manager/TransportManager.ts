@@ -1,5 +1,6 @@
 import { Transport } from '@onekeyfe/hd-transport';
 import HttpBridge from '@onekeyfe/hd-transport-http';
+import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import DataManager from './DataManager';
 import { getBridgeInfo } from './transportInfo';
@@ -24,13 +25,10 @@ export default class TransportManager {
     this.transport.setBridgeLatestVersion(bridgeLatestVersion);
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
-
-    this.configure();
   }
 
   static async configure() {
     try {
-      console.log(1);
       Log.debug('Initializing transports');
       await this.transport.init(true);
       Log.debug('Configuring transports');
@@ -39,6 +37,21 @@ export default class TransportManager {
       await this.transport.init();
     } catch (error) {
       Log.debug('Initializing transports error: ', error);
+    }
+  }
+
+  static async reconfigure(messages: JSON | number[]) {
+    if (Array.isArray(messages)) {
+      messages = DataManager.getProtobufMessages();
+    }
+    if (this.currentMessages === messages || !messages) {
+      return;
+    }
+    try {
+      await this.transport.configure(JSON.stringify(messages));
+      this.currentMessages = messages;
+    } catch (error) {
+      throw ERRORS.TypedError('Transport_InvalidProtobuf', error.message);
     }
   }
 

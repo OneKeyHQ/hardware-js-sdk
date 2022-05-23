@@ -34,6 +34,8 @@
     ],
     // valid case of class method overloads in typescript
     "no-dupe-class-members": "off",
-    "@typescript-eslint/ban-ts-comment": "off"
+    "@typescript-eslint/ban-ts-comment": "off",
+    "no-use-before-define": "off",
+    "@typescript-eslint/no-use-before-define": "off"
   }
 }

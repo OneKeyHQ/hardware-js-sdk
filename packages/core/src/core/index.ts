@@ -1,61 +1,12 @@
 import { ERRORS } from '../constants';
-import DataManager from '../data-manager/DataManager';
 import { DeviceList } from '../device/DeviceList';
 import { initLog } from '../utils';
+import { findMethod } from '../api/utils';
+import TransportManager from '../data-manager/TransportManager';
+import type { Device } from '../device/Device';
+import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = initLog('Core');
-
-let device: any;
-export default class Core {
-  deviceList?: DeviceList;
-
-  // eslint-disable-next-line class-methods-use-this
-  async initCore() {
-    await DataManager.load({});
-  }
-
-  async initDeviceList() {
-    this.deviceList = new DeviceList();
-    await this.deviceList.getDeviceLists();
-  }
-
-  async initDevice(path?: string) {
-    Log.debug('initDevice', path);
-    if (!this.deviceList) {
-      await this.initDeviceList();
-    }
-
-    const _deviceList = this.deviceList?.allDevices();
-    // 请求设备列表后，还是没有连接设备则不继续创建设备
-    if (!_deviceList || !_deviceList.length) {
-      return false;
-    }
-
-    if (path) {
-      device = this.deviceList?.getDevice(path) ?? null;
-    }
-
-    if (_deviceList.length === 1) {
-      [device] = _deviceList;
-    } else if (_deviceList.length > 1) {
-      throw new Error('设备列表中有多个设备，请先选择设备');
-    }
-
-    if (device) {
-      device.deviceConnector = this.deviceList?.connector;
-    }
-
-    // TODO: 获取 device 后测试连接部分逻辑
-    const connectRes = await device?.connect();
-    Log.debug('connect result: ', connectRes);
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  async getFeatures() {
-    Log.debug('Core getFeatures, ', device);
-    await device?.getFeatures();
-  }
-}
 
 interface CommonParams {
   device?: {
@@ -70,6 +21,7 @@ interface CommonParams {
   skipFinalReload?: boolean;
   useCardanoDerivation?: boolean;
 }
+
 type CallAPIParams = {
   type: string;
   payload: CommonParams;
@@ -77,14 +29,135 @@ type CallAPIParams = {
 };
 
 let _deviceList: DeviceList | undefined;
-const callApiQueue = [];
 let _preferredDevice: CommonParams['device'];
+const callApiQueue = [];
 
 export const callAPI = async (params: CallAPIParams) => {
   if (!params.id || !params.payload || !params.type) {
-    throw ERRORS.TypedError(
-      'Method_InvalidParameter',
-      'onCall: message.id or message.payload is missing'
+    return Promise.reject(
+      ERRORS.TypedError(
+        'Method_InvalidParameter',
+        'onCall: message.id or message.payload is missing'
+      )
     );
   }
+
+  if (_preferredDevice && !params.payload.device) {
+    params.payload.device = _preferredDevice;
+  }
+
+  // find api method
+  let method: BaseMethod;
+  let messageResponse: any;
+  try {
+    method = findMethod(params.payload);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  // push method to queue
+  callApiQueue.push(method);
+
+  // init DeviceList and first configure transport messages
+  if (!_deviceList) {
+    try {
+      await initDeviceList();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
+  let device: Device;
+  try {
+    device = initDevice(method);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  Log.debug('Call API - setDevice: ', device);
+  method.setDevice?.(device);
+
+  try {
+    const inner = async (): Promise<void> => {
+      // check firmware status
+      const firmwareException = method.checkFirmwareRange();
+      if (firmwareException) {
+        return Promise.reject(ERRORS.TypedError('Device_FwException', firmwareException));
+      }
+
+      // check call method mode
+      const unexpectedMode = device.hasUnexpectedMode(
+        method.allowDeviceMode,
+        method.requireDeviceMode
+      );
+      if (unexpectedMode) {
+        return Promise.reject(ERRORS.TypedError('Device_UnexpectedMode', unexpectedMode));
+      }
+
+      const deviceTypeException = method.checkDeviceType();
+      if (deviceTypeException) {
+        return Promise.reject(ERRORS.TypedError('Not_Use_Onekey_Device'));
+      }
+
+      // reconfigure messages
+      if (_deviceList) {
+        await TransportManager.reconfigure(device.getVersion());
+      }
+
+      try {
+        const response: object = await method.run();
+        Log.debug('Call API - Inner Method Run: ', device);
+        messageResponse = { ...response };
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    };
+    Log.debug('Call API - Device Run: ', device);
+    await device.run(inner);
+  } catch (error) {
+    return await Promise.reject(error);
+  } finally {
+    const response = messageResponse;
+
+    if (response) {
+      if (method) {
+        method.dispose();
+      }
+    }
+    // TODO: 方法执行后，检查队列内是否有等待调用的 API，依次调用
+  }
 };
+
+async function initDeviceList() {
+  _deviceList = new DeviceList();
+  await TransportManager.configure();
+  await _deviceList.getDeviceLists();
+}
+
+function initDevice(method: BaseMethod) {
+  if (!_deviceList) {
+    throw ERRORS.TypedError('Call_API', 'DeviceList is not initialized');
+  }
+
+  let device: Device | typeof undefined;
+  const allDevices = _deviceList.allDevices();
+
+  if (method.devicePath) {
+    device = _deviceList.getDevice(method.devicePath);
+  } else if (allDevices.length === 1) {
+    [device] = allDevices;
+  } else if (allDevices.length > 1) {
+    throw ERRORS.TypedError('Call_API', '请选择连接设备');
+  }
+
+  if (!device) {
+    throw ERRORS.TypedError('Call_API', 'Device Not Found');
+  }
+
+  // inject properties
+  device.deviceConnector = _deviceList.connector;
+
+  return device;
+}
+
+export default callAPI;
