@@ -2,12 +2,23 @@ import EventEmitter from 'events';
 import { OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
-import { initLog, versionCompare } from '../utils';
+import { initLog, versionCompare, Deferred, create as createDeferred } from '../utils';
 import { parseCapabilities } from '../utils/deviceFeaturesUtils';
 import { getFirmwareStatus, getRelease } from '../data-manager/FirmwareInfo';
 import type { Features, DeviceFirmwareStatus, ReleaseInfo } from '../types';
 import { getBLEFirmwareStatus, getBLERelease } from '../data-manager/BLEFirmwareInfo';
 import { UI_REQUEST } from '../constants/ui-request';
+import { ERRORS } from '../constants';
+
+type RunOptions = {
+  keepSession?: boolean;
+  useEmptyPassphrase?: boolean;
+};
+
+const parseRunOptions = (options?: RunOptions): RunOptions => {
+  if (!options) options = {};
+  return options;
+};
 
 const Log = initLog('Device');
 export class Device extends EventEmitter {
@@ -63,6 +74,14 @@ export class Device extends EventEmitter {
    */
   bleFirmwareRelease?: any;
 
+  runPromise?: Deferred<void> | null;
+
+  instance = 0;
+
+  internalState: string[] = [];
+
+  loaded = false;
+
   /**
    * 执行 API 方法后是否保留 SessionID
    */
@@ -76,11 +95,6 @@ export class Device extends EventEmitter {
   static fromDescriptor(originalDescriptor: DeviceDescriptor) {
     const descriptor = { ...originalDescriptor, session: null };
     return new Device(descriptor);
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  async run(fn: () => Promise<any>) {
-    await fn();
   }
 
   // TODO: Device TO Message Object 返回给前端
@@ -153,6 +167,24 @@ export class Device extends EventEmitter {
     }
   }
 
+  getInternalState() {
+    return this.internalState[this.instance];
+  }
+
+  async initialize() {
+    let payload: any;
+    if (this.features) {
+      const internalState = this.getInternalState();
+      payload = {};
+      if (internalState) {
+        payload.session_id = internalState;
+      }
+    }
+
+    const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
+    this._updateFeatures(message);
+  }
+
   async getFeatures() {
     const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
     this._updateFeatures(message);
@@ -197,6 +229,68 @@ export class Device extends EventEmitter {
     }
   }
 
+  async run(fn?: () => Promise<void>, options?: RunOptions) {
+    if (this.runPromise) {
+      Log.error('[Device] run error:', 'Device is running');
+      throw ERRORS.TypedError('Device_CallInProgress');
+    }
+
+    options = parseRunOptions(options);
+
+    this.runPromise = createDeferred(this._runInner.bind(this, fn, options));
+    return this.runPromise.promise;
+  }
+
+  async _runInner<T>(fn: (() => Promise<T>) | undefined, options: RunOptions) {
+    if (!this.isUsedHere() || this.commands.dispose) {
+      await this.acquire();
+      try {
+        if (fn) {
+          await this.initialize();
+        }
+      } catch (error) {
+        this.runPromise = null;
+        return Promise.reject(
+          ERRORS.TypedError(
+            'Device_InitializeFailed',
+            `Initialize failed: ${error.message as string}, code: ${error.code as string}`
+          )
+        );
+      }
+    }
+
+    if (options.keepSession) {
+      this.keepSession = true;
+    }
+
+    if (fn) {
+      await fn();
+    }
+
+    // reload features
+    if (this.loaded && this.features) {
+      await this.getFeatures();
+    }
+
+    if (
+      (!this.keepSession && typeof options.keepSession !== 'boolean') ||
+      options.keepSession === false
+    ) {
+      this.keepSession = false;
+      await this.release();
+    }
+
+    if (this.runPromise) {
+      this.runPromise.resolve();
+    }
+
+    this.runPromise = null;
+
+    if (!this.loaded) {
+      this.loaded = true;
+    }
+  }
+
   getVersion(): number[] {
     if (!this.features) return [];
     return [this.features.major_version, this.features.minor_version, this.features.patch_version];
@@ -227,6 +321,10 @@ export class Device extends EventEmitter {
 
   isSeedless() {
     return this.features && !!this.features.no_backup;
+  }
+
+  isT1() {
+    return this.features ? this.features.major_version === 1 : false;
   }
 
   hasUnexpectedMode(allow: string[], require: string[]) {

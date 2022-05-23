@@ -5,6 +5,8 @@ export const ERROR_CODES = {
   Call_API: '',
   Device_FwException: '',
   Device_UnexpectedMode: '',
+  Device_CallInProgress: '',
+  Device_InitializeFailed: '',
 };
 
 export class OnekeyError extends Error {

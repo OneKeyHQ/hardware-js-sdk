@@ -42,7 +42,6 @@ export default class TransportManager {
 
   static async reconfigure(messages: JSON | number[]) {
     if (Array.isArray(messages)) {
-      // eslint-disable-next-line no-param-reassign
       messages = DataManager.getProtobufMessages();
     }
     if (this.currentMessages === messages || !messages) {

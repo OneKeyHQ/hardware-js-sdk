@@ -1,5 +1,6 @@
 {
   "rules": {
-    "camelcase": "off"
+    "camelcase": "off",
+    "no-param-reassign": "off"
   }
 }
