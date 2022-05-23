@@ -3,6 +3,8 @@ export const ERROR_CODES = {
   Runtime: '',
   Transport_InvalidProtobuf: '',
   Call_API: '',
+  Device_FwException: '',
+  Device_UnexpectedMode: '',
 };
 
 export class OnekeyError extends Error {

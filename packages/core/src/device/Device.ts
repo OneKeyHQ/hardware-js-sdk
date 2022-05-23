@@ -7,6 +7,7 @@ import { parseCapabilities } from '../utils/deviceFeaturesUtils';
 import { getFirmwareStatus, getRelease } from '../data-manager/FirmwareInfo';
 import type { Features, DeviceFirmwareStatus, ReleaseInfo } from '../types';
 import { getBLEFirmwareStatus, getBLERelease } from '../data-manager/BLEFirmwareInfo';
+import { UI_REQUEST } from '../constants/ui-request';
 
 const Log = initLog('Device');
 export class Device extends EventEmitter {
@@ -75,6 +76,11 @@ export class Device extends EventEmitter {
   static fromDescriptor(originalDescriptor: DeviceDescriptor) {
     const descriptor = { ...originalDescriptor, session: null };
     return new Device(descriptor);
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async run(fn: () => Promise<any>) {
+    await fn();
   }
 
   // TODO: Device TO Message Object 返回给前端
@@ -209,5 +215,39 @@ export class Device extends EventEmitter {
 
   isUsedHere() {
     return this.isUsed() && this.originalDescriptor.session === this.activitySessionID;
+  }
+
+  isBootloader() {
+    return this.features && !!this.features.bootloader_mode;
+  }
+
+  isInitialized() {
+    return this.features && !!this.features.initialized;
+  }
+
+  isSeedless() {
+    return this.features && !!this.features.no_backup;
+  }
+
+  hasUnexpectedMode(allow: string[], require: string[]) {
+    // both allow and require cases might generate single unexpected mode
+    if (this.features) {
+      // allow cases
+      if (this.isBootloader() && !allow.includes(UI_REQUEST.BOOTLOADER)) {
+        return UI_REQUEST.BOOTLOADER;
+      }
+      if (!this.isInitialized() && !allow.includes(UI_REQUEST.INITIALIZE)) {
+        return UI_REQUEST.INITIALIZE;
+      }
+      if (this.isSeedless() && !allow.includes(UI_REQUEST.SEEDLESS)) {
+        return UI_REQUEST.SEEDLESS;
+      }
+
+      // require cases
+      if (!this.isBootloader() && require.includes(UI_REQUEST.BOOTLOADER)) {
+        return UI_REQUEST.NOT_IN_BOOTLOADER;
+      }
+    }
+    return null;
   }
 }

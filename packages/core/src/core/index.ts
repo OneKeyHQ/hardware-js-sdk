@@ -4,6 +4,7 @@ import { initLog } from '../utils';
 import { findMethod } from '../api/utils';
 import TransportManager from '../data-manager/TransportManager';
 import type { Device } from '../device/Device';
+import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = initLog('Core');
 
@@ -48,7 +49,8 @@ export const callAPI = async (params: CallAPIParams) => {
   }
 
   // find api method
-  let method: Method;
+  let method: BaseMethod;
+  let messageResponse: any;
   try {
     method = findMethod(params.payload);
   } catch (error) {
@@ -77,7 +79,49 @@ export const callAPI = async (params: CallAPIParams) => {
   Log.debug('Call API - setDevice: ', device);
   method.setDevice?.(device);
 
-  // TODO: connect device
+  try {
+    const inner = async (): Promise<void> => {
+      // check firmware status
+      const firmwareException = method.checkFirmwareRange();
+      if (firmwareException) {
+        return Promise.reject(ERRORS.TypedError('Device_FwException', firmwareException));
+      }
+
+      // check call method mode
+      const unexpectedMode = device.hasUnexpectedMode(
+        method.allowDeviceMode,
+        method.requireDeviceMode
+      );
+      if (unexpectedMode) {
+        return Promise.reject(ERRORS.TypedError('Device_UnexpectedMode', unexpectedMode));
+      }
+
+      // reconfigure messages
+      if (_deviceList) {
+        await TransportManager.reconfigure(device.getVersion());
+      }
+
+      try {
+        const response: object = await method.run();
+        Log.debug('Call API - Inner Method Run: ', device);
+        messageResponse = { ...response };
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    };
+    Log.debug('Call API - Device Run: ', device);
+    await device.run(inner);
+  } catch (error) {
+    return await Promise.reject(error);
+  } finally {
+    const response = messageResponse;
+
+    if (response) {
+      if (method) {
+        method.dispose();
+      }
+    }
+  }
 };
 
 async function initDeviceList() {
