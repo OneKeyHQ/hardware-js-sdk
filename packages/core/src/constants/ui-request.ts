@@ -8,4 +8,5 @@ export const UI_REQUEST = {
   FIRMWARE_NOT_SUPPORTED: 'ui-device_firmware_unsupported',
   FIRMWARE_NOT_COMPATIBLE: 'ui-device_firmware_not_compatible',
   FIRMWARE_NOT_INSTALLED: 'ui-device_firmware_not_installed',
+  NOT_USE_ONEKEY_DEVICE: 'ui-device_please_use_onekey_device',
 } as const;

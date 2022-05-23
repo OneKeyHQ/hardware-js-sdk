@@ -94,6 +94,11 @@ export const callAPI = async (params: CallAPIParams) => {
         return Promise.reject(ERRORS.TypedError('Device_UnexpectedMode', unexpectedMode));
       }
 
+      const deviceTypeException = method.checkDeviceType();
+      if (deviceTypeException) {
+        return Promise.reject(ERRORS.TypedError('Not_Use_Onekey_Device'));
+      }
+
       // reconfigure messages
       if (_deviceList) {
         await TransportManager.reconfigure(device.getVersion());

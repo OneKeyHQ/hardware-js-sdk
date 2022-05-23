@@ -1,7 +1,10 @@
+import { ERRORS } from '../constants';
+import { TypedError } from '../constants/errors';
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import type { FirmwareRange } from '../types';
 import { versionCompare } from '../utils';
+import { getDeviceType } from '../utils/deviceFeaturesUtils';
 
 export abstract class BaseMethod<Params = undefined> {
   // @ts-expect-error
@@ -79,6 +82,15 @@ export abstract class BaseMethod<Params = undefined> {
 
     if (range.max !== '0' && versionCompare(version, range.max) > 0) {
       return UI_REQUEST.FIRMWARE_NOT_COMPATIBLE;
+    }
+  }
+
+  checkDeviceType() {
+    const { device } = this;
+    if (!device.features) return;
+    const deviceType = getDeviceType(device.features);
+    if (!['mini', 'classic'].includes(deviceType)) {
+      return UI_REQUEST.NOT_USE_ONEKEY_DEVICE;
     }
   }
 

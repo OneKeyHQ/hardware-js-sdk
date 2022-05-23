@@ -7,6 +7,7 @@ export const ERROR_CODES = {
   Device_UnexpectedMode: '',
   Device_CallInProgress: '',
   Device_InitializeFailed: '',
+  Not_Use_Onekey_Device: 'Please use onekey device',
 };
 
 export class OnekeyError extends Error {
