@@ -10,10 +10,10 @@ function App() {
   const [initialize, setInitialize] = useState(false)
 
   const sdkInit = async () => {
-    core = new Core()
-    await core.initCore()
-    await core.initDeviceList()
-    setInitialize(true)
+    // core = new Core()
+    // await core.initCore()
+    // await core.initDeviceList()
+    // setInitialize(true)
   }
 
   const usbConnect = () => {
@@ -27,9 +27,9 @@ function App() {
       alert('请先操作 SDK 初始化')
       return
     }
-    const deviceList = new DeviceList()
-    const devices = await deviceList.getDeviceLists()
-    setDevices(devices)
+    // const deviceList = new DeviceList()
+    // const devices = await deviceList.getDeviceLists()
+    // setDevices(devices)
   }
 
   const onGetFeatures = () => {

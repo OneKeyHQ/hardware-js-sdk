@@ -22,8 +22,8 @@
     "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
-    "@onekeyfe/hd-transport": "file:../hd-transport",
-    "@onekeyfe/hd-transport-http": "file:../hd-transport-http",
+    "@onekeyfe/hd-transport": "*",
+    "@onekeyfe/hd-transport-http": "*",
     "@onekeyfe/rollout": "1.0.6",
     "cross-fetch": "^3.1.5"
   }

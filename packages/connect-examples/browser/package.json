@@ -9,8 +9,7 @@
     "react": "^18.1.0",
     "react-dom": "^18.1.0",
     "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4",
-    "@onekeyfe/hd-core": "file:../../core"
+    "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "export PORT=8088 && HTTPS=true react-scripts start",
