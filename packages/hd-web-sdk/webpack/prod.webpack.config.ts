@@ -22,6 +22,12 @@ const config: webpack.Configuration = {
   module: {
     rules: [
       {
+        test: /\.m?js/,
+        resolve: {
+          fullySpecified: false,
+        },
+      },
+      {
         test: /\.(js|ts)$/,
         exclude: /node_modules/,
         use: {

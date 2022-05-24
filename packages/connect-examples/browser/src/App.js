@@ -4,16 +4,18 @@ import './App.css';
 
 let core
 
+
 function App() {
   const [devices, setDevices] = useState([])
   const [currentDevice, setCurrentDevice] = useState(null)
   const [initialize, setInitialize] = useState(false)
-  console.log(HardwareWebSdk)
 
   const sdkInit = async () => {
-    HardwareWebSdk.init({
+    console.log('sdk: ', HardwareWebSdk)
+    const settings = {
       iframeSrc: 'https://localhost:8088/iframe.html',
-    })
+    }
+    HardwareWebSdk.init(settings)
   }
 
   const usbConnect = () => {
