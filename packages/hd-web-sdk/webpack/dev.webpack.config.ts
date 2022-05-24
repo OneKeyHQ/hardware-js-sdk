@@ -28,8 +28,8 @@ const dev = {
       port: 8088,
       hmr: true,
       https: {
-        key: fs.readFileSync(path.join(__dirname, '../webpack/connect_dev.key')),
-        cert: fs.readFileSync(path.join(__dirname, '../webpack/connect_dev.crt')),
+        key: fs.readFileSync(path.join(__dirname, '../webpack/https_dev.key')),
+        cert: fs.readFileSync(path.join(__dirname, '../webpack/https_dev.crt')),
       },
       static: [path.join(__dirname, '../build')],
     }),
