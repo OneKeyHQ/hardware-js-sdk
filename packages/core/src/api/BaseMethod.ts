@@ -1,5 +1,3 @@
-import { ERRORS } from '../constants';
-import { TypedError } from '../constants/errors';
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import type { FirmwareRange } from '../types';
