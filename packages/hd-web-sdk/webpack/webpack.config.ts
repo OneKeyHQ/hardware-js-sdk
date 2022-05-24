@@ -1,15 +1,6 @@
-import webpack from 'webpack';
 import path from 'path';
-import TerserPlugin from 'terser-webpack-plugin';
 
-const config: webpack.Configuration = {
-  target: 'web',
-  mode: 'production',
-  devtool: 'source-map',
-  entry: {
-    'onekey-js-sdk': path.resolve(__dirname, '../src/index.ts'),
-    'onekey-js-sdk.min': path.resolve(__dirname, '../src/index.ts'),
-  },
+export default {
   output: {
     filename: '[name].js',
     path: path.resolve(__dirname, '../build'),
@@ -17,21 +8,6 @@ const config: webpack.Configuration = {
     library: 'onekey-js-sdk',
     libraryTarget: 'umd',
     libraryExport: 'default',
-  },
-
-  module: {
-    rules: [
-      {
-        test: /\.(js|ts)$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-typescript'],
-          },
-        },
-      },
-    ],
   },
   resolve: {
     modules: ['node_modules'],
@@ -50,23 +26,4 @@ const config: webpack.Configuration = {
       buffer: require.resolve('buffer/'),
     },
   },
-  performance: {
-    hints: false,
-  },
-
-  optimization: {
-    minimizer: [
-      new TerserPlugin({
-        exclude: /onekey-js-sdk.js/,
-        extractComments: false,
-        terserOptions: {
-          format: {
-            comments: false,
-          },
-        },
-      }),
-    ],
-  },
 };
-
-export default config;
