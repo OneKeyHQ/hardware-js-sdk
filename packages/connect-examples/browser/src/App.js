@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DeviceList, Core } from '@onekeyfe/hd-core'
+import HardwareWebSdk from '@onekeyfe/hd-web-sdk'
 import './App.css';
 
 let core
@@ -8,12 +8,12 @@ function App() {
   const [devices, setDevices] = useState([])
   const [currentDevice, setCurrentDevice] = useState(null)
   const [initialize, setInitialize] = useState(false)
+  console.log(HardwareWebSdk)
 
   const sdkInit = async () => {
-    // core = new Core()
-    // await core.initCore()
-    // await core.initDeviceList()
-    // setInitialize(true)
+    HardwareWebSdk.init({
+      iframeSrc: 'https://localhost:8088/iframe.html',
+    })
   }
 
   const usbConnect = () => {

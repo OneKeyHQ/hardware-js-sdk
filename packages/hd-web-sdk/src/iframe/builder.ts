@@ -30,7 +30,7 @@ const injectStyleSheet = () => {
 
 export const init = (settings: any) => {
   initPromise = createDeferred();
-  const existedFrame = document.getElementById('onekeyconnect') as HTMLIFrameElement;
+  const existedFrame = document.getElementById('onekey-connect') as HTMLIFrameElement;
   if (existedFrame) {
     instance = existedFrame;
   } else {
@@ -43,7 +43,7 @@ export const init = (settings: any) => {
     instance.style.border = '0px';
     instance.style.width = '0px';
     instance.style.height = '0px';
-    instance.id = 'onekeycconnect';
+    instance.id = 'onekey-connect';
   }
 
   const manifestString = settings.manifest ? JSON.stringify(settings.manifest) : 'undefined'; // note: btoa(undefined) === btoa('undefined') === "dW5kZWZpbmVk"
