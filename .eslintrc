@@ -36,6 +36,8 @@
     "no-dupe-class-members": "off",
     "@typescript-eslint/ban-ts-comment": "off",
     "no-use-before-define": "off",
-    "@typescript-eslint/no-use-before-define": "off"
+    "@typescript-eslint/no-use-before-define": "off",
+    // webpack packages should put in devDependencies
+    "import/no-extraneous-dependencies": "off"
   }
 }

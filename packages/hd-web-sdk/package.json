@@ -1,0 +1,23 @@
+{
+  "name": "hd-web-sdk",
+  "version": "1.0.0",
+  "author": "OneKey",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "ISC",
+  "type": "commonjs",
+  "main": "lib/hd-web-sdk.js",
+  "scripts": {
+    "build": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "echo \"Error: run tests from root\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.35",
+    "@types/webpack": "^5.28.0",
+    "html-webpack-plugin": "^5.5.0",
+    "terser-webpack-plugin": "^5.3.1",
+    "webpack": "^5.72.1",
+    "webpack-cli": "^4.9.2"
+  }
+}
