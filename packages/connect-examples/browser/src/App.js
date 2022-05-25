@@ -12,7 +12,6 @@ function App() {
   const [initialize, setInitialize] = useState(false)
 
   const sdkInit = async () => {
-    console.log('sdk: ', HardwareWebSdk)
     const settings = {
       debug: true,
       connectSrc: 'https://localhost:8088/',

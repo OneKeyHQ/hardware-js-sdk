@@ -1,7 +1,6 @@
 import parseUri from 'parse-uri';
 import * as config from '../data/config.json';
 import { httpRequest } from '../utils';
-import { enableLog } from '../utils/logger';
 import { parseBridgeJSON } from './transportInfo';
 import type { ConnectSettings } from '../types';
 
@@ -30,8 +29,6 @@ export default class DataManager {
     if (!this.settings.trustedHost && !whitelist) {
       this.settings.debug = false;
     }
-
-    enableLog(settings.debug);
 
     if (!withAssets) return;
 

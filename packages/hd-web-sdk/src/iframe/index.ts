@@ -9,12 +9,15 @@ import {
   IFrameInit,
   createIFrameMessage,
   createErrorMessage,
+  initCore,
+  Core,
 } from '@onekeyfe/hd-core';
 import { getOrigin } from '../utils/urlUtils';
 import { sendMessage } from '../utils/bridgeUtils';
 
 import JSBridgeConfig from './bridge-config';
 
+let _core: Core | undefined;
 const Log = initLog('IFrame');
 
 const handleMessage = (event: PostMessageEvent) => {
@@ -30,7 +33,6 @@ const handleMessage = (event: PostMessageEvent) => {
 export async function init(payload: IFrameInit['payload']) {
   if (DataManager.getSettings('origin')) return;
 
-  console.log(1);
   const settings = parseConnectSettings({
     ...(payload.settings ?? {}),
     isFrame: true,
@@ -41,7 +43,7 @@ export async function init(payload: IFrameInit['payload']) {
   Log.enabled = !!settings.debug;
 
   try {
-    // TODO: add some init flow
+    _core = await initCore(settings);
   } catch (error) {
     return createErrorMessage(error);
   }
@@ -52,10 +54,13 @@ export async function init(payload: IFrameInit['payload']) {
     selfFrameName: JSBridgeConfig.iframeName,
     channel: JSBridgeConfig.channel,
     targetOrigin: getOrigin(settings.parentOrigin as string),
-    receiveHandler: messageEvent => {
+    receiveHandler: async messageEvent => {
       const message = parseMessage(messageEvent);
       console.log('Frame Bridge Receive message: ', message);
-      // Log.debug('Host Bridge receive data: ', receive);
+
+      const response = await _core?.handleMessage(message);
+      Log.debug('Frame Bridge response data: ', response);
+      return response;
     },
   });
 
