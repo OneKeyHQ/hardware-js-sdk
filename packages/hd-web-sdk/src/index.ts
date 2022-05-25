@@ -1,5 +1,4 @@
 import EventEmitter from 'events';
-import { JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
 import HardwareSdk, {
   ERRORS,
   parseConnectSettings,
@@ -14,7 +13,7 @@ import HardwareSdk, {
 } from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
-import { sendMessage } from './utils/bridgeUtils';
+import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
 
 const eventEmitter = new EventEmitter();
 const Log = initLog('@onekey/connect');
@@ -46,8 +45,9 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
     return;
   }
-  if (!window.hostBridge) {
-    window.hostBridge = new JsBridgeIframe({
+  if (!hostBridge) {
+    createJsBridge({
+      isHost: true,
       remoteFrame: iframe.instance?.contentWindow as Window,
       remoteFrameName: JSBridgeConfig.iframeName,
       selfFrameName: JSBridgeConfig.hostName,

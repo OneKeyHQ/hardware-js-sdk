@@ -1,4 +1,3 @@
-import { JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
 import {
   PostMessageEvent,
   IFRAME,
@@ -13,7 +12,7 @@ import {
   Core,
 } from '@onekeyfe/hd-core';
 import { getOrigin } from '../utils/urlUtils';
-import { sendMessage } from '../utils/bridgeUtils';
+import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
 
 import JSBridgeConfig from './bridge-config';
 
@@ -48,7 +47,8 @@ export async function init(payload: IFrameInit['payload']) {
     return createErrorMessage(error);
   }
 
-  window.frameBridge = new JsBridgeIframe({
+  createJsBridge({
+    isHost: false,
     remoteFrame: window.parent,
     remoteFrameName: JSBridgeConfig.hostName,
     selfFrameName: JSBridgeConfig.iframeName,
