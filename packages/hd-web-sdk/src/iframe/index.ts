@@ -34,6 +34,7 @@ export async function init(settings: ConnectSettings) {
     targetOrigin: getOrigin(settings.parentOrigin as string),
     receiveHandler: payload => {
       console.log('window frameBridge: ', payload);
+      // Log.debug('Host Bridge receive data: ', receive);
     },
   });
 

@@ -30,7 +30,7 @@ const injectStyleSheet = () => {
   }
 };
 
-export const init = (settings: any) => {
+export const init = async (settings: any) => {
   initPromise = createDeferred();
   const existedFrame = document.getElementById('onekey-connect') as HTMLIFrameElement;
   if (existedFrame) {
@@ -93,6 +93,21 @@ export const init = (settings: any) => {
     document.body.appendChild(instance);
     // eslint-disable-next-line no-use-before-define
     injectStyleSheet();
+  }
+
+  try {
+    await initPromise.promise;
+  } catch (e) {
+    if (instance) {
+      if (instance.parentNode) {
+        instance.parentNode.removeChild(instance);
+      }
+      instance = null;
+    }
+    throw e;
+  } finally {
+    window.clearTimeout(timeout);
+    timeout = 0;
   }
 };
 

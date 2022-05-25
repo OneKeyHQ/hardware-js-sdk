@@ -9,6 +9,7 @@ import {
   createErrorMessage,
   parseMessage,
   UI_EVENT,
+  CoreMessage,
 } from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
@@ -18,6 +19,20 @@ const eventEmitter = new EventEmitter();
 const Log = initLog('@onekey/connect');
 
 let _settings = parseConnectSettings();
+
+const handleMessage = async (message: CoreMessage) => {
+  switch (message.event) {
+    case UI_EVENT:
+      if (message.type === IFRAME.INIT_BRIDGE) {
+        iframe.initPromise.resolve();
+        return Promise.resolve({ success: true, payload: 'JSBridge Handshake Success' });
+      }
+      break;
+
+    default:
+      Log.log('Undefined message', message.event);
+  }
+};
 
 const dispose = () => {
   eventEmitter.removeAllListeners();
@@ -38,12 +53,12 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
       channel: JSBridgeConfig.channel,
       targetOrigin: iframe.origin,
 
-      receiveHandler: messageEvent => {
-        console.log('window hostBridge: ', messageEvent);
+      receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
-        if (message.type === IFRAME.INIT_BRIDGE) {
-          return { success: true, payload: 'JSBridge Connect Success' };
-        }
+        console.log('Hose Bridge Receive message: ', message);
+        const response = await handleMessage(message);
+        Log.debug('Host Bridge response: ', response);
+        return response;
       },
     });
   }
