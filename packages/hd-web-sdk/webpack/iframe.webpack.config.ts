@@ -1,6 +1,7 @@
 import path from 'path';
 import webpack from 'webpack';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
+import CopyWebpackPlugin from 'copy-webpack-plugin';
 
 const BUILD = path.resolve(__dirname, '../build');
 
@@ -54,6 +55,10 @@ export default {
       Buffer: ['buffer', 'Buffer'],
       Promise: ['es6-promise', 'Promise'],
       process: 'process/browser',
+    }),
+
+    new CopyWebpackPlugin({
+      patterns: [{ from: '../../packages/core/src/data', to: `${BUILD}/data` }],
     }),
 
     new HtmlWebpackPlugin({
