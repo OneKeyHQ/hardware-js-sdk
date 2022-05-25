@@ -8,7 +8,7 @@ import type { BaseMethod } from '../api/BaseMethod';
 import { ConnectSettings } from '../types';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
-import { CoreMessage, IFRAME, UI_EVENT } from '../events';
+import { CoreMessage, createResponseMessage, IFRAME, UI_EVENT } from '../events';
 
 const Log = initLog('Core');
 
@@ -172,8 +172,14 @@ export default class Core {
       case UI_EVENT:
         break;
       case IFRAME.CALL:
-        if (message.payload?.method === 'GetFeatures') {
-          //
+        if (message.payload?.method === 'searchDevices') {
+          console.log('searchDevices');
+          if (!_deviceList) {
+            _deviceList = new DeviceList();
+            await TransportManager.configure();
+          }
+          const devices = await _deviceList?.getDeviceLists();
+          return createResponseMessage(Number(message.id), true, devices);
         }
         break;
       default:

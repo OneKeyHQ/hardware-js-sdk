@@ -7,6 +7,7 @@ let core
 let loaded = false
 
 function App() {
+  console.log(HardwareWebSdk)
   const [devices, setDevices] = useState([])
   const [currentDevice, setCurrentDevice] = useState(null)
   const [initialize, setInitialize] = useState(false)
@@ -38,17 +39,11 @@ function App() {
   }
 
   const getDevicesList = async () => {
-    if (!initialize) {
-      alert('请先操作 SDK 初始化')
-      return
-    }
-    // const deviceList = new DeviceList()
-    // const devices = await deviceList.getDeviceLists()
-    // setDevices(devices)
+    HardwareWebSdk.searchDevices()
   }
 
   const onGetFeatures = () => {
-    core.getFeatures()
+    // HardwareWebSdk.getDevicesList()
   }
 
   return (

@@ -21,9 +21,14 @@ export const inject = ({ eventEmitter, init, call, dispose }: InjectApi): CoreAp
     removeAllListeners: type => {
       eventEmitter.removeAllListeners(type);
     },
+
     init,
+
     call,
+
     dispose,
+
+    searchDevices: () => call({ method: 'searchDevices' }),
   };
   return api;
 };

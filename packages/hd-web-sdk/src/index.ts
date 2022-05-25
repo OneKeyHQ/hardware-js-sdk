@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
-import {
+import HardwareSdk, {
   ERRORS,
   parseConnectSettings,
   initLog,
@@ -10,6 +10,7 @@ import {
   parseMessage,
   UI_EVENT,
   CoreMessage,
+  ConnectSettings,
 } from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
@@ -64,7 +65,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
   }
 };
 
-const init = (settings: any) => {
+const init = (settings: Partial<ConnectSettings>) => {
   if (iframe.instance) {
     throw ERRORS.TypedError('Init_AlreadyInitialized');
   }
@@ -115,11 +116,11 @@ const call = async (params: any) => {
   }
 };
 
-const HardwareWebSdk = {
+const HardwareWebSdk = HardwareSdk({
   eventEmitter,
   init,
   call,
   dispose,
-};
+});
 
 export default HardwareWebSdk;
