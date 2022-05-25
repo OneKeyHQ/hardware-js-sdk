@@ -71,7 +71,7 @@ export const init = (settings: any) => {
       {
         type: 'iframe-init',
         payload: {
-          settings,
+          settings: { ...settings },
         },
       },
       origin

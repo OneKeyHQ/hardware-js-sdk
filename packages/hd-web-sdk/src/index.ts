@@ -1,6 +1,14 @@
 import EventEmitter from 'events';
 import { JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
-import { ERRORS, parseConnectSettings, initLog, PostMessageEvent } from '@onekeyfe/hd-core';
+import {
+  ERRORS,
+  parseConnectSettings,
+  initLog,
+  PostMessageEvent,
+  IFRAME,
+  BridgeMessage,
+  BridgePayload,
+} from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
 
@@ -20,16 +28,22 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
     return;
   }
-  window.hostBridge = new JsBridgeIframe({
-    remoteFrame: iframe.instance?.contentWindow as Window,
-    remoteFrameName: JSBridgeConfig.iframeName,
-    selfFrameName: JSBridgeConfig.hostName,
-    channel: JSBridgeConfig.channel,
-    targetOrigin: '*',
-    receiveHandler: payload => {
-      console.log('window hostBridge: ', payload);
-    },
-  });
+  if (!window.hostBridge) {
+    window.hostBridge = new JsBridgeIframe({
+      remoteFrame: iframe.instance?.contentWindow as Window,
+      remoteFrameName: JSBridgeConfig.iframeName,
+      selfFrameName: JSBridgeConfig.hostName,
+      channel: JSBridgeConfig.channel,
+      targetOrigin: iframe.origin,
+      receiveHandler: messageEvent => {
+        console.log('window hostBridge: ', messageEvent);
+        const payload = messageEvent.data as BridgePayload;
+        if (payload.type === IFRAME.INIT_BRIDGE) {
+          return 'JSBridge Connect Success';
+        }
+      },
+    });
+  }
 };
 
 const init = (settings: any) => {

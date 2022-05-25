@@ -3,7 +3,7 @@ export interface Manifest {
   email: string;
 }
 
-export interface ConnectSettings {
+export type ConnectSettings = {
   manifest?: Manifest;
   connectSrc?: string;
   debug?: boolean;
@@ -11,6 +11,7 @@ export interface ConnectSettings {
   lazyLoad?: boolean;
   // internal part, not to be accepted from .init()
   origin?: string;
+  parentOrigin?: string; // parent window origin
   configSrc: string;
   iframeSrc: string;
   version: string;
@@ -19,4 +20,4 @@ export interface ConnectSettings {
   supportedBrowser?: boolean;
   env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native';
   timestamp: number;
-}
+};
