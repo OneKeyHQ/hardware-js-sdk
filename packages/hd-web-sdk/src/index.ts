@@ -6,12 +6,13 @@ import {
   initLog,
   PostMessageEvent,
   IFRAME,
-  BridgePayload,
   createErrorMessage,
   parseMessage,
+  UI_EVENT,
 } from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
+import { sendMessage } from './utils/bridgeUtils';
 
 const eventEmitter = new EventEmitter();
 const Log = initLog('@onekey/connect');
@@ -70,7 +71,8 @@ const init = (settings: any) => {
   iframe.init(_settings);
 };
 
-const call = async params => {
+const call = async (params: any) => {
+  Log.debug('call : ', params);
   // lazy load
   if (!iframe.instance && !iframe.timeout) {
     _settings = parseConnectSettings(_settings);
@@ -85,12 +87,23 @@ const call = async params => {
     return createErrorMessage(ERRORS.TypedError('Init_IframeLoadFail'));
   }
 
-  // TODO: bridge request
+  try {
+    const response = await sendMessage({ event: UI_EVENT, type: IFRAME.CALL, payload: params });
+    if (response) {
+      return response;
+    }
+
+    return createErrorMessage(ERRORS.TypedError('Call_NotResponse'));
+  } catch (error) {
+    Log.error('__call error: ', error);
+    return createErrorMessage(error);
+  }
 };
 
 const HardwareWebSdk = {
   eventEmitter,
   init,
+  call,
   dispose,
 };
 

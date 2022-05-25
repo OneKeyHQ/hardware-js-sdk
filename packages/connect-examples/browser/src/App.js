@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import HardwareWebSdk from '@onekeyfe/hd-web-sdk'
 import './App.css';
 
 let core
 
+let loaded = false
 
 function App() {
   const [devices, setDevices] = useState([])
@@ -17,6 +18,18 @@ function App() {
       connectSrc: 'https://localhost:8088/',
     }
     HardwareWebSdk.init(settings)
+  }
+
+  useEffect(() => {
+    if (!loaded) {
+      sdkInit()
+    }
+    loaded = true
+  }, []);
+
+  const callAPI = async () => {
+    const res = await HardwareWebSdk.call({method: 'getFeatures', params: {foo: 'bar'}})
+    console.log('call ressssssss: ', res)
   }
 
   const usbConnect = () => {
@@ -47,6 +60,7 @@ function App() {
         <button onClick={getDevicesList}>GetDeviceList</button>
         <button onClick={usbConnect}>Device Connect</button>
         <button onClick={onGetFeatures}>GetFeatures</button>
+        <button onClick={callAPI}>CallAPI</button>
       </div>
       <div style={{textAlign: 'left', margin: '20px'}}>
         当前选取设备：{currentDevice ? JSON.stringify(currentDevice) : '无'}

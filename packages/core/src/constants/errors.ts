@@ -2,6 +2,7 @@ export const ERROR_CODES = {
   // methods error
   Method_InvalidParameter: '',
   Call_API: '',
+  Call_NotResponse: 'No response data',
 
   // device error
   Transport_InvalidProtobuf: '',
