@@ -8,7 +8,7 @@ import type { BaseMethod } from '../api/BaseMethod';
 import { ConnectSettings } from '../types';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
-import { CoreMessage } from '../events';
+import { CoreMessage, IFRAME, UI_EVENT } from '../events';
 
 const Log = initLog('Core');
 
@@ -168,6 +168,17 @@ function initDevice(method: BaseMethod) {
 export default class Core {
   // eslint-disable-next-line class-methods-use-this
   async handleMessage(message: CoreMessage) {
+    switch (message.event) {
+      case UI_EVENT:
+        break;
+      case IFRAME.CALL:
+        if (message.payload?.method === 'GetFeatures') {
+          //
+        }
+        break;
+      default:
+        break;
+    }
     return Promise.resolve(message);
   }
 
