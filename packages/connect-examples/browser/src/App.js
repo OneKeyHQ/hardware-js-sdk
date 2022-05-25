@@ -13,7 +13,8 @@ function App() {
   const sdkInit = async () => {
     console.log('sdk: ', HardwareWebSdk)
     const settings = {
-      iframeSrc: 'https://localhost:8088/iframe.html',
+      debug: true,
+      connectSrc: 'https://localhost:8088/',
     }
     HardwareWebSdk.init(settings)
   }

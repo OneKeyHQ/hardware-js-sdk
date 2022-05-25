@@ -1,8 +1,10 @@
 import { ERRORS, Deferred, create as createDeferred } from '@onekeyfe/hd-core';
+import { getOrigin } from '../utils/urlUtils';
 import css from './inlineStyles';
 
 /* eslint-disable import/no-mutable-exports */
 export let instance: HTMLIFrameElement | null;
+export let origin: string;
 export let initPromise: Deferred<void> = createDeferred();
 export let timeout = 0;
 /* eslint-disable import/no-mutable-exports */
@@ -52,11 +54,12 @@ export const init = (settings: any) => {
   )}`;
   const src = `${settings.iframeSrc as string}?${manifest}`;
 
+  instance.setAttribute('src', src);
+
+  origin = getOrigin(instance.src);
   timeout = window.setTimeout(() => {
     initPromise.reject(ERRORS.TypedError('Init_IframeTimeout'));
   }, 10000);
-
-  instance.setAttribute('src', src);
 
   const onLoad = () => {
     if (!instance) {
@@ -64,8 +67,17 @@ export const init = (settings: any) => {
       return;
     }
 
+    instance.contentWindow?.postMessage(
+      {
+        type: 'iframe-init',
+        payload: {
+          settings,
+        },
+      },
+      origin
+    );
+
     instance.onload = null;
-    console.log('IFrame onload');
   };
 
   // IE hack

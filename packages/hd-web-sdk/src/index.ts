@@ -1,10 +1,11 @@
 import EventEmitter from 'events';
 import { JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
-import { ERRORS, parseConnectSettings, initLog } from '@onekeyfe/hd-core';
+import { ERRORS, parseConnectSettings, initLog, PostMessageEvent } from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
+import JSBridgeConfig from './iframe/bridge-config';
 
 const eventEmitter = new EventEmitter();
-const Log = initLog('HD-WEB-SDK');
+const Log = initLog('@onekey/connect');
 
 let _settings = parseConnectSettings();
 
@@ -15,7 +16,21 @@ const dispose = () => {
   window.removeEventListener('message', createJSBridge);
 };
 
-const createJSBridge = () => {};
+const createJSBridge = (messageEvent: PostMessageEvent) => {
+  if (messageEvent.origin !== iframe.origin) {
+    return;
+  }
+  window.hostBridge = new JsBridgeIframe({
+    remoteFrame: iframe.instance?.contentWindow as Window,
+    remoteFrameName: JSBridgeConfig.iframeName,
+    selfFrameName: JSBridgeConfig.hostName,
+    channel: JSBridgeConfig.channel,
+    targetOrigin: '*',
+    receiveHandler: payload => {
+      console.log('window hostBridge: ', payload);
+    },
+  });
+};
 
 const init = (settings: any) => {
   if (iframe.instance) {
@@ -30,6 +45,8 @@ const init = (settings: any) => {
   }
 
   Log.enabled = !!_settings.debug;
+
+  Log.debug('init');
 
   window.addEventListener('message', createJSBridge);
   window.addEventListener('unload', dispose);
