@@ -18,6 +18,7 @@ export const ERROR_CODES = {
   Init_IframeBlocked: 'Init_IframeBlocked',
   Init_IframeTimeout: 'Init_IframeTimeout',
   Init_AlreadyInitialized: 'Init_AlreadyInitialized',
+  Init_IframeLoadFail: 'Init_IframeLoadFail',
 };
 
 export class OnekeyError extends Error {

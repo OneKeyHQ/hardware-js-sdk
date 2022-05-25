@@ -1,11 +1,38 @@
+import { Unsuccessful } from '../types/params';
+import { IFrameEventMessage } from './iframe';
+
 export const CORE_EVENT = 'CORE_EVENT';
 
 export type CoreMessage = {
-  type: string; // type is used before the bridge is created
-  channel: string;
-  direction: string;
-  frameName: string;
-  payload: any;
+  id?: string;
+  success?: true | false;
+} & IFrameEventMessage;
+
+export type PostMessageEvent = MessageEvent<any>;
+
+export const parseMessage = (messageData: any): CoreMessage => {
+  const { data } = messageData;
+  const message: CoreMessage = {
+    event: data.event,
+    type: data.type,
+    payload: data.payload,
+  };
+
+  if (typeof messageData.id === 'number') {
+    message.id = messageData.id;
+  }
+
+  if (typeof message.success === 'boolean') {
+    message.success = data.success;
+  }
+
+  return message;
 };
 
-export type PostMessageEvent = MessageEvent<CoreMessage>;
+export const createErrorMessage = (error: Error & { code?: string }): Unsuccessful => ({
+  success: false,
+  payload: {
+    error: error.message,
+    code: error.code,
+  },
+});

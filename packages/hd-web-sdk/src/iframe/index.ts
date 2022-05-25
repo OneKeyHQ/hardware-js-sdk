@@ -1,6 +1,13 @@
 import { JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
-import { PostMessageEvent, IFRAME, initLog, ConnectSettings } from '@onekeyfe/hd-core';
+import {
+  PostMessageEvent,
+  IFRAME,
+  initLog,
+  ConnectSettings,
+  parseMessage,
+} from '@onekeyfe/hd-core';
 import { getOrigin } from '../utils/urlUtils';
+import { sendMessage } from '../utils/bridgeUtils';
 
 import JSBridgeConfig from './bridge-config';
 
@@ -8,10 +15,11 @@ const Log = initLog('IFrame');
 
 const handleMessage = (event: PostMessageEvent) => {
   if (event.source === window || !event.data) return;
-  const { data } = event;
 
-  if (data.type === IFRAME.INIT) {
-    init(event.data.payload?.settings ?? {});
+  const message = parseMessage(event);
+
+  if (message.type === IFRAME.INIT) {
+    init(message.payload.settings ?? {});
   }
 };
 
@@ -28,15 +36,15 @@ export async function init(settings: ConnectSettings) {
       console.log('window frameBridge: ', payload);
     },
   });
-  Log.debug('request');
 
-  await window.frameBridge.request({
-    scope: JSBridgeConfig.scope,
-    data: {
+  await sendMessage(
+    {
+      event: 'UI_EVENT',
       type: IFRAME.INIT_BRIDGE,
-      params: { settings: {} },
+      payload: {},
     },
-  });
+    false
+  );
 }
 
 window.addEventListener('message', handleMessage, false);

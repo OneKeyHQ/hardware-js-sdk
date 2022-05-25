@@ -6,8 +6,9 @@ import {
   initLog,
   PostMessageEvent,
   IFRAME,
-  BridgeMessage,
   BridgePayload,
+  createErrorMessage,
+  parseMessage,
 } from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
@@ -35,11 +36,12 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
       selfFrameName: JSBridgeConfig.hostName,
       channel: JSBridgeConfig.channel,
       targetOrigin: iframe.origin,
+
       receiveHandler: messageEvent => {
         console.log('window hostBridge: ', messageEvent);
-        const payload = messageEvent.data as BridgePayload;
-        if (payload.type === IFRAME.INIT_BRIDGE) {
-          return 'JSBridge Connect Success';
+        const message = parseMessage(messageEvent);
+        if (message.type === IFRAME.INIT_BRIDGE) {
+          return { success: true, payload: 'JSBridge Connect Success' };
         }
       },
     });
@@ -66,6 +68,24 @@ const init = (settings: any) => {
   window.addEventListener('unload', dispose);
 
   iframe.init(_settings);
+};
+
+const call = async params => {
+  // lazy load
+  if (!iframe.instance && !iframe.timeout) {
+    _settings = parseConnectSettings(_settings);
+    try {
+      init(_settings);
+    } catch (error) {
+      return createErrorMessage(error);
+    }
+  }
+
+  if (iframe.timeout) {
+    return createErrorMessage(ERRORS.TypedError('Init_IframeLoadFail'));
+  }
+
+  // TODO: bridge request
 };
 
 const HardwareWebSdk = {
