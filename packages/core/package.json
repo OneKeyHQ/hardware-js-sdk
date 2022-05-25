@@ -25,6 +25,10 @@
     "@onekeyfe/hd-transport": "*",
     "@onekeyfe/hd-transport-http": "*",
     "@onekeyfe/rollout": "1.0.6",
-    "cross-fetch": "^3.1.5"
+    "cross-fetch": "^3.1.5",
+    "parse-uri": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/parse-uri": "^1.0.0"
   }
 }

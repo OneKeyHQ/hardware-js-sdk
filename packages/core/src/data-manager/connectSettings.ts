@@ -86,6 +86,12 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
     }
   }
 
+  if (typeof input.isFrame === 'boolean') {
+    if (input.isFrame) {
+      settings.parentOrigin = input.parentOrigin;
+    }
+  }
+
   if (typeof input.connectSrc === 'string') {
     settings.connectSrc = input.connectSrc;
   }

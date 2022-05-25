@@ -1,5 +1,6 @@
 import type { ConnectSettings } from '../types';
 import { UI_EVENT } from './ui-request';
+import { MessageFactoryFn } from './utils';
 
 export const IFRAME = {
   INIT: 'iframe-init',
@@ -19,10 +20,15 @@ export interface IFrameBridge {
   payload: unknown;
 }
 
-export interface IFrameCall {
-  type: typeof IFRAME.CALL;
-  payload: any;
-}
-
-export type IFrameEvent = IFrameInit | IFrameBridge | IFrameCall;
+export type IFrameEvent = IFrameInit | IFrameBridge;
 export type IFrameEventMessage = IFrameEvent & { event: typeof UI_EVENT };
+
+export const createIFrameMessage: MessageFactoryFn<typeof UI_EVENT, IFrameEvent> = (
+  type,
+  payload
+) =>
+  ({
+    event: UI_EVENT,
+    type,
+    payload,
+  } as any);

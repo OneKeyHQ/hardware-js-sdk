@@ -103,7 +103,7 @@ const call = async (params: any) => {
   }
 
   try {
-    const response = await sendMessage({ event: UI_EVENT, type: IFRAME.CALL, payload: params });
+    const response = await sendMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
       return response;
     }

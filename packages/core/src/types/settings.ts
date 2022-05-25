@@ -20,4 +20,5 @@ export type ConnectSettings = {
   supportedBrowser?: boolean;
   env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native';
   timestamp: number;
+  isFrame?: boolean;
 };
