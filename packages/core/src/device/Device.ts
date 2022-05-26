@@ -93,7 +93,7 @@ export class Device extends EventEmitter {
   }
 
   static fromDescriptor(originalDescriptor: DeviceDescriptor) {
-    const descriptor = { ...originalDescriptor, session: null };
+    const descriptor = { ...originalDescriptor };
     return new Device(descriptor);
   }
 

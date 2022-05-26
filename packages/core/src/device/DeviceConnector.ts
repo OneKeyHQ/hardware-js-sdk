@@ -76,6 +76,9 @@ export default class DeviceConnector {
   listening = false;
 
   constructor() {
+    if (!TransportManager.getTransport()) {
+      TransportManager.load();
+    }
     this.transport = TransportManager.getTransport();
   }
 
@@ -113,8 +116,9 @@ export default class DeviceConnector {
   }
 
   async acquire(path: string, session?: string | null) {
+    console.log('acquire', path, session);
     try {
-      const res = await this.transport.acquire({ path, previous: session });
+      const res = await this.transport.acquire({ path, previous: session ?? null });
       return res;
     } catch (error) {
       throw new Error(error);

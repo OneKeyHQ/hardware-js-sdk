@@ -8,7 +8,7 @@ import type { BaseMethod } from '../api/BaseMethod';
 import { ConnectSettings, CommonParams } from '../types';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
-import { CoreMessage, createResponseMessage, IFRAME, UI_EVENT } from '../events';
+import { CoreMessage, createResponseMessage, IFRAME, IFrameCallMessage, UI_EVENT } from '../events';
 
 const Log = initLog('Core');
 
@@ -35,7 +35,7 @@ export const callAPI = async (message: CoreMessage) => {
   let method: BaseMethod;
   let messageResponse: any;
   try {
-    method = findMethod(message.payload);
+    method = findMethod(message as IFrameCallMessage);
     method.init();
   } catch (error) {
     return Promise.reject(error);
@@ -44,9 +44,9 @@ export const callAPI = async (message: CoreMessage) => {
   if (!method.useDevice) {
     try {
       const response = await method.run();
-      return response;
+      return createResponseMessage(method.responseID, true, response);
     } catch (error) {
-      return Promise.resolve(error);
+      return createResponseMessage(method.responseID, false, error);
     }
   }
 
@@ -160,17 +160,10 @@ export default class Core {
     switch (message.event) {
       case UI_EVENT:
         break;
-      case IFRAME.CALL:
-        if (message.payload?.method === 'searchDevices') {
-          console.log('searchDevices');
-          if (!_deviceList) {
-            _deviceList = new DeviceList();
-            await TransportManager.configure();
-          }
-          const devices = await _deviceList?.getDeviceLists();
-          return createResponseMessage(Number(message.id), true, devices);
-        }
-        break;
+      case IFRAME.CALL: {
+        const response = await callAPI(message);
+        return response;
+      }
       default:
         break;
     }

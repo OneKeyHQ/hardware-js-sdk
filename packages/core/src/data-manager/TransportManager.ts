@@ -34,7 +34,6 @@ export default class TransportManager {
       Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));
       Log.debug('Configuring transports done');
-      await this.transport.init();
     } catch (error) {
       Log.debug('Initializing transports error: ', error);
     }

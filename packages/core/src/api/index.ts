@@ -1,1 +1,1 @@
-export { default as SearchDevices } from './SearchDevices';
+export { default as searchDevices } from './SearchDevices';
