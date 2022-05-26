@@ -3,12 +3,19 @@ import { OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-tr
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
 import { initLog, versionCompare, Deferred, create as createDeferred } from '../utils';
-import { parseCapabilities } from '../utils/deviceFeaturesUtils';
+import { parseCapabilities, getDeviceType } from '../utils/deviceFeaturesUtils';
 import { getFirmwareStatus, getRelease } from '../data-manager/FirmwareInfo';
-import type { Features, DeviceFirmwareStatus, ReleaseInfo } from '../types';
+import type {
+  Features,
+  DeviceFirmwareStatus,
+  ReleaseInfo,
+  Device as DeviceTyped,
+  UnavailableCapabilities,
+} from '../types';
 import { getBLEFirmwareStatus, getBLERelease } from '../data-manager/BLEFirmwareInfo';
 import { UI_REQUEST } from '../constants/ui-request';
 import { ERRORS } from '../constants';
+import { DEVICE } from '../events';
 
 type RunOptions = {
   keepSession?: boolean;
@@ -76,6 +83,10 @@ export class Device extends EventEmitter {
 
   runPromise?: Deferred<void> | null;
 
+  externalState: string[] = [];
+
+  unavailableCapabilities: UnavailableCapabilities = {};
+
   instance = 0;
 
   internalState: string[] = [];
@@ -97,9 +108,43 @@ export class Device extends EventEmitter {
     return new Device(descriptor);
   }
 
-  // TODO: Device TO Message Object 返回给前端
-  toMessageObject() {
-    // empty
+  // simplified object to pass via postMessage
+  toMessageObject(): DeviceTyped {
+    if (this.originalDescriptor.path === DEVICE.UNREADABLE) {
+      return {
+        type: 'unreadable',
+        path: this.originalDescriptor.path,
+        label: 'Unreadable device',
+        error: '',
+      };
+    }
+    if (this.isUnacquired()) {
+      return {
+        type: 'unacquired',
+        path: this.originalDescriptor.path,
+        label: 'Unacquired device',
+      };
+    }
+    const deviceType = getDeviceType(this.features);
+    const defaultLabel: string = deviceType === 'mini' ? 'My OneKey Mini' : 'My OneKey';
+    const label =
+      this.features?.label === '' || !this.features?.label ? defaultLabel : this.features.label;
+    return {
+      type: 'acquired',
+      id: this.features?.device_id || null,
+      path: this.originalDescriptor.path,
+      label,
+      state: this.getExternalState(),
+      // eslint-disable-next-line no-nested-ternary
+      status: this.isUsedElsewhere() ? 'occupied' : this.featuresNeedsReload ? 'used' : 'available',
+      mode: this.getMode(),
+      firmware: this.firmwareStatus as DeviceFirmwareStatus,
+      firmwareRelease: this.firmwareRelease,
+      bleFirmware: this.bleFirmwareStatus,
+      bleFirmwareRelease: this.bleFirmwareRelease,
+      features: this.features as Features,
+      unavailableCapabilities: this.unavailableCapabilities,
+    };
   }
 
   /**
@@ -302,12 +347,20 @@ export class Device extends EventEmitter {
     return 'normal';
   }
 
+  getExternalState() {
+    return this.externalState[this.instance];
+  }
+
   isUsed() {
     return typeof this.originalDescriptor.session === 'string';
   }
 
   isUsedHere() {
     return this.isUsed() && this.originalDescriptor.session === this.activitySessionID;
+  }
+
+  isUsedElsewhere(): boolean {
+    return this.isUsed() && !this.isUsedHere();
   }
 
   isBootloader() {
@@ -324,6 +377,10 @@ export class Device extends EventEmitter {
 
   isT1() {
     return this.features ? this.features.major_version === 1 : false;
+  }
+
+  isUnacquired(): boolean {
+    return this.features === undefined;
   }
 
   hasUnexpectedMode(allow: string[], require: string[]) {
