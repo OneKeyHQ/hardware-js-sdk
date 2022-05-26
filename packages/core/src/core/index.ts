@@ -5,40 +5,20 @@ import { findMethod } from '../api/utils';
 import TransportManager from '../data-manager/TransportManager';
 import type { Device } from '../device/Device';
 import type { BaseMethod } from '../api/BaseMethod';
-import { ConnectSettings } from '../types';
+import { ConnectSettings, CommonParams } from '../types';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
 import { CoreMessage, createResponseMessage, IFRAME, UI_EVENT } from '../events';
 
 const Log = initLog('Core');
 
-interface CommonParams {
-  device?: {
-    path: string;
-    state?: string;
-    instance?: number;
-  };
-  useEmptyPassphrase?: boolean;
-  useEventListener?: boolean; // this param is set automatically in factory
-  allowSeedlessDevice?: boolean;
-  keepSession?: boolean;
-  skipFinalReload?: boolean;
-  useCardanoDerivation?: boolean;
-}
-
-type CallAPIParams = {
-  type: string;
-  payload: CommonParams;
-  id: string;
-};
-
 let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _preferredDevice: CommonParams['device'];
 const callApiQueue = [];
 
-export const callAPI = async (params: CallAPIParams) => {
-  if (!params.id || !params.payload || !params.type) {
+export const callAPI = async (message: CoreMessage) => {
+  if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(
       ERRORS.TypedError(
         'Method_InvalidParameter',
@@ -47,17 +27,27 @@ export const callAPI = async (params: CallAPIParams) => {
     );
   }
 
-  if (_preferredDevice && !params.payload.device) {
-    params.payload.device = _preferredDevice;
+  if (_preferredDevice && !message.payload.device) {
+    message.payload.device = _preferredDevice;
   }
 
   // find api method
   let method: BaseMethod;
   let messageResponse: any;
   try {
-    method = findMethod(params.payload);
+    method = findMethod(message.payload);
+    method.init();
   } catch (error) {
     return Promise.reject(error);
+  }
+
+  if (!method.useDevice) {
+    try {
+      const response = await method.run();
+      return response;
+    } catch (error) {
+      return Promise.resolve(error);
+    }
   }
 
   // push method to queue

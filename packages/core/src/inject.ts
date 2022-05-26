@@ -1,8 +1,9 @@
 import { EventEmitter } from 'events';
+import { CallMethod } from './events';
 import { CoreApi } from './types/api';
 
 export interface InjectApi {
-  call: (params: any) => Promise<any>;
+  call: CallMethod;
   eventEmitter: EventEmitter;
   init: CoreApi['init'];
   dispose: () => void;

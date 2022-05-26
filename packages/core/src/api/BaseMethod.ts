@@ -5,6 +5,8 @@ import { versionCompare } from '../utils';
 import { getDeviceType } from '../utils/deviceFeaturesUtils';
 
 export abstract class BaseMethod<Params = undefined> {
+  responseID: number;
+
   // @ts-expect-error
   device: Device;
 
@@ -25,6 +27,11 @@ export abstract class BaseMethod<Params = undefined> {
    */
   payload: Record<string, any>;
 
+  /**
+   * 是否需要使用设备
+   */
+  useDevice: boolean;
+
   firmwareRange: FirmwareRange;
 
   /**
@@ -37,10 +44,13 @@ export abstract class BaseMethod<Params = undefined> {
    */
   requireDeviceMode: string[];
 
-  constructor(payload: Record<string, any>) {
+  constructor(message: { id?: number; payload: any }) {
+    const { payload } = message;
     this.name = payload.method;
     this.payload = payload;
+    this.responseID = message.id || 0;
     this.devicePath = payload.device?.path;
+    this.useDevice = true;
     this.allowDeviceMode = [];
     this.requireDeviceMode = [];
     this.firmwareRange = {
@@ -49,10 +59,9 @@ export abstract class BaseMethod<Params = undefined> {
     };
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  run() {
-    return Promise.resolve({ code: 200 });
-  }
+  abstract init(): void;
+
+  abstract run(): Promise<any>;
 
   setDevice(device: Device) {
     this.device = device;

@@ -1,14 +1,48 @@
 import { serializeError } from '../constants/errors';
 import { IFRAME } from './iframe';
-import { CoreApi } from '../types';
+import { CommonParams, CoreApi } from '../types';
+
+type UnwrappedResponse<T> = T extends Promise<infer R>
+  ? R extends { success: true; payload: infer P }
+    ? P
+    : never
+  : void;
+
+type OverloadedMethod<T, E extends Record<string, string>> = T extends {
+  (params: infer P1): infer R1;
+  (params: infer P2): infer R2;
+}
+  ? ((params: P1 & E) => R1) | ((params: P2 & E) => R2) // - method IS overloaded, result depends on params (example: getAddress)
+  : T extends (...args: infer P) => infer R
+  ? (params: E & P[0]) => R // - method in NOT overloaded, one set of params and one set of result (example: signTransaction)
+  : never;
+
+type UnwrappedMethod<T, M extends Record<string, string>> = T extends () => infer R
+  ? (params: M & CommonParams) => R // - method doesn't have params (example: dispose, disableWebUSB)
+  : OverloadedMethod<T, M>;
+
+type IsMethodCallable<T> = T extends (...args: any[]) => infer R
+  ? R extends Promise<{ success: boolean }>
+    ? R
+    : never
+  : never;
+
+type CallApi = {
+  [K in keyof CoreApi]: IsMethodCallable<CoreApi[K]> extends never
+    ? never
+    : UnwrappedMethod<CoreApi[K], { method: K }>;
+};
+
+export type CallMethodUnion = CallApi[keyof CallApi];
+export type CallMethodPayload = Parameters<CallMethodUnion>[0];
+export type CallMethodResponse<M extends keyof CallApi> = UnwrappedResponse<ReturnType<CallApi[M]>>;
+
+export type CallMethod = (params: CallMethodPayload) => Promise<any>;
 
 export interface IFrameCallMessage {
   event: typeof IFRAME.CALL;
   type: typeof IFRAME.CALL;
-  payload: {
-    params: any;
-    method: CallMethodKeys;
-  };
+  payload: CallMethodPayload;
 }
 
 export const RESPONSE_EVENT = 'RESPONSE_EVENT';

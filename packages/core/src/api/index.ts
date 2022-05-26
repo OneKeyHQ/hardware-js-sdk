@@ -1,1 +1,1 @@
-export { default as Foo } from './foo';
+export { default as SearchDevices } from './SearchDevices';

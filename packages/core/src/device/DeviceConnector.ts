@@ -1,5 +1,6 @@
 import { Transport, OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import TransportManager from '../data-manager/TransportManager';
+import { initLog } from '../utils';
 
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;
@@ -13,6 +14,8 @@ export type DeviceDescriptorDiff = {
   debugReleased: DeviceDescriptor[];
   descriptors: DeviceDescriptor[];
 };
+
+const Log = initLog('DeviceConnector');
 
 const getDiff = (
   current: DeviceDescriptor[],
@@ -80,6 +83,7 @@ export default class DeviceConnector {
     try {
       this.upcoming = await this.transport.enumerate();
       const diff = this._reportDevicesChange();
+      Log.debug('diff result: ', diff);
       return diff;
     } catch (error) {
       throw new Error(error);
