@@ -1,6 +1,7 @@
 import { Transport, OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import TransportManager from '../data-manager/TransportManager';
 import { initLog } from '../utils';
+import { resolveAfter } from '../utils/promiseUtils';
 
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;
@@ -69,6 +70,8 @@ const getDiff = (
 export default class DeviceConnector {
   transport: Transport;
 
+  listenTimestamp = 0;
+
   current: DeviceDescriptor[] | null = null;
 
   upcoming: DeviceDescriptor[] = [];
@@ -95,24 +98,40 @@ export default class DeviceConnector {
   }
 
   async listen() {
-    if (this.listening) {
-      return;
-    }
+    const waitForEvent = this.current !== null;
+    const current: DeviceDescriptor[] = this.current || [];
+
     this.listening = true;
 
-    if (!this.current || !Array.isArray(this.current)) {
-      return {};
-    }
+    let descriptors: DeviceDescriptor[];
 
     try {
-      this.upcoming = await this.transport.listen(this.current);
-      const diff = this._reportDevicesChange();
-      return diff;
+      Log.debug('Start listening', current);
+      this.listenTimestamp = new Date().getTime();
+      descriptors = waitForEvent
+        ? await this.transport.listen(current)
+        : await this.transport.enumerate();
+      if (!this.listening) return; // do not continue if stop() was called
+
+      this.upcoming = descriptors;
+      Log.debug('Listen result', descriptors);
+      this._reportDevicesChange();
+      if (this.listening) this.listen(); // handlers might have called stop()
     } catch (error) {
-      throw new Error(error);
-    } finally {
-      this.listening = false;
+      const time = new Date().getTime() - this.listenTimestamp;
+      Log.debug('Listen error', 'timestamp', time, typeof error);
+
+      if (time > 1100) {
+        await resolveAfter(1000, null);
+        if (this.listening) this.listen();
+      } else {
+        Log.warn('Transport error');
+      }
     }
+  }
+
+  stop() {
+    this.listening = false;
   }
 
   async acquire(path: string, session?: string | null) {

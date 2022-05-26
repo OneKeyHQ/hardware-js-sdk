@@ -9,11 +9,13 @@ import { ConnectSettings, CommonParams } from '../types';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
 import { CoreMessage, createResponseMessage, IFRAME, IFrameCallMessage, UI_EVENT } from '../events';
+import DeviceConnector from '../device/DeviceConnector';
 
 const Log = initLog('Core');
 
 let _core: Core;
 let _deviceList: DeviceList | undefined;
+let _connector: DeviceConnector | undefined;
 let _preferredDevice: CommonParams['device'];
 const callApiQueue = [];
 
@@ -36,6 +38,7 @@ export const callAPI = async (message: CoreMessage) => {
   let messageResponse: any;
   try {
     method = findMethod(message as IFrameCallMessage);
+    method.connector = _connector;
     method.init();
   } catch (error) {
     return Promise.reject(error);
@@ -125,6 +128,7 @@ export const callAPI = async (message: CoreMessage) => {
 
 async function initDeviceList() {
   _deviceList = new DeviceList();
+  _deviceList.connector = _connector;
   await TransportManager.configure();
   await _deviceList.getDeviceLists();
 }
@@ -150,7 +154,7 @@ function initDevice(method: BaseMethod) {
   }
 
   // inject properties
-  device.deviceConnector = _deviceList.connector;
+  device.deviceConnector = _connector;
 
   return device;
 }
@@ -180,6 +184,11 @@ export const initCore = () => {
   return _core;
 };
 
+export const initConnector = () => {
+  _connector = new DeviceConnector();
+  return _connector;
+};
+
 export const init = async (settings: ConnectSettings) => {
   try {
     try {
@@ -189,6 +198,7 @@ export const init = async (settings: ConnectSettings) => {
     }
     enableLog(DataManager.getSettings('debug'));
     initCore();
+    initConnector();
 
     return _core;
   } catch (error) {

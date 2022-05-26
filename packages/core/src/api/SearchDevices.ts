@@ -8,20 +8,21 @@ export default class SearchDevices extends BaseMethod {
 
   init() {
     this.useDevice = false;
-    this.connector = new DeviceConnector();
+    // this.connector?.listen();
   }
 
   async run() {
     await TransportManager.configure();
     const deviceDiff = await this.connector?.enumerate();
-    const devicesDescriptor = deviceDiff?.connected ?? [];
+    const devicesDescriptor = deviceDiff?.descriptors ?? [];
 
     const devices = [];
     for await (const descriptor of devicesDescriptor) {
       const device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;
       await device.connect();
-      await device.getFeatures();
+      await device.initialize();
+      await device.release();
       devices.push(device);
     }
     return devices;

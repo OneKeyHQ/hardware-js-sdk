@@ -1,5 +1,6 @@
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
+import DeviceConnector from '../device/DeviceConnector';
 import type { FirmwareRange } from '../types';
 import { versionCompare } from '../utils';
 import { getDeviceType } from '../utils/deviceFeaturesUtils';
@@ -26,6 +27,8 @@ export abstract class BaseMethod<Params = undefined> {
    * 请求携带参数
    */
   payload: Record<string, any>;
+
+  connector?: DeviceConnector;
 
   /**
    * 是否需要使用设备
