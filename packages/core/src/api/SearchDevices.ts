@@ -24,6 +24,6 @@ export default class SearchDevices extends BaseMethod {
       await device.release();
       devices.push(device);
     }
-    return devices;
+    return devices.map(device => device.toMessageObject());
   }
 }

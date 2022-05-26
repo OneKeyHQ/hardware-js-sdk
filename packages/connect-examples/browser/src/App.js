@@ -39,7 +39,9 @@ function App() {
   }
 
   const getDevicesList = async () => {
-    HardwareWebSdk.searchDevices()
+   const res = await HardwareWebSdk.searchDevices()
+   console.log('react searchDevices response: ', res)
+   setDevices(res.payload ?? [])
   }
 
   const onGetFeatures = async () => {

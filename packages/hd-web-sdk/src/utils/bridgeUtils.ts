@@ -1,11 +1,13 @@
 import { IJsBridgeIframeConfig, JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
-import { CoreMessage } from '@onekeyfe/hd-core';
+import { CoreMessage, initLog } from '@onekeyfe/hd-core';
 import JSBridgeConfig from '../iframe/bridge-config';
 
 // eslint-disable-next-line import/no-mutable-exports
 let frameBridge: JsBridgeIframe;
 // eslint-disable-next-line import/no-mutable-exports
 let hostBridge: JsBridgeIframe;
+
+const Log = initLog('[SendMessage]');
 
 export const createJsBridge = (params: IJsBridgeIframeConfig & { isHost: boolean }) => {
   const bridge = new JsBridgeIframe(params);
@@ -20,13 +22,15 @@ export const sendMessage = async (messages: CoreMessage, isHost = true): Promise
   const bridge = isHost ? hostBridge : frameBridge;
 
   try {
+    Log.debug('request: ', messages);
     const result = await bridge?.request({
       scope: JSBridgeConfig.scope,
       data: { ...messages },
     });
-
+    Log.debug('response: ', result);
     return result;
   } catch (error) {
+    Log.error(error);
     throw new Error(error);
   }
 };
