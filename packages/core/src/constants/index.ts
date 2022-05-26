@@ -1,2 +1,2 @@
 export * as ERRORS from './errors';
-export * as PROTO from '@onekeyfe/hd-transport/dist/types/messages';
+export { Messages as PROTO } from '@onekeyfe/hd-transport';

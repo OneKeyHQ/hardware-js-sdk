@@ -5,6 +5,10 @@ import { findMethod } from '../api/utils';
 import TransportManager from '../data-manager/TransportManager';
 import type { Device } from '../device/Device';
 import type { BaseMethod } from '../api/BaseMethod';
+import { ConnectSettings } from '../types';
+import { DataManager } from '../data-manager';
+import { enableLog } from '../utils/logger';
+import { CoreMessage, createResponseMessage, IFRAME, UI_EVENT } from '../events';
 
 const Log = initLog('Core');
 
@@ -28,6 +32,7 @@ type CallAPIParams = {
   id: string;
 };
 
+let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _preferredDevice: CommonParams['device'];
 const callApiQueue = [];
@@ -160,4 +165,52 @@ function initDevice(method: BaseMethod) {
   return device;
 }
 
-export default callAPI;
+export default class Core {
+  // eslint-disable-next-line class-methods-use-this
+  async handleMessage(message: CoreMessage) {
+    switch (message.event) {
+      case UI_EVENT:
+        break;
+      case IFRAME.CALL:
+        if (message.payload?.method === 'searchDevices') {
+          console.log('searchDevices');
+          if (!_deviceList) {
+            _deviceList = new DeviceList();
+            await TransportManager.configure();
+          }
+          const devices = await _deviceList?.getDeviceLists();
+          return createResponseMessage(Number(message.id), true, devices);
+        }
+        break;
+      default:
+        break;
+    }
+    return Promise.resolve(message);
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  dispose() {
+    // empty
+  }
+}
+
+export const initCore = () => {
+  _core = new Core();
+  return _core;
+};
+
+export const init = async (settings: ConnectSettings) => {
+  try {
+    try {
+      await DataManager.load(settings);
+    } catch {
+      Log.error('DataManager.load error');
+    }
+    enableLog(DataManager.getSettings('debug'));
+    initCore();
+
+    return _core;
+  } catch (error) {
+    Log.error('core init', error);
+  }
+};

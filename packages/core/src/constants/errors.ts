@@ -1,13 +1,25 @@
 export const ERROR_CODES = {
+  // methods error
   Method_InvalidParameter: '',
-  Runtime: '',
-  Transport_InvalidProtobuf: '',
   Call_API: '',
+  Call_NotResponse: 'No response data',
+
+  // device error
+  Transport_InvalidProtobuf: '',
   Device_FwException: '',
   Device_UnexpectedMode: '',
   Device_CallInProgress: '',
   Device_InitializeFailed: '',
   Not_Use_Onekey_Device: 'Please use onekey device',
+
+  // runtime error
+  Runtime: '',
+
+  // iframe error
+  Init_IframeBlocked: 'Init_IframeBlocked',
+  Init_IframeTimeout: 'Init_IframeTimeout',
+  Init_AlreadyInitialized: 'Init_AlreadyInitialized',
+  Init_IframeLoadFail: 'Init_IframeLoadFail',
 };
 
 export class OnekeyError extends Error {

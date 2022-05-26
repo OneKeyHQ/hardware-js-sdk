@@ -1,7 +1,8 @@
 import typescript from '@rollup/plugin-typescript';
-import json from '@rollup/plugin-json'
+import json from '@rollup/plugin-json';
 import dts from 'rollup-plugin-dts';
 import path from 'path';
+import commonjs from '@rollup/plugin-commonjs';
 
 const config = [
   {
@@ -12,7 +13,7 @@ const config = [
         format: 'cjs',
       },
     ],
-    plugins: [typescript(), json()],
+    plugins: [typescript(), commonjs(), json()],
   },
   {
     input: path.resolve('./src/index.ts'),

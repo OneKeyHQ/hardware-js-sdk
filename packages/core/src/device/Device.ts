@@ -349,3 +349,5 @@ export class Device extends EventEmitter {
     return null;
   }
 }
+
+export default Device;
