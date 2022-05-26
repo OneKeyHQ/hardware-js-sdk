@@ -156,7 +156,6 @@ function initDevice(method: BaseMethod) {
 }
 
 export default class Core {
-  // eslint-disable-next-line class-methods-use-this
   async handleMessage(message: CoreMessage) {
     switch (message.event) {
       case UI_EVENT:
@@ -178,7 +177,6 @@ export default class Core {
     return Promise.resolve(message);
   }
 
-  // eslint-disable-next-line class-methods-use-this
   dispose() {
     // empty
   }

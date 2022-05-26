@@ -159,7 +159,6 @@ export default class HttpTransport {
     return check.call(jsonData);
   }
 
-  // eslint-disable-next-line class-methods-use-this
   requestDevice() {
     // eslint-disable-next-line prefer-promise-reject-errors
     return Promise.reject();

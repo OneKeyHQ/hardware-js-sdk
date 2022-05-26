@@ -116,7 +116,6 @@ export class DeviceCommands {
     return this._filterCommonTypes(resp);
   }
 
-  // eslint-disable-next-line class-methods-use-this
   _filterCommonTypes(res: DefaultMessageResponse): Promise<DefaultMessageResponse> {
     if (res.type === 'Failure') {
       const { code } = res.message;

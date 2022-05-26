@@ -98,7 +98,6 @@ export class Device extends EventEmitter {
   }
 
   // TODO: Device TO Message Object 返回给前端
-  // eslint-disable-next-line class-methods-use-this
   toMessageObject() {
     // empty
   }

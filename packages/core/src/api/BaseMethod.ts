@@ -101,6 +101,5 @@ export abstract class BaseMethod<Params = undefined> {
     }
   }
 
-  // eslint-disable-next-line class-methods-use-this
   dispose() {}
 }
