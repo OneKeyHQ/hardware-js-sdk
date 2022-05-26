@@ -8,7 +8,6 @@ export default class SearchDevices extends BaseMethod {
 
   init() {
     this.useDevice = false;
-    // this.connector?.listen();
   }
 
   async run() {

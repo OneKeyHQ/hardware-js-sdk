@@ -30,6 +30,8 @@ export const inject = ({ eventEmitter, init, call, dispose }: InjectApi): CoreAp
     dispose,
 
     searchDevices: () => call({ method: 'searchDevices' }),
+
+    getFeatures: params => call({ ...params, method: 'getFeatures' }),
   };
   return api;
 };

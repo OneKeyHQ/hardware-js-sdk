@@ -29,7 +29,7 @@ function App() {
 
   const callAPI = async () => {
     const res = await HardwareWebSdk.call({method: 'getFeatures', params: {foo: 'bar'}})
-    console.log('call ressssssss: ', res)
+    console.log('react call api response: ', res)
   }
 
   const usbConnect = () => {
@@ -42,8 +42,9 @@ function App() {
     HardwareWebSdk.searchDevices()
   }
 
-  const onGetFeatures = () => {
-    // HardwareWebSdk.getDevicesList()
+  const onGetFeatures = async () => {
+    const res = await HardwareWebSdk.getFeatures({})
+    console.log('react get features response: ', res)
   }
 
   return (
