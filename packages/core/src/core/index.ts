@@ -1,6 +1,6 @@
 import { ERRORS } from '../constants';
 import { DeviceList } from '../device/DeviceList';
-import { initLog } from '../utils';
+import { initLog, create as createDeferred, Deferred } from '../utils';
 import { findMethod } from '../api/utils';
 import TransportManager from '../data-manager/TransportManager';
 import type { Device } from '../device/Device';
@@ -17,6 +17,7 @@ let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _preferredDevice: CommonParams['device'];
+let _callPromise: Deferred<any> | undefined;
 const callApiQueue = [];
 
 export const callAPI = async (message: CoreMessage) => {
@@ -105,15 +106,19 @@ export const callAPI = async (message: CoreMessage) => {
       try {
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ', device);
-        messageResponse = { ...response };
+        messageResponse = createResponseMessage(method.responseID, true, response);
+        _callPromise?.resolve(messageResponse);
       } catch (error) {
         return Promise.reject(error);
       }
     };
     Log.debug('Call API - Device Run: ', device);
-    await device.run(inner);
+    const deviceRun = () => device.run(inner);
+    _callPromise = createDeferred(deviceRun);
+    return await _callPromise.promise;
   } catch (error) {
-    return await Promise.reject(error);
+    messageResponse = createResponseMessage(method.responseID, false, error);
+    _callPromise?.reject(ERRORS.TypedError('Call_API', error));
   } finally {
     const response = messageResponse;
 
