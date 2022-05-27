@@ -13,7 +13,7 @@ export class DeviceList extends EventEmitter {
    */
   async getDeviceLists() {
     const deviceDiff = await this.connector?.enumerate();
-    const deviceList = deviceDiff?.connected ?? [];
+    const deviceList = deviceDiff?.descriptors ?? [];
     this.devices = deviceList.reduce<Record<string, Device>>((prev, device) => {
       prev[device.path] = new Device(device);
       return prev;

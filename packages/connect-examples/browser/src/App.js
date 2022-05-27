@@ -10,7 +10,6 @@ function App() {
   console.log(HardwareWebSdk)
   const [devices, setDevices] = useState([])
   const [currentDevice, setCurrentDevice] = useState(null)
-  const [initialize, setInitialize] = useState(false)
 
   const sdkInit = async () => {
     const settings = {
@@ -45,7 +44,7 @@ function App() {
   }
 
   const onGetFeatures = async () => {
-    const res = await HardwareWebSdk.getFeatures({})
+    const res = await HardwareWebSdk.getFeatures({device: {...currentDevice}})
     console.log('react get features response: ', res)
   }
 
