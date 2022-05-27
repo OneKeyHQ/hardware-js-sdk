@@ -3,6 +3,7 @@ import HardwareSdk, {
   ERRORS,
   parseConnectSettings,
   initLog,
+  enableLog,
   PostMessageEvent,
   IFRAME,
   createErrorMessage,
@@ -56,7 +57,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
-        console.log('Hose Bridge Receive message: ', message);
+        console.log('Host Bridge Receive message: ', message);
         const response = await handleMessage(message);
         Log.debug('Host Bridge response: ', response);
         return response;
@@ -77,7 +78,7 @@ const init = (settings: Partial<ConnectSettings>) => {
     return;
   }
 
-  Log.enabled = !!_settings.debug;
+  enableLog(!!settings.debug);
 
   Log.debug('init');
 

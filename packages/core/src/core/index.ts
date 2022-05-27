@@ -1,44 +1,27 @@
 import { ERRORS } from '../constants';
 import { DeviceList } from '../device/DeviceList';
-import { initLog } from '../utils';
+import { initLog, create as createDeferred, Deferred } from '../utils';
 import { findMethod } from '../api/utils';
 import TransportManager from '../data-manager/TransportManager';
 import type { Device } from '../device/Device';
 import type { BaseMethod } from '../api/BaseMethod';
-import { ConnectSettings } from '../types';
+import { ConnectSettings, CommonParams } from '../types';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
-import { CoreMessage, createResponseMessage, IFRAME, UI_EVENT } from '../events';
+import { CoreMessage, createResponseMessage, IFRAME, IFrameCallMessage, UI_EVENT } from '../events';
+import DeviceConnector from '../device/DeviceConnector';
 
 const Log = initLog('Core');
 
-interface CommonParams {
-  device?: {
-    path: string;
-    state?: string;
-    instance?: number;
-  };
-  useEmptyPassphrase?: boolean;
-  useEventListener?: boolean; // this param is set automatically in factory
-  allowSeedlessDevice?: boolean;
-  keepSession?: boolean;
-  skipFinalReload?: boolean;
-  useCardanoDerivation?: boolean;
-}
-
-type CallAPIParams = {
-  type: string;
-  payload: CommonParams;
-  id: string;
-};
-
 let _core: Core;
 let _deviceList: DeviceList | undefined;
+let _connector: DeviceConnector | undefined;
 let _preferredDevice: CommonParams['device'];
+let _callPromise: Deferred<any> | undefined;
 const callApiQueue = [];
 
-export const callAPI = async (params: CallAPIParams) => {
-  if (!params.id || !params.payload || !params.type) {
+export const callAPI = async (message: CoreMessage) => {
+  if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(
       ERRORS.TypedError(
         'Method_InvalidParameter',
@@ -47,29 +30,38 @@ export const callAPI = async (params: CallAPIParams) => {
     );
   }
 
-  if (_preferredDevice && !params.payload.device) {
-    params.payload.device = _preferredDevice;
+  if (_preferredDevice && !message.payload.device) {
+    message.payload.device = _preferredDevice;
   }
 
   // find api method
   let method: BaseMethod;
   let messageResponse: any;
   try {
-    method = findMethod(params.payload);
+    method = findMethod(message as IFrameCallMessage);
+    method.connector = _connector;
+    method.init();
   } catch (error) {
     return Promise.reject(error);
+  }
+
+  if (!method.useDevice) {
+    try {
+      const response = await method.run();
+      return createResponseMessage(method.responseID, true, response);
+    } catch (error) {
+      return createResponseMessage(method.responseID, false, error);
+    }
   }
 
   // push method to queue
   callApiQueue.push(method);
 
-  // init DeviceList and first configure transport messages
-  if (!_deviceList) {
-    try {
-      await initDeviceList();
-    } catch (error) {
-      return Promise.reject(error);
-    }
+  // update DeviceList every call and first configure transport messages
+  try {
+    await initDeviceList();
+  } catch (error) {
+    return Promise.reject(error);
   }
 
   let device: Device;
@@ -112,15 +104,19 @@ export const callAPI = async (params: CallAPIParams) => {
       try {
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ', device);
-        messageResponse = { ...response };
+        messageResponse = createResponseMessage(method.responseID, true, response);
+        _callPromise?.resolve(messageResponse);
       } catch (error) {
         return Promise.reject(error);
       }
     };
     Log.debug('Call API - Device Run: ', device);
-    await device.run(inner);
+    const deviceRun = () => device.run(inner);
+    _callPromise = createDeferred(deviceRun);
+    return await _callPromise.promise;
   } catch (error) {
-    return await Promise.reject(error);
+    messageResponse = createResponseMessage(method.responseID, false, error);
+    _callPromise?.reject(ERRORS.TypedError('Call_API', error));
   } finally {
     const response = messageResponse;
 
@@ -134,8 +130,11 @@ export const callAPI = async (params: CallAPIParams) => {
 };
 
 async function initDeviceList() {
-  _deviceList = new DeviceList();
-  await TransportManager.configure();
+  if (!_deviceList) {
+    _deviceList = new DeviceList();
+    await TransportManager.configure();
+    _deviceList.connector = _connector;
+  }
   await _deviceList.getDeviceLists();
 }
 
@@ -160,35 +159,26 @@ function initDevice(method: BaseMethod) {
   }
 
   // inject properties
-  device.deviceConnector = _deviceList.connector;
+  device.deviceConnector = _connector;
 
   return device;
 }
 
 export default class Core {
-  // eslint-disable-next-line class-methods-use-this
   async handleMessage(message: CoreMessage) {
     switch (message.event) {
       case UI_EVENT:
         break;
-      case IFRAME.CALL:
-        if (message.payload?.method === 'searchDevices') {
-          console.log('searchDevices');
-          if (!_deviceList) {
-            _deviceList = new DeviceList();
-            await TransportManager.configure();
-          }
-          const devices = await _deviceList?.getDeviceLists();
-          return createResponseMessage(Number(message.id), true, devices);
-        }
-        break;
+      case IFRAME.CALL: {
+        const response = await callAPI(message);
+        return response;
+      }
       default:
         break;
     }
     return Promise.resolve(message);
   }
 
-  // eslint-disable-next-line class-methods-use-this
   dispose() {
     // empty
   }
@@ -197,6 +187,11 @@ export default class Core {
 export const initCore = () => {
   _core = new Core();
   return _core;
+};
+
+export const initConnector = () => {
+  _connector = new DeviceConnector();
+  return _connector;
 };
 
 export const init = async (settings: ConnectSettings) => {
@@ -208,6 +203,7 @@ export const init = async (settings: ConnectSettings) => {
     }
     enableLog(DataManager.getSettings('debug'));
     initCore();
+    initConnector();
 
     return _core;
   } catch (error) {

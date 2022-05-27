@@ -3,3 +3,4 @@ export * from './device';
 export * from './firmware';
 export * from './settings';
 export * from './params';
+export * from './device'

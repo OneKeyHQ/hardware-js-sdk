@@ -2,15 +2,12 @@ import { useState, useEffect } from 'react'
 import HardwareWebSdk from '@onekeyfe/hd-web-sdk'
 import './App.css';
 
-let core
-
 let loaded = false
 
 function App() {
   console.log(HardwareWebSdk)
   const [devices, setDevices] = useState([])
   const [currentDevice, setCurrentDevice] = useState(null)
-  const [initialize, setInitialize] = useState(false)
 
   const sdkInit = async () => {
     const settings = {
@@ -27,23 +24,15 @@ function App() {
     loaded = true
   }, []);
 
-  const callAPI = async () => {
-    const res = await HardwareWebSdk.call({method: 'getFeatures', params: {foo: 'bar'}})
-    console.log('call ressssssss: ', res)
-  }
-
-  const usbConnect = () => {
-    if (currentDevice) {
-      core.initDevice(currentDevice.path)
-    }
-  }
-
   const getDevicesList = async () => {
-    HardwareWebSdk.searchDevices()
+   const res = await HardwareWebSdk.searchDevices()
+   console.log('react searchDevices response: ', res)
+   setDevices(res.payload ?? [])
   }
 
-  const onGetFeatures = () => {
-    // HardwareWebSdk.getDevicesList()
+  const onGetFeatures = async () => {
+    const res = await HardwareWebSdk.getFeatures({device: {...currentDevice}})
+    console.log('react get features response: ', res)
   }
 
   return (
@@ -52,9 +41,7 @@ function App() {
       <div>
         <button onClick={sdkInit}>SDK init</button>
         <button onClick={getDevicesList}>GetDeviceList</button>
-        <button onClick={usbConnect}>Device Connect</button>
         <button onClick={onGetFeatures}>GetFeatures</button>
-        <button onClick={callAPI}>CallAPI</button>
       </div>
       <div style={{textAlign: 'left', margin: '20px'}}>
         当前选取设备：{currentDevice ? JSON.stringify(currentDevice) : '无'}
