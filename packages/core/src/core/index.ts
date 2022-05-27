@@ -57,13 +57,11 @@ export const callAPI = async (message: CoreMessage) => {
   // push method to queue
   callApiQueue.push(method);
 
-  // init DeviceList and first configure transport messages
-  if (!_deviceList) {
-    try {
-      await initDeviceList();
-    } catch (error) {
-      return Promise.reject(error);
-    }
+  // update DeviceList every call and first configure transport messages
+  try {
+    await initDeviceList();
+  } catch (error) {
+    return Promise.reject(error);
   }
 
   let device: Device;
@@ -132,9 +130,11 @@ export const callAPI = async (message: CoreMessage) => {
 };
 
 async function initDeviceList() {
-  _deviceList = new DeviceList();
-  _deviceList.connector = _connector;
-  await TransportManager.configure();
+  if (!_deviceList) {
+    _deviceList = new DeviceList();
+    await TransportManager.configure();
+    _deviceList.connector = _connector;
+  }
   await _deviceList.getDeviceLists();
 }
 

@@ -93,6 +93,8 @@ export class Device extends EventEmitter {
 
   loaded = false;
 
+  needReloadDevice = false;
+
   /**
    * 执行 API 方法后是否保留 SessionID
    */
@@ -187,7 +189,12 @@ export class Device extends EventEmitter {
 
       this.commands = new DeviceCommands(this, sessionID ?? '');
     } catch (error) {
-      throw new Error(error);
+      if (this.runPromise) {
+        this.runPromise.reject(error);
+      } else {
+        throw error;
+      }
+      this.runPromise = null;
     }
   }
 
@@ -207,6 +214,8 @@ export class Device extends EventEmitter {
         await this.deviceConnector?.release(this.activitySessionID, false);
       } catch (err) {
         Log.error('[Device] release error: ', err);
+      } finally {
+        this.needReloadDevice = true;
       }
     }
   }
