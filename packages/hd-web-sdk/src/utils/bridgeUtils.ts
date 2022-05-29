@@ -31,7 +31,7 @@ export const sendMessage = async (messages: CoreMessage, isHost = true): Promise
     return result;
   } catch (error) {
     Log.error(error);
-    throw new Error(error);
+    throw error;
   }
 };
 
