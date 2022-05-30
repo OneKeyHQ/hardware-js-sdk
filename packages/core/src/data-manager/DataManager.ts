@@ -1,5 +1,4 @@
 import parseUri from 'parse-uri';
-import * as configJSON from '../data/config.json';
 import { httpRequest } from '../utils';
 import { parseBridgeJSON } from './transportInfo';
 import type { ConnectSettings, ConfigSettings, AssetCollection } from '../types';
@@ -93,9 +92,9 @@ export default class DataManager {
       );
     }
 
-    const protobufPromises = configJSON.messages.map(async protobuf => {
+    const protobufPromises = this.config.messages.map(async protobuf => {
       const json = await httpRequest(`${protobuf.json}${ts}`, 'json');
-      this.messages[protobuf.name] = json;
+      this.messages[protobuf.name] = typeof json === 'string' ? JSON.parse(json) : json;
     });
     await Promise.all(protobufPromises);
 
