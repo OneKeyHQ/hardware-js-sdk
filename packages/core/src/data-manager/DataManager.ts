@@ -3,6 +3,8 @@ import * as configJSON from '../data/config.json';
 import { httpRequest } from '../utils';
 import { parseBridgeJSON } from './transportInfo';
 import type { ConnectSettings, ConfigSettings, AssetCollection } from '../types';
+import { parseFirmware } from './FirmwareInfo';
+import { parseBLEFirmware } from './BLEFirmwareInfo';
 
 const parseConfig = (json: any): ConfigSettings => {
   const config: ConfigSettings = typeof json === 'string' ? JSON.parse(json) : json;
@@ -38,12 +40,6 @@ export default class DataManager {
     }
 
     if (!withAssets) return;
-
-    // const assetPromises = this.config.assets.map(async asset => {
-    //   const json = await httpRequest(`${asset.url}${ts}`, 'json');
-    //   this.assets[asset.name] = json;
-    // });
-    // await Promise.all(assetPromises);
 
     let nrfData = this.assets.nrf;
     try {
@@ -105,6 +101,12 @@ export default class DataManager {
 
     // parse bridge JSON
     parseBridgeJSON(this.assets.bridge);
+
+    // parse firmware definitions
+    parseFirmware(this.assets['firmware-t1'], 1);
+    parseFirmware(this.assets['firmware-t2'], 2);
+    parseFirmware(this.assets['firmware-mini'], 'mini');
+    parseBLEFirmware(this.assets.ble);
   }
 
   static getProtobufMessages() {
