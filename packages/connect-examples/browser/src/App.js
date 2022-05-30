@@ -49,11 +49,21 @@ function App() {
     <div className="App">
       <header>Connect Browser Example</header>
       <div>
-        <button onClick={sdkInit}>SDK init</button>
-        <button onClick={getDevicesList}>GetDeviceList</button>
-        <button onClick={onGetFeatures}>GetFeatures</button>
-        <button onClick={onCheckFirmwareRelease}>checkFirmwareRelease</button>
-        <button onClick={onCheckBLEFirmwareRelease}>checkBLEFirmwareRelease</button>
+        <button type="button" onClick={sdkInit}>
+          SDK init
+        </button>
+        <button type="button" onClick={getDevicesList}>
+          GetDeviceList
+        </button>
+        <button type="button" onClick={onGetFeatures}>
+          GetFeatures
+        </button>
+        <button type="button" onClick={onCheckFirmwareRelease}>
+          checkFirmwareRelease
+        </button>
+        <button type="button" onClick={onCheckBLEFirmwareRelease}>
+          checkBLEFirmwareRelease
+        </button>
       </div>
       <div style={{ textAlign: 'left', margin: '20px' }}>
         当前选取设备：{currentDevice ? JSON.stringify(currentDevice) : '无'}
@@ -64,7 +74,9 @@ function App() {
           {devices.map(device => (
             <li key={device.path}>
               <span>{JSON.stringify(device)}</span>
-              <button onClick={() => setCurrentDevice(device)}>select</button>
+              <button type="button" onClick={() => setCurrentDevice(device)}>
+                select
+              </button>
             </li>
           ))}
         </ul>
