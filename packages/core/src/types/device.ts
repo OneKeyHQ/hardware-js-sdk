@@ -1,18 +1,17 @@
 import type { PROTO } from '../constants';
-import type { ReleaseInfo } from './firmware'
+import type { ReleaseInfo } from './firmware';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
 export type DeviceMode = 'normal' | 'bootloader' | 'initialize' | 'seedless';
 
 export type UnavailableCapability =
-    | 'no-capability'
-    | 'no-support'
-    | 'update-required'
-    | 'trezor-connect-outdated';
+  | 'no-capability'
+  | 'no-support'
+  | 'update-required'
+  | 'trezor-connect-outdated';
 
 export type UnavailableCapabilities = { [key: string]: UnavailableCapability };
-
 
 export type KnownDevice = {
   type: 'acquired';

@@ -1,6 +1,7 @@
 import { on, off, removeAllListeners } from './event';
 import { searchDevices } from './searchDevices';
 import { getFeatures } from './getFeatures';
+import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { init } from './init';
 
 export type CoreApi = {
@@ -20,4 +21,6 @@ export type CoreApi = {
   searchDevices: typeof searchDevices;
 
   getFeatures: typeof getFeatures;
+
+  checkFirmwareRelease: typeof checkFirmwareRelease;
 };
