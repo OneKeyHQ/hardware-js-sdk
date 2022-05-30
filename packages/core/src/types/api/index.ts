@@ -3,10 +3,11 @@ import { searchDevices } from './searchDevices';
 import { getFeatures } from './getFeatures';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { init } from './init';
+import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 
 export type CoreApi = {
   /**
-   * inject function
+   * Inject function
    */
   init: typeof init;
   on: typeof on;
@@ -16,11 +17,13 @@ export type CoreApi = {
   call: (params: any) => Promise<any>;
 
   /**
-   * core function
+   * Core function
    */
   searchDevices: typeof searchDevices;
 
   getFeatures: typeof getFeatures;
 
   checkFirmwareRelease: typeof checkFirmwareRelease;
+
+  checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
 };

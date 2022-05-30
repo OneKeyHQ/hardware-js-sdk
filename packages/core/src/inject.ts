@@ -29,11 +29,25 @@ export const inject = ({ eventEmitter, init, call, dispose }: InjectApi): CoreAp
 
     dispose,
 
+    /**
+     * 搜索设备
+     */
     searchDevices: () => call({ method: 'searchDevices' }),
 
+    /**
+     * 获取设备信息
+     */
     getFeatures: params => call({ ...params, method: 'getFeatures' }),
 
+    /**
+     * 检查固件版本
+     */
     checkFirmwareRelease: params => call({ ...params, method: 'checkFirmwareRelease' }),
+
+    /**
+     * 检查蓝牙固件版本
+     */
+    checkBLEFirmwareRelease: params => call({ ...params, method: 'checkBLEFirmwareRelease' }),
   };
   return api;
 };
