@@ -1,7 +1,7 @@
 {
   "packages": [
     "packages/*",
-    "packages/connect-examples/*"
+    "packages/connect-examples/browser"
   ],
   "npmClient": "yarn",
   "useWorkspaces": true,
