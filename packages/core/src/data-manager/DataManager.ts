@@ -1,12 +1,17 @@
 import parseUri from 'parse-uri';
-import * as config from '../data/config.json';
+import * as configJSON from '../data/config.json';
 import { httpRequest } from '../utils';
 import { parseBridgeJSON } from './transportInfo';
-import type { ConnectSettings } from '../types';
+import type { ConnectSettings, ConfigSettings, AssetCollection } from '../types';
 
-type AssetCollection = { [key: string]: JSON };
+const parseConfig = (json: any): ConfigSettings => {
+  const config: ConfigSettings = typeof json === 'string' ? JSON.parse(json) : json;
+  return config;
+};
 
 export default class DataManager {
+  static config: ConfigSettings;
+
   static assets: AssetCollection = {};
 
   static settings: ConnectSettings;
@@ -17,6 +22,8 @@ export default class DataManager {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     const ts = `?r=${settings.timestamp}`;
     this.settings = settings;
+    const config = await httpRequest(`${settings.configSrc}${ts}`, 'json');
+    this.config = parseConfig(config);
 
     const isLocalhost =
       typeof window !== 'undefined' && window.location
@@ -32,17 +39,17 @@ export default class DataManager {
 
     if (!withAssets) return;
 
-    const assetPromises = config.assets.map(async asset => {
-      const json = await httpRequest(`${asset.url}${ts}`, 'json');
-      this.assets[asset.name] = json;
-    });
-    await Promise.all(assetPromises);
+    // const assetPromises = this.config.assets.map(async asset => {
+    //   const json = await httpRequest(`${asset.url}${ts}`, 'json');
+    //   this.assets[asset.name] = json;
+    // });
+    // await Promise.all(assetPromises);
 
     let nrfData = this.assets.nrf;
     try {
       const timestamp = new Date().getTime();
       const resp = await fetch(`https://data.onekey.so/version.json?noCache=${timestamp}`);
-      const { firmware, ble, mini_firmware } = await resp.json();
+      const { firmware, ble, mini_firmware, bridge } = await resp.json();
       if (ble && Array.isArray(ble)) {
         // TODO: use bleFirmware config
         [nrfData] = ble;
@@ -72,6 +79,8 @@ export default class DataManager {
 
         // @ts-expect-error
         this.assets['firmware-mini'] = paredFirmwareConfig;
+
+        this.assets.bridge = bridge;
       }
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -88,7 +97,7 @@ export default class DataManager {
       );
     }
 
-    const protobufPromises = config.messages.map(async protobuf => {
+    const protobufPromises = configJSON.messages.map(async protobuf => {
       const json = await httpRequest(`${protobuf.json}${ts}`, 'json');
       this.messages[protobuf.name] = json;
     });
@@ -110,7 +119,7 @@ export default class DataManager {
         // subdomain
         uri.host = parts.slice(parts.length - 2, parts.length).join('.');
       }
-      return config.whitelist.find(item => item.origin === origin || item.origin === uri.host);
+      return this.config.whitelist.find(item => item.origin === origin || item.origin === uri.host);
     }
   }
 
