@@ -48,6 +48,11 @@ export const inject = ({ eventEmitter, init, call, dispose }: InjectApi): CoreAp
      * 检查蓝牙固件版本
      */
     checkBLEFirmwareRelease: params => call({ ...params, method: 'checkBLEFirmwareRelease' }),
+
+    /**
+     * 检查 bridge 版本
+     */
+    checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
   };
   return api;
 };

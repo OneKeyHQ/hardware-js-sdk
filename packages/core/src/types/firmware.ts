@@ -36,3 +36,5 @@ export type ReleaseInfo = {
   isRequired: boolean | null;
   isNewer: boolean | null;
 };
+
+export type TransportReleaseStatus = 'valid' | 'outdated';
