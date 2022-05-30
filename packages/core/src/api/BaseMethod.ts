@@ -54,7 +54,7 @@ export abstract class BaseMethod<Params = undefined> {
     this.responseID = message.id || 0;
     this.devicePath = payload.device?.path;
     this.useDevice = true;
-    this.allowDeviceMode = [];
+    this.allowDeviceMode = [UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [];
     this.firmwareRange = {
       '1': { min: '1.0.0', max: '0' },

@@ -53,7 +53,8 @@ export class Device extends EventEmitter {
   /**
    * 设备信息
    */
-  features?: Features;
+  // @ts-expect-error: strictPropertyInitialization
+  features: Features;
 
   /**
    * 是否需要更新设备信息
@@ -130,10 +131,10 @@ export class Device extends EventEmitter {
     const deviceType = getDeviceType(this.features);
     const defaultLabel: string = deviceType === 'mini' ? 'My OneKey Mini' : 'My OneKey';
     const label =
-      this.features?.label === '' || !this.features?.label ? defaultLabel : this.features.label;
+      this.features.label === '' || !this.features.label ? defaultLabel : this.features.label;
     return {
       type: 'acquired',
-      id: this.features?.device_id || null,
+      id: this.features.device_id || null,
       path: this.originalDescriptor.path,
       label,
       state: this.getExternalState(),
@@ -144,7 +145,7 @@ export class Device extends EventEmitter {
       firmwareRelease: this.firmwareRelease,
       bleFirmware: this.bleFirmwareStatus,
       bleFirmwareRelease: this.bleFirmwareRelease,
-      features: this.features as Features,
+      features: this.features,
       unavailableCapabilities: this.unavailableCapabilities,
     };
   }
@@ -350,9 +351,9 @@ export class Device extends EventEmitter {
   }
 
   getMode() {
-    if (this.features?.bootloader_mode) return 'bootloader';
-    if (!this.features?.initialized) return 'initialize';
-    if (this.features?.no_backup) return 'seedless';
+    if (this.features.bootloader_mode) return 'bootloader';
+    if (!this.features.initialized) return 'initialize';
+    if (this.features.no_backup) return 'seedless';
     return 'normal';
   }
 
