@@ -8,7 +8,8 @@
   },
   "author": "OneKey",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "packages/connect-examples/browser"
   ],
   "scripts": {
     "bootstrap": "lerna bootstrap",

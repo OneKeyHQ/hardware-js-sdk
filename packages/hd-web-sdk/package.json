@@ -11,13 +11,14 @@
     "dev": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/dev.webpack.config.ts",
     "build:iframe": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/iframe.webpack.config.ts",
     "build:lib": "rimraf ./dist && tsc --build tsconfig.json",
-    "build:sdk": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
-    "build": "yarn build:lib && yarn build:iframe && yarn build:sdk",
+    "build:sdk": "TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
+    "build": "echo not config",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "echo \"Error: run tests from root\" && exit 1"
   },
   "dependencies": {
+    "@onekeyfe/hd-core": "*",
     "@onekeyfe/cross-inpage-provider-core": "^0.0.14"
   },
   "devDependencies": {
