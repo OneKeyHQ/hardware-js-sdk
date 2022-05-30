@@ -5,7 +5,7 @@ import { parseBridgeJSON } from './transportInfo';
 import type { ConnectSettings, ConfigSettings, AssetCollection } from '../types';
 
 const parseConfig = (json: any): ConfigSettings => {
-  const config: ConfigSettings = json;
+  const config: ConfigSettings = typeof json === 'string' ? JSON.parse(json) : json;
   return config;
 };
 
@@ -39,17 +39,17 @@ export default class DataManager {
 
     if (!withAssets) return;
 
-    const assetPromises = this.config.assets.map(async asset => {
-      const json = await httpRequest(`${asset.url}${ts}`, 'json');
-      this.assets[asset.name] = json;
-    });
-    await Promise.all(assetPromises);
+    // const assetPromises = this.config.assets.map(async asset => {
+    //   const json = await httpRequest(`${asset.url}${ts}`, 'json');
+    //   this.assets[asset.name] = json;
+    // });
+    // await Promise.all(assetPromises);
 
     let nrfData = this.assets.nrf;
     try {
       const timestamp = new Date().getTime();
       const resp = await fetch(`https://data.onekey.so/version.json?noCache=${timestamp}`);
-      const { firmware, ble, mini_firmware } = await resp.json();
+      const { firmware, ble, mini_firmware, bridge } = await resp.json();
       if (ble && Array.isArray(ble)) {
         // TODO: use bleFirmware config
         [nrfData] = ble;
@@ -79,6 +79,8 @@ export default class DataManager {
 
         // @ts-expect-error
         this.assets['firmware-mini'] = paredFirmwareConfig;
+
+        this.assets.bridge = bridge;
       }
     } catch (e) {
       // eslint-disable-next-line no-console
