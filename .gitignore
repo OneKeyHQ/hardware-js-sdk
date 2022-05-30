@@ -29,6 +29,5 @@ logs
 lib
 libDev
 dist
-public
 coverage
 build
