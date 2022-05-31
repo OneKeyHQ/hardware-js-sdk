@@ -1,10 +1,6 @@
-export interface Manifest {
-  appUrl: string;
-  email: string;
-}
+import type { IDeviceType } from './device';
 
 export type ConnectSettings = {
-  manifest?: Manifest;
   connectSrc?: string;
   debug?: boolean;
   transportReconnect?: boolean;
@@ -23,58 +19,59 @@ export type ConnectSettings = {
   isFrame?: boolean;
 };
 
-// config settings
-export type AssetCollection = { [key: string]: JSON };
+export type IVersionArray = [number, number, number];
 
-type WhiteList = {
-  priority: number;
-  origin: string;
-};
+export type ILocale = 'zh-CN' | 'en-US';
 
-type Asset = {
-  name: string;
-  type?: string;
+/** STM32 firmware config */
+export type IFirmwareReleaseInfo = {
+  required: boolean;
   url: string;
-};
-
-type KnownHost = {
-  origin: string;
-  label?: string;
-  icon?: string;
-};
-
-type SupportedBrowser = {
-  version: number;
-  download: string;
-  update: string;
-};
-
-type Resources = {
-  bridge: string;
-};
-
-type ProtobufMessages = {
-  name: string;
-  range: {
-    min: string[];
-    max?: string[];
+  fingerprint: string;
+  version: IVersionArray;
+  changelog: {
+    [k in ILocale]: string;
   };
-  json: string;
 };
 
-export type ConfigSettings = {
-  whitelist: WhiteList[];
-  management: WhiteList[];
-  knownHosts: KnownHost[];
-  resources: Resources;
-  assets: Asset[];
-  messages: ProtobufMessages[];
-  supportedBrowsers: { [key: string]: SupportedBrowser };
-  supportedFirmware: Array<{
-    coinType?: string;
-    coin?: string | string[];
-    excludedMethods?: string[];
-    min?: string[];
-    max?: string[];
-  }>;
+/** BLE firmware config */
+export type IBLEFirmwareReleaseInfo = {
+  required: boolean;
+  /** bluetooth dfu version */
+  url: string;
+  /** stm bluetooth update version */
+  webUpdate: string;
+  fingerprint: string;
+  fingerprintWeb: string;
+  version: IVersionArray;
+  changelog: {
+    [k in ILocale]: string;
+  };
 };
+
+export type DeviceTypeMap = {
+  [k in IDeviceType]: {
+    firmware: IFirmwareReleaseInfo[];
+    ble: IBLEFirmwareReleaseInfo[];
+  };
+};
+
+export type AssetsMap = {
+  bridge: {
+    version: IVersionArray;
+    linux32Rpm: string;
+    linux64Rpm: string;
+    linux32Deb: string;
+    linux64Deb: string;
+    win: string;
+    mac: string;
+    sha256sumAsc: string;
+    changelog: {
+      [k in ILocale]: string;
+    };
+  };
+};
+
+export type RemoteConfigResponse = {
+  bridge: AssetsMap['bridge'];
+} & DeviceTypeMap;

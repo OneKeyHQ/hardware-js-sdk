@@ -2,17 +2,9 @@ import EventEmitter from 'events';
 import { OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
-import { initLog, versionCompare, Deferred, create as createDeferred } from '../utils';
+import { initLog, Deferred, create as createDeferred } from '../utils';
 import { parseCapabilities, getDeviceType } from '../utils/deviceFeaturesUtils';
-import { getFirmwareStatus, getRelease } from '../data-manager/FirmwareInfo';
-import type {
-  Features,
-  DeviceFirmwareStatus,
-  ReleaseInfo,
-  Device as DeviceTyped,
-  UnavailableCapabilities,
-} from '../types';
-import { getBLEFirmwareStatus, getBLERelease } from '../data-manager/BLEFirmwareInfo';
+import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { UI_REQUEST } from '../constants/ui-request';
 import { ERRORS } from '../constants';
 import { DEVICE } from '../events';
@@ -53,34 +45,12 @@ export class Device extends EventEmitter {
   /**
    * 设备信息
    */
-  // @ts-expect-error: strictPropertyInitialization
   features: Features;
 
   /**
    * 是否需要更新设备信息
    */
   featuresNeedsReload = false;
-
-  /**
-   * 固件状态
-   */
-  firmwareStatus?: DeviceFirmwareStatus;
-
-  /**
-   * 固件版本信息
-   */
-  firmwareRelease?: ReleaseInfo;
-
-  /**
-   * 蓝牙固件状态
-   */
-  bleFirmwareStatus?: DeviceFirmwareStatus;
-
-  /**
-   * 蓝牙固件版本信息
-   * TODO: 完善蓝牙固件类型
-   */
-  bleFirmwareRelease?: any;
 
   runPromise?: Deferred<void> | null;
 
@@ -141,10 +111,6 @@ export class Device extends EventEmitter {
       // eslint-disable-next-line no-nested-ternary
       status: this.isUsedElsewhere() ? 'occupied' : this.featuresNeedsReload ? 'used' : 'available',
       mode: this.getMode(),
-      firmware: this.firmwareStatus as DeviceFirmwareStatus,
-      firmwareRelease: this.firmwareRelease,
-      bleFirmware: this.bleFirmwareStatus,
-      bleFirmwareRelease: this.bleFirmwareRelease,
       features: this.features,
       unavailableCapabilities: this.unavailableCapabilities,
     };
@@ -247,17 +213,6 @@ export class Device extends EventEmitter {
   _updateFeatures(feat: Features) {
     const capabilities = parseCapabilities(feat);
     feat.capabilities = capabilities;
-    const version = [feat.major_version, feat.minor_version, feat.patch_version];
-    const capabilitiesDidChange =
-      this.features &&
-      this.features.capabilities &&
-      this.features.capabilities.join('') !== capabilities.join('');
-    if (versionCompare(version, this.getVersion()) !== 0 || capabilitiesDidChange) {
-      this.firmwareStatus = getFirmwareStatus(feat);
-      this.firmwareRelease = getRelease(feat);
-      this.bleFirmwareStatus = getBLEFirmwareStatus(feat);
-      this.bleFirmwareRelease = getBLERelease(feat);
-    }
 
     // GetFeatures doesn't return 'session_id'
     if (this.features && this.features.session_id && !feat.session_id) {

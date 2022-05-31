@@ -1,6 +1,6 @@
 /* eslint-disable vars-on-top */
 
-import type { Manifest, ConnectSettings } from '../types';
+import type { ConnectSettings } from '../types';
 import { VERSION, DEFAULT_DOMAIN } from '../data/version';
 
 export const DEFAULT_PRIORITY = 2;
@@ -26,17 +26,6 @@ const initialSettings: ConnectSettings = {
   env: 'web',
   lazyLoad: false,
   timestamp: new Date().getTime(),
-};
-
-const parseManifest = (manifest?: Manifest) => {
-  if (!manifest) return;
-  if (typeof manifest.email !== 'string') return;
-  if (typeof manifest.appUrl !== 'string') return;
-
-  return {
-    email: manifest.email,
-    appUrl: manifest.appUrl,
-  };
 };
 
 export const getEnv = () => {
@@ -126,10 +115,6 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
 
   if (typeof input.timestamp === 'number') {
     settings.timestamp = input.timestamp;
-  }
-
-  if (typeof input.manifest === 'object') {
-    settings.manifest = parseManifest(input.manifest);
   }
 
   return settings;
