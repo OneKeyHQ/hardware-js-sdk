@@ -16,17 +16,6 @@
 <body>
 
     <script type="text/javascript">
-        window.addEventListener('message', (event) => {
-            if (event.data === 'BLE_MODE_SUCCESS') {
-                window.$BLE_MODE = true;
-                return;
-            }
-
-            if (event.data === 'BLE_MODE_FAIL') {
-                window.$BLE_MODE = false;
-                return;
-            }
-        });
 
         window.parent.postMessage({
             event: 'UI_EVENT',
