@@ -43,8 +43,11 @@ export default class DataManager {
     let nrfData = this.assets.nrf;
     try {
       const timestamp = new Date().getTime();
-      const resp = await fetch(`https://data.onekey.so/version.json?noCache=${timestamp}`);
-      const { firmware, ble, mini_firmware, bridge } = await resp.json();
+      const resp = await httpRequest(
+        `https://data.onekey.so/version.json?noCache=${timestamp}`,
+        'json'
+      );
+      const { firmware, ble, mini_firmware, bridge } = resp;
       if (ble && Array.isArray(ble)) {
         // TODO: use bleFirmware config
         [nrfData] = ble;

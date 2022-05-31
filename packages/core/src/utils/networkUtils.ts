@@ -1,16 +1,18 @@
-import fetch from 'cross-fetch';
+import axios from 'axios';
 
 export const httpRequest = async (url: string, type = 'text') => {
-  const response = await fetch(url, { credentials: 'same-origin' });
-  if (response.ok) {
+  const response = await axios.request({
+    url,
+    withCredentials: false,
+  });
+  if (+response.status === 200) {
     if (type === 'json') {
-      const txt = await response.text();
-      return JSON.parse(txt);
+      return response.data;
     }
     if (type === 'binary') {
-      return response.arrayBuffer();
+      return response.data.arrayBuffer();
     }
-    return response.text();
+    return response.data;
   }
   throw new Error(`httpRequest error: ${url} ${response.statusText}`);
 };
