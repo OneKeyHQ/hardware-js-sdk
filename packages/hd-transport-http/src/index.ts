@@ -32,7 +32,6 @@ export default class HttpTransport {
       ...options,
       method: 'POST',
       url: this.url + options.url,
-      skipContentTypeHeader: true,
     });
   }
 
