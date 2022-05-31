@@ -5,7 +5,6 @@ import './App.css';
 let loaded = false;
 
 function App() {
-  console.log(HardwareWebSdk);
   const [devices, setDevices] = useState([]);
   const [currentDevice, setCurrentDevice] = useState(null);
 
@@ -45,6 +44,11 @@ function App() {
     console.log('react get bluetooth firmware response: ', res);
   };
 
+  const onCheckTransportRelease = async () => {
+    const res = await HardwareWebSdk.checkTransportRelease();
+    console.log('react get transport release response: ', res);
+  };
+
   return (
     <div className="App">
       <header>Connect Browser Example</header>
@@ -63,6 +67,9 @@ function App() {
         </button>
         <button type="button" onClick={onCheckBLEFirmwareRelease}>
           checkBLEFirmwareRelease
+        </button>
+        <button type="button" onClick={onCheckTransportRelease}>
+          checkTransportRelease
         </button>
       </div>
       <div style={{ textAlign: 'left', margin: '20px' }}>

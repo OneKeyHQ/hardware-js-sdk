@@ -4,6 +4,7 @@ import { getFeatures } from './getFeatures';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { init } from './init';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
+import { checkTransportRelease } from './checkTransportRelease';
 
 export type CoreApi = {
   /**
@@ -26,4 +27,6 @@ export type CoreApi = {
   checkFirmwareRelease: typeof checkFirmwareRelease;
 
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
+
+  checkTransportRelease: typeof checkTransportRelease;
 };

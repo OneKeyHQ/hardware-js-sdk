@@ -3,7 +3,6 @@ import HttpBridge from '@onekeyfe/hd-transport-http';
 import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import DataManager from './DataManager';
-import { getBridgeInfo } from './transportInfo';
 
 const Log = initLog('Transport');
 
@@ -20,9 +19,7 @@ export default class TransportManager {
   static currentMessages: JSON | Record<string, any>;
 
   static load() {
-    const bridgeLatestVersion = getBridgeInfo().version.join('.');
     this.transport = new HttpBridge() as any;
-    this.transport.setBridgeLatestVersion(bridgeLatestVersion);
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
   }
@@ -30,7 +27,7 @@ export default class TransportManager {
   static async configure() {
     try {
       Log.debug('Initializing transports');
-      await this.transport.init(true);
+      await this.transport.init();
       Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));
       Log.debug('Configuring transports done');
