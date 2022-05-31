@@ -13,49 +13,47 @@ export type UnavailableCapability =
 export type UnavailableCapabilities = { [key: string]: UnavailableCapability };
 
 export type KnownDevice = {
-  type: 'acquired';
-  id: string | null;
+  uuid: string;
+  deviceId: string | null;
   path: string;
   label: string;
   error?: typeof undefined;
-  status: DeviceStatus;
   mode: DeviceMode;
-  state?: string;
   features: PROTO.Features;
   unavailableCapabilities: UnavailableCapabilities;
 };
 
-export type UnknownDevice = {
-  type: 'unacquired';
-  id?: null;
-  path: string;
-  label: string;
-  error?: typeof undefined;
-  features?: typeof undefined;
-  firmware?: typeof undefined;
-  firmwareRelease?: typeof undefined;
-  status?: typeof undefined;
-  mode?: typeof undefined;
-  state?: typeof undefined;
-  unavailableCapabilities?: typeof undefined;
-};
+// export type UnknownDevice = {
+//   type: 'unacquired';
+//   id?: null;
+//   path: string;
+//   label: string;
+//   error?: typeof undefined;
+//   features?: typeof undefined;
+//   firmware?: typeof undefined;
+//   firmwareRelease?: typeof undefined;
+//   status?: typeof undefined;
+//   mode?: typeof undefined;
+//   state?: typeof undefined;
+//   unavailableCapabilities?: typeof undefined;
+// };
 
-export type UnreadableDevice = {
-  type: 'unreadable';
-  id?: null;
-  path: string;
-  label: string;
-  error: string;
-  features?: typeof undefined;
-  firmware?: typeof undefined;
-  firmwareRelease?: typeof undefined;
-  status?: typeof undefined;
-  mode?: typeof undefined;
-  state?: typeof undefined;
-  unavailableCapabilities?: typeof undefined;
-};
+// export type UnreadableDevice = {
+//   type: 'unreadable';
+//   id?: null;
+//   path: string;
+//   label: string;
+//   error: string;
+//   features?: typeof undefined;
+//   firmware?: typeof undefined;
+//   firmwareRelease?: typeof undefined;
+//   status?: typeof undefined;
+//   mode?: typeof undefined;
+//   state?: typeof undefined;
+//   unavailableCapabilities?: typeof undefined;
+// };
 
-export type Device = KnownDevice | UnknownDevice | UnreadableDevice;
+export type Device = KnownDevice;
 
 export type Features = PROTO.Features;
 
