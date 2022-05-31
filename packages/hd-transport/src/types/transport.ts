@@ -26,7 +26,7 @@ export type Transport = {
   read(session: string): Promise<MessageFromOneKey>;
 
   // resolves when the transport can be used; rejects when it cannot
-  init(debug?: boolean): Promise<void>;
+  init(): Promise<string>;
   stop(): void;
 
   configured: boolean;
@@ -40,6 +40,4 @@ export type Transport = {
   requestNeeded: boolean;
 
   isOutdated: boolean;
-  setBridgeLatestUrl(url: string): void;
-  setBridgeLatestVersion(version: string): void;
 };

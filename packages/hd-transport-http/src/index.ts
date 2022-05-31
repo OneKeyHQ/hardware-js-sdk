@@ -1,7 +1,7 @@
 import transport from '@onekeyfe/hd-transport';
 import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
-import { DEFAULT_URL, DEFAULT_VERSION_URL } from './constants';
+import { DEFAULT_URL } from './constants';
 
 const { check, buildOne, receiveOne, parseConfigure } = transport;
 
@@ -13,23 +13,14 @@ type IncompleteRequestOptions = {
 export default class HttpTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
-  bridgeVersion?: string;
-
   configured = false;
-
-  debug = false;
-
-  newestVersionUrl: string;
 
   stopped = false;
 
   url: string;
 
-  version = '';
-
-  constructor(url?: string, newestVersionUrl?: string) {
+  constructor(url?: string) {
     this.url = url == null ? DEFAULT_URL : url;
-    this.newestVersionUrl = newestVersionUrl == null ? DEFAULT_VERSION_URL : newestVersionUrl;
   }
 
   _post(options: IncompleteRequestOptions) {
@@ -45,9 +36,9 @@ export default class HttpTransport {
     });
   }
 
-  async init(debug: boolean) {
-    this.debug = !!debug;
-    await this._silentInit();
+  async init() {
+    const bridgeVersion = await this._silentInit();
+    return bridgeVersion;
   }
 
   async _silentInit() {
@@ -56,7 +47,7 @@ export default class HttpTransport {
       method: 'POST',
     });
     const info = check.info(infoS);
-    this.version = info.version;
+    return info.version;
   }
 
   configure(signedData: any) {
@@ -162,14 +153,6 @@ export default class HttpTransport {
   requestDevice() {
     // eslint-disable-next-line prefer-promise-reject-errors
     return Promise.reject();
-  }
-
-  setBridgeLatestUrl(url: string) {
-    this.newestVersionUrl = url;
-  }
-
-  setBridgeLatestVersion(version: string) {
-    this.bridgeVersion = version;
   }
 
   stop() {
