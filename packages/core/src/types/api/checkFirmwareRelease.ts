@@ -1,4 +1,6 @@
 import type { CommonParams, Response } from '../params';
-import type { DeviceFirmwareStatus } from '../device';
+import type { IDeviceFirmwareStatus } from '../device';
 
-export declare function checkFirmwareRelease(params?: CommonParams): Response<DeviceFirmwareStatus>;
+export declare function checkFirmwareRelease(
+  params?: CommonParams
+): Response<IDeviceFirmwareStatus>;

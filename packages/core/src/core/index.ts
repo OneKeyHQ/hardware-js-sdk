@@ -77,10 +77,10 @@ export const callAPI = async (message: CoreMessage) => {
   try {
     const inner = async (): Promise<void> => {
       // check firmware status
-      const firmwareException = method.checkFirmwareRange();
-      if (firmwareException) {
-        return Promise.reject(ERRORS.TypedError('Device_FwException', firmwareException));
-      }
+      // const firmwareException = method.checkFirmwareRange();
+      // if (firmwareException) {
+      //   return Promise.reject(ERRORS.TypedError('Device_FwException', firmwareException));
+      // }
 
       // check call method mode
       const unexpectedMode = device.hasUnexpectedMode(
@@ -91,10 +91,10 @@ export const callAPI = async (message: CoreMessage) => {
         return Promise.reject(ERRORS.TypedError('Device_UnexpectedMode', unexpectedMode));
       }
 
-      const deviceTypeException = method.checkDeviceType();
-      if (deviceTypeException) {
-        return Promise.reject(ERRORS.TypedError('Not_Use_Onekey_Device'));
-      }
+      // const deviceTypeException = method.checkDeviceType();
+      // if (deviceTypeException) {
+      //   return Promise.reject(ERRORS.TypedError('Not_Use_Onekey_Device'));
+      // }
 
       // reconfigure messages
       if (_deviceList) {

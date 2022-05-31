@@ -1,5 +1,4 @@
 import type { PROTO } from '../constants';
-import type { ReleaseInfo } from './firmware';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -19,10 +18,6 @@ export type KnownDevice = {
   path: string;
   label: string;
   error?: typeof undefined;
-  firmware: DeviceFirmwareStatus;
-  firmwareRelease?: ReleaseInfo | null;
-  bleFirmware?: DeviceFirmwareStatus;
-  bleFirmwareRelease?: ReleaseInfo | null;
   status: DeviceStatus;
   mode: DeviceMode;
   state?: string;
@@ -64,6 +59,10 @@ export type Device = KnownDevice | UnknownDevice | UnreadableDevice;
 
 export type Features = PROTO.Features;
 
-export type DeviceType = 'mini' | 'classic';
+export type IDeviceType = 'classic' | 'mini' | 'touch' | 'pro';
 
-export type DeviceFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';
+export type IDeviceFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';
+
+export type IDeviceBLEFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';
+
+export type ITransportStatus = 'valid' | 'outdated';

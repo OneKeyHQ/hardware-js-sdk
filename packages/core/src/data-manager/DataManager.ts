@@ -1,130 +1,137 @@
-import parseUri from 'parse-uri';
-import { httpRequest } from '../utils';
-import { parseBridgeJSON } from './transportInfo';
-import type { ConnectSettings, ConfigSettings, AssetCollection } from '../types';
-import { parseFirmware } from './FirmwareInfo';
-import { parseBLEFirmware } from './BLEFirmwareInfo';
+import axios from 'axios';
+import semver from 'semver';
+import MessagesJSON from '../data/messages/messages.json';
+import { getTimeStamp } from '../utils';
+import {
+  getDeviceType,
+  getDeviceFirmwareVersion,
+  getDeviceBLEFirmwareVersion,
+} from '../utils/deviceFeaturesUtils';
 
-const parseConfig = (json: any): ConfigSettings => {
-  const config: ConfigSettings = typeof json === 'string' ? JSON.parse(json) : json;
-  return config;
-};
+import type {
+  ConnectSettings,
+  DeviceTypeMap,
+  AssetsMap,
+  RemoteConfigResponse,
+  Features,
+  IDeviceFirmwareStatus,
+  IDeviceBLEFirmwareStatus,
+  ITransportStatus,
+} from '../types';
 
 export default class DataManager {
-  static config: ConfigSettings;
+  static deviceMap: DeviceTypeMap = {
+    classic: {
+      firmware: [],
+      ble: [],
+    },
+    mini: {
+      firmware: [],
+      ble: [],
+    },
+    touch: {
+      firmware: [],
+      ble: [],
+    },
+    pro: {
+      firmware: [],
+      ble: [],
+    },
+  };
 
-  static assets: AssetCollection = {};
+  static assets: AssetsMap | null = null;
 
   static settings: ConnectSettings;
 
-  static messages: { [key: string]: JSON } = {};
+  static messages: { default: JSON } = {
+    default: MessagesJSON as unknown as JSON,
+  };
 
-  static async load(settings: ConnectSettings, withAssets = true) {
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    const ts = `?r=${settings.timestamp}`;
+  static getFirmwareStatus = (features: Features): IDeviceFirmwareStatus => {
+    const deviceType = getDeviceType(features);
+    const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
+    if (features.firmware_present === false) {
+      return 'none';
+    }
+
+    if (deviceType === 'classic' && features.bootloader_mode) {
+      return 'unknown';
+    }
+
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
+    const latestFirmware = targetDeviceConfigList[targetDeviceConfigList.length - 1];
+
+    if (!latestFirmware) return 'valid';
+
+    const latestVersion = latestFirmware.version.join('.');
+    const currentVersion = deviceFirmwareVersion.join('.');
+
+    /** latest is greater or equal current */
+    if (semver.gt(latestVersion, currentVersion)) {
+      if (latestFirmware.required) return 'required';
+
+      return 'outdated';
+    }
+
+    return 'valid';
+  };
+
+  static getBLEFirmwareStatus = (features: Features): IDeviceBLEFirmwareStatus => {
+    const deviceType = getDeviceType(features);
+    const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
+
+    /** mini has no device ble_ver */
+    if (!deviceBLEFirmwareVersion) {
+      return 'none';
+    }
+
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
+    const latestBLEFirmware = targetDeviceConfigList[targetDeviceConfigList.length - 1];
+
+    if (!latestBLEFirmware) return 'valid';
+
+    const latestVersion = latestBLEFirmware.version.join('.');
+    const currentVersion = deviceBLEFirmwareVersion.join('.');
+
+    /** latest is greater or equal current */
+    if (semver.gt(latestVersion, currentVersion)) {
+      if (latestBLEFirmware.required) return 'required';
+
+      return 'outdated';
+    }
+
+    return 'valid';
+  };
+
+  static getTransportStatus = (localVersion: string): ITransportStatus => {
+    const latestTransportVersion = this.assets?.bridge?.version;
+    if (!latestTransportVersion) return 'valid';
+    const isLatest = semver.gte(localVersion, latestTransportVersion.join('.'));
+    return isLatest ? 'valid' : 'outdated';
+  };
+
+  static async load(settings: ConnectSettings) {
     this.settings = settings;
-    const config = await httpRequest(`${settings.configSrc}${ts}`, 'json');
-    this.config = parseConfig(config);
-
-    const isLocalhost =
-      typeof window !== 'undefined' && window.location
-        ? window.location.hostname === 'localhost'
-        : true;
-    const whitelist = DataManager.isWhitelisted(this.settings.origin || '');
-    this.settings.trustedHost = isLocalhost || !!whitelist;
-
-    // ensure that debug is disabled
-    if (!this.settings.trustedHost && !whitelist) {
-      this.settings.debug = false;
-    }
-
-    if (!withAssets) return;
-
-    let nrfData = this.assets.nrf;
     try {
-      const timestamp = new Date().getTime();
-      const resp = await httpRequest(
-        `https://data.onekey.so/version.json?noCache=${timestamp}`,
-        'json'
+      const { data } = await axios.get<RemoteConfigResponse>(
+        `https://data.onekey.so/config.json?noCache=${getTimeStamp()}`
       );
-      const { firmware, ble, mini_firmware, bridge } = resp;
-      if (ble && Array.isArray(ble)) {
-        // TODO: use bleFirmware config
-        [nrfData] = ble;
-      }
-
-      if (firmware && Array.isArray(firmware)) {
-        const paredFirmwareConfig = firmware.map(firm => {
-          if (firm.changelog) return firm;
-          return {
-            ...firm,
-            changelog: firm.changelog_cn,
-          };
-        });
-
-        // @ts-expect-error
-        this.assets['firmware-t1'] = paredFirmwareConfig;
-        this.assets.ble = ble;
-      }
-      if (mini_firmware && Array.isArray(mini_firmware)) {
-        const paredFirmwareConfig = mini_firmware.map(firm => {
-          if (firm.changelog) return firm;
-          return {
-            ...firm,
-            changelog: firm.changelog_cn,
-          };
-        });
-
-        // @ts-expect-error
-        this.assets['firmware-mini'] = paredFirmwareConfig;
-
-        this.assets.bridge = bridge;
-      }
+      this.deviceMap = {
+        classic: data.classic,
+        mini: data.mini,
+        touch: data.touch,
+        pro: data.pro,
+      };
+      this.assets = {
+        bridge: data.bridge,
+      };
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.log('fetch data error', e.message);
+      // ignore
     }
-
-    if (typeof window !== 'undefined' && window?.parent) {
-      window?.parent?.postMessage?.(
-        {
-          type: 'UPDATE_NRF_DATA',
-          data: nrfData ?? this.assets.nrf,
-        },
-        '*'
-      );
-    }
-
-    const protobufPromises = this.config.messages.map(async protobuf => {
-      const json = await httpRequest(`${protobuf.json}${ts}`, 'json');
-      this.messages[protobuf.name] = typeof json === 'string' ? JSON.parse(json) : json;
-    });
-    await Promise.all(protobufPromises);
-
-    // parse bridge JSON
-    parseBridgeJSON(this.assets.bridge);
-
-    // parse firmware definitions
-    parseFirmware(this.assets['firmware-t1'], 1);
-    parseFirmware(this.assets['firmware-t2'], 2);
-    parseFirmware(this.assets['firmware-mini'], 'mini');
-    parseBLEFirmware(this.assets.ble);
   }
 
   static getProtobufMessages() {
     return this.messages.default;
-  }
-
-  static isWhitelisted(origin: string) {
-    const uri = parseUri(origin);
-    if (uri && typeof uri.host === 'string') {
-      const parts = uri.host.split('.');
-      if (parts.length > 2) {
-        // subdomain
-        uri.host = parts.slice(parts.length - 2, parts.length).join('.');
-      }
-      return this.config.whitelist.find(item => item.origin === origin || item.origin === uri.host);
-    }
   }
 
   static getSettings(key?: undefined): ConnectSettings;
