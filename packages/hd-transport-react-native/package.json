@@ -14,7 +14,8 @@
   "scripts": {
     "test": "echo \"Error: run tests from root\" && exit 1"
   },
-  "bugs": {
-    "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
+  "dependencies": {
+    "@onekeyfe/hd-transport": "*",
+    "react-native-ble-plx": "^2.0.3"
   }
 }
