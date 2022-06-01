@@ -1,0 +1,20 @@
+{
+  "name": "hd-transport-react-native",
+  "version": "1.0.0",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "MIT",
+  "main": "lib/hd-transport-react-native.js",
+  "publishConfig": {
+    "registry": "http://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "scripts": {
+    "test": "echo \"Error: run tests from root\" && exit 1"
+  },
+  "bugs": {
+    "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
+  }
+}
