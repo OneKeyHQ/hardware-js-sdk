@@ -5,7 +5,13 @@ import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
 
 import { initLog, Deferred, create as createDeferred } from '../utils';
-import { getDeviceLabel, getDeviceUUID } from '../utils/deviceFeaturesUtils';
+import {
+  getDeviceFirmwareVersion,
+  getDeviceLabel,
+  getDeviceType,
+  getDeviceUUID,
+  getDeviceBLEFirmwareVersion,
+} from '../utils/deviceFeaturesUtils';
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { UI_REQUEST } from '../constants/ui-request';
 import { ERRORS } from '../constants';
@@ -89,12 +95,15 @@ export class Device extends EventEmitter {
     return {
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
+      deviceType: getDeviceType(this.features),
       /** ID for current seeds, will clear after replace a new seed at device */
       deviceId: this.features.device_id || null,
       path: this.originalDescriptor.path,
       label: getDeviceLabel(this.features),
       mode: this.getMode(),
       features: this.features,
+      firmwareVersion: this.getFirmwareVersion(),
+      bleFirmwareVersion: this.getBLEFirmwareVersion(),
       unavailableCapabilities: this.unavailableCapabilities,
     };
   }
@@ -285,6 +294,16 @@ export class Device extends EventEmitter {
     if (!this.features?.initialized) return 'initialize';
     if (this.features?.no_backup) return 'seedless';
     return 'normal';
+  }
+
+  getFirmwareVersion() {
+    if (!this.features) return null;
+    return getDeviceFirmwareVersion(this.features);
+  }
+
+  getBLEFirmwareVersion() {
+    if (!this.features) return null;
+    return getDeviceBLEFirmwareVersion(this.features);
   }
 
   isUsed() {
