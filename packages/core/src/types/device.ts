@@ -1,4 +1,5 @@
 import type { PROTO } from '../constants';
+import { IVersionArray } from './settings';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -15,12 +16,15 @@ export type UnavailableCapabilities = { [key: string]: UnavailableCapability };
 export type KnownDevice = {
   uuid: string;
   deviceId: string | null;
+  deviceType: IDeviceType;
   path: string;
   label: string;
   error?: typeof undefined;
   mode: DeviceMode;
   features: PROTO.Features;
   unavailableCapabilities: UnavailableCapabilities;
+  bleFirmwareVersion: IVersionArray | null;
+  firmwareVersion: IVersionArray | null;
 };
 
 // export type UnknownDevice = {

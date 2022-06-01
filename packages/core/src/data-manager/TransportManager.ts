@@ -36,7 +36,7 @@ export default class TransportManager {
     }
   }
 
-  static async reconfigure(messages: JSON | number[]) {
+  static async reconfigure(messages?: JSON | number[] | null) {
     if (Array.isArray(messages)) {
       messages = DataManager.getProtobufMessages();
     }
