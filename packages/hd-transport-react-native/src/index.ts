@@ -313,7 +313,12 @@ export default class ReactNativeBleTransport {
     try {
       const response = await this.runPromise.promise;
 
-      console.log('runPromise response is : ', response);
+      if (typeof response !== 'string') {
+        throw new Error('Returning data is not string.');
+      }
+
+      const jsonData = receiveOne(messages, response);
+      return check.call(jsonData);
     } catch (e) {
       return e;
     } finally {
