@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 import transport from '@onekeyfe/hd-transport';
-import { BleManager, Device, BleErrorCode, Characteristic } from 'react-native-ble-plx';
+import { BleManager as BlePlxManager, Device, BleErrorCode, Characteristic } from 'react-native-ble-plx';
 import { subscribeBleOn } from './subscribeBleOn';
 import { isOnekeyDevice, getBluetoothServiceUuids, getInfosForServiceUuid } from './constants';
 import type { BleAcquireInput, TransportOptions } from './types';
@@ -11,7 +11,7 @@ import { isHeaderChunk } from './utils/validateNotify';
 
 const { check, buildBuffer, receiveOne, parseConfigure } = transport;
 
-const bleManager = new BleManager();
+const blePlxManager = new BlePlxManager();
 
 const transportCache: Record<string, any> = {};
 
@@ -66,8 +66,8 @@ export default class ReactNativeBleTransport {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<Device[]>(async resolve => {
       const deviceList: Device[] = [];
-      await subscribeBleOn(bleManager);
-      bleManager.startDeviceScan(null, null, (error, device) => {
+      await subscribeBleOn(blePlxManager);
+      blePlxManager.startDeviceScan(null, null, (error, device) => {
         if (error) {
           console.log('ble scan error: ', error);
           return;
@@ -108,15 +108,15 @@ export default class ReactNativeBleTransport {
       return { uuid };
     }
 
-    await subscribeBleOn(bleManager);
+    await subscribeBleOn(blePlxManager);
 
     if (!device) {
-      const devices = await bleManager.devices([uuid]);
+      const devices = await blePlxManager.devices([uuid]);
       [device] = devices;
     }
 
     if (!device) {
-      const connectedDevice = await bleManager.connectedDevices(getBluetoothServiceUuids());
+      const connectedDevice = await blePlxManager.connectedDevices(getBluetoothServiceUuids());
       const deviceFilter = connectedDevice.filter(device => device.id === uuid);
       console.log(`found connected device count: ${deviceFilter.length}`);
       [device] = deviceFilter;
@@ -125,12 +125,12 @@ export default class ReactNativeBleTransport {
     if (!device) {
       console.log('try to connect to device: ', uuid);
       try {
-        device = await bleManager.connectToDevice(uuid, connectOptions);
+        device = await blePlxManager.connectToDevice(uuid, connectOptions);
       } catch (e) {
         console.log('try to connect to device has error: ', e);
         if (e.errorCode === BleErrorCode.DeviceMTUChangeFailed) {
           connectOptions = {};
-          device = await bleManager.connectToDevice(uuid);
+          device = await blePlxManager.connectToDevice(uuid);
         } else {
           throw e;
         }
@@ -273,7 +273,7 @@ export default class ReactNativeBleTransport {
       delete transportCache[uuid];
     }
 
-    await bleManager.cancelDeviceConnection(uuid);
+    await blePlxManager.cancelDeviceConnection(uuid);
     console.log(`user disconnect(${uuid}`);
   }
 
