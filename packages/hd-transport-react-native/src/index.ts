@@ -90,11 +90,16 @@ export default class ReactNativeBleTransport {
 
   async acquire(input: BleAcquireInput) {
     const { uuid } = input;
+
+    if (!uuid) {
+      throw new Error('uuid is required');
+    }
+
     let device;
 
     if (transportCache[uuid]) {
       console.log('transport in cache, using that');
-      return;
+      return { uuid };
     }
 
     await subscribeBleOn(bleManager);
@@ -211,6 +216,8 @@ export default class ReactNativeBleTransport {
       transport.nofitySubscription?.();
       delete transportCache[uuid];
     });
+
+    return { uuid };
   }
 
   _monitorCharacteristic(characteristic: Characteristic) {

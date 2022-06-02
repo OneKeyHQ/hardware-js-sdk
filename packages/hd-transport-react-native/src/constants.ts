@@ -36,10 +36,8 @@ const OneKeyServices: Record<string, BluetoothServices> = {
 const bluetoothServices: string[] = [];
 
 for (const deviceType of Object.keys(OneKeyServices)) {
-  const { services } = OneKeyServices[deviceType];
-  for (const service of Object.keys(services)) {
-    bluetoothServices.push(service);
-  }
+  const services = OneKeyServices[deviceType];
+  bluetoothServices.push(...Object.keys(services));
 }
 
 export const getBluetoothServiceUuids = () => bluetoothServices;
