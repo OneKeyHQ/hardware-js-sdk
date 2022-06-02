@@ -92,6 +92,11 @@ export default class ReactNativeBleTransport {
     const { uuid } = input;
     let device;
 
+    if (transportCache[uuid]) {
+      console.log('transport in cache, using that');
+      return;
+    }
+
     await subscribeBleOn(bleManager);
 
     if (!device) {
@@ -198,12 +203,17 @@ export default class ReactNativeBleTransport {
     }
 
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
+    transport.nofitySubscription = this._monitorCharacteristic(transport.notifyCharacteristic);
     transportCache[uuid] = transport;
 
-    this.monitorCharacteristic(transport.notifyCharacteristic);
+    device.onDisconnected(() => {
+      console.log('device disconnected');
+      transport.nofitySubscription?.();
+      delete transportCache[uuid];
+    });
   }
 
-  monitorCharacteristic(characteristic: Characteristic) {
+  _monitorCharacteristic(characteristic: Characteristic) {
     const subscription = characteristic.monitor((error, c) => {
       if (error) {
         console.log(`error monitor ${characteristic.uuid}: ${error as unknown as string}`);
@@ -227,5 +237,49 @@ export default class ReactNativeBleTransport {
       console.log('remove characteristic monitor: ', characteristic.uuid);
       subscription.remove();
     };
+  }
+
+  async release(uuid: string) {
+    const transport = transportCache[uuid];
+
+    if (transport) {
+      delete transportCache[uuid];
+    }
+
+    await bleManager.cancelDeviceConnection(uuid);
+    console.log(`user disconnect(${uuid}`);
+  }
+
+  async call(uuid: string, name: string, data: Record<string, unknown>) {
+    if (!this.stopped) {
+      // eslint-disable-next-line prefer-promise-reject-errors
+      return Promise.reject('Transport stopped.');
+    }
+    if (this._messages == null) {
+      throw new Error('Transport not configured.');
+    }
+    const transport = transportCache[uuid] as BleTransport;
+    if (!transport) {
+      throw new Error('Transport not found.');
+    }
+    const messages = this._messages;
+    console.log(
+      'transport-react-native',
+      'call-',
+      'messages: ',
+      messages,
+      ' name: ',
+      name,
+      ' data: ',
+      data
+    );
+    const o = buildOne(messages, name, data);
+    const outData = o.toString('base64');
+    await transport.writeCharacteristic.writeWithResponse(outData);
+    // TODO: deferred Promis
+  }
+
+  stop() {
+    this.stopped = true;
   }
 }

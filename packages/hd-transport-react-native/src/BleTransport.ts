@@ -11,6 +11,8 @@ export default class BleTransport {
 
   notifyCharacteristic: Characteristic;
 
+  nofitySubscription?: () => void;
+
   constructor(
     device: Device,
     writeCharacteristic: Characteristic,
