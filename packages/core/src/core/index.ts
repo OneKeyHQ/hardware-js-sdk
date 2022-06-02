@@ -98,7 +98,7 @@ export const callAPI = async (message: CoreMessage) => {
 
       // reconfigure messages
       if (_deviceList) {
-        await TransportManager.reconfigure(device.getVersion());
+        await TransportManager.reconfigure(device.getFirmwareVersion());
       }
 
       try {

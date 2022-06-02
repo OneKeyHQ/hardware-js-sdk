@@ -1,13 +1,20 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
+
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
+
 import { initLog, Deferred, create as createDeferred } from '../utils';
-import { parseCapabilities, getDeviceType } from '../utils/deviceFeaturesUtils';
+import {
+  getDeviceFirmwareVersion,
+  getDeviceLabel,
+  getDeviceType,
+  getDeviceUUID,
+  getDeviceBLEFirmwareVersion,
+} from '../utils/deviceFeaturesUtils';
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { UI_REQUEST } from '../constants/ui-request';
 import { ERRORS } from '../constants';
-import { DEVICE } from '../events';
 
 type RunOptions = {
   keepSession?: boolean;
@@ -45,7 +52,7 @@ export class Device extends EventEmitter {
   /**
    * 设备信息
    */
-  features: Features;
+  features: Features | undefined = undefined;
 
   /**
    * 是否需要更新设备信息
@@ -82,36 +89,21 @@ export class Device extends EventEmitter {
   }
 
   // simplified object to pass via postMessage
-  toMessageObject(): DeviceTyped {
-    if (this.originalDescriptor.path === DEVICE.UNREADABLE) {
-      return {
-        type: 'unreadable',
-        path: this.originalDescriptor.path,
-        label: 'Unreadable device',
-        error: '',
-      };
-    }
-    if (this.isUnacquired()) {
-      return {
-        type: 'unacquired',
-        path: this.originalDescriptor.path,
-        label: 'Unacquired device',
-      };
-    }
-    const deviceType = getDeviceType(this.features);
-    const defaultLabel: string = deviceType === 'mini' ? 'My OneKey Mini' : 'My OneKey';
-    const label =
-      this.features.label === '' || !this.features.label ? defaultLabel : this.features.label;
+  toMessageObject(): DeviceTyped | null {
+    if (this.isUnacquired() || !this.features) return null;
+
     return {
-      type: 'acquired',
-      id: this.features.device_id || null,
+      /** Hardware ID, will not change at any time */
+      uuid: getDeviceUUID(this.features),
+      deviceType: getDeviceType(this.features),
+      /** ID for current seeds, will clear after replace a new seed at device */
+      deviceId: this.features.device_id || null,
       path: this.originalDescriptor.path,
-      label,
-      state: this.getExternalState(),
-      // eslint-disable-next-line no-nested-ternary
-      status: this.isUsedElsewhere() ? 'occupied' : this.featuresNeedsReload ? 'used' : 'available',
+      label: getDeviceLabel(this.features),
       mode: this.getMode(),
       features: this.features,
+      firmwareVersion: this.getFirmwareVersion(),
+      bleFirmwareVersion: this.getBLEFirmwareVersion(),
       unavailableCapabilities: this.unavailableCapabilities,
     };
   }
@@ -211,9 +203,6 @@ export class Device extends EventEmitter {
   }
 
   _updateFeatures(feat: Features) {
-    const capabilities = parseCapabilities(feat);
-    feat.capabilities = capabilities;
-
     // GetFeatures doesn't return 'session_id'
     if (this.features && this.features.session_id && !feat.session_id) {
       feat.session_id = this.features.session_id;
@@ -300,20 +289,21 @@ export class Device extends EventEmitter {
     }
   }
 
-  getVersion(): number[] {
-    if (!this.features) return [];
-    return [this.features.major_version, this.features.minor_version, this.features.patch_version];
-  }
-
   getMode() {
-    if (this.features.bootloader_mode) return 'bootloader';
-    if (!this.features.initialized) return 'initialize';
-    if (this.features.no_backup) return 'seedless';
+    if (this.features?.bootloader_mode) return 'bootloader';
+    if (!this.features?.initialized) return 'initialize';
+    if (this.features?.no_backup) return 'seedless';
     return 'normal';
   }
 
-  getExternalState() {
-    return this.externalState[this.instance];
+  getFirmwareVersion() {
+    if (!this.features) return null;
+    return getDeviceFirmwareVersion(this.features);
+  }
+
+  getBLEFirmwareVersion() {
+    if (!this.features) return null;
+    return getDeviceBLEFirmwareVersion(this.features);
   }
 
   isUsed() {
@@ -338,10 +328,6 @@ export class Device extends EventEmitter {
 
   isSeedless() {
     return this.features && !!this.features.no_backup;
-  }
-
-  isT1() {
-    return this.features ? this.features.major_version === 1 : false;
   }
 
   isUnacquired(): boolean {
