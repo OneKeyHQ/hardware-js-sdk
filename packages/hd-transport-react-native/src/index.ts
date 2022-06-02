@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import transport from '@onekeyfe/hd-transport';
 import { BleManager, Device, BleErrorCode, Characteristic } from 'react-native-ble-plx';
 import { subscribeBleOn } from './subscribeBleOn';
@@ -5,8 +6,11 @@ import { isOnekeyDevice, getBluetoothServiceUuids, getInfosForServiceUuid } from
 import type { BleAcquireInput, TransportOptions } from './types';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';
+import { Deferred, create as createDeferred } from './utils/deferred';
+import { isHeaderChunk } from './utils/validateNotify';
 
-const { check, buildOne, receiveOne, parseConfigure } = transport;
+const { check, buildBuffer, receiveOne, parseConfigure } = transport;
+
 const bleManager = new BleManager();
 
 const transportCache: Record<string, any> = {};
@@ -32,6 +36,8 @@ export default class ReactNativeBleTransport {
   stopped = false;
 
   scanTimeout = 3000;
+
+  runPromise: Deferred<any> | null = null;
 
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? 3000;
@@ -221,6 +227,8 @@ export default class ReactNativeBleTransport {
   }
 
   _monitorCharacteristic(characteristic: Characteristic) {
+    let bufferLength = 0;
+    let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
       if (error) {
         console.log(`error monitor ${characteristic.uuid}: ${error as unknown as string}`);
@@ -233,10 +241,22 @@ export default class ReactNativeBleTransport {
 
       try {
         const data = Buffer.from(c.value as string, 'base64');
-        // TODO: 处理 data 数据
+        if (isHeaderChunk(data)) {
+          bufferLength = data.readInt32BE(5);
+          buffer = [...data.subarray(3)];
+        } else {
+          buffer = buffer.concat([...data]);
+        }
+
+        if (buffer.length >= bufferLength) {
+          const value = Buffer.from(buffer);
+          bufferLength = 0;
+          buffer = [];
+          this.runPromise?.resolve(value.toString('hex'));
+        }
       } catch (error) {
         console.log('monitor data error: ', error);
-        throw error;
+        this.runPromise?.reject(error);
       }
     });
 
@@ -258,17 +278,24 @@ export default class ReactNativeBleTransport {
   }
 
   async call(uuid: string, name: string, data: Record<string, unknown>) {
-    if (!this.stopped) {
+    if (this.stopped) {
       // eslint-disable-next-line prefer-promise-reject-errors
       return Promise.reject('Transport stopped.');
     }
     if (this._messages == null) {
       throw new Error('Transport not configured.');
     }
+
+    if (this.runPromise) {
+      throw new Error('Transport_CallInProgress');
+    }
+
     const transport = transportCache[uuid] as BleTransport;
     if (!transport) {
       throw new Error('Transport not found.');
     }
+
+    this.runPromise = createDeferred();
     const messages = this._messages;
     console.log(
       'transport-react-native',
@@ -280,10 +307,18 @@ export default class ReactNativeBleTransport {
       ' data: ',
       data
     );
-    const o = buildOne(messages, name, data);
+    const o = buildBuffer(messages, name, data);
     const outData = o.toString('base64');
     await transport.writeCharacteristic.writeWithResponse(outData);
-    // TODO: deferred Promis
+    try {
+      const response = await this.runPromise.promise;
+
+      console.log('runPromise response is : ', response);
+    } catch (e) {
+      return e;
+    } finally {
+      this.runPromise = null;
+    }
   }
 
   stop() {
