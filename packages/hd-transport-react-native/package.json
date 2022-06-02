@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@onekeyfe/hd-transport": "*",
+    "react-native-ble-manager": "^8.1.0",
     "react-native-ble-plx": "^2.0.3"
   }
 }

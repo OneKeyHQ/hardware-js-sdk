@@ -11082,6 +11082,11 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.1.0.tgz#61aaed3096d30eacf2a2127118b5b41387d32a67"
   integrity sha512-Fl7FuabXsJnV5Q1qIOQwx/sagGF18kogb4gpfcG4gjLBWO0WDiiz1ko/ExayuxE7InyQkBLkxRFG5oxY6Uu3Kg==
 
+react-native-ble-manager@^8.1.0:
+  version "8.1.0"
+  resolved "https://registry.yarnpkg.com/react-native-ble-manager/-/react-native-ble-manager-8.1.0.tgz#e4a3a733f22257643efa5f4a01a2708ceaae6d9c"
+  integrity sha512-ikQsrGJ5D109a9ZpodGJW1bdIc5QOXBJSJHzL2rq+dNOZj0j8pm+b3F4TWvggABhbnDsZ0MJJ/VB+09rs5/NRA==
+
 react-native-ble-plx@^2.0.3:
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/react-native-ble-plx/-/react-native-ble-plx-2.0.3.tgz#b0a746f33389dbf7fd7b158513330d487d5d0fbb"
