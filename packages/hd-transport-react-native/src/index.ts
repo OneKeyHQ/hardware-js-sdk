@@ -1,13 +1,19 @@
 import { Buffer } from 'buffer';
 import transport from '@onekeyfe/hd-transport';
-import { BleManager as BlePlxManager, Device, BleErrorCode, Characteristic } from 'react-native-ble-plx';
+import {
+  BleManager as BlePlxManager,
+  Device,
+  BleErrorCode,
+  Characteristic,
+} from 'react-native-ble-plx';
+import { getConnectedDeviceIds } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import { isOnekeyDevice, getBluetoothServiceUuids, getInfosForServiceUuid } from './constants';
-import type { BleAcquireInput, TransportOptions } from './types';
-import BleTransport from './BleTransport';
-import timer from './utils/timer';
 import { Deferred, create as createDeferred } from './utils/deferred';
 import { isHeaderChunk } from './utils/validateNotify';
+import BleTransport from './BleTransport';
+import timer from './utils/timer';
+import type { BleAcquireInput, TransportOptions } from './types';
 
 const { check, buildBuffer, receiveOne, parseConfigure } = transport;
 
@@ -75,20 +81,27 @@ export default class ReactNativeBleTransport {
 
         if (isOnekeyDevice(device?.name ?? null, device?.id)) {
           console.log('search device start ======================');
+
           const { name, localName, id } = device ?? {};
           console.log(`device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`);
           deviceList.push(device as unknown as Device);
-
-          if (deviceList.length >= 5) {
-            resolve(deviceList);
-            removeTimeout();
-          }
 
           console.log('search device end ======================\n');
         }
       });
 
-      const removeTimeout = timer.timeout(() => {
+      getConnectedDeviceIds(getBluetoothServiceUuids()).then(async ids => {
+        for (const id of ids) {
+          const device = await blePlxManager.connectToDevice(id, {
+            ...connectOptions,
+            refreshGatt: 'OnConnected',
+            autoConnect: false,
+          });
+          deviceList.push(device);
+        }
+      });
+
+      timer.timeout(() => {
         resolve(deviceList);
       }, this.scanTimeout);
     });

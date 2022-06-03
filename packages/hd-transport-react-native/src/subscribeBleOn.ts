@@ -1,7 +1,8 @@
-import { BleManager } from './types';
+import { BlePlxManager } from './types';
 import timer from './utils/timer';
+import { initializeBleManager } from './BleManager';
 
-export const subscribeBleOn = (bleManager: BleManager, ms = 3000): Promise<void> =>
+export const subscribeBleOn = (bleManager: BlePlxManager, ms = 3000): Promise<void> =>
   new Promise((resolve, reject) => {
     let done = false;
     let lastState = 'Unknown';
@@ -16,6 +17,7 @@ export const subscribeBleOn = (bleManager: BleManager, ms = 3000): Promise<void>
         clearTimeout();
         done = true;
         subscription.remove();
+        initializeBleManager();
         resolve();
       }
     }, true);
