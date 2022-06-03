@@ -5,10 +5,11 @@ import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { init } from './init';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { checkTransportRelease } from './checkTransportRelease';
+import { btcGetAddress } from './btcGetAddress';
+import { btcGetPublicKey } from './btcGetPublicKey';
 import { evmGetAddress } from './evmGetAddress';
 import { evmGetPublicKey } from './evmGetPublicKey';
 import { evmSignMessage } from './evmSignMessage';
-import { btcGetAddress } from './btcGetAddress';
 import { evmSignMessageEIP712 } from './evmSignMessageEIP712';
 import { evmSignTransaction } from './evmSignTransaction';
 import { evmVerifyMessage } from './evmVerifyMessage';
@@ -45,4 +46,5 @@ export type CoreApi = {
   evmVerifyMessage: typeof evmVerifyMessage;
 
   btcGetAddress: typeof btcGetAddress;
+  btcGetPublicKey: typeof btcGetPublicKey;
 };
