@@ -6,7 +6,7 @@ import {
   BleErrorCode,
   Characteristic,
 } from 'react-native-ble-plx';
-import { getConnectedDeviceIds } from './BleManager';
+import { initializeBleManager, getConnectedDeviceIds } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import { isOnekeyDevice, getBluetoothServiceUuids, getInfosForServiceUuid } from './constants';
 import { Deferred, create as createDeferred } from './utils/deferred';
@@ -50,7 +50,7 @@ export default class ReactNativeBleTransport {
   }
 
   init() {
-    // empty
+    initializeBleManager();
   }
 
   configure(signedData: any) {
@@ -97,6 +97,7 @@ export default class ReactNativeBleTransport {
             refreshGatt: 'OnConnected',
             autoConnect: false,
           });
+          console.log('search connected peripheral: ', device.id);
           deviceList.push(device);
         }
       });
