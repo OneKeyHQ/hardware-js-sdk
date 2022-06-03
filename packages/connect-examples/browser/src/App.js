@@ -299,7 +299,6 @@ function App() {
           <CallMethod
             title="evmVerifyMessage"
             option={[
-              { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
               {
                 name: 'address',
                 value: '0xdA0b608bdb1a4A154325C854607c68950b4F1a34',
@@ -355,6 +354,50 @@ function App() {
             ]}
             onCall={data =>
               HardwareWebSdk.btcGetPublicKey({
+                device: { ...currentDevice },
+                ...data,
+              })
+            }
+          />
+
+          <CallMethod
+            title="btcSignMessage"
+            option={[
+              { name: 'path', value: "m/44'/0'/0'/0/0", type: 'string' },
+              { name: 'coin', value: 'btc', type: 'string' },
+              {
+                name: 'messageHex',
+                value: '4578616d706c65206d657373616765', // 'Example message'
+                type: 'string',
+              },
+            ]}
+            onCall={data =>
+              HardwareWebSdk.btcSignMessage({
+                device: { ...currentDevice },
+                ...data,
+              })
+            }
+          />
+
+          <CallMethod
+            title="btcVerifyMessage"
+            option={[
+              { name: 'address', value: '3BD8TL6iShVzizQzvo789SuynEKGpLTms9', type: 'string' },
+              { name: 'coin', value: 'btc', type: 'string' },
+              {
+                name: 'messageHex',
+                value: '0x6578616d706c65206d657373616765', // 'example message'
+                type: 'string',
+              },
+              {
+                name: 'signature',
+                value:
+                  '0x24eeef2f7b4e075a90c9f49e2152ef744c3d1b5b42bcbfa5363efc5c3015338b7a529b400ecde45c34cedbed9978438b14be3ffb09be041752a68de46f70a7b1ab',
+                type: 'string',
+              },
+            ]}
+            onCall={data =>
+              HardwareWebSdk.btcVerifyMessage({
                 device: { ...currentDevice },
                 ...data,
               })

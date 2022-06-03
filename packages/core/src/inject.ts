@@ -66,6 +66,8 @@ export const inject = ({ eventEmitter, init, call, dispose }: InjectApi): CoreAp
 
     btcGetAddress: params => call({ ...params, method: 'btcGetAddress' }),
     btcGetPublicKey: params => call({ ...params, method: 'btcGetPublicKey' }),
+    btcSignMessage: params => call({ ...params, method: 'btcSignMessage' }),
+    btcVerifyMessage: params => call({ ...params, method: 'btcVerifyMessage' }),
   };
   return api;
 };

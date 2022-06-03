@@ -10,15 +10,21 @@ const CallMethod = ({ title, option, onCall }) => {
   const onSubmit = async e => {
     e.preventDefault();
     const callData = {};
+
     data.forEach(item => {
+      let { value } = item;
+      if (value === '') {
+        value = undefined;
+      }
+
       if (item.name.includes('.')) {
         const split = item.name.split('.');
         for (let i = 0; i < split.length - 1; i++) {
           callData[split[i]] = callData[split[i]] || {};
         }
-        callData[split[split.length - 2]][split[split.length - 1]] = item.value;
+        callData[split[split.length - 2]][split[split.length - 1]] = value;
       } else {
-        callData[item.name] = item.value;
+        callData[item.name] = value;
       }
     });
     const res = await onCall(callData);

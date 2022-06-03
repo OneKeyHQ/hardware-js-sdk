@@ -7,6 +7,8 @@ import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { checkTransportRelease } from './checkTransportRelease';
 import { btcGetAddress } from './btcGetAddress';
 import { btcGetPublicKey } from './btcGetPublicKey';
+import { btcSignMessage } from './btcSignMessage';
+import { btcVerifyMessage } from './btcVerifyMessage';
 import { evmGetAddress } from './evmGetAddress';
 import { evmGetPublicKey } from './evmGetPublicKey';
 import { evmSignMessage } from './evmSignMessage';
@@ -47,4 +49,6 @@ export type CoreApi = {
 
   btcGetAddress: typeof btcGetAddress;
   btcGetPublicKey: typeof btcGetPublicKey;
+  btcSignMessage: typeof btcSignMessage;
+  btcVerifyMessage: typeof btcVerifyMessage;
 };

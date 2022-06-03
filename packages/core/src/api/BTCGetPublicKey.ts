@@ -1,4 +1,4 @@
-import { Address, GetAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { Address, GetPublicKey } from '@onekeyfe/hd-transport/src/types/messages';
 import { UI_REQUEST } from '../constants/ui-request';
 import { getScriptType, validatePath } from './helpers/pathUtils';
 import { BaseMethod } from './BaseMethod';
@@ -17,7 +17,7 @@ export default class BTCGetPublicKey extends BaseMethod {
 
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);
 
-    const params: GetAddress[] = [];
+    const params: GetPublicKey[] = [];
 
     payload.bundle.forEach((batch: BTCGetAddressParams) => {
       const address_n = validatePath(batch.path, 1);
