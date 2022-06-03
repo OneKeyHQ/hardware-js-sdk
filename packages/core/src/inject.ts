@@ -53,6 +53,16 @@ export const inject = ({ eventEmitter, init, call, dispose }: InjectApi): CoreAp
      * 检查 bridge 版本
      */
     checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
+
+    /**
+     * 获取 ethereum 地址
+     */
+    evmGetAddress: params => call({ ...params, method: 'evmGetAddress' }),
+    evmGetPublicKey: params => call({ ...params, method: 'evmGetPublicKey' }),
+    evmSignMessage: params => call({ ...params, method: 'evmSignMessage' }),
+    evmSignMessageEIP712: params => call({ ...params, method: 'evmSignMessageEIP712' }),
+    evmSignTransaction: params => call({ ...params, method: 'evmSignTransaction' }),
+    evmVerifyMessage: params => call({ ...params, method: 'evmVerifyMessage' }),
   };
   return api;
 };

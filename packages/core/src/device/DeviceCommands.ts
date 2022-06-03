@@ -69,7 +69,6 @@ export class DeviceCommands {
       const promise = this.transport.call(this.sessionId, type, msg) as any;
       this.callPromise = promise;
       const res = await promise;
-      Log.debug('[DeviceCommands] [call] Received', res.type);
       return res;
     } catch (error) {
       Log.debug('[DeviceCommands] [call] Received error', error);

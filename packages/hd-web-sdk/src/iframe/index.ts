@@ -56,7 +56,7 @@ export async function init(payload: IFrameInit['payload']) {
     targetOrigin: getOrigin(settings.parentOrigin as string),
     receiveHandler: async messageEvent => {
       const message = parseMessage(messageEvent);
-      console.log('Frame Bridge Receive message: ', message);
+      Log.debug('Frame Bridge Receive message: ', message);
 
       const response = await _core?.handleMessage(message);
       Log.debug('Frame Bridge response data: ', response);

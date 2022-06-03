@@ -5,6 +5,13 @@ import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { init } from './init';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { checkTransportRelease } from './checkTransportRelease';
+import { evmGetAddress } from './evmGetAddress';
+import { evmGetPublicKey } from './evmGetPublicKey';
+import { evmSignMessage } from './evmSignMessage';
+import { btcGetAddress } from './btcGetAddress';
+import { evmSignMessageEIP712 } from './evmSignMessageEIP712';
+import { evmSignTransaction } from './evmSignTransaction';
+import { evmVerifyMessage } from './evmVerifyMessage';
 
 export type CoreApi = {
   /**
@@ -29,4 +36,11 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
 
   checkTransportRelease: typeof checkTransportRelease;
+
+  evmGetAddress: typeof evmGetAddress;
+  evmGetPublicKey: typeof evmGetPublicKey;
+  evmSignMessage: typeof evmSignMessage;
+  evmSignMessageEIP712: typeof evmSignMessageEIP712;
+  evmSignTransaction: typeof evmSignTransaction;
+  evmVerifyMessage: typeof evmVerifyMessage;
 };

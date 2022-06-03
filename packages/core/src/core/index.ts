@@ -107,6 +107,7 @@ export const callAPI = async (message: CoreMessage) => {
         messageResponse = createResponseMessage(method.responseID, true, response);
         _callPromise?.resolve(messageResponse);
       } catch (error) {
+        Log.debug('Call API - Inner Method Run Error: ', error);
         return Promise.reject(error);
       }
     };
