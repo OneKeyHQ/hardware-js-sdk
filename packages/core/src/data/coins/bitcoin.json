@@ -1,0 +1,274 @@
+[
+  {
+    "name": "Bitcoin",
+    "slip44": 0,
+    "segwit": true,
+    "coin_label": "Bitcoin",
+    "coin_name": "Bitcoin",
+    "coin_shortcut": "BTC"
+  },
+  {
+    "name": "Testnet",
+    "slip44": 1,
+    "segwit": true,
+    "coin_label": "Testnet",
+    "coin_name": "Testnet",
+    "coin_shortcut": "TEST"
+  },
+  {
+    "name": "Actinium",
+    "slip44": 228,
+    "segwit": true,
+    "coin_label": "Actinium",
+    "coin_name": "Actinium",
+    "coin_shortcut": "ACM"
+  },
+  {
+    "name": "Axe",
+    "slip44": 4242,
+    "segwit": false,
+    "coin_label": "Axe",
+    "coin_name": "Axe",
+    "coin_shortcut": "AXE"
+  },
+  {
+    "name": "Bitcore",
+    "slip44": 160,
+    "segwit": true,
+    "coin_label": "Bitcore",
+    "coin_name": "Bitcore",
+    "coin_shortcut": "BTX"
+  },
+  {
+    "name": "Dash",
+    "slip44": 5,
+    "segwit": false,
+    "coin_label": "Dash",
+    "coin_name": "Dash",
+    "coin_shortcut": "DASH"
+  },
+  {
+    "name": "Dash Testnet",
+    "slip44": 1,
+    "segwit": false,
+    "coin_label": "Dash Testnet",
+    "coin_name": "Dash Testnet",
+    "coin_shortcut": "tDASH"
+  },
+  {
+    "name": "DigiByte",
+    "slip44": 20,
+    "segwit": true,
+    "coin_label": "DigiByte",
+    "coin_name": "DigiByte",
+    "coin_shortcut": "DGB"
+  },
+  {
+    "name": "Dogecoin",
+    "slip44": 3,
+    "segwit": false,
+    "coin_label": "Dogecoin",
+    "coin_name": "Dogecoin",
+    "coin_shortcut": "DOGE"
+  },
+  {
+    "name": "Feathercoin",
+    "slip44": 8,
+    "segwit": true,
+    "coin_label": "Feathercoin",
+    "coin_name": "Feathercoin",
+    "coin_shortcut": "FTC"
+  },
+  {
+    "name": "Fujicoin",
+    "slip44": 75,
+    "segwit": true,
+    "coin_label": "Fujicoin",
+    "coin_name": "Fujicoin",
+    "coin_shortcut": "FJC"
+  },
+  {
+    "name": "GameCredits",
+    "slip44": 101,
+    "segwit": true,
+    "coin_label": "GameCredits",
+    "coin_name": "GameCredits",
+    "coin_shortcut": "GAME"
+  },
+  {
+    "name": "Komodo",
+    "slip44": 141,
+    "segwit": false,
+    "coin_label": "Komodo",
+    "coin_name": "Komodo",
+    "coin_shortcut": "KMD"
+  },
+  {
+    "name": "Koto",
+    "slip44": 510,
+    "segwit": false,
+    "coin_label": "Koto",
+    "coin_name": "Koto",
+    "coin_shortcut": "KOTO"
+  },
+  {
+    "name": "Litecoin",
+    "slip44": 2,
+    "segwit": true,
+    "coin_label": "Litecoin",
+    "coin_name": "Litecoin",
+    "coin_shortcut": "LTC"
+  },
+  {
+    "name": "Litecoin Testnet",
+    "slip44": 1,
+    "segwit": true,
+    "coin_label": "Litecoin Testnet",
+    "coin_name": "Litecoin Testnet",
+    "coin_shortcut": "tLTC"
+  },
+  {
+    "name": "Monacoin",
+    "slip44": 22,
+    "segwit": true,
+    "coin_label": "Monacoin",
+    "coin_name": "Monacoin",
+    "coin_shortcut": "MONA"
+  },
+  {
+    "name": "MonetaryUnit",
+    "slip44": 31,
+    "segwit": false,
+    "coin_label": "MonetaryUnit",
+    "coin_name": "MonetaryUnit",
+    "coin_shortcut": "MUE"
+  },
+  {
+    "name": "NIX",
+    "slip44": 400,
+    "segwit": true,
+    "coin_label": "NIX",
+    "coin_name": "NIX",
+    "coin_shortcut": "NIX"
+  },
+  {
+    "name": "Namecoin",
+    "slip44": 7,
+    "segwit": false,
+    "coin_label": "Namecoin",
+    "coin_name": "Namecoin",
+    "coin_shortcut": "NMC"
+  },
+  {
+    "name": "Peercoin",
+    "slip44": 6,
+    "segwit": true,
+    "coin_label": "Peercoin",
+    "coin_name": "Peercoin",
+    "coin_shortcut": "PPC"
+  },
+  {
+    "name": "Peercoin Testnet",
+    "slip44": 1,
+    "segwit": true,
+    "coin_label": "Peercoin Testnet",
+    "coin_name": "Peercoin Testnet",
+    "coin_shortcut": "tPPC"
+  },
+  {
+    "name": "Polis",
+    "slip44": 1997,
+    "segwit": false,
+    "coin_label": "Polis",
+    "coin_name": "Polis",
+    "coin_shortcut": "POLIS"
+  },
+  {
+    "name": "Primecoin",
+    "slip44": 24,
+    "segwit": false,
+    "coin_label": "Primecoin",
+    "coin_name": "Primecoin",
+    "coin_shortcut": "XPM"
+  },
+  {
+    "name": "Ravencoin",
+    "slip44": 175,
+    "segwit": false,
+    "coin_label": "Ravencoin",
+    "coin_name": "Ravencoin",
+    "coin_shortcut": "RVN"
+  },
+  {
+    "name": "Ritocoin",
+    "slip44": 19169,
+    "segwit": false,
+    "coin_label": "Ritocoin",
+    "coin_name": "Ritocoin",
+    "coin_shortcut": "RITO"
+  },
+  {
+    "name": "Stakenet",
+    "slip44": 199,
+    "segwit": true,
+    "coin_label": "Stakenet",
+    "coin_name": "Stakenet",
+    "coin_shortcut": "XSN"
+  },
+  {
+    "name": "Unobtanium",
+    "slip44": 92,
+    "segwit": false,
+    "coin_label": "Unobtanium",
+    "coin_name": "Unobtanium",
+    "coin_shortcut": "UNO"
+  },
+  {
+    "name": "Verge",
+    "slip44": 77,
+    "segwit": false,
+    "coin_label": "Verge",
+    "coin_name": "Verge",
+    "coin_shortcut": "XVG"
+  },
+  {
+    "name": "Vertcoin",
+    "slip44": 28,
+    "segwit": true,
+    "coin_label": "Vertcoin",
+    "coin_name": "Vertcoin",
+    "coin_shortcut": "VTC"
+  },
+  {
+    "name": "Viacoin",
+    "slip44": 14,
+    "segwit": true,
+    "coin_label": "Viacoin",
+    "coin_name": "Viacoin",
+    "coin_shortcut": "VIA"
+  },
+  {
+    "name": "ZCore",
+    "slip44": 428,
+    "segwit": false,
+    "coin_label": "ZCore",
+    "coin_name": "ZCore",
+    "coin_shortcut": "ZCR"
+  },
+  {
+    "name": "Zcash",
+    "slip44": 133,
+    "segwit": false,
+    "coin_label": "Zcash",
+    "coin_name": "Zcash",
+    "coin_shortcut": "ZEC"
+  },
+  {
+    "name": "Zcash Testnet",
+    "slip44": 1,
+    "segwit": false,
+    "coin_label": "Zcash Testnet",
+    "coin_name": "Zcash Testnet",
+    "coin_shortcut": "TAZ"
+  }
+]

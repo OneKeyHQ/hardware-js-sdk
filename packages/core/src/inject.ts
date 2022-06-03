@@ -63,6 +63,8 @@ export const inject = ({ eventEmitter, init, call, dispose }: InjectApi): CoreAp
     evmSignMessageEIP712: params => call({ ...params, method: 'evmSignMessageEIP712' }),
     evmSignTransaction: params => call({ ...params, method: 'evmSignTransaction' }),
     evmVerifyMessage: params => call({ ...params, method: 'evmVerifyMessage' }),
+
+    btcGetAddress: params => call({ ...params, method: 'btcGetAddress' }),
   };
   return api;
 };

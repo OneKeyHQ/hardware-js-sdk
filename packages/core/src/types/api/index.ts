@@ -43,4 +43,6 @@ export type CoreApi = {
   evmSignMessageEIP712: typeof evmSignMessageEIP712;
   evmSignTransaction: typeof evmSignTransaction;
   evmVerifyMessage: typeof evmVerifyMessage;
+
+  btcGetAddress: typeof btcGetAddress;
 };
