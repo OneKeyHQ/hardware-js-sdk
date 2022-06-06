@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { ERRORS } from '../constants';
 import { DeviceList } from '../device/DeviceList';
 import { initLog, create as createDeferred, Deferred } from '../utils';
@@ -164,7 +165,7 @@ function initDevice(method: BaseMethod) {
   return device;
 }
 
-export default class Core {
+export default class Core extends EventEmitter {
   async handleMessage(message: CoreMessage) {
     switch (message.event) {
       case UI_EVENT:
@@ -195,6 +196,7 @@ export const initConnector = () => {
 };
 
 export const init = async (settings: ConnectSettings) => {
+  console.log('init');
   try {
     try {
       await DataManager.load(settings);

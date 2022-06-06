@@ -24,6 +24,7 @@
   "dependencies": {
     "@onekeyfe/hd-transport": "*",
     "@onekeyfe/hd-transport-http": "*",
+    "@onekeyfe/hd-transport-react-native": "*",
     "@onekeyfe/rollout": "1.0.6",
     "axios": "^0.27.2",
     "parse-uri": "^1.0.7",
