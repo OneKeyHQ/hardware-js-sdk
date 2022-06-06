@@ -17,7 +17,7 @@ const dispose = () => {
 };
 
 const init = (settings: Partial<ConnectSettings>) => {
-  _settings = { ..._settings, ...settings };
+  _settings = { ..._settings, ...settings, env: 'react-native' };
 
   enableLog(!!settings.debug);
   Log.debug('init');
