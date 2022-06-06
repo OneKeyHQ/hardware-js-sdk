@@ -1,4 +1,5 @@
 import { Transport, OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { initLog } from '../utils';
 import { resolveAfter } from '../utils/promiseUtils';
@@ -86,8 +87,12 @@ export default class DeviceConnector {
   }
 
   async enumerate() {
+    const env = DataManager.getSettings('env');
     try {
       this.upcoming = await this.transport.enumerate();
+      if (env === 'react-native') {
+        return { descriptors: this.upcoming };
+      }
       const diff = this._reportDevicesChange();
       Log.debug('diff result: ', diff);
       return diff;

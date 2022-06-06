@@ -72,7 +72,15 @@ export default class ReactNativeBleTransport {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<Device[]>(async resolve => {
       const deviceList: Device[] = [];
-      await subscribeBleOn(blePlxManager);
+
+      try {
+        await subscribeBleOn(blePlxManager);
+      } catch (error) {
+        console.log('subscribeBleOn error: ', error);
+        resolve([]);
+        return;
+      }
+
       blePlxManager.startDeviceScan(null, null, (error, device) => {
         if (error) {
           console.log('ble scan error: ', error);
@@ -122,7 +130,12 @@ export default class ReactNativeBleTransport {
       return { uuid };
     }
 
-    await subscribeBleOn(blePlxManager);
+    try {
+      await subscribeBleOn(blePlxManager);
+    } catch (error) {
+      console.log('subscribeBleOn error: ', error);
+      throw error;
+    }
 
     if (!device) {
       const devices = await blePlxManager.devices([uuid]);

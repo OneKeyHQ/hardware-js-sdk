@@ -6,7 +6,6 @@ import { initLog } from '../utils';
 import DataManager from './DataManager';
 
 const Log = initLog('Transport');
-let reactNativeInit = false;
 /**
  * transport 在同一个环境中只会存在一个
  * 这里设计成单例获取
@@ -18,6 +17,8 @@ export default class TransportManager {
   static defaultMessages: JSON | Record<string, any>;
 
   static currentMessages: JSON | Record<string, any>;
+
+  static reactNativeInit = false;
 
   static load() {
     const env = DataManager.getSettings('env');
@@ -36,9 +37,11 @@ export default class TransportManager {
       const env = DataManager.getSettings('env');
       Log.debug('Initializing transports');
       if (env === 'react-native') {
-        if (!reactNativeInit) {
+        if (!this.reactNativeInit) {
           await this.transport.init();
-          reactNativeInit = true;
+          this.reactNativeInit = true;
+        } else {
+          Log.debug('React Native Do Not Initializing transports');
         }
       } else {
         await this.transport.init();

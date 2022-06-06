@@ -12,7 +12,6 @@ import HardwareSdk, {
   ERRORS,
   Deferred,
   create as createDeferred,
-  CallMethodAnyResponse,
   IFRAME,
 } from '@onekeyfe/hd-core';
 
@@ -30,13 +29,7 @@ const dispose = () => {
   _settings = parseConnectSettings();
 };
 
-const handleMessage = (message: CoreMessage) => {
-  console.log(message);
-};
-
-function postMessage(message: CoreMessage, usePromise?: true): CallMethodAnyResponse;
-function postMessage(message: CoreMessage, usePromise: false): Promise<void>;
-function postMessage(message: CoreMessage, usePromise = true) {
+async function postMessage(message: CoreMessage, usePromise = true) {
   if (!_core) {
     throw ERRORS.TypedError('Runtime', 'postMessage: _core not found');
   }
@@ -44,9 +37,10 @@ function postMessage(message: CoreMessage, usePromise = true) {
   if (usePromise) {
     _messageID++;
     messagePromises[_messageID] = createDeferred();
-    const { promise } = messagePromises[_messageID];
-    _core.handleMessage({ ...message, id: `${_messageID}` });
-    return promise;
+    // const { promise } = messagePromises[_messageID];
+    const response = await _core.handleMessage({ ...message, id: `${_messageID}` });
+    // return promise;
+    return response;
   }
 
   _core.handleMessage(message);
@@ -61,7 +55,6 @@ const init = async (settings: Partial<ConnectSettings>) => {
   try {
     _core = await initCore(_settings);
     _core?.on(CORE_EVENT, handleMessage);
-    console.log(_core);
   } catch (error) {
     Log.error(createErrorMessage(error));
   }
