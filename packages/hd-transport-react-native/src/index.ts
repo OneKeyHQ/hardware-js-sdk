@@ -125,10 +125,10 @@ export default class ReactNativeBleTransport {
 
     let device;
 
-    if (transportCache[uuid]) {
-      console.log('transport in cache, using that');
-      return { uuid };
-    }
+    // if (transportCache[uuid]) {
+    //   console.log('transport in cache, using that');
+    //   return { uuid };
+    // }
 
     try {
       await subscribeBleOn(blePlxManager);
@@ -336,7 +336,13 @@ export default class ReactNativeBleTransport {
     );
     const o = buildBuffer(messages, name, data);
     const outData = o.toString('base64');
-    await transport.writeCharacteristic.writeWithResponse(outData);
+    try {
+      await transport.writeCharacteristic.writeWithResponse(outData);
+    } catch (e) {
+      this.runPromise = null;
+      console.log('writeCharacteristic write error: ', e);
+      return;
+    }
     try {
       const response = await this.runPromise.promise;
 
@@ -347,6 +353,7 @@ export default class ReactNativeBleTransport {
       const jsonData = receiveOne(messages, response);
       return check.call(jsonData);
     } catch (e) {
+      console.log('call error: ', e);
       return e;
     } finally {
       this.runPromise = null;
