@@ -3,7 +3,6 @@ import TransportManager from '../data-manager/TransportManager';
 import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import type { Device } from './Device';
-import { DataManager } from '../data-manager';
 
 type MessageType = Messages.MessageType;
 type MessageKey = keyof MessageType;
@@ -33,16 +32,13 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
 };
 
 const Log = initLog('DeviceCommands');
-const env = DataManager.getSettings('env');
 
 export class DeviceCommands {
   device: Device;
 
   transport: Transport;
 
-  sessionId: string;
-
-  uuid = '';
+  mainId: string;
 
   disposed: boolean;
 
@@ -50,12 +46,9 @@ export class DeviceCommands {
 
   _cancelableRequest?: (error?: any) => void;
 
-  constructor(device: Device, sessionId: string) {
+  constructor(device: Device, mainId: string) {
     this.device = device;
-    this.sessionId = sessionId;
-    if (env === 'react-native') {
-      this.uuid = sessionId;
-    }
+    this.mainId = mainId;
     this.transport = TransportManager.getTransport();
     this.disposed = false;
   }
@@ -73,8 +66,7 @@ export class DeviceCommands {
     console.log('[DeviceCommands] [call] Sending', type, this.transport);
 
     try {
-      const mainId = env === 'react-native' ? this.uuid : this.sessionId;
-      const promise = this.transport.call(mainId, type, msg) as any;
+      const promise = this.transport.call(this.mainId, type, msg) as any;
       this.callPromise = promise;
       const res = await promise;
       Log.debug('[DeviceCommands] [call] Received', res.type);
@@ -112,7 +104,7 @@ export class DeviceCommands {
     } catch (error) {
       // handle possible race condition
       // Bridge may have some unread message in buffer, read it
-      await this.transport.read(this.sessionId);
+      await this.transport.read(this.mainId);
       // throw error anyway, next call should be resolved properly
       throw error;
     }

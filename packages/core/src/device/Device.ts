@@ -36,9 +36,11 @@ export class Device extends EventEmitter {
   originalDescriptor: DeviceDescriptor;
 
   /**
-   * 当前 Session ID
+   * 设备主 ID
+   * 蓝牙连接时是设备的 UUID
+   * USB连接时是设备的 sessionID
    */
-  activitySessionID?: string | null;
+  mainId?: string | null;
 
   /**
    * 通信管道，向设备发送请求
@@ -127,7 +129,7 @@ export class Device extends EventEmitter {
         return;
       }
       // 不存在 Session ID 或存在 Session ID 但设备在别处使用，都需要 acquire 获取最新 sessionID
-      if (!this.activitySessionID || (!this.isUsedHere() && this.originalDescriptor)) {
+      if (!this.mainId || (!this.isUsedHere() && this.originalDescriptor)) {
         try {
           await this.acquire();
           resolve(true);
@@ -145,26 +147,24 @@ export class Device extends EventEmitter {
   }
 
   async acquire() {
-    let mainId;
     const mainIdKey = env === 'react-native' ? 'id' : 'session';
     try {
       if (env === 'react-native') {
-        mainId = await this.deviceConnector?.acquire(this.originalDescriptor.id);
-        Log.debug('Expected uuid:', mainId);
+        this.mainId = await this.deviceConnector?.acquire(this.originalDescriptor.id);
+        Log.debug('Expected uuid:', this.mainId);
       } else {
-        mainId = await this.deviceConnector?.acquire(
+        this.mainId = await this.deviceConnector?.acquire(
           this.originalDescriptor.path,
           this.originalDescriptor.session
         );
-        Log.debug('Expected session id:', mainId);
-        this.activitySessionID = mainId;
+        Log.debug('Expected session id:', this.mainId);
       }
-      this.updateDescriptor({ [mainIdKey]: mainId } as unknown as DeviceDescriptor);
+      this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
         this.commands.dispose();
       }
 
-      this.commands = new DeviceCommands(this, mainId ?? '');
+      this.commands = new DeviceCommands(this, this.mainId ?? '');
     } catch (error) {
       if (this.runPromise) {
         this.runPromise.reject(error);
@@ -176,7 +176,7 @@ export class Device extends EventEmitter {
   }
 
   async release() {
-    if (this.isUsedHere() && !this.keepSession && this.activitySessionID) {
+    if (this.isUsedHere() && !this.keepSession && this.mainId) {
       if (this.commands) {
         this.commands.dispose();
         if (this.commands.callPromise) {
@@ -188,7 +188,7 @@ export class Device extends EventEmitter {
         }
       }
       try {
-        await this.deviceConnector?.release(this.activitySessionID, false);
+        await this.deviceConnector?.release(this.mainId, false);
       } catch (err) {
         Log.error('[Device] release error: ', err);
       } finally {
@@ -237,6 +237,9 @@ export class Device extends EventEmitter {
    * @param descriptor
    */
   updateDescriptor(descriptor: DeviceDescriptor) {
+    if (env === 'react-native') {
+      return;
+    }
     const originalSession = this.originalDescriptor.session;
     const upcomingSession = descriptor.session;
 
@@ -329,7 +332,10 @@ export class Device extends EventEmitter {
   }
 
   isUsedHere() {
-    return this.isUsed() && this.originalDescriptor.session === this.activitySessionID;
+    if (env === 'react-native') {
+      return false;
+    }
+    return this.isUsed() && this.originalDescriptor.session === this.mainId;
   }
 
   isUsedElsewhere(): boolean {
