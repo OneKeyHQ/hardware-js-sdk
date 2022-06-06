@@ -3,6 +3,7 @@ import TransportManager from '../data-manager/TransportManager';
 import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import type { Device } from './Device';
+import { DataManager } from '../data-manager';
 
 type MessageType = Messages.MessageType;
 type MessageKey = keyof MessageType;
@@ -32,6 +33,7 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
 };
 
 const Log = initLog('DeviceCommands');
+const env = DataManager.getSettings('env');
 
 export class DeviceCommands {
   device: Device;
@@ -39,6 +41,8 @@ export class DeviceCommands {
   transport: Transport;
 
   sessionId: string;
+
+  uuid = '';
 
   disposed: boolean;
 
@@ -49,6 +53,9 @@ export class DeviceCommands {
   constructor(device: Device, sessionId: string) {
     this.device = device;
     this.sessionId = sessionId;
+    if (env === 'react-native') {
+      this.uuid = sessionId;
+    }
     this.transport = TransportManager.getTransport();
     this.disposed = false;
   }
@@ -66,7 +73,8 @@ export class DeviceCommands {
     console.log('[DeviceCommands] [call] Sending', type, this.transport);
 
     try {
-      const promise = this.transport.call(this.sessionId, type, msg) as any;
+      const mainId = env === 'react-native' ? this.uuid : this.sessionId;
+      const promise = this.transport.call(mainId, type, msg) as any;
       this.callPromise = promise;
       const res = await promise;
       Log.debug('[DeviceCommands] [call] Received', res.type);

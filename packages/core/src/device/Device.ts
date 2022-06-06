@@ -15,6 +15,7 @@ import {
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { UI_REQUEST } from '../constants/ui-request';
 import { ERRORS } from '../constants';
+import { DataManager } from '../data-manager';
 
 type RunOptions = {
   keepSession?: boolean;
@@ -27,6 +28,7 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
 };
 
 const Log = initLog('Device');
+const env = DataManager.getSettings('env');
 export class Device extends EventEmitter {
   /**
    * 设备标识对象
@@ -115,6 +117,15 @@ export class Device extends EventEmitter {
   connect() {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async resolve => {
+      if (env === 'react-native') {
+        try {
+          await this.acquire();
+          resolve(true);
+        } catch (error) {
+          resolve(error);
+        }
+        return;
+      }
       // 不存在 Session ID 或存在 Session ID 但设备在别处使用，都需要 acquire 获取最新 sessionID
       if (!this.activitySessionID || (!this.isUsedHere() && this.originalDescriptor)) {
         try {
@@ -134,19 +145,26 @@ export class Device extends EventEmitter {
   }
 
   async acquire() {
+    let mainId;
+    const mainIdKey = env === 'react-native' ? 'id' : 'session';
     try {
-      const sessionID = await this.deviceConnector?.acquire(
-        this.originalDescriptor.path,
-        this.originalDescriptor.session
-      );
-      Log.debug('Expected session id:', sessionID);
-      this.activitySessionID = sessionID;
-      this.updateDescriptor({ session: sessionID } as DeviceDescriptor);
+      if (env === 'react-native') {
+        mainId = await this.deviceConnector?.acquire(this.originalDescriptor.id);
+        Log.debug('Expected uuid:', mainId);
+      } else {
+        mainId = await this.deviceConnector?.acquire(
+          this.originalDescriptor.path,
+          this.originalDescriptor.session
+        );
+        Log.debug('Expected session id:', mainId);
+        this.activitySessionID = mainId;
+      }
+      this.updateDescriptor({ [mainIdKey]: mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
         this.commands.dispose();
       }
 
-      this.commands = new DeviceCommands(this, sessionID ?? '');
+      this.commands = new DeviceCommands(this, mainId ?? '');
     } catch (error) {
       if (this.runPromise) {
         this.runPromise.reject(error);
