@@ -18,11 +18,18 @@ export type DeviceDescriptorDiff = {
 };
 
 const Log = initLog('DeviceConnector');
+const env = DataManager.getSettings('env');
 
 const getDiff = (
   current: DeviceDescriptor[],
   descriptors: DeviceDescriptor[]
 ): DeviceDescriptorDiff => {
+  if (env === 'react-native') {
+    return {
+      descriptors: current,
+    } as DeviceDescriptorDiff;
+  }
+
   const connected = descriptors.filter(d => current.find(x => x.path === d.path) === undefined);
   const disconnected = current.filter(d => descriptors.find(x => x.path === d.path) === undefined);
   const changedSessions = descriptors.filter(d => {
@@ -87,12 +94,8 @@ export default class DeviceConnector {
   }
 
   async enumerate() {
-    const env = DataManager.getSettings('env');
     try {
       this.upcoming = await this.transport.enumerate();
-      if (env === 'react-native') {
-        return { descriptors: this.upcoming };
-      }
       const diff = this._reportDevicesChange();
       Log.debug('diff result: ', diff);
       return diff;
@@ -142,7 +145,12 @@ export default class DeviceConnector {
   async acquire(path: string, session?: string | null) {
     console.log('acquire', path, session);
     try {
-      const res = await this.transport.acquire({ path, previous: session ?? null });
+      let res;
+      if (env === 'react-native') {
+        res = await this.transport.acquire({ uuid: path });
+      } else {
+        res = await this.transport.acquire({ path, previous: session ?? null });
+      }
       return res;
     } catch (error) {
       throw new Error(error);
