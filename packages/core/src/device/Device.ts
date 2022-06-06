@@ -28,7 +28,6 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
 };
 
 const Log = initLog('Device');
-const env = DataManager.getSettings('env');
 export class Device extends EventEmitter {
   /**
    * 设备标识对象
@@ -117,6 +116,7 @@ export class Device extends EventEmitter {
    * @returns {Promise<boolean>}
    */
   connect() {
+    const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async resolve => {
       if (env === 'react-native') {
@@ -147,10 +147,12 @@ export class Device extends EventEmitter {
   }
 
   async acquire() {
+    const env = DataManager.getSettings('env');
     const mainIdKey = env === 'react-native' ? 'id' : 'session';
     try {
       if (env === 'react-native') {
-        this.mainId = await this.deviceConnector?.acquire(this.originalDescriptor.id);
+        const res = await this.deviceConnector?.acquire(this.originalDescriptor.id);
+        this.mainId = (res as unknown as any).uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
       } else {
         this.mainId = await this.deviceConnector?.acquire(
@@ -237,6 +239,7 @@ export class Device extends EventEmitter {
    * @param descriptor
    */
   updateDescriptor(descriptor: DeviceDescriptor) {
+    const env = DataManager.getSettings('env');
     if (env === 'react-native') {
       return;
     }
@@ -332,6 +335,7 @@ export class Device extends EventEmitter {
   }
 
   isUsedHere() {
+    const env = DataManager.getSettings('env');
     if (env === 'react-native') {
       return false;
     }

@@ -18,15 +18,15 @@ export type DeviceDescriptorDiff = {
 };
 
 const Log = initLog('DeviceConnector');
-const env = DataManager.getSettings('env');
 
 const getDiff = (
   current: DeviceDescriptor[],
   descriptors: DeviceDescriptor[]
 ): DeviceDescriptorDiff => {
+  const env = DataManager.getSettings('env');
   if (env === 'react-native') {
     return {
-      descriptors: current,
+      descriptors,
     } as DeviceDescriptorDiff;
   }
 
@@ -144,6 +144,7 @@ export default class DeviceConnector {
 
   async acquire(path: string, session?: string | null) {
     console.log('acquire', path, session);
+    const env = DataManager.getSettings('env');
     try {
       let res;
       if (env === 'react-native') {
