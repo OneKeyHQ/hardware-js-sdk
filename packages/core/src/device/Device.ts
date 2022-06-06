@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';

@@ -1,4 +1,4 @@
-import { Transport, OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { initLog } from '../utils';
