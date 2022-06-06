@@ -1,26 +1,21 @@
 {
-  "name": "@onekeyfe/hd-transport-react-native",
+  "name": "@onekeyfe/hd-ble-sdk",
   "version": "1.0.0",
+  "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
-  "license": "MIT",
+  "license": "ISC",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "publishConfig": {
-    "registry": "http://registry.npmjs.org/"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
   },
   "scripts": {
-    "test": "echo \"Error: run tests from root\" && exit 1",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-transport": "file:../hd-transport",
-    "react-native-ble-manager": "^8.1.0",
-    "react-native-ble-plx": "^2.0.3"
+    "@onekeyfe/hd-core": "*"
   }
 }

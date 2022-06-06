@@ -2568,6 +2568,13 @@
   resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-0.0.14.tgz#9be87ef486175dc303fc627ab718bdd57bb6c2fd"
   integrity sha512-Nn+rPUiHu620gDhSWXICQBJsS5l0ohhdTmKR/C/0b/wC95rpCLcPy14hH3Tm5c13OREy6+MrJ0GNO1q4a6KFjQ==
 
+"@onekeyfe/hd-transport@file:packages/hd-transport":
+  version "1.0.0"
+  dependencies:
+    bytebuffer "^5.0.1"
+    long "^4.0.0"
+    protobufjs "^6.11.2"
+
 "@onekeyfe/rollout@1.0.6":
   version "1.0.6"
   resolved "https://registry.yarnpkg.com/@onekeyfe/rollout/-/rollout-1.0.6.tgz#3d2f1121be525a48cb97543434fe599e592208a1"
