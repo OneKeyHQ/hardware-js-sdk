@@ -8,13 +8,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       <Suspense fallback={<Text>Loading...</Text>}>
-        {Platform.OS === 'web' ? (
-          <USB />
-        ) : (
-          <View>
-            <USB />
-          </View>
-        )}
+        {Platform.OS === 'web' ? <USB /> : <Bluetooth />}
       </Suspense>
     </View>
   );
