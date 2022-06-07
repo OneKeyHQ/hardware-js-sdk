@@ -9,8 +9,9 @@ import {
   TouchableOpacity,
 } from 'react-native';
 
-type Device = {
+export type Device = {
   uuid: string;
+  connectId: string;
 };
 
 type ItemProps = {
@@ -26,7 +27,12 @@ const Item = ({ item, onPress, backgroundColor, textColor }: ItemProps) => (
   </TouchableOpacity>
 );
 
-export function DeviceList({ data }: { data: Device[] }) {
+type IDeviceListProps = {
+  data: Device[];
+  onSelected: (device: Device) => void;
+};
+
+export function DeviceList({ data, onSelected }: IDeviceListProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const renderItem = ({ item }: { item: Device }) => {
@@ -36,7 +42,10 @@ export function DeviceList({ data }: { data: Device[] }) {
     return (
       <Item
         item={item}
-        onPress={() => setSelectedId(item.uuid)}
+        onPress={() => {
+          setSelectedId(item.uuid);
+          onSelected(item);
+        }}
         backgroundColor={{ backgroundColor }}
         textColor={{ color }}
       />
