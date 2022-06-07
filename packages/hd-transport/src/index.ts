@@ -9,6 +9,8 @@ protobuf.configure();
 export type {
   Transport,
   AcquireInput,
+  OneKeyDeviceInfo,
+  OneKeyMobileDeviceInfo,
   OneKeyDeviceInfoWithSession,
   MessageFromOneKey,
 } from './types';

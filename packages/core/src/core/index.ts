@@ -1,14 +1,16 @@
+import EventEmitter from 'events';
+import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { ERRORS } from '../constants';
+import { Device } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
-import { initLog, create as createDeferred, Deferred } from '../utils';
 import { findMethod } from '../api/utils';
-import TransportManager from '../data-manager/TransportManager';
-import type { Device } from '../device/Device';
-import type { BaseMethod } from '../api/BaseMethod';
-import { ConnectSettings, CommonParams } from '../types';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
+import { initLog, create as createDeferred, Deferred } from '../utils';
 import { CoreMessage, createResponseMessage, IFRAME, IFrameCallMessage, UI_EVENT } from '../events';
+import type { BaseMethod } from '../api/BaseMethod';
+import type { ConnectSettings, CommonParams } from '../types';
+import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 
 const Log = initLog('Core');
@@ -59,14 +61,19 @@ export const callAPI = async (message: CoreMessage) => {
 
   // update DeviceList every call and first configure transport messages
   try {
-    await initDeviceList();
+    await initDeviceList(method);
   } catch (error) {
     return Promise.reject(error);
   }
 
+  const env = DataManager.getSettings('env');
   let device: Device;
   try {
-    device = initDevice(method);
+    if (env === 'react-native') {
+      device = initDeviceForBle(method);
+    } else {
+      device = initDevice(method);
+    }
   } catch (error) {
     return Promise.reject(error);
   }
@@ -129,7 +136,13 @@ export const callAPI = async (message: CoreMessage) => {
   }
 };
 
-async function initDeviceList() {
+async function initDeviceList(method: BaseMethod) {
+  const env = DataManager.getSettings('env');
+  if (env === 'react-native' && method.connectId) {
+    await TransportManager.configure();
+    return;
+  }
+
   if (!_deviceList) {
     _deviceList = new DeviceList();
     await TransportManager.configure();
@@ -146,8 +159,8 @@ function initDevice(method: BaseMethod) {
   let device: Device | typeof undefined;
   const allDevices = _deviceList.allDevices();
 
-  if (method.devicePath) {
-    device = _deviceList.getDevice(method.devicePath);
+  if (method.connectId) {
+    device = _deviceList.getDevice(method.connectId);
   } else if (allDevices.length === 1) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {
@@ -164,7 +177,21 @@ function initDevice(method: BaseMethod) {
   return device;
 }
 
-export default class Core {
+function initDeviceForBle(method: BaseMethod) {
+  if (!method.connectId && !_deviceList) {
+    throw ERRORS.TypedError('Call_API', 'DeviceList is not initialized');
+  }
+
+  if (!method.connectId) {
+    return initDevice(method);
+  }
+
+  const device = Device.fromDescriptor({ id: method.connectId } as OneKeyDeviceInfo);
+  device.deviceConnector = _connector;
+  return device;
+}
+
+export default class Core extends EventEmitter {
   async handleMessage(message: CoreMessage) {
     switch (message.event) {
       case UI_EVENT:
@@ -195,6 +222,7 @@ export const initConnector = () => {
 };
 
 export const init = async (settings: ConnectSettings) => {
+  console.log('init');
   try {
     try {
       await DataManager.load(settings);

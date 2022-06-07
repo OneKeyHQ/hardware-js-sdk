@@ -38,7 +38,7 @@ export class DeviceCommands {
 
   transport: Transport;
 
-  sessionId: string;
+  mainId: string;
 
   disposed: boolean;
 
@@ -46,9 +46,9 @@ export class DeviceCommands {
 
   _cancelableRequest?: (error?: any) => void;
 
-  constructor(device: Device, sessionId: string) {
+  constructor(device: Device, mainId: string) {
     this.device = device;
-    this.sessionId = sessionId;
+    this.mainId = mainId;
     this.transport = TransportManager.getTransport();
     this.disposed = false;
   }
@@ -66,7 +66,7 @@ export class DeviceCommands {
     console.log('[DeviceCommands] [call] Sending', type, this.transport);
 
     try {
-      const promise = this.transport.call(this.sessionId, type, msg) as any;
+      const promise = this.transport.call(this.mainId, type, msg) as any;
       this.callPromise = promise;
       const res = await promise;
       Log.debug('[DeviceCommands] [call] Received', res.type);
@@ -104,7 +104,7 @@ export class DeviceCommands {
     } catch (error) {
       // handle possible race condition
       // Bridge may have some unread message in buffer, read it
-      await this.transport.read(this.sessionId);
+      await this.transport.read(this.mainId);
       // throw error anyway, next call should be resolved properly
       throw error;
     }

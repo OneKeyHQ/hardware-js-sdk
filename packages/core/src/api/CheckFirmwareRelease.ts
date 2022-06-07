@@ -6,7 +6,10 @@ export default class CheckFirmwareRelease extends BaseMethod {
   init() {}
 
   run() {
-    const firmwareStatus = DataManager.getFirmwareStatus(this.device.features);
-    return Promise.resolve(firmwareStatus);
+    if (this.device.features) {
+      const firmwareStatus = DataManager.getFirmwareStatus(this.device.features);
+      return Promise.resolve(firmwareStatus);
+    }
+    return Promise.resolve(null);
   }
 }

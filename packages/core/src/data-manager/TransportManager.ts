@@ -1,11 +1,11 @@
 import { Transport } from '@onekeyfe/hd-transport';
 import HttpBridge from '@onekeyfe/hd-transport-http';
+import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import DataManager from './DataManager';
 
 const Log = initLog('Transport');
-
 /**
  * transport 在同一个环境中只会存在一个
  * 这里设计成单例获取
@@ -18,16 +18,34 @@ export default class TransportManager {
 
   static currentMessages: JSON | Record<string, any>;
 
+  static reactNativeInit = false;
+
   static load() {
-    this.transport = new HttpBridge() as any;
+    const env = DataManager.getSettings('env');
+    console.log('transport manager load');
+    if (env === 'react-native') {
+      this.transport = new ReactNativeTransport({ scanTimeout: 1500 }) as any;
+    } else {
+      this.transport = new HttpBridge() as any;
+    }
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
   }
 
   static async configure() {
     try {
+      const env = DataManager.getSettings('env');
       Log.debug('Initializing transports');
-      await this.transport.init();
+      if (env === 'react-native') {
+        if (!this.reactNativeInit) {
+          await this.transport.init();
+          this.reactNativeInit = true;
+        } else {
+          Log.debug('React Native Do Not Initializing transports');
+        }
+      } else {
+        await this.transport.init();
+      }
       Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));
       Log.debug('Configuring transports done');

@@ -11,7 +11,7 @@ export abstract class BaseMethod<Params = undefined> {
   // @ts-expect-error
   params: Params;
 
-  devicePath?: string;
+  connectId?: string;
 
   deviceState?: string;
 
@@ -47,7 +47,7 @@ export abstract class BaseMethod<Params = undefined> {
     this.name = payload.method;
     this.payload = payload;
     this.responseID = message.id || 0;
-    this.devicePath = payload.device?.path;
+    this.connectId = payload.device?.path || payload.connectId || '';
     this.useDevice = true;
     this.allowDeviceMode = [UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [];
@@ -59,7 +59,7 @@ export abstract class BaseMethod<Params = undefined> {
 
   setDevice(device: Device) {
     this.device = device;
-    this.devicePath = device.originalDescriptor.path;
+    this.connectId = device.originalDescriptor.path;
   }
 
   dispose() {}

@@ -9,7 +9,8 @@
   "author": "OneKey",
   "workspaces": [
     "packages/*",
-    "packages/connect-examples/browser"
+    "packages/connect-examples/browser",
+    "packages/connect-examples/bluetooth"
   ],
   "scripts": {
     "bootstrap": "lerna bootstrap",
@@ -20,6 +21,7 @@
     "@babel/core": "^7.16.0",
     "@babel/eslint-parser": "^7.16.3",
     "@babel/preset-react": "^7.16.0",
+    "@babel/plugin-proposal-object-rest-spread": "^7.18.0",
     "@babel/preset-typescript": "^7.17.12",
     "@rollup/plugin-babel": "^5.3.1",
     "@rollup/plugin-commonjs": "^22.0.0",

@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
@@ -15,6 +15,7 @@ import {
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { UI_REQUEST } from '../constants/ui-request';
 import { ERRORS } from '../constants';
+import { DataManager } from '../data-manager';
 
 type RunOptions = {
   keepSession?: boolean;
@@ -34,9 +35,11 @@ export class Device extends EventEmitter {
   originalDescriptor: DeviceDescriptor;
 
   /**
-   * 当前 Session ID
+   * 设备主 ID
+   * 蓝牙连接时是设备的 UUID
+   * USB连接时是设备的 sessionID
    */
-  activitySessionID?: string | null;
+  mainId?: string | null;
 
   /**
    * 通信管道，向设备发送请求
@@ -93,6 +96,8 @@ export class Device extends EventEmitter {
     if (this.isUnacquired() || !this.features) return null;
 
     return {
+      /** Android uses Mac address, iOS uses uuid, USB uses path  */
+      connectId: this.mainId || null,
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
       deviceType: getDeviceType(this.features),
@@ -113,10 +118,20 @@ export class Device extends EventEmitter {
    * @returns {Promise<boolean>}
    */
   connect() {
+    const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async resolve => {
+      if (env === 'react-native') {
+        try {
+          await this.acquire();
+          resolve(true);
+        } catch (error) {
+          resolve(error);
+        }
+        return;
+      }
       // 不存在 Session ID 或存在 Session ID 但设备在别处使用，都需要 acquire 获取最新 sessionID
-      if (!this.activitySessionID || (!this.isUsedHere() && this.originalDescriptor)) {
+      if (!this.mainId || (!this.isUsedHere() && this.originalDescriptor)) {
         try {
           await this.acquire();
           resolve(true);
@@ -134,19 +149,26 @@ export class Device extends EventEmitter {
   }
 
   async acquire() {
+    const env = DataManager.getSettings('env');
+    const mainIdKey = env === 'react-native' ? 'id' : 'session';
     try {
-      const sessionID = await this.deviceConnector?.acquire(
-        this.originalDescriptor.path,
-        this.originalDescriptor.session
-      );
-      Log.debug('Expected session id:', sessionID);
-      this.activitySessionID = sessionID;
-      this.updateDescriptor({ session: sessionID } as DeviceDescriptor);
+      if (env === 'react-native') {
+        const res = await this.deviceConnector?.acquire(this.originalDescriptor.id);
+        this.mainId = (res as unknown as any).uuid ?? '';
+        Log.debug('Expected uuid:', this.mainId);
+      } else {
+        this.mainId = await this.deviceConnector?.acquire(
+          this.originalDescriptor.path,
+          this.originalDescriptor.session
+        );
+        Log.debug('Expected session id:', this.mainId);
+      }
+      this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
         this.commands.dispose();
       }
 
-      this.commands = new DeviceCommands(this, sessionID ?? '');
+      this.commands = new DeviceCommands(this, this.mainId ?? '');
     } catch (error) {
       if (this.runPromise) {
         this.runPromise.reject(error);
@@ -158,7 +180,7 @@ export class Device extends EventEmitter {
   }
 
   async release() {
-    if (this.isUsedHere() && !this.keepSession && this.activitySessionID) {
+    if (this.isUsedHere() && !this.keepSession && this.mainId) {
       if (this.commands) {
         this.commands.dispose();
         if (this.commands.callPromise) {
@@ -170,7 +192,7 @@ export class Device extends EventEmitter {
         }
       }
       try {
-        await this.deviceConnector?.release(this.activitySessionID, false);
+        await this.deviceConnector?.release(this.mainId, false);
       } catch (err) {
         Log.error('[Device] release error: ', err);
       } finally {
@@ -219,6 +241,10 @@ export class Device extends EventEmitter {
    * @param descriptor
    */
   updateDescriptor(descriptor: DeviceDescriptor) {
+    const env = DataManager.getSettings('env');
+    if (env === 'react-native') {
+      return;
+    }
     const originalSession = this.originalDescriptor.session;
     const upcomingSession = descriptor.session;
 
@@ -311,7 +337,11 @@ export class Device extends EventEmitter {
   }
 
   isUsedHere() {
-    return this.isUsed() && this.originalDescriptor.session === this.activitySessionID;
+    const env = DataManager.getSettings('env');
+    if (env === 'react-native') {
+      return false;
+    }
+    return this.isUsed() && this.originalDescriptor.session === this.mainId;
   }
 
   isUsedElsewhere(): boolean {

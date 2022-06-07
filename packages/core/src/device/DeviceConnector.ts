@@ -1,4 +1,5 @@
-import { Transport, OneKeyDeviceInfoWithSession as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { initLog } from '../utils';
 import { resolveAfter } from '../utils/promiseUtils';
@@ -22,6 +23,13 @@ const getDiff = (
   current: DeviceDescriptor[],
   descriptors: DeviceDescriptor[]
 ): DeviceDescriptorDiff => {
+  const env = DataManager.getSettings('env');
+  if (env === 'react-native') {
+    return {
+      descriptors,
+    } as DeviceDescriptorDiff;
+  }
+
   const connected = descriptors.filter(d => current.find(x => x.path === d.path) === undefined);
   const disconnected = current.filter(d => descriptors.find(x => x.path === d.path) === undefined);
   const changedSessions = descriptors.filter(d => {
@@ -136,8 +144,14 @@ export default class DeviceConnector {
 
   async acquire(path: string, session?: string | null) {
     console.log('acquire', path, session);
+    const env = DataManager.getSettings('env');
     try {
-      const res = await this.transport.acquire({ path, previous: session ?? null });
+      let res;
+      if (env === 'react-native') {
+        res = await this.transport.acquire({ uuid: path });
+      } else {
+        res = await this.transport.acquire({ path, previous: session ?? null });
+      }
       return res;
     } catch (error) {
       throw new Error(error);

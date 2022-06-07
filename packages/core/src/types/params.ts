@@ -1,4 +1,5 @@
 export interface CommonParams {
+  connectId?: string;
   device?: {
     path: string;
     state?: string;

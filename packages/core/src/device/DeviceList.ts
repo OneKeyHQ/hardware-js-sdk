@@ -9,7 +9,7 @@ export class DeviceList extends EventEmitter {
 
   /**
    * 获取已连接的设备列表
-   * @returns {OneKeyDeviceInfoWithSession[]}
+   * @returns {OneKeyDeviceInfo[]}
    */
   async getDeviceLists() {
     const deviceDiff = await this.connector?.enumerate();
@@ -26,7 +26,7 @@ export class DeviceList extends EventEmitter {
     return Object.keys(this.devices).map(key => this.devices[key]);
   }
 
-  getDevice(devicePath: string) {
-    return this.devices[devicePath];
+  getDevice(connectId: string) {
+    return this.devices[connectId];
   }
 }

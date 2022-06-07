@@ -19,10 +19,9 @@ const initialSettings: ConnectSettings = {
   trustedHost: false,
   connectSrc: DEFAULT_DOMAIN,
   iframeSrc: `${DEFAULT_DOMAIN}iframe.html`,
-  parentOrigin: window.location.origin,
+  parentOrigin: window.location ? window.location.origin : '',
   supportedBrowser:
     typeof navigator !== 'undefined' ? !/Trident|MSIE|Edge/.test(navigator.userAgent) : true,
-  // manifest: null,
   env: 'web',
   lazyLoad: false,
   timestamp: new Date().getTime(),
@@ -53,32 +52,20 @@ export const getEnv = () => {
 
 export const corsValidator = (url?: string) => {
   if (typeof url !== 'string') return;
-  if (url.match(/^https:\/\/([A-Za-z0-9\-_]+\.)*trezor\.io\//)) return url;
+  if (url.match(/^https:\/\/([A-Za-z0-9\-_]+\.)*onekey\.so\//)) return url;
   if (url.match(/^https?:\/\/localhost:[58][0-9]{3}\//)) return url;
-  if (url.match(/^https:\/\/([A-Za-z0-9\-_]+\.)*sldev\.cz\//)) return url;
-  if (
-    url.match(
-      /^https?:\/\/([A-Za-z0-9\-_]+\.)*trezoriovpjcahpzkrewelclulmszwbqpzmzgub37gbcjlvluxtruqad\.onion\//
-    )
-  )
-    return url;
+  return url;
 };
 
 export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
   const settings: ConnectSettings = { ...initialSettings };
 
   if (Object.prototype.hasOwnProperty.call(input, 'debug')) {
-    if (typeof input.debug === 'boolean') {
-      settings.debug = input.debug;
-    } else if (typeof input.debug === 'string') {
-      settings.debug = input.debug === 'true';
-    }
+    settings.debug = input.debug;
   }
 
-  if (typeof input.isFrame === 'boolean') {
-    if (input.isFrame) {
-      settings.parentOrigin = input.parentOrigin;
-    }
+  if (input.isFrame) {
+    settings.parentOrigin = input.parentOrigin;
   }
 
   if (typeof input.connectSrc === 'string') {
@@ -91,6 +78,7 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
   } else if (typeof global !== 'undefined') {
     globalSrc = global.ONEKEY_CONNECT_SRC;
   }
+
   if (typeof globalSrc === 'string') {
     settings.connectSrc = corsValidator(globalSrc);
     settings.debug = true;
@@ -99,11 +87,11 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
   const src = settings.connectSrc || DEFAULT_DOMAIN;
   settings.iframeSrc = `${src}iframe.html`;
 
-  if (typeof input.transportReconnect === 'boolean') {
+  if (input.transportReconnect) {
     settings.transportReconnect = input.transportReconnect;
   }
 
-  if (typeof input.lazyLoad === 'boolean') {
+  if (input.lazyLoad) {
     settings.lazyLoad = input.lazyLoad;
   }
 
@@ -113,7 +101,7 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
     settings.env = getEnv();
   }
 
-  if (typeof input.timestamp === 'number') {
+  if (input.timestamp) {
     settings.timestamp = input.timestamp;
   }
 

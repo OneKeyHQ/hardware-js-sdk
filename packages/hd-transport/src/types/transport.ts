@@ -1,23 +1,31 @@
-export type OneKeyDeviceInfo = {
+export type OneKeyUsbDeviceInfo = {
   path: string;
 };
 
-export type OneKeyDeviceInfoWithSession = OneKeyDeviceInfo & {
+export type OneKeyDeviceInfoWithSession = OneKeyUsbDeviceInfo & {
   session?: string | null;
   debugSession?: string | null;
   debug: boolean;
 };
 
+export type OneKeyMobileDeviceInfo = {
+  id: string;
+  name: string | null;
+};
+
+export type OneKeyDeviceInfo = OneKeyDeviceInfoWithSession & OneKeyMobileDeviceInfo;
+
 export type AcquireInput = {
-  path: string;
+  path?: string;
   previous?: string | null;
+  uuid?: string;
 };
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };
 
 export type Transport = {
-  enumerate(): Promise<Array<OneKeyDeviceInfoWithSession>>;
-  listen(old?: Array<OneKeyDeviceInfoWithSession>): Promise<Array<OneKeyDeviceInfoWithSession>>;
+  enumerate(): Promise<Array<OneKeyDeviceInfo>>;
+  listen(old?: Array<OneKeyDeviceInfo>): Promise<Array<OneKeyDeviceInfo>>;
   acquire(input: AcquireInput): Promise<string>;
   release(session: string, onclose: boolean): Promise<void>;
   configure(signedData: JSON | string): Promise<void>;

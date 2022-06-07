@@ -72,7 +72,15 @@ export default class ReactNativeBleTransport {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<Device[]>(async resolve => {
       const deviceList: Device[] = [];
-      await subscribeBleOn(blePlxManager);
+
+      try {
+        await subscribeBleOn(blePlxManager);
+      } catch (error) {
+        console.log('subscribeBleOn error: ', error);
+        resolve([]);
+        return;
+      }
+
       blePlxManager.startDeviceScan(null, null, (error, device) => {
         if (error) {
           console.log('ble scan error: ', error);
@@ -117,12 +125,17 @@ export default class ReactNativeBleTransport {
 
     let device;
 
-    if (transportCache[uuid]) {
-      console.log('transport in cache, using that');
-      return { uuid };
-    }
+    // if (transportCache[uuid]) {
+    //   console.log('transport in cache, using that');
+    //   return { uuid };
+    // }
 
-    await subscribeBleOn(blePlxManager);
+    try {
+      await subscribeBleOn(blePlxManager);
+    } catch (error) {
+      console.log('subscribeBleOn error: ', error);
+      throw error;
+    }
 
     if (!device) {
       const devices = await blePlxManager.devices([uuid]);
@@ -323,7 +336,13 @@ export default class ReactNativeBleTransport {
     );
     const o = buildBuffer(messages, name, data);
     const outData = o.toString('base64');
-    await transport.writeCharacteristic.writeWithResponse(outData);
+    try {
+      await transport.writeCharacteristic.writeWithResponse(outData);
+    } catch (e) {
+      this.runPromise = null;
+      console.log('writeCharacteristic write error: ', e);
+      return;
+    }
     try {
       const response = await this.runPromise.promise;
 
@@ -334,6 +353,7 @@ export default class ReactNativeBleTransport {
       const jsonData = receiveOne(messages, response);
       return check.call(jsonData);
     } catch (e) {
+      console.log('call error: ', e);
       return e;
     } finally {
       this.runPromise = null;
