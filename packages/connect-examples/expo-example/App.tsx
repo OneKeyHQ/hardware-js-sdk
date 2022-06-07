@@ -1,9 +1,23 @@
+import React, { Suspense } from 'react';
 import { StyleSheet, Platform, View, Text } from 'react-native';
-import USB from './src/env/USB';
-import Bluetooth from './src/env/Bluetooth';
+
+const USB = React.lazy(() => import('./src/env/USB'));
+const Bluetooth = React.lazy(() => import('./src/env/Bluetooth'));
 
 export default function App() {
-  return <View style={styles.container}>{Platform.OS === 'web' ? <USB /> : <Bluetooth />}</View>;
+  return (
+    <View style={styles.container}>
+      <Suspense fallback={<Text>Loading...</Text>}>
+        {Platform.OS === 'web' ? (
+          <USB />
+        ) : (
+          <View>
+            <USB />
+          </View>
+        )}
+      </Suspense>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -12,6 +26,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '32px',
+    padding: 32,
   },
 });
