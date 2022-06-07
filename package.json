@@ -9,8 +9,7 @@
   "author": "OneKey",
   "workspaces": [
     "packages/*",
-    "packages/connect-examples/browser",
-    "packages/connect-examples/bluetooth"
+    "packages/connect-examples/expo-example"
   ],
   "scripts": {
     "bootstrap": "lerna bootstrap",
