@@ -2,7 +2,8 @@
   "packages": [
     "packages/*",
     "packages/connect-examples/browser",
-    "packages/connect-examples/bluetooth"
+    "packages/connect-examples/bluetooth",
+    "packages/connect-examples/expo-example"
   ],
   "npmClient": "yarn",
   "useWorkspaces": true,
