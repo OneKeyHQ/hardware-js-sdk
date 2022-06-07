@@ -29,6 +29,8 @@ const dispose = () => {
   _settings = parseConnectSettings();
 };
 
+function handleMessage() {}
+
 async function postMessage(message: CoreMessage, usePromise = true) {
   if (!_core) {
     throw ERRORS.TypedError('Runtime', 'postMessage: _core not found');

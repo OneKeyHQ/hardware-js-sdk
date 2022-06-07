@@ -96,6 +96,8 @@ export class Device extends EventEmitter {
     if (this.isUnacquired() || !this.features) return null;
 
     return {
+      /** Android uses Mac address, iOS uses uuid, USB uses path  */
+      connectId: this.mainId || null,
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
       deviceType: getDeviceType(this.features),

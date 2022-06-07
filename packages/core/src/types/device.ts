@@ -14,6 +14,7 @@ export type UnavailableCapability =
 export type UnavailableCapabilities = { [key: string]: UnavailableCapability };
 
 export type KnownDevice = {
+  connectId: string | null;
   uuid: string;
   deviceId: string | null;
   deviceType: IDeviceType;
