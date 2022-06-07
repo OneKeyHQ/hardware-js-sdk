@@ -1,13 +1,9 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Platform, View, Text } from 'react-native';
+import USB from './src/env/USB';
+import Bluetooth from './src/env/Bluetooth';
 
 export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
+  return <View style={styles.container}>{Platform.OS === 'web' ? <USB /> : <Bluetooth />}</View>;
 }
 
 const styles = StyleSheet.create({
