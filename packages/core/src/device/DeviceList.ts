@@ -26,7 +26,7 @@ export class DeviceList extends EventEmitter {
     return Object.keys(this.devices).map(key => this.devices[key]);
   }
 
-  getDevice(devicePath: string) {
-    return this.devices[devicePath];
+  getDevice(connectId: string) {
+    return this.devices[connectId];
   }
 }
