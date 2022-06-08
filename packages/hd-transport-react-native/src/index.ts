@@ -98,15 +98,10 @@ export default class ReactNativeBleTransport {
         }
       });
 
-      getConnectedDeviceIds(getBluetoothServiceUuids()).then(async ids => {
-        for (const id of ids) {
-          const device = await blePlxManager.connectToDevice(id, {
-            ...connectOptions,
-            refreshGatt: 'OnConnected',
-            autoConnect: false,
-          });
+      getConnectedDeviceIds(getBluetoothServiceUuids()).then(devices => {
+        for (const device of devices) {
           console.log('search connected peripheral: ', device.id);
-          addDevice(device);
+          addDevice(device as unknown as Device);
         }
       });
 
@@ -162,7 +157,10 @@ export default class ReactNativeBleTransport {
         device = await blePlxManager.connectToDevice(uuid, connectOptions);
       } catch (e) {
         console.log('try to connect to device has error: ', e);
-        if (e.errorCode === BleErrorCode.DeviceMTUChangeFailed) {
+        if (
+          e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
+          e.errorCode === BleErrorCode.OperationCancelled
+        ) {
           connectOptions = {};
           device = await blePlxManager.connectToDevice(uuid);
         } else {
@@ -182,7 +180,10 @@ export default class ReactNativeBleTransport {
         await device.connect(connectOptions);
       } catch (e) {
         console.log('try to connect to device has error: ', e);
-        if (e.errorCode === BleErrorCode.DeviceMTUChangeFailed) {
+        if (
+          e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
+          e.errorCode === BleErrorCode.OperationCancelled
+        ) {
           connectOptions = {};
           await device.connect();
         } else {

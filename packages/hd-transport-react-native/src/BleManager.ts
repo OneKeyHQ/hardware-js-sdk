@@ -5,11 +5,14 @@ export const initializeBleManager = () => {
 };
 
 /**
- * get the id of connected devices
+ * get the device basic info of connected devices
  * @param serviceUuids
  * @returns {Promise<[string[]]>}
  */
 export const getConnectedDeviceIds = async (serviceUuids: string[]) => {
   const connectedPeripherals = await BleManager.getConnectedPeripherals(serviceUuids);
-  return connectedPeripherals.map(peripheral => peripheral.id);
+  return connectedPeripherals.map(peripheral => {
+    const { id, name, advertising = {} } = peripheral;
+    return { id, name, ...advertising };
+  });
 };
