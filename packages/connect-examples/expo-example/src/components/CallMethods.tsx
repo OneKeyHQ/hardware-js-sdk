@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { View, Button, StyleSheet } from 'react-native';
-import { UI_EVENT, UI_REQUEST, CoreMessage } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import type { Device } from './DeviceList';
 
@@ -9,14 +10,24 @@ type ICallMethodProps = {
   setDevices: (devices: Device[]) => void;
 };
 export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProps) {
+  const [showPinInput, setShowPinInput] = useState(false);
+  const [pinValue, setPinValue] = useState('');
+
   // 监听 SDK 事件
   SDK.on(UI_EVENT, (message: CoreMessage) => {
     console.log(message);
 
     if (message.type === UI_REQUEST.REQUEST_PIN) {
       console.log('expo get pin request: ', message);
+      setShowPinInput(true);
     }
   });
+
+  // 输入 pin 码的确认回调
+  function onConfirmPin(pin: string) {
+    SDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, pin });
+    setShowPinInput(false);
+  }
 
   const handleSearchDevices = async () => {
     const response = await SDK.searchDevices();
@@ -60,7 +71,13 @@ export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProp
         />
         <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
       </View>
-      <ReceivePin />
+      {showPinInput && (
+        <ReceivePin
+          value={pinValue}
+          onChange={val => setPinValue(val)}
+          onConfirm={val => onConfirmPin(val)}
+        />
+      )}
     </View>
   );
 }
