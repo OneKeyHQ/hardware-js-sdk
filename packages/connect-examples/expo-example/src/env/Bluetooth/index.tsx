@@ -1,6 +1,6 @@
 import HardwareBleSdk from '@onekeyfe/hd-ble-sdk';
 import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Platform, PermissionsAndroid } from 'react-native';
 
 import { CallMethods } from '../../components/CallMethods';
 import { DeviceList } from '../../components/DeviceList';
@@ -23,6 +23,26 @@ export default function Bluetooth() {
   useEffect(() => {
     if (!isSdkInit) {
       sdkInit();
+
+      if (Platform.OS === 'android' && Platform.Version >= 23) {
+        PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION).then(
+          result => {
+            if (result) {
+              console.log('Permission is OK');
+            } else {
+              PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION).then(
+                result => {
+                  if (result) {
+                    console.log('User accept');
+                  } else {
+                    console.log('User refuse');
+                  }
+                }
+              );
+            }
+          }
+        );
+      }
     }
     isSdkInit = true;
   }, []);
