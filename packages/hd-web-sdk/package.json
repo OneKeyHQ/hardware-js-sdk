@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@onekeyfe/hd-core": "*",
+    "@onekeyfe/hd-transport-http": "*",
     "@onekeyfe/cross-inpage-provider-core": "^0.0.14"
   },
   "devDependencies": {

@@ -1,3 +1,4 @@
+import HttpTransport from '@onekeyfe/hd-transport-http';
 import {
   PostMessageEvent,
   IFRAME,
@@ -42,7 +43,7 @@ export async function init(payload: IFrameInit['payload']) {
   Log.enabled = !!settings.debug;
 
   try {
-    _core = await initCore(settings);
+    _core = await initCore(settings, HttpTransport);
   } catch (error) {
     return createErrorMessage(error);
   }

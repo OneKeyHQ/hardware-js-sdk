@@ -87,9 +87,7 @@ export default class DeviceConnector {
   listening = false;
 
   constructor() {
-    if (!TransportManager.getTransport()) {
-      TransportManager.load();
-    }
+    TransportManager.load();
     this.transport = TransportManager.getTransport();
   }
 

@@ -1,6 +1,4 @@
 import { Transport } from '@onekeyfe/hd-transport';
-import HttpBridge from '@onekeyfe/hd-transport-http';
-import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import DataManager from './DataManager';
@@ -21,13 +19,7 @@ export default class TransportManager {
   static reactNativeInit = false;
 
   static load() {
-    const env = DataManager.getSettings('env');
     console.log('transport manager load');
-    if (env === 'react-native') {
-      this.transport = new ReactNativeTransport({ scanTimeout: 1500 }) as any;
-    } else {
-      this.transport = new HttpBridge() as any;
-    }
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
   }
@@ -67,6 +59,18 @@ export default class TransportManager {
     } catch (error) {
       throw ERRORS.TypedError('Transport_InvalidProtobuf', error.message);
     }
+  }
+
+  static setTransport(TransportConstructor: any) {
+    const env = DataManager.getSettings('env');
+    if (env === 'react-native') {
+      /** Actually initializes the ReactNativeTransport */
+      this.transport = new TransportConstructor({ scanTimeout: 1500 }) as unknown as Transport;
+    } else {
+      /** Actually initializes the HttpTransport */
+      this.transport = new TransportConstructor() as unknown as Transport;
+    }
+    console.log('set transport: ', this.transport);
   }
 
   static getTransport() {
