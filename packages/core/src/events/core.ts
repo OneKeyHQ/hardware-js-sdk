@@ -1,13 +1,15 @@
 import { Unsuccessful } from '../types/params';
 import { IFrameCallMessage } from './call';
 import { IFrameEventMessage } from './iframe';
+import { UiEventMessage } from './ui-request';
+import { UiResponseMessage } from './ui-response';
 
 export const CORE_EVENT = 'CORE_EVENT';
 
 export type CoreMessage = {
   id?: string;
   success?: true | false;
-} & (IFrameEventMessage | IFrameCallMessage);
+} & (IFrameEventMessage | IFrameCallMessage | UiResponseMessage | UiEventMessage);
 
 export type PostMessageEvent = MessageEvent<any>;
 

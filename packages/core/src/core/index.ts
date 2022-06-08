@@ -13,6 +13,8 @@ import {
   DEVICE,
   IFRAME,
   IFrameCallMessage,
+  RESPONSE_EVENT,
+  CORE_EVENT,
   UI_EVENT,
   UI_REQUEST,
   UI_RESPONSE,
@@ -223,6 +225,17 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
   const uiResp = await uiPromise.promise;
   // callback.apply(null, [null, pin]);
   callback(null, uiResp.payload);
+};
+
+/**
+ * Emit message to listener (parent).
+ * Clear method reference from _callMethods
+ * @param {CoreMessage} message
+ * @returns {void}
+ * @memberof Core
+ */
+const postMessage = (message: CoreMessage) => {
+  _core.emit(CORE_EVENT, message);
 };
 
 const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, device?: Device) => {

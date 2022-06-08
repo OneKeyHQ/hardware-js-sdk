@@ -11,6 +11,7 @@ import {
   createErrorMessage,
   initCore,
   Core,
+  CORE_EVENT,
 } from '@onekeyfe/hd-core';
 import { getOrigin } from '../utils/urlUtils';
 import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
@@ -30,6 +31,10 @@ const handleMessage = (event: PostMessageEvent) => {
   }
 };
 
+function fakeMessage(...args: any[]) {
+  console.log(args);
+}
+
 export async function init(payload: IFrameInit['payload']) {
   if (DataManager.getSettings('origin')) return;
 
@@ -44,6 +49,7 @@ export async function init(payload: IFrameInit['payload']) {
 
   try {
     _core = await initCore(settings, HttpTransport);
+    _core?.on(CORE_EVENT, messages => sendMessage(messages, false));
   } catch (error) {
     return createErrorMessage(error);
   }

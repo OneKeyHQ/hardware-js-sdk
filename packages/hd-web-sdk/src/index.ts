@@ -28,6 +28,11 @@ const handleMessage = async (message: CoreMessage) => {
         iframe.initPromise.resolve();
         return Promise.resolve({ success: true, payload: 'JSBridge Handshake Success' });
       }
+
+      // pass UI event up
+      console.log('pass UI event up');
+      eventEmitter.emit(message.event, message);
+      eventEmitter.emit(message.type, message.payload);
       break;
 
     default:

@@ -1,4 +1,6 @@
 import { View, Button, StyleSheet } from 'react-native';
+import { UI_EVENT, UI_REQUEST, CoreMessage } from '@onekeyfe/hd-core';
+import { ReceivePin } from './ReceivePin';
 import type { Device } from './DeviceList';
 
 type ICallMethodProps = {
@@ -7,6 +9,15 @@ type ICallMethodProps = {
   setDevices: (devices: Device[]) => void;
 };
 export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProps) {
+  // 监听 SDK 事件
+  SDK.on(UI_EVENT, (message: CoreMessage) => {
+    console.log(message);
+
+    if (message.type === UI_REQUEST.REQUEST_PIN) {
+      console.log('expo get pin request: ', message);
+    }
+  });
+
   const handleSearchDevices = async () => {
     const response = await SDK.searchDevices();
     console.log('example searchDevices response: ', response);
@@ -38,12 +49,18 @@ export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProp
   };
 
   return (
-    <View style={styles.buttonContainer}>
-      <Button title="search devices" onPress={() => handleSearchDevices()} />
-      <Button title="get Features" onPress={() => handleGetFeatures()} />
-      <Button title="check firmware release" onPress={() => handleCheckFirmwareRelease()} />
-      <Button title="check ble firmware release" onPress={() => handleCheckBLEFirmwareRelease()} />
-      <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
+    <View>
+      <View style={styles.buttonContainer}>
+        <Button title="search devices" onPress={() => handleSearchDevices()} />
+        <Button title="get Features" onPress={() => handleGetFeatures()} />
+        <Button title="check firmware release" onPress={() => handleCheckFirmwareRelease()} />
+        <Button
+          title="check ble firmware release"
+          onPress={() => handleCheckBLEFirmwareRelease()}
+        />
+        <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
+      </View>
+      <ReceivePin />
     </View>
   );
 }

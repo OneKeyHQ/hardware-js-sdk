@@ -18,6 +18,8 @@ export type UiRequestDeviceAction = {
 
 export type UiEvent = UiRequestDeviceAction;
 
+export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
+
 export const createUiMessage: MessageFactoryFn<typeof UI_EVENT, UiEvent> = (type, payload) =>
   ({
     event: UI_EVENT,
