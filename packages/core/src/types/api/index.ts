@@ -5,6 +5,18 @@ import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { init } from './init';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { checkTransportRelease } from './checkTransportRelease';
+import { evmGetAddress } from './evmGetAddress';
+import { evmGetPublicKey } from './evmGetPublicKey';
+import { evmSignMessage } from './evmSignMessage';
+import { evmSignMessageEIP712 } from './evmSignMessageEIP712';
+import { evmSignTransaction } from './evmSignTransaction';
+import { evmSignTypedData } from './evmSignTypedData';
+import { evmVerifyMessage } from './evmVerifyMessage';
+import { btcGetAddress } from './btcGetAddress';
+import { btcGetPublicKey } from './btcGetPublicKey';
+import { btcSignMessage } from './btcSignMessage';
+import { btcSignTransaction } from './btcSignTransaction';
+import { btcVerifyMessage } from './btcVerifyMessage';
 
 export type CoreApi = {
   /**
@@ -29,4 +41,18 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
 
   checkTransportRelease: typeof checkTransportRelease;
+
+  evmGetAddress: typeof evmGetAddress;
+  evmGetPublicKey: typeof evmGetPublicKey;
+  evmSignMessage: typeof evmSignMessage;
+  evmSignMessageEIP712: typeof evmSignMessageEIP712;
+  evmSignTransaction: typeof evmSignTransaction;
+  evmSignTypedData: typeof evmSignTypedData;
+  evmVerifyMessage: typeof evmVerifyMessage;
+
+  btcGetAddress: typeof btcGetAddress;
+  btcGetPublicKey: typeof btcGetPublicKey;
+  btcSignMessage: typeof btcSignMessage;
+  btcSignTransaction: typeof btcSignTransaction;
+  btcVerifyMessage: typeof btcVerifyMessage;
 };

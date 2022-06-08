@@ -1417,6 +1417,13 @@ export type EthereumSignMessage = {
   message: string;
 };
 
+// EthereumSignMessageEIP712
+export type EthereumSignMessageEIP712 = {
+  address_n: number[];
+  domain_hash: string;
+  message_hash: string;
+};
+
 // EthereumMessageSignature
 export type EthereumMessageSignature = {
   signature: string;
@@ -2366,6 +2373,7 @@ export type MessageType = {
   EthereumTxRequest: EthereumTxRequest;
   EthereumTxAck: EthereumTxAck;
   EthereumSignMessage: EthereumSignMessage;
+  EthereumSignMessageEIP712: EthereumSignMessageEIP712;
   EthereumMessageSignature: EthereumMessageSignature;
   EthereumVerifyMessage: EthereumVerifyMessage;
   EthereumSignTypedHash: EthereumSignTypedHash;
