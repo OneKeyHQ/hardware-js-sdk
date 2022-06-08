@@ -31,10 +31,6 @@ const handleMessage = (event: PostMessageEvent) => {
   }
 };
 
-function fakeMessage(...args: any[]) {
-  console.log(args);
-}
-
 export async function init(payload: IFrameInit['payload']) {
   if (DataManager.getSettings('origin')) return;
 
