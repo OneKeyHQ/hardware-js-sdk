@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Button, StyleSheet } from 'react-native';
 import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import type { Device } from './DeviceList';
+
+let registerListener = false;
 
 type ICallMethodProps = {
   SDK: any;
@@ -13,15 +15,20 @@ export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProp
   const [showPinInput, setShowPinInput] = useState(false);
   const [pinValue, setPinValue] = useState('');
 
-  // 监听 SDK 事件
-  SDK.on(UI_EVENT, (message: CoreMessage) => {
-    console.log(message);
-
-    if (message.type === UI_REQUEST.REQUEST_PIN) {
-      console.log('expo get pin request: ', message);
-      setShowPinInput(true);
+  useEffect(() => {
+    // 监听 SDK 事件
+    if (registerListener) {
+      return;
     }
-  });
+    SDK.on(UI_EVENT, (message: CoreMessage) => {
+      console.log(message);
+
+      if (message.type === UI_REQUEST.REQUEST_PIN) {
+        setShowPinInput(true);
+      }
+    });
+    registerListener = true;
+  }, [SDK]);
 
   // 输入 pin 码的确认回调
   function onConfirmPin(payload: string) {

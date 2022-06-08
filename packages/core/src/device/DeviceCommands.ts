@@ -153,7 +153,13 @@ export class DeviceCommands {
 
     if (res.type === 'PinMatrixRequest') {
       return this._promptPin(res.message.type).then(
-        pin => this._commonCall('PinMatrixAck', { pin }),
+        pin => {
+          if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
+            // @ts-expect-error
+            return this._commonCall('BixinPinInputOnDevice');
+          }
+          return this._commonCall('PinMatrixAck', { pin });
+        },
         () => this._commonCall('Cancel', {})
       );
     }

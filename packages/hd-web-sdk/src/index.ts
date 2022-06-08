@@ -31,7 +31,6 @@ const handleMessage = async (message: CoreMessage) => {
       }
 
       // pass UI event up
-      console.log('pass UI event up');
       eventEmitter.emit(message.event, message);
       eventEmitter.emit(message.type, message.payload);
       break;
@@ -55,6 +54,8 @@ const uiResponse = (response: UiResponseEvent) => {
   const { type, payload } = response;
   sendMessage({ event: UI_EVENT, type, payload });
 };
+
+const cancel = () => {};
 
 const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
@@ -135,6 +136,7 @@ const HardwareWebSdk = HardwareSdk({
   eventEmitter,
   init,
   call,
+  cancel,
   dispose,
   uiResponse,
 });

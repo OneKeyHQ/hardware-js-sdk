@@ -8,9 +8,17 @@ export interface InjectApi {
   init: CoreApi['init'];
   dispose: CoreApi['dispose'];
   uiResponse: CoreApi['uiResponse'];
+  cancel: CoreApi['cancel'];
 }
 
-export const inject = ({ eventEmitter, init, call, dispose, uiResponse }: InjectApi): CoreApi => {
+export const inject = ({
+  call,
+  cancel,
+  dispose,
+  eventEmitter,
+  init,
+  uiResponse,
+}: InjectApi): CoreApi => {
   const api: CoreApi = {
     on: <T extends string, P extends (...args: any[]) => any>(type: T, fn: P) => {
       eventEmitter.on(type, fn);
@@ -32,6 +40,7 @@ export const inject = ({ eventEmitter, init, call, dispose, uiResponse }: Inject
 
     uiResponse,
 
+    cancel,
     /**
      * 搜索设备
      */
