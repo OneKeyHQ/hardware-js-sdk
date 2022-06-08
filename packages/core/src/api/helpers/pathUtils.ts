@@ -1,6 +1,6 @@
 /* eslint-disable no-bitwise */
 
-import { InputScriptType } from '@onekeyfe/hd-transport/src/types/messages';
+import { ChangeOutputScriptType, InputScriptType } from '@onekeyfe/hd-transport/src/types/messages';
 import { ERRORS } from '../../constants';
 
 export const HD_HARDENED = 0x80000000;
@@ -60,6 +60,27 @@ export const getScriptType = (path: Array<number>): InputScriptType => {
       return 'SPENDWITNESS';
     default:
       return 'SPENDADDRESS';
+  }
+};
+
+export const getOutputScriptType = (path?: number[]): ChangeOutputScriptType => {
+  if (!Array.isArray(path) || path.length < 1) return 'PAYTOADDRESS';
+
+  // compatibility for Casa - allow an unhardened 49 path to use PAYTOP2SHWITNESS
+  if (path[0] === 49) {
+    return 'PAYTOP2SHWITNESS';
+  }
+
+  const p = fromHardened(path[0]);
+  switch (p) {
+    case 48:
+      return 'PAYTOMULTISIG';
+    case 49:
+      return 'PAYTOP2SHWITNESS';
+    case 84:
+      return 'PAYTOWITNESS';
+    default:
+      return 'PAYTOADDRESS';
   }
 };
 
