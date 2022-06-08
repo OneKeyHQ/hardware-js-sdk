@@ -92,25 +92,27 @@ export default class ReactNativeBleTransport {
 
           const { name, localName, id } = device ?? {};
           console.log(`device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`);
-          deviceList.push(device as unknown as Device);
+          addDevice(device as unknown as Device);
 
           console.log('search device end ======================\n');
         }
       });
 
-      getConnectedDeviceIds(getBluetoothServiceUuids()).then(async ids => {
-        for (const id of ids) {
-          const device = await blePlxManager.connectToDevice(id, {
-            ...connectOptions,
-            refreshGatt: 'OnConnected',
-            autoConnect: false,
-          });
+      getConnectedDeviceIds(getBluetoothServiceUuids()).then(devices => {
+        for (const device of devices) {
           console.log('search connected peripheral: ', device.id);
-          deviceList.push(device);
+          addDevice(device as unknown as Device);
         }
       });
 
+      const addDevice = (device: Device) => {
+        if (deviceList.every(d => d.id !== device.id)) {
+          deviceList.push(device);
+        }
+      };
+
       timer.timeout(() => {
+        blePlxManager.stopDeviceScan();
         resolve(deviceList);
       }, this.scanTimeout);
     });
@@ -155,7 +157,10 @@ export default class ReactNativeBleTransport {
         device = await blePlxManager.connectToDevice(uuid, connectOptions);
       } catch (e) {
         console.log('try to connect to device has error: ', e);
-        if (e.errorCode === BleErrorCode.DeviceMTUChangeFailed) {
+        if (
+          e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
+          e.errorCode === BleErrorCode.OperationCancelled
+        ) {
           connectOptions = {};
           device = await blePlxManager.connectToDevice(uuid);
         } else {
@@ -175,7 +180,10 @@ export default class ReactNativeBleTransport {
         await device.connect(connectOptions);
       } catch (e) {
         console.log('try to connect to device has error: ', e);
-        if (e.errorCode === BleErrorCode.DeviceMTUChangeFailed) {
+        if (
+          e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
+          e.errorCode === BleErrorCode.OperationCancelled
+        ) {
           connectOptions = {};
           await device.connect();
         } else {

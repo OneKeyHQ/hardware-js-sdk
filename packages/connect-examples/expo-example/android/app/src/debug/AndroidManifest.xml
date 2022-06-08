@@ -3,5 +3,33 @@
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission-sdk-23 android:name="android.permission.ACCESS_FINE_LOCATION"/>
+
+    <!-- Add this line if your application always requires BLE. More info can be found on:
+        https://developer.android.com/guide/topics/connectivity/bluetooth-le.html#permissions
+      -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
+
+    <!-- Only when targeting Android 12 or higher -->
+    <!-- Please make sure you read the following documentation to have a
+         better understanding of the new permissions.
+         https://developer.android.com/guide/topics/connectivity/bluetooth/permissions#assert-never-for-location
+         -->
+
+    <!-- If your app doesn't use Bluetooth scan results to derive physical location information,
+         you can strongly assert that your app
+         doesn't derive physical location. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
+      android:usesPermissionFlags="neverForLocation"
+      tools:targetApi="s" />
+
+    <!-- Needed only if your app looks for Bluetooth devices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <!-- Needed only if your app makes the device discoverable to Bluetooth devices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
     <application android:usesCleartextTraffic="true" tools:targetApi="28" tools:ignore="GoogleAppIndexingWarning" />
 </manifest>

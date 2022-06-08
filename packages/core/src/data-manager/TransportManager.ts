@@ -65,7 +65,7 @@ export default class TransportManager {
     const env = DataManager.getSettings('env');
     if (env === 'react-native') {
       /** Actually initializes the ReactNativeTransport */
-      this.transport = new TransportConstructor({ scanTimeout: 1500 }) as unknown as Transport;
+      this.transport = new TransportConstructor({ scanTimeout: 3000 }) as unknown as Transport;
     } else {
       /** Actually initializes the HttpTransport */
       this.transport = new TransportConstructor() as unknown as Transport;
