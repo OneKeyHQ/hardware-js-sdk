@@ -17,6 +17,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-core": "*"
+    "@onekeyfe/hd-core": "*",
+    "@onekeyfe/hd-transport-react-native": "*"
   }
 }

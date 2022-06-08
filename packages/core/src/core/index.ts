@@ -221,11 +221,15 @@ export const initConnector = () => {
   return _connector;
 };
 
-export const init = async (settings: ConnectSettings) => {
-  console.log('init');
+const initTransport = (Transport: any) => {
+  TransportManager.setTransport(Transport);
+};
+
+export const init = async (settings: ConnectSettings, Transport: any) => {
   try {
     try {
       await DataManager.load(settings);
+      initTransport(Transport);
     } catch {
       Log.error('DataManager.load error');
     }

@@ -14,6 +14,7 @@ import HardwareSdk, {
   create as createDeferred,
   IFRAME,
 } from '@onekeyfe/hd-core';
+import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 
 const eventEmitter = new EventEmitter();
 const Log = initLog('@onekey/hd-ble-sdk');
@@ -55,7 +56,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
   Log.debug('init');
 
   try {
-    _core = await initCore(_settings);
+    _core = await initCore(_settings, ReactNativeTransport);
     _core?.on(CORE_EVENT, handleMessage);
   } catch (error) {
     Log.error(createErrorMessage(error));
