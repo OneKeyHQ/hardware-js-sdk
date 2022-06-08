@@ -92,7 +92,7 @@ export default class ReactNativeBleTransport {
 
           const { name, localName, id } = device ?? {};
           console.log(`device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`);
-          deviceList.push(device as unknown as Device);
+          addDevice(device as unknown as Device);
 
           console.log('search device end ======================\n');
         }
@@ -106,11 +106,18 @@ export default class ReactNativeBleTransport {
             autoConnect: false,
           });
           console.log('search connected peripheral: ', device.id);
-          deviceList.push(device);
+          addDevice(device);
         }
       });
 
+      const addDevice = (device: Device) => {
+        if (deviceList.every(d => d.id !== device.id)) {
+          deviceList.push(device);
+        }
+      };
+
       timer.timeout(() => {
+        blePlxManager.stopDeviceScan();
         resolve(deviceList);
       }, this.scanTimeout);
     });
