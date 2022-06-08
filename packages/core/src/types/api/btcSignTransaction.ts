@@ -8,6 +8,22 @@ import {
 } from '@onekeyfe/hd-transport/src/types/messages';
 import type { CommonParams, Response } from '../params';
 
+export type SignedTransaction = {
+  signatures: string[];
+  serializedTx: string;
+  txid?: string;
+};
+
+export type TransactionOptions = {
+  version?: number;
+  lock_time?: number;
+  expiry?: number;
+  overwintered?: boolean;
+  version_group_id?: number;
+  timestamp?: number;
+  branch_id?: number;
+};
+
 export type RefTransaction =
   | {
       hash: string;
@@ -38,11 +54,30 @@ export type RefTransaction =
       branch_id?: number;
     };
 
-export type BTCVerifyMessageParams = {
+export type AccountAddress = {
+  address: string;
+  path: string;
+  transfers?: number;
+  balance?: string;
+  sent?: string;
+  received?: string;
+};
+
+export type AccountAddresses = {
+  change: AccountAddress[];
+  used: AccountAddress[];
+  unused: AccountAddress[];
+};
+
+export type BTCSignTransactionParams = {
   coin: string;
   inputs: TxInputType[];
   outputs: TxOutputType[];
   refTxs: RefTransaction[];
+  account?: {
+    // Partial account (addresses)
+    addresses: AccountAddresses;
+  };
   locktime?: number;
   version?: number;
   // Only available for Decred and Zcash
@@ -58,5 +93,5 @@ export type BTCVerifyMessageParams = {
 };
 
 export declare function btcSignTransaction(
-  params: CommonParams & BTCVerifyMessageParams
+  params: CommonParams & BTCSignTransactionParams
 ): Response<Success>;

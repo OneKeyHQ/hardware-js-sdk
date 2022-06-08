@@ -4,7 +4,7 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { formatAnyHex } from './helpers/hexUtils';
-import CoinManager from '../data-manager/CoinManager';
+import { getCoinInfo } from './helpers/btcParamsUtils';
 
 export default class BTCVerifyMessage extends BaseMethod<VerifyMessage> {
   init() {
@@ -20,17 +20,13 @@ export default class BTCVerifyMessage extends BaseMethod<VerifyMessage> {
     const { coin } = this.payload;
     const { address, messageHex, signature } = formatAnyHex(this.payload);
 
-    const coin_name = CoinManager.getBitcoinCoinInfo({ name: coin })?.name;
-    if (!coin_name) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Invalid coin name: ${coin}`);
-    }
+    const coinName = getCoinInfo(undefined, coin).name;
 
     this.params = {
       address,
       message: messageHex,
       signature,
-      coin_name,
+      coin_name: coinName,
     };
   }
 

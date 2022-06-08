@@ -1,20 +1,44 @@
-import CoinManager from '../../data-manager/CoinManager';
-import { getScriptType, isMultisigPath } from './pathUtils';
+import { ERRORS } from '../../constants';
+import { getScriptType, isMultisigPath, fromHardened } from './pathUtils';
+import bitcoin from '../../data/coins/bitcoin.json';
+
+export type BitcoinInfo = {
+  name: string;
+  slip44: number;
+  label: string;
+};
+
+export const getCoinInfo = (path: number[] | undefined, coin: string | undefined) => {
+  let coinInfo: BitcoinInfo | undefined;
+  if (coin) {
+    const coinName = coin.toLowerCase();
+    coinInfo = bitcoin.find(
+      c => c.name.toLowerCase() === coinName || c.label.toLowerCase() === coinName
+    );
+  } else if (path) {
+    const slip44 = fromHardened(path[1]);
+    coinInfo = bitcoin.find(c => c.slip44 === slip44);
+  }
+
+  if (!coinInfo) {
+    if (coin) {
+      throw ERRORS.TypedError('Method_InvalidParameter', `Invalid coin name: ${coin}`);
+    } else if (path) {
+      throw ERRORS.TypedError('Method_InvalidParameter', `Invalid path: ${path[0]}`);
+    } else {
+      throw ERRORS.TypedError('Method_InvalidParameter');
+    }
+  }
+
+  return coinInfo;
+};
 
 export const getCoinAndScriptType = (
   path: number[],
   coin: string | undefined,
   multisig?: boolean
 ) => {
-  let coin_name: string | undefined;
-  if (coin) {
-    coin_name = CoinManager.getBitcoinCoinInfo({ name: coin })?.name;
-    if (!coin_name) {
-      throw new Error(`Invalid coin name: ${coin}`);
-    }
-  } else {
-    coin_name = CoinManager.getBitcoinCoinInfo({ path })?.name;
-  }
+  const coinName = getCoinInfo(path, coin).name;
 
   let isMultisig = multisig;
   if (isMultisig === undefined) {
@@ -27,7 +51,7 @@ export const getCoinAndScriptType = (
   }
 
   return {
-    coin_name,
-    script_type: scriptType ?? 'SPENDADDRESS',
+    coinName,
+    scriptType: scriptType ?? 'SPENDADDRESS',
   };
 };

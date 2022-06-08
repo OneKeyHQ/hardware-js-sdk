@@ -4,7 +4,7 @@ import { getScriptType, validatePath } from './helpers/pathUtils';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { BTCGetAddressParams } from '../types/api/btcGetAddress';
-import CoinManager from '../data-manager/CoinManager';
+import { getCoinInfo } from './helpers/btcParamsUtils';
 
 export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
   hasBundle = false;
@@ -19,7 +19,7 @@ export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
 
     this.params = [];
     payload.bundle.forEach((batch: BTCGetAddressParams) => {
-      const address_n = validatePath(batch.path, 1);
+      const addressN = validatePath(batch.path, 1);
 
       validateParams(batch, [
         { name: 'path', required: true },
@@ -33,30 +33,22 @@ export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
 
       const { multisig, coin } = batch;
 
-      let script_type = batch.scriptType;
-      if (!script_type) {
-        script_type = getScriptType(address_n);
-        if (script_type === 'SPENDMULTISIG' && !multisig) {
-          script_type = 'SPENDADDRESS';
+      let { scriptType } = batch;
+      if (!scriptType) {
+        scriptType = getScriptType(addressN);
+        if (scriptType === 'SPENDMULTISIG' && !multisig) {
+          scriptType = 'SPENDADDRESS';
         }
       }
 
-      let coin_name: string | undefined;
-      if (coin) {
-        coin_name = CoinManager.getBitcoinCoinInfo({ name: coin })?.name;
-        if (!coin_name) {
-          throw new Error(`Invalid coin name: ${coin}`);
-        }
-      } else {
-        coin_name = CoinManager.getBitcoinCoinInfo({ path: address_n })?.name;
-      }
+      const coinName = getCoinInfo(addressN, coin).name;
 
       this.params.push({
-        address_n,
+        address_n: addressN,
         show_display: showOnOneKey,
-        coin_name,
+        coin_name: coinName,
         multisig,
-        script_type: script_type || 'SPENDADDRESS',
+        script_type: scriptType || 'SPENDADDRESS',
       });
     });
   }
