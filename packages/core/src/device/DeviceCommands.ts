@@ -3,6 +3,7 @@ import TransportManager from '../data-manager/TransportManager';
 import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import type { Device } from './Device';
+import { DEVICE } from '../events';
 
 type MessageType = Messages.MessageType;
 type MessageKey = keyof MessageType;
@@ -117,6 +118,7 @@ export class DeviceCommands {
   }
 
   _filterCommonTypes(res: DefaultMessageResponse): Promise<DefaultMessageResponse> {
+    console.log('_filterCommonTypes: ', res);
     if (res.type === 'Failure') {
       const { code } = res.message;
       let { message } = res.message;
@@ -150,7 +152,16 @@ export class DeviceCommands {
     }
 
     if (res.type === 'PinMatrixRequest') {
-      // TODO: PinMatrixRequest
+      return this._promptPin(res.message.type).then(
+        pin => {
+          if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
+            // @ts-expect-error
+            return this._commonCall('BixinPinInputOnDevice');
+          }
+          return this._commonCall('PinMatrixAck', { pin });
+        },
+        () => this._commonCall('Cancel', {})
+      );
     }
 
     if (res.type === 'PassphraseRequest') {
@@ -167,5 +178,24 @@ export class DeviceCommands {
       // TODO: WordRequest
     }
     return Promise.resolve(res);
+  }
+
+  _promptPin(type?: Messages.PinMatrixRequestType) {
+    return new Promise<string>((resolve, reject) => {
+      if (this.device.listenerCount(DEVICE.PIN) > 0) {
+        this._cancelableRequest = reject;
+        this.device.emit(DEVICE.PIN, this.device, type, (err, pin) => {
+          this._cancelableRequest = undefined;
+          if (err) {
+            reject(err);
+          } else {
+            resolve(pin);
+          }
+        });
+      } else {
+        console.warn('[DeviceCommands] [call] PIN callback not configured, cancelling request');
+        reject(ERRORS.TypedError('Runtime', '_promptPin: PIN callback not configured'));
+      }
+    });
   }
 }

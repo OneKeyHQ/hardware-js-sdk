@@ -13,8 +13,9 @@ import {
   getDeviceBLEFirmwareVersion,
 } from '../utils/deviceFeaturesUtils';
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
+import { DEVICE } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
-import { ERRORS } from '../constants';
+import { ERRORS, PROTO } from '../constants';
 import { DataManager } from '../data-manager';
 
 type RunOptions = {
@@ -28,6 +29,17 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
 };
 
 const Log = initLog('Device');
+
+export interface DeviceEvents {
+  [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
+}
+
+export interface Device {
+  on<K extends keyof DeviceEvents>(type: K, listener: (...event: DeviceEvents[K]) => void): this;
+  off<K extends keyof DeviceEvents>(type: K, listener: (...event: DeviceEvents[K]) => void): this;
+  emit<K extends keyof DeviceEvents>(type: K, ...args: DeviceEvents[K]): boolean;
+}
+
 export class Device extends EventEmitter {
   /**
    * 设备标识对象

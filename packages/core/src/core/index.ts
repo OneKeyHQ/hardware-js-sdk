@@ -1,15 +1,27 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { ERRORS } from '../constants';
-import { Device } from '../device/Device';
+import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
 import { initLog, create as createDeferred, Deferred } from '../utils';
-import { CoreMessage, createResponseMessage, IFRAME, IFrameCallMessage, UI_EVENT } from '../events';
+import {
+  CoreMessage,
+  createResponseMessage,
+  DEVICE,
+  IFRAME,
+  IFrameCallMessage,
+  CORE_EVENT,
+  UI_REQUEST,
+  UI_RESPONSE,
+  UiPromise,
+  UiPromiseResponse,
+  createUiMessage,
+} from '../events';
 import type { BaseMethod } from '../api/BaseMethod';
-import type { ConnectSettings, CommonParams } from '../types';
+import type { ConnectSettings, CommonParams, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 
@@ -19,6 +31,7 @@ let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _preferredDevice: CommonParams['device'];
+let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
 let _callPromise: Deferred<any> | undefined;
 const callApiQueue = [];
 
@@ -81,6 +94,8 @@ export const callAPI = async (message: CoreMessage) => {
   Log.debug('Call API - setDevice: ', device);
   method.setDevice?.(device);
 
+  device.on(DEVICE.PIN, onDevicePinHandler);
+
   try {
     const inner = async (): Promise<void> => {
       // check firmware status
@@ -115,7 +130,8 @@ export const callAPI = async (message: CoreMessage) => {
         _callPromise?.resolve(messageResponse);
       } catch (error) {
         Log.debug('Call API - Inner Method Run Error: ', error);
-        return Promise.reject(error);
+        messageResponse = createResponseMessage(method.responseID, false, error.message);
+        _callPromise?.resolve(messageResponse);
       }
     };
     Log.debug('Call API - Device Run: ', device);
@@ -192,11 +208,60 @@ function initDeviceForBle(method: BaseMethod) {
   return device;
 }
 
+const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
+  console.log('onDevicePinHandler');
+  // create ui promise
+  const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PIN, device);
+  // request pin view
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PIN, {
+      device: device.toMessageObject() as unknown as KnownDevice,
+      type,
+    })
+  );
+  // wait for pin
+  const uiResp = await uiPromise.promise;
+  // callback.apply(null, [null, pin]);
+  callback(null, uiResp.payload);
+};
+
+/**
+ * Emit message to listener (parent).
+ * Clear method reference from _callMethods
+ * @param {CoreMessage} message
+ * @returns {void}
+ * @memberof Core
+ */
+const postMessage = (message: CoreMessage) => {
+  _core.emit(CORE_EVENT, message);
+};
+
+const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, device?: Device) => {
+  const uiPromise: UiPromise<T> = createDeferred(promiseEvent, device);
+  _uiPromises.push(uiPromise as any);
+
+  return uiPromise;
+};
+
+const findUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T) =>
+  _uiPromises.find(p => p.id === promiseEvent) as UiPromise<T> | undefined;
+
+const removeUiPromise = (promise: Deferred<any>) => {
+  _uiPromises = _uiPromises.filter(p => p !== promise);
+};
+
 export default class Core extends EventEmitter {
   async handleMessage(message: CoreMessage) {
-    switch (message.event) {
-      case UI_EVENT:
+    switch (message.type) {
+      case UI_RESPONSE.RECEIVE_PIN: {
+        const uiPromise = findUiPromise(message.type);
+        if (uiPromise) {
+          uiPromise.resolve(message);
+          removeUiPromise(uiPromise);
+        }
         break;
+      }
+
       case IFRAME.CALL: {
         const response = await callAPI(message);
         return response;

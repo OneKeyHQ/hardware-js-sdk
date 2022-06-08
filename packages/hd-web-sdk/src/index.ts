@@ -11,6 +11,7 @@ import HardwareSdk, {
   UI_EVENT,
   CoreMessage,
   ConnectSettings,
+  UiResponseEvent,
 } from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
@@ -28,6 +29,10 @@ const handleMessage = async (message: CoreMessage) => {
         iframe.initPromise.resolve();
         return Promise.resolve({ success: true, payload: 'JSBridge Handshake Success' });
       }
+
+      // pass UI event up
+      eventEmitter.emit(message.event, message);
+      eventEmitter.emit(message.type, message.payload);
       break;
 
     default:
@@ -41,6 +46,16 @@ const dispose = () => {
   _settings = parseConnectSettings();
   window.removeEventListener('message', createJSBridge);
 };
+
+const uiResponse = (response: UiResponseEvent) => {
+  if (!iframe.instance) {
+    throw ERRORS.TypedError('Init_NotInitialized');
+  }
+  const { type, payload } = response;
+  sendMessage({ event: UI_EVENT, type, payload });
+};
+
+const cancel = () => {};
 
 const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
@@ -121,7 +136,9 @@ const HardwareWebSdk = HardwareSdk({
   eventEmitter,
   init,
   call,
+  cancel,
   dispose,
+  uiResponse,
 });
 
 export default HardwareWebSdk;
