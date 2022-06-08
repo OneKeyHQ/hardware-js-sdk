@@ -10,6 +10,32 @@ import { CallBTCMethods } from '../../components/CallBTCMethods';
 
 let isSdkInit = false;
 
+const requestLocationPermission = async () => {
+  const permissionRequest = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+  );
+  const granted = permissionRequest === PermissionsAndroid.RESULTS.GRANTED;
+  console.log('Location permission granted: ', granted);
+  return granted;
+};
+
+const requestBluetoothPermission = async () => {
+  const permissionRequest = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
+  );
+  const granted = permissionRequest === PermissionsAndroid.RESULTS.GRANTED;
+  console.log('Bluetooth permission granted: ', granted);
+  return granted;
+};
+const requestBluetoothScanPermission = async () => {
+  const permissionRequest = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN
+  );
+  const granted = permissionRequest === PermissionsAndroid.RESULTS.GRANTED;
+  console.log('Bluetooth permission granted: ', granted);
+  return granted;
+};
+
 export default function Bluetooth() {
   console.log(HardwareBleSdk);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -23,30 +49,28 @@ export default function Bluetooth() {
   };
 
   useEffect(() => {
-    if (!isSdkInit) {
-      sdkInit();
+    (async () => {
+      console.log('Bluetooth init');
 
-      if (Platform.OS === 'android' && Platform.Version >= 23) {
-        PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION).then(
-          result => {
-            if (result) {
-              console.log('Permission is OK');
-            } else {
-              PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION).then(
-                result => {
-                  if (result) {
-                    console.log('User accept');
-                  } else {
-                    console.log('User refuse');
-                  }
-                }
-              );
-            }
+      if (!isSdkInit) {
+        if (Platform.OS === 'android') {
+          console.log('Bluetooth android request permission');
+          try {
+            if (Platform.Version >= 23 && !(await requestLocationPermission())) return;
+            if (Platform.Version >= 31 && !(await requestBluetoothPermission())) return;
+            if (Platform.Version >= 31 && !(await requestBluetoothScanPermission())) return;
+          } catch (e) {
+            console.log('request permission error:', e);
+            return;
           }
-        );
+        }
+
+        console.log('Bluetooth SDK init');
+
+        sdkInit();
+        isSdkInit = true;
       }
-    }
-    isSdkInit = true;
+    })();
   }, []);
 
   return (

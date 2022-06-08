@@ -5,6 +5,7 @@ import {
   Device,
   BleErrorCode,
   Characteristic,
+  ScanMode,
 } from 'react-native-ble-plx';
 import { initializeBleManager, getConnectedDeviceIds } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
@@ -81,22 +82,31 @@ export default class ReactNativeBleTransport {
         return;
       }
 
-      blePlxManager.startDeviceScan(null, null, (error, device) => {
-        if (error) {
-          console.log('ble scan error: ', error);
-          return;
+      blePlxManager.startDeviceScan(
+        null,
+        {
+          scanMode: ScanMode.LowLatency,
+        },
+        (error, device) => {
+          if (error) {
+            console.log('ble scan manager: ', blePlxManager);
+            console.log('ble scan error: ', error);
+            return;
+          }
+
+          if (isOnekeyDevice(device?.name ?? null, device?.id)) {
+            console.log('search device start ======================');
+
+            const { name, localName, id } = device ?? {};
+            console.log(
+              `device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`
+            );
+            addDevice(device as unknown as Device);
+
+            console.log('search device end ======================\n');
+          }
         }
-
-        if (isOnekeyDevice(device?.name ?? null, device?.id)) {
-          console.log('search device start ======================');
-
-          const { name, localName, id } = device ?? {};
-          console.log(`device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`);
-          addDevice(device as unknown as Device);
-
-          console.log('search device end ======================\n');
-        }
-      });
+      );
 
       getConnectedDeviceIds(getBluetoothServiceUuids()).then(devices => {
         for (const device of devices) {
