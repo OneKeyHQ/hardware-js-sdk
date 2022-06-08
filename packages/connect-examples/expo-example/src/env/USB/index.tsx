@@ -5,6 +5,7 @@ import { CallMethods } from '../../components/CallMethods';
 import { DeviceList } from '../../components/DeviceList';
 import type { Device } from '../../components/DeviceList';
 import { CallEVMMethods } from '../../components/CallEVMMethods';
+import { CallBTCMethods } from '../../components/CallBTCMethods';
 
 let isSdkInit = false;
 
@@ -37,6 +38,7 @@ export default function USB() {
       />
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
       <CallEVMMethods SDK={HardwareWebSdk} selectedDevice={selectedDevice} />
+      <CallBTCMethods SDK={HardwareWebSdk} selectedDevice={selectedDevice} />
     </View>
   );
 }
