@@ -16,6 +16,7 @@ export const ERROR_CODES = {
   Runtime: '',
 
   // iframe error
+  Init_NotInitialized: 'Init_NotInitialized',
   Init_IframeBlocked: 'Init_IframeBlocked',
   Init_IframeTimeout: 'Init_IframeTimeout',
   Init_AlreadyInitialized: 'Init_AlreadyInitialized',

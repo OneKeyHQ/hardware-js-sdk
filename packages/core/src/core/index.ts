@@ -13,9 +13,7 @@ import {
   DEVICE,
   IFRAME,
   IFrameCallMessage,
-  RESPONSE_EVENT,
   CORE_EVENT,
-  UI_EVENT,
   UI_REQUEST,
   UI_RESPONSE,
   UiPromise,
@@ -33,7 +31,7 @@ let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _preferredDevice: CommonParams['device'];
-const _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
+let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
 let _callPromise: Deferred<any> | undefined;
 const callApiQueue = [];
 
@@ -245,11 +243,25 @@ const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, d
   return uiPromise;
 };
 
+const findUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T) =>
+  _uiPromises.find(p => p.id === promiseEvent) as UiPromise<T> | undefined;
+
+const removeUiPromise = (promise: Deferred<any>) => {
+  _uiPromises = _uiPromises.filter(p => p !== promise);
+};
+
 export default class Core extends EventEmitter {
   async handleMessage(message: CoreMessage) {
-    switch (message.event) {
-      case UI_EVENT:
+    switch (message.type) {
+      case UI_RESPONSE.RECEIVE_PIN: {
+        const uiPromise = findUiPromise(message.type);
+        if (uiPromise) {
+          uiPromise.resolve(message);
+          removeUiPromise(uiPromise);
+        }
         break;
+      }
+
       case IFRAME.CALL: {
         const response = await callAPI(message);
         return response;

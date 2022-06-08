@@ -9,12 +9,13 @@ export * from './data-manager';
 export * from './events';
 export * from './types';
 
-const HardwareSdk = ({ init, call, dispose, eventEmitter }: InjectApi): CoreApi =>
+const HardwareSdk = ({ init, call, dispose, eventEmitter, uiResponse }: InjectApi): CoreApi =>
   inject({
     init,
     call,
     dispose,
     eventEmitter,
+    uiResponse,
   });
 
 export default HardwareSdk;

@@ -17,6 +17,7 @@ import { btcGetPublicKey } from './btcGetPublicKey';
 import { btcSignMessage } from './btcSignMessage';
 import { btcSignTransaction } from './btcSignTransaction';
 import { btcVerifyMessage } from './btcVerifyMessage';
+import { uiResponse } from './uiResponse';
 
 export type CoreApi = {
   /**
@@ -28,6 +29,7 @@ export type CoreApi = {
   removeAllListeners: typeof removeAllListeners;
   dispose: () => void;
   call: (params: any) => Promise<any>;
+  uiResponse: typeof uiResponse;
 
   /**
    * Core function

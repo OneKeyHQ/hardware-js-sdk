@@ -24,9 +24,14 @@ export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProp
   });
 
   // 输入 pin 码的确认回调
-  function onConfirmPin(pin: string) {
-    SDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, pin });
+  function onConfirmPin(payload: string) {
+    SDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload });
     setShowPinInput(false);
+  }
+
+  // 取消输入 pin 码
+  function onPinCancel() {
+    SDK.cancel('pin-cancelled');
   }
 
   const handleSearchDevices = async () => {
