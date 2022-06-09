@@ -144,7 +144,12 @@ export class DeviceCommands {
     }
 
     if (res.type === 'ButtonRequest') {
-      // TODO: ButtonRequest
+      if (res.message.code === 'ButtonRequest_PassphraseEntry') {
+        this.device.emit(DEVICE.PASSPHRASE_ON_DEVICE, this.device);
+      } else {
+        this.device.emit(DEVICE.BUTTON, this.device, res.message);
+      }
+      return this._commonCall('ButtonAck', {});
     }
 
     if (res.type === 'EntropyRequest') {
