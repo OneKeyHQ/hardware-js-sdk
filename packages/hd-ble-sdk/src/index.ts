@@ -13,6 +13,8 @@ import HardwareSdk, {
   Deferred,
   create as createDeferred,
   IFRAME,
+  UI_EVENT,
+  UiResponseEvent,
 } from '@onekeyfe/hd-core';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 
@@ -30,7 +32,33 @@ const dispose = () => {
   _settings = parseConnectSettings();
 };
 
-function handleMessage() {}
+const uiResponse = (response: UiResponseEvent) => {
+  if (!_core) {
+    throw ERRORS.TypedError('Init_NotInitialized');
+  }
+  const { type, payload } = response;
+  _core.handleMessage({ event: UI_EVENT, type, payload });
+};
+
+const cancel = () => {};
+
+function handleMessage(message: CoreMessage) {
+  const { event } = message;
+  if (!_core) {
+    return;
+  }
+  Log.debug('hd-ble-sdk handleMessage', message);
+
+  switch (event) {
+    case UI_EVENT:
+      // pass UI event up
+      eventEmitter.emit(message.event, message);
+      eventEmitter.emit(message.type, message.payload);
+      break;
+    default:
+      Log.log('No need to be captured message', message.event);
+  }
+}
 
 async function postMessage(message: CoreMessage, usePromise = true) {
   if (!_core) {
@@ -69,6 +97,7 @@ const call = async (params: any) => {
   try {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
+      Log.debug('response: ', response);
       return response;
     }
 
@@ -83,7 +112,9 @@ const HardwareBleSdk = HardwareSdk({
   eventEmitter,
   init,
   call,
+  cancel,
   dispose,
+  uiResponse,
 });
 
 export default HardwareBleSdk;

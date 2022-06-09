@@ -37,7 +37,6 @@ const requestBluetoothScanPermission = async () => {
 };
 
 export default function Bluetooth() {
-  console.log(HardwareBleSdk);
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
 

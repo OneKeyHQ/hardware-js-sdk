@@ -36,7 +36,7 @@ const handleMessage = async (message: CoreMessage) => {
       break;
 
     default:
-      Log.log('Undefined message', message.event);
+      Log.log('No need to be captured message', message.event);
   }
 };
 
