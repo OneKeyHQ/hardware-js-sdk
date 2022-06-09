@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, Text, Button } from 'react-native';
+import { View, TextInput, Text, Button, Platform } from 'react-native';
 
 type IReceivePinProps = {
   value: string;
@@ -12,7 +12,13 @@ export function ReceivePin({ value, onChange, onConfirm }: IReceivePinProps) {
     <View style={{ maxWidth: 300 }}>
       <Text style={{ fontSize: 24 }}>Input Pin</Text>
       <TextInput
-        style={{ height: 40, borderColor: 'gray', borderWidth: 1, padding: 16, margin: 12 }}
+        style={{
+          height: 40,
+          borderColor: 'gray',
+          borderWidth: 1,
+          padding: Platform.OS === 'web' ? 16 : 0,
+          margin: 12,
+        }}
         onChangeText={text => onChange(text)}
         value={value}
       />

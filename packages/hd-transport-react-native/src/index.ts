@@ -263,11 +263,7 @@ export default class ReactNativeBleTransport {
     transportCache[uuid] = transport;
 
     device.onDisconnected(() => {
-      if (transportCache[uuid]) {
-        console.log('device disconnected');
-        transport.nofitySubscription?.();
-        delete transportCache[uuid];
-      }
+      this.release(uuid);
     });
 
     return { uuid };
@@ -324,9 +320,8 @@ export default class ReactNativeBleTransport {
 
     if (transport) {
       delete transportCache[uuid];
+      transport.nofitySubscription?.();
     }
-
-    transport.nofitySubscription?.();
 
     /**
      * The current strategy does not require disconnection
