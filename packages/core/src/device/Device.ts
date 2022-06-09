@@ -197,7 +197,11 @@ export class Device extends EventEmitter {
   }
 
   async release() {
-    if (this.isUsedHere() && !this.keepSession && this.mainId) {
+    const env = DataManager.getSettings('env');
+    if (
+      (this.isUsedHere() && !this.keepSession && this.mainId) ||
+      (this.mainId && env === 'react-native')
+    ) {
       if (this.commands) {
         this.commands.dispose();
         if (this.commands.callPromise) {
@@ -319,6 +323,7 @@ export class Device extends EventEmitter {
     ) {
       this.keepSession = false;
       await this.release();
+      Log.debug('release device, mainId: ', this.mainId);
     }
 
     if (this.runPromise) {

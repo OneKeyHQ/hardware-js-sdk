@@ -263,9 +263,11 @@ export default class ReactNativeBleTransport {
     transportCache[uuid] = transport;
 
     device.onDisconnected(() => {
-      console.log('device disconnected');
-      transport.nofitySubscription?.();
-      delete transportCache[uuid];
+      if (transportCache[uuid]) {
+        console.log('device disconnected');
+        transport.nofitySubscription?.();
+        delete transportCache[uuid];
+      }
     });
 
     return { uuid };
@@ -295,6 +297,12 @@ export default class ReactNativeBleTransport {
 
         if (buffer.length >= bufferLength) {
           const value = Buffer.from(buffer);
+          console.log(
+            '[hd-transport-react-native] Received a complete packet of data, resolve Promise, this.runPromise: ',
+            this.runPromise,
+            'buffer: ',
+            value
+          );
           bufferLength = 0;
           buffer = [];
           this.runPromise?.resolve(value.toString('hex'));
@@ -319,7 +327,6 @@ export default class ReactNativeBleTransport {
     }
 
     await blePlxManager.cancelDeviceConnection(uuid);
-    console.log(`user disconnect(${uuid}`);
   }
 
   async call(uuid: string, name: string, data: Record<string, unknown>) {
@@ -353,6 +360,7 @@ export default class ReactNativeBleTransport {
       data
     );
     const o = buildBuffer(messages, name, data);
+    console.log('hd-ble-sdk send hex strting: ', o.toString('hex'));
     const outData = o.toString('base64');
     try {
       await transport.writeCharacteristic.writeWithResponse(outData);
@@ -368,6 +376,7 @@ export default class ReactNativeBleTransport {
         throw new Error('Returning data is not string.');
       }
 
+      console.log('hd-ble-sdk receive data: ', response);
       const jsonData = receiveOne(messages, response);
       return check.call(jsonData);
     } catch (e) {

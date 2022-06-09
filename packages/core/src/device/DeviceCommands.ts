@@ -105,8 +105,9 @@ export class DeviceCommands {
     } catch (error) {
       // handle possible race condition
       // Bridge may have some unread message in buffer, read it
-      await this.transport.read(this.mainId);
+      // await this.transport.read(this.mainId);
       // throw error anyway, next call should be resolved properly
+      console.log('DeviceCommands typedcall error: ', error);
       throw error;
     }
     return response;
