@@ -19,6 +19,7 @@ import {
   UiPromise,
   UiPromiseResponse,
   createUiMessage,
+  createDeviceMessage,
 } from '../events';
 import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, CommonParams, KnownDevice } from '../types';
@@ -95,6 +96,7 @@ export const callAPI = async (message: CoreMessage) => {
   method.setDevice?.(device);
 
   device.on(DEVICE.PIN, onDevicePinHandler);
+  device.on(DEVICE.BUTTON, onDeviceButtonHandler);
 
   try {
     const inner = async (): Promise<void> => {
@@ -223,6 +225,22 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
   const uiResp = await uiPromise.promise;
   // callback.apply(null, [null, pin]);
   callback(null, uiResp.payload);
+};
+
+const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
+  postMessage(
+    createDeviceMessage(DEVICE.BUTTON, {
+      ...request,
+      device: device.toMessageObject() as KnownDevice,
+    })
+  );
+
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_BUTTON, {
+      ...request,
+      device: device.toMessageObject() as KnownDevice,
+    })
+  );
 };
 
 /**

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Button, StyleSheet } from 'react-native';
-import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE, DEVICE_EVENT } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import type { Device } from './DeviceList';
 
@@ -26,7 +26,12 @@ export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProp
       if (message.type === UI_REQUEST.REQUEST_PIN) {
         setShowPinInput(true);
       }
+
+      if (message.type === UI_REQUEST.REQUEST_BUTTON) {
+        alert('请在设备上确认');
+      }
     });
+
     registerListener = true;
   }, [SDK]);
 
