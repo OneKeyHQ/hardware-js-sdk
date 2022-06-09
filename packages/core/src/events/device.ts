@@ -1,3 +1,5 @@
+import type { PROTO } from '../constants';
+
 export const DEVICE = {
   // device list events
   CONNECT: 'device-connect',
@@ -20,3 +22,7 @@ export const DEVICE = {
   PASSPHRASE_ON_DEVICE: 'passphrase_on_device',
   WORD: 'word',
 } as const;
+
+export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'code'> {
+  code?: PROTO.ButtonRequest['code'] | 'ButtonRequest_FirmwareUpdate';
+}
