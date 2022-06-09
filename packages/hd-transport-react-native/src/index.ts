@@ -326,7 +326,13 @@ export default class ReactNativeBleTransport {
       delete transportCache[uuid];
     }
 
-    await blePlxManager.cancelDeviceConnection(uuid);
+    transport.nofitySubscription?.();
+
+    /**
+     * The current strategy does not require disconnection
+     */
+    // await blePlxManager.cancelDeviceConnection(uuid);
+    return Promise.resolve(true);
   }
 
   async call(uuid: string, name: string, data: Record<string, unknown>) {
