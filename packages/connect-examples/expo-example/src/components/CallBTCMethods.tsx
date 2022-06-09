@@ -91,53 +91,53 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
 
         <MethodInvoke
           title="btcSignTransaction"
-          options={[{ name: 'coin', value: 'btc', type: 'string' }]}
+          options={[{ name: 'coin', value: 'test', type: 'string' }]}
           onCall={data =>
             SDK.btcSignTransaction({
               device: { ...currentDevice },
               inputs: [
                 {
-                  address_n: [2147483692, 2147483648, 2147483648, 1, 0],
+                  address_n: [2147483692, 2147483648, 2147483648, 0, 0],
+                  prev_hash: '31287e47ceeacf2ee1797a08413e8d6431fb08fd14fd7d0c5134e99fbc16f0c4',
                   prev_index: 0,
-                  prev_hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+                  amount: '1058412',
                 },
               ],
               outputs: [
                 {
-                  address_n: [2147483692, 2147483648, 2147483648, 1, 1],
-                  amount: '3181747',
+                  address_n: [2147483692, 2147483648, 2147483648, 0, 0],
+                  amount: '500000',
                   script_type: 'PAYTOADDRESS',
                 },
                 {
-                  address: '18WL2iZKmpDYWk1oFavJapdLALxwSjcSk2',
-                  amount: '200000',
+                  address: 'mnQv1Ty6iGNSmn3Fttdc3e5tqHn88gtJ6t',
+                  amount: '100000',
                   script_type: 'PAYTOADDRESS',
                 },
               ],
               refTxs: [
                 {
-                  hash: 'b035d89d4543ce5713c553d69431698116a822c57c03ddacf3f04b763d1999ac',
+                  hash: '31287e47ceeacf2ee1797a08413e8d6431fb08fd14fd7d0c5134e99fbc16f0c4',
                   inputs: [
                     {
-                      prev_hash: '448946a44f1ef514601ccf9b22cc3e638c69ea3900b67b87517ea673eb0293dc',
-                      prev_index: 0,
-                      script_sig:
-                        '47304402202872cb8459eed053dcec0f353c7e293611fe77615862bfadb4d35a5d8807a4cf022015057aa0aaf72ab342b5f8939f86f193ad87b539931911a72e77148a1233e022012103f66bbe3c721f119bb4b8a1e6c1832b98f2cf625d9f59242008411dd92aab8d94',
-                      sequence: 4294967295,
+                      prev_hash: '4380a32516a57fd5bb5634436a5113449f451ab6ab8f180ce287e2a526299676',
+                      prev_index: 1,
+                      script_sig: '',
+                      sequence: 4294967294,
                     },
                   ],
                   bin_outputs: [
                     {
-                      amount: 3431747,
-                      script_pubkey: '76a91441352a84436847a7b660d5e76518f6ebb718dedc88ac',
+                      amount: 1058412,
+                      script_pubkey: '76a9140b535ee6a35c99cf2b65953ba3e84ef981b60cf688ac',
                     },
                     {
-                      amount: 10000,
-                      script_pubkey: '76a9141403b451c79d34e6a7f6e36806683308085467ac88ac',
+                      amount: 2797469652,
+                      script_pubkey: '76a9144ba479f8fabb30a5c83a70922e4172675b4393b988ac',
                     },
                   ],
-                  lock_time: 0,
-                  version: 1,
+                  lock_time: 2254775,
+                  version: 2,
                 },
               ],
               ...data,

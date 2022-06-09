@@ -3,10 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Platform, PermissionsAndroid, ScrollView } from 'react-native';
 
 import { CallMethods } from '../../components/CallMethods';
-import { DeviceList } from '../../components/DeviceList';
-import type { Device } from '../../components/DeviceList';
-import { CallEVMMethods } from '../../components/CallEVMMethods';
-import { CallBTCMethods } from '../../components/CallBTCMethods';
 
 let isSdkInit = false;
 
@@ -37,8 +33,7 @@ const requestBluetoothScanPermission = async () => {
 };
 
 export default function Bluetooth() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  console.log(HardwareBleSdk);
 
   const sdkInit = () => {
     const settings = {
@@ -76,14 +71,7 @@ export default function Bluetooth() {
     <ScrollView>
       <View>
         <Text>This is Bluetooth example page, will run on iOS / Android device. </Text>
-        <CallMethods
-          SDK={HardwareBleSdk}
-          selectedDevice={selectedDevice}
-          setDevices={devices => setDevices(devices)}
-        />
-        <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
-        <CallEVMMethods SDK={HardwareBleSdk} selectedDevice={selectedDevice} />
-        <CallBTCMethods SDK={HardwareBleSdk} selectedDevice={selectedDevice} />
+        <CallMethods SDK={HardwareBleSdk} />
       </View>
     </ScrollView>
   );

@@ -2,18 +2,20 @@ import { useEffect, useState } from 'react';
 import { View, Button, StyleSheet } from 'react-native';
 import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
-import type { Device } from './DeviceList';
+import { Device, DeviceList } from './DeviceList';
+import { CallEVMMethods } from './CallEVMMethods';
+import { CallBTCMethods } from './CallBTCMethods';
 
 let registerListener = false;
 
 type ICallMethodProps = {
   SDK: any;
-  selectedDevice: Device | null;
-  setDevices: (devices: Device[]) => void;
 };
-export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProps) {
+export function CallMethods({ SDK }: ICallMethodProps) {
   const [showPinInput, setShowPinInput] = useState(false);
   const [pinValue, setPinValue] = useState('');
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
 
   useEffect(() => {
     // 监听 SDK 事件
@@ -90,6 +92,9 @@ export function CallMethods({ SDK, selectedDevice, setDevices }: ICallMethodProp
           onConfirm={val => onConfirmPin(val)}
         />
       )}
+      <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
+      <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
     </View>
   );
 }
