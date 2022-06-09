@@ -273,7 +273,6 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
 
 const styles = StyleSheet.create({
   buttonContainer: {
-    padding: 12,
     display: 'flex',
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -5,6 +5,7 @@ import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
 import { CallEVMMethods } from './CallEVMMethods';
 import { CallBTCMethods } from './CallBTCMethods';
+import { CallDeviceMethods } from './CallDeviceMethods';
 
 let registerListener = false;
 
@@ -93,6 +94,7 @@ export function CallMethods({ SDK }: ICallMethodProps) {
         />
       )}
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
+      <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
     </View>

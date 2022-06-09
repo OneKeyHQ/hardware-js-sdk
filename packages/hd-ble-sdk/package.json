@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
-    
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

@@ -151,7 +151,6 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
 
 const styles = StyleSheet.create({
   buttonContainer: {
-    padding: 12,
     display: 'flex',
     flexDirection: 'row',
     flexWrap: 'wrap',
