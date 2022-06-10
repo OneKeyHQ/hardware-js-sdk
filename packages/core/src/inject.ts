@@ -66,6 +66,16 @@ export const inject = ({
      */
     checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
 
+    deviceBackup: params => call({ ...params, method: 'deviceBackup' }),
+    deviceChangePin: params => call({ ...params, method: 'deviceChangePin' }),
+    deviceFlags: params => call({ ...params, method: 'deviceFlags' }),
+    deviceRebootToBootloader: params => call({ ...params, method: 'deviceRebootToBootloader' }),
+    deviceRecovery: params => call({ ...params, method: 'deviceRecovery' }),
+    deviceReset: params => call({ ...params, method: 'deviceReset' }),
+    deviceSettings: params => call({ ...params, method: 'deviceSettings' }),
+    deviceUpdateReboot: params => call({ ...params, method: 'deviceUpdateReboot' }),
+    deviceWipe: params => call({ ...params, method: 'deviceWipe' }),
+
     evmGetAddress: params => call({ ...params, method: 'evmGetAddress' }),
     evmGetPublicKey: params => call({ ...params, method: 'evmGetPublicKey' }),
     evmSignMessage: params => call({ ...params, method: 'evmSignMessage' }),

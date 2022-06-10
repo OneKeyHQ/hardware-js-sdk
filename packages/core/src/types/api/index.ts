@@ -18,6 +18,15 @@ import { btcSignMessage } from './btcSignMessage';
 import { btcSignTransaction } from './btcSignTransaction';
 import { btcVerifyMessage } from './btcVerifyMessage';
 import { uiResponse } from './uiResponse';
+import { deviceReset } from './deviceReset';
+import { deviceRecovery } from './deviceRecovery';
+import { deviceWipe } from './deviceWipe';
+import { deviceRebootToBootloader } from './deviceRebootToBootloader';
+import { deviceBackup } from './deviceBackup';
+import { deviceChangePin } from './deviceChangePin';
+import { deviceSettings } from './deviceSettings';
+import { deviceFlags } from './deviceFlags';
+import { deviceUpdateReboot } from './deviceUpdateReboot';
 
 export type CoreApi = {
   /**
@@ -44,6 +53,16 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
 
   checkTransportRelease: typeof checkTransportRelease;
+
+  deviceBackup: typeof deviceBackup;
+  deviceChangePin: typeof deviceChangePin;
+  deviceFlags: typeof deviceFlags;
+  deviceRebootToBootloader: typeof deviceRebootToBootloader;
+  deviceRecovery: typeof deviceRecovery;
+  deviceReset: typeof deviceReset;
+  deviceSettings: typeof deviceSettings;
+  deviceUpdateReboot: typeof deviceUpdateReboot;
+  deviceWipe: typeof deviceWipe;
 
   evmGetAddress: typeof evmGetAddress;
   evmGetPublicKey: typeof evmGetPublicKey;

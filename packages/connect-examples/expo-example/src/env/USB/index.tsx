@@ -2,17 +2,10 @@ import HardwareWebSdk from '@onekeyfe/hd-web-sdk';
 import React, { useEffect, useState } from 'react';
 import { View, Text } from 'react-native';
 import { CallMethods } from '../../components/CallMethods';
-import { DeviceList } from '../../components/DeviceList';
-import type { Device } from '../../components/DeviceList';
-import { CallEVMMethods } from '../../components/CallEVMMethods';
-import { CallBTCMethods } from '../../components/CallBTCMethods';
 
 let isSdkInit = false;
 
 export default function USB() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-
   const sdkInit = () => {
     const settings = {
       debug: true,
@@ -31,14 +24,7 @@ export default function USB() {
   return (
     <View>
       <Text>This is USB example page, will run on desktop browser. </Text>
-      <CallMethods
-        SDK={HardwareWebSdk}
-        selectedDevice={selectedDevice}
-        setDevices={devices => setDevices(devices)}
-      />
-      <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
-      <CallEVMMethods SDK={HardwareWebSdk} selectedDevice={selectedDevice} />
-      <CallBTCMethods SDK={HardwareWebSdk} selectedDevice={selectedDevice} />
+      <CallMethods SDK={HardwareWebSdk} />
     </View>
   );
 }

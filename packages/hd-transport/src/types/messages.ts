@@ -1714,6 +1714,9 @@ export type PreauthorizedRequest = Empty;
 // CancelAuthorization
 export type CancelAuthorization = Empty;
 
+// BixinReboot
+export type BixinReboot = Empty;
+
 // RebootToBootloader
 export type RebootToBootloader = Empty;
 
@@ -2411,6 +2414,7 @@ export type MessageType = {
   DoPreauthorized: DoPreauthorized;
   PreauthorizedRequest: PreauthorizedRequest;
   CancelAuthorization: CancelAuthorization;
+  BixinReboot: BixinReboot;
   RebootToBootloader: RebootToBootloader;
   GetNonce: GetNonce;
   Nonce: Nonce;
