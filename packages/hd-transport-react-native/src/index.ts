@@ -137,10 +137,14 @@ export default class ReactNativeBleTransport {
 
     let device;
 
-    // if (transportCache[uuid]) {
-    //   console.log('transport in cache, using that');
-    //   return { uuid };
-    // }
+    if (transportCache[uuid]) {
+      /**
+       * If the transport is not released due to an exception operation
+       * it will be handled again here
+       */
+      console.log('@onekey/hd-ble-sdk transport not be released, will release: ', uuid);
+      await this.release(uuid);
+    }
 
     try {
       await subscribeBleOn(blePlxManager);
@@ -361,7 +365,7 @@ export default class ReactNativeBleTransport {
       data
     );
     const o = buildBuffer(messages, name, data);
-    console.log('hd-ble-sdk send hex strting: ', o.toString('hex'));
+    console.log('@onekey/hd-ble-sdk send hex strting: ', o.toString('hex'));
     const outData = o.toString('base64');
     try {
       await transport.writeCharacteristic.writeWithResponse(outData);
@@ -377,7 +381,7 @@ export default class ReactNativeBleTransport {
         throw new Error('Returning data is not string.');
       }
 
-      console.log('hd-ble-sdk receive data: ', response);
+      console.log('@onekey/hd-ble-sdk receive data: ', response);
       const jsonData = receiveOne(messages, response);
       return check.call(jsonData);
     } catch (e) {
