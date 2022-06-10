@@ -6,9 +6,7 @@ export default class DeviceUpdateReboot extends BaseMethod<BixinReboot> {
   init() {}
 
   async run() {
-    const res = await this.device.commands.typedCall('BixinReboot', 'Success', {
-      ...this.params,
-    });
+    const res = await this.device.commands.typedCall('BixinReboot', 'Success');
 
     return Promise.resolve(res.message);
   }
