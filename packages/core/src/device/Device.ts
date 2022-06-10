@@ -112,9 +112,8 @@ export class Device extends EventEmitter {
     const env = DataManager.getSettings('env');
 
     return {
-      /** Android uses Mac address, iOS uses uuid, USB uses path  */
-      connectId:
-        env === 'react-native' ? this.mainId || null : this.originalDescriptor.path || null,
+      /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
+      connectId: env === 'react-native' ? this.mainId || null : getDeviceUUID(this.features),
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
       deviceType: getDeviceType(this.features),
@@ -214,6 +213,7 @@ export class Device extends EventEmitter {
       }
       try {
         await this.deviceConnector?.release(this.mainId, false);
+        this.updateDescriptor({ session: null } as DeviceDescriptor);
       } catch (err) {
         Log.error('[Device] release error: ', err);
       } finally {
@@ -287,7 +287,7 @@ export class Device extends EventEmitter {
   }
 
   async _runInner<T>(fn: (() => Promise<T>) | undefined, options: RunOptions) {
-    if (!this.isUsedHere() || this.commands.dispose) {
+    if (!this.isUsedHere() || this.commands.disposed) {
       await this.acquire();
       try {
         if (fn) {
