@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 
 export type Device = {
-  uuid: string;
   connectId: string;
 };
 
@@ -23,7 +22,7 @@ type ItemProps = {
 
 const Item = ({ item, onPress, backgroundColor, textColor }: ItemProps) => (
   <TouchableOpacity onPress={onPress} style={[styles.item, backgroundColor]}>
-    <Text style={[styles.title, textColor]}>{item.uuid}</Text>
+    <Text style={[styles.title, textColor]}>{item.connectId}</Text>
   </TouchableOpacity>
 );
 
@@ -36,14 +35,14 @@ export function DeviceList({ data, onSelected }: IDeviceListProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const renderItem = ({ item }: { item: Device }) => {
-    const backgroundColor = item.uuid === selectedId ? '#6e3b6e' : '#f9c2ff';
-    const color = item.uuid === selectedId ? 'white' : 'black';
+    const backgroundColor = item.connectId === selectedId ? '#6e3b6e' : '#f9c2ff';
+    const color = item.connectId === selectedId ? 'white' : 'black';
 
     return (
       <Item
         item={item}
         onPress={() => {
-          setSelectedId(item.uuid);
+          setSelectedId(item.connectId);
           onSelected(item);
         }}
         backgroundColor={{ backgroundColor }}
@@ -57,7 +56,7 @@ export function DeviceList({ data, onSelected }: IDeviceListProps) {
       <FlatList
         data={data}
         renderItem={renderItem}
-        keyExtractor={item => item.uuid}
+        keyExtractor={item => item.connectId}
         extraData={selectedId}
       />
     </SafeAreaView>
