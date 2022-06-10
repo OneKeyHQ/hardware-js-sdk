@@ -57,10 +57,10 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
         />
 
         <MethodInvoke
-          title="deviceUploadReboot"
+          title="deviceUpdateReboot"
           options={[]}
           onCall={data =>
-            SDK.deviceUploadReboot({
+            SDK.deviceUpdateReboot({
               device: { ...currentDevice },
               ...data,
             })
