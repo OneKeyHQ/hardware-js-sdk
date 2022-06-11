@@ -20,7 +20,6 @@ import { DataManager } from '../data-manager';
 
 type RunOptions = {
   keepSession?: boolean;
-  useEmptyPassphrase?: boolean;
 };
 
 const parseRunOptions = (options?: RunOptions): RunOptions => {

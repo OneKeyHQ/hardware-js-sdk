@@ -1,16 +1,5 @@
 export interface CommonParams {
-  connectId?: string;
-  device?: {
-    path: string;
-    state?: string;
-    instance?: number;
-  };
-  useEmptyPassphrase?: boolean;
-  useEventListener?: boolean; // this param is set automatically in factory
-  allowSeedlessDevice?: boolean;
   keepSession?: boolean;
-  skipFinalReload?: boolean;
-  useCardanoDerivation?: boolean;
 }
 
 export interface Unsuccessful {
