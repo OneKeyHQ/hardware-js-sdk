@@ -71,7 +71,8 @@ export function DeviceList({ data, onSelected }: IDeviceListProps) {
         onSelected({ connectId: value });
       }
     });
-  }, [onSelected]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const renderItem = ({ item }: { item: Device }) => {
     const backgroundColor = item.connectId === selectedId ? '#6e3b6e' : '#f9c2ff';
