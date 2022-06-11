@@ -14,9 +14,11 @@ export type BTCGetAddressParams = {
 };
 
 export declare function btcGetAddress(
+  connectId: string,
   params: CommonParams & BTCGetAddressParams
 ): Response<Address>;
 
 export declare function btcGetAddress(
+  connectId: string,
   params: CommonParams & { bundle?: BTCGetAddressParams[] }
 ): Response<Array<Address>>;

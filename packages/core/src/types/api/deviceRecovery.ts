@@ -14,5 +14,6 @@ export type DeviceRecoveryParams = {
 };
 
 export declare function deviceRecovery(
+  connectId: string,
   params: CommonParams & DeviceRecoveryParams
 ): Response<Success>;

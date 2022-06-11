@@ -14,4 +14,7 @@ export type DeviceResetParams = {
   backupType?: string | number;
 };
 
-export declare function deviceReset(params: CommonParams & DeviceResetParams): Response<Success>;
+export declare function deviceReset(
+  connectId: string,
+  params: CommonParams & DeviceResetParams
+): Response<Success>;

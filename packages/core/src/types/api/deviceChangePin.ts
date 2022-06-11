@@ -6,5 +6,6 @@ export type DeviceChangePinParams = {
 };
 
 export declare function deviceChangePin(
+  connectId: string,
   params: CommonParams & DeviceChangePinParams
 ): Response<Success>;

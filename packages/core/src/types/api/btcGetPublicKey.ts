@@ -9,9 +9,11 @@ export type BTCGetPublicKeyParams = {
 };
 
 export declare function btcGetPublicKey(
+  connectId: string,
   params: CommonParams & BTCGetPublicKeyParams
 ): Response<PublicKey>;
 
 export declare function btcGetPublicKey(
+  connectId: string,
   params: CommonParams & { bundle?: BTCGetPublicKeyParams[] }
 ): Response<Array<PublicKey>>;

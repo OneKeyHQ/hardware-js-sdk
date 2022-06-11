@@ -7,9 +7,11 @@ export type EVMGetPublicKeyParams = {
 };
 
 export declare function evmGetPublicKey(
+  connectId: string,
   params: CommonParams & EVMGetPublicKeyParams
 ): Response<EthereumPublicKey>;
 
 export declare function evmGetPublicKey(
+  connectId: string,
   params: CommonParams & { bundle?: EVMGetPublicKeyParams[] }
 ): Response<Array<EthereumPublicKey>>;

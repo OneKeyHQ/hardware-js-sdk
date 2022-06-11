@@ -1,6 +1,6 @@
-import type { CommonParams, Response } from '../params';
+import type { Response } from '../params';
 import type { IDeviceFirmwareStatus } from '../device';
 
 export declare function checkBLEFirmwareRelease(
-  params?: CommonParams
+  connectId?: string
 ): Response<IDeviceFirmwareStatus>;
