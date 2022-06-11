@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Button, StyleSheet } from 'react-native';
-import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE, CoreApi } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
 import { CallEVMMethods } from './CallEVMMethods';
@@ -10,7 +10,7 @@ import { CallDeviceMethods } from './CallDeviceMethods';
 let registerListener = false;
 
 type ICallMethodProps = {
-  SDK: any;
+  SDK: CoreApi;
 };
 export function CallMethods({ SDK }: ICallMethodProps) {
   const [showPinInput, setShowPinInput] = useState(false);
@@ -47,25 +47,21 @@ export function CallMethods({ SDK }: ICallMethodProps) {
   const handleSearchDevices = async () => {
     const response = await SDK.searchDevices();
     console.log('example searchDevices response: ', response);
-    setDevices(response.payload ?? []);
+    setDevices((response.payload as unknown as Device[]) ?? []);
   };
 
   const handleGetFeatures = async () => {
-    const response = await SDK.getFeatures({ connectId: selectedDevice?.connectId });
+    const response = await SDK.getFeatures(selectedDevice?.connectId);
     console.log('example getFeatures response: ', response);
   };
 
   const handleCheckFirmwareRelease = async () => {
-    const response = await SDK.checkFirmwareRelease({
-      connectId: selectedDevice?.connectId,
-    });
+    const response = await SDK.checkFirmwareRelease(selectedDevice?.connectId);
     console.log('example checkFirmwareRelease response: ', response);
   };
 
   const handleCheckBLEFirmwareRelease = async () => {
-    const response = await SDK.checkBLEFirmwareRelease({
-      connectId: selectedDevice?.connectId,
-    });
+    const response = await SDK.checkBLEFirmwareRelease(selectedDevice?.connectId);
     console.log('example checkBLEFirmwareRelease response: ', response);
   };
 

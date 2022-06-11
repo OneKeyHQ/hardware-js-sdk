@@ -1,5 +1,5 @@
 import HardwareWebSdk from '@onekeyfe/hd-web-sdk';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { CallMethods } from '../../components/CallMethods';
 

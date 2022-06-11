@@ -7,6 +7,7 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
+  Button,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -14,9 +15,10 @@ export type Device = {
   connectId: string;
 };
 
+const STORE_KEY = '@onekey/selectedId';
 const storeSelectedId = async (value: string) => {
   try {
-    await AsyncStorage.setItem('@onekey/selectedId', value);
+    await AsyncStorage.setItem(STORE_KEY, value);
   } catch (error) {
     console.log(error);
   }
@@ -24,12 +26,20 @@ const storeSelectedId = async (value: string) => {
 
 const getSelectedId = async () => {
   try {
-    const value = await AsyncStorage.getItem('@onekey/selectedId');
+    const value = await AsyncStorage.getItem(STORE_KEY);
     if (value !== null) {
       return value;
     }
   } catch (error) {
     console.log(error);
+  }
+};
+
+const removeSelectedId = async () => {
+  try {
+    await AsyncStorage.removeItem(STORE_KEY);
+  } catch (e) {
+    // remove error
   }
 };
 
@@ -58,9 +68,10 @@ export function DeviceList({ data, onSelected }: IDeviceListProps) {
     getSelectedId().then(value => {
       if (value) {
         setSelectedId(value);
+        onSelected({ connectId: value });
       }
     });
-  }, []);
+  }, [onSelected]);
 
   const renderItem = ({ item }: { item: Device }) => {
     const backgroundColor = item.connectId === selectedId ? '#6e3b6e' : '#f9c2ff';
@@ -82,8 +93,9 @@ export function DeviceList({ data, onSelected }: IDeviceListProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View>
+      <View style={styles.seleteWrap}>
         <Text>当前选择设备：{selectedId}</Text>
+        <Button title="清除" onPress={() => removeSelectedId()} />
       </View>
       <FlatList
         data={data}
@@ -108,5 +120,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
+  },
+  seleteWrap: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
