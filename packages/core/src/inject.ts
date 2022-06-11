@@ -49,46 +49,55 @@ export const inject = ({
     /**
      * 获取设备信息
      */
-    getFeatures: params => call({ ...params, method: 'getFeatures' }),
+    getFeatures: connectId => call({ connectId, method: 'getFeatures' }),
 
     /**
      * 检查固件版本
      */
-    checkFirmwareRelease: params => call({ ...params, method: 'checkFirmwareRelease' }),
+    checkFirmwareRelease: connectId => call({ connectId, method: 'checkFirmwareRelease' }),
 
     /**
      * 检查蓝牙固件版本
      */
-    checkBLEFirmwareRelease: params => call({ ...params, method: 'checkBLEFirmwareRelease' }),
+    checkBLEFirmwareRelease: connectId => call({ connectId, method: 'checkBLEFirmwareRelease' }),
 
     /**
      * 检查 bridge 版本
      */
     checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
 
-    deviceBackup: params => call({ ...params, method: 'deviceBackup' }),
-    deviceChangePin: params => call({ ...params, method: 'deviceChangePin' }),
-    deviceFlags: params => call({ ...params, method: 'deviceFlags' }),
-    deviceRebootToBootloader: params => call({ ...params, method: 'deviceRebootToBootloader' }),
-    deviceRecovery: params => call({ ...params, method: 'deviceRecovery' }),
-    deviceReset: params => call({ ...params, method: 'deviceReset' }),
-    deviceSettings: params => call({ ...params, method: 'deviceSettings' }),
-    deviceUpdateReboot: params => call({ ...params, method: 'deviceUpdateReboot' }),
-    deviceWipe: params => call({ ...params, method: 'deviceWipe' }),
+    deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
+    deviceChangePin: (connectId, params) =>
+      call({ ...params, connectId, method: 'deviceChangePin' }),
+    deviceFlags: (connectId, params) => call({ ...params, connectId, method: 'deviceFlags' }),
+    deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
+    deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
+    deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
+    deviceSettings: connectId => call({ connectId, method: 'deviceSettings' }),
+    deviceUpdateReboot: connectId => call({ connectId, method: 'deviceUpdateReboot' }),
+    deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
 
-    evmGetAddress: params => call({ ...params, method: 'evmGetAddress' }),
-    evmGetPublicKey: params => call({ ...params, method: 'evmGetPublicKey' }),
-    evmSignMessage: params => call({ ...params, method: 'evmSignMessage' }),
-    evmSignMessageEIP712: params => call({ ...params, method: 'evmSignMessageEIP712' }),
-    evmSignTransaction: params => call({ ...params, method: 'evmSignTransaction' }),
-    evmSignTypedData: params => call({ ...params, method: 'evmSignTypedData' }),
-    evmVerifyMessage: params => call({ ...params, method: 'evmVerifyMessage' }),
+    evmGetAddress: (connectId, params) => call({ ...params, connectId, method: 'evmGetAddress' }),
+    evmGetPublicKey: (connectId, params) =>
+      call({ ...params, connectId, method: 'evmGetPublicKey' }),
+    evmSignMessage: (connectId, params) => call({ ...params, connectId, method: 'evmSignMessage' }),
+    evmSignMessageEIP712: (connectId, params) =>
+      call({ ...params, connectId, method: 'evmSignMessageEIP712' }),
+    evmSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'evmSignTransaction' }),
+    evmSignTypedData: (connectId, params) =>
+      call({ ...params, connectId, method: 'evmSignTypedData' }),
+    evmVerifyMessage: (connectId, params) =>
+      call({ ...params, connectId, method: 'evmVerifyMessage' }),
 
-    btcGetAddress: params => call({ ...params, method: 'btcGetAddress' }),
-    btcGetPublicKey: params => call({ ...params, method: 'btcGetPublicKey' }),
-    btcSignMessage: params => call({ ...params, method: 'btcSignMessage' }),
-    btcSignTransaction: params => call({ ...params, method: 'btcSignTransaction' }),
-    btcVerifyMessage: params => call({ ...params, method: 'btcVerifyMessage' }),
+    btcGetAddress: (connectId, params) => call({ ...params, connectId, method: 'btcGetAddress' }),
+    btcGetPublicKey: (connectId, params) =>
+      call({ ...params, connectId, method: 'btcGetPublicKey' }),
+    btcSignMessage: (connectId, params) => call({ ...params, connectId, method: 'btcSignMessage' }),
+    btcSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'btcSignTransaction' }),
+    btcVerifyMessage: (connectId, params) =>
+      call({ ...params, connectId, method: 'btcVerifyMessage' }),
   };
   return api;
 };

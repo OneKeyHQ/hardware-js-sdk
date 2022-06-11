@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 import DeviceConnector from './DeviceConnector';
 import { Device } from './Device';
+import { getDeviceUUID } from '../utils/deviceFeaturesUtils';
 
 export class DeviceList extends EventEmitter {
   devices: Record<string, Device> = {};
@@ -13,11 +14,25 @@ export class DeviceList extends EventEmitter {
    */
   async getDeviceLists() {
     const deviceDiff = await this.connector?.enumerate();
-    const deviceList = deviceDiff?.descriptors ?? [];
-    this.devices = deviceList.reduce<Record<string, Device>>((prev, device) => {
-      prev[device.path] = new Device(device);
-      return prev;
-    }, {});
+    const descriptorList = deviceDiff?.descriptors ?? [];
+
+    this.devices = {};
+    const deviceList = [];
+    console.log('get device list');
+    for await (const descriptor of descriptorList) {
+      const device = Device.fromDescriptor(descriptor);
+      device.deviceConnector = this.connector;
+      await device.connect();
+      await device.initialize();
+      await device.release();
+
+      // clean session after release
+      deviceList.push(device);
+      if (device.features) {
+        const uuid = getDeviceUUID(device.features);
+        this.devices[uuid] = device;
+      }
+    }
 
     return deviceList;
   }

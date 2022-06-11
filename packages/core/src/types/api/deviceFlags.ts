@@ -5,4 +5,7 @@ export type DeviceFlagsParams = {
   flags?: number;
 };
 
-export declare function deviceFlags(params: CommonParams & DeviceFlagsParams): Response<Success>;
+export declare function deviceFlags(
+  connectId: string,
+  params: CommonParams & DeviceFlagsParams
+): Response<Success>;

@@ -1,13 +1,15 @@
+import { CoreApi } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
 
 type CallEVMMethodsProps = {
-  SDK: any;
+  SDK: CoreApi;
   selectedDevice: Device | null;
 };
 
 export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMethodsProps) {
+  const connectId = currentDevice?.connectId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>EVM Method Test</Text>
@@ -18,12 +20,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data =>
-            SDK.evmGetAddress({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.evmGetAddress(connectId, { ...data })}
         />
 
         <MethodInvoke
@@ -32,12 +29,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data =>
-            SDK.evmGetPublicKey({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.evmGetPublicKey(connectId, { ...data })}
         />
 
         <MethodInvoke
@@ -46,12 +38,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'messageHex', value: '0x68656c6c6f20776f726c64', type: 'string' },
           ]}
-          onCall={data =>
-            SDK.evmSignMessage({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.evmSignMessage(connectId, { ...data } as unknown as any)}
         />
 
         <MethodInvoke
@@ -69,12 +56,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
               type: 'string',
             },
           ]}
-          onCall={data =>
-            SDK.evmSignMessageEIP712({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.evmSignMessageEIP712(connectId, { ...data } as unknown as any)}
         />
 
         <MethodInvoke
@@ -122,12 +104,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
               type: 'number',
             },
           ]}
-          onCall={data =>
-            SDK.evmSignTransaction({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.evmSignTransaction(connectId, { ...data } as unknown as any)}
         />
 
         <MethodInvoke
@@ -175,12 +152,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
               type: 'string',
             },
           ]}
-          onCall={data =>
-            SDK.evmSignTransaction({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.evmSignTransaction(connectId, { ...data } as unknown as any)}
         />
 
         <MethodInvoke
@@ -204,8 +176,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             },
           ]}
           onCall={data =>
-            SDK.evmSignTypedData({
-              device: { ...currentDevice },
+            SDK.evmSignTypedData(connectId, {
               ...data,
               data: {
                 types: {
@@ -235,7 +206,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
                   Number: '911112119',
                 },
               },
-            })
+            } as unknown as any)
           }
         />
 
@@ -259,12 +230,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
               type: 'string',
             },
           ]}
-          onCall={data =>
-            SDK.evmVerifyMessage({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.evmVerifyMessage(connectId, { ...data } as unknown as any)}
         />
       </View>
     </View>

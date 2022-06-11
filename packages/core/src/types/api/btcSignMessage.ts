@@ -8,5 +8,6 @@ export type BTCSignMessageParams = {
 };
 
 export declare function btcSignMessage(
+  connectId: string,
   params: CommonParams & BTCSignMessageParams
 ): Response<MessageSignature>;

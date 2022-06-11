@@ -1,13 +1,15 @@
+import { CoreApi } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
 
 type CallDeviceMethodsProps = {
-  SDK: any;
+  SDK: CoreApi;
   selectedDevice: Device | null;
 };
 
 export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDeviceMethodsProps) {
+  const connectId = currentDevice?.connectId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>Device Method Test</Text>
@@ -15,56 +17,31 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
         <MethodInvoke
           title="deviceBackup"
           options={[]}
-          onCall={data =>
-            SDK.deviceBackup({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={() => SDK.deviceBackup(connectId)}
         />
 
         <MethodInvoke
           title="deviceChangePin"
           options={[{ name: 'remove', value: undefined, type: 'boolean' }]}
-          onCall={data =>
-            SDK.deviceChangePin({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.deviceChangePin(connectId, { ...data })}
         />
 
         <MethodInvoke
           title="deviceFlags"
           options={[{ name: 'flags', value: undefined, type: 'number' }]}
-          onCall={data =>
-            SDK.deviceFlags({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.deviceFlags(connectId, { ...data })}
         />
 
         <MethodInvoke
           title="deviceRebootToBootloader"
           options={[]}
-          onCall={data =>
-            SDK.deviceRebootToBootloader({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={() => SDK.deviceRebootToBootloader(connectId)}
         />
 
         <MethodInvoke
           title="deviceUpdateReboot"
           options={[]}
-          onCall={data =>
-            SDK.deviceUpdateReboot({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={() => SDK.deviceUpdateReboot(connectId)}
         />
 
         <MethodInvoke
@@ -80,12 +57,7 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
             { name: 'u2fCounter', value: undefined, type: 'number' },
             { name: 'dryRun', value: undefined, type: 'boolean' },
           ]}
-          onCall={data =>
-            SDK.deviceRecovery({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.deviceRecovery(connectId, { ...data })}
         />
 
         <MethodInvoke
@@ -102,12 +74,7 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
             { name: 'noBackup', value: undefined, type: 'boolean' },
             { name: 'backupType', value: undefined, type: 'string' },
           ]}
-          onCall={data =>
-            SDK.deviceReset({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.deviceReset(connectId, { ...data })}
         />
 
         <MethodInvoke
@@ -124,24 +91,10 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
             { name: 'safetyChecks', value: undefined, type: 'string' },
             { name: 'experimentalFeatures', value: undefined, type: 'boolean' },
           ]}
-          onCall={data =>
-            SDK.deviceSettings({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={() => SDK.deviceSettings(connectId)}
         />
 
-        <MethodInvoke
-          title="deviceWipe"
-          options={[]}
-          onCall={data =>
-            SDK.deviceWipe({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
-        />
+        <MethodInvoke title="deviceWipe" options={[]} onCall={() => SDK.deviceWipe(connectId)} />
       </View>
     </View>
   );

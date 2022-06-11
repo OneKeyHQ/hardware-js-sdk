@@ -11,6 +11,11 @@ export abstract class BaseMethod<Params = undefined> {
   // @ts-expect-error
   params: Params;
 
+  /**
+   * USB: onekey_serial or serial_no
+   * iOS: uuid
+   * Android: MAC address
+   */
   connectId?: string;
 
   deviceState?: string;
@@ -47,7 +52,7 @@ export abstract class BaseMethod<Params = undefined> {
     this.name = payload.method;
     this.payload = payload;
     this.responseID = message.id || 0;
-    this.connectId = payload.device?.path || payload.connectId || '';
+    this.connectId = payload.connectId || '';
     this.useDevice = true;
     this.allowDeviceMode = [UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [];

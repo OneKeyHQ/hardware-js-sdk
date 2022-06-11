@@ -35,5 +35,6 @@ export type EVMSignTypedDataParams = {
 };
 
 export declare function evmSignTypedData(
+  connectId: string,
   params: CommonParams & EVMSignTypedDataParams
 ): Response<EthereumMessageSignature>;

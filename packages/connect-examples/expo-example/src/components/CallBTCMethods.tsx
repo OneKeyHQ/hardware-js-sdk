@@ -1,13 +1,15 @@
+import { CoreApi, PROTO } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
 
 type CallBTCMethodsProps = {
-  SDK: any;
+  SDK: CoreApi;
   selectedDevice: Device | null;
 };
 
 export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMethodsProps) {
+  const connectId = currentDevice?.connectId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>BTC Method Test</Text>
@@ -21,12 +23,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
             { name: 'multisig', value: undefined, type: 'string' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
-          onCall={data =>
-            SDK.btcGetAddress({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.btcGetAddress(connectId, { ...data })}
         />
 
         <MethodInvoke
@@ -37,12 +34,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
             { name: 'showOnOneKey', value: false, type: 'boolean' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
-          onCall={data =>
-            SDK.btcGetPublicKey({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.btcGetPublicKey(connectId, { ...data })}
         />
 
         <MethodInvoke
@@ -56,12 +48,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
               type: 'string',
             },
           ]}
-          onCall={data =>
-            SDK.btcSignMessage({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.btcSignMessage(connectId, { ...data } as any)}
         />
 
         <MethodInvoke
@@ -81,20 +68,14 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
               type: 'string',
             },
           ]}
-          onCall={data =>
-            SDK.btcVerifyMessage({
-              device: { ...currentDevice },
-              ...data,
-            })
-          }
+          onCall={data => SDK.btcVerifyMessage(connectId, { ...data } as unknown as any)}
         />
 
         <MethodInvoke
           title="btcSignTransaction"
           options={[{ name: 'coin', value: 'test', type: 'string' }]}
           onCall={data =>
-            SDK.btcSignTransaction({
-              device: { ...currentDevice },
+            SDK.btcSignTransaction(connectId, {
               inputs: [
                 {
                   address_n: [2147483692, 2147483648, 2147483648, 0, 0],
@@ -141,7 +122,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
                 },
               ],
               ...data,
-            })
+            } as unknown as any)
           }
         />
       </View>

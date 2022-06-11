@@ -7,9 +7,11 @@ export type EVMGetAddressParams = {
 };
 
 export declare function evmGetAddress(
+  connectId: string,
   params: CommonParams & EVMGetAddressParams
 ): Response<EthereumAddress>;
 
 export declare function evmGetAddress(
+  connectId: string,
   params: CommonParams & { bundle?: EVMGetAddressParams[] }
 ): Response<Array<EthereumAddress>>;

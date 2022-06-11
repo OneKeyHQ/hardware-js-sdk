@@ -2,6 +2,7 @@ import { BaseMethod } from './BaseMethod';
 import DeviceConnector from '../device/DeviceConnector';
 import TransportManager from '../data-manager/TransportManager';
 import { Device } from '../device/Device';
+import { DataManager } from '../data-manager';
 
 export default class SearchDevices extends BaseMethod {
   connector?: DeviceConnector;
@@ -14,6 +15,16 @@ export default class SearchDevices extends BaseMethod {
     await TransportManager.configure();
     const deviceDiff = await this.connector?.enumerate();
     const devicesDescriptor = deviceDiff?.descriptors ?? [];
+
+    const env = DataManager.getSettings('env');
+
+    /**
+     * No need to call features during Bluetooth scaning
+     * to avoid device pairing
+     */
+    if (env === 'react-native') {
+      return devicesDescriptor.map(device => ({ ...device, connectId: device.id }));
+    }
 
     const devices = [];
     for await (const descriptor of devicesDescriptor) {

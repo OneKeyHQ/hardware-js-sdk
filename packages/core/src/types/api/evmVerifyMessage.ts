@@ -8,5 +8,6 @@ export type EVMVerifyMessageParams = {
 };
 
 export declare function evmVerifyMessage(
+  connectId: string,
   params: CommonParams & EVMVerifyMessageParams
 ): Response<Success>;

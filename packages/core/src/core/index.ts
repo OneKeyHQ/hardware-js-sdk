@@ -21,7 +21,7 @@ import {
   createUiMessage,
 } from '../events';
 import type { BaseMethod } from '../api/BaseMethod';
-import type { ConnectSettings, CommonParams, KnownDevice } from '../types';
+import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 
@@ -30,7 +30,6 @@ const Log = initLog('Core');
 let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
-let _preferredDevice: CommonParams['device'];
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
 let _callPromise: Deferred<any> | undefined;
 const callApiQueue = [];
@@ -43,10 +42,6 @@ export const callAPI = async (message: CoreMessage) => {
         'onCall: message.id or message.payload is missing'
       )
     );
-  }
-
-  if (_preferredDevice && !message.payload.device) {
-    message.payload.device = _preferredDevice;
   }
 
   // find api method
