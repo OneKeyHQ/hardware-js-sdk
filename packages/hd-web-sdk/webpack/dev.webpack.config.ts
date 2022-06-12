@@ -4,13 +4,12 @@ import { merge } from 'webpack-merge';
 import { WebpackPluginServe } from 'webpack-plugin-serve';
 
 import config from './webpack.config';
-import iframe from './iframe.webpack.config';
 import prod from './prod.webpack.config';
 
 const dev = {
   mode: 'development',
   watch: true,
-  devtool: 'eval-source-map',
+  devtool: 'source-map',
   entry: {
     'onekey-js-sdk': path.resolve(__dirname, '../src/index.ts'),
   },
@@ -36,4 +35,4 @@ const dev = {
   ],
 };
 
-export default merge([prod, iframe, dev]);
+export default merge([prod, dev]);
