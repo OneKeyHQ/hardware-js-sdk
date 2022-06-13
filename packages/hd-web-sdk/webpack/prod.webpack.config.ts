@@ -2,6 +2,7 @@ import path from 'path';
 import TerserPlugin from 'terser-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
+import { BundleAnalyzerPlugin } from 'webpack-bundle-analyzer';
 import config from './webpack.config';
 
 const BUILD = path.resolve(__dirname, '../build');
@@ -9,7 +10,7 @@ const BUILD = path.resolve(__dirname, '../build');
 const prodConfig = {
   target: 'web',
   mode: 'production',
-  devtool: 'eval',
+  devtool: 'hidden-source-map',
   entry: {
     'onekey-js-sdk': path.resolve(__dirname, '../src/index.ts'),
     'onekey-js-sdk.min': path.resolve(__dirname, '../src/index.ts'),
@@ -49,6 +50,7 @@ const prodConfig = {
   },
 
   plugins: [
+    new BundleAnalyzerPlugin({ analyzerMode: 'static', analyzer: '3001' }),
     new CopyWebpackPlugin({
       patterns: [{ from: '../../packages/core/src/data', to: `${BUILD}/data` }],
     }),
@@ -63,6 +65,7 @@ const prodConfig = {
   ],
 
   optimization: {
+    minimize: true,
     minimizer: [
       new TerserPlugin({
         exclude: /onekey-js-sdk.js/,
