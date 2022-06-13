@@ -29,7 +29,7 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
         { name: 'scriptType', type: 'string' },
       ]);
 
-      const showOnOneKey = batch.showOnOneKey ?? false;
+      const showOnOneKey = batch.showOnOneKey ?? true;
 
       const { multisig, coin } = batch;
 
