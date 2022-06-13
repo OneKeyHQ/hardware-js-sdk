@@ -4,6 +4,7 @@ import { merge } from 'webpack-merge';
 import { WebpackPluginServe } from 'webpack-plugin-serve';
 
 import config from './webpack.config';
+import iframe from './iframe.webpack.config';
 import prod from './prod.webpack.config';
 
 const dev = {
@@ -13,14 +14,7 @@ const dev = {
   entry: {
     'onekey-js-sdk': path.resolve(__dirname, '../src/index.ts'),
   },
-  output: {
-    filename: '[name].js',
-    path: path.resolve(__dirname, '../build'),
-    publicPath: './',
-    library: 'onekey-js-sdk',
-    libraryTarget: 'umd',
-    libraryExport: 'default',
-  },
+  output: config.output,
   resolve: config.resolve,
   plugins: [
     new WebpackPluginServe({
@@ -35,4 +29,4 @@ const dev = {
   ],
 };
 
-export default merge([prod, dev]);
+export default merge([prod, iframe, dev]);
