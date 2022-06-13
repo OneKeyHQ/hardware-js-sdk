@@ -15,7 +15,9 @@
     "bootstrap": "lerna bootstrap",
     "build": "lerna run build",
     "lint": "lerna run lint",
-    "setup": "yarn && yarn bootstrap && yarn build"
+    "setup": "yarn && yarn bootstrap && yarn build",
+    "publish-packages": "lerna publish from-package",
+    "update-version": "lerna version --no-git-tag-version"
   },
   "devDependencies": {
     "@babel/core": "^7.16.0",
