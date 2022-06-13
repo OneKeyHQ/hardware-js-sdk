@@ -1,17 +1,17 @@
-import HardwareWebSdk from '@onekeyfe/hd-web-sdk';
+import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { CallMethods } from '../../components/CallMethods';
 
 let isSdkInit = false;
 
-export default function USB() {
+export default function USB({ SDK }: { SDK: CoreApi }) {
   const sdkInit = () => {
     const settings = {
       debug: true,
       connectSrc: 'https://localhost:8088/',
     };
-    HardwareWebSdk.init(settings);
+    SDK.init(settings);
   };
 
   useEffect(() => {
@@ -19,12 +19,13 @@ export default function USB() {
       sdkInit();
     }
     isSdkInit = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <View>
       <Text>This is USB example page, will run on desktop browser. </Text>
-      <CallMethods SDK={HardwareWebSdk} />
+      <CallMethods SDK={SDK} />
     </View>
   );
 }

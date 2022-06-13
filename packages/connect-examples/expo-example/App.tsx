@@ -1,15 +1,23 @@
-import React, { Suspense } from 'react';
+import { CoreApi } from '@onekeyfe/hd-core';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Platform, View, Text } from 'react-native';
-
-const USB = React.lazy(() => import('./src/env/USB'));
-const Bluetooth = React.lazy(() => import('./src/env/Bluetooth'));
+import { getOneKeySDK } from './sdk-provider';
+import USB from './src/env/USB';
+import Bluetooth from './src/env/Bluetooth';
 
 export default function App() {
+  const [SDK, setSDK] = useState<CoreApi | null>(null);
+
+  useEffect(() => {
+    getOneKeySDK().then(lib => setSDK(lib));
+  });
+
+  if (!SDK) return null;
+
   return (
     <View style={styles.container}>
-      <Suspense fallback={<Text>Loading...</Text>}>
-        {Platform.OS === 'web' ? <USB /> : <Bluetooth />}
-      </Suspense>
+      {Platform.OS === 'web' ? <USB SDK={SDK} /> : <Bluetooth SDK={SDK} />}
+      <Text>Hello World</Text>
     </View>
   );
 }
