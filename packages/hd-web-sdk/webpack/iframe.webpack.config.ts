@@ -2,6 +2,7 @@ import path from 'path';
 import webpack from 'webpack';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
+import config from './webpack.config';
 
 const BUILD = path.resolve(__dirname, '../build');
 
@@ -20,6 +21,12 @@ export default {
   module: {
     rules: [
       {
+        test: /\.m?js/,
+        resolve: {
+          fullySpecified: false,
+        },
+      },
+      {
         test: /\.(js|ts)$/,
         exclude: /node_modules/,
         use: {
@@ -31,20 +38,7 @@ export default {
       },
     ],
   },
-  resolve: {
-    extensions: ['.ts', '.js'],
-    modules: ['node_modules'],
-
-    fallback: {
-      fs: false, // ignore "fs" import in fastxpub (hd-wallet)
-      https: false, // ignore "https" import in "ripple-lib"
-      vm: false, // ignore "vm" imports in "asn1.js@4.10.1" > crypto-browserify"
-      util: require.resolve('util'), // required by "ripple-lib"
-      assert: require.resolve('assert'), // required by multiple dependencies
-      crypto: require.resolve('crypto-browserify'), // required by multiple dependencies
-      events: require.resolve('events'),
-    },
-  },
+  resolve: config.resolve,
 
   performance: {
     hints: false,

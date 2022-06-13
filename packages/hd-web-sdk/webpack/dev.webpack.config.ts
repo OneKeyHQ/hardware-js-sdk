@@ -14,14 +14,7 @@ const dev = {
   entry: {
     'onekey-js-sdk': path.resolve(__dirname, '../src/index.ts'),
   },
-  output: {
-    filename: '[name].js',
-    path: path.resolve(__dirname, '../build'),
-    publicPath: './',
-    library: 'onekey-js-sdk',
-    libraryTarget: 'umd',
-    libraryExport: 'default',
-  },
+  output: config.output,
   resolve: config.resolve,
   plugins: [
     new WebpackPluginServe({
