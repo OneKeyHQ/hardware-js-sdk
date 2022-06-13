@@ -10,7 +10,7 @@ import prod from './prod.webpack.config';
 const dev = {
   mode: 'development',
   watch: true,
-  devtool: 'eval-source-map',
+  devtool: 'source-map',
   entry: {
     'onekey-js-sdk': path.resolve(__dirname, '../src/index.ts'),
   },

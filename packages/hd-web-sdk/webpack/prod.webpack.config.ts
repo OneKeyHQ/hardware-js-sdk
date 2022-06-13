@@ -5,7 +5,7 @@ import config from './webpack.config';
 const prodConfig = {
   target: 'web',
   mode: 'production',
-  devtool: 'eval-source-map',
+  devtool: 'hidden-source-map',
   entry: {
     'onekey-js-sdk': path.resolve(__dirname, '../src/index.ts'),
     'onekey-js-sdk.min': path.resolve(__dirname, '../src/index.ts'),
@@ -21,12 +21,18 @@ const prodConfig = {
         },
       },
       {
-        test: /\.(js|ts)$/,
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: ['babel-loader'],
+      },
+      {
+        test: /\.ts$/,
         exclude: /node_modules/,
         use: {
           loader: 'babel-loader',
           options: {
             presets: ['@babel/preset-typescript'],
+            plugins: ['@babel/plugin-proposal-optional-chaining'],
           },
         },
       },
