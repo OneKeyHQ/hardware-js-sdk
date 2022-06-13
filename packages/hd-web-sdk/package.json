@@ -11,7 +11,7 @@
     "dev": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/dev.webpack.config.ts",
     "build:lib": "rimraf ./dist && tsc --build tsconfig.json",
     "build:sdk": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
-    "build": "yarn build:lib && yarn build:sdk",
+    "build": "yarn build:sdk",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "echo \"Error: run tests from root\" && exit 1"
@@ -33,6 +33,11 @@
     "util": "^0.12.4",
     "webpack": "^5.72.1",
     "webpack-cli": "^4.9.2",
-    "webpack-plugin-serve": "^1.6.0"
+    "webpack-plugin-serve": "^1.6.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.0",
+    "es6-promise": "^4.2.8",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0"
   }
 }

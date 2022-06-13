@@ -14,7 +14,8 @@
   "scripts": {
     "bootstrap": "lerna bootstrap",
     "build": "lerna run build",
-    "lint": "lerna run lint"
+    "lint": "lerna run lint",
+    "setup": "yarn && yarn bootstrap && yarn build"
   },
   "devDependencies": {
     "@babel/core": "^7.16.0",
