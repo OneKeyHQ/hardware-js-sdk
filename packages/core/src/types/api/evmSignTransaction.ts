@@ -1,7 +1,12 @@
-import { EthereumMessageSignature } from '@onekeyfe/hd-transport/src/types/messages';
 import type { CommonParams, Response } from '../params';
 
-export interface EVMTransaction {
+export type EVMSignedTx = {
+  v: string;
+  r: string;
+  s: string;
+};
+
+export type EVMTransaction = {
   to: string;
   value: string;
   gasPrice: string;
@@ -12,7 +17,7 @@ export interface EVMTransaction {
   data?: string;
   chainId: number;
   txType?: number;
-}
+};
 
 export type EVMAccessList = {
   address: string;
@@ -40,4 +45,4 @@ export type EVMSignTransactionParams = {
 export declare function evmSignTransaction(
   connectId: string,
   params: CommonParams & EVMSignTransactionParams
-): Response<EthereumMessageSignature>;
+): Response<EVMSignedTx>;

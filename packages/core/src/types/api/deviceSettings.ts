@@ -1,5 +1,5 @@
 import { SafetyCheckLevel, Success } from '@onekeyfe/hd-transport/src/types/messages';
-import type { Response } from '../params';
+import type { CommonParams, Response } from '../params';
 
 export type DeviceSettingsParams = {
   language?: string;
@@ -14,4 +14,7 @@ export type DeviceSettingsParams = {
   experimentalFeatures?: boolean;
 };
 
-export declare function deviceSettings(connectId: string): Response<Success>;
+export declare function deviceSettings(
+  connectId: string,
+  params: CommonParams & DeviceSettingsParams
+): Response<Success>;
