@@ -7,6 +7,9 @@
   "license": "ISC",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",

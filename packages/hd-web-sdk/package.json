@@ -7,6 +7,9 @@
   "type": "commonjs",
   "main": "build/onekey-js-sdk.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/dev.webpack.config.ts",
     "build:lib": "rimraf ./dist && tsc --build tsconfig.json",
