@@ -29,6 +29,7 @@ import { deviceChangePin } from './deviceChangePin';
 import { deviceSettings } from './deviceSettings';
 import { deviceFlags } from './deviceFlags';
 import { deviceUpdateReboot } from './deviceUpdateReboot';
+
 import { starcoinGetAddress } from './starcoinGetAddress';
 import { starcoinGetPublicKey } from './starcoinGetPublicKey';
 import { starcoinSignMessage } from './starcoinSignMessage';
@@ -49,6 +50,11 @@ import { getPassphraseState } from './getPassphraseState';
 import { tronGetAddress } from './tronGetAddress';
 import { tronSignTransaction } from './tronSignTransaction';
 import { tronSignMessage } from './tronSignMessage';
+
+import { confluxGetAddress } from './confluxGetAddress';
+import { confluxSignMessage } from './confluxSignMessage';
+import { confluxSignMessageCIP23 } from './confluxSignMessageCIP23';
+import { confluxSignTransaction } from './confluxSignTransaction';
 
 export * from './export';
 
@@ -132,4 +138,9 @@ export type CoreApi = {
   tronGetAddress: typeof tronGetAddress;
   tronSignMessage: typeof tronSignMessage;
   tronSignTransaction: typeof tronSignTransaction;
+
+  confluxGetAddress: typeof confluxGetAddress;
+  confluxSignMessage: typeof confluxSignMessage;
+  confluxSignMessageCIP23: typeof confluxSignMessageCIP23;
+  confluxSignTransaction: typeof confluxSignTransaction;
 };

@@ -80,3 +80,12 @@ export type {
   TronTransferContract,
   TronTriggerSmartContract,
 } from './tronSignTransaction';
+
+export type { ConfluxAddress, ConfluxGetAddressParams } from './confluxGetAddress';
+export type { ConfluxSignMessageParams } from './confluxSignMessage';
+export type { ConfluxSignMessageCIP23Params } from './confluxSignMessageCIP23';
+export type {
+  ConfluxSignTransactionParams,
+  ConfluxSignedTx,
+  ConfluxTransaction,
+} from './confluxSignTransaction';

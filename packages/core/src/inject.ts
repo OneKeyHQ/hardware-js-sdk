@@ -152,6 +152,15 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'tronSignMessage' }),
     tronSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'tronSignTransaction' }),
+
+    confluxGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'confluxGetAddress' }),
+    confluxSignMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'confluxSignMessage' }),
+    confluxSignMessageCIP23: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'confluxSignMessageCIP23' }),
+    confluxSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'confluxSignTransaction' }),
   };
   return api;
 };

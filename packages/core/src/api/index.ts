@@ -1,11 +1,7 @@
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
-export { default as cipherKeyValue } from './CipherKeyValue';
-export { default as btcGetAddress } from './btc/BTCGetAddress';
-export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
-export { default as btcSignMessage } from './btc/BTCSignMessage';
-export { default as btcSignTransaction } from './btc/BTCSignTransaction';
-export { default as btcVerifyMessage } from './btc/BTCVerifyMessage';
+export { default as getPassphraseState } from './GetPassphraseState';
+export { default as getLogs } from './GetLogs';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkTransportRelease } from './CheckTransportRelease';
@@ -21,6 +17,22 @@ export { default as deviceUpdateReboot } from './device/DeviceUpdateReboot';
 export { default as deviceSupportFeatures } from './device/DeviceSupportFeatures';
 export { default as deviceVerify } from './device/DeviceVerify';
 export { default as deviceWipe } from './device/DeviceWipe';
+export { default as firmwareUpdate } from './FirmwareUpdate';
+export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
+
+export { default as cipherKeyValue } from './CipherKeyValue';
+
+export { default as btcGetAddress } from './btc/BTCGetAddress';
+export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
+export { default as btcSignMessage } from './btc/BTCSignMessage';
+export { default as btcSignTransaction } from './btc/BTCSignTransaction';
+export { default as btcVerifyMessage } from './btc/BTCVerifyMessage';
+
+export { default as confluxGetAddress } from './conflux/ConfluxGetAddress';
+export { default as confluxSignMessage } from './conflux/ConfluxSignMessage';
+export { default as confluxSignMessageCIP23 } from './conflux/ConfluxSignMessageCIP23';
+export { default as confluxSignTransaction } from './conflux/ConfluxSignTransaction';
+
 export { default as evmGetAddress } from './evm/EVMGetAddress';
 export { default as evmGetPublicKey } from './evm/EVMGetPublicKey';
 export { default as evmSignMessage } from './evm/EVMSignMessage';
@@ -28,6 +40,7 @@ export { default as evmSignMessageEIP712 } from './evm/EVMSignMessageEIP712';
 export { default as evmSignTransaction } from './evm/EVMSignTransaction';
 export { default as evmSignTypedData } from './evm/EVMSignTypedData';
 export { default as evmVerifyMessage } from './evm/EVMVerifyMessage';
+
 export { default as starcoinGetAddress } from './starcoin/StarcoinGetAddress';
 export { default as starcoinGetPublicKey } from './starcoin/StarcoinGetPublicKey';
 export { default as starcoinSignMessage } from './starcoin/StarcoinSignMessage';
@@ -42,13 +55,6 @@ export { default as solSignTransaction } from './solana/SolSignTransaction';
 
 export { default as stellarGetAddress } from './stellar/StellarGetAddress';
 export { default as stellarSignTransaction } from './stellar/StellarSignTransaction';
-
-export { default as firmwareUpdate } from './FirmwareUpdate';
-
-export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
-
-export { default as getPassphraseState } from './GetPassphraseState';
-export { default as getLogs } from './GetLogs';
 
 export { default as tronGetAddress } from './tron/TronGetAddress';
 export { default as tronSignMessage } from './tron/TronSignMessage';

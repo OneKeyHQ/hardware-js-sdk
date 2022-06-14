@@ -23,6 +23,7 @@ import { CallSolanaMethods } from './CallSolanaMethods';
 import { CallStellarMethods } from './CallStellarMethods';
 import { CallOtherMethods } from './CallOtherMethods';
 import { CallTronMethods } from './CallTronMethods';
+import { CallConfluxMethods } from './CallConfluxMethods';
 
 let registerListener = false;
 
@@ -286,6 +287,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallTronMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallConfluxMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }
