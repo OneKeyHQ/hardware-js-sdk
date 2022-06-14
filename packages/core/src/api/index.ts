@@ -24,3 +24,7 @@ export { default as evmSignMessageEIP712 } from './EVMSignMessageEIP712';
 export { default as evmSignTransaction } from './EVMSignTransaction';
 export { default as evmSignTypedData } from './EVMSignTypedData';
 export { default as evmVerifyMessage } from './EVMVerifyMessage';
+export { default as starcoinGetAddress } from './StarcoinGetAddress';
+export { default as starcoinGetPublicKey } from './StarcoinGetPublicKey';
+export { default as starcoinSignMessage } from './StarcoinSignMessage';
+export { default as starcoinVerifyMessage } from './StarcoinVerifyMessage';

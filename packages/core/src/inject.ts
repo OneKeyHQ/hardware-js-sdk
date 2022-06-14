@@ -98,6 +98,17 @@ export const inject = ({
       call({ ...params, connectId, method: 'btcSignTransaction' }),
     btcVerifyMessage: (connectId, params) =>
       call({ ...params, connectId, method: 'btcVerifyMessage' }),
+
+    starcoinGetAddress: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinGetAddress' }),
+    starcoinGetPublicKey: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinGetPublicKey' }),
+    starcoinSignMessage: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinSignMessage' }),
+    starcoinSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinSignTransaction' }),
+    starcoinVerifyMessage: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinVerifyMessage' }),
   };
   return api;
 };

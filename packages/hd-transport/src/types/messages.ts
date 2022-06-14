@@ -1908,6 +1908,59 @@ export enum StellarAssetType {
   ALPHANUM12 = 2,
 }
 
+// StarcoinGetAddress
+export type StarcoinGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// StarcoinAddress
+export type StarcoinAddress = {
+  address?: string;
+};
+
+// StarcoinGetPublicKey
+export type StarcoinGetPublicKey = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// StarcoinPublicKey
+export type StarcoinPublicKey = {
+  public_key?: string;
+};
+
+// StarcoinSignTx
+export type StarcoinSignTx = {
+  address_n: number[];
+  raw_tx?: string;
+};
+
+// StarcoinSignedTx
+export type StarcoinSignedTx = {
+  public_key?: string;
+  signature?: string;
+};
+
+// StarcoinSignMessage
+export type StarcoinSignMessage = {
+  address_n: number[];
+  message?: string;
+};
+
+// StarcoinMessageSignature
+export type StarcoinMessageSignature = {
+  public_key?: string;
+  signature?: string;
+};
+
+// StarcoinVerifyMessage
+export type StarcoinVerifyMessage = {
+  public_key?: string;
+  signature?: string;
+  message?: string;
+};
+
 // StellarAsset
 export type StellarAsset = {
   type: StellarAssetType;
@@ -2440,6 +2493,15 @@ export type MessageType = {
   RipplePayment: RipplePayment;
   RippleSignTx: RippleSignTx;
   RippleSignedTx: RippleSignedTx;
+  StarcoinGetAddress: StarcoinGetAddress;
+  StarcoinAddress: StarcoinAddress;
+  StarcoinGetPublicKey: StarcoinGetPublicKey;
+  StarcoinPublicKey: StarcoinPublicKey;
+  StarcoinSignTx: StarcoinSignTx;
+  StarcoinSignedTx: StarcoinSignedTx;
+  StarcoinSignMessage: StarcoinSignMessage;
+  StarcoinMessageSignature: StarcoinMessageSignature;
+  StarcoinVerifyMessage: StarcoinVerifyMessage;
   StellarAsset: StellarAsset;
   StellarGetAddress: StellarGetAddress;
   StellarAddress: StellarAddress;
