@@ -29,7 +29,7 @@ export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
         { name: 'scriptType', type: 'string' },
       ]);
 
-      const showOnOneKey = batch.showOnOneKey ?? false;
+      const showOnOneKey = batch.showOnOneKey ?? true;
 
       const { multisig, coin } = batch;
 
