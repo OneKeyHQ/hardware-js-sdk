@@ -1,4 +1,5 @@
-import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { SearchDevice } from '../device';
+
 import { Response } from '../params';
 
-export declare function searchDevices(): Response<DeviceDescriptor[]>;
+export declare function searchDevices(): Response<SearchDevice[]>;

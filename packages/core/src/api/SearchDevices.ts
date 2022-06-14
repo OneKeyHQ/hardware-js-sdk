@@ -23,7 +23,12 @@ export default class SearchDevices extends BaseMethod {
      * to avoid device pairing
      */
     if (env === 'react-native') {
-      return devicesDescriptor.map(device => ({ ...device, connectId: device.id }));
+      return devicesDescriptor.map(device => ({
+        ...device,
+        connectId: device.id,
+        // 蓝牙场景只有 classic 能被搜索到
+        deviceType: 'classic',
+      }));
     }
 
     const devices = [];

@@ -20,12 +20,21 @@ export type KnownDevice = {
   deviceType: IDeviceType;
   path: string;
   label: string;
+  name: string;
   error?: typeof undefined;
   mode: DeviceMode;
   features: PROTO.Features;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
   firmwareVersion: IVersionArray | null;
+};
+
+export type SearchDevice = {
+  connectId: string | null;
+  uuid: string;
+  deviceId: string | null;
+  deviceType: IDeviceType;
+  name: string;
 };
 
 // export type UnknownDevice = {

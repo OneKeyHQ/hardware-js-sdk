@@ -119,6 +119,10 @@ export class Device extends EventEmitter {
       /** ID for current seeds, will clear after replace a new seed at device */
       deviceId: this.features.device_id || null,
       path: this.originalDescriptor.path,
+      name:
+        this.features.ble_name ||
+        this.features.label ||
+        `OneKey ${getDeviceType(this.features).toUpperCase()}`,
       label: getDeviceLabel(this.features),
       mode: this.getMode(),
       features: this.features,
