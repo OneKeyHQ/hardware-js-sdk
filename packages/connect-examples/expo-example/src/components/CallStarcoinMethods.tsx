@@ -53,7 +53,7 @@ export function CallStarcoinMethods({
           options={[
             {
               name: 'publicKey',
-              value: 'bf70027c9e4cea4584bd6016748c21e350708b2c166bf61ea78a147b5ff320ae',
+              value: 'cf90aea8962229869bcba527f0cf0de73ad4c22fe27ad2875007e967db7056f5',
               type: 'string',
             },
             {
@@ -64,7 +64,7 @@ export function CallStarcoinMethods({
             {
               name: 'signature',
               value:
-                'd39843f39983cf42609d1667f1c5a7958d8aef6b06880b93f67833630113a11c6847607a184d17da24bfaf799afc45fdcf2abef34142a23cabeb0d11374ac103',
+                '447d2c3131c32d176106482d8fc780d933f13b37b0f06beee27de5e73a945e8c807f7764d269a196306f53383a26ab632913f4076457e3230b9defafe1c6ba0b',
               type: 'string',
             },
           ]}

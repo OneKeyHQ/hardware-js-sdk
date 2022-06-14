@@ -73,7 +73,7 @@ export const inject = ({
     deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
     deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
     deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
-    deviceSettings: connectId => call({ connectId, method: 'deviceSettings' }),
+    deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),
     deviceUpdateReboot: connectId => call({ connectId, method: 'deviceUpdateReboot' }),
     deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
 

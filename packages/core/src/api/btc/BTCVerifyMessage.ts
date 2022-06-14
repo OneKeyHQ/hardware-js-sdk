@@ -1,9 +1,9 @@
 import { VerifyMessage } from '@onekeyfe/hd-transport/src/types/messages';
-import { UI_REQUEST } from '../constants/ui-request';
+import { UI_REQUEST } from '../../constants/ui-request';
 
-import { BaseMethod } from './BaseMethod';
-import { validateParams } from './helpers/paramsValidator';
-import { formatAnyHex } from './helpers/hexUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
+import { formatAnyHex } from '../helpers/hexUtils';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 
 export default class BTCVerifyMessage extends BaseMethod<VerifyMessage> {

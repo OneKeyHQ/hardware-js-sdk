@@ -1,5 +1,5 @@
 import { BixinReboot } from '@onekeyfe/hd-transport/src/types/messages';
-import { BaseMethod } from './BaseMethod';
+import { BaseMethod } from '../BaseMethod';
 
 // Upload hint Reboot BootLoader
 export default class DeviceUpdateReboot extends BaseMethod<BixinReboot> {

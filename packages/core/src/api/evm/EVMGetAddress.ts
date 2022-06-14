@@ -1,9 +1,9 @@
 import { EthereumGetAddress } from '@onekeyfe/hd-transport/src/types/messages';
-import { UI_REQUEST } from '../constants/ui-request';
-import { serializedPath, validatePath } from './helpers/pathUtils';
-import { BaseMethod } from './BaseMethod';
-import { validateParams } from './helpers/paramsValidator';
-import { EVMAddress, EVMGetAddressParams } from '../types/api/evmGetAddress';
+import { UI_REQUEST } from '../../constants/ui-request';
+import { serializedPath, validatePath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
+import { EVMAddress, EVMGetAddressParams } from '../../types/api/evmGetAddress';
 
 export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
   hasBundle = false;

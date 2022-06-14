@@ -4,19 +4,19 @@ import {
   EthereumTxRequest,
 } from '@onekeyfe/hd-transport/src/types/messages';
 
-import { UI_REQUEST } from '../constants/ui-request';
-import { validatePath } from './helpers/pathUtils';
-import { BaseMethod } from './BaseMethod';
-import { SchemaParam, validateParams } from './helpers/paramsValidator';
+import { UI_REQUEST } from '../../constants/ui-request';
+import { validatePath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { SchemaParam, validateParams } from '../helpers/paramsValidator';
 import {
   EVMSignedTx,
   EVMSignTransactionParams,
   EVMTransaction,
   EVMTransactionEIP1559,
-} from '../types/api/evmSignTransaction';
-import { cutString } from './helpers/stringUtils';
-import { formatAnyHex, stripHexStartZeroes } from './helpers/hexUtils';
-import { ERRORS } from '../constants';
+} from '../../types/api/evmSignTransaction';
+import { cutString } from '../helpers/stringUtils';
+import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
+import { ERRORS } from '../../constants';
 
 export default class EVMSignTransaction extends BaseMethod {
   addressN: number[] = [];
@@ -70,7 +70,7 @@ export default class EVMSignTransaction extends BaseMethod {
       const r = request.signature_r;
       const s = request.signature_s;
 
-      if (!v || !r || !s) {
+      if (v == null || r == null || s == null) {
         throw ERRORS.TypedError('Runtime', 'processTxRequest: Unexpected request');
       }
 

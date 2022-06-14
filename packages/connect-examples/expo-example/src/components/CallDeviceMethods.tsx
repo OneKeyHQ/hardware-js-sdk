@@ -91,7 +91,7 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
             { name: 'safetyChecks', value: undefined, type: 'string' },
             { name: 'experimentalFeatures', value: undefined, type: 'boolean' },
           ]}
-          onCall={() => SDK.deviceSettings(connectId)}
+          onCall={data => SDK.deviceSettings(connectId, { ...data } as unknown as any)}
         />
 
         <MethodInvoke title="deviceWipe" options={[]} onCall={() => SDK.deviceWipe(connectId)} />

@@ -1,18 +1,18 @@
 import { TxInputType, TxOutputType } from '@onekeyfe/hd-transport/src/types/messages';
 
-import { UI_REQUEST } from '../constants/ui-request';
-import { getOutputScriptType, isSegwitPath, validatePath } from './helpers/pathUtils';
-import { BaseMethod } from './BaseMethod';
-import { validateParams } from './helpers/paramsValidator';
+import { UI_REQUEST } from '../../constants/ui-request';
+import { getOutputScriptType, isSegwitPath, validatePath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
 import {
   AccountAddresses,
   BTCSignTransactionParams,
   RefTransaction,
   TransactionOptions,
-} from '../types/api/btcSignTransaction';
-import { ERRORS } from '../constants';
-import signtx from './helpers/btc/signtx';
-import signtxLegacy from './helpers/btc/signtxLegacy';
+} from '../../types/api/btcSignTransaction';
+import { ERRORS } from '../../constants';
+import signtx from './helpers/signtx';
+import signtxLegacy from './helpers/signtxLegacy';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 
 type Params = {

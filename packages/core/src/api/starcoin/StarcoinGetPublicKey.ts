@@ -1,9 +1,12 @@
 import { StarcoinGetPublicKey as HardwareStarcoinGetPublicKey } from '@onekeyfe/hd-transport/src/types/messages';
-import { UI_REQUEST } from '../constants/ui-request';
-import { validatePath, serializedPath } from './helpers/pathUtils';
-import { BaseMethod } from './BaseMethod';
-import { validateParams } from './helpers/paramsValidator';
-import { StarcoinPublicKey, StarcoinGetPublicKeyParams } from '../types/api/starcoinGetPublicKey';
+import { UI_REQUEST } from '../../constants/ui-request';
+import { validatePath, serializedPath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
+import {
+  StarcoinPublicKey,
+  StarcoinGetPublicKeyParams,
+} from '../../types/api/starcoinGetPublicKey';
 
 export default class StarcoinGetPublicKey extends BaseMethod<HardwareStarcoinGetPublicKey[]> {
   hasBundle = false;

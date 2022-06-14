@@ -1,11 +1,11 @@
-import { EthereumGetPublicKey } from '@onekeyfe/hd-transport/src/types/messages';
-import { UI_REQUEST } from '../constants/ui-request';
-import { serializedPath, validatePath } from './helpers/pathUtils';
-import { BaseMethod } from './BaseMethod';
-import { validateParams } from './helpers/paramsValidator';
-import { EVMGetPublicKeyParams, EVMPublicKey } from '../types/api/evmGetPublicKey';
+import { StarcoinGetAddress as HardwareStarcoinGetAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { UI_REQUEST } from '../../constants/ui-request';
+import { validatePath, serializedPath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
+import { StarcoinAddress, StarcoinGetAddressParams } from '../../types/api/starcoinGetAddress';
 
-export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> {
+export default class StarcoinGetAddress extends BaseMethod<HardwareStarcoinGetAddress[]> {
   hasBundle = false;
 
   init() {
@@ -19,7 +19,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
 
     // init params
     this.params = [];
-    payload.bundle.forEach((batch: EVMGetPublicKeyParams) => {
+    payload.bundle.forEach((batch: StarcoinGetAddressParams) => {
       const addressN = validatePath(batch.path, 3);
 
       validateParams(batch, [
@@ -37,18 +37,14 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
   }
 
   async run() {
-    const responses: EVMPublicKey[] = [];
+    const responses: StarcoinAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall(
-        'EthereumGetPublicKey',
-        'EthereumPublicKey',
-        {
-          ...param,
-        }
-      );
+      const res = await this.device.commands.typedCall('StarcoinGetAddress', 'StarcoinAddress', {
+        ...param,
+      });
 
       responses.push({
         path: serializedPath(param.address_n),
