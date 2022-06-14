@@ -1,9 +1,9 @@
-import { EthereumGetPublicKey, EthereumPublicKey } from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumGetPublicKey } from '@onekeyfe/hd-transport/src/types/messages';
 import { UI_REQUEST } from '../constants/ui-request';
-import { validatePath } from './helpers/pathUtils';
+import { serializedPath, validatePath } from './helpers/pathUtils';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
-import { EVMGetPublicKeyParams } from '../types/api/evmGetPublicKey';
+import { EVMGetPublicKeyParams, EVMPublicKey } from '../types/api/evmGetPublicKey';
 
 export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> {
   hasBundle = false;
@@ -27,7 +27,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
         { name: 'showOnOneKey', type: 'boolean' },
       ]);
 
-      const showOnOneKey = batch.showOnOneKey ?? false;
+      const showOnOneKey = batch.showOnOneKey ?? true;
 
       this.params.push({
         address_n: addressN,
@@ -37,7 +37,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
   }
 
   async run() {
-    const responses: EthereumPublicKey[] = [];
+    const responses: EVMPublicKey[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
@@ -50,7 +50,10 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
         }
       );
 
-      responses.push(res.message);
+      responses.push({
+        path: serializedPath(param.address_n),
+        ...res.message,
+      });
     }
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);

@@ -1,12 +1,15 @@
 {
   "name": "@onekeyfe/hd-web-sdk",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
   "type": "commonjs",
   "main": "build/onekey-js-sdk.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/dev.webpack.config.ts",
     "build:lib": "rimraf ./dist && tsc --build tsconfig.json",
@@ -19,8 +22,8 @@
   },
   "dependencies": {
     "@onekeyfe/cross-inpage-provider-core": "^0.0.14",
-    "@onekeyfe/hd-core": "*",
-    "@onekeyfe/hd-transport-http": "*"
+    "@onekeyfe/hd-core": "^0.0.1",
+    "@onekeyfe/hd-transport-http": "^0.0.1"
   },
   "devDependencies": {
     "@babel/plugin-proposal-optional-chaining": "^7.17.12",

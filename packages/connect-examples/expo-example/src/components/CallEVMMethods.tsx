@@ -36,7 +36,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
           title="evmSignMessage"
           options={[
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
-            { name: 'messageHex', value: '0x68656c6c6f20776f726c64', type: 'string' },
+            { name: 'messageHex', value: '0x6578616d706c65206d657373616765', type: 'string' },
           ]}
           onCall={data => SDK.evmSignMessage(connectId, { ...data } as unknown as any)}
         />
@@ -47,12 +47,12 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             {
               name: 'domainHash',
-              value: '0xb9d8c78acf9b987311de6c7b45bb6a9c8e1bf361fa7fd3467a2163f994c79500',
+              value: '7c872d109a4e735dc1886c72af47e9b4888a1507557e0f49c85b570019163373',
               type: 'string',
             },
             {
               name: 'messageHash',
-              value: '0xb9d8c78acf9b987311de6c7b45bb6a9c8e1bf361fa7fd3467a2163f994c79500',
+              value: '0x07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c644',
               type: 'string',
             },
           ]}
@@ -161,17 +161,17 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             {
               name: 'metamaskV4Compat',
-              value: true, // 'Example message'
+              value: true,
               type: 'boolean',
             },
             {
               name: 'domainHash',
-              value: '0xb9d8c78acf9b987311de6c7b45bb6a9c8e1bf361fa7fd3467a2163f994c79500',
+              value: '7c872d109a4e735dc1886c72af47e9b4888a1507557e0f49c85b570019163373',
               type: 'string',
             },
             {
               name: 'messageHash',
-              value: '0xb9d8c78acf9b987311de6c7b45bb6a9c8e1bf361fa7fd3467a2163f994c79500',
+              value: '0x07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c644',
               type: 'string',
             },
           ]}
@@ -220,7 +220,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             },
             {
               name: 'messageHex',
-              value: '4578616d706c65206d657373616765', // 'Example message'
+              value: '4578616d706c65206d657373616765', // 'example message'
               type: 'string',
             },
             {

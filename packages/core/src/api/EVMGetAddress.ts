@@ -1,9 +1,9 @@
-import { EthereumAddress, EthereumGetAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumGetAddress } from '@onekeyfe/hd-transport/src/types/messages';
 import { UI_REQUEST } from '../constants/ui-request';
-import { validatePath } from './helpers/pathUtils';
+import { serializedPath, validatePath } from './helpers/pathUtils';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
-import { EVMGetAddressParams } from '../types/api/evmGetAddress';
+import { EVMAddress, EVMGetAddressParams } from '../types/api/evmGetAddress';
 
 export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
   hasBundle = false;
@@ -27,7 +27,7 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
         { name: 'showOnOneKey', type: 'boolean' },
       ]);
 
-      const showOnOneKey = batch.showOnOneKey ?? false;
+      const showOnOneKey = batch.showOnOneKey ?? true;
 
       this.params.push({
         address_n: addressN,
@@ -37,7 +37,7 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
   }
 
   async run() {
-    const responses: EthereumAddress[] = [];
+    const responses: EVMAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
@@ -46,7 +46,12 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
         ...param,
       });
 
-      responses.push(res.message);
+      const { address } = res.message;
+
+      responses.push({
+        path: serializedPath(param.address_n),
+        address,
+      });
     }
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);

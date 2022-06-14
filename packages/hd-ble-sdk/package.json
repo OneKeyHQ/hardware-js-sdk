@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-ble-sdk",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
@@ -10,6 +10,9 @@
     "type": "git",
     "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
@@ -17,7 +20,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-core": "*",
-    "@onekeyfe/hd-transport-react-native": "*"
+    "@onekeyfe/hd-core": "^0.0.1",
+    "@onekeyfe/hd-transport-react-native": "^0.0.1"
   }
 }
