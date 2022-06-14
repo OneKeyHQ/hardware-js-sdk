@@ -44,7 +44,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
             { name: 'coin', value: 'btc', type: 'string' },
             {
               name: 'messageHex',
-              value: '4578616d706c65206d657373616765', // 'Example message'
+              value: '6578616d706c65206d657373616765', // 'example message'
               type: 'string',
             },
           ]}

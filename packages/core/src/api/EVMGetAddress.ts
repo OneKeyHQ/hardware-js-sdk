@@ -27,7 +27,7 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
         { name: 'showOnOneKey', type: 'boolean' },
       ]);
 
-      const showOnOneKey = batch.showOnOneKey ?? false;
+      const showOnOneKey = batch.showOnOneKey ?? true;
 
       this.params.push({
         address_n: addressN,
