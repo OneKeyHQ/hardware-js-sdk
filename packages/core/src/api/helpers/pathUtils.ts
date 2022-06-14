@@ -84,6 +84,19 @@ export const getOutputScriptType = (path?: number[]): ChangeOutputScriptType => 
   }
 };
 
+export const serializedPath = (path: Array<number>): string => {
+  const pathStr = path
+    .map((p: number) => {
+      if (p & HD_HARDENED) {
+        return `${p & ~HD_HARDENED}'`;
+      }
+      return p;
+    })
+    .join('/');
+
+  return `m/${pathStr}`;
+};
+
 export const validatePath = (
   path: string | Array<number>,
   length = 0,

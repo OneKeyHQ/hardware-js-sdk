@@ -1,10 +1,11 @@
-import { GetPublicKey, PublicKey } from '@onekeyfe/hd-transport/src/types/messages';
+import { GetPublicKey } from '@onekeyfe/hd-transport/src/types/messages';
 import { UI_REQUEST } from '../constants/ui-request';
-import { getScriptType, validatePath } from './helpers/pathUtils';
+import { getScriptType, serializedPath, validatePath } from './helpers/pathUtils';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { BTCGetAddressParams } from '../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
+import { BTCPublicKey } from '../types/api/btcGetPublicKey';
 
 export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   hasBundle = false;
@@ -53,7 +54,7 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   }
 
   async run() {
-    const responses: PublicKey[] = [];
+    const responses: BTCPublicKey[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
@@ -62,7 +63,10 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
         ...param,
       });
 
-      responses.push(res.message);
+      responses.push({
+        path: serializedPath(param.address_n),
+        ...res.message,
+      });
     }
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);

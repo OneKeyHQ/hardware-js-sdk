@@ -9,6 +9,7 @@ import { validatePath } from './helpers/pathUtils';
 import { BaseMethod } from './BaseMethod';
 import { SchemaParam, validateParams } from './helpers/paramsValidator';
 import {
+  EVMSignedTx,
   EVMSignTransactionParams,
   EVMTransaction,
   EVMTransactionEIP1559,
@@ -16,12 +17,6 @@ import {
 import { cutString } from './helpers/stringUtils';
 import { formatAnyHex, stripHexStartZeroes } from './helpers/hexUtils';
 import { ERRORS } from '../constants';
-
-type EVMSignedTx = {
-  v: string;
-  r: string;
-  s: string;
-};
 
 export default class EVMSignTransaction extends BaseMethod {
   addressN: number[] = [];
