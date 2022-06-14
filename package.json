@@ -14,8 +14,13 @@
   "scripts": {
     "bootstrap": "lerna bootstrap",
     "build": "lerna run build",
+    "clean": "lerna clean --yes",
+    "clean-workspace": "yarn clean && lerna run clean",
     "lint": "lerna run lint",
-    "setup": "yarn && yarn bootstrap && yarn build"
+    "setup": "yarn && yarn bootstrap && yarn build",
+    "publish-packages": "lerna publish from-package",
+    "update-version": "lerna version --no-git-tag-version",
+    "example": "cd ./packages/connect-examples/expo-example && yarn start"
   },
   "devDependencies": {
     "@babel/core": "^7.16.0",

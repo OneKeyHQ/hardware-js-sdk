@@ -1,0 +1,25 @@
+name: package-publish
+
+on: workflow_dispatch
+
+jobs:
+  package-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install Package
+        run: |
+          yarn
+          yarn bootstrap
+      - name: Build Target
+        run: |
+          yarn build
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          yarn publish-packages -y
