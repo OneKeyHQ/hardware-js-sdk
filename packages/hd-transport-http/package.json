@@ -11,6 +11,9 @@
     "type": "git",
     "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "test": "echo \"Error: run tests from root\" && exit 1",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
