@@ -21,19 +21,24 @@ export function buildOne(messages: Root, name: string, data: Record<string, unkn
   });
 }
 
-export const buildBuffer = (messages: Root, name: string, data: Record<string, unknown>) => {
+export const buildBuffers = (messages: Root, name: string, data: Record<string, unknown>) => {
   const { Message, messageType } = createMessageFromName(messages, name);
   const buffer = encodeProtobuf(Message, data);
-  const encodeBuffer = encodeProtocol(buffer, {
+  const encodeBuffers = encodeProtocol(buffer, {
     addTrezorHeaders: true,
-    chunked: false,
+    chunked: true,
     messageType,
   });
 
-  const outBuffer = new ByteBuffer(BUFFER_SIZE + 1);
-  outBuffer.writeByte(MESSAGE_TOP_CHAR);
-  outBuffer.append(encodeBuffer);
-  outBuffer.reset();
+  const outBuffers: ByteBuffer[] = [];
 
-  return outBuffer;
+  for (const buf of encodeBuffers) {
+    const chunkBuffer = new ByteBuffer(BUFFER_SIZE + 1);
+    chunkBuffer.writeByte(MESSAGE_TOP_CHAR);
+    chunkBuffer.append(buf);
+    chunkBuffer.reset();
+    outBuffers.push(chunkBuffer);
+  }
+
+  return outBuffers;
 };
