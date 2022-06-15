@@ -33,6 +33,8 @@ import { starcoinSignMessage } from './starcoinSignMessage';
 import { starcoinSignTransaction } from './starcoinSignTransaction';
 import { starcoinVerifyMessage } from './starcoinVerifyMessage';
 
+export * from './export';
+
 export type CoreApi = {
   /**
    * Inject function
