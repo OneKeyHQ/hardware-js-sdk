@@ -1,5 +1,5 @@
 import { RebootToBootloader } from '@onekeyfe/hd-transport/src/types/messages';
-import { BaseMethod } from './BaseMethod';
+import { BaseMethod } from '../BaseMethod';
 
 // Reboot BootLoader
 export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloader> {

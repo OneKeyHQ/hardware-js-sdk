@@ -27,6 +27,13 @@ import { deviceChangePin } from './deviceChangePin';
 import { deviceSettings } from './deviceSettings';
 import { deviceFlags } from './deviceFlags';
 import { deviceUpdateReboot } from './deviceUpdateReboot';
+import { starcoinGetAddress } from './starcoinGetAddress';
+import { starcoinGetPublicKey } from './starcoinGetPublicKey';
+import { starcoinSignMessage } from './starcoinSignMessage';
+import { starcoinSignTransaction } from './starcoinSignTransaction';
+import { starcoinVerifyMessage } from './starcoinVerifyMessage';
+
+export * from './export';
 
 export type CoreApi = {
   /**
@@ -77,4 +84,10 @@ export type CoreApi = {
   btcSignMessage: typeof btcSignMessage;
   btcSignTransaction: typeof btcSignTransaction;
   btcVerifyMessage: typeof btcVerifyMessage;
+
+  starcoinGetAddress: typeof starcoinGetAddress;
+  starcoinGetPublicKey: typeof starcoinGetPublicKey;
+  starcoinSignMessage: typeof starcoinSignMessage;
+  starcoinSignTransaction: typeof starcoinSignTransaction;
+  starcoinVerifyMessage: typeof starcoinVerifyMessage;
 };

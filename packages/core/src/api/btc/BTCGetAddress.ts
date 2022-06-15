@@ -1,9 +1,9 @@
 import { GetAddress } from '@onekeyfe/hd-transport/src/types/messages';
-import { UI_REQUEST } from '../constants/ui-request';
-import { getScriptType, serializedPath, validatePath } from './helpers/pathUtils';
-import { BaseMethod } from './BaseMethod';
-import { validateParams } from './helpers/paramsValidator';
-import { BTCAddress, BTCGetAddressParams } from '../types/api/btcGetAddress';
+import { UI_REQUEST } from '../../constants/ui-request';
+import { getScriptType, serializedPath, validatePath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
+import { BTCAddress, BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 
 export default class BTCGetAddress extends BaseMethod<GetAddress[]> {

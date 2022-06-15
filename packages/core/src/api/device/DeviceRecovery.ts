@@ -1,6 +1,6 @@
 import { RecoveryDevice } from '@onekeyfe/hd-transport/src/types/messages';
-import { BaseMethod } from './BaseMethod';
-import { validateParams } from './helpers/paramsValidator';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
 
 export default class DeviceRecovery extends BaseMethod<RecoveryDevice> {
   init() {

@@ -1,6 +1,6 @@
-import { ERRORS } from '../../constants';
-import { getScriptType, isMultisigPath, fromHardened } from './pathUtils';
-import bitcoin from '../../data/coins/bitcoin.json';
+import { ERRORS } from '../../../constants';
+import { getScriptType, isMultisigPath, fromHardened } from '../../helpers/pathUtils';
+import bitcoin from '../../../data/coins/bitcoin.json';
 
 export type BitcoinInfo = {
   name: string;
