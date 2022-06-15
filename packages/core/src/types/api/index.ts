@@ -32,6 +32,8 @@ import { starcoinGetPublicKey } from './starcoinGetPublicKey';
 import { starcoinSignMessage } from './starcoinSignMessage';
 import { starcoinSignTransaction } from './starcoinSignTransaction';
 import { starcoinVerifyMessage } from './starcoinVerifyMessage';
+import { nemGetAddress } from './nemGetAddress';
+import { nemSignTransaction } from './nemSignTransaction';
 
 export * from './export';
 
@@ -90,4 +92,7 @@ export type CoreApi = {
   starcoinSignMessage: typeof starcoinSignMessage;
   starcoinSignTransaction: typeof starcoinSignTransaction;
   starcoinVerifyMessage: typeof starcoinVerifyMessage;
+
+  nemGetAddress: typeof nemGetAddress;
+  nemSignTransaction: typeof nemSignTransaction;
 };

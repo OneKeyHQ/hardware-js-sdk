@@ -29,3 +29,6 @@ export { default as starcoinGetPublicKey } from './starcoin/StarcoinGetPublicKey
 export { default as starcoinSignMessage } from './starcoin/StarcoinSignMessage';
 export { default as starcoinSignTransaction } from './starcoin/StarcoinSignTransaction';
 export { default as starcoinVerifyMessage } from './starcoin/StarcoinVerifyMessage';
+
+export { default as nemGetAddress } from './nem/NEMGetAddress';
+export { default as nemSignTransaction } from './nem/NEMSignTransaction';

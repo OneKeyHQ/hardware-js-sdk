@@ -109,6 +109,10 @@ export const inject = ({
       call({ ...params, connectId, method: 'starcoinSignTransaction' }),
     starcoinVerifyMessage: (connectId, params) =>
       call({ ...params, connectId, method: 'starcoinVerifyMessage' }),
+
+    nemGetAddress: (connectId, params) => call({ ...params, connectId, method: 'nemGetAddress' }),
+    nemSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'nemSignTransaction' }),
   };
   return api;
 };

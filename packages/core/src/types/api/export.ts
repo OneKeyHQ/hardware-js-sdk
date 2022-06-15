@@ -41,3 +41,17 @@ export type { StarcoinPublicKey, StarcoinGetPublicKeyParams } from './starcoinGe
 export type { StarcoinSignMessageParams } from './starcoinSignMessage';
 export type { StarcoinSignTransactionParams } from './starcoinSignTransaction';
 export type { StarcoinVerifyMessageParams } from './starcoinVerifyMessage';
+
+export type { NEMAddress, NEMGetAddressParams } from './nemGetAddress';
+export type {
+  NEMAggregateModificationTransaction,
+  NEMImportanceTransaction,
+  NEMMosaic,
+  NEMMosaicCreationTransaction,
+  NEMMultisigTransaction,
+  NEMProvisionNamespaceTransaction,
+  NEMSupplyChangeTransaction,
+  NEMTransferTransaction,
+  NEMTransaction,
+  NEMSignTransactionParams,
+} from './nemSignTransaction';
