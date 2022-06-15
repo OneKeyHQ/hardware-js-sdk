@@ -86,8 +86,12 @@ const init = async (settings: Partial<ConnectSettings>) => {
   try {
     _core = await initCore(_settings, ReactNativeTransport);
     _core?.on(CORE_EVENT, handleMessage);
+
+    return true;
   } catch (error) {
     Log.error(createErrorMessage(error));
+
+    return false;
   }
 };
 
