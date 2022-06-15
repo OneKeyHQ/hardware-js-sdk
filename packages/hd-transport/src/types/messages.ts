@@ -1046,6 +1046,9 @@ export type Deprecated_PassphraseStateRequest = {
 // Deprecated_PassphraseStateAck
 export type Deprecated_PassphraseStateAck = Empty;
 
+// BixinPinInputOnDevice
+export type BixinPinInputOnDevice = Empty;
+
 // CipherKeyValue
 export type CipherKeyValue = {
   address_n: number[];
@@ -2378,6 +2381,7 @@ export type MessageType = {
   PassphraseAck: PassphraseAck;
   Deprecated_PassphraseStateRequest: Deprecated_PassphraseStateRequest;
   Deprecated_PassphraseStateAck: Deprecated_PassphraseStateAck;
+  BixinPinInputOnDevice: BixinPinInputOnDevice;
   CipherKeyValue: CipherKeyValue;
   CipheredKeyValue: CipheredKeyValue;
   IdentityType: IdentityType;
