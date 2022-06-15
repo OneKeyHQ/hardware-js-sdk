@@ -73,7 +73,7 @@ export const inject = ({
     deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
     deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
     deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
-    deviceSettings: connectId => call({ connectId, method: 'deviceSettings' }),
+    deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),
     deviceUpdateReboot: connectId => call({ connectId, method: 'deviceUpdateReboot' }),
     deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
 
@@ -98,6 +98,17 @@ export const inject = ({
       call({ ...params, connectId, method: 'btcSignTransaction' }),
     btcVerifyMessage: (connectId, params) =>
       call({ ...params, connectId, method: 'btcVerifyMessage' }),
+
+    starcoinGetAddress: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinGetAddress' }),
+    starcoinGetPublicKey: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinGetPublicKey' }),
+    starcoinSignMessage: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinSignMessage' }),
+    starcoinSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinSignTransaction' }),
+    starcoinVerifyMessage: (connectId, params) =>
+      call({ ...params, connectId, method: 'starcoinVerifyMessage' }),
   };
   return api;
 };

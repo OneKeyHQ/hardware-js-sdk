@@ -1,11 +1,11 @@
-import { EthereumGetAddress } from '@onekeyfe/hd-transport/src/types/messages';
-import { UI_REQUEST } from '../constants/ui-request';
-import { serializedPath, validatePath } from './helpers/pathUtils';
-import { BaseMethod } from './BaseMethod';
-import { validateParams } from './helpers/paramsValidator';
-import { EVMAddress, EVMGetAddressParams } from '../types/api/evmGetAddress';
+import { StarcoinGetAddress as HardwareStarcoinGetAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { UI_REQUEST } from '../../constants/ui-request';
+import { validatePath, serializedPath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
+import { StarcoinAddress, StarcoinGetAddressParams } from '../../types/api/starcoinGetAddress';
 
-export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
+export default class StarcoinGetAddress extends BaseMethod<HardwareStarcoinGetAddress[]> {
   hasBundle = false;
 
   init() {
@@ -19,7 +19,7 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
 
     // init params
     this.params = [];
-    payload.bundle.forEach((batch: EVMGetAddressParams) => {
+    payload.bundle.forEach((batch: StarcoinGetAddressParams) => {
       const addressN = validatePath(batch.path, 3);
 
       validateParams(batch, [
@@ -37,20 +37,18 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
   }
 
   async run() {
-    const responses: EVMAddress[] = [];
+    const responses: StarcoinAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall('EthereumGetAddress', 'EthereumAddress', {
+      const res = await this.device.commands.typedCall('StarcoinGetAddress', 'StarcoinAddress', {
         ...param,
       });
 
-      const { address } = res.message;
-
       responses.push({
         path: serializedPath(param.address_n),
-        address,
+        ...res.message,
       });
     }
 
