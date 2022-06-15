@@ -16,7 +16,7 @@ import BleTransport from './BleTransport';
 import timer from './utils/timer';
 import type { BleAcquireInput, TransportOptions } from './types';
 
-const { check, buildBuffer, receiveOne, parseConfigure } = transport;
+const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 
 const blePlxManager = new BlePlxManager();
 
@@ -364,15 +364,17 @@ export default class ReactNativeBleTransport {
       ' data: ',
       data
     );
-    const o = buildBuffer(messages, name, data);
-    console.log('@onekey/hd-ble-sdk send hex strting: ', o.toString('hex'));
-    const outData = o.toString('base64');
-    try {
-      await transport.writeCharacteristic.writeWithResponse(outData);
-    } catch (e) {
-      this.runPromise = null;
-      console.log('writeCharacteristic write error: ', e);
-      return;
+    const buffers = buildBuffers(messages, name, data);
+    for (const o of buffers) {
+      const outData = o.toString('base64');
+      console.log('@onekey/hd-ble-sdk send hex strting: ', o.toString('hex'));
+      try {
+        await transport.writeCharacteristic.writeWithResponse(outData);
+      } catch (e) {
+        this.runPromise = null;
+        console.log('writeCharacteristic write error: ', e);
+        return;
+      }
     }
     try {
       const response = await this.runPromise.promise;
