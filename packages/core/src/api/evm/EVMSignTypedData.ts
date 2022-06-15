@@ -14,6 +14,7 @@ import {
   EthereumSignTypedDataMessage,
   EthereumSignTypedDataTypes,
 } from '../../types/api/evmSignTypedData';
+import { getDeviceType } from '../../utils/deviceFeaturesUtils';
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -173,6 +174,17 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EVMSignTypedDataPar
   //   };
   // }
 
+  getVersionRange() {
+    return {
+      classic: {
+        min: '2.2.0',
+      },
+      mini: {
+        min: '2.2.0',
+      },
+    };
+  }
+
   async run() {
     if (!this.device.features) {
       throw ERRORS.TypedError(
@@ -184,7 +196,8 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EVMSignTypedDataPar
     const { addressN } = this.params;
 
     // For Classic、Mini device we use EthereumSignTypedData
-    if (this.device.features.model === '1') {
+    const deviceType = getDeviceType(this.device.features);
+    if (deviceType === 'classic' || deviceType === 'mini') {
       validateParams(this.params, [
         { name: 'domainHash', type: 'hexString', required: true },
         { name: 'messageHash', type: 'hexString' },

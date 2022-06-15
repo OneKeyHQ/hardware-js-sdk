@@ -26,6 +26,17 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessage
     };
   }
 
+  getVersionRange() {
+    return {
+      classic: {
+        min: '2.1.9',
+      },
+      mini: {
+        min: '2.1.9',
+      },
+    };
+  }
+
   async run() {
     const res = await this.device.commands.typedCall(
       'EthereumSignMessageEIP712',

@@ -78,3 +78,7 @@ export type IDeviceFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown
 export type IDeviceBLEFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';
 
 export type ITransportStatus = 'valid' | 'outdated';
+
+export type DeviceFirmwareRange = {
+  [deviceType in IDeviceType]?: { min: string; max?: string };
+};
