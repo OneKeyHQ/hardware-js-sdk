@@ -81,17 +81,12 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
   }
 };
 
-const init = (settings: Partial<ConnectSettings>) => {
+const init = async (settings: Partial<ConnectSettings>) => {
   if (iframe.instance) {
     throw ERRORS.TypedError('Init_AlreadyInitialized');
   }
 
   _settings = parseConnectSettings({ ..._settings, ...settings });
-
-  if (_settings.lazyLoad) {
-    _settings.lazyLoad = false;
-    return;
-  }
 
   enableLog(!!settings.debug);
 
@@ -100,7 +95,13 @@ const init = (settings: Partial<ConnectSettings>) => {
   window.addEventListener('message', createJSBridge);
   window.addEventListener('unload', dispose);
 
-  iframe.init(_settings);
+  try {
+    await iframe.init(_settings);
+    return true;
+  } catch (e) {
+    console.log('init error: ', e);
+    return false;
+  }
 };
 
 const call = async (params: any) => {
