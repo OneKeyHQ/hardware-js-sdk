@@ -32,3 +32,6 @@ export { default as starcoinVerifyMessage } from './starcoin/StarcoinVerifyMessa
 
 export { default as nemGetAddress } from './nem/NEMGetAddress';
 export { default as nemSignTransaction } from './nem/NEMSignTransaction';
+
+export { default as solGetAddress } from './solana/SolGetAddress';
+export { default as solSignTransaction } from './solana/SolSignTransaction';

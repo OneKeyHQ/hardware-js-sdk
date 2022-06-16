@@ -1902,6 +1902,28 @@ export type RippleSignedTx = {
   serialized_tx: string;
 };
 
+// SolanaGetAddress
+export type SolanaGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// SolanaAddress
+export type SolanaAddress = {
+  address?: string;
+};
+
+// SolanaSignTx
+export type SolanaSignTx = {
+  address_n: number[];
+  raw_tx?: string;
+};
+
+// SolanaSignedTx
+export type SolanaSignedTx = {
+  signature?: string;
+};
+
 export enum StellarAssetType {
   NATIVE = 0,
   ALPHANUM4 = 1,

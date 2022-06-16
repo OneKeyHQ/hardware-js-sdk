@@ -113,6 +113,10 @@ export const inject = ({
     nemGetAddress: (connectId, params) => call({ ...params, connectId, method: 'nemGetAddress' }),
     nemSignTransaction: (connectId, params) =>
       call({ ...params, connectId, method: 'nemSignTransaction' }),
+
+    solGetAddress: (connectId, params) => call({ ...params, connectId, method: 'solGetAddress' }),
+    solSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'solSignTransaction' }),
   };
   return api;
 };

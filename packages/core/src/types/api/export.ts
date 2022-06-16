@@ -55,3 +55,6 @@ export type {
   NEMTransaction,
   NEMSignTransactionParams,
 } from './nemSignTransaction';
+
+export type { SolanaAddress, SolanaGetAddressParams } from './solGetAddress';
+export type { SolanaSignedTx, SolanaSignTransactionParams } from './solSignTransaction';
