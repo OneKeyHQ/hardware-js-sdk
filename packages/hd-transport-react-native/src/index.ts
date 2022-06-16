@@ -297,12 +297,12 @@ export default class ReactNativeBleTransport {
 
         if (buffer.length >= bufferLength) {
           const value = Buffer.from(buffer);
-          console.log(
-            '[hd-transport-react-native] Received a complete packet of data, resolve Promise, this.runPromise: ',
-            this.runPromise,
-            'buffer: ',
-            value
-          );
+          // console.log(
+          //   '[hd-transport-react-native] Received a complete packet of data, resolve Promise, this.runPromise: ',
+          //   this.runPromise,
+          //   'buffer: ',
+          //   value
+          // );
           bufferLength = 0;
           buffer = [];
           this.runPromise?.resolve(value.toString('hex'));
@@ -354,16 +354,7 @@ export default class ReactNativeBleTransport {
 
     this.runPromise = createDeferred();
     const messages = this._messages;
-    console.log(
-      'transport-react-native',
-      'call-',
-      'messages: ',
-      messages,
-      ' name: ',
-      name,
-      ' data: ',
-      data
-    );
+    console.log('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
     const buffers = buildBuffers(messages, name, data);
     for (const o of buffers) {
       const outData = o.toString('base64');
