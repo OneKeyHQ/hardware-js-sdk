@@ -36,6 +36,8 @@ import { nemGetAddress } from './nemGetAddress';
 import { nemSignTransaction } from './nemSignTransaction';
 import { solGetAddress } from './solGetAddress';
 import { solSignTransaction } from './solSignTransaction';
+import { stellarGetAddress } from './stellarGetAddress';
+import { stellarSignTransaction } from './stellarSignTransaction';
 
 export * from './export';
 
@@ -100,4 +102,7 @@ export type CoreApi = {
 
   solGetAddress: typeof solGetAddress;
   solSignTransaction: typeof solSignTransaction;
+
+  stellarGetAddress: typeof stellarGetAddress;
+  stellarSignTransaction: typeof stellarSignTransaction;
 };

@@ -2016,9 +2016,9 @@ export type StellarSignTx = {
   source_account: string;
   fee: UintType;
   sequence_number: UintType;
-  timebounds_start: number;
-  timebounds_end: number;
-  memo_type: StellarMemoType;
+  timebounds_start?: number;
+  timebounds_end?: number;
+  memo_type?: StellarMemoType;
   memo_text?: string;
   memo_id?: string;
   memo_hash?: Buffer | string;

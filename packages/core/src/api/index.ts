@@ -35,3 +35,6 @@ export { default as nemSignTransaction } from './nem/NEMSignTransaction';
 
 export { default as solGetAddress } from './solana/SolGetAddress';
 export { default as solSignTransaction } from './solana/SolSignTransaction';
+
+export { default as stellarGetAddress } from './stellar/StellarGetAddress';
+export { default as stellarSignTransaction } from './stellar/StellarSignTransaction';

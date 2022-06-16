@@ -117,6 +117,11 @@ export const inject = ({
     solGetAddress: (connectId, params) => call({ ...params, connectId, method: 'solGetAddress' }),
     solSignTransaction: (connectId, params) =>
       call({ ...params, connectId, method: 'solSignTransaction' }),
+
+    stellarGetAddress: (connectId, params) =>
+      call({ ...params, connectId, method: 'stellarGetAddress' }),
+    stellarSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'stellarSignTransaction' }),
   };
   return api;
 };

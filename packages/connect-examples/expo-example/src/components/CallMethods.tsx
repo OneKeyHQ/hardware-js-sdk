@@ -9,6 +9,7 @@ import { CallDeviceMethods } from './CallDeviceMethods';
 import { CallStarcoinMethods } from './CallStarcoinMethods';
 import { CallNEMMethods } from './CallNEMMethods';
 import { CallSolanaMethods } from './CallSolanaMethods';
+import { CallStellarMethods } from './CallStellarMethods';
 
 let registerListener = false;
 
@@ -99,6 +100,7 @@ export function CallMethods({ SDK }: ICallMethodProps) {
       <CallStarcoinMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} />
     </View>
   );
 }

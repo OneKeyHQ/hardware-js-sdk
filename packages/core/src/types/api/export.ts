@@ -58,3 +58,11 @@ export type {
 
 export type { SolanaAddress, SolanaGetAddressParams } from './solGetAddress';
 export type { SolanaSignedTx, SolanaSignTransactionParams } from './solSignTransaction';
+
+export type { StellarAddress, StellarGetAddressParams } from './stellarGetAddress';
+export type {
+  StellarAsset,
+  StellarOperation,
+  StellarTransaction,
+  StellarSignTransactionParams,
+} from './stellarSignTransaction';
