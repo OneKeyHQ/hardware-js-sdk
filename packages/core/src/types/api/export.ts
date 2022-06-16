@@ -11,6 +11,8 @@ export type {
   TransactionOptions,
 } from './btcSignTransaction';
 
+export type { CipheredKeyValue, CipheredKeyValueParams } from './cipherKeyValue';
+
 export type { DeviceChangePinParams } from './deviceChangePin';
 export type { DeviceFlagsParams } from './deviceFlags';
 export type { DeviceRecoveryParams } from './deviceRecovery';

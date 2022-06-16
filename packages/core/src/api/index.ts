@@ -1,5 +1,6 @@
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
+export { default as cipherKeyValue } from './CipherKeyValue';
 export { default as btcGetAddress } from './btc/BTCGetAddress';
 export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
 export { default as btcSignMessage } from './btc/BTCSignMessage';

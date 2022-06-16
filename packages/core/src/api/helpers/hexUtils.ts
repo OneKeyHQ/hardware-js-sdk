@@ -44,7 +44,6 @@ export const formatAnyHex: (value: any) => any = value => {
   if (typeof value === 'object') {
     return modifyValues(value, value => formatAnyHex(value));
   }
-  console.log('unexpected value', value);
 
   return value;
 };

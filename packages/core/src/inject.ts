@@ -66,6 +66,8 @@ export const inject = ({
      */
     checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
 
+    cipherKeyValue: (connectId, params) => call({ ...params, connectId, method: 'cipherKeyValue' }),
+
     deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
     deviceChangePin: (connectId, params) =>
       call({ ...params, connectId, method: 'deviceChangePin' }),

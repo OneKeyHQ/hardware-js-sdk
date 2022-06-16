@@ -38,6 +38,7 @@ import { solGetAddress } from './solGetAddress';
 import { solSignTransaction } from './solSignTransaction';
 import { stellarGetAddress } from './stellarGetAddress';
 import { stellarSignTransaction } from './stellarSignTransaction';
+import { cipherKeyValue } from './cipherKeyValue';
 
 export * from './export';
 
@@ -66,6 +67,8 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
 
   checkTransportRelease: typeof checkTransportRelease;
+
+  cipherKeyValue: typeof cipherKeyValue;
 
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;
