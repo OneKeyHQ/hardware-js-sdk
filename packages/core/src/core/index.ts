@@ -19,6 +19,7 @@ import {
   UiPromise,
   UiPromiseResponse,
   createUiMessage,
+  createDeviceMessage,
 } from '../events';
 import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, KnownDevice } from '../types';
@@ -90,6 +91,9 @@ export const callAPI = async (message: CoreMessage) => {
   method.setDevice?.(device);
 
   device.on(DEVICE.PIN, onDevicePinHandler);
+  device.on(DEVICE.BUTTON, (d, code) => {
+    onDeviceButtonHandler(d, code);
+  });
 
   try {
     const inner = async (): Promise<void> => {
@@ -144,6 +148,10 @@ export const callAPI = async (message: CoreMessage) => {
         method.dispose();
       }
     }
+
+    closePopup();
+
+    cleanup();
     // TODO: 方法执行后，检查队列内是否有等待调用的 API，依次调用
   }
 };
@@ -203,6 +211,18 @@ function initDeviceForBle(method: BaseMethod) {
   return device;
 }
 
+const cleanup = () => {
+  _uiPromises = [];
+  Log.debug('Cleanup...');
+};
+
+/**
+ * Force close popup
+ */
+const closePopup = () => {
+  postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW));
+};
+
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
   console.log('onDevicePinHandler');
   // create ui promise
@@ -218,6 +238,11 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
   const uiResp = await uiPromise.promise;
   // callback.apply(null, [null, pin]);
   callback(null, uiResp.payload);
+};
+
+const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
+  postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
+  postMessage(createUiMessage(UI_REQUEST.REQUEST_BUTTON, { device: device.toMessageObject() }));
 };
 
 /**

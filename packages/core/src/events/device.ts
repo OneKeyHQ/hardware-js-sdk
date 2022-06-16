@@ -1,5 +1,8 @@
 import type { PROTO } from '../constants';
+import type { KnownDevice as Device } from '../types/device';
+import { MessageFactoryFn } from './utils';
 
+export const DEVICE_EVENT = 'DEVICE_EVENT';
 export const DEVICE = {
   // device list events
   CONNECT: 'device-connect',
@@ -26,3 +29,27 @@ export const DEVICE = {
 export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'code'> {
   code?: PROTO.ButtonRequest['code'] | 'ButtonRequest_FirmwareUpdate';
 }
+
+export interface DeviceButtonRequest {
+  type: typeof DEVICE.BUTTON;
+  payload: DeviceButtonRequestPayload & { device: Device | null };
+}
+
+export type DeviceEvent = DeviceButtonRequest;
+
+export type DeviceEventMessage = DeviceEvent & { event: typeof DEVICE_EVENT };
+
+export type DeviceEventListenerFn = (
+  type: typeof DEVICE_EVENT,
+  cb: (event: DeviceEventMessage) => void
+) => void;
+
+export const createDeviceMessage: MessageFactoryFn<typeof DEVICE_EVENT, DeviceEvent> = (
+  type,
+  payload
+) =>
+  ({
+    event: DEVICE_EVENT,
+    type,
+    payload,
+  } as any);
