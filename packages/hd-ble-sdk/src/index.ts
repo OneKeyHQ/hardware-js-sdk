@@ -7,6 +7,7 @@ import HardwareSdk, {
   initCore,
   Core,
   createErrorMessage,
+  createUiMessage,
   CORE_EVENT,
   CoreMessage,
   ERRORS,
@@ -15,8 +16,9 @@ import HardwareSdk, {
   IFRAME,
   UI_EVENT,
   UiResponseEvent,
+  UI_REQUEST,
 } from '@onekeyfe/hd-core';
-import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
+import ReactNativeTransport, { PERMISSION_ERROR } from '@onekeyfe/hd-transport-react-native';
 
 const eventEmitter = new EventEmitter();
 const Log = initLog('@onekey/hd-ble-sdk');
@@ -102,6 +104,18 @@ const call = async (params: any) => {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
       Log.debug('response: ', response);
+
+      if (
+        !response.success &&
+        ((typeof response.payload === 'string' && response.payload.includes(PERMISSION_ERROR)) ||
+          response.payload.error?.includes(PERMISSION_ERROR))
+      ) {
+        /**
+         * Send message notification when there is no Bluetooth access permission
+         */
+        postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION), false);
+      }
+
       return response;
     }
 

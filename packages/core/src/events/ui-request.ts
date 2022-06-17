@@ -11,10 +11,12 @@ export const UI_REQUEST = {
   REQUEST_BUTTON: 'ui-button',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
+
+  BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
 } as const;
 
 export interface UiRequestWithoutPayload {
-  type: typeof UI_REQUEST.CLOSE_UI_WINDOW;
+  type: typeof UI_REQUEST.CLOSE_UI_WINDOW | typeof UI_REQUEST.BLUETOOTH_PERMISSION;
   payload?: typeof undefined;
 }
 

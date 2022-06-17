@@ -1,3 +1,5 @@
+export const PERMISSION_ERROR = 'Bluetooth required to be turned on';
+
 export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
   if (id?.startsWith?.('MI')) {
     return true;

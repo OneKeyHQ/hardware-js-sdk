@@ -1,4 +1,5 @@
 import HardwareBleSdk from '@onekeyfe/hd-ble-sdk';
+import { UI_REQUEST } from '@onekeyfe/hd-core';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Platform, PermissionsAndroid, ScrollView } from 'react-native';
 
@@ -40,6 +41,10 @@ export default function Bluetooth() {
       debug: true,
     };
     HardwareBleSdk.init(settings);
+
+    HardwareBleSdk.on('UI_EVENT', event => {
+      console.log('example received UI_EVENT: ', event);
+    });
   };
 
   useEffect(() => {
