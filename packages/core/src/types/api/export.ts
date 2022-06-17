@@ -2,6 +2,14 @@ export type { BTCAddress, BTCGetAddressParams } from './btcGetAddress';
 export type { BTCPublicKey, BTCGetPublicKeyParams } from './btcGetPublicKey';
 export type { BTCSignMessageParams } from './btcSignMessage';
 export type { BTCVerifyMessageParams } from './btcVerifyMessage';
+export type {
+  RefTransaction,
+  AccountAddress,
+  AccountAddresses,
+  BTCSignTransactionParams,
+  SignedTransaction,
+  TransactionOptions,
+} from './btcSignTransaction';
 
 export type { DeviceChangePinParams } from './deviceChangePin';
 export type { DeviceFlagsParams } from './deviceFlags';

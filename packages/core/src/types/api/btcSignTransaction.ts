@@ -1,7 +1,6 @@
 import {
   TxInput as OrigTxInput,
   PrevInput,
-  Success,
   TxOutputBinType,
   TxOutputType,
   TxInputType,
@@ -95,4 +94,4 @@ export type BTCSignTransactionParams = {
 export declare function btcSignTransaction(
   connectId: string,
   params: CommonParams & BTCSignTransactionParams
-): Response<Success>;
+): Response<SignedTransaction>;
