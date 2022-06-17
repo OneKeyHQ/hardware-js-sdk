@@ -13,8 +13,8 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   init() {
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
-    const hasBundle = Object.prototype.hasOwnProperty.call(this.payload, 'bundle');
-    const payload = hasBundle ? this.payload : { bundle: [this.payload] };
+    this.hasBundle = Object.prototype.hasOwnProperty.call(this.payload, 'bundle');
+    const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);
 
