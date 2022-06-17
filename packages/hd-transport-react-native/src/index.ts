@@ -11,6 +11,7 @@ import { initializeBleManager, getConnectedDeviceIds } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
   PERMISSION_ERROR,
+  LOCATION_ERROR,
   isOnekeyDevice,
   getBluetoothServiceUuids,
   getInfosForServiceUuid,
@@ -96,6 +97,7 @@ export default class ReactNativeBleTransport {
           if (error) {
             console.log('ble scan manager: ', blePlxManager);
             console.log('ble scan error: ', error);
+            reject(error);
             return;
           }
 
@@ -395,4 +397,4 @@ export default class ReactNativeBleTransport {
   }
 }
 
-export { PERMISSION_ERROR };
+export { PERMISSION_ERROR, LOCATION_ERROR };

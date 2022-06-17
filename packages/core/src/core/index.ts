@@ -291,7 +291,8 @@ export default class Core extends EventEmitter {
         break;
       }
 
-      case UI_REQUEST.BLUETOOTH_PERMISSION: {
+      case UI_REQUEST.BLUETOOTH_PERMISSION:
+      case UI_REQUEST.LOCATION_PERMISSION: {
         postMessage(message);
         break;
       }
