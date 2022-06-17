@@ -3,7 +3,7 @@
 import { ChangeOutputScriptType, InputScriptType } from '@onekeyfe/hd-transport/src/types/messages';
 import { ERRORS } from '../../constants';
 
-export const HD_HARDENED = 0x80000000;
+const HD_HARDENED = 0x80000000;
 export const toHardened = (n: number): number => (n | HD_HARDENED) >>> 0;
 export const fromHardened = (n: number): number => (n & ~HD_HARDENED) >>> 0;
 
