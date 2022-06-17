@@ -61,7 +61,10 @@ export const callAPI = async (message: CoreMessage) => {
       const response = await method.run();
       return createResponseMessage(method.responseID, true, response);
     } catch (error) {
-      return createResponseMessage(method.responseID, false, error);
+      return createResponseMessage(method.responseID, false, {
+        code: error.code,
+        error: error.message ?? error,
+      });
     }
   }
 
@@ -136,7 +139,13 @@ export const callAPI = async (message: CoreMessage) => {
     Log.debug('Call API - Device Run: ', device);
     const deviceRun = () => device.run(inner);
     _callPromise = createDeferred(deviceRun);
-    return await _callPromise.promise;
+
+    try {
+      return await _callPromise.promise;
+    } catch (e) {
+      console.log('Device Run Error: ', e);
+      return createResponseMessage(method.responseID, false, e.message);
+    }
   } catch (error) {
     messageResponse = createResponseMessage(method.responseID, false, error);
     _callPromise?.reject(ERRORS.TypedError('Call_API', error));
@@ -279,6 +288,12 @@ export default class Core extends EventEmitter {
           uiPromise.resolve(message);
           removeUiPromise(uiPromise);
         }
+        break;
+      }
+
+      case UI_REQUEST.BLUETOOTH_PERMISSION:
+      case UI_REQUEST.LOCATION_PERMISSION: {
+        postMessage(message);
         break;
       }
 

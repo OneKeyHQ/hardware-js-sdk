@@ -1,14 +1,12 @@
+import { PERMISSION_ERROR } from './constants';
 import { BlePlxManager } from './types';
 import timer from './utils/timer';
 
 export const subscribeBleOn = (bleManager: BlePlxManager, ms = 3000): Promise<void> =>
   new Promise((resolve, reject) => {
     let done = false;
-    let lastState = 'Unknown';
 
     const subscription = bleManager.onStateChange(state => {
-      lastState = state;
-
       console.log('ble state -> ', state);
 
       if (state === 'PoweredOn') {
@@ -23,6 +21,6 @@ export const subscribeBleOn = (bleManager: BlePlxManager, ms = 3000): Promise<vo
     const clearTimeout = timer.timeout(() => {
       if (done) return;
       subscription.remove();
-      reject(new Error(`Bluetooth required to be turned ${lastState}`));
+      reject(new Error(PERMISSION_ERROR));
     }, ms);
   });

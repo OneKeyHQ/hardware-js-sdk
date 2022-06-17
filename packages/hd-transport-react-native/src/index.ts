@@ -9,7 +9,13 @@ import {
 } from 'react-native-ble-plx';
 import { initializeBleManager, getConnectedDeviceIds } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
-import { isOnekeyDevice, getBluetoothServiceUuids, getInfosForServiceUuid } from './constants';
+import {
+  PERMISSION_ERROR,
+  LOCATION_ERROR,
+  isOnekeyDevice,
+  getBluetoothServiceUuids,
+  getInfosForServiceUuid,
+} from './constants';
 import { Deferred, create as createDeferred } from './utils/deferred';
 import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
@@ -71,14 +77,14 @@ export default class ReactNativeBleTransport {
    */
   async enumerate() {
     // eslint-disable-next-line no-async-promise-executor
-    return new Promise<Device[]>(async resolve => {
+    return new Promise<Device[]>(async (resolve, reject) => {
       const deviceList: Device[] = [];
 
       try {
         await subscribeBleOn(blePlxManager);
       } catch (error) {
         console.log('subscribeBleOn error: ', error);
-        resolve([]);
+        reject(error);
         return;
       }
 
@@ -91,6 +97,7 @@ export default class ReactNativeBleTransport {
           if (error) {
             console.log('ble scan manager: ', blePlxManager);
             console.log('ble scan error: ', error);
+            reject(error);
             return;
           }
 
@@ -389,3 +396,5 @@ export default class ReactNativeBleTransport {
     this.stopped = true;
   }
 }
+
+export { PERMISSION_ERROR, LOCATION_ERROR };
