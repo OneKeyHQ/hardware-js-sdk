@@ -24,12 +24,10 @@ import type { BleAcquireInput, TransportOptions } from './types';
 
 const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 
-const blePlxManager = new BlePlxManager();
-
 const transportCache: Record<string, any> = {};
 
 let connectOptions: Record<string, unknown> = {
-  requestMTU: 1500,
+  requestMTU: 512,
   timeout: 3000,
 };
 
@@ -42,6 +40,8 @@ const tryToGetConfiguration = (device: Device) => {
 };
 
 export default class ReactNativeBleTransport {
+  blePlxManager: BlePlxManager | undefined;
+
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
   configured = false;
@@ -56,9 +56,7 @@ export default class ReactNativeBleTransport {
     this.scanTimeout = options.scanTimeout ?? 3000;
   }
 
-  init() {
-    initializeBleManager();
-  }
+  init() {}
 
   configure(signedData: any) {
     const messages = parseConfigure(signedData);
@@ -70,6 +68,13 @@ export default class ReactNativeBleTransport {
     // empty
   }
 
+  getPlxManager(): Promise<BlePlxManager> {
+    if (this.blePlxManager) return Promise.resolve(this.blePlxManager);
+    this.blePlxManager = new BlePlxManager();
+    initializeBleManager();
+    return Promise.resolve(this.blePlxManager);
+  }
+
   /**
    * 获取设备列表
    * 在搜索超过超时时间或设备数量大于 5 台时，返回 OneKey 设备，
@@ -79,7 +84,7 @@ export default class ReactNativeBleTransport {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<Device[]>(async (resolve, reject) => {
       const deviceList: Device[] = [];
-
+      const blePlxManager = await this.getPlxManager();
       try {
         await subscribeBleOn(blePlxManager);
       } catch (error) {
@@ -97,7 +102,11 @@ export default class ReactNativeBleTransport {
           if (error) {
             console.log('ble scan manager: ', blePlxManager);
             console.log('ble scan error: ', error);
-            reject(error);
+            if (error.errorCode === BleErrorCode.BluetoothInUnknownState) {
+              reject(new Error(PERMISSION_ERROR));
+            } else {
+              reject(error);
+            }
             return;
           }
 
@@ -153,6 +162,7 @@ export default class ReactNativeBleTransport {
       await this.release(uuid);
     }
 
+    const blePlxManager = await this.getPlxManager();
     try {
       await subscribeBleOn(blePlxManager);
     } catch (error) {
