@@ -251,7 +251,17 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
 
 const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
   postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
-  postMessage(createUiMessage(UI_REQUEST.REQUEST_BUTTON, { device: device.toMessageObject() }));
+
+  if (request.code === 'ButtonRequest_PinEntry') {
+    postMessage(
+      createUiMessage(UI_REQUEST.REQUEST_PIN, {
+        device: device.toMessageObject() as KnownDevice,
+        type: 'ButtonRequest_PinEntry',
+      })
+    );
+  } else {
+    postMessage(createUiMessage(UI_REQUEST.REQUEST_BUTTON, { device: device.toMessageObject() }));
+  }
 };
 
 /**

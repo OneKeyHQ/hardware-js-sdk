@@ -28,7 +28,7 @@ export type UiRequestDeviceAction = {
   type: typeof UI_REQUEST.REQUEST_PIN;
   payload: {
     device: Device;
-    type?: PROTO.PinMatrixRequestType;
+    type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry';
   };
 };
 
