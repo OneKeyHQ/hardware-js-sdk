@@ -102,7 +102,11 @@ export default class ReactNativeBleTransport {
           if (error) {
             console.log('ble scan manager: ', blePlxManager);
             console.log('ble scan error: ', error);
-            if (error.errorCode === BleErrorCode.BluetoothInUnknownState) {
+            if (
+              [BleErrorCode.BluetoothPoweredOff, BleErrorCode.BluetoothInUnknownState].includes(
+                error.errorCode
+              )
+            ) {
               reject(new Error(PERMISSION_ERROR));
             } else {
               reject(error);
