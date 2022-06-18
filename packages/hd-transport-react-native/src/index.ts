@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer';
-import transport from '@onekeyfe/hd-transport';
+import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import {
   BleManager as BlePlxManager,
   Device,
@@ -295,6 +295,7 @@ export default class ReactNativeBleTransport {
 
       try {
         const data = Buffer.from(c.value as string, 'base64');
+        // console.log('[hd-transport-react-native] Received a packet, ', 'buffer: ', data);
         if (isHeaderChunk(data)) {
           bufferLength = data.readInt32BE(5);
           buffer = [...data.subarray(3)];
@@ -302,7 +303,7 @@ export default class ReactNativeBleTransport {
           buffer = buffer.concat([...data]);
         }
 
-        if (buffer.length >= bufferLength) {
+        if (buffer.length - COMMON_HEADER_SIZE >= bufferLength) {
           const value = Buffer.from(buffer);
           // console.log(
           //   '[hd-transport-react-native] Received a complete packet of data, resolve Promise, this.runPromise: ',

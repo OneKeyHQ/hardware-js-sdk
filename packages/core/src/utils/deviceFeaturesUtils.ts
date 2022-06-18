@@ -8,6 +8,24 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   const serialNo = features.serial_no;
   const miniFlag = serialNo.slice(0, 2);
   if (miniFlag.toLowerCase() === 'mi') return 'mini';
+  if (miniFlag.toLowerCase() === 'tc') return 'touch';
+  return 'classic';
+};
+
+export const getDeviceTypeByBleName = (name?: string): IDeviceType | null => {
+  if (!name) return 'classic';
+  if (name.startsWith('MI')) return 'mini';
+  if (name.startsWith('T')) return 'touch';
+  return 'classic';
+};
+
+export const getDeviceTypeByDeviceId = (deviceId?: string): IDeviceType => {
+  if (!deviceId) {
+    return 'classic';
+  }
+
+  const miniFlag = deviceId.slice(0, 2);
+  if (miniFlag.toLowerCase() === 'mi') return 'mini';
   return 'classic';
 };
 
