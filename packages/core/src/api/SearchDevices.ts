@@ -3,6 +3,7 @@ import DeviceConnector from '../device/DeviceConnector';
 import TransportManager from '../data-manager/TransportManager';
 import { Device } from '../device/Device';
 import { DataManager } from '../data-manager';
+import { getDeviceTypeByBleName } from '../utils';
 
 export default class SearchDevices extends BaseMethod {
   connector?: DeviceConnector;
@@ -26,8 +27,7 @@ export default class SearchDevices extends BaseMethod {
       return devicesDescriptor.map(device => ({
         ...device,
         connectId: device.id,
-        // 蓝牙场景只有 classic 能被搜索到
-        deviceType: 'classic',
+        deviceType: getDeviceTypeByBleName(device.name ?? ''),
       }));
     }
 

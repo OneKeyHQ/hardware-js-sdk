@@ -2,7 +2,7 @@ import { PERMISSION_ERROR } from './constants';
 import { BlePlxManager } from './types';
 import timer from './utils/timer';
 
-export const subscribeBleOn = (bleManager: BlePlxManager, ms = 3000): Promise<void> =>
+export const subscribeBleOn = (bleManager: BlePlxManager, ms = 1000): Promise<void> =>
   new Promise((resolve, reject) => {
     let done = false;
 

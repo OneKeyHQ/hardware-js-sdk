@@ -6,9 +6,9 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
     return true;
   }
 
-  // 过滤 BixinKeyxxx 和 Kxxxx
+  // 过滤 BixinKeyxxx 和 Kxxxx 和 Txxxx
   // i 忽略大小写模式
-  const re = /(BixinKey\d{10})|(K\d{4})/i;
+  const re = /(BixinKey\d{10})|(K\d{4})|(T\d{4})/i;
   if (name && re.exec(name)) {
     return true;
   }
