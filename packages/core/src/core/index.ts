@@ -26,7 +26,11 @@ import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
-import { getDeviceFirmwareVersion, getDeviceType } from '../utils/deviceFeaturesUtils';
+import {
+  getDeviceFirmwareVersion,
+  getDeviceModel,
+  getDeviceType,
+} from '../utils/deviceFeaturesUtils';
 
 const Log = initLog('Core');
 
@@ -104,7 +108,12 @@ export const callAPI = async (message: CoreMessage) => {
     const inner = async (): Promise<void> => {
       // check firmware version
       const deviceType = getDeviceType(device.features);
-      const versionRange = method.getVersionRange()[deviceType];
+      const deviceModel = getDeviceModel(device.features);
+      const versionRangeType = method.getVersionRange()[deviceType];
+      const versionRangeModel = method.getVersionRange()[deviceModel];
+
+      // Type has a higher priority than Model
+      const versionRange = versionRangeType ?? versionRangeModel;
 
       if (versionRange && device.features) {
         const currentVersion = getDeviceFirmwareVersion(device.features).join('.');

@@ -1,4 +1,16 @@
-import type { Features, IVersionArray, IDeviceType } from '../types';
+import type { Features, IVersionArray, IDeviceType, IDeviceModel } from '../types';
+
+export const getDeviceModel = (features?: Features): IDeviceModel => {
+  if (!features || typeof features !== 'object') {
+    return 'model_mini';
+  }
+
+  if (features.model === '1') {
+    return 'model_mini';
+  }
+  // model === 'T'
+  return 'model_touch';
+};
 
 export const getDeviceType = (features?: Features): IDeviceType => {
   if (!features || typeof features !== 'object' || !features.serial_no) {

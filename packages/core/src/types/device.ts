@@ -73,6 +73,10 @@ export type Features = PROTO.Features;
 
 export type IDeviceType = 'classic' | 'mini' | 'touch' | 'pro';
 
+// model_mini: 'classic' | 'mini'
+// model_touch: 'touch' | 'pro'
+export type IDeviceModel = 'model_mini' | 'model_touch';
+
 export type IDeviceFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';
 
 export type IDeviceBLEFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';
@@ -80,5 +84,5 @@ export type IDeviceBLEFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unkn
 export type ITransportStatus = 'valid' | 'outdated';
 
 export type DeviceFirmwareRange = {
-  [deviceType in IDeviceType]?: { min: string; max?: string };
+  [deviceType in IDeviceType | IDeviceModel]?: { min: string; max?: string };
 };

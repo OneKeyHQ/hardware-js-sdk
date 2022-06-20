@@ -176,10 +176,7 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EVMSignTypedDataPar
 
   getVersionRange() {
     return {
-      classic: {
-        min: '2.2.0',
-      },
-      mini: {
+      model_mini: {
         min: '2.2.0',
       },
     };

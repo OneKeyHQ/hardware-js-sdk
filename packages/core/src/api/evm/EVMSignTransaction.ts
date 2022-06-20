@@ -181,19 +181,13 @@ export default class EVMSignTransaction extends BaseMethod {
   getVersionRange() {
     if (this.isEIP1559) {
       return {
-        classic: {
-          min: '2.1.11',
-        },
-        mini: {
+        model_mini: {
           min: '2.1.11',
         },
       };
     }
     return {
-      classic: {
-        min: '1.0.0',
-      },
-      mini: {
+      model_mini: {
         min: '1.0.0',
       },
     };
