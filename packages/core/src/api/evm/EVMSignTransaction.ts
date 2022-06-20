@@ -178,6 +178,21 @@ export default class EVMSignTransaction extends BaseMethod {
     return this.processTxRequest(response.message, rest, chainId);
   };
 
+  getVersionRange() {
+    if (this.isEIP1559) {
+      return {
+        model_mini: {
+          min: '2.1.11',
+        },
+      };
+    }
+    return {
+      model_mini: {
+        min: '1.0.0',
+      },
+    };
+  }
+
   async run() {
     const { addressN, isEIP1559, formattedTx } = this;
 

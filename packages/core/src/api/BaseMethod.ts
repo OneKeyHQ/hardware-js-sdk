@@ -1,6 +1,7 @@
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import DeviceConnector from '../device/DeviceConnector';
+import { DeviceFirmwareRange } from '../types';
 
 export abstract class BaseMethod<Params = undefined> {
   responseID: number;
@@ -61,6 +62,10 @@ export abstract class BaseMethod<Params = undefined> {
   abstract init(): void;
 
   abstract run(): Promise<any>;
+
+  getVersionRange(): DeviceFirmwareRange {
+    return {};
+  }
 
   setDevice(device: Device) {
     this.device = device;

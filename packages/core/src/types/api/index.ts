@@ -32,6 +32,13 @@ import { starcoinGetPublicKey } from './starcoinGetPublicKey';
 import { starcoinSignMessage } from './starcoinSignMessage';
 import { starcoinSignTransaction } from './starcoinSignTransaction';
 import { starcoinVerifyMessage } from './starcoinVerifyMessage';
+import { nemGetAddress } from './nemGetAddress';
+import { nemSignTransaction } from './nemSignTransaction';
+import { solGetAddress } from './solGetAddress';
+import { solSignTransaction } from './solSignTransaction';
+import { stellarGetAddress } from './stellarGetAddress';
+import { stellarSignTransaction } from './stellarSignTransaction';
+import { cipherKeyValue } from './cipherKeyValue';
 
 export * from './export';
 
@@ -60,6 +67,8 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
 
   checkTransportRelease: typeof checkTransportRelease;
+
+  cipherKeyValue: typeof cipherKeyValue;
 
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;
@@ -90,4 +99,13 @@ export type CoreApi = {
   starcoinSignMessage: typeof starcoinSignMessage;
   starcoinSignTransaction: typeof starcoinSignTransaction;
   starcoinVerifyMessage: typeof starcoinVerifyMessage;
+
+  nemGetAddress: typeof nemGetAddress;
+  nemSignTransaction: typeof nemSignTransaction;
+
+  solGetAddress: typeof solGetAddress;
+  solSignTransaction: typeof solSignTransaction;
+
+  stellarGetAddress: typeof stellarGetAddress;
+  stellarSignTransaction: typeof stellarSignTransaction;
 };

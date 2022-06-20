@@ -1,5 +1,6 @@
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
+export { default as cipherKeyValue } from './CipherKeyValue';
 export { default as btcGetAddress } from './btc/BTCGetAddress';
 export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
 export { default as btcSignMessage } from './btc/BTCSignMessage';
@@ -29,3 +30,12 @@ export { default as starcoinGetPublicKey } from './starcoin/StarcoinGetPublicKey
 export { default as starcoinSignMessage } from './starcoin/StarcoinSignMessage';
 export { default as starcoinSignTransaction } from './starcoin/StarcoinSignTransaction';
 export { default as starcoinVerifyMessage } from './starcoin/StarcoinVerifyMessage';
+
+export { default as nemGetAddress } from './nem/NEMGetAddress';
+export { default as nemSignTransaction } from './nem/NEMSignTransaction';
+
+export { default as solGetAddress } from './solana/SolGetAddress';
+export { default as solSignTransaction } from './solana/SolSignTransaction';
+
+export { default as stellarGetAddress } from './stellar/StellarGetAddress';
+export { default as stellarSignTransaction } from './stellar/StellarSignTransaction';

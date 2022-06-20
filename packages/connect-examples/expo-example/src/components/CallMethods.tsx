@@ -7,6 +7,10 @@ import { CallEVMMethods } from './CallEVMMethods';
 import { CallBTCMethods } from './CallBTCMethods';
 import { CallDeviceMethods } from './CallDeviceMethods';
 import { CallStarcoinMethods } from './CallStarcoinMethods';
+import { CallNEMMethods } from './CallNEMMethods';
+import { CallSolanaMethods } from './CallSolanaMethods';
+import { CallStellarMethods } from './CallStellarMethods';
+import { CallOtherMethods } from './CallOtherMethods';
 
 let registerListener = false;
 
@@ -92,9 +96,13 @@ export function CallMethods({ SDK }: ICallMethodProps) {
       )}
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallStarcoinMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} />
     </View>
   );
 }

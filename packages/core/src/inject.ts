@@ -66,6 +66,8 @@ export const inject = ({
      */
     checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
 
+    cipherKeyValue: (connectId, params) => call({ ...params, connectId, method: 'cipherKeyValue' }),
+
     deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
     deviceChangePin: (connectId, params) =>
       call({ ...params, connectId, method: 'deviceChangePin' }),
@@ -109,6 +111,19 @@ export const inject = ({
       call({ ...params, connectId, method: 'starcoinSignTransaction' }),
     starcoinVerifyMessage: (connectId, params) =>
       call({ ...params, connectId, method: 'starcoinVerifyMessage' }),
+
+    nemGetAddress: (connectId, params) => call({ ...params, connectId, method: 'nemGetAddress' }),
+    nemSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'nemSignTransaction' }),
+
+    solGetAddress: (connectId, params) => call({ ...params, connectId, method: 'solGetAddress' }),
+    solSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'solSignTransaction' }),
+
+    stellarGetAddress: (connectId, params) =>
+      call({ ...params, connectId, method: 'stellarGetAddress' }),
+    stellarSignTransaction: (connectId, params) =>
+      call({ ...params, connectId, method: 'stellarSignTransaction' }),
   };
   return api;
 };

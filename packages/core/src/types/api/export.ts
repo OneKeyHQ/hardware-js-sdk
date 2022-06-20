@@ -11,6 +11,8 @@ export type {
   TransactionOptions,
 } from './btcSignTransaction';
 
+export type { CipheredKeyValue, CipheredKeyValueParams } from './cipherKeyValue';
+
 export type { DeviceChangePinParams } from './deviceChangePin';
 export type { DeviceFlagsParams } from './deviceFlags';
 export type { DeviceRecoveryParams } from './deviceRecovery';
@@ -41,3 +43,28 @@ export type { StarcoinPublicKey, StarcoinGetPublicKeyParams } from './starcoinGe
 export type { StarcoinSignMessageParams } from './starcoinSignMessage';
 export type { StarcoinSignTransactionParams } from './starcoinSignTransaction';
 export type { StarcoinVerifyMessageParams } from './starcoinVerifyMessage';
+
+export type { NEMAddress, NEMGetAddressParams } from './nemGetAddress';
+export type {
+  NEMAggregateModificationTransaction,
+  NEMImportanceTransaction,
+  NEMMosaic,
+  NEMMosaicCreationTransaction,
+  NEMMultisigTransaction,
+  NEMProvisionNamespaceTransaction,
+  NEMSupplyChangeTransaction,
+  NEMTransferTransaction,
+  NEMTransaction,
+  NEMSignTransactionParams,
+} from './nemSignTransaction';
+
+export type { SolanaAddress, SolanaGetAddressParams } from './solGetAddress';
+export type { SolanaSignedTx, SolanaSignTransactionParams } from './solSignTransaction';
+
+export type { StellarAddress, StellarGetAddressParams } from './stellarGetAddress';
+export type {
+  StellarAsset,
+  StellarOperation,
+  StellarTransaction,
+  StellarSignTransactionParams,
+} from './stellarSignTransaction';

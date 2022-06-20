@@ -1,3 +1,4 @@
+import semver from 'semver';
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { ERRORS } from '../constants';
@@ -25,6 +26,11 @@ import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
+import {
+  getDeviceFirmwareVersion,
+  getDeviceModel,
+  getDeviceType,
+} from '../utils/deviceFeaturesUtils';
 
 const Log = initLog('Core');
 
@@ -100,11 +106,38 @@ export const callAPI = async (message: CoreMessage) => {
 
   try {
     const inner = async (): Promise<void> => {
-      // check firmware status
-      // const firmwareException = method.checkFirmwareRange();
-      // if (firmwareException) {
-      //   return Promise.reject(ERRORS.TypedError('Device_FwException', firmwareException));
-      // }
+      // check firmware version
+      const deviceType = getDeviceType(device.features);
+      const deviceModel = getDeviceModel(device.features);
+      const versionRangeType = method.getVersionRange()[deviceType];
+      const versionRangeModel = method.getVersionRange()[deviceModel];
+
+      // Type has a higher priority than Model
+      const versionRange = versionRangeType ?? versionRangeModel;
+
+      if (versionRange && device.features) {
+        const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+        if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
+          return Promise.reject(
+            ERRORS.TypedError(
+              'Device_FwException',
+              `Device firmware version is too low, please update to ${versionRange.min}`
+            )
+          );
+        }
+        if (
+          versionRange.max &&
+          semver.valid(versionRange.max) &&
+          semver.gt(currentVersion, versionRange.max)
+        ) {
+          return Promise.reject(
+            ERRORS.TypedError(
+              'Device_FwException',
+              `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`
+            )
+          );
+        }
+      }
 
       // check call method mode
       const unexpectedMode = device.hasUnexpectedMode(
@@ -149,6 +182,7 @@ export const callAPI = async (message: CoreMessage) => {
   } catch (error) {
     messageResponse = createResponseMessage(method.responseID, false, error);
     _callPromise?.reject(ERRORS.TypedError('Call_API', error));
+    Log.debug('Call API - Run Error: ', error);
   } finally {
     const response = messageResponse;
 
