@@ -61,7 +61,9 @@ export const getDeviceLabel = (features: Features) => {
 /**
  * Get Connected Device version by features
  */
-export const getDeviceFirmwareVersion = (features: Features): IVersionArray => {
+export const getDeviceFirmwareVersion = (features: Features | undefined): IVersionArray => {
+  if (!features) return [0, 0, 0];
+
   if (features.onekey_version) {
     return features.onekey_version.split('.') as unknown as IVersionArray;
   }
