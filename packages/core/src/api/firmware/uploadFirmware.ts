@@ -33,7 +33,7 @@ export const uploadFirmware = async (
 ) => {
   if (device.features?.major_version === 1) {
     postConfirmationMessage(device);
-    const eraseCommand = updateType === 'firmware' ? 'FirmwareErase_ex' : 'FirmwareErase';
+    const eraseCommand = updateType === 'firmware' ? 'FirmwareErase' : 'FirmwareErase_ex';
     await typedCall(eraseCommand as unknown as any, 'Success', {});
     postProgressMessage(device, 0, postMessage);
     const { message } = await typedCall('FirmwareUpload', 'Success', {

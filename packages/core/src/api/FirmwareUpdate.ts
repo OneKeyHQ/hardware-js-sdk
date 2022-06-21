@@ -3,6 +3,7 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { getBinary } from './firmware/getBinary';
+import { uploadFirmware } from './firmware/uploadFirmware';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -66,6 +67,12 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       throw ERRORS.TypedError('Method_FirmwareUpdate_DownloadFailed', err);
     }
 
-    return Promise.resolve(binary);
+    return uploadFirmware(
+      params.updateType,
+      this.device.getCommands().typedCall.bind(this.device.getCommands()),
+      this.postMessage,
+      device,
+      { payload: binary }
+    );
   }
 }

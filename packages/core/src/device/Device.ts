@@ -225,6 +225,10 @@ export class Device extends EventEmitter {
     }
   }
 
+  getCommands() {
+    return this.commands;
+  }
+
   getInternalState() {
     return this.internalState[this.instance];
   }
