@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { Buffer } from 'buffer';
 import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import {
@@ -228,10 +229,12 @@ export default class ReactNativeBleTransport {
     }
 
     // check device is bonded
-    const bondedDevices = await getBondedDevices();
-    const hasBonded = !!bondedDevices.find(bondedDevice => bondedDevice.id === device?.id);
-    if (!hasBonded) {
-      throw new Error('device is not bonded');
+    if (Platform.OS === 'android') {
+      const bondedDevices = await getBondedDevices();
+      const hasBonded = !!bondedDevices.find(bondedDevice => bondedDevice.id === device?.id);
+      if (!hasBonded) {
+        throw new Error('device is not bonded');
+      }
     }
 
     await device.discoverAllServicesAndCharacteristics();
