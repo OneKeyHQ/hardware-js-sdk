@@ -1,4 +1,6 @@
+import semver from 'semver';
 import {
+  EthereumMessageSignature,
   EthereumTypedDataSignature,
   EthereumTypedDataStructAck,
   MessageKey,
@@ -14,7 +16,8 @@ import {
   EthereumSignTypedDataMessage,
   EthereumSignTypedDataTypes,
 } from '../../types/api/evmSignTypedData';
-import { getDeviceType } from '../../utils/deviceFeaturesUtils';
+import { getDeviceFirmwareVersion, getDeviceType } from '../../utils/deviceFeaturesUtils';
+import { TypedResponseMessage } from '../../device/DeviceCommands';
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -24,14 +27,14 @@ export type EVMSignTypedDataParams = {
   messageHash?: string;
 };
 
-export default class EVMSignMessageEIP712 extends BaseMethod<EVMSignTypedDataParams> {
+export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
   init() {
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'path', required: true },
-      { name: 'metamaskV4Compat', type: 'boolean', required: true },
-      { name: 'data', type: 'object', required: true },
+      { name: 'metamaskV4Compat', type: 'boolean' },
+      { name: 'data', type: 'object' },
       { name: 'domainHash', type: 'hexString' },
       { name: 'messageHash', type: 'hexString' },
     ]);
@@ -50,7 +53,7 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EVMSignTypedDataPar
       this.params.domainHash = formatAnyHex(domainHash);
       if (messageHash) {
         this.params.messageHash = formatAnyHex(messageHash);
-      } else if (!data.primaryType || data.primaryType !== 'EIP712Domain') {
+      } else if (!!data && (!data.primaryType || data.primaryType !== 'EIP712Domain')) {
         throw ERRORS.TypedError(
           'Method_InvalidParameter',
           'message_hash should only be empty when data.primaryType=EIP712Domain'
@@ -177,9 +180,23 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EVMSignTypedDataPar
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.2.0',
+        min: '2.1.9',
       },
     };
+  }
+
+  supportSignTyped() {
+    const deviceType = getDeviceType(this.device.features);
+    if (deviceType === 'classic' || deviceType === 'mini') {
+      const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+      const supportSignTypedVersion = '2.2.0';
+
+      if (semver.lt(currentVersion, supportSignTypedVersion)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   async run() {
@@ -197,20 +214,33 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EVMSignTypedDataPar
     if (deviceType === 'classic' || deviceType === 'mini') {
       validateParams(this.params, [
         { name: 'domainHash', type: 'hexString', required: true },
-        { name: 'messageHash', type: 'hexString' },
+        { name: 'messageHash', type: 'hexString', required: true },
       ]);
 
       const { domainHash, messageHash } = this.params;
 
-      const response = await this.device.commands.typedCall(
-        'EthereumSignTypedHash',
-        'EthereumTypedDataSignature',
-        {
-          address_n: addressN,
-          domain_separator_hash: domainHash ?? '',
-          message_hash: messageHash,
-        }
-      );
+      let response;
+      if (this.supportSignTyped()) {
+        response = await this.device.commands.typedCall(
+          'EthereumSignTypedHash',
+          'EthereumTypedDataSignature',
+          {
+            address_n: addressN,
+            domain_separator_hash: domainHash ?? '',
+            message_hash: messageHash,
+          }
+        );
+      } else {
+        response = await this.device.commands.typedCall(
+          'EthereumSignMessageEIP712',
+          'EthereumMessageSignature',
+          {
+            address_n: addressN,
+            domain_hash: domainHash ?? '',
+            message_hash: messageHash ?? '',
+          }
+        );
+      }
 
       return Promise.resolve(response.message);
     }

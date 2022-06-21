@@ -7,7 +7,7 @@ import {
   Characteristic,
   ScanMode,
 } from 'react-native-ble-plx';
-import { initializeBleManager, getConnectedDeviceIds } from './BleManager';
+import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
   PERMISSION_ERROR,
@@ -155,7 +155,7 @@ export default class ReactNativeBleTransport {
       throw new Error('uuid is required');
     }
 
-    let device;
+    let device: Device | null = null;
 
     if (transportCache[uuid]) {
       /**
@@ -225,6 +225,13 @@ export default class ReactNativeBleTransport {
           throw e;
         }
       }
+    }
+
+    // check device is bonded
+    const bondedDevices = await getBondedDevices();
+    const hasBonded = !!bondedDevices.find(bondedDevice => bondedDevice.id === device?.id);
+    if (!hasBonded) {
+      throw new Error('device is not bonded');
     }
 
     await device.discoverAllServicesAndCharacteristics();
