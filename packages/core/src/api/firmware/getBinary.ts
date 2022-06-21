@@ -1,52 +1,41 @@
-import { VersionArray } from '../../types';
-import { httpRequest } from '../../utils';
-import { GetInfoProps, getInfo } from './firmwareInfo';
-import * as versionUtils from './versionUtils';
+import semver from 'semver';
+import { Features } from '../../types';
+import { getDeviceType, httpRequest } from '../../utils';
+import { DataManager } from '../../data-manager';
+import { ERRORS } from '../../constants';
 
-interface GetBinaryProps extends GetInfoProps {
-  baseUrl: string;
-  btcOnly?: boolean;
-  version?: number[];
-  intermediary?: boolean;
+export interface GetInfoProps {
+  features: Features;
+  updateType: 'firmware' | 'ble';
 }
 
-export const getBinary = async ({
-  features,
-  releases,
-  baseUrl,
-  version,
-  btcOnly,
-}: GetBinaryProps) => {
-  const releaseByFirmware = releases.find(r =>
-    versionUtils.isEqual(r.version, version as unknown as VersionArray)
-  );
-  const infoByBootloader = getInfo({ features, releases });
+interface GetBinaryProps extends GetInfoProps {
+  version?: number[];
+}
 
-  if (!infoByBootloader || !releaseByFirmware) {
-    throw new Error('no firmware found for this device');
+export const getBinary = async ({ features, updateType, version }: GetBinaryProps) => {
+  const releaseInfo = getInfo({ features, updateType });
+
+  if (!releaseInfo) {
+    throw ERRORS.TypedError('Runtime', 'no firmware found for this device');
   }
 
-  if (btcOnly && !releaseByFirmware.url_bitcoinonly) {
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    throw new Error(`firmware version ${version} does not exist in btc only variant`);
+  if (
+    version &&
+    !semver.eq(releaseInfo.version as unknown as semver.SemVer, version as unknown as semver.SemVer)
+  ) {
+    throw ERRORS.TypedError('Runtime', 'firmware version mismatch');
   }
 
-  // it is better to be defensive and not allow user update rather than let him wipe his seed
-  // in case of improper update
-  if (!versionUtils.isEqual(releaseByFirmware.version, infoByBootloader.release.version)) {
-    throw new Error(
-      'version provided as param does not match firmware version found by features in bootloader'
-    );
-  }
+  const fw = await httpRequest(releaseInfo.url, 'binary');
 
-  const fw = await httpRequest(
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    `${baseUrl}/${btcOnly ? releaseByFirmware.url_bitcoinonly : releaseByFirmware.url}`,
-    'binary'
-  );
+  return fw;
+};
 
-  return {
-    ...infoByBootloader,
-    binary: fw,
-  };
+const getInfo = ({ features, updateType }: GetInfoProps) => {
+  const deviceType = getDeviceType(features);
+  const { deviceMap } = DataManager;
+  const releaseInfo = deviceMap?.[deviceType]?.[updateType]?.[0] ?? null;
+
+  return releaseInfo;
 };

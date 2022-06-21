@@ -3,14 +3,11 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { getBinary } from './firmware/getBinary';
-import { DataManager } from '../data-manager';
-import { getDeviceType } from '../utils';
 
 type Params = {
   binary?: ArrayBuffer;
   version?: number[];
-  btcOnly?: boolean;
-  baseUrl?: string;
+  updateType: 'firmware' | 'ble';
 };
 
 export default class FirmwareUpdate extends BaseMethod<Params> {
@@ -22,16 +19,15 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
 
     validateParams(payload, [
       { name: 'version', type: 'array' },
-      { name: 'btcOnly', type: 'boolean' },
-      { name: 'baseUrl', type: 'string' },
       { name: 'binary', type: 'buffer' },
     ]);
 
+    this.params = { updateType: payload.updateType };
+
     if ('version' in payload) {
       this.params = {
+        ...this.params,
         version: payload.version,
-        btcOnly: payload.btcOnly,
-        baseUrl: payload.baseUrl || 'https://onekey-asset.com/onekey',
       };
     }
 
@@ -52,13 +48,15 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       if (params.binary) {
         binary = this.params.binary;
       } else {
-        // const firmaware = await getBinary({
-        //   features: device.features,
-        //   releases: DataManager.deviceMap[getDeviceType(this.device.features)],
-        //   version: params.version,
-        //   btcOnly: params.btcOnly,
-        // });
-        // binary = firmware.binary;
+        if (!device.features) {
+          throw ERRORS.TypedError('Runtime', 'no features found for this device');
+        }
+        const firmware = await getBinary({
+          features: device.features,
+          version: params.version,
+          updateType: params.updateType,
+        });
+        binary = firmware.binary;
       }
     } catch (err) {
       throw ERRORS.TypedError(
@@ -67,6 +65,6 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       );
     }
 
-    return Promise.resolve(1);
+    return Promise.resolve(binary);
   }
 }

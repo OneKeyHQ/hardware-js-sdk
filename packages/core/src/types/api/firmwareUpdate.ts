@@ -12,10 +12,10 @@ export interface FirmwareUpdate {
 }
 
 export declare function firmwareUpdate(
-  connectId: string,
+  connectId: string | undefined,
   params: Params<FirmwareUpdate>
 ): Response<PROTO.Success>;
 export declare function firmwareUpdate(
-  connectId: string,
+  connectId: string | undefined,
   params: Params<FirmwareUpdateBinary>
 ): Response<PROTO.Success>;

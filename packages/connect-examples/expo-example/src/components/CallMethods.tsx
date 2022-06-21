@@ -76,7 +76,7 @@ export function CallMethods({ SDK }: ICallMethodProps) {
   };
 
   const handleFirmwareUpdate = async () => {
-    const response = await SDK.firmwareUpdate();
+    const response = await SDK.firmwareUpdate(undefined, {} as any);
     console.log('example firmwareUpdate response: ', response);
   };
 
