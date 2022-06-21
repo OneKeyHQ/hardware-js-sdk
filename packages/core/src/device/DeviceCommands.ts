@@ -205,3 +205,5 @@ export class DeviceCommands {
     });
   }
 }
+
+export type TypedCall = DeviceCommands['typedCall'];

@@ -22,6 +22,10 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       { name: 'binary', type: 'buffer' },
     ]);
 
+    if (!payload.updateType) {
+      throw ERRORS.TypedError('Method_InvalidParameter', 'updateType is required');
+    }
+
     this.params = { updateType: payload.updateType };
 
     if ('version' in payload) {
@@ -59,10 +63,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         binary = firmware.binary;
       }
     } catch (err) {
-      throw ERRORS.TypedError(
-        'Method_FirmwareUpdate_DownloadFailed',
-        'Failed to download firmware binary'
-      );
+      throw ERRORS.TypedError('Method_FirmwareUpdate_DownloadFailed', err);
     }
 
     return Promise.resolve(binary);

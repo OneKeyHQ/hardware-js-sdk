@@ -29,7 +29,10 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
 
   const fw = await httpRequest(releaseInfo.url, 'binary');
 
-  return fw;
+  return {
+    ...releaseInfo,
+    binary: fw,
+  };
 };
 
 const getInfo = ({ features, updateType }: GetInfoProps) => {
