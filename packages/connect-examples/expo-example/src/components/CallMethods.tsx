@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createRef } from 'react';
 import { View, Button, StyleSheet } from 'react-native';
 import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE, CoreApi } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
@@ -22,6 +22,7 @@ export function CallMethods({ SDK }: ICallMethodProps) {
   const [pinValue, setPinValue] = useState('');
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [selectedFile, setSelectedFile] = useState<Uint8Array>();
 
   useEffect(() => {
     // 监听 SDK 事件
@@ -75,9 +76,24 @@ export function CallMethods({ SDK }: ICallMethodProps) {
     console.log('example checkTransportRelease response: ', response);
   };
 
-  const handleFirmwareUpdate = async () => {
-    const response = await SDK.firmwareUpdate(undefined, { updateType: 'firmware' } as any);
+  const handleFirmwareUpdate = async (file?: Uint8Array) => {
+    const params: any = { updateType: 'firmware' };
+    if (file) {
+      params.binary = file;
+    }
+    const response = await SDK.firmwareUpdate(undefined, params);
     console.log('example firmwareUpdate response: ', response);
+  };
+
+  const onFileChange = (e: any) => {
+    const file = e.target.files?.[0];
+    const reader = new FileReader();
+    reader.readAsArrayBuffer(file);
+    reader.onload = function () {
+      const arrayBuffer = reader.result;
+      const array = new Uint8Array(arrayBuffer as ArrayBuffer);
+      setSelectedFile(array);
+    };
   };
 
   return (
@@ -92,6 +108,11 @@ export function CallMethods({ SDK }: ICallMethodProps) {
         />
         <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
         <Button title="firmware update" onPress={() => handleFirmwareUpdate()} />
+        <Button
+          title="firmware update with local file"
+          onPress={() => handleFirmwareUpdate(selectedFile)}
+        />
+        <input type="file" onChange={e => onFileChange(e)} />
       </View>
       {showPinInput && (
         <ReceivePin
