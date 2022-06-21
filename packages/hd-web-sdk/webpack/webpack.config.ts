@@ -13,5 +13,10 @@ export default {
     modules: ['node_modules'],
     mainFields: ['browser', 'module', 'main'],
     extensions: ['.ts', '.js'],
+
+    fallback: {
+      crypto: require.resolve('crypto-browserify'), // required by multiple dependencies
+      stream: require.resolve('stream-browserify'),
+    },
   },
 };

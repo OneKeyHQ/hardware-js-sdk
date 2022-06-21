@@ -124,6 +124,8 @@ export const inject = ({
       call({ ...params, connectId, method: 'stellarGetAddress' }),
     stellarSignTransaction: (connectId, params) =>
       call({ ...params, connectId, method: 'stellarSignTransaction' }),
+
+    firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
   };
   return api;
 };

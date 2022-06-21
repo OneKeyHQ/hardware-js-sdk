@@ -75,6 +75,11 @@ export function CallMethods({ SDK }: ICallMethodProps) {
     console.log('example checkTransportRelease response: ', response);
   };
 
+  const handleFirmwareUpdate = async () => {
+    const response = await SDK.firmwareUpdate();
+    console.log('example firmwareUpdate response: ', response);
+  };
+
   return (
     <View>
       <View style={styles.buttonContainer}>
@@ -86,6 +91,7 @@ export function CallMethods({ SDK }: ICallMethodProps) {
           onPress={() => handleCheckBLEFirmwareRelease()}
         />
         <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
+        <Button title="firmware update" onPress={() => handleFirmwareUpdate()} />
       </View>
       {showPinInput && (
         <ReceivePin

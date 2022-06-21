@@ -3,6 +3,7 @@ export const ERROR_CODES = {
   Method_InvalidParameter: '',
   Call_API: '',
   Call_NotResponse: 'No response data',
+  Method_FirmwareUpdate_DownloadFailed: '',
 
   // device error
   Transport_InvalidProtobuf: '',
