@@ -27,7 +27,9 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
     throw ERRORS.TypedError('Runtime', 'firmware version mismatch');
   }
 
-  const fw = await httpRequest(releaseInfo.url, 'binary');
+  // @ts-expect-error
+  const url = updateType === 'ble' ? releaseInfo.webUpdate : releaseInfo.url;
+  const fw = await httpRequest(url, 'binary');
 
   return {
     ...releaseInfo,

@@ -8,7 +8,7 @@ export interface FirmwareUpdateBinary {
 export interface FirmwareUpdate {
   version: number[];
   btcOnly?: boolean;
-  baseUrl?: string;
+  updateType: 'firmware' | 'ble';
 }
 
 export declare function firmwareUpdate(
