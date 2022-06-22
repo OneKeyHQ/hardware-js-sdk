@@ -16,3 +16,11 @@ export const getConnectedDeviceIds = async (serviceUuids: string[]) => {
     return { id, name, ...advertising };
   });
 };
+
+export const getBondedDevices = async () => {
+  const peripherals = await BleManager.getBondedPeripherals();
+  return peripherals.map(peripheral => {
+    const { id, name, advertising = {} } = peripheral;
+    return { id, name, ...advertising };
+  });
+};

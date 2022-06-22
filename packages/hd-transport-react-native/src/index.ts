@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { Buffer } from 'buffer';
 import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import {
@@ -7,7 +8,7 @@ import {
   Characteristic,
   ScanMode,
 } from 'react-native-ble-plx';
-import { initializeBleManager, getConnectedDeviceIds } from './BleManager';
+import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
   PERMISSION_ERROR,
@@ -155,7 +156,7 @@ export default class ReactNativeBleTransport {
       throw new Error('uuid is required');
     }
 
-    let device;
+    let device: Device | null = null;
 
     if (transportCache[uuid]) {
       /**
@@ -224,6 +225,15 @@ export default class ReactNativeBleTransport {
         } else {
           throw e;
         }
+      }
+    }
+
+    // check device is bonded
+    if (Platform.OS === 'android') {
+      const bondedDevices = await getBondedDevices();
+      const hasBonded = !!bondedDevices.find(bondedDevice => bondedDevice.id === device?.id);
+      if (!hasBonded) {
+        throw new Error('device is not bonded');
       }
     }
 
