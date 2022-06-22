@@ -1,5 +1,5 @@
 import { useEffect, useState, createRef } from 'react';
-import { View, Button, StyleSheet } from 'react-native';
+import { View, Button, StyleSheet, TextInput, Platform } from 'react-native';
 import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE, CoreApi } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
@@ -16,8 +16,9 @@ let registerListener = false;
 
 type ICallMethodProps = {
   SDK: CoreApi;
+  type: 'Bluetooth' | 'USB';
 };
-export function CallMethods({ SDK }: ICallMethodProps) {
+export function CallMethods({ SDK, type }: ICallMethodProps) {
   const [showPinInput, setShowPinInput] = useState(false);
   const [pinValue, setPinValue] = useState('');
   const [devices, setDevices] = useState<Device[]>([]);
@@ -81,7 +82,10 @@ export function CallMethods({ SDK }: ICallMethodProps) {
     if (file) {
       params.binary = file;
     }
-    const response = await SDK.firmwareUpdate(undefined, params);
+    const response = await SDK.firmwareUpdate(
+      type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
+      params
+    );
     console.log('example firmwareUpdate response: ', response);
   };
 
@@ -112,7 +116,7 @@ export function CallMethods({ SDK }: ICallMethodProps) {
           title="firmware update with local file"
           onPress={() => handleFirmwareUpdate(selectedFile)}
         />
-        <input type="file" onChange={e => onFileChange(e)} />
+        {Platform.OS === 'web' ? <input type="file" onChange={e => onFileChange(e)} /> : null}
       </View>
       {showPinInput && (
         <ReceivePin

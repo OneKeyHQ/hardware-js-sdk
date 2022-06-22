@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type Device = {
   connectId: string;
+  name: string;
 };
 
 const STORE_KEY = '@onekey/selectedId';
@@ -52,7 +53,7 @@ type ItemProps = {
 
 const Item = ({ item, onPress, backgroundColor, textColor }: ItemProps) => (
   <TouchableOpacity onPress={onPress} style={[styles.item, backgroundColor]}>
-    <Text style={[styles.title, textColor]}>{item.connectId}</Text>
+    <Text style={[styles.title, textColor]}>{item.name}</Text>
   </TouchableOpacity>
 );
 
@@ -68,7 +69,7 @@ export function DeviceList({ data, onSelected }: IDeviceListProps) {
     getSelectedId().then(value => {
       if (value) {
         setSelectedId(value);
-        onSelected({ connectId: value });
+        onSelected({ connectId: value } as Device);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

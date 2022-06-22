@@ -24,7 +24,7 @@ export default function USB() {
   return (
     <View>
       <Text>This is USB example page, will run on desktop browser. </Text>
-      <CallMethods SDK={HardwareWebSdk} />
+      <CallMethods SDK={HardwareWebSdk} type="USB" />
     </View>
   );
 }
