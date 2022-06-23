@@ -1,5 +1,5 @@
-import { useEffect, useState, createRef } from 'react';
-import { View, Button, StyleSheet, TextInput, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Button, StyleSheet, Platform, Switch, Text } from 'react-native';
 import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE, CoreApi } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
@@ -24,6 +24,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [selectedFile, setSelectedFile] = useState<Uint8Array>();
+  const [firmwareType, setFirmwareType] = useState<boolean>(false);
 
   useEffect(() => {
     // 监听 SDK 事件
@@ -78,7 +79,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   };
 
   const handleFirmwareUpdate = async (file?: Uint8Array) => {
-    const params: any = { updateType: 'ble' };
+    const params: any = { updateType: firmwareType ? 'firmware' : 'ble' };
     if (file) {
       params.binary = file;
     }
@@ -111,12 +112,6 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
           onPress={() => handleCheckBLEFirmwareRelease()}
         />
         <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
-        <Button title="firmware update" onPress={() => handleFirmwareUpdate()} />
-        <Button
-          title="firmware update with local file"
-          onPress={() => handleFirmwareUpdate(selectedFile)}
-        />
-        {Platform.OS === 'web' ? <input type="file" onChange={e => onFileChange(e)} /> : null}
       </View>
       {showPinInput && (
         <ReceivePin
@@ -125,6 +120,20 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
           onConfirm={val => onConfirmPin(val)}
         />
       )}
+
+      <View style={styles.buttonContainer}>
+        <View style={styles.buttonContainer}>
+          <Text>升级固件类型：{firmwareType ? 'firmware' : 'ble'}</Text>
+          <Switch onValueChange={() => setFirmwareType(!firmwareType)} value={firmwareType} />
+        </View>
+        <Button title="firmware update" onPress={() => handleFirmwareUpdate()} />
+        <Button
+          title="firmware update with local file"
+          onPress={() => handleFirmwareUpdate(selectedFile)}
+        />
+        {Platform.OS === 'web' ? <input type="file" onChange={onFileChange} /> : null}
+      </View>
+
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />
