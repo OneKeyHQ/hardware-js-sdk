@@ -1,6 +1,9 @@
 export const PERMISSION_ERROR = 'Bluetooth required to be turned on';
 export const LOCATION_ERROR = 'Device is not authorized to use BluetoothLE';
 
+export const IOS_PACKET_LENGTH = 128;
+export const ANDROID_PACKET_LENGTH = 192;
+
 export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
   if (id?.startsWith?.('MI')) {
     return true;
