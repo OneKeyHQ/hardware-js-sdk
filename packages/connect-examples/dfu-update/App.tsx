@@ -14,12 +14,17 @@ import RNFS from 'react-native-fs';
 import BleManager from 'react-native-ble-manager';
 import HardwareSDK from '@onekeyfe/hd-ble-sdk';
 
+BleManager.start({ showAlert: false });
+const BleManagerModule = NativeModules.BleManager;
+const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
+
 const T_UUID = '41391B3D-4DCE-47B3-7B19-E3171BA96D4B';
-const C_UUID = '8CCA5EE6-8584-95A7-8C3A-6A68F8B6EFC0';
-// const C_UUID = '71C6EAC9-B3D9-8D84-214E-7829C058339B';
+// const C_UUID = '8CCA5EE6-8584-95A7-8C3A-6A68F8B6EFC0';
+const C_UUID = '10A16F2B-82E3-0752-0D70-5697080800F5';
+const C_MAC = 'CB:F9:80:A6:83:18'; // K1883
 let isInit = false;
 export default function App() {
-  const MAC = Platform.OS === 'ios' ? C_UUID : T_UUID;
+  const MAC = Platform.OS === 'ios' ? C_UUID : C_MAC;
   const [dfuState, setDfuState] = useState<string>();
   const [uri, setUri] = useState<string>();
 
@@ -40,6 +45,9 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       await HardwareSDK.init({ debug: true });
+      // BleManager.start({ showAlert: false });
+
+      // await BleManager.refreshCache(MAC);
     };
     init();
     isInit = true;
@@ -48,11 +56,31 @@ export default function App() {
   const getFeatures = async () => {
     const res = await HardwareSDK.getFeatures(MAC);
     console.log(res);
+    refreshCache();
   };
 
   const search = async () => {
     const a = await HardwareSDK.searchDevices();
     console.log(a);
+  };
+
+  const refreshCache = () => {
+    BleManager.connect(MAC)
+      .then(async () => {
+        // Success code
+        console.log('Connected');
+
+        try {
+          await BleManager.refreshCache(MAC);
+          console.log('Refresh cache success');
+        } catch (error) {
+          console.log(error);
+        }
+      })
+      .catch(error => {
+        // Failure code
+        console.log(error);
+      });
   };
 
   const handleDFU = async () => {
@@ -63,6 +91,7 @@ export default function App() {
         alternativeAdvertisingNameEnabled: false,
       });
       console.log('NordicDFU.startDFU end');
+      refreshCache();
     } catch (e) {
       console.log(e);
     }
