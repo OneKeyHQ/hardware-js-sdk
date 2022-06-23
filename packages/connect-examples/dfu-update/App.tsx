@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { DFUEmitter, NordicDFU } from 'react-native-nordic-dfu';
-import { StatusBar } from 'expo-status-bar';
 import {
   StyleSheet,
   Text,
@@ -21,8 +20,8 @@ const C_UUID = '8CCA5EE6-8584-95A7-8C3A-6A68F8B6EFC0';
 let isInit = false;
 export default function App() {
   const MAC = Platform.OS === 'ios' ? C_UUID : T_UUID;
-  const [dfuState, setDfuState] = useState();
-  const [uri, setUri] = useState();
+  const [dfuState, setDfuState] = useState<string>();
+  const [uri, setUri] = useState<string>();
 
   useEffect(() => {
     DFUEmitter.addListener(
@@ -60,7 +59,7 @@ export default function App() {
     try {
       const resp = await NordicDFU.startDFU({
         deviceAddress: MAC,
-        filePath: uri,
+        filePath: uri ?? '',
         alternativeAdvertisingNameEnabled: false,
       });
       console.log('NordicDFU.startDFU end');
@@ -72,14 +71,14 @@ export default function App() {
   const handlePick = async () => {
     if (Platform.OS === 'ios') {
       const url = await DocumentPicker.pick({ type: 'public.archive' });
-      setUri(url[0].uri);
+      setUri(url[0].uri ?? '');
       console.log(url);
     } else if (Platform.OS === 'android') {
       const firmwareFile = await DocumentPicker.pick({
         type: DocumentPicker.types.zip,
       });
-      // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
       console.log(firmwareFile);
+      // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
       const destination = RNFS.CachesDirectoryPath + firmwareFile[0].name;
       await RNFS.copyFile(firmwareFile[0].uri, destination);
       setUri(destination);

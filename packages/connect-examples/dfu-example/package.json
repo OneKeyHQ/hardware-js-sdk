@@ -16,7 +16,7 @@
     "react": "16.13.1",
     "react-dom": "16.13.1",
     "react-native": "~0.63.4",
-    "react-native-ble-manager": "^8.4.0",
+    "react-native-ble-manager": "^7.5.0",
     "react-native-ble-plx": "^2.0.3",
     "react-native-document-picker": "^8.1.1",
     "react-native-fs": "^2.20.0",
