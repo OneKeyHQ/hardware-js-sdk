@@ -17,6 +17,7 @@
     "react-dom": "16.13.1",
     "react-native": "~0.63.4",
     "react-native-ble-manager": "^8.4.0",
+    "react-native-ble-plx": "^2.0.3",
     "react-native-document-picker": "^8.1.1",
     "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "~1.10.2",
@@ -27,7 +28,9 @@
     "react-native-web": "~0.13.12"
   },
   "devDependencies": {
-    "@babel/core": "^7.9.0"
+    "@babel/core": "^7.9.0",
+    "@onekeyfe/hd-ble-sdk": "^0.0.10",
+    "@onekeyfe/hd-core": "^0.0.10"
   },
   "private": true
 }

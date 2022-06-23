@@ -321,8 +321,8 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.originalee.dfuexample";
-				PRODUCT_NAME = "dfuexample";
+				PRODUCT_BUNDLE_IDENTIFIER = com.originalee.dfuexample;
+				PRODUCT_NAME = dfuexample;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "dfuexample/dfuexample-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -351,8 +351,8 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.originalee.dfuexample";
-				PRODUCT_NAME = "dfuexample";
+				PRODUCT_BUNDLE_IDENTIFIER = com.originalee.dfuexample;
+				PRODUCT_NAME = dfuexample;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "dfuexample/dfuexample-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
