@@ -57,6 +57,7 @@ export const callAPI = async (message: CoreMessage) => {
   try {
     method = findMethod(message as IFrameCallMessage);
     method.connector = _connector;
+    method.postMessage = postMessage;
     method.init();
   } catch (error) {
     return Promise.reject(error);

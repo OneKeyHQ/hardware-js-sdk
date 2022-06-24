@@ -76,7 +76,7 @@ export default function Bluetooth() {
     <ScrollView>
       <View>
         <Text>This is Bluetooth example page, will run on iOS / Android device. </Text>
-        <CallMethods SDK={HardwareBleSdk} />
+        <CallMethods SDK={HardwareBleSdk} type="Bluetooth" />
       </View>
     </ScrollView>
   );

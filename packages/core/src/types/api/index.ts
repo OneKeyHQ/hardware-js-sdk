@@ -39,6 +39,7 @@ import { solSignTransaction } from './solSignTransaction';
 import { stellarGetAddress } from './stellarGetAddress';
 import { stellarSignTransaction } from './stellarSignTransaction';
 import { cipherKeyValue } from './cipherKeyValue';
+import { firmwareUpdate } from './firmwareUpdate';
 
 export * from './export';
 
@@ -108,4 +109,6 @@ export type CoreApi = {
 
   stellarGetAddress: typeof stellarGetAddress;
   stellarSignTransaction: typeof stellarSignTransaction;
+
+  firmwareUpdate: typeof firmwareUpdate;
 };

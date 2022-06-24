@@ -14,6 +14,8 @@ export const UI_REQUEST = {
 
   BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
   LOCATION_PERMISSION: 'ui-location_permission',
+
+  FIRMWARE_PROGRESS: 'ui-firmware-progress',
 } as const;
 
 export interface UiRequestWithoutPayload {
@@ -37,7 +39,19 @@ export interface UiRequestButton {
   payload: DeviceButtonRequest['payload'];
 }
 
-export type UiEvent = UiRequestWithoutPayload | UiRequestDeviceAction | UiRequestButton;
+export interface FirmwareProgress {
+  type: typeof UI_REQUEST.FIRMWARE_PROGRESS;
+  payload: {
+    device: Device;
+    progress: number;
+  };
+}
+
+export type UiEvent =
+  | UiRequestWithoutPayload
+  | UiRequestDeviceAction
+  | UiRequestButton
+  | FirmwareProgress;
 
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
 

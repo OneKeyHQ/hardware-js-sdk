@@ -8,6 +8,7 @@ import {
   Characteristic,
   ScanMode,
 } from 'react-native-ble-plx';
+import ByteBuffer from 'bytebuffer';
 import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
@@ -16,6 +17,8 @@ import {
   isOnekeyDevice,
   getBluetoothServiceUuids,
   getInfosForServiceUuid,
+  IOS_PACKET_LENGTH,
+  ANDROID_PACKET_LENGTH,
 } from './constants';
 import { Deferred, create as createDeferred } from './utils/deferred';
 import { isHeaderChunk } from './utils/validateNotify';
@@ -388,17 +391,42 @@ export default class ReactNativeBleTransport {
     const messages = this._messages;
     console.log('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
     const buffers = buildBuffers(messages, name, data);
-    for (const o of buffers) {
-      const outData = o.toString('base64');
-      console.log('@onekey/hd-ble-sdk send hex strting: ', o.toString('hex'));
-      try {
-        await transport.writeCharacteristic.writeWithResponse(outData);
-      } catch (e) {
-        this.runPromise = null;
-        console.log('writeCharacteristic write error: ', e);
-        return;
+
+    if (name === 'FirmwareUpload') {
+      const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
+      let index = 0;
+      let chunk = ByteBuffer.allocate(packetCapacity);
+      while (index < buffers.length) {
+        const buffer = buffers[index].toBuffer();
+        chunk.append(buffer);
+        index += 1;
+        if (chunk.offset === packetCapacity || index >= buffers.length) {
+          chunk.reset();
+          console.log('@onekey/hd-ble-sdk send more packet hex strting: ', chunk.toString('hex'));
+          try {
+            await transport.writeCharacteristic.writeWithResponse(chunk.toString('base64'));
+            chunk = ByteBuffer.allocate(packetCapacity);
+          } catch (e) {
+            this.runPromise = null;
+            console.log('writeCharacteristic write error: ', e);
+            return;
+          }
+        }
+      }
+    } else {
+      for (const o of buffers) {
+        const outData = o.toString('base64');
+        console.log('@onekey/hd-ble-sdk send hex strting: ', o.toString('hex'));
+        try {
+          await transport.writeCharacteristic.writeWithResponse(outData);
+        } catch (e) {
+          this.runPromise = null;
+          console.log('writeCharacteristic write error: ', e);
+          return;
+        }
       }
     }
+
     try {
       const response = await this.runPromise.promise;
 

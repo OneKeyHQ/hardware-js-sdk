@@ -9,7 +9,8 @@ export interface FirmwareRange {
   };
 }
 
-export type VersionArray = [1 | 2, number, number];
+export type MajorVersion = 1 | 2;
+export type VersionArray = [MajorVersion, number, number];
 
 export type FirmwareRelease = {
   required: boolean;

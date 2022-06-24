@@ -2,6 +2,7 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange } from '../types';
+import { CoreMessage } from '../events';
 
 export abstract class BaseMethod<Params = undefined> {
   responseID: number;
@@ -47,6 +48,9 @@ export abstract class BaseMethod<Params = undefined> {
    * 依赖的设备模式
    */
   requireDeviceMode: string[];
+
+  // @ts-expect-error: strictPropertyInitialization
+  postMessage: (message: CoreMessage) => void;
 
   constructor(message: { id?: number; payload: any }) {
     const { payload } = message;

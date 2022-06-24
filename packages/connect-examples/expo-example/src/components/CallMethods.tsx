@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Button, StyleSheet } from 'react-native';
+import { View, Button, StyleSheet, Platform, Switch, Text } from 'react-native';
 import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE, CoreApi } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
@@ -16,12 +16,15 @@ let registerListener = false;
 
 type ICallMethodProps = {
   SDK: CoreApi;
+  type: 'Bluetooth' | 'USB';
 };
-export function CallMethods({ SDK }: ICallMethodProps) {
+export function CallMethods({ SDK, type }: ICallMethodProps) {
   const [showPinInput, setShowPinInput] = useState(false);
   const [pinValue, setPinValue] = useState('');
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [selectedFile, setSelectedFile] = useState<Uint8Array>();
+  const [firmwareType, setFirmwareType] = useState<boolean>(false);
 
   useEffect(() => {
     // 监听 SDK 事件
@@ -75,6 +78,29 @@ export function CallMethods({ SDK }: ICallMethodProps) {
     console.log('example checkTransportRelease response: ', response);
   };
 
+  const handleFirmwareUpdate = async (file?: Uint8Array) => {
+    const params: any = { updateType: firmwareType ? 'firmware' : 'ble' };
+    if (file) {
+      params.binary = file;
+    }
+    const response = await SDK.firmwareUpdate(
+      type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
+      params
+    );
+    console.log('example firmwareUpdate response: ', response);
+  };
+
+  const onFileChange = (e: any) => {
+    const file = e.target.files?.[0];
+    const reader = new FileReader();
+    reader.readAsArrayBuffer(file);
+    reader.onload = function () {
+      const arrayBuffer = reader.result;
+      const array = new Uint8Array(arrayBuffer as ArrayBuffer);
+      setSelectedFile(array);
+    };
+  };
+
   return (
     <View>
       <View style={styles.buttonContainer}>
@@ -94,6 +120,20 @@ export function CallMethods({ SDK }: ICallMethodProps) {
           onConfirm={val => onConfirmPin(val)}
         />
       )}
+
+      <View style={styles.buttonContainer}>
+        <View style={styles.buttonContainer}>
+          <Text>升级固件类型：{firmwareType ? 'firmware' : 'ble'}</Text>
+          <Switch onValueChange={() => setFirmwareType(!firmwareType)} value={firmwareType} />
+        </View>
+        <Button title="firmware update" onPress={() => handleFirmwareUpdate()} />
+        <Button
+          title="firmware update with local file"
+          onPress={() => handleFirmwareUpdate(selectedFile)}
+        />
+        {Platform.OS === 'web' ? <input type="file" onChange={onFileChange} /> : null}
+      </View>
+
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />

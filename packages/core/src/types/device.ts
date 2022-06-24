@@ -86,3 +86,47 @@ export type ITransportStatus = 'valid' | 'outdated';
 export type DeviceFirmwareRange = {
   [deviceType in IDeviceType | IDeviceModel]?: { min: string; max?: string };
 };
+
+type FeaturesNarrowing =
+  | {
+      major_version: 2;
+      fw_major: null;
+      fw_minor: null;
+      fw_patch: null;
+      bootloader_mode: true;
+      firmware_present: false;
+    }
+  | {
+      major_version: 2;
+      fw_major: null;
+      fw_minor: null;
+      fw_patch: null;
+      bootloader_mode: null;
+      firmware_present: null;
+    }
+  | {
+      major_version: 2;
+      fw_major: 2;
+      fw_minor: number;
+      fw_patch: number;
+      bootloader_mode: true;
+      firmware_present: true;
+    }
+  | {
+      major_version: 1;
+      fw_major: null;
+      fw_minor: null;
+      fw_patch: null;
+      bootloader_mode: true;
+      firmware_present: false;
+    }
+  | {
+      major_version: 1;
+      fw_major: null;
+      fw_minor: null;
+      fw_patch: null;
+      bootloader_mode: true;
+      firmware_present: true;
+    };
+
+export type StrictFeatures = Features & FeaturesNarrowing;
