@@ -404,7 +404,7 @@ export default class ReactNativeBleTransport {
           chunk.reset();
           console.log('@onekey/hd-ble-sdk send more packet hex strting: ', chunk.toString('hex'));
           try {
-            await transport.writeCharacteristic.writeWithResponse(chunk.toString('base64'));
+            await transport.writeCharacteristic.writeWithoutResponse(chunk.toString('base64'));
             chunk = ByteBuffer.allocate(packetCapacity);
           } catch (e) {
             this.runPromise = null;
