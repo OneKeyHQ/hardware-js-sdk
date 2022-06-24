@@ -1,0 +1,24 @@
+import semver from 'semver';
+import { IBLEFirmwareReleaseInfo, IDeviceFirmwareStatus, IFirmwareReleaseInfo } from '../types';
+
+export const getReleaseStatus = (
+  releases: (IFirmwareReleaseInfo | IBLEFirmwareReleaseInfo)[],
+  currentVersion: string
+): IDeviceFirmwareStatus => {
+  const newVersions = releases.filter(r => semver.gt(r.version.join('.'), currentVersion));
+  if (newVersions.length === 0) {
+    return 'valid';
+  }
+  if (newVersions.some(r => r.required)) {
+    return 'required';
+  }
+  return 'outdated';
+};
+
+export const getReleaseChangelog = (
+  releases: (IFirmwareReleaseInfo | IBLEFirmwareReleaseInfo)[],
+  currentVersion: string
+): IFirmwareReleaseInfo['changelog'][] => {
+  const newVersions = releases.filter(r => semver.gt(r.version.join('.'), currentVersion));
+  return newVersions.map(r => r.changelog);
+};
