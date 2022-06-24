@@ -1,6 +1,14 @@
 import type { Response } from '../params';
-import type { IDeviceFirmwareStatus } from '../device';
+import type { IDeviceBLEFirmwareStatus } from '../device';
+import { IBLEFirmwareReleaseInfo } from '../settings';
 
-export declare function checkBLEFirmwareRelease(
-  connectId?: string
-): Response<IDeviceFirmwareStatus>;
+type BleFirmwareRelease = {
+  status: IDeviceBLEFirmwareStatus;
+  changelog: {
+    'zh-CN': string;
+    'en-US': string;
+  }[];
+  release: IBLEFirmwareReleaseInfo;
+};
+
+export declare function checkBLEFirmwareRelease(connectId?: string): Response<BleFirmwareRelease>;

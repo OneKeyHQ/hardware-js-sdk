@@ -11,7 +11,13 @@ export default class CheckBLEFirmwareRelease extends BaseMethod {
   run() {
     if (this.device.features) {
       const firmwareStatus = DataManager.getBLEFirmwareStatus(this.device.features);
-      return Promise.resolve(firmwareStatus);
+      const changelog = DataManager.getBleFirmwareChangelog(this.device.features);
+      const release = DataManager.getBleFirmwareLeatestRelease(this.device.features);
+      return Promise.resolve({
+        status: firmwareStatus,
+        changelog,
+        release,
+      });
     }
     return Promise.resolve(null);
   }
