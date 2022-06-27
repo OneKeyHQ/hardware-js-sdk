@@ -182,7 +182,6 @@ export class Device extends EventEmitter {
       }
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
-        console.log('has commands !!!!!!!!!!!!!!!!!!!!!!!!!!');
         this.commands.dispose();
       }
 
@@ -281,6 +280,8 @@ export class Device extends EventEmitter {
   }
 
   updateFromCache(device: Device) {
+    this.mainId = device.mainId;
+    this.commands = device.commands;
     this.updateDescriptor(device.originalDescriptor);
     if (device.features) {
       this._updateFeatures(device.features);

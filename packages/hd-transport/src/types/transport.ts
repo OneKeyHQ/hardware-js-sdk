@@ -32,6 +32,7 @@ export type Transport = {
   call(session: string, name: string, data: Record<string, any>): Promise<MessageFromOneKey>;
   post(session: string, name: string, data: Record<string, any>): Promise<void>;
   read(session: string): Promise<MessageFromOneKey>;
+  cancel(): Promise<void>;
 
   // resolves when the transport can be used; rejects when it cannot
   init(): Promise<string>;
