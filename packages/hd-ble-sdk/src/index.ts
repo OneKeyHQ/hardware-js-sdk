@@ -45,7 +45,10 @@ const uiResponse = (response: UiResponseEvent) => {
   _core.handleMessage({ event: UI_EVENT, type, payload });
 };
 
-const cancel = () => {};
+const cancel = (connectId?: string) => {
+  if (_core === undefined) return;
+  _core.handleMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
+};
 
 function handleMessage(message: CoreMessage) {
   const { event } = message;

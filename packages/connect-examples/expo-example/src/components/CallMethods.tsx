@@ -101,6 +101,10 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     };
   };
 
+  const cancel = () => {
+    SDK.cancel(selectedDevice?.connectId);
+  };
+
   return (
     <View>
       <View style={styles.buttonContainer}>
@@ -112,6 +116,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
           onPress={() => handleCheckBLEFirmwareRelease()}
         />
         <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
+        <Button title="cancel" onPress={() => cancel()} />
       </View>
       {showPinInput && (
         <ReceivePin
@@ -135,9 +140,9 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       </View>
 
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
+      <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallStarcoinMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} />

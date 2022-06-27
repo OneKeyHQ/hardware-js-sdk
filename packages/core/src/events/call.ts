@@ -46,6 +46,12 @@ export interface IFrameCallMessage {
   payload: CallMethodPayload;
 }
 
+export interface IFrameCancelMessage {
+  event: typeof IFRAME.CANCEL;
+  type: typeof IFRAME.CANCEL;
+  payload: { connectId?: string };
+}
+
 export const RESPONSE_EVENT = 'RESPONSE_EVENT';
 
 export interface MethodResponseMessage {

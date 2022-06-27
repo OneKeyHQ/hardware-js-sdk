@@ -55,7 +55,9 @@ const uiResponse = (response: UiResponseEvent) => {
   sendMessage({ event: UI_EVENT, type, payload });
 };
 
-const cancel = () => {};
+const cancel = (connectId?: string) => {
+  sendMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
+};
 
 const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {

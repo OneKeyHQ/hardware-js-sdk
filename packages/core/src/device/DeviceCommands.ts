@@ -56,7 +56,11 @@ export class DeviceCommands {
 
   dispose() {
     this.disposed = true;
+    if (this._cancelableRequest) {
+      this._cancelableRequest();
+    }
     this._cancelableRequest = undefined;
+    this.transport.cancel?.();
   }
 
   // Sends an async message to the opened device.

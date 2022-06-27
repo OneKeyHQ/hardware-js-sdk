@@ -41,6 +41,8 @@ let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui 
 let _callPromise: Deferred<any> | undefined;
 const callApiQueue = [];
 
+const deviceCacheMap = new Map<string, Device>();
+
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(
@@ -250,10 +252,31 @@ function initDeviceForBle(method: BaseMethod) {
     return initDevice(method);
   }
 
-  const device = Device.fromDescriptor({ id: method.connectId } as OneKeyDeviceInfo);
+  let device: Device;
+  if (deviceCacheMap.has(method.connectId)) {
+    device = deviceCacheMap.get(method.connectId) as Device;
+  } else {
+    device = Device.fromDescriptor({ id: method.connectId } as OneKeyDeviceInfo);
+    deviceCacheMap.set(method.connectId, device);
+  }
   device.deviceConnector = _connector;
   return device;
 }
+
+export const cancel = (connectId?: string) => {
+  const env = DataManager.getSettings('env');
+  if (connectId) {
+    let device;
+    if (env === 'react-native') {
+      device = initDeviceForBle({ connectId } as BaseMethod);
+    } else {
+      device = initDevice({ connectId } as BaseMethod);
+    }
+    device?.interruption();
+  }
+  cleanup();
+  closePopup();
+};
 
 const cleanup = () => {
   _uiPromises = [];
@@ -345,6 +368,10 @@ export default class Core extends EventEmitter {
       case IFRAME.CALL: {
         const response = await callAPI(message);
         return response;
+      }
+      case IFRAME.CANCEL: {
+        cancel(message.payload.connectId);
+        break;
       }
       default:
         break;

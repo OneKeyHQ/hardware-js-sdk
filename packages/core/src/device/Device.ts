@@ -85,8 +85,6 @@ export class Device extends EventEmitter {
 
   internalState: string[] = [];
 
-  loaded = false;
-
   needReloadDevice = false;
 
   /**
@@ -281,10 +279,19 @@ export class Device extends EventEmitter {
     }
   }
 
+  updateFromCache(device: Device) {
+    this.mainId = device.mainId;
+    this.commands = device.commands;
+    this.updateDescriptor(device.originalDescriptor);
+    if (device.features) {
+      this._updateFeatures(device.features);
+    }
+  }
+
   async run(fn?: () => Promise<void>, options?: RunOptions) {
     if (this.runPromise) {
-      Log.error('[Device] run error:', 'Device is running');
-      throw ERRORS.TypedError('Device_CallInProgress');
+      this.interruption();
+      Log.debug('[Device] run error:', 'Device is running, but will cancel previous operate');
     }
 
     options = parseRunOptions(options);
@@ -319,11 +326,6 @@ export class Device extends EventEmitter {
       await fn();
     }
 
-    // reload features
-    if (this.loaded && this.features) {
-      await this.getFeatures();
-    }
-
     if (
       (!this.keepSession && typeof options.keepSession !== 'boolean') ||
       options.keepSession === false
@@ -338,9 +340,14 @@ export class Device extends EventEmitter {
     }
 
     this.runPromise = null;
+  }
 
-    if (!this.loaded) {
-      this.loaded = true;
+  interruption() {
+    if (this.commands) {
+      this.commands.dispose();
+    }
+    if (this.runPromise) {
+      this.runPromise.reject(ERRORS.TypedError('Device_Interrupted'));
     }
   }
 

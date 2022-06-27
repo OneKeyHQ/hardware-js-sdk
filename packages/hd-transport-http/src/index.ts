@@ -158,4 +158,8 @@ export default class HttpTransport {
   stop() {
     this.stopped = true;
   }
+
+  cancel() {
+    console.log('transport-http canceled');
+  }
 }
