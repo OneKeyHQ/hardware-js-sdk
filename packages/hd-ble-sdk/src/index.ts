@@ -5,7 +5,6 @@ import HardwareSdk, {
   initLog,
   parseConnectSettings,
   initCore,
-  coreCancel,
   Core,
   createErrorMessage,
   createUiMessage,
