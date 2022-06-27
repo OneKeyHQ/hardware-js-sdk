@@ -85,8 +85,6 @@ export class Device extends EventEmitter {
 
   internalState: string[] = [];
 
-  loaded = false;
-
   needReloadDevice = false;
 
   /**
@@ -327,11 +325,6 @@ export class Device extends EventEmitter {
       await fn();
     }
 
-    // reload features
-    if (this.loaded && this.features) {
-      await this.getFeatures();
-    }
-
     if (
       (!this.keepSession && typeof options.keepSession !== 'boolean') ||
       options.keepSession === false
@@ -346,10 +339,6 @@ export class Device extends EventEmitter {
     }
 
     this.runPromise = null;
-
-    if (!this.loaded) {
-      this.loaded = true;
-    }
   }
 
   interruption() {
