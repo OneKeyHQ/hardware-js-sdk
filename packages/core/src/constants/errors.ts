@@ -11,6 +11,7 @@ export const ERROR_CODES = {
   Device_UnexpectedMode: '',
   Device_CallInProgress: '',
   Device_InitializeFailed: '',
+  Device_Interrupted: 'The device is performing other operations',
   Not_Use_Onekey_Device: 'Please use onekey device',
 
   // runtime error

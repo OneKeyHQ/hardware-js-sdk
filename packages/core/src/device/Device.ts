@@ -184,6 +184,7 @@ export class Device extends EventEmitter {
       }
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
+        console.log('has commands !!!!!!!!!!!!!!!!!!!!!!!!!!');
         this.commands.dispose();
       }
 
@@ -281,10 +282,17 @@ export class Device extends EventEmitter {
     }
   }
 
+  updateFromCache(device: Device) {
+    this.updateDescriptor(device.originalDescriptor);
+    if (device.features) {
+      this._updateFeatures(device.features);
+    }
+  }
+
   async run(fn?: () => Promise<void>, options?: RunOptions) {
     if (this.runPromise) {
-      Log.error('[Device] run error:', 'Device is running');
-      throw ERRORS.TypedError('Device_CallInProgress');
+      this.interruption();
+      Log.debug('[Device] run error:', 'Device is running, but will cancel previous operate');
     }
 
     options = parseRunOptions(options);
@@ -341,6 +349,15 @@ export class Device extends EventEmitter {
 
     if (!this.loaded) {
       this.loaded = true;
+    }
+  }
+
+  interruption() {
+    if (this.commands) {
+      this.commands.dispose();
+    }
+    if (this.runPromise) {
+      this.runPromise.reject(ERRORS.TypedError('Device_Interrupted'));
     }
   }
 
