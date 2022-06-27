@@ -265,9 +265,14 @@ function initDeviceForBle(method: BaseMethod) {
 
 export const cancel = (connectId?: string) => {
   const env = DataManager.getSettings('env');
-  if (env === 'react-native' && connectId) {
-    const device = initDeviceForBle({ connectId } as BaseMethod);
-    device.interruption();
+  if (connectId) {
+    let device;
+    if (env === 'react-native') {
+      device = initDeviceForBle({ connectId } as BaseMethod);
+    } else {
+      device = initDevice({ connectId } as BaseMethod);
+    }
+    device?.interruption();
   }
   cleanup();
   closePopup();
@@ -363,6 +368,10 @@ export default class Core extends EventEmitter {
       case IFRAME.CALL: {
         const response = await callAPI(message);
         return response;
+      }
+      case IFRAME.CANCEL: {
+        cancel(message.payload.connectId);
+        break;
       }
       default:
         break;

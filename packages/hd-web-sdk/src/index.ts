@@ -12,7 +12,6 @@ import HardwareSdk, {
   CoreMessage,
   ConnectSettings,
   UiResponseEvent,
-  coreCancel,
 } from '@onekeyfe/hd-core';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
@@ -56,8 +55,8 @@ const uiResponse = (response: UiResponseEvent) => {
   sendMessage({ event: UI_EVENT, type, payload });
 };
 
-const cancel = () => {
-  coreCancel();
+const cancel = (connectId?: string) => {
+  sendMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
 };
 
 const createJSBridge = (messageEvent: PostMessageEvent) => {

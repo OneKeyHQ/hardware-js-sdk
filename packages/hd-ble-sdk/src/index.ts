@@ -47,10 +47,8 @@ const uiResponse = (response: UiResponseEvent) => {
 };
 
 const cancel = (connectId?: string) => {
-  if (!connectId) {
-    return;
-  }
-  coreCancel(connectId);
+  if (_core === undefined) return;
+  _core.handleMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
 };
 
 function handleMessage(message: CoreMessage) {

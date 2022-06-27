@@ -1,5 +1,5 @@
 import { Unsuccessful } from '../types/params';
-import { IFrameCallMessage } from './call';
+import { IFrameCallMessage, IFrameCancelMessage } from './call';
 import { DeviceEventMessage } from './device';
 import { IFrameEventMessage } from './iframe';
 import { UiEventMessage } from './ui-request';
@@ -13,6 +13,7 @@ export type CoreMessage = {
 } & (
   | IFrameEventMessage
   | IFrameCallMessage
+  | IFrameCancelMessage
   | UiResponseMessage
   | UiEventMessage
   | DeviceEventMessage

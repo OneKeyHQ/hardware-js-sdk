@@ -6,6 +6,7 @@ export const IFRAME = {
   INIT: 'iframe-init',
   INIT_BRIDGE: 'iframe-init-bridge',
   CALL: 'iframe-call',
+  CANCEL: 'iframe-cancel',
 } as const;
 
 export interface IFrameInit {
