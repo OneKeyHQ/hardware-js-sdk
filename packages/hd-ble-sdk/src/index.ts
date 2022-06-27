@@ -5,6 +5,7 @@ import HardwareSdk, {
   initLog,
   parseConnectSettings,
   initCore,
+  coreCancel,
   Core,
   createErrorMessage,
   createUiMessage,
@@ -45,7 +46,12 @@ const uiResponse = (response: UiResponseEvent) => {
   _core.handleMessage({ event: UI_EVENT, type, payload });
 };
 
-const cancel = () => {};
+const cancel = (connectId?: string) => {
+  if (!connectId) {
+    return;
+  }
+  coreCancel(connectId);
+};
 
 function handleMessage(message: CoreMessage) {
   const { event } = message;

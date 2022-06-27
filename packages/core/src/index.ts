@@ -1,7 +1,7 @@
 import { inject, InjectApi } from './inject';
 import { CoreApi } from './types/api';
 
-export { default as Core, init as initCore } from './core';
+export { default as Core, init as initCore, cancel as coreCancel } from './core';
 
 export * from './constants';
 export * from './utils';

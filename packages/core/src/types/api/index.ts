@@ -54,7 +54,7 @@ export type CoreApi = {
   dispose: () => void;
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
-  cancel: (params?: string) => void;
+  cancel: (connectId?: string) => void;
 
   /**
    * Core function

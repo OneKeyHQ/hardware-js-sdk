@@ -263,6 +263,16 @@ function initDeviceForBle(method: BaseMethod) {
   return device;
 }
 
+export const cancel = (connectId?: string) => {
+  const env = DataManager.getSettings('env');
+  if (env === 'react-native' && connectId) {
+    const device = initDeviceForBle({ connectId } as BaseMethod);
+    device.interruption();
+  }
+  cleanup();
+  closePopup();
+};
+
 const cleanup = () => {
   _uiPromises = [];
   Log.debug('Cleanup...');
