@@ -448,6 +448,14 @@ export default class ReactNativeBleTransport {
   stop() {
     this.stopped = true;
   }
+
+  cancel() {
+    console.log('transport-react-native canceled');
+    if (this.runPromise) {
+      // this.runPromise.reject(new Error('Transport_CallCanceled'));
+    }
+    this.runPromise = null;
+  }
 }
 
 export { PERMISSION_ERROR, LOCATION_ERROR };
