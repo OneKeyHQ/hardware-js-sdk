@@ -18,6 +18,11 @@ export default function MockConnect() {
 
   function connect(device: KnownDevice) {
     deviceUtils.stopScan();
+    try {
+      deviceUtils.ensureConnected(device.connectId ?? '');
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   return (

@@ -93,6 +93,16 @@ class DeviceUtils {
     return null;
   }
 
+  async getFeaturesWithError(connectId: string) {
+    const HardwareSDK = await this.getSDKInstance();
+    const response = await HardwareSDK?.getFeatures(connectId);
+    if (response.success) {
+      this.connectedDeviceType = getDeviceType(response.payload);
+      return response.payload;
+    }
+    throw new Error(response.payload.error ?? response.payload);
+  }
+
   async ensureConnected(connectId: string) {
     let tryCount = 0;
     let connected = false;
@@ -101,10 +111,19 @@ class DeviceUtils {
         return Promise.resolve({} as Features);
       }
       tryCount += 1;
-      const feature = await this.getFeatures(connectId);
-      if (feature) {
-        connected = true;
-        return Promise.resolve(feature);
+      try {
+        const feature = await this.getFeaturesWithError(connectId);
+        if (feature) {
+          connected = true;
+          return await Promise.resolve(feature);
+        }
+      } catch (e) {
+        console.log('feature 报错 ======== =========');
+        // stop when device not bonded
+        if ((e as unknown as Error).message.includes('device is not bonded')) {
+          return Promise.reject(e);
+        }
+        console.log(e);
       }
 
       if (tryCount > MAX_CONNECT_TRY_COUNT) {
