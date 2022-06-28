@@ -420,6 +420,9 @@ export default class ReactNativeBleTransport {
         try {
           await transport.writeCharacteristic.writeWithResponse(outData);
         } catch (e) {
+          if (e.errorCode === BleErrorCode.DeviceDisconnected) {
+            throw new Error('device is not bonded');
+          }
           this.runPromise = null;
           console.log('writeCharacteristic write error: ', e);
           return;
