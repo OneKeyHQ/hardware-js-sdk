@@ -1,25 +1,20 @@
 import React, { Suspense } from 'react';
-import { StyleSheet, Platform, View, Text } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import HomeScreen from './src/views/HomeScreen';
+import MockScreen from './src/views/MockConnect';
+import { getHardwareSDKInstance } from './src/utils/hardwareInstance';
 
-const USB = React.lazy(() => import('./src/env/USB'));
-const Bluetooth = React.lazy(() => import('./src/env/Bluetooth'));
+getHardwareSDKInstance();
 
+const Stack = createNativeStackNavigator();
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Suspense fallback={<Text>Loading...</Text>}>
-        {Platform.OS === 'web' ? <USB /> : <Bluetooth />}
-      </Suspense>
-    </View>
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Mock" component={MockScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-});
