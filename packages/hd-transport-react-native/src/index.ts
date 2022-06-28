@@ -312,7 +312,14 @@ export default class ReactNativeBleTransport {
     let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
       if (error) {
-        console.log(`error monitor ${characteristic.uuid}: ${error as unknown as string}`);
+        console.log(
+          `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
+            error as unknown as string
+          }`
+        );
+        this.blePlxManager?.cancelDeviceConnection(characteristic.deviceID).then(() => {
+          console.log('device disconnect when monitor has error');
+        });
         return;
       }
 
