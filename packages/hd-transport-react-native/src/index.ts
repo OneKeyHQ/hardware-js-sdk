@@ -301,6 +301,7 @@ export default class ReactNativeBleTransport {
     transportCache[uuid] = transport;
 
     device.onDisconnected(() => {
+      console.log('device disconnect: ', device?.id);
       this.release(uuid);
     });
 
@@ -312,7 +313,11 @@ export default class ReactNativeBleTransport {
     let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
       if (error) {
-        console.log(`error monitor ${characteristic.uuid}: ${error as unknown as string}`);
+        console.log(
+          `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
+            error as unknown as string
+          }`
+        );
         return;
       }
 
@@ -360,12 +365,11 @@ export default class ReactNativeBleTransport {
     if (transport) {
       delete transportCache[uuid];
       transport.nofitySubscription?.();
+      if (Platform.OS === 'android') {
+        await this.blePlxManager?.cancelDeviceConnection(uuid);
+      }
     }
 
-    /**
-     * The current strategy does not require disconnection
-     */
-    // await blePlxManager.cancelDeviceConnection(uuid);
     return Promise.resolve(true);
   }
 
@@ -418,7 +422,7 @@ export default class ReactNativeBleTransport {
         const outData = o.toString('base64');
         console.log('@onekey/hd-ble-sdk send hex strting: ', o.toString('hex'));
         try {
-          await transport.writeCharacteristic.writeWithResponse(outData);
+          await transport.writeCharacteristic.writeWithoutResponse(outData);
         } catch (e) {
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw new Error('device is not bonded');

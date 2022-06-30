@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Button, StyleSheet, Platform, Switch, Text } from 'react-native';
+import RNRestart from 'react-native-restart';
 import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE, CoreApi } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
@@ -117,6 +118,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         />
         <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
         <Button title="cancel" onPress={() => cancel()} />
+        <Button title="reset" onPress={() => RNRestart.Restart()} />
       </View>
       {showPinInput && (
         <ReceivePin
@@ -140,10 +142,10 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       </View>
 
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
+      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallStarcoinMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} />
