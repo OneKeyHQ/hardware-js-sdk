@@ -6,7 +6,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      TEST_ENDPOINT: hardwarejs.test.onekey.so
+      TEST_ENDPOINT: hardware-sdk.test.onekey.so
     steps:
       - uses: actions/checkout@v2
       - name: Setup Environment
