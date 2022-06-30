@@ -266,7 +266,7 @@ export class Device extends EventEmitter {
    * 后续看是否有需要依据 listen 返回结果更新
    * @param descriptor
    */
-  updateDescriptor(descriptor: DeviceDescriptor) {
+  updateDescriptor(descriptor: DeviceDescriptor, forceUpdate = false) {
     const env = DataManager.getSettings('env');
     if (env === 'react-native') {
       return;
@@ -277,12 +277,16 @@ export class Device extends EventEmitter {
     if (originalSession !== upcomingSession) {
       this.originalDescriptor.session = upcomingSession;
     }
+
+    if (forceUpdate) {
+      this.originalDescriptor = descriptor;
+    }
   }
 
   updateFromCache(device: Device) {
     this.mainId = device.mainId;
     this.commands = device.commands;
-    this.updateDescriptor(device.originalDescriptor);
+    this.updateDescriptor(device.originalDescriptor, true);
     if (device.features) {
       this._updateFeatures(device.features);
     }
