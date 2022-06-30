@@ -1,0 +1,31 @@
+name: test iframe page
+
+on: workflow_dispatch
+
+jobs:
+  test-web:
+    runs-on: ubuntu-latest
+    env:
+      TEST_ENDPOINT: hardwarejs.test.onekey.so
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Environment
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install Package
+        run: |
+          yarn
+          yarn bootstrap
+      - name: Build Target
+        run: |
+          yarn build
+
+      - name: Deploy Github Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./packages/hd-web-sdk/build
+          cname: ${{ env.TEST_ENDPOINT }}
+          force_orphan: true
