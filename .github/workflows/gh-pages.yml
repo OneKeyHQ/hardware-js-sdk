@@ -3,7 +3,7 @@ name: test iframe page
 on: workflow_dispatch
 
 jobs:
-  test-web:
+  deploy:
     runs-on: ubuntu-latest
     env:
       TEST_ENDPOINT: hardwarejs.test.onekey.so
