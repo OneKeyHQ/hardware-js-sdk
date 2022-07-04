@@ -5,6 +5,7 @@ import CopyWebpackPlugin from 'copy-webpack-plugin';
 import config from './webpack.config';
 
 const BUILD = path.resolve(__dirname, '../build');
+const PUBLIC_PATH = process.env.PUBLIC_PATH || './';
 
 export default {
   target: 'web',
@@ -16,7 +17,7 @@ export default {
   output: {
     filename: 'js/[name].[contenthash].js',
     path: BUILD,
-    publicPath: './',
+    publicPath: PUBLIC_PATH,
   },
   module: {
     rules: [
@@ -61,6 +62,10 @@ export default {
       template: path.resolve(__dirname, '../static/iframe.html'),
       minify: false,
       inject: false,
+    }),
+
+    new webpack.DefinePlugin({
+      'process.env.PUBLIC_PATH': JSON.stringify(PUBLIC_PATH),
     }),
   ],
 };
