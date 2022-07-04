@@ -39,7 +39,7 @@ export const uploadFirmware = async (
     const { message } = await typedCall('FirmwareUpload', 'Success', {
       payload,
     });
-
+    postProgressMessage(device, 100, postMessage);
     return message;
   }
 
