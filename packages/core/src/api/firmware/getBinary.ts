@@ -29,7 +29,12 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
 
   // @ts-expect-error
   const url = updateType === 'ble' ? releaseInfo.webUpdate : releaseInfo.url;
-  const fw = await httpRequest(url, 'binary');
+  let fw;
+  try {
+    fw = await httpRequest(url, 'binary');
+  } catch {
+    throw ERRORS.TypedError('Runtime', 'Method_FirmwareUpdate_DownloadFailed');
+  }
 
   return {
     ...releaseInfo,
