@@ -10,6 +10,7 @@ import {
   NEMTransfer,
 } from '@onekeyfe/hd-transport/src/types/messages';
 
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -23,7 +24,6 @@ import {
   NEMTransaction,
   NEMTransferTransaction,
 } from '../../types';
-import { ERRORS } from '../../constants';
 
 const NEM_TRANSFER = 0x0101;
 const NEM_COSIGNING = 0x0102;
@@ -217,7 +217,10 @@ export default class NEMSignTransaction extends BaseMethod<NEMSignTx> {
         break;
 
       default:
-        throw ERRORS.TypedError('Method_InvalidParameter', 'Unknown transaction type');
+        throw ERRORS.TypedError(
+          HardwareErrorCode.CallMethodInvalidParameter,
+          'Unknown transaction type'
+        );
     }
 
     return message;

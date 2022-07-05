@@ -5,12 +5,12 @@ import {
   EthereumTypedDataStructAck,
   MessageKey,
 } from '@onekeyfe/hd-transport/src/types/messages';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { ERRORS } from '../../constants';
 import { encodeData, getFieldType, parseArrayType } from '../helpers/typeNameUtils';
 import {
   EthereumSignTypedDataMessage,
@@ -55,7 +55,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         this.params.messageHash = formatAnyHex(messageHash);
       } else if (!!data && (!data.primaryType || data.primaryType !== 'EIP712Domain')) {
         throw ERRORS.TypedError(
-          'Method_InvalidParameter',
+          HardwareErrorCode.CallMethodInvalidParameter,
           'message_hash should only be empty when data.primaryType=EIP712Domain'
         );
       }

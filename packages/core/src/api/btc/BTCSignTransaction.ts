@@ -1,5 +1,6 @@
 import { TxInputType, TxOutputType } from '@onekeyfe/hd-transport/src/types/messages';
 
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getOutputScriptType, isSegwitPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -10,7 +11,6 @@ import {
   RefTransaction,
   TransactionOptions,
 } from '../../types/api/btcSignTransaction';
-import { ERRORS } from '../../constants';
 import signtx from './helpers/signtx';
 import signtxLegacy from './helpers/signtxLegacy';
 import { getCoinInfo } from './helpers/btcParamsUtils';
@@ -82,7 +82,7 @@ export default class BTCSignTransaction extends BaseMethod<Params> {
         Object.prototype.hasOwnProperty.call(output, 'address')
       ) {
         throw ERRORS.TypedError(
-          'Method_InvalidParameter',
+          HardwareErrorCode.CallMethodInvalidParameter,
           'Cannot use address and address_n in one output'
         );
       }
@@ -91,7 +91,7 @@ export default class BTCSignTransaction extends BaseMethod<Params> {
         const scriptType = getOutputScriptType(output.address_n);
         if (output.script_type !== scriptType)
           throw ERRORS.TypedError(
-            'Method_InvalidParameter',
+            HardwareErrorCode.CallMethodInvalidParameter,
             `Output change script_type should be set to ${scriptType}`
           );
       }

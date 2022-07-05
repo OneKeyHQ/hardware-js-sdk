@@ -1,8 +1,8 @@
 import semver from 'semver';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Features } from '../../types';
 import { getDeviceType, httpRequest } from '../../utils';
 import { DataManager } from '../../data-manager';
-import { ERRORS } from '../../constants';
 
 export interface GetInfoProps {
   features: Features;
@@ -17,14 +17,14 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
   const releaseInfo = getInfo({ features, updateType });
 
   if (!releaseInfo) {
-    throw ERRORS.TypedError('Runtime', 'no firmware found for this device');
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'no firmware found for this device');
   }
 
   if (
     version &&
     !semver.eq(releaseInfo.version as unknown as semver.SemVer, version as unknown as semver.SemVer)
   ) {
-    throw ERRORS.TypedError('Runtime', 'firmware version mismatch');
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware version mismatch');
   }
 
   // @ts-expect-error
@@ -33,7 +33,7 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
   try {
     fw = await httpRequest(url, 'binary');
   } catch {
-    throw ERRORS.TypedError('Runtime', 'Method_FirmwareUpdate_DownloadFailed');
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Method_FirmwareUpdate_DownloadFailed');
   }
 
   return {

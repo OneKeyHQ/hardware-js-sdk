@@ -2,7 +2,7 @@
 
 import { EthereumDataType, EthereumFieldType } from '@onekeyfe/hd-transport/src/types/messages';
 
-import { ERRORS } from '../../constants';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { EthereumSignTypedDataTypes } from '../../types/api/evmSignTypedData';
 import { intToHex } from './bigNumberUtils';
 import { formatAnyHex } from './hexUtils';
@@ -25,7 +25,7 @@ export const parseArrayType = (
   const arrayMatch = paramTypeArray.exec(arrayTypeName);
   if (arrayMatch === null) {
     throw ERRORS.TypedError(
-      'Runtime',
+      HardwareErrorCode.RuntimeError,
       `typename ${arrayTypeName} could not be parsed as an EIP-712 array`
     );
   }
@@ -62,7 +62,7 @@ export const encodeData = (typeName: string, data: any): string => {
 
   // We should be receiving only atomic, non-array types
   throw ERRORS.TypedError(
-    'Runtime',
+    HardwareErrorCode.RuntimeError,
     `Unsupported data type for direct field encoding: ${typeName}`
   );
 };
@@ -128,5 +128,8 @@ export const getFieldType = (
     };
   }
 
-  throw ERRORS.TypedError('Runtime', `No type definition specified: ${typeName}`);
+  throw ERRORS.TypedError(
+    HardwareErrorCode.RuntimeError,
+    `No type definition specified: ${typeName}`
+  );
 };

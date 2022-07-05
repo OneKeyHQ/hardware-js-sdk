@@ -121,6 +121,16 @@ export const HardwareErrorCode = {
   CallMethodNotResponse: 404,
 
   /**
+   * Call method invalid parameter
+   */
+  CallMethodInvalidParameter: 405,
+
+  /**
+   * firmware update download failed
+   */
+  FirmwareUpdateDownloadFailed: 406,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -211,6 +221,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    */
   [HardwareErrorCode.CallMethodError]: 'Runtime errors during method execution',
   [HardwareErrorCode.CallMethodNotResponse]: 'Method does not responding',
+  [HardwareErrorCode.CallMethodInvalidParameter]: 'Call method invalid parameter',
+  [HardwareErrorCode.FirmwareUpdateDownloadFailed]: 'Firmware update download failed',
 
   /**
    * Network Errors
