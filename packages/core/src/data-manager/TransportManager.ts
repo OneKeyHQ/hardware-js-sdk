@@ -1,5 +1,5 @@
 import { Transport } from '@onekeyfe/hd-transport';
-import { ERRORS } from '../constants';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { initLog } from '../utils';
 import DataManager from './DataManager';
 
@@ -57,7 +57,10 @@ export default class TransportManager {
       await this.transport.configure(JSON.stringify(messages));
       this.currentMessages = messages;
     } catch (error) {
-      throw ERRORS.TypedError('Transport_InvalidProtobuf', error.message);
+      throw ERRORS.TypedError(
+        HardwareErrorCode.TransportInvalidProtobuf,
+        `Transport_InvalidProtobuf:  ${error.message as unknown as string}`
+      );
     }
   }
 

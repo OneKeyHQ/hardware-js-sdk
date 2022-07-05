@@ -1,6 +1,6 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
-import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import type { Device } from './Device';
 import { DEVICE } from '../events';
@@ -26,7 +26,7 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
   const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
   if (!splitResTypes.includes(res.type)) {
     throw ERRORS.TypedError(
-      'Runtime',
+      HardwareErrorCode.RuntimeError,
       `assertType: Response of unexpected type: ${res.type}. Should be ${resType as string}`
     );
   }
@@ -100,7 +100,10 @@ export class DeviceCommands {
     msg?: DefaultMessageResponse['message']
   ) {
     if (this.disposed) {
-      throw ERRORS.TypedError('Runtime', 'typedCall: DeviceCommands already disposed');
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'typedCall: DeviceCommands already disposed'
+      );
     }
 
     const response = await this._commonCall(type, msg);
@@ -137,9 +140,10 @@ export class DeviceCommands {
       }
       // pass code and message from firmware error
       return Promise.reject(
-        new ERRORS.OnekeyError(
-          (code as any) || 'Failure_UnknownCode',
-          message || 'Failure_UnknownMessage'
+        ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          `${(code as any) || 'Failure_UnknownCode'},${message || 'Failure_UnknownMessage'}`
         )
       );
     }
@@ -204,7 +208,12 @@ export class DeviceCommands {
         });
       } else {
         console.warn('[DeviceCommands] [call] PIN callback not configured, cancelling request');
-        reject(ERRORS.TypedError('Runtime', '_promptPin: PIN callback not configured'));
+        reject(
+          ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            '_promptPin: PIN callback not configured'
+          )
+        );
       }
     });
   }

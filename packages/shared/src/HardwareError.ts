@@ -51,6 +51,36 @@ export const HardwareErrorCode = {
   DeviceFwException: 101,
 
   /**
+   * Device unexpected mode
+   */
+  DeviceUnexpectedMode: 102,
+
+  /**
+   * Device list is not initialized
+   */
+  DeviceListNotInitialized: 103,
+
+  /**
+   * Please select the connected device
+   */
+  SelectDevice: 104,
+
+  /**
+   * Device not found
+   */
+  DeviceNotFound: 105,
+
+  /**
+   * Device is not initialized
+   */
+  DeviceInitializeFailed: 106,
+
+  /**
+   * Device interrupted from another operation
+   */
+  DeviceInterruptedFromOutside: 107,
+
+  /**
    * Not initialized
    */
   NotInitialized: 200,
@@ -108,7 +138,12 @@ export const HardwareErrorCode = {
   /**
    * Transport not found
    */
-  TransportNotFound: 601,
+  TransportNotFound: 602,
+
+  /**
+   * Transport invalid protobuf
+   */
+  TransportInvalidProtobuf: 603,
 
   BleScanError: 700,
   BlePermissionError: 701,
@@ -119,6 +154,8 @@ export const HardwareErrorCode = {
   BleServiceNotFound: 706,
   BleCharacteristicNotFound: 707,
   BleMonitorError: 708,
+
+  RuntimeError: 800,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -128,6 +165,12 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    * Device Errors
    */
   [HardwareErrorCode.DeviceFwException]: 'Firmware version mismatch',
+  [HardwareErrorCode.DeviceUnexpectedMode]: 'Device unexpected mode',
+  [HardwareErrorCode.DeviceListNotInitialized]: 'Device list is not initialized',
+  [HardwareErrorCode.SelectDevice]: 'Please select the connected device',
+  [HardwareErrorCode.DeviceNotFound]: 'Device not found',
+  [HardwareErrorCode.DeviceInitializeFailed]: 'Device initialization failed',
+  [HardwareErrorCode.DeviceInterruptedFromOutside]: 'Device interrupted',
 
   /**
    * Node Errors
@@ -159,6 +202,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.TransportNotConfigured]: 'Transport not configured',
   [HardwareErrorCode.TransportCallInProgress]: 'Transport call in progress',
   [HardwareErrorCode.TransportNotFound]: 'Transport not found',
+  [HardwareErrorCode.TransportInvalidProtobuf]: 'Transport invalid protobuf',
 
   /**
    * Bluetooth Error
@@ -172,6 +216,11 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleServiceNotFound]: 'BLEServiceNotFound: service not found',
   [HardwareErrorCode.BleCharacteristicNotFound]: 'BLEServiceNotFound: service not found',
   [HardwareErrorCode.BleMonitorError]: 'Monitor Error: characteristic not found',
+
+  /**
+   * Runtime Error
+   */
+  [HardwareErrorCode.RuntimeError]: 'Runtime error',
 } as const;
 
 export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {

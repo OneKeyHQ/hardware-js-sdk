@@ -1,13 +1,7 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
-import {
-  createDeferred,
-  Deferred,
-  ERRORS,
-  HardwareError,
-  HardwareErrorCode,
-} from '@onekeyfe/hd-shared';
+import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
@@ -146,7 +140,9 @@ export const callAPI = async (message: CoreMessage) => {
         method.requireDeviceMode
       );
       if (unexpectedMode) {
-        return Promise.reject(ERRORS.TypedError('Device_UnexpectedMode', unexpectedMode));
+        return Promise.reject(
+          ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
+        );
       }
 
       // const deviceTypeException = method.checkDeviceType();
@@ -217,7 +213,7 @@ async function initDeviceList(method: BaseMethod) {
 
 function initDevice(method: BaseMethod) {
   if (!_deviceList) {
-    throw ERRORS.TypedError('Call_API', 'DeviceList is not initialized');
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceListNotInitialized);
   }
 
   let device: Device | typeof undefined;
@@ -228,11 +224,11 @@ function initDevice(method: BaseMethod) {
   } else if (allDevices.length === 1) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {
-    throw ERRORS.TypedError('Call_API', '请选择连接设备');
+    throw ERRORS.TypedError(HardwareErrorCode.SelectDevice);
   }
 
   if (!device) {
-    throw ERRORS.TypedError('Call_API', 'Device Not Found');
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
   }
 
   // inject properties
@@ -243,7 +239,7 @@ function initDevice(method: BaseMethod) {
 
 function initDeviceForBle(method: BaseMethod) {
   if (!method.connectId && !_deviceList) {
-    throw ERRORS.TypedError('Call_API', 'DeviceList is not initialized');
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceListNotInitialized);
   }
 
   if (!method.connectId) {
