@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HOST_PATH: '${{ github.event.repository.name }}/${{ github.sha }}/'
-      PUBLIC_URL: 'https://hardware-sdk.onekey.so/'
+      PUBLIC_PATH: 'https://hardware-sdk.onekey.so/${{ github.event.repository.name }}/${{ github.sha }}/'
     steps:
       - uses: actions/checkout@v2
       - name: Setup Environment
