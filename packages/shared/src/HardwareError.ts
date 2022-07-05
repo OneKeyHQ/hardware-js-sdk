@@ -5,7 +5,7 @@ export interface IHardwareError {
 
 type ValueOf<P extends object> = P[keyof P];
 
-export type HardwareErrorCodeMessageMapping = { [P in ValueOf<typeof HardwareErrorCode>]: string };
+type HardwareErrorCodeMessageMapping = { [P in ValueOf<typeof HardwareErrorCode>]: string };
 
 export class HardwareError extends Error {
   errorCode: ValueOf<typeof HardwareErrorCode> = HardwareErrorCode.UnknownError;
@@ -38,6 +38,6 @@ export const HardwareErrorCode = {
   UnknownError: 0,
 } as const;
 
-export function fillStringWithArguments(value: string, object: object) {
+function fillStringWithArguments(value: string, object: object) {
   return value.replace(/\{([^}]+)\}/g, (_, arg: string) => (object as unknown as any)[arg] || '?');
 }

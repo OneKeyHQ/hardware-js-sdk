@@ -1,10 +1,11 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { createDeferred, Deferred } from '@onekeyfe/hd-shared';
 
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
 
-import { initLog, Deferred, create as createDeferred } from '../utils';
+import { initLog } from '../utils';
 import {
   getDeviceFirmwareVersion,
   getDeviceLabel,

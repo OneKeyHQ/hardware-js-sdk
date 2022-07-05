@@ -1,13 +1,14 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import { createDeferred, Deferred } from '@onekeyfe/hd-shared';
 import { ERRORS } from '../constants';
 import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
-import { initLog, create as createDeferred, Deferred } from '../utils';
+import { initLog } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,

@@ -1,6 +1,5 @@
 import { Platform } from 'react-native';
 import { Buffer } from 'buffer';
-import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import {
   BleManager as BlePlxManager,
   Device,
@@ -9,6 +8,8 @@ import {
   ScanMode,
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
+import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
+import { createDeferred, Deferred } from '@onekeyfe/hd-shared';
 import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
@@ -20,7 +21,6 @@ import {
   IOS_PACKET_LENGTH,
   ANDROID_PACKET_LENGTH,
 } from './constants';
-import { Deferred, create as createDeferred } from './utils/deferred';
 import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';

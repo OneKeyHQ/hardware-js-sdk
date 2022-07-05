@@ -11,13 +11,12 @@ import HardwareSdk, {
   CORE_EVENT,
   CoreMessage,
   ERRORS,
-  Deferred,
-  create as createDeferred,
   IFRAME,
   UI_EVENT,
   UiResponseEvent,
   UI_REQUEST,
 } from '@onekeyfe/hd-core';
+import { createDeferred, Deferred } from '@onekeyfe/hd-shared';
 import ReactNativeTransport, {
   PERMISSION_ERROR,
   LOCATION_ERROR,

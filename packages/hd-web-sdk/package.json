@@ -23,6 +23,7 @@
   "dependencies": {
     "@onekeyfe/cross-inpage-provider-core": "^0.0.14",
     "@onekeyfe/hd-core": "^0.1.5",
+    "@onekeyfe/hd-shared": "^0.1.5",
     "@onekeyfe/hd-transport-http": "^0.1.5"
   },
   "devDependencies": {

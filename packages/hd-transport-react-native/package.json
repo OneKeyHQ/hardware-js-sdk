@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@onekeyfe/hd-transport": "^0.1.5",
+    "@onekeyfe/hd-shared": "^0.1.5",
     "react-native-ble-manager": "^8.1.0",
     "react-native-ble-plx": "^2.0.3"
   }

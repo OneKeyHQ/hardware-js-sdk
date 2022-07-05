@@ -1,4 +1,5 @@
-import { ERRORS, Deferred, create as createDeferred } from '@onekeyfe/hd-core';
+import { ERRORS } from '@onekeyfe/hd-core';
+import { Deferred, createDeferred } from '@onekeyfe/hd-shared';
 import { getOrigin } from '../utils/urlUtils';
 
 /* eslint-disable import/no-mutable-exports */

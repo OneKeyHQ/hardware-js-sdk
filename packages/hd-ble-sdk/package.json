@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@onekeyfe/hd-core": "^0.1.5",
+    "@onekeyfe/hd-shared": "^0.1.5",
     "@onekeyfe/hd-transport-react-native": "^0.1.5"
   }
 }
