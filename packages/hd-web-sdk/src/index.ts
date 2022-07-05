@@ -1,6 +1,5 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
-  ERRORS,
   parseConnectSettings,
   initLog,
   enableLog,
@@ -13,6 +12,7 @@ import HardwareSdk, {
   ConnectSettings,
   UiResponseEvent,
 } from '@onekeyfe/hd-core';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
 import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
@@ -49,7 +49,7 @@ const dispose = () => {
 
 const uiResponse = (response: UiResponseEvent) => {
   if (!iframe.instance) {
-    throw ERRORS.TypedError('Init_NotInitialized');
+    throw ERRORS.TypedError(HardwareErrorCode.IFrameNotInitialized);
   }
   const { type, payload } = response;
   sendMessage({ event: UI_EVENT, type, payload });
@@ -85,7 +85,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 
 const init = async (settings: Partial<ConnectSettings>) => {
   if (iframe.instance) {
-    throw ERRORS.TypedError('Init_AlreadyInitialized');
+    throw ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized);
   }
 
   _settings = parseConnectSettings({ ..._settings, ...settings });
@@ -119,7 +119,7 @@ const call = async (params: any) => {
   }
 
   if (iframe.timeout) {
-    return createErrorMessage(ERRORS.TypedError('Init_IframeLoadFail'));
+    return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.IFrameLoadFail));
   }
 
   try {
@@ -128,7 +128,7 @@ const call = async (params: any) => {
       return response;
     }
 
-    return createErrorMessage(ERRORS.TypedError('Call_NotResponse'));
+    return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse));
   } catch (error) {
     Log.error('__call error: ', error);
     return createErrorMessage(error);
