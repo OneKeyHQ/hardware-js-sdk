@@ -10,13 +10,12 @@ import HardwareSdk, {
   createUiMessage,
   CORE_EVENT,
   CoreMessage,
-  ERRORS,
   IFRAME,
   UI_EVENT,
   UiResponseEvent,
   UI_REQUEST,
 } from '@onekeyfe/hd-core';
-import { createDeferred, Deferred } from '@onekeyfe/hd-shared';
+import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import ReactNativeTransport, {
   PERMISSION_ERROR,
   LOCATION_ERROR,
@@ -38,7 +37,7 @@ const dispose = () => {
 
 const uiResponse = (response: UiResponseEvent) => {
   if (!_core) {
-    throw ERRORS.TypedError('Init_NotInitialized');
+    throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
   }
   const { type, payload } = response;
   _core.handleMessage({ event: UI_EVENT, type, payload });
@@ -69,7 +68,7 @@ function handleMessage(message: CoreMessage) {
 
 async function postMessage(message: CoreMessage, usePromise = true) {
   if (!_core) {
-    throw ERRORS.TypedError('Runtime', 'postMessage: _core not found');
+    throw ERRORS.TypedError('postMessage: _core not found');
   }
 
   if (usePromise) {
@@ -129,7 +128,7 @@ const call = async (params: any) => {
       return response;
     }
 
-    return createErrorMessage(ERRORS.TypedError('Call_NotResponse'));
+    return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse));
   } catch (error) {
     Log.error('__call error: ', error);
     return createErrorMessage(error);

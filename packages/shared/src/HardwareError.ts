@@ -51,6 +51,11 @@ export const HardwareErrorCode = {
   DeviceFwException: 101,
 
   /**
+   * Not initialized
+   */
+  NotInitialized: 200,
+
+  /**
    * Iframe not initialized
    */
   IFrameNotInitialized: 300,
@@ -84,6 +89,16 @@ export const HardwareErrorCode = {
    * Method does not responding
    */
   CallMethodNotResponse: 404,
+
+  /**
+   * Netword request error
+   */
+  NetworkError: 500,
+
+  /**
+   * transport not configured
+   */
+  TransportNotConfigured: 600,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -94,6 +109,10 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    */
   [HardwareErrorCode.DeviceFwException]: 'Firmware version mismatch',
 
+  /**
+   * Node Errors
+   */
+  [HardwareErrorCode.NotInitialized]: 'Not initialized',
   /**
    * Iframe Errors
    */
@@ -108,6 +127,16 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    */
   [HardwareErrorCode.CallMethodError]: 'Runtime errors during method execution',
   [HardwareErrorCode.CallMethodNotResponse]: 'Method does not responding',
+
+  /**
+   * Network Errors
+   */
+  [HardwareErrorCode.NetworkError]: 'Network request error',
+
+  /**
+   * Transport Errors
+   */
+  [HardwareErrorCode.TransportNotConfigured]: 'Transport not configured',
 } as const;
 
 export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {

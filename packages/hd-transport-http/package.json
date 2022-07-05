@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@onekeyfe/hd-transport": "^0.1.5",
+    "@onekeyfe/hd-shared": "^0.1.5",
     "axios": "^0.27.2"
   }
 }
