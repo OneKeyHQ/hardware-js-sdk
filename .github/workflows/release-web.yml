@@ -26,7 +26,7 @@ jobs:
 
       - name: Build Target
         env:
-          PUBLIC_URL: ${{ env.PUBLIC_URL }}
+          PUBLIC_PATH: ${{ env.PUBLIC_PATH }}
         run: |
           yarn build
 
