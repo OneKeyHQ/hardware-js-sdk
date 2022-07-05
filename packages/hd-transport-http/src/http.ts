@@ -1,4 +1,5 @@
 import axios, { AxiosRequestConfig } from 'axios';
+import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 export type HttpRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
@@ -46,8 +47,8 @@ export async function request(options: HttpRequestOptions) {
   }
   const resJson = parseResult(res.data);
   if (typeof resJson === 'object' && resJson != null && resJson.error != null) {
-    throw new Error(resJson.error);
+    throw new HardwareError({ errorCode: HardwareErrorCode.NetworkError, message: resJson.error });
   } else {
-    throw new Error(res.data);
+    throw new HardwareError({ errorCode: HardwareErrorCode.NetworkError, message: res.data });
   }
 }

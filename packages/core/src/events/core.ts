@@ -1,3 +1,4 @@
+import { HardwareError } from '@onekeyfe/hd-shared';
 import { Unsuccessful } from '../types/params';
 import { IFrameCallMessage, IFrameCancelMessage } from './call';
 import { DeviceEventMessage } from './device';
@@ -40,10 +41,13 @@ export const parseMessage = (messageData: any): CoreMessage => {
   return message;
 };
 
-export const createErrorMessage = (error: Error & { code?: string }): Unsuccessful => ({
-  success: false,
-  payload: {
-    error: error.message,
-    code: error.code,
-  },
-});
+export const createErrorMessage = (error: Error & { code?: string | number }): Unsuccessful => {
+  let payload = { error: error.message, code: error.code };
+  if (error instanceof HardwareError) {
+    payload = { error: error.message, code: error.errorCode };
+  }
+  return {
+    success: false,
+    payload,
+  };
+};

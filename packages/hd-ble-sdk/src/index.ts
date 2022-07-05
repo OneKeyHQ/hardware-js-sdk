@@ -10,18 +10,13 @@ import HardwareSdk, {
   createUiMessage,
   CORE_EVENT,
   CoreMessage,
-  ERRORS,
-  Deferred,
-  create as createDeferred,
   IFRAME,
   UI_EVENT,
   UiResponseEvent,
   UI_REQUEST,
 } from '@onekeyfe/hd-core';
-import ReactNativeTransport, {
-  PERMISSION_ERROR,
-  LOCATION_ERROR,
-} from '@onekeyfe/hd-transport-react-native';
+import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 
 const eventEmitter = new EventEmitter();
 const Log = initLog('@onekey/hd-ble-sdk');
@@ -39,7 +34,7 @@ const dispose = () => {
 
 const uiResponse = (response: UiResponseEvent) => {
   if (!_core) {
-    throw ERRORS.TypedError('Init_NotInitialized');
+    throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
   }
   const { type, payload } = response;
   _core.handleMessage({ event: UI_EVENT, type, payload });
@@ -70,7 +65,7 @@ function handleMessage(message: CoreMessage) {
 
 async function postMessage(message: CoreMessage, usePromise = true) {
   if (!_core) {
-    throw ERRORS.TypedError('Runtime', 'postMessage: _core not found');
+    throw ERRORS.TypedError('postMessage: _core not found');
   }
 
   if (usePromise) {
@@ -112,17 +107,14 @@ const call = async (params: any) => {
       Log.debug('response: ', response);
 
       if (!response.success) {
-        if (
-          (typeof response.payload === 'string' && response.payload.includes(PERMISSION_ERROR)) ||
-          response.payload.error?.includes(PERMISSION_ERROR)
-        ) {
+        if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
           /**
            * Send message notification when there is no Bluetooth access permission
            */
           postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION), false);
         }
 
-        if (response.payload.error?.includes(LOCATION_ERROR)) {
+        if (response.payload?.code === HardwareErrorCode.BleLocationError) {
           postMessage(createUiMessage(UI_REQUEST.LOCATION_PERMISSION), false);
         }
       }
@@ -130,7 +122,7 @@ const call = async (params: any) => {
       return response;
     }
 
-    return createErrorMessage(ERRORS.TypedError('Call_NotResponse'));
+    return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse));
   } catch (error) {
     Log.error('__call error: ', error);
     return createErrorMessage(error);

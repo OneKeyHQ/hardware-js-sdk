@@ -1,4 +1,4 @@
-import { ERRORS } from '../constants';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
@@ -24,7 +24,10 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     ]);
 
     if (!payload.updateType) {
-      throw ERRORS.TypedError('Method_InvalidParameter', 'updateType is required');
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        'updateType is required'
+      );
     }
 
     this.params = { updateType: payload.updateType };
@@ -54,7 +57,10 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         binary = this.params.binary;
       } else {
         if (!device.features) {
-          throw ERRORS.TypedError('Runtime', 'no features found for this device');
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            'no features found for this device'
+          );
         }
         const firmware = await getBinary({
           features: device.features,
@@ -64,7 +70,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         binary = firmware.binary;
       }
     } catch (err) {
-      throw ERRORS.TypedError('Method_FirmwareUpdate_DownloadFailed', err);
+      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err);
     }
 
     return uploadFirmware(

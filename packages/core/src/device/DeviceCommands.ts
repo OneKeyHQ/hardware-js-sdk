@@ -1,6 +1,6 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
-import { ERRORS } from '../constants';
 import { initLog } from '../utils';
 import type { Device } from './Device';
 import { DEVICE } from '../events';
@@ -26,7 +26,7 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
   const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
   if (!splitResTypes.includes(res.type)) {
     throw ERRORS.TypedError(
-      'Runtime',
+      HardwareErrorCode.RuntimeError,
       `assertType: Response of unexpected type: ${res.type}. Should be ${resType as string}`
     );
   }
@@ -100,7 +100,10 @@ export class DeviceCommands {
     msg?: DefaultMessageResponse['message']
   ) {
     if (this.disposed) {
-      throw ERRORS.TypedError('Runtime', 'typedCall: DeviceCommands already disposed');
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'typedCall: DeviceCommands already disposed'
+      );
     }
 
     const response = await this._commonCall(type, msg);
@@ -126,20 +129,34 @@ export class DeviceCommands {
     console.log('_filterCommonTypes: ', res);
     if (res.type === 'Failure') {
       const { code } = res.message;
-      let { message } = res.message;
+      const { message } = res.message;
+      let error: HardwareError | null = null;
       // Model One does not send any message in firmware update
       if (code === 'Failure_FirmwareError' && !message) {
-        message = 'Firmware installation failed';
+        error = ERRORS.TypedError(HardwareErrorCode.FirmwareError);
       }
       // Failure_ActionCancelled message could be also missing
-      if (code === 'Failure_ActionCancelled' && !message) {
-        message = 'Action cancelled by user';
+      if (code === 'Failure_ActionCancelled') {
+        error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled);
       }
-      // pass code and message from firmware error
+
+      if (code === 'Failure_PinInvalid') {
+        error = ERRORS.TypedError(HardwareErrorCode.PinInvalid, message);
+      }
+
+      if (code === 'Failure_PinCancelled') {
+        error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
+      }
+
+      if (error) {
+        return Promise.reject(error);
+      }
+
       return Promise.reject(
-        new ERRORS.OnekeyError(
-          (code as any) || 'Failure_UnknownCode',
-          message || 'Failure_UnknownMessage'
+        ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          `${(code as any) || 'Failure_UnknownCode'},${message || 'Failure_UnknownMessage'}`
         )
       );
     }
@@ -204,7 +221,12 @@ export class DeviceCommands {
         });
       } else {
         console.warn('[DeviceCommands] [call] PIN callback not configured, cancelling request');
-        reject(ERRORS.TypedError('Runtime', '_promptPin: PIN callback not configured'));
+        reject(
+          ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            '_promptPin: PIN callback not configured'
+          )
+        );
       }
     });
   }

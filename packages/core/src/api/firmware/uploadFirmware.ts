@@ -1,5 +1,6 @@
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { DEVICE, CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
-import { ERRORS, PROTO } from '../../constants';
+import { PROTO } from '../../constants';
 import type { Device } from '../../device/Device';
 import type { TypedCall } from '../../device/DeviceCommands';
 import { KnownDevice } from '../../types';
@@ -68,5 +69,5 @@ export const uploadFirmware = async (
     return response.message;
   }
 
-  throw ERRORS.TypedError('Runtime', 'uploadFirmware: unknown major_version');
+  throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'uploadFirmware: unknown major_version');
 };

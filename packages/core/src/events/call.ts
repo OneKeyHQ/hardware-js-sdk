@@ -1,4 +1,4 @@
-import { serializeError } from '../constants/errors';
+import { serializeError } from '@onekeyfe/hd-shared';
 import { IFRAME } from './iframe';
 import { CommonParams, CoreApi } from '../types';
 

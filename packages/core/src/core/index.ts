@@ -1,13 +1,13 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
-import { ERRORS } from '../constants';
+import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
 import { enableLog } from '../utils/logger';
-import { initLog, create as createDeferred, Deferred } from '../utils';
+import { initLog } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,
@@ -45,12 +45,7 @@ const deviceCacheMap = new Map<string, Device>();
 
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
-    return Promise.reject(
-      ERRORS.TypedError(
-        'Method_InvalidParameter',
-        'onCall: message.id or message.payload is missing'
-      )
-    );
+    return Promise.reject(ERRORS.TypedError('on call: message.id or message.payload is missing'));
   }
 
   // find api method
@@ -70,10 +65,7 @@ export const callAPI = async (message: CoreMessage) => {
       const response = await method.run();
       return createResponseMessage(method.responseID, true, response);
     } catch (error) {
-      return createResponseMessage(method.responseID, false, {
-        code: error.code,
-        error: error.message ?? error,
-      });
+      return createResponseMessage(method.responseID, false, { error });
     }
   }
 
@@ -123,7 +115,7 @@ export const callAPI = async (message: CoreMessage) => {
         if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
           return Promise.reject(
             ERRORS.TypedError(
-              'Device_FwException',
+              HardwareErrorCode.DeviceFwException,
               `Device firmware version is too low, please update to ${versionRange.min}`
             )
           );
@@ -135,7 +127,7 @@ export const callAPI = async (message: CoreMessage) => {
         ) {
           return Promise.reject(
             ERRORS.TypedError(
-              'Device_FwException',
+              HardwareErrorCode.DeviceFwException,
               `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`
             )
           );
@@ -148,7 +140,9 @@ export const callAPI = async (message: CoreMessage) => {
         method.requireDeviceMode
       );
       if (unexpectedMode) {
-        return Promise.reject(ERRORS.TypedError('Device_UnexpectedMode', unexpectedMode));
+        return Promise.reject(
+          ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
+        );
       }
 
       // const deviceTypeException = method.checkDeviceType();
@@ -168,7 +162,7 @@ export const callAPI = async (message: CoreMessage) => {
         _callPromise?.resolve(messageResponse);
       } catch (error) {
         Log.debug('Call API - Inner Method Run Error: ', error);
-        messageResponse = createResponseMessage(method.responseID, false, error.message);
+        messageResponse = createResponseMessage(method.responseID, false, { error });
         _callPromise?.resolve(messageResponse);
       }
     };
@@ -180,11 +174,11 @@ export const callAPI = async (message: CoreMessage) => {
       return await _callPromise.promise;
     } catch (e) {
       console.log('Device Run Error: ', e);
-      return createResponseMessage(method.responseID, false, e.message);
+      return createResponseMessage(method.responseID, false, { error: e });
     }
   } catch (error) {
-    messageResponse = createResponseMessage(method.responseID, false, error);
-    _callPromise?.reject(ERRORS.TypedError('Call_API', error));
+    messageResponse = createResponseMessage(method.responseID, false, { error });
+    _callPromise?.reject(ERRORS.TypedError(HardwareErrorCode.CallMethodError, error.message));
     Log.debug('Call API - Run Error: ', error);
   } finally {
     const response = messageResponse;
@@ -219,7 +213,7 @@ async function initDeviceList(method: BaseMethod) {
 
 function initDevice(method: BaseMethod) {
   if (!_deviceList) {
-    throw ERRORS.TypedError('Call_API', 'DeviceList is not initialized');
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceListNotInitialized);
   }
 
   let device: Device | typeof undefined;
@@ -230,11 +224,11 @@ function initDevice(method: BaseMethod) {
   } else if (allDevices.length === 1) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {
-    throw ERRORS.TypedError('Call_API', '请选择连接设备');
+    throw ERRORS.TypedError(HardwareErrorCode.SelectDevice);
   }
 
   if (!device) {
-    throw ERRORS.TypedError('Call_API', 'Device Not Found');
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
   }
 
   // inject properties
@@ -245,7 +239,7 @@ function initDevice(method: BaseMethod) {
 
 function initDeviceForBle(method: BaseMethod) {
   if (!method.connectId && !_deviceList) {
-    throw ERRORS.TypedError('Call_API', 'DeviceList is not initialized');
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceListNotInitialized);
   }
 
   if (!method.connectId) {

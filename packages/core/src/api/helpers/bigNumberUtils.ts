@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { ERRORS } from '../../constants';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 /**
  * Converts a number to a two's complement representation.
@@ -20,7 +20,7 @@ export const twosComplement = (number: BigNumber, bytes: number): BigNumber => {
 
   if (bigNumber.isGreaterThan(maxValue) || bigNumber.isLessThan(minValue)) {
     throw ERRORS.TypedError(
-      'Runtime',
+      HardwareErrorCode.RuntimeError,
       `Overflow when trying to convert number ${number.toString()} into ${bytes} bytes`
     );
   }
@@ -42,7 +42,7 @@ export const intToHex = (
   }
   if (bigNumber.isNegative()) {
     throw ERRORS.TypedError(
-      'Runtime',
+      HardwareErrorCode.RuntimeError,
       `Cannot convert negative number to unsigned interger: ${number.toString()}`
     );
   }
@@ -50,7 +50,7 @@ export const intToHex = (
   const hexChars = bytes * 2;
   if (hex.length > hexChars) {
     throw ERRORS.TypedError(
-      'Runtime',
+      HardwareErrorCode.RuntimeError,
       `Overflow when trying to convert number ${number.toString()} into ${bytes} bytes`
     );
   }

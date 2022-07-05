@@ -1,10 +1,11 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { createDeferred, Deferred, HardwareErrorCode, ERRORS } from '@onekeyfe/hd-shared';
 
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
 
-import { initLog, Deferred, create as createDeferred } from '../utils';
+import { initLog } from '../utils';
 import {
   getDeviceFirmwareVersion,
   getDeviceLabel,
@@ -15,7 +16,7 @@ import {
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { DEVICE, DeviceButtonRequestPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
-import { ERRORS, PROTO } from '../constants';
+import { PROTO } from '../constants';
 import { DataManager } from '../data-manager';
 
 type RunOptions = {
@@ -315,7 +316,7 @@ export class Device extends EventEmitter {
         this.runPromise = null;
         return Promise.reject(
           ERRORS.TypedError(
-            'Device_InitializeFailed',
+            HardwareErrorCode.DeviceInitializeFailed,
             `Initialize failed: ${error.message as string}, code: ${error.code as string}`
           )
         );
@@ -351,7 +352,7 @@ export class Device extends EventEmitter {
       this.commands.dispose();
     }
     if (this.runPromise) {
-      this.runPromise.reject(ERRORS.TypedError('Device_Interrupted'));
+      this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside));
     }
   }
 

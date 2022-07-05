@@ -1,4 +1,4 @@
-import { ERRORS, Deferred, create as createDeferred } from '@onekeyfe/hd-core';
+import { Deferred, createDeferred, HardwareErrorCode, ERRORS } from '@onekeyfe/hd-shared';
 import { getOrigin } from '../utils/urlUtils';
 
 /* eslint-disable import/no-mutable-exports */
@@ -33,12 +33,12 @@ export const init = async (settings: any) => {
 
   origin = getOrigin(instance.src);
   timeout = window.setTimeout(() => {
-    initPromise.reject(ERRORS.TypedError('Init_IframeTimeout'));
+    initPromise.reject(ERRORS.TypedError(HardwareErrorCode.IframeTimeout));
   }, 10000);
 
   const onLoad = () => {
     if (!instance) {
-      initPromise.reject(ERRORS.TypedError('Init_IframeBlocked'));
+      initPromise.reject(ERRORS.TypedError(HardwareErrorCode.IframeBlocked));
       return;
     }
 

@@ -1,4 +1,5 @@
 import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { initLog } from '../utils';
@@ -98,8 +99,7 @@ export default class DeviceConnector {
       Log.debug('diff result: ', diff);
       return diff;
     } catch (error) {
-      throw new Error(error);
-      // empty
+      safeThrowError(error);
     }
   }
 
@@ -152,7 +152,7 @@ export default class DeviceConnector {
       }
       return res;
     } catch (error) {
-      throw new Error(error);
+      safeThrowError(error);
     }
   }
 
@@ -161,7 +161,7 @@ export default class DeviceConnector {
       const res = await this.transport.release(session, onclose);
       return res;
     } catch (error) {
-      throw new Error(error);
+      safeThrowError(error);
     }
   }
 

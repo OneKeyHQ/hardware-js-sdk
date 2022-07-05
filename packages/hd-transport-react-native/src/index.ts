@@ -1,6 +1,5 @@
 import { Platform } from 'react-native';
 import { Buffer } from 'buffer';
-import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import {
   BleManager as BlePlxManager,
   Device,
@@ -9,18 +8,17 @@ import {
   ScanMode,
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
+import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
+import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
-  PERMISSION_ERROR,
-  LOCATION_ERROR,
   isOnekeyDevice,
   getBluetoothServiceUuids,
   getInfosForServiceUuid,
   IOS_PACKET_LENGTH,
   ANDROID_PACKET_LENGTH,
 } from './constants';
-import { Deferred, create as createDeferred } from './utils/deferred';
 import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';
@@ -111,9 +109,9 @@ export default class ReactNativeBleTransport {
                 error.errorCode
               )
             ) {
-              reject(new Error(PERMISSION_ERROR));
+              reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
             } else {
-              reject(error);
+              reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.reason ?? ''));
             }
             return;
           }
@@ -156,7 +154,7 @@ export default class ReactNativeBleTransport {
     const { uuid } = input;
 
     if (!uuid) {
-      throw new Error('uuid is required');
+      throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
     let device: Device | null = null;
@@ -203,13 +201,13 @@ export default class ReactNativeBleTransport {
           connectOptions = {};
           device = await blePlxManager.connectToDevice(uuid);
         } else {
-          throw e;
+          throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }
       }
     }
 
     if (!device) {
-      throw new Error('unable to connect to device');
+      throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'unable to connect to device');
     }
 
     if (!(await device.isConnected())) {
@@ -226,7 +224,7 @@ export default class ReactNativeBleTransport {
           connectOptions = {};
           await device.connect();
         } else {
-          throw e;
+          throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }
       }
     }
@@ -236,7 +234,7 @@ export default class ReactNativeBleTransport {
       const bondedDevices = await getBondedDevices();
       const hasBonded = !!bondedDevices.find(bondedDevice => bondedDevice.id === device?.id);
       if (!hasBonded) {
-        throw new Error('device is not bonded');
+        throw ERRORS.TypedError('device is not bonded');
       }
     }
 
@@ -251,13 +249,13 @@ export default class ReactNativeBleTransport {
           infos = getInfosForServiceUuid(serviceUuid, 'classic');
           break;
         } catch (e) {
-          // empty
+          console.log(e);
         }
       }
     }
 
     if (!infos) {
-      throw new Error('BLEServiceNotFound: service not found');
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
 
     const { serviceUuid, writeUuid, notifyUuid } = infos;
@@ -267,7 +265,7 @@ export default class ReactNativeBleTransport {
     }
 
     if (!characteristics) {
-      throw new Error('BLEServiceNotFound: characteristics not found');
+      throw ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound);
     }
 
     let writeCharacteristic;
@@ -281,19 +279,21 @@ export default class ReactNativeBleTransport {
     }
 
     if (!writeCharacteristic) {
-      throw new Error('BLECharacteristicNotFound: write characteristic not found');
+      throw ERRORS.TypedError('BLECharacteristicNotFound: write characteristic not found');
     }
 
     if (!notifyCharacteristic) {
-      throw new Error('BLECharacteristicNotFound: notify characteristic not found');
+      throw ERRORS.TypedError('BLECharacteristicNotFound: notify characteristic not found');
     }
 
     if (!writeCharacteristic.isWritableWithResponse) {
-      throw new Error('BLECharacteristicNotWritable: write characteristic not writable');
+      throw ERRORS.TypedError('BLECharacteristicNotWritable: write characteristic not writable');
     }
 
     if (!notifyCharacteristic.isNotifiable) {
-      throw new Error('BLECharacteristicNotNotifiable: notify characteristic not notifiable');
+      throw ERRORS.TypedError(
+        'BLECharacteristicNotNotifiable: notify characteristic not notifiable'
+      );
     }
 
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
@@ -322,7 +322,7 @@ export default class ReactNativeBleTransport {
       }
 
       if (!c) {
-        throw new Error('Monitor Error: characteristic not found');
+        throw ERRORS.TypedError(HardwareErrorCode.BleMonitorError);
       }
 
       try {
@@ -376,19 +376,19 @@ export default class ReactNativeBleTransport {
   async call(uuid: string, name: string, data: Record<string, unknown>) {
     if (this.stopped) {
       // eslint-disable-next-line prefer-promise-reject-errors
-      return Promise.reject('Transport stopped.');
+      return Promise.reject(ERRORS.TypedError('Transport stopped.'));
     }
     if (this._messages == null) {
-      throw new Error('Transport not configured.');
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
     if (this.runPromise) {
-      throw new Error('Transport_CallInProgress');
+      throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
 
     const transport = transportCache[uuid] as BleTransport;
     if (!transport) {
-      throw new Error('Transport not found.');
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
     }
 
     this.runPromise = createDeferred();
@@ -425,7 +425,7 @@ export default class ReactNativeBleTransport {
           await transport.writeCharacteristic.writeWithoutResponse(outData);
         } catch (e) {
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
-            throw new Error('device is not bonded');
+            throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
           }
           this.runPromise = null;
           console.log('writeCharacteristic write error: ', e);
@@ -464,5 +464,3 @@ export default class ReactNativeBleTransport {
     this.runPromise = null;
   }
 }
-
-export { PERMISSION_ERROR, LOCATION_ERROR };
