@@ -145,6 +145,9 @@ export const HardwareErrorCode = {
    */
   TransportInvalidProtobuf: 603,
 
+  /**
+   * Bluetooth error code
+   */
   BleScanError: 700,
   BlePermissionError: 701,
   BleLocationError: 702,
@@ -155,7 +158,25 @@ export const HardwareErrorCode = {
   BleCharacteristicNotFound: 707,
   BleMonitorError: 708,
 
+  /**
+   * Hardware runtiome errors
+   */
   RuntimeError: 800,
+
+  /**
+   * invalid pin
+   */
+  PinInvalid: 801,
+
+  /**
+   * Action cancelled by user
+   */
+  ActionCancelled: 802,
+
+  /**
+   * Firmware installation failed
+   */
+  FirmwareError: 803,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -221,6 +242,9 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    * Runtime Error
    */
   [HardwareErrorCode.RuntimeError]: 'Runtime error',
+  [HardwareErrorCode.PinInvalid]: 'Pin invalid',
+  [HardwareErrorCode.ActionCancelled]: 'Action cancelled by user',
+  [HardwareErrorCode.FirmwareError]: 'Firmware installation failed',
 } as const;
 
 export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {

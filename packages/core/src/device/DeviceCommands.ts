@@ -1,5 +1,5 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
 import { initLog } from '../utils';
 import type { Device } from './Device';
@@ -129,16 +129,25 @@ export class DeviceCommands {
     console.log('_filterCommonTypes: ', res);
     if (res.type === 'Failure') {
       const { code } = res.message;
-      let { message } = res.message;
+      const { message } = res.message;
+      let error: HardwareError | null = null;
       // Model One does not send any message in firmware update
       if (code === 'Failure_FirmwareError' && !message) {
-        message = 'Firmware installation failed';
+        error = ERRORS.TypedError(HardwareErrorCode.FirmwareError);
       }
       // Failure_ActionCancelled message could be also missing
       if (code === 'Failure_ActionCancelled' && !message) {
-        message = 'Action cancelled by user';
+        error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled);
       }
-      // pass code and message from firmware error
+
+      if (code === 'Failure_PinInvalid') {
+        error = ERRORS.TypedError(HardwareErrorCode.PinInvalid, message);
+      }
+
+      if (error) {
+        return Promise.reject(error);
+      }
+
       return Promise.reject(
         ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
