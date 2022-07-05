@@ -136,12 +136,16 @@ export class DeviceCommands {
         error = ERRORS.TypedError(HardwareErrorCode.FirmwareError);
       }
       // Failure_ActionCancelled message could be also missing
-      if (code === 'Failure_ActionCancelled' && !message) {
+      if (code === 'Failure_ActionCancelled') {
         error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled);
       }
 
       if (code === 'Failure_PinInvalid') {
         error = ERRORS.TypedError(HardwareErrorCode.PinInvalid, message);
+      }
+
+      if (code === 'Failure_PinCancelled') {
+        error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
       }
 
       if (error) {

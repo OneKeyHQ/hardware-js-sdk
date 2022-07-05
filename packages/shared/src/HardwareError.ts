@@ -179,14 +179,19 @@ export const HardwareErrorCode = {
   PinInvalid: 801,
 
   /**
+   * pin cancelled by user
+   */
+  PinCancelled: 802,
+
+  /**
    * Action cancelled by user
    */
-  ActionCancelled: 802,
+  ActionCancelled: 803,
 
   /**
    * Firmware installation failed
    */
-  FirmwareError: 803,
+  FirmwareError: 804,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -255,6 +260,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    */
   [HardwareErrorCode.RuntimeError]: 'Runtime error',
   [HardwareErrorCode.PinInvalid]: 'Pin invalid',
+  [HardwareErrorCode.PinCancelled]: 'Pin cancelled',
   [HardwareErrorCode.ActionCancelled]: 'Action cancelled by user',
   [HardwareErrorCode.FirmwareError]: 'Firmware installation failed',
 } as const;
