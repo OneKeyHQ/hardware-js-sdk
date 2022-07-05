@@ -96,9 +96,29 @@ export const HardwareErrorCode = {
   NetworkError: 500,
 
   /**
-   * transport not configured
+   * Transport not configured
    */
   TransportNotConfigured: 600,
+
+  /**
+   * Transport call in progress
+   */
+  TransportCallInProgress: 601,
+
+  /**
+   * Transport not found
+   */
+  TransportNotFound: 601,
+
+  BleScanError: 700,
+  BlePermissionError: 701,
+  BleLocationError: 702,
+  BleRequiredUUID: 703,
+  BleConnectedError: 704,
+  BleDeviceNotBonded: 705,
+  BleServiceNotFound: 706,
+  BleCharacteristicNotFound: 707,
+  BleMonitorError: 708,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -137,6 +157,21 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    * Transport Errors
    */
   [HardwareErrorCode.TransportNotConfigured]: 'Transport not configured',
+  [HardwareErrorCode.TransportCallInProgress]: 'Transport call in progress',
+  [HardwareErrorCode.TransportNotFound]: 'Transport not found',
+
+  /**
+   * Bluetooth Error
+   */
+  [HardwareErrorCode.BleScanError]: 'BLE scan error',
+  [HardwareErrorCode.BlePermissionError]: 'Bluetooth required to be turned on',
+  [HardwareErrorCode.BleLocationError]: 'Device is not authorized to use BluetoothLE',
+  [HardwareErrorCode.BleRequiredUUID]: 'uuid is required',
+  [HardwareErrorCode.BleConnectedError]: 'connected error is always runtime error',
+  [HardwareErrorCode.BleDeviceNotBonded]: 'device is not bonded',
+  [HardwareErrorCode.BleServiceNotFound]: 'BLEServiceNotFound: service not found',
+  [HardwareErrorCode.BleCharacteristicNotFound]: 'BLEServiceNotFound: service not found',
+  [HardwareErrorCode.BleMonitorError]: 'Monitor Error: characteristic not found',
 } as const;
 
 export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {
