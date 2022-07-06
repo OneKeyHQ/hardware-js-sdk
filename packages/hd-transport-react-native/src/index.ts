@@ -110,6 +110,8 @@ export default class ReactNativeBleTransport {
               )
             ) {
               reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+            } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
+              reject(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
             } else {
               reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.reason ?? ''));
             }
