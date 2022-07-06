@@ -167,6 +167,7 @@ export const HardwareErrorCode = {
   BleServiceNotFound: 706,
   BleCharacteristicNotFound: 707,
   BleMonitorError: 708,
+  BleCharacteristicNotifyError: 709,
 
   /**
    * Hardware runtiome errors
@@ -254,6 +255,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleServiceNotFound]: 'BLEServiceNotFound: service not found',
   [HardwareErrorCode.BleCharacteristicNotFound]: 'BLEServiceNotFound: service not found',
   [HardwareErrorCode.BleMonitorError]: 'Monitor Error: characteristic not found',
+  [HardwareErrorCode.BleCharacteristicNotifyError]: 'Characteristic Notify Error',
 
   /**
    * Runtime Error

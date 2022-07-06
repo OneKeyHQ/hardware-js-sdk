@@ -300,9 +300,10 @@ export default class ReactNativeBleTransport {
     transport.nofitySubscription = this._monitorCharacteristic(transport.notifyCharacteristic);
     transportCache[uuid] = transport;
 
-    device.onDisconnected(() => {
+    const disconnectSubscription = device.onDisconnected(() => {
       console.log('device disconnect: ', device?.id);
       this.release(uuid);
+      disconnectSubscription?.remove();
     });
 
     return { uuid };
@@ -318,6 +319,15 @@ export default class ReactNativeBleTransport {
             error as unknown as string
           }`
         );
+        if (this.runPromise) {
+          this.runPromise.reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.BleCharacteristicNotifyError,
+              error.reason ?? error.message
+            )
+          );
+          console.log('@onekey/hd-ble-sdk: monitor notify error, and has unreleased Promise');
+        }
         return;
       }
 
