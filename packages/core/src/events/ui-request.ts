@@ -16,6 +16,8 @@ export const UI_REQUEST = {
   LOCATION_PERMISSION: 'ui-location_permission',
 
   FIRMWARE_PROGRESS: 'ui-firmware-progress',
+
+  NOT_IN_BOOTLOADER: 'ui-device_not_in_bootloader_mode',
 } as const;
 
 export interface UiRequestWithoutPayload {

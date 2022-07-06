@@ -140,6 +140,11 @@ export const callAPI = async (message: CoreMessage) => {
         method.requireDeviceMode
       );
       if (unexpectedMode) {
+        if (unexpectedMode === UI_REQUEST.NOT_IN_BOOTLOADER) {
+          return Promise.reject(
+            ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedBootloaderMode)
+          );
+        }
         return Promise.reject(
           ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
         );
