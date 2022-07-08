@@ -1,4 +1,4 @@
-import { ApplyFlags } from '@onekeyfe/hd-transport/src/types/messages';
+import { ApplyFlags } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 

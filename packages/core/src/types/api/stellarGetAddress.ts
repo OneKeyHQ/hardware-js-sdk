@@ -1,4 +1,4 @@
-import { StellarAddress as HardwareStellarAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { StellarAddress as HardwareStellarAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type StellarAddress = {

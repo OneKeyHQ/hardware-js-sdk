@@ -1,4 +1,4 @@
-import { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport/src/types/messages';
+import { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -52,10 +52,12 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
+      // @ts-ignore
       const res = await this.device.commands.typedCall('SolanaSignTx', 'SolanaSignedTx', {
         ...param,
       });
 
+      // @ts-ignore
       const { signature } = res.message;
 
       responses.push({

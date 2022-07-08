@@ -1,4 +1,4 @@
-import { RebootToBootloader } from '@onekeyfe/hd-transport/src/types/messages';
+import { RebootToBootloader } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 
 // Reboot BootLoader

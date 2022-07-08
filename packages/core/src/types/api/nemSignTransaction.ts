@@ -1,4 +1,4 @@
-import { NEMSignedTx } from '@onekeyfe/hd-transport/src/types/messages';
+import { NEMSignedTx } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 type MosaicID = {

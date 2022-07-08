@@ -1,4 +1,4 @@
-import { ResetDevice } from '@onekeyfe/hd-transport/src/types/messages';
+import { ResetDevice } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 

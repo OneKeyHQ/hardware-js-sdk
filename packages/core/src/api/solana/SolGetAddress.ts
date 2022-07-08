@@ -1,4 +1,4 @@
-import { SolanaGetAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { SolanaGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -42,10 +42,12 @@ export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
+      // @ts-ignore
       const res = await this.device.commands.typedCall('SolanaGetAddress', 'SolanaAddress', {
         ...param,
       });
 
+      // @ts-ignore
       const { address } = res.message;
 
       responses.push({

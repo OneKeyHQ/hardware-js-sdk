@@ -1,8 +1,4 @@
-import {
-  EthereumSignTx,
-  EthereumSignTxEIP1559,
-  EthereumTxRequest,
-} from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumSignTx, EthereumSignTxEIP1559, EthereumTxRequest } from '@onekeyfe/hd-transport';
 
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';

@@ -4,7 +4,7 @@ import {
   TxOutputBinType,
   TxOutputType,
   TxInputType,
-} from '@onekeyfe/hd-transport/src/types/messages';
+} from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type SignedTransaction = {

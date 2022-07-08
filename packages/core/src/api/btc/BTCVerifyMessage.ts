@@ -1,4 +1,4 @@
-import { VerifyMessage } from '@onekeyfe/hd-transport/src/types/messages';
+import { VerifyMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 
 import { BaseMethod } from '../BaseMethod';

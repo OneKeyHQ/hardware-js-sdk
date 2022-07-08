@@ -1,6 +1,6 @@
 /* eslint-disable prefer-regex-literals */
 
-import { EthereumDataType, EthereumFieldType } from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumDataType, EthereumFieldType } from '@onekeyfe/hd-transport';
 
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { EthereumSignTypedDataTypes } from '../../types/api/evmSignTypedData';
