@@ -94,6 +94,12 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
           onCall={data => SDK.deviceSettings(connectId, { ...data } as unknown as any)}
         />
 
+        <MethodInvoke
+          title="deviceVerify"
+          options={[{ name: 'dataHex', value: '36d5e8bb396f4497c5cb876cac5c7fe1', type: 'string' }]}
+          onCall={data => SDK.deviceVerify(connectId, { ...data } as unknown as any)}
+        />
+
         <MethodInvoke title="deviceWipe" options={[]} onCall={() => SDK.deviceWipe(connectId)} />
       </View>
     </View>

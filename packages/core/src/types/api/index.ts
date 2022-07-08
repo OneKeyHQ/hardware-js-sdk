@@ -20,6 +20,7 @@ import { btcVerifyMessage } from './btcVerifyMessage';
 import { uiResponse } from './uiResponse';
 import { deviceReset } from './deviceReset';
 import { deviceRecovery } from './deviceRecovery';
+import { deviceVerify } from './deviceVerify';
 import { deviceWipe } from './deviceWipe';
 import { deviceRebootToBootloader } from './deviceRebootToBootloader';
 import { deviceBackup } from './deviceBackup';
@@ -79,6 +80,7 @@ export type CoreApi = {
   deviceReset: typeof deviceReset;
   deviceSettings: typeof deviceSettings;
   deviceUpdateReboot: typeof deviceUpdateReboot;
+  deviceVerify: typeof deviceVerify;
   deviceWipe: typeof deviceWipe;
 
   evmGetAddress: typeof evmGetAddress;
