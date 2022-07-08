@@ -42,12 +42,12 @@ export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      // @ts-ignore
+      // @ts-expect-error
       const res = await this.device.commands.typedCall('SolanaGetAddress', 'SolanaAddress', {
         ...param,
       });
 
-      // @ts-ignore
+      // @ts-expect-error
       const { address } = res.message;
 
       responses.push({
