@@ -1,4 +1,4 @@
-import { TxInputType, TxOutputType } from '@onekeyfe/hd-transport/src/types/messages';
+import { TxInputType, TxOutputType } from '@onekeyfe/hd-transport';
 
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';

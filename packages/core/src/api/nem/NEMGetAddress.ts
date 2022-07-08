@@ -1,4 +1,4 @@
-import { NEMGetAddress as HardwareNEMGetAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { NEMGetAddress as HardwareNEMGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath, serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';

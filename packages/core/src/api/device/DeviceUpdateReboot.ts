@@ -1,4 +1,4 @@
-import { BixinReboot } from '@onekeyfe/hd-transport/src/types/messages';
+import { BixinReboot } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 
 // Upload hint Reboot BootLoader

@@ -16,6 +16,7 @@ export type {
 } from './types';
 
 export { Messages } from './types';
+export * from './types/messages';
 
 export * from './constants';
 

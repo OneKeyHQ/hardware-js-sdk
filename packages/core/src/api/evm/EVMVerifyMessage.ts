@@ -1,4 +1,4 @@
-import { EthereumVerifyMessage } from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumVerifyMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';

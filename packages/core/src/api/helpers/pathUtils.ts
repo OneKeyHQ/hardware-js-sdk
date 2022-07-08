@@ -1,6 +1,6 @@
 /* eslint-disable no-bitwise */
 
-import { ChangeOutputScriptType, InputScriptType } from '@onekeyfe/hd-transport/src/types/messages';
+import { ChangeOutputScriptType, InputScriptType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 const HD_HARDENED = 0x80000000;

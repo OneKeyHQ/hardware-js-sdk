@@ -5,7 +5,7 @@ import {
   TxRequest,
   TxRequestSerializedType,
   TypedCall,
-} from '@onekeyfe/hd-transport/src/types/messages';
+} from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import {
   RefTransaction,
