@@ -13,11 +13,20 @@ export const getDeviceModel = (features?: Features): IDeviceModel => {
 };
 
 export const getDeviceType = (features?: Features): IDeviceType => {
-  if (!features || typeof features !== 'object' || !features.serial_no) {
+  if (!features || typeof features !== 'object') {
     return 'classic';
   }
 
-  const serialNo = features.serial_no;
+  const serialNo = features.serial_no ?? features.onekey_serial;
+  if (!serialNo) {
+    // Command to enter the mini Bootloader mode
+    // @ts-expect-error
+    if (features?.cpu_info && !features.model) {
+      return 'mini';
+    }
+    return 'classic';
+  }
+
   const miniFlag = serialNo.slice(0, 2);
   if (miniFlag.toLowerCase() === 'mi') return 'mini';
   if (miniFlag.toLowerCase() === 'tc') return 'touch';
