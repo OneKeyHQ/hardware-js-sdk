@@ -77,6 +77,7 @@ export const inject = ({
     deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
     deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),
     deviceUpdateReboot: connectId => call({ connectId, method: 'deviceUpdateReboot' }),
+    deviceVerify: (connectId, params) => call({ ...params, connectId, method: 'deviceVerify' }),
     deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
 
     evmGetAddress: (connectId, params) => call({ ...params, connectId, method: 'evmGetAddress' }),

@@ -1718,6 +1718,29 @@ export type CancelAuthorization = Empty;
 // BixinReboot
 export type BixinReboot = Empty;
 
+export type BixinVerifyDeviceRequest = {
+  data: Buffer | string;
+};
+
+export type BixinVerifyDeviceAck = {
+  cert: Buffer;
+  signature: Buffer;
+};
+
+export type SESignMessage = {
+  message: Buffer | string;
+};
+
+export type SEMessageSignature = {
+  signature: Buffer;
+};
+
+export type ReadSEPublicCert = Empty;
+
+export type SEPublicCert = {
+  public_cert: Buffer;
+};
+
 // RebootToBootloader
 export type RebootToBootloader = Empty;
 
@@ -2491,6 +2514,12 @@ export type MessageType = {
   PreauthorizedRequest: PreauthorizedRequest;
   CancelAuthorization: CancelAuthorization;
   BixinReboot: BixinReboot;
+  BixinVerifyDeviceRequest: BixinVerifyDeviceRequest;
+  BixinVerifyDeviceAck: BixinVerifyDeviceAck;
+  SESignMessage: SESignMessage;
+  SEMessageSignature: SEMessageSignature;
+  ReadSEPublicCert: ReadSEPublicCert;
+  SEPublicCert: SEPublicCert;
   RebootToBootloader: RebootToBootloader;
   GetNonce: GetNonce;
   Nonce: Nonce;
