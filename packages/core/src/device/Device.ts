@@ -12,6 +12,7 @@ import {
   getDeviceType,
   getDeviceUUID,
   getDeviceBLEFirmwareVersion,
+  getDeviceTypeOnBootloader,
 } from '../utils/deviceFeaturesUtils';
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { DEVICE, DeviceButtonRequestPayload } from '../events';
@@ -114,7 +115,9 @@ export class Device extends EventEmitter {
       connectId: env === 'react-native' ? this.mainId || null : getDeviceUUID(this.features),
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
-      deviceType: getDeviceType(this.features),
+      deviceType: this.features.bootloader_mode
+        ? getDeviceTypeOnBootloader(this.features)
+        : getDeviceType(this.features),
       /** ID for current seeds, will clear after replace a new seed at device */
       deviceId: this.features.device_id || null,
       path: this.originalDescriptor.path,
