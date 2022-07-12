@@ -1,7 +1,7 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
-import { initLog } from '../utils';
+import { initLog, patchFeatures } from '../utils';
 import type { Device } from './Device';
 import { DEVICE } from '../events';
 
@@ -162,7 +162,7 @@ export class DeviceCommands {
     }
 
     if (res.type === 'Features') {
-      return Promise.resolve(res);
+      return Promise.resolve(patchFeatures(res));
     }
 
     if (res.type === 'ButtonRequest') {
