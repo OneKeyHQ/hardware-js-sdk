@@ -79,6 +79,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     console.log('example checkTransportRelease response: ', response);
   };
 
+  const handleCheckBridgeStatus = async () => {
+    const response = await SDK.checkBridgeStatus();
+    console.log('example checkBridgeStatus response: ', response);
+  };
+
   const handleFirmwareUpdate = async (file?: Uint8Array) => {
     const params: any = { updateType: firmwareType ? 'firmware' : 'ble' };
     if (file) {
@@ -117,6 +122,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
           onPress={() => handleCheckBLEFirmwareRelease()}
         />
         <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
+        <Button title="check bridge status" onPress={() => handleCheckBridgeStatus()} />
         <Button title="cancel" onPress={() => cancel()} />
         <Button title="reset" onPress={() => RNRestart.Restart()} />
       </View>

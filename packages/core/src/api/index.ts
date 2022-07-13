@@ -9,6 +9,7 @@ export { default as btcVerifyMessage } from './btc/BTCVerifyMessage';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkTransportRelease } from './CheckTransportRelease';
+export { default as checkBridgeStatus } from './CheckBridgeStatus';
 export { default as deviceBackup } from './device/DeviceBackup';
 export { default as deviceChangePin } from './device/DeviceChangePin';
 export { default as deviceFlags } from './device/DeviceFlags';

@@ -66,6 +66,11 @@ export const inject = ({
      */
     checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
 
+    /**
+     * 检查 Bridge 是否安装
+     */
+    checkBridgeStatus: () => call({ method: 'checkBridgeStatus' }),
+
     cipherKeyValue: (connectId, params) => call({ ...params, connectId, method: 'cipherKeyValue' }),
 
     deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
