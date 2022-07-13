@@ -5,6 +5,7 @@ import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { init } from './init';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { checkTransportRelease } from './checkTransportRelease';
+import { checkBridgeStatus } from './checkBridgeStatus';
 import { evmGetAddress } from './evmGetAddress';
 import { evmGetPublicKey } from './evmGetPublicKey';
 import { evmSignMessage } from './evmSignMessage';
@@ -69,6 +70,8 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
 
   checkTransportRelease: typeof checkTransportRelease;
+
+  checkBridgeStatus: typeof checkBridgeStatus;
 
   cipherKeyValue: typeof cipherKeyValue;
 
