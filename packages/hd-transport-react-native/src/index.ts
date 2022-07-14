@@ -236,7 +236,7 @@ export default class ReactNativeBleTransport {
       const bondedDevices = await getBondedDevices();
       const hasBonded = !!bondedDevices.find(bondedDevice => bondedDevice.id === device?.id);
       if (!hasBonded) {
-        throw ERRORS.TypedError('device is not bonded');
+        throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
       }
     }
 
