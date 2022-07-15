@@ -1,4 +1,5 @@
 import path from 'path';
+import webpack from 'webpack';
 import TerserPlugin from 'terser-webpack-plugin';
 import config from './webpack.config';
 
@@ -42,6 +43,13 @@ const prodConfig = {
   performance: {
     hints: false,
   },
+
+  plugins: [
+    new webpack.DefinePlugin({
+      // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+      'process.env.VERSION': JSON.stringify(require('../package.json').version),
+    }),
+  ],
 
   optimization: {
     minimizer: [

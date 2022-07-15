@@ -1,7 +1,7 @@
 /* eslint-disable vars-on-top */
 
 import type { ConnectSettings } from '../types';
-import { VERSION, DEFAULT_DOMAIN } from '../data/version';
+import { DEFAULT_DOMAIN } from '../data/config';
 
 export const DEFAULT_PRIORITY = 2;
 
@@ -13,7 +13,7 @@ declare global {
 
 const initialSettings: ConnectSettings = {
   configSrc: './data/config.json', // constant
-  version: VERSION, // constant
+  version: '', // constant
   debug: false,
   priority: DEFAULT_PRIORITY,
   trustedHost: false,
