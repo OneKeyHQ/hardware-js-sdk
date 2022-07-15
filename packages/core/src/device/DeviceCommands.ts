@@ -26,7 +26,7 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
   const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
   if (!splitResTypes.includes(res.type)) {
     throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
+      HardwareErrorCode.ResponseUnexpectTypeError,
       `assertType: Response of unexpected type: ${res.type}. Should be ${resType as string}`
     );
   }
@@ -78,6 +78,9 @@ export class DeviceCommands {
       return res;
     } catch (error) {
       Log.debug('[DeviceCommands] [call] Received error', error);
+      if (error?.response?.data?.error === 'device disconnected during action') {
+        return { type: 'BridgeNetworkError', message: {} } as any;
+      }
       throw error;
     }
   }
@@ -112,10 +115,21 @@ export class DeviceCommands {
     } catch (error) {
       // handle possible race condition
       // Bridge may have some unread message in buffer, read it
-      // await this.transport.read(this.mainId);
-      // throw error anyway, next call should be resolved properly
+      // await this.transport.read?.(this.mainId);
+
       console.log('DeviceCommands typedcall error: ', error);
-      throw error;
+
+      // throw bridge network error
+      if (error instanceof HardwareError) {
+        if (error.errorCode === HardwareErrorCode.ResponseUnexpectTypeError) {
+          if (error.message.indexOf('BridgeNetworkError') > -1) {
+            throw ERRORS.TypedError(HardwareErrorCode.BridgeNetworkError);
+          }
+        }
+      } else {
+        // throw error anyway, next call should be resolved properly// throw error anyway, next call should be resolved properly
+        throw error;
+      }
     }
     return response;
   }
