@@ -198,6 +198,16 @@ export const HardwareErrorCode = {
    * Firmware installation failed
    */
   FirmwareError: 804,
+
+  /**
+   * transport response unexpect error
+   */
+  ResponseUnexpectTypeError: 805,
+
+  /**
+   * bridge network error
+   */
+  BridgeNetworkError: 806,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -271,6 +281,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.PinCancelled]: 'Pin cancelled',
   [HardwareErrorCode.ActionCancelled]: 'Action cancelled by user',
   [HardwareErrorCode.FirmwareError]: 'Firmware installation failed',
+  [HardwareErrorCode.ResponseUnexpectTypeError]: 'Response type is not expected',
+  [HardwareErrorCode.BridgeNetworkError]: 'Bridge network error',
 } as const;
 
 export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {
