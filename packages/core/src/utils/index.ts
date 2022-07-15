@@ -1,4 +1,4 @@
-import { initLog, enableLog } from './logger';
+import { initLog, enableLog } from '@onekeyfe/hd-shared';
 
 export * from './assets';
 export * from './versionUtils';

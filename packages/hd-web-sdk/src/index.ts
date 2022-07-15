@@ -98,7 +98,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
   window.addEventListener('unload', dispose);
 
   try {
-    await iframe.init(_settings);
+    await iframe.init({ ..._settings, version: process.env.VERSION });
     return true;
   } catch (e) {
     console.log('init error: ', e);
