@@ -68,7 +68,7 @@ export class DeviceCommands {
     type: MessageKey,
     msg: DefaultMessageResponse['message'] = {}
   ): Promise<DefaultMessageResponse> {
-    console.log('[DeviceCommands] [call] Sending', type, this.transport);
+    console.log('[DeviceCommands] [call] Sending', type);
 
     try {
       const promise = this.transport.call(this.mainId, type, msg) as any;

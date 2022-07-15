@@ -1,5 +1,5 @@
 import transport from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, enableLog, initLog } from '@onekeyfe/hd-shared';
 import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
@@ -10,6 +10,8 @@ type IncompleteRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
   url: string;
 };
+
+const Log = initLog('@onekey/hd-transport-http');
 
 export default class HttpTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
@@ -22,6 +24,7 @@ export default class HttpTransport {
 
   constructor(url?: string) {
     this.url = url == null ? DEFAULT_URL : url;
+    enableLog(true);
   }
 
   _post(options: IncompleteRequestOptions) {
@@ -100,16 +103,7 @@ export default class HttpTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    console.log(
-      'transport-http',
-      'call-',
-      'messages: ',
-      messages,
-      ' name: ',
-      name,
-      ' data: ',
-      data
-    );
+    Log.debug('call-', ' name: ', name, ' data: ', data);
     const o = buildOne(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
@@ -160,6 +154,6 @@ export default class HttpTransport {
   }
 
   cancel() {
-    console.log('transport-http canceled');
+    Log.debug('canceled');
   }
 }

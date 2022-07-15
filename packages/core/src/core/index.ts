@@ -6,8 +6,7 @@ import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { enableLog } from '../utils/logger';
-import { initLog } from '../utils';
+import { initLog, enableLog } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,
@@ -162,7 +161,7 @@ export const callAPI = async (message: CoreMessage) => {
 
       try {
         const response: object = await method.run();
-        Log.debug('Call API - Inner Method Run: ', device);
+        Log.debug('Call API - Inner Method Run: ');
         messageResponse = createResponseMessage(method.responseID, true, response);
         _callPromise?.resolve(messageResponse);
       } catch (error) {

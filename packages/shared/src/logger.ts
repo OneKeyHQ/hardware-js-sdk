@@ -1,23 +1,18 @@
-const colors: Record<string, string> = {
-  // orange, api related
-  '@onekey/connect': 'color: #f4a742; background: #000;',
-  IFrame: 'color: #f4a742; background: #000;',
-  Core: 'color: #f4a742; background: #000;',
-  // green, device related
-  DescriptorStream: 'color: #77ab59; background: #000;',
-  DeviceList: 'color: #77ab59; background: #000;',
-  Device: 'color: #bada55; background: #000;',
-  DeviceCommands: 'color: #bada55; background: #000;',
-  DeviceConnector: 'color: #bada55; background: #000;',
-  // red, data-manager related
-  Transport: 'color: #ffb6c1; background: #000;',
-};
-
 type LogMessage = {
   level: string;
   prefix: string;
   message: any[];
   timestamp: number;
+};
+
+type LoggerFn = (...data: any[]) => void;
+type LoggerMoreParams = (message?: any, ...optionalParams: any[]) => void;
+
+type Logger = {
+  debug: LoggerFn | LoggerMoreParams;
+  info: LoggerFn | LoggerMoreParams;
+  warn: LoggerFn | LoggerMoreParams;
+  error: LoggerFn | LoggerMoreParams;
 };
 
 const MAX_ENTRIES = 100;
@@ -27,15 +22,17 @@ class Log {
 
   enabled: boolean;
 
-  css: string;
-
   messages: LogMessage[];
 
-  constructor(prefix: string, enabled: boolean) {
+  logger?: Logger;
+
+  constructor(prefix: string, enabled: boolean, logger?: Logger) {
     this.prefix = prefix;
     this.enabled = enabled;
     this.messages = [];
-    this.css = typeof window !== 'undefined' && colors[prefix] ? colors[prefix] : '';
+    if (logger) {
+      this.logger = logger;
+    }
   }
 
   addMessage(level: string, prefix: string, ...args: any[]) {
@@ -52,41 +49,57 @@ class Log {
 
   log(...args: any[]) {
     this.addMessage('log', this.prefix, ...args);
-    if (this.enabled) {
+    if (!this.enabled) {
+      return;
+    }
+    if (this.logger) {
+      this.logger.info(this.prefix, ...args);
+    } else {
       console.log(this.prefix, ...args);
     }
   }
 
   error(...args: any[]) {
     this.addMessage('error', this.prefix, ...args);
-    if (this.enabled) {
+    if (!this.enabled) {
+      return;
+    }
+    if (this.logger) {
+      this.logger.error(this.prefix, ...args);
+    } else {
       console.error(this.prefix, ...args);
     }
   }
 
   warn(...args: any[]) {
     this.addMessage('warn', this.prefix, ...args);
-    if (this.enabled) {
+    if (!this.enabled) {
+      return;
+    }
+    if (this.logger) {
+      this.logger.warn(this.prefix, ...args);
+    } else {
       console.warn(this.prefix, ...args);
     }
   }
 
   debug(...args: any[]) {
     this.addMessage('debug', this.prefix, ...args);
-    if (this.enabled) {
-      if (this.css) {
-        console.log(`%c${this.prefix}`, this.css, ...args);
-      } else {
-        console.log(this.prefix, ...args);
-      }
+    if (!this.enabled) {
+      return;
+    }
+    if (this.logger) {
+      this.logger.debug(this.prefix, ...args);
+    } else {
+      console.log(this.prefix, ...args);
     }
   }
 }
 
 const _logs: { [k: string]: Log } = {};
 
-export const initLog = (prefix: string, enabled?: boolean) => {
-  const instance = new Log(prefix, !!enabled);
+export const initLog = (prefix: string, enabled?: boolean, logger?: Logger) => {
+  const instance = new Log(prefix, !!enabled, logger);
   _logs[prefix] = instance;
   return instance;
 };
@@ -94,6 +107,12 @@ export const initLog = (prefix: string, enabled?: boolean) => {
 export const enableLog = (enabled?: boolean) => {
   Object.keys(_logs).forEach(key => {
     _logs[key].enabled = !!enabled;
+  });
+};
+
+export const setOutsideLogger = (logger: Logger) => {
+  Object.keys(_logs).forEach(key => {
+    _logs[key].logger = logger;
   });
 };
 
