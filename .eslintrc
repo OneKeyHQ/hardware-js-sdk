@@ -2,6 +2,9 @@
   "extends": [
     "wesbos/typescript"
   ],
+  "env": {
+    "jest": true
+  },
   "rules": {
     "no-console": "off",
     "prettier/prettier": [
