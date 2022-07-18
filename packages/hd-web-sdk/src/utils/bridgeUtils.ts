@@ -1,5 +1,6 @@
 import { IJsBridgeIframeConfig, JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
 import { CoreMessage, initLog } from '@onekeyfe/hd-core';
+import { ERRORS } from '@onekeyfe/hd-shared';
 import JSBridgeConfig from '../iframe/bridge-config';
 
 // eslint-disable-next-line import/no-mutable-exports
@@ -31,7 +32,7 @@ export const sendMessage = async (messages: CoreMessage, isHost = true): Promise
     return result;
   } catch (error) {
     Log.error(error);
-    throw error;
+    throw ERRORS.CreateErrorByMessage(error.message);
   }
 };
 

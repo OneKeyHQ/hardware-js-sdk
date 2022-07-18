@@ -5,6 +5,7 @@ export type HttpRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
   url: string;
   method: 'POST' | 'GET';
+  timeout?: number;
 };
 
 function contentType(body: any) {
@@ -38,6 +39,7 @@ export async function request(options: HttpRequestOptions) {
     headers: {
       'Content-Type': contentType(options.body == null ? '' : options.body),
     },
+    timeout: options.timeout ?? undefined,
   };
 
   const res = await axios.request(fetchOptions);

@@ -12,7 +12,7 @@ import HardwareSdk, {
   ConnectSettings,
   UiResponseEvent,
 } from '@onekeyfe/hd-core';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
 import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
@@ -131,7 +131,11 @@ const call = async (params: any) => {
     return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse));
   } catch (error) {
     Log.error('__call error: ', error);
-    return createErrorMessage(error);
+    let err = error;
+    if (!(err instanceof HardwareError)) {
+      err = ERRORS.CreateErrorByMessage(error.message);
+    }
+    return createErrorMessage(err);
   }
 };
 

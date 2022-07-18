@@ -208,6 +208,11 @@ export const HardwareErrorCode = {
    * bridge network error
    */
   BridgeNetworkError: 806,
+
+  /**
+   * Bridge network timeout
+   */
+  BridgeTimeoutError: 807,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -283,6 +288,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FirmwareError]: 'Firmware installation failed',
   [HardwareErrorCode.ResponseUnexpectTypeError]: 'Response type is not expected',
   [HardwareErrorCode.BridgeNetworkError]: 'Bridge network error',
+  [HardwareErrorCode.BridgeTimeoutError]: 'Bridge network timeout',
 } as const;
 
 export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {
@@ -300,4 +306,13 @@ export const serializeError = (payload: any) => {
     return { error: payload.error.message, code: payload.error.code };
   }
   return payload;
+};
+
+export const CreateErrorByMessage = (message: string): HardwareError => {
+  for (const code of Object.values(HardwareErrorCode)) {
+    if (HardwareErrorCodeMessage[code] === message) {
+      return TypedError(code);
+    }
+  }
+  return new HardwareError(message);
 };
