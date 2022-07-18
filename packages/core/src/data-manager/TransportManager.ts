@@ -43,6 +43,9 @@ export default class TransportManager {
       Log.debug('Configuring transports done');
     } catch (error) {
       Log.debug('Initializing transports error: ', error);
+      if (error.code === 'ECONNABORTED') {
+        throw ERRORS.TypedError(HardwareErrorCode.BridgeTimeoutError);
+      }
     }
   }
 

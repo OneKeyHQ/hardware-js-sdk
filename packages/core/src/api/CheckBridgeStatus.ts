@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { BaseMethod } from './BaseMethod';
 
 export default class CheckBridgeStatus extends BaseMethod {
@@ -7,15 +8,22 @@ export default class CheckBridgeStatus extends BaseMethod {
   }
 
   async run() {
-    return new Promise<boolean>(resolve => {
+    return new Promise<boolean>((resolve, reject) => {
       axios
         .request({
           url: 'http://localhost:21320',
           method: 'POST',
           withCredentials: false,
+          timeout: 3000,
         })
         .then(() => resolve(true))
-        .catch(() => resolve(false));
+        .catch(e => {
+          if (e.code === 'ECONNABORTED') {
+            reject(ERRORS.TypedError(HardwareErrorCode.BridgeTimeoutError));
+          } else {
+            resolve(false);
+          }
+        });
     });
   }
 }

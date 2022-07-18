@@ -47,6 +47,7 @@ export default class HttpTransport {
     const infoS = await http({
       url: this.url,
       method: 'POST',
+      timeout: 3000,
     });
     const info = check.info(infoS);
     return info.version;
