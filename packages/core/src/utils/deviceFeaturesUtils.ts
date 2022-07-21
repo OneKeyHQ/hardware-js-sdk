@@ -24,16 +24,8 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   return 'classic';
 };
 
-export const getDeviceTypeOnBootloader = (features?: Features): IDeviceType => {
-  if (!features || typeof features !== 'object') {
-    return 'classic';
-  }
-  if (features.model === 'T') {
-    return 'touch';
-  }
-
-  return getDeviceType(features);
-};
+export const getDeviceTypeOnBootloader = (features?: Features): IDeviceType =>
+  getDeviceType(features);
 
 export const getDeviceTypeByBleName = (name?: string): IDeviceType | null => {
   if (!name) return 'classic';

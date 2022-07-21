@@ -70,7 +70,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         binary = firmware.binary;
       }
     } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err);
+      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
     return uploadFirmware(
