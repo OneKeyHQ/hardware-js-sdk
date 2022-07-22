@@ -1,7 +1,6 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
   parseConnectSettings,
-  initLog,
   enableLog,
   PostMessageEvent,
   IFRAME,
@@ -12,13 +11,19 @@ import HardwareSdk, {
   ConnectSettings,
   UiResponseEvent,
 } from '@onekeyfe/hd-core';
-import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  getLogger,
+  HardwareError,
+  HardwareErrorCode,
+  LoggerNames,
+} from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
 import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
 
 const eventEmitter = new EventEmitter();
-const Log = initLog('@onekey/connect');
+const Log = getLogger(LoggerNames.Connect);
 
 let _settings = parseConnectSettings();
 

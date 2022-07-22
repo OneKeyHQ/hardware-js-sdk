@@ -15,7 +15,8 @@ import {
   ERRORS,
   HardwareErrorCode,
   enableLog,
-  initLog,
+  getLogger,
+  LoggerNames,
 } from '@onekeyfe/hd-shared';
 import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
@@ -35,7 +36,7 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 
 const transportCache: Record<string, any> = {};
 
-const Log = initLog('@onekey/hd-ble-transport');
+const Log = getLogger(LoggerNames.HdBleTransport);
 
 let connectOptions: Record<string, unknown> = {
   requestMTU: 512,

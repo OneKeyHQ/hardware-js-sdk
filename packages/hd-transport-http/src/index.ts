@@ -1,5 +1,5 @@
 import transport from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, enableLog, initLog } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, enableLog, getLogger, LoggerNames } from '@onekeyfe/hd-shared';
 import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
@@ -11,7 +11,7 @@ type IncompleteRequestOptions = {
   url: string;
 };
 
-const Log = initLog('@onekey/hd-transport-http');
+const Log = getLogger(LoggerNames.HdTransportHttp);
 
 export default class HttpTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;

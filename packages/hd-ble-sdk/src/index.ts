@@ -2,7 +2,6 @@ import EventEmitter from 'events';
 import HardwareSdk, {
   ConnectSettings,
   enableLog,
-  initLog,
   parseConnectSettings,
   initCore,
   Core,
@@ -15,11 +14,18 @@ import HardwareSdk, {
   UiResponseEvent,
   UI_REQUEST,
 } from '@onekeyfe/hd-core';
-import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  createDeferred,
+  Deferred,
+  HardwareErrorCode,
+  getLogger,
+  LoggerNames,
+} from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 
 const eventEmitter = new EventEmitter();
-const Log = initLog('@onekey/hd-ble-sdk');
+const Log = getLogger(LoggerNames.HdBleSdk);
 
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
