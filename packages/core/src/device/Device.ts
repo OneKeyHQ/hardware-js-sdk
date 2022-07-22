@@ -1,11 +1,17 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
-import { createDeferred, Deferred, HardwareErrorCode, ERRORS } from '@onekeyfe/hd-shared';
+import {
+  createDeferred,
+  Deferred,
+  HardwareErrorCode,
+  ERRORS,
+  getLogger,
+  LoggerNames,
+} from '@onekeyfe/hd-shared';
 
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
 
-import { initLog } from '../utils';
 import {
   getDeviceFirmwareVersion,
   getDeviceLabel,
@@ -29,7 +35,7 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
   return options;
 };
 
-const Log = initLog('Device');
+const Log = getLogger(LoggerNames.Device);
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];

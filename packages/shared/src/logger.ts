@@ -132,3 +132,35 @@ export const getLog = () => {
   logs.sort((a, b) => a.timestamp - b.timestamp);
   return logs;
 };
+
+export enum LoggerNames {
+  Core = 'Core',
+  Transport = 'Transport',
+  Device = 'Device',
+  DeviceCommands = 'DeviceCommands',
+  DeviceConnector = 'DeviceConnector',
+  DeviceList = 'DeviceList',
+  HdBleSdk = '@onekey/hd-ble-sdk',
+  HdTransportHttp = '@onekey/hd-transport-http',
+  HdBleTransport = '@onekey/hd-ble-transport',
+  Connect = '@onekey/connect',
+  Iframe = 'IFrame',
+  SendMessage = '[SendMessage]',
+}
+
+export const LoggerMap = {
+  [LoggerNames.Core]: initLog(LoggerNames.Core),
+  [LoggerNames.Transport]: initLog(LoggerNames.Transport),
+  [LoggerNames.Device]: initLog(LoggerNames.Device),
+  [LoggerNames.DeviceCommands]: initLog(LoggerNames.DeviceCommands),
+  [LoggerNames.DeviceConnector]: initLog(LoggerNames.DeviceConnector),
+  [LoggerNames.DeviceList]: initLog(LoggerNames.DeviceList),
+  [LoggerNames.HdBleSdk]: initLog(LoggerNames.HdBleSdk),
+  [LoggerNames.HdTransportHttp]: initLog(LoggerNames.HdTransportHttp),
+  [LoggerNames.HdBleTransport]: initLog(LoggerNames.HdBleTransport),
+  [LoggerNames.Connect]: initLog(LoggerNames.Connect),
+  [LoggerNames.Iframe]: initLog(LoggerNames.Iframe),
+  [LoggerNames.SendMessage]: initLog(LoggerNames.SendMessage),
+};
+
+export const getLogger = (key: LoggerNames) => LoggerMap[key];

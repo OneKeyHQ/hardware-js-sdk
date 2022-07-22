@@ -1,7 +1,13 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+  getLogger,
+  LoggerNames,
+} from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
-import { initLog, patchFeatures } from '../utils';
+import { patchFeatures } from '../utils';
 import type { Device } from './Device';
 import { DEVICE } from '../events';
 
@@ -32,7 +38,7 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
   }
 };
 
-const Log = initLog('DeviceCommands');
+const Log = getLogger(LoggerNames.DeviceCommands);
 
 export class DeviceCommands {
   device: Device;

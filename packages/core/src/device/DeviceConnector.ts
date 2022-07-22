@@ -1,8 +1,8 @@
 import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { getLogger, LoggerNames } from '@onekeyfe/hd-shared';
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
-import { initLog } from '../utils';
 import { resolveAfter } from '../utils/promiseUtils';
 
 export type DeviceDescriptorDiff = {
@@ -18,7 +18,7 @@ export type DeviceDescriptorDiff = {
   descriptors: DeviceDescriptor[];
 };
 
-const Log = initLog('DeviceConnector');
+const Log = getLogger(LoggerNames.DeviceConnector);
 
 const getDiff = (
   current: DeviceDescriptor[],

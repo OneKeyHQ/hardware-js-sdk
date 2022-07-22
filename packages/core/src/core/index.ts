@@ -1,12 +1,19 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
-import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  createDeferred,
+  Deferred,
+  ERRORS,
+  HardwareErrorCode,
+  getLogger,
+  LoggerNames,
+} from '@onekeyfe/hd-shared';
 import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { initLog, enableLog } from '../utils';
+import { enableLog } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,
@@ -31,7 +38,7 @@ import {
   getDeviceType,
 } from '../utils/deviceFeaturesUtils';
 
-const Log = initLog('Core');
+const Log = getLogger(LoggerNames.Core);
 
 let _core: Core;
 let _deviceList: DeviceList | undefined;

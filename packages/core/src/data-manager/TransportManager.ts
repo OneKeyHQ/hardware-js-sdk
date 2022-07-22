@@ -1,9 +1,8 @@
 import { Transport } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { initLog } from '../utils';
+import { ERRORS, HardwareErrorCode, getLogger, LoggerNames } from '@onekeyfe/hd-shared';
 import DataManager from './DataManager';
 
-const Log = initLog('Transport');
+const Log = getLogger(LoggerNames.Transport);
 /**
  * transport 在同一个环境中只会存在一个
  * 这里设计成单例获取
