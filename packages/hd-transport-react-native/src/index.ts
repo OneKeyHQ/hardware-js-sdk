@@ -35,7 +35,7 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 
 const transportCache: Record<string, any> = {};
 
-const Log = initLog('@onekey/hd-ble-sdk');
+const Log = initLog('@onekey/hd-ble-transport');
 
 let connectOptions: Record<string, unknown> = {
   requestMTU: 512,
@@ -65,10 +65,11 @@ export default class ReactNativeBleTransport {
 
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? 3000;
-    enableLog(true);
   }
 
-  init() {}
+  init() {
+    enableLog(true);
+  }
 
   configure(signedData: any) {
     const messages = parseConfigure(signedData);
