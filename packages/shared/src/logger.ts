@@ -107,6 +107,8 @@ export const initLog = (prefix: string, enabled?: boolean, logger?: Logger) => {
 export const enableLog = (enabled?: boolean) => {
   Object.keys(_logs).forEach(key => {
     _logs[key].enabled = !!enabled;
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    // console.log(`log switch: set ${key} -> ${!!enabled}`);
   });
 };
 
