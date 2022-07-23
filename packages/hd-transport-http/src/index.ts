@@ -1,5 +1,5 @@
 import transport from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, enableLog, getLogger, LoggerNames } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, getLogger, LoggerNames } from '@onekeyfe/hd-shared';
 import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
@@ -24,7 +24,6 @@ export default class HttpTransport {
 
   constructor(url?: string) {
     this.url = url == null ? DEFAULT_URL : url;
-    enableLog(true);
   }
 
   _post(options: IncompleteRequestOptions) {

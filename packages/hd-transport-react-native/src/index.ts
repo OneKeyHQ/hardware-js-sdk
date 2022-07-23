@@ -14,7 +14,6 @@ import {
   Deferred,
   ERRORS,
   HardwareErrorCode,
-  enableLog,
   getLogger,
   LoggerNames,
 } from '@onekeyfe/hd-shared';
@@ -68,9 +67,7 @@ export default class ReactNativeBleTransport {
     this.scanTimeout = options.scanTimeout ?? 3000;
   }
 
-  init() {
-    enableLog(true);
-  }
+  init() {}
 
   configure(signedData: any) {
     const messages = parseConfigure(signedData);

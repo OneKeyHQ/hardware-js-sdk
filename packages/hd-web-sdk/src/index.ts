@@ -17,6 +17,7 @@ import {
   HardwareError,
   HardwareErrorCode,
   LoggerNames,
+  setOutsideLogger,
 } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
@@ -96,6 +97,11 @@ const init = async (settings: Partial<ConnectSettings>) => {
   _settings = parseConnectSettings({ ..._settings, ...settings });
 
   enableLog(!!settings.debug);
+
+  console.log('init-============');
+  if (_settings.logger) {
+    setOutsideLogger(_settings.logger);
+  }
 
   Log.debug('init');
 

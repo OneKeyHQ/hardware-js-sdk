@@ -21,6 +21,7 @@ import {
   HardwareErrorCode,
   getLogger,
   LoggerNames,
+  setOutsideLogger,
 } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 
@@ -90,6 +91,11 @@ const init = async (settings: Partial<ConnectSettings>) => {
   _settings = { ..._settings, ...settings, env: 'react-native' };
 
   enableLog(!!settings.debug);
+
+  if (_settings.logger) {
+    setOutsideLogger(_settings.logger);
+  }
+
   Log.debug('init');
 
   try {

@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import type { ConnectSettings, CoreApi } from '@onekeyfe/hd-core';
+import { logger } from './logger';
 
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;
@@ -14,6 +15,7 @@ const promise: Promise<CoreApi> = new Promise(async resolve => {
 
   const settings: Partial<ConnectSettings> = {
     debug: true,
+    logger,
   };
 
   if (Platform.OS === 'android' || Platform.OS === 'ios') {

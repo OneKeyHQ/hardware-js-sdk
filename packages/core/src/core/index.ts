@@ -8,6 +8,7 @@ import {
   HardwareErrorCode,
   getLogger,
   LoggerNames,
+  setOutsideLogger,
 } from '@onekeyfe/hd-shared';
 import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
@@ -412,6 +413,10 @@ export const init = async (settings: ConnectSettings, Transport: any) => {
       Log.error('DataManager.load error');
     }
     enableLog(DataManager.getSettings('debug'));
+    const logger = DataManager.getSettings('logger');
+    if (logger) {
+      setOutsideLogger(logger);
+    }
     initCore();
     initConnector();
 
