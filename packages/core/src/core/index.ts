@@ -407,10 +407,6 @@ export const init = async (settings: ConnectSettings, Transport: any) => {
     }
     enableLog(DataManager.getSettings('debug'));
     setLoggerPostMessage(postMessage);
-    // const logger = DataManager.getSettings('logger');
-    // if (logger) {
-    //   setOutsideLogger(logger);
-    // }
     initCore();
     initConnector();
 

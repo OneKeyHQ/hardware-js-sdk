@@ -8,16 +8,6 @@ type LogMessage = {
   timestamp: number;
 };
 
-type LoggerFn = (...data: any[]) => void;
-type LoggerMoreParams = (message?: any, ...optionalParams: any[]) => void;
-
-type Logger = {
-  debug: LoggerFn | LoggerMoreParams;
-  info: LoggerFn | LoggerMoreParams;
-  warn: LoggerFn | LoggerMoreParams;
-  error: LoggerFn | LoggerMoreParams;
-};
-
 const MAX_ENTRIES = 500;
 
 let postMessage: (message: CoreMessage) => void;
@@ -29,15 +19,10 @@ class Log {
 
   messages: LogMessage[];
 
-  logger?: Logger;
-
-  constructor(prefix: string, enabled: boolean, logger?: Logger) {
+  constructor(prefix: string, enabled: boolean) {
     this.prefix = prefix;
     this.enabled = enabled;
     this.messages = [];
-    if (logger) {
-      this.logger = logger;
-    }
   }
 
   addMessage(level: string, prefix: string, ...args: any[]) {
@@ -58,11 +43,7 @@ class Log {
       return;
     }
     sendLogMessage(this.prefix, ...args);
-    if (this.logger) {
-      this.logger.info(this.prefix, ...args);
-    } else {
-      console.log(this.prefix, ...args);
-    }
+    console.log(this.prefix, ...args);
   }
 
   error(...args: any[]) {
@@ -71,11 +52,7 @@ class Log {
       return;
     }
     sendLogMessage(this.prefix, ...args);
-    if (this.logger) {
-      this.logger.error(this.prefix, ...args);
-    } else {
-      console.error(this.prefix, ...args);
-    }
+    console.error(this.prefix, ...args);
   }
 
   warn(...args: any[]) {
@@ -84,11 +61,7 @@ class Log {
       return;
     }
     sendLogMessage(this.prefix, ...args);
-    if (this.logger) {
-      this.logger.warn(this.prefix, ...args);
-    } else {
-      console.warn(this.prefix, ...args);
-    }
+    console.warn(this.prefix, ...args);
   }
 
   debug(...args: any[]) {
@@ -97,18 +70,14 @@ class Log {
       return;
     }
     sendLogMessage(this.prefix, ...args);
-    if (this.logger) {
-      this.logger.debug(this.prefix, ...args);
-    } else {
-      console.log(this.prefix, ...args);
-    }
+    console.log(this.prefix, ...args);
   }
 }
 
 const _logs: { [k: string]: Log } = {};
 
-export const initLog = (prefix: string, enabled?: boolean, logger?: Logger) => {
-  const instance = new Log(prefix, !!enabled, logger);
+export const initLog = (prefix: string, enabled?: boolean) => {
+  const instance = new Log(prefix, !!enabled);
   _logs[prefix] = instance;
   return instance;
 };
@@ -116,12 +85,6 @@ export const initLog = (prefix: string, enabled?: boolean, logger?: Logger) => {
 export const enableLog = (enabled?: boolean) => {
   Object.keys(_logs).forEach(key => {
     _logs[key].enabled = !!enabled;
-  });
-};
-
-export const setOutsideLogger = (logger: Logger) => {
-  Object.keys(_logs).forEach(key => {
-    _logs[key].logger = logger;
   });
 };
 
@@ -194,6 +157,7 @@ export enum LoggerNames {
   Connect = '@onekey/connect',
   Iframe = 'IFrame',
   SendMessage = '[SendMessage]',
+  Method = '[Method]',
 }
 
 export const LoggerMap = {
@@ -209,6 +173,7 @@ export const LoggerMap = {
   [LoggerNames.Connect]: initLog(LoggerNames.Connect),
   [LoggerNames.Iframe]: initLog(LoggerNames.Iframe),
   [LoggerNames.SendMessage]: initLog(LoggerNames.SendMessage),
+  [LoggerNames.Method]: initLog(LoggerNames.Method),
 };
 
 export const getLogger = (key: LoggerNames) => LoggerMap[key];

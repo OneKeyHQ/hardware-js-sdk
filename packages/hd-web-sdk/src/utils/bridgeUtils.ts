@@ -1,6 +1,6 @@
 import { IJsBridgeIframeConfig, JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
-import { CoreMessage } from '@onekeyfe/hd-core';
-import { ERRORS, getLogger, LoggerNames } from '@onekeyfe/hd-shared';
+import { CoreMessage, getLogger, LoggerNames } from '@onekeyfe/hd-core';
+import { ERRORS } from '@onekeyfe/hd-shared';
 import JSBridgeConfig from '../iframe/bridge-config';
 
 // eslint-disable-next-line import/no-mutable-exports

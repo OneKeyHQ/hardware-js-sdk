@@ -11,15 +11,11 @@ import HardwareSdk, {
   ConnectSettings,
   UiResponseEvent,
   LOG_EVENT,
-} from '@onekeyfe/hd-core';
-import {
-  ERRORS,
+  setLoggerPostMessage,
   getLogger,
-  HardwareError,
-  HardwareErrorCode,
   LoggerNames,
-  setOutsideLogger,
-} from '@onekeyfe/hd-shared';
+} from '@onekeyfe/hd-core';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
 import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
@@ -85,10 +81,12 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
         if (message.event !== 'LOG_EVENT') {
-          console.log('Host Bridge Receive message: ', message);
+          Log.debug('Host Bridge Receive message: ', message);
         }
         const response = await handleMessage(message);
-        Log.debug('Host Bridge response: ', response);
+        if (message.event !== 'LOG_EVENT') {
+          Log.debug('Host Bridge response: ', response);
+        }
         return response;
       },
     });
@@ -103,11 +101,9 @@ const init = async (settings: Partial<ConnectSettings>) => {
   _settings = parseConnectSettings({ ..._settings, ...settings });
 
   enableLog(!!settings.debug);
+  setLoggerPostMessage(handleMessage);
 
   console.log('init-============');
-  if (_settings.logger) {
-    setOutsideLogger(_settings.logger);
-  }
 
   Log.debug('init');
 

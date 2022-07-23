@@ -14,16 +14,11 @@ import HardwareSdk, {
   UiResponseEvent,
   UI_REQUEST,
   LOG_EVENT,
-} from '@onekeyfe/hd-core';
-import {
-  ERRORS,
-  createDeferred,
-  Deferred,
-  HardwareErrorCode,
   getLogger,
   LoggerNames,
-  setOutsideLogger,
-} from '@onekeyfe/hd-shared';
+  setLoggerPostMessage,
+} from '@onekeyfe/hd-core';
+import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 
 const eventEmitter = new EventEmitter();
@@ -95,10 +90,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
   _settings = { ..._settings, ...settings, env: 'react-native' };
 
   enableLog(!!settings.debug);
-
-  if (_settings.logger) {
-    setOutsideLogger(_settings.logger);
-  }
+  // setLoggerPostMessage(postMessage);
 
   Log.debug('init');
 

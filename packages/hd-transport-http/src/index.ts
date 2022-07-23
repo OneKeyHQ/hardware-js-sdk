@@ -1,5 +1,5 @@
 import transport from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, getLogger, LoggerNames, enableLog } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
@@ -38,8 +38,7 @@ export default class HttpTransport {
   }
 
   async init(logger: any) {
-    this.Log = logger ?? getLogger(LoggerNames.HdTransportHttp);
-    enableLog(true);
+    this.Log = logger;
     const bridgeVersion = await this._silentInit();
     return bridgeVersion;
   }

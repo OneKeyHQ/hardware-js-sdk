@@ -105,9 +105,5 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
     settings.timestamp = input.timestamp;
   }
 
-  // if (input.logger) {
-  //   settings.logger = input.logger;
-  // }
-
   return settings;
 };

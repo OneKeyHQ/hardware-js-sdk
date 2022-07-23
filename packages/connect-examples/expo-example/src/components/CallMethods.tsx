@@ -50,7 +50,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     SDK.on(LOG_EVENT, (message: CoreMessage) => {
       if (Array.isArray(message.payload)) {
         const msg = message.payload.join(' ');
-        console.log('Loggggggg get: ', msg);
+        console.log('receive log event: ', msg);
       }
     });
     registerListener = true;

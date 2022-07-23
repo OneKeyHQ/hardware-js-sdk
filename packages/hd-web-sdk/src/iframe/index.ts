@@ -11,8 +11,9 @@ import {
   initCore,
   Core,
   CORE_EVENT,
+  getLogger,
+  LoggerNames,
 } from '@onekeyfe/hd-core';
-import { getLogger, LoggerNames } from '@onekeyfe/hd-shared';
 import { getOrigin } from '../utils/urlUtils';
 import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
 

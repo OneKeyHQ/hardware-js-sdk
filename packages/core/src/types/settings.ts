@@ -17,7 +17,6 @@ export type ConnectSettings = {
   env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native';
   timestamp: number;
   isFrame?: boolean;
-  logger?: any;
 };
 
 export type IVersionArray = [number, number, number];
