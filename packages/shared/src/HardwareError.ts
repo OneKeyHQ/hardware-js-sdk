@@ -10,6 +10,7 @@ type HardwareErrorCodeMessageMapping = { [P in ValueOf<typeof HardwareErrorCode>
 type ErrorCodeUnion = ValueOf<typeof HardwareErrorCode>;
 
 function fillStringWithArguments(value: string, object: object) {
+  if (typeof value !== 'string') return value;
   return value.replace(/\{([^}]+)\}/g, (_, arg: string) => (object as unknown as any)[arg] || '?');
 }
 
