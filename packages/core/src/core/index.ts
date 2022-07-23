@@ -1,18 +1,12 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
-import {
-  createDeferred,
-  Deferred,
-  ERRORS,
-  HardwareErrorCode,
-  setOutsideLogger,
-} from '@onekeyfe/hd-shared';
+import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { enableLog, getLogger, LoggerNames, getLog } from '../utils';
+import { enableLog, getLogger, LoggerNames } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,
@@ -36,6 +30,7 @@ import {
   getDeviceModel,
   getDeviceType,
 } from '../utils/deviceFeaturesUtils';
+import { setLoggerPostMessage } from '../utils/logger';
 
 const Log = getLogger(LoggerNames.Core);
 
@@ -96,7 +91,7 @@ export const callAPI = async (message: CoreMessage) => {
     return Promise.reject(error);
   }
 
-  Log.debug('Call API - setDevice: ', device);
+  Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
 
   device.on(DEVICE.PIN, onDevicePinHandler);
@@ -176,7 +171,7 @@ export const callAPI = async (message: CoreMessage) => {
         _callPromise?.resolve(messageResponse);
       }
     };
-    Log.debug('Call API - Device Run: ', device);
+    Log.debug('Call API - Device Run: ', device.mainId);
     const deviceRun = () => device.run(inner);
     _callPromise = createDeferred(deviceRun);
 
@@ -411,10 +406,11 @@ export const init = async (settings: ConnectSettings, Transport: any) => {
       Log.error('DataManager.load error');
     }
     enableLog(DataManager.getSettings('debug'));
-    const logger = DataManager.getSettings('logger');
-    if (logger) {
-      setOutsideLogger(logger);
-    }
+    setLoggerPostMessage(postMessage);
+    // const logger = DataManager.getSettings('logger');
+    // if (logger) {
+    //   setOutsideLogger(logger);
+    // }
     initCore();
     initConnector();
 

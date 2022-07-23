@@ -10,4 +10,4 @@ export {
 } from './deviceFeaturesUtils';
 export { getHDPath, getScriptType } from '../api/helpers/pathUtils';
 
-export { getLogger, enableLog, LoggerNames, getLog } from './logger';
+export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';

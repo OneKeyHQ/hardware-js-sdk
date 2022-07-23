@@ -23,12 +23,16 @@ export const sendMessage = async (messages: CoreMessage, isHost = true): Promise
   const bridge = isHost ? hostBridge : frameBridge;
 
   try {
-    Log.debug('request: ', messages);
+    if (messages.event !== 'LOG_EVENT') {
+      Log.debug('request: ', messages);
+    }
     const result = await bridge?.request({
       scope: JSBridgeConfig.scope,
       data: { ...messages },
     });
-    Log.debug('response: ', result);
+    if (messages.event !== 'LOG_EVENT') {
+      Log.debug('response: ', result);
+    }
     return result;
   } catch (error) {
     Log.error(error);

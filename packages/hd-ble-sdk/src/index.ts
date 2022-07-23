@@ -13,6 +13,7 @@ import HardwareSdk, {
   UI_EVENT,
   UiResponseEvent,
   UI_REQUEST,
+  LOG_EVENT,
 } from '@onekeyfe/hd-core';
 import {
   ERRORS,
@@ -64,6 +65,9 @@ function handleMessage(message: CoreMessage) {
       // pass UI event up
       eventEmitter.emit(message.event, message);
       eventEmitter.emit(message.type, message.payload);
+      break;
+    case LOG_EVENT:
+      eventEmitter.emit(message.event, message);
       break;
     default:
       Log.log('No need to be captured message', message.event);

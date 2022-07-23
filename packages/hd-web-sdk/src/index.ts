@@ -10,6 +10,7 @@ import HardwareSdk, {
   CoreMessage,
   ConnectSettings,
   UiResponseEvent,
+  LOG_EVENT,
 } from '@onekeyfe/hd-core';
 import {
   ERRORS,
@@ -39,6 +40,9 @@ const handleMessage = async (message: CoreMessage) => {
       // pass UI event up
       eventEmitter.emit(message.event, message);
       eventEmitter.emit(message.type, message.payload);
+      break;
+    case LOG_EVENT:
+      eventEmitter.emit(message.event, message);
       break;
 
     default:
@@ -80,7 +84,9 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
-        console.log('Host Bridge Receive message: ', message);
+        if (message.event !== 'LOG_EVENT') {
+          console.log('Host Bridge Receive message: ', message);
+        }
         const response = await handleMessage(message);
         Log.debug('Host Bridge response: ', response);
         return response;

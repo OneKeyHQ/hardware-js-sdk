@@ -1,3 +1,6 @@
+import { CoreMessage } from '../events';
+import { createLogMessage, LOG } from '../events/log';
+
 type LogMessage = {
   level: string;
   prefix: string;
@@ -16,6 +19,8 @@ type Logger = {
 };
 
 const MAX_ENTRIES = 500;
+
+let postMessage: (message: CoreMessage) => void;
 
 class Log {
   prefix: string;
@@ -52,6 +57,7 @@ class Log {
     if (!this.enabled) {
       return;
     }
+    sendLogMessage(this.prefix, ...args);
     if (this.logger) {
       this.logger.info(this.prefix, ...args);
     } else {
@@ -64,6 +70,7 @@ class Log {
     if (!this.enabled) {
       return;
     }
+    sendLogMessage(this.prefix, ...args);
     if (this.logger) {
       this.logger.error(this.prefix, ...args);
     } else {
@@ -76,6 +83,7 @@ class Log {
     if (!this.enabled) {
       return;
     }
+    sendLogMessage(this.prefix, ...args);
     if (this.logger) {
       this.logger.warn(this.prefix, ...args);
     } else {
@@ -88,6 +96,7 @@ class Log {
     if (!this.enabled) {
       return;
     }
+    sendLogMessage(this.prefix, ...args);
     if (this.logger) {
       this.logger.debug(this.prefix, ...args);
     } else {
@@ -129,6 +138,47 @@ export const getLog = () => {
   });
   logs.sort((a, b) => a.timestamp - b.timestamp);
   return logs;
+};
+
+export const setLoggerPostMessage = (postMessageFn: (message: CoreMessage) => void) => {
+  postMessage = postMessageFn;
+};
+
+const serializeLog = (...args: any[]) =>
+  args.map(arg => {
+    if (typeof arg === 'string') {
+      return arg;
+    }
+    if (typeof arg === 'number') {
+      return arg;
+    }
+    if (typeof arg === 'boolean') {
+      return arg;
+    }
+    if (typeof arg === 'undefined') {
+      return arg;
+    }
+    if (typeof arg === 'object') {
+      return JSON.stringify(arg, getCircularReplacer());
+    }
+    return arg;
+  });
+
+const getCircularReplacer = () => {
+  const seen = new WeakSet();
+  return (_: string, value: any) => {
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return;
+      }
+      seen.add(value);
+    }
+    return value;
+  };
+};
+
+const sendLogMessage = (prefix: string, ...args: any[]) => {
+  postMessage?.(createLogMessage(LOG.OUTPUT, serializeLog(prefix, ...args)));
 };
 
 export enum LoggerNames {
