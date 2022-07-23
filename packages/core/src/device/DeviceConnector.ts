@@ -1,9 +1,9 @@
 import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
-import { getLogger, LoggerNames } from '@onekeyfe/hd-shared';
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { resolveAfter } from '../utils/promiseUtils';
+import { getLogger, LoggerNames } from '../utils';
 
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;

@@ -1,8 +1,11 @@
 import { Transport } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, getLogger, LoggerNames } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import DataManager from './DataManager';
+import { getLogger, LoggerNames } from '../utils';
 
 const Log = getLogger(LoggerNames.Transport);
+const BleLogger = getLogger(LoggerNames.HdBleTransport);
+const HttpLogger = getLogger(LoggerNames.HdTransportHttp);
 /**
  * transport 在同一个环境中只会存在一个
  * 这里设计成单例获取
@@ -29,13 +32,13 @@ export default class TransportManager {
       Log.debug('Initializing transports');
       if (env === 'react-native') {
         if (!this.reactNativeInit) {
-          await this.transport.init();
+          await this.transport.init(BleLogger);
           this.reactNativeInit = true;
         } else {
           Log.debug('React Native Do Not Initializing transports');
         }
       } else {
-        await this.transport.init();
+        await this.transport.init(HttpLogger);
       }
       Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));

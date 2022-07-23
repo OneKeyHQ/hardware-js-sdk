@@ -1,8 +1,8 @@
 import EventEmitter from 'events';
-import { getLogger, LoggerNames } from '@onekeyfe/hd-shared';
 import DeviceConnector from './DeviceConnector';
 import { Device } from './Device';
 import { getDeviceUUID } from '../utils/deviceFeaturesUtils';
+import { getLogger, LoggerNames } from '../utils';
 
 const cacheDeviceMap = new Map<string, Device>();
 

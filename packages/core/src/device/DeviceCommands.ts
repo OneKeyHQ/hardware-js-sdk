@@ -1,13 +1,7 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
-import {
-  ERRORS,
-  HardwareError,
-  HardwareErrorCode,
-  getLogger,
-  LoggerNames,
-} from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
-import { patchFeatures } from '../utils';
+import { patchFeatures, getLogger, LoggerNames } from '../utils';
 import type { Device } from './Device';
 import { DEVICE } from '../events';
 

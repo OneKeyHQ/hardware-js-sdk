@@ -43,3 +43,5 @@ export { default as stellarGetAddress } from './stellar/StellarGetAddress';
 export { default as stellarSignTransaction } from './stellar/StellarSignTransaction';
 
 export { default as firmwareUpdate } from './FirmwareUpdate';
+
+export { default as getLogs } from './GetLogs';

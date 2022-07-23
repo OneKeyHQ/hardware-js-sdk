@@ -15,7 +15,7 @@ type Logger = {
   error: LoggerFn | LoggerMoreParams;
 };
 
-const MAX_ENTRIES = 100;
+const MAX_ENTRIES = 500;
 
 class Log {
   prefix: string;

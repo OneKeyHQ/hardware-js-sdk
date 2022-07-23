@@ -1,13 +1,6 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
-import {
-  createDeferred,
-  Deferred,
-  HardwareErrorCode,
-  ERRORS,
-  getLogger,
-  LoggerNames,
-} from '@onekeyfe/hd-shared';
+import { createDeferred, Deferred, HardwareErrorCode, ERRORS } from '@onekeyfe/hd-shared';
 
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
@@ -24,6 +17,7 @@ import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '.
 import { DEVICE, DeviceButtonRequestPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
+import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
 
 type RunOptions = {

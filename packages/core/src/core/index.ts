@@ -6,15 +6,13 @@ import {
   Deferred,
   ERRORS,
   HardwareErrorCode,
-  getLogger,
-  LoggerNames,
   setOutsideLogger,
 } from '@onekeyfe/hd-shared';
 import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { enableLog } from '../utils';
+import { enableLog, getLogger, LoggerNames, getLog } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,

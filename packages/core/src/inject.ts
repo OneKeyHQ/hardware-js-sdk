@@ -41,6 +41,8 @@ export const inject = ({
     uiResponse,
 
     cancel,
+
+    getLogs: () => call({ method: 'getLogs' }),
     /**
      * 搜索设备
      */

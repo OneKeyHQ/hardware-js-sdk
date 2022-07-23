@@ -35,7 +35,7 @@ export type Transport = {
   cancel(): Promise<void>;
 
   // resolves when the transport can be used; rejects when it cannot
-  init(): Promise<string>;
+  init(logger: any): Promise<string>;
   stop(): void;
 
   configured: boolean;
