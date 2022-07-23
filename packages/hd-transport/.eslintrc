@@ -16,6 +16,7 @@
       // note you must disable the base rule as it can report incorrect errors
       "no-use-before-define": "off",
       "@typescript-eslint/no-use-before-define": ["error"],
-      "require-await": ["error"]
+      "require-await": ["error"],
+      "@typescript-eslint/ban-types": "off"
   }
 }

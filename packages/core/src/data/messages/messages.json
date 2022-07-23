@@ -4300,6 +4300,10 @@
               "coin_switch": {
                   "type": "uint32",
                   "id": 517
+              },
+              "build_id": {
+                  "type": "string",
+                  "id": 518
               }
           },
           "nested": {
@@ -7540,6 +7544,171 @@
               }
           }
       },
+      "TronGetAddress": {
+          "fields": {
+              "address_n": {
+                  "rule": "repeated",
+                  "type": "uint32",
+                  "id": 1,
+                  "options": {
+                      "packed": false
+                  }
+              },
+              "show_display": {
+                  "type": "bool",
+                  "id": 2
+              }
+          }
+      },
+      "TronAddress": {
+          "fields": {
+              "address": {
+                  "type": "string",
+                  "id": 1
+              }
+          }
+      },
+      "TronSignTx": {
+          "fields": {
+              "address_n": {
+                  "rule": "repeated",
+                  "type": "uint32",
+                  "id": 1,
+                  "options": {
+                      "packed": false
+                  }
+              },
+              "ref_block_bytes": {
+                  "rule": "required",
+                  "type": "bytes",
+                  "id": 2
+              },
+              "ref_block_hash": {
+                  "rule": "required",
+                  "type": "bytes",
+                  "id": 3
+              },
+              "expiration": {
+                  "rule": "required",
+                  "type": "uint64",
+                  "id": 4
+              },
+              "data": {
+                  "type": "string",
+                  "id": 5
+              },
+              "contract": {
+                  "rule": "required",
+                  "type": "TronContract",
+                  "id": 6
+              },
+              "timestamp": {
+                  "rule": "required",
+                  "type": "uint64",
+                  "id": 7
+              },
+              "fee_limit": {
+                  "type": "uint64",
+                  "id": 8
+              }
+          },
+          "nested": {
+              "TronContract": {
+                  "fields": {
+                      "transfer_contract": {
+                          "type": "TronTransferContract",
+                          "id": 2
+                      },
+                      "trigger_smart_contract": {
+                          "type": "TronTriggerSmartContract",
+                          "id": 31
+                      }
+                  },
+                  "nested": {
+                      "TronTransferContract": {
+                          "fields": {
+                              "to_address": {
+                                  "type": "string",
+                                  "id": 2
+                              },
+                              "amount": {
+                                  "type": "uint64",
+                                  "id": 3
+                              }
+                          }
+                      },
+                      "TronTriggerSmartContract": {
+                          "fields": {
+                              "contract_address": {
+                                  "type": "string",
+                                  "id": 2
+                              },
+                              "call_value": {
+                                  "type": "uint64",
+                                  "id": 3
+                              },
+                              "data": {
+                                  "type": "bytes",
+                                  "id": 4
+                              },
+                              "call_token_value": {
+                                  "type": "uint64",
+                                  "id": 5
+                              },
+                              "asset_id": {
+                                  "type": "uint64",
+                                  "id": 6
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      },
+      "TronSignedTx": {
+          "fields": {
+              "signature": {
+                  "rule": "required",
+                  "type": "bytes",
+                  "id": 1
+              },
+              "serialized_tx": {
+                  "type": "bytes",
+                  "id": 2
+              }
+          }
+      },
+      "TronSignMessage": {
+          "fields": {
+              "address_n": {
+                  "rule": "repeated",
+                  "type": "uint32",
+                  "id": 1,
+                  "options": {
+                      "packed": false
+                  }
+              },
+              "message": {
+                  "rule": "required",
+                  "type": "bytes",
+                  "id": 2
+              }
+          }
+      },
+      "TronMessageSignature": {
+          "fields": {
+              "address": {
+                  "rule": "required",
+                  "type": "bytes",
+                  "id": 1
+              },
+              "signature": {
+                  "rule": "required",
+                  "type": "bytes",
+                  "id": 2
+              }
+          }
+      },
       "WebAuthnListResidentCredentials": {
           "fields": {}
       },
@@ -7957,6 +8126,12 @@
               "MessageType_EthereumSignMessageEIP712": 10200,
               "MessageType_GetPublicKeyMultiple": 10210,
               "MessageType_PublicKeyMultiple": 10211,
+              "MessageType_TronGetAddress": 10501,
+              "MessageType_TronAddress": 10502,
+              "MessageType_TronSignTx": 10503,
+              "MessageType_TronSignedTx": 10504,
+              "MessageType_TronSignMessage": 10505,
+              "MessageType_TronMessageSignature": 10506,
               "MessageType_DeviceInfoSettings": 10001,
               "MessageType_GetDeviceInfo": 10002,
               "MessageType_DeviceInfo": 10003,
