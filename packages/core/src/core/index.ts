@@ -6,7 +6,7 @@ import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { enableLog, getLogger, LoggerNames } from '../utils';
+import { enableLog, getLogger, LoggerNames, setLoggerPostMessage } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,
@@ -30,7 +30,6 @@ import {
   getDeviceModel,
   getDeviceType,
 } from '../utils/deviceFeaturesUtils';
-import { setLoggerPostMessage } from '../utils/logger';
 
 const Log = getLogger(LoggerNames.Core);
 
@@ -178,7 +177,7 @@ export const callAPI = async (message: CoreMessage) => {
     try {
       return await _callPromise.promise;
     } catch (e) {
-      console.log('Device Run Error: ', e);
+      Log.debug('Device Run Error: ', e);
       return createResponseMessage(method.responseID, false, { error: e });
     }
   } catch (error) {
@@ -290,7 +289,7 @@ const closePopup = () => {
 };
 
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
-  console.log('onDevicePinHandler');
+  Log.debug('onDevicePinHandler');
   // create ui promise
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PIN, device);
   // request pin view
@@ -406,7 +405,9 @@ export const init = async (settings: ConnectSettings, Transport: any) => {
       Log.error('DataManager.load error');
     }
     enableLog(DataManager.getSettings('debug'));
-    setLoggerPostMessage(postMessage);
+    if (DataManager.getSettings('env') !== 'react-native') {
+      setLoggerPostMessage(postMessage);
+    }
     initCore();
     initConnector();
 

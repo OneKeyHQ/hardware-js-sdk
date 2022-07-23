@@ -68,7 +68,7 @@ export class DeviceCommands {
     type: MessageKey,
     msg: DefaultMessageResponse['message'] = {}
   ): Promise<DefaultMessageResponse> {
-    console.log('[DeviceCommands] [call] Sending', type);
+    Log.debug('[DeviceCommands] [call] Sending', type);
 
     try {
       const promise = this.transport.call(this.mainId, type, msg) as any;
@@ -117,7 +117,7 @@ export class DeviceCommands {
       // Bridge may have some unread message in buffer, read it
       // await this.transport.read?.(this.mainId);
 
-      console.log('DeviceCommands typedcall error: ', error);
+      Log.debug('DeviceCommands typedcall error: ', error);
 
       // throw bridge network error
       if (error instanceof HardwareError) {
@@ -140,7 +140,7 @@ export class DeviceCommands {
   }
 
   _filterCommonTypes(res: DefaultMessageResponse): Promise<DefaultMessageResponse> {
-    console.log('_filterCommonTypes: ', res);
+    Log.debug('_filterCommonTypes: ', res);
     if (res.type === 'Failure') {
       const { code } = res.message;
       const { message } = res.message;

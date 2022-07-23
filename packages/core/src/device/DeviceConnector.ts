@@ -141,7 +141,7 @@ export default class DeviceConnector {
   }
 
   async acquire(path: string, session?: string | null) {
-    console.log('acquire', path, session);
+    Log.debug('acquire', path, session);
     const env = DataManager.getSettings('env');
     try {
       let res;

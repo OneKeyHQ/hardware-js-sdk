@@ -23,7 +23,7 @@ export class DeviceList extends EventEmitter {
 
     this.devices = {};
     const deviceList = [];
-    console.log('get device list');
+    Log.debug('get device list');
     for await (const descriptor of descriptorList) {
       let device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;

@@ -53,8 +53,10 @@ function handleMessage(message: CoreMessage) {
   if (!_core) {
     return;
   }
-  Log.debug('hd-ble-sdk handleMessage', message);
 
+  if (event !== LOG_EVENT) {
+    Log.debug('hd-ble-sdk handleMessage', message);
+  }
   switch (event) {
     case UI_EVENT:
       // pass UI event up
@@ -90,13 +92,13 @@ const init = async (settings: Partial<ConnectSettings>) => {
   _settings = { ..._settings, ...settings, env: 'react-native' };
 
   enableLog(!!settings.debug);
-  // setLoggerPostMessage(postMessage);
 
   Log.debug('init');
 
   try {
     _core = await initCore(_settings, ReactNativeTransport);
     _core?.on(CORE_EVENT, handleMessage);
+    setLoggerPostMessage(handleMessage);
 
     return true;
   } catch (error) {

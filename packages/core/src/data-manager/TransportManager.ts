@@ -21,7 +21,7 @@ export default class TransportManager {
   static reactNativeInit = false;
 
   static load() {
-    console.log('transport manager load');
+    Log.debug('transport manager load');
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
   }
@@ -78,7 +78,7 @@ export default class TransportManager {
       /** Actually initializes the HttpTransport */
       this.transport = new TransportConstructor() as unknown as Transport;
     }
-    console.log('set transport: ', this.transport);
+    Log.debug('set transport: ', this.transport);
   }
 
   static getTransport() {

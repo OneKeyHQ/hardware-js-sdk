@@ -103,8 +103,6 @@ const init = async (settings: Partial<ConnectSettings>) => {
   enableLog(!!settings.debug);
   setLoggerPostMessage(handleMessage);
 
-  console.log('init-============');
-
   Log.debug('init');
 
   window.addEventListener('message', createJSBridge);
