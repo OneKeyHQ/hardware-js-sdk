@@ -2,7 +2,6 @@ import EventEmitter from 'events';
 import HardwareSdk, {
   ConnectSettings,
   enableLog,
-  initLog,
   parseConnectSettings,
   initCore,
   Core,
@@ -14,12 +13,16 @@ import HardwareSdk, {
   UI_EVENT,
   UiResponseEvent,
   UI_REQUEST,
+  LOG_EVENT,
+  getLogger,
+  LoggerNames,
+  setLoggerPostMessage,
 } from '@onekeyfe/hd-core';
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 
 const eventEmitter = new EventEmitter();
-const Log = initLog('@onekey/hd-ble-sdk');
+const Log = getLogger(LoggerNames.HdBleSdk);
 
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
@@ -50,13 +53,18 @@ function handleMessage(message: CoreMessage) {
   if (!_core) {
     return;
   }
-  Log.debug('hd-ble-sdk handleMessage', message);
 
+  if (event !== LOG_EVENT) {
+    Log.debug('hd-ble-sdk handleMessage', message);
+  }
   switch (event) {
     case UI_EVENT:
       // pass UI event up
       eventEmitter.emit(message.event, message);
       eventEmitter.emit(message.type, message.payload);
+      break;
+    case LOG_EVENT:
+      eventEmitter.emit(message.event, message);
       break;
     default:
       Log.log('No need to be captured message', message.event);
@@ -84,11 +92,13 @@ const init = async (settings: Partial<ConnectSettings>) => {
   _settings = { ..._settings, ...settings, env: 'react-native' };
 
   enableLog(!!settings.debug);
+
   Log.debug('init');
 
   try {
     _core = await initCore(_settings, ReactNativeTransport);
     _core?.on(CORE_EVENT, handleMessage);
+    setLoggerPostMessage(handleMessage);
 
     return true;
   } catch (error) {

@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { View, Button, StyleSheet, Platform, Switch, Text } from 'react-native';
 import RNRestart from 'react-native-restart';
-import { UI_EVENT, UI_REQUEST, CoreMessage, UI_RESPONSE, CoreApi } from '@onekeyfe/hd-core';
+import {
+  UI_EVENT,
+  UI_REQUEST,
+  CoreMessage,
+  UI_RESPONSE,
+  CoreApi,
+  LOG_EVENT,
+} from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
 import { CallEVMMethods } from './CallEVMMethods';
@@ -37,6 +44,13 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
 
       if (message.type === UI_REQUEST.REQUEST_PIN) {
         setShowPinInput(true);
+      }
+    });
+
+    SDK.on(LOG_EVENT, (message: CoreMessage) => {
+      if (Array.isArray(message.payload)) {
+        const msg = message.payload.join(' ');
+        console.log('receive log event: ', msg);
       }
     });
     registerListener = true;
@@ -111,6 +125,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     SDK.cancel(selectedDevice?.connectId);
   };
 
+  const handleGetLogs = async () => {
+    const res = await SDK.getLogs();
+    console.log('example getLogs response: ', res);
+  };
+
   return (
     <View>
       <View style={styles.buttonContainer}>
@@ -125,6 +144,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         <Button title="check bridge status" onPress={() => handleCheckBridgeStatus()} />
         <Button title="cancel" onPress={() => cancel()} />
         <Button title="reset" onPress={() => RNRestart.Restart()} />
+        <Button title="getLogs" onPress={() => handleGetLogs()} />
       </View>
       {showPinInput && (
         <ReceivePin

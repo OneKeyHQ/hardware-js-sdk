@@ -2,11 +2,11 @@ import EventEmitter from 'events';
 import DeviceConnector from './DeviceConnector';
 import { Device } from './Device';
 import { getDeviceUUID } from '../utils/deviceFeaturesUtils';
-import { initLog } from '../utils';
+import { getLogger, LoggerNames } from '../utils';
 
 const cacheDeviceMap = new Map<string, Device>();
 
-const Log = initLog('DeviceList');
+const Log = getLogger(LoggerNames.DeviceList);
 
 export class DeviceList extends EventEmitter {
   devices: Record<string, Device> = {};
@@ -23,7 +23,7 @@ export class DeviceList extends EventEmitter {
 
     this.devices = {};
     const deviceList = [];
-    console.log('get device list');
+    Log.debug('get device list');
     for await (const descriptor of descriptorList) {
       let device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;

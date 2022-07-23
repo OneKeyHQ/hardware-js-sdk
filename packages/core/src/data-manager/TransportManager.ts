@@ -1,9 +1,11 @@
 import { Transport } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { initLog } from '../utils';
 import DataManager from './DataManager';
+import { getLogger, LoggerNames } from '../utils';
 
-const Log = initLog('Transport');
+const Log = getLogger(LoggerNames.Transport);
+const BleLogger = getLogger(LoggerNames.HdBleTransport);
+const HttpLogger = getLogger(LoggerNames.HdTransportHttp);
 /**
  * transport 在同一个环境中只会存在一个
  * 这里设计成单例获取
@@ -19,7 +21,7 @@ export default class TransportManager {
   static reactNativeInit = false;
 
   static load() {
-    console.log('transport manager load');
+    Log.debug('transport manager load');
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
   }
@@ -30,13 +32,13 @@ export default class TransportManager {
       Log.debug('Initializing transports');
       if (env === 'react-native') {
         if (!this.reactNativeInit) {
-          await this.transport.init();
+          await this.transport.init(BleLogger);
           this.reactNativeInit = true;
         } else {
           Log.debug('React Native Do Not Initializing transports');
         }
       } else {
-        await this.transport.init();
+        await this.transport.init(HttpLogger);
       }
       Log.debug('Configuring transports');
       await this.transport.configure(JSON.stringify(this.defaultMessages));
@@ -76,7 +78,7 @@ export default class TransportManager {
       /** Actually initializes the HttpTransport */
       this.transport = new TransportConstructor() as unknown as Transport;
     }
-    console.log('set transport: ', this.transport);
+    Log.debug('set transport: ', this.transport);
   }
 
   static getTransport() {

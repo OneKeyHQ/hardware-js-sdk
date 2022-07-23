@@ -2,8 +2,8 @@ import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-tr
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
-import { initLog } from '../utils';
 import { resolveAfter } from '../utils/promiseUtils';
+import { getLogger, LoggerNames } from '../utils';
 
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;
@@ -18,7 +18,7 @@ export type DeviceDescriptorDiff = {
   descriptors: DeviceDescriptor[];
 };
 
-const Log = initLog('DeviceConnector');
+const Log = getLogger(LoggerNames.DeviceConnector);
 
 const getDiff = (
   current: DeviceDescriptor[],
@@ -141,7 +141,7 @@ export default class DeviceConnector {
   }
 
   async acquire(path: string, session?: string | null) {
-    console.log('acquire', path, session);
+    Log.debug('acquire', path, session);
     const env = DataManager.getSettings('env');
     try {
       let res;

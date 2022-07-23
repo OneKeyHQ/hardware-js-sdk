@@ -6,7 +6,7 @@ import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { initLog, enableLog } from '../utils';
+import { enableLog, getLogger, LoggerNames, setLoggerPostMessage } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,
@@ -31,7 +31,7 @@ import {
   getDeviceType,
 } from '../utils/deviceFeaturesUtils';
 
-const Log = initLog('Core');
+const Log = getLogger(LoggerNames.Core);
 
 let _core: Core;
 let _deviceList: DeviceList | undefined;
@@ -90,7 +90,7 @@ export const callAPI = async (message: CoreMessage) => {
     return Promise.reject(error);
   }
 
-  Log.debug('Call API - setDevice: ', device);
+  Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
 
   device.on(DEVICE.PIN, onDevicePinHandler);
@@ -170,14 +170,14 @@ export const callAPI = async (message: CoreMessage) => {
         _callPromise?.resolve(messageResponse);
       }
     };
-    Log.debug('Call API - Device Run: ', device);
+    Log.debug('Call API - Device Run: ', device.mainId);
     const deviceRun = () => device.run(inner);
     _callPromise = createDeferred(deviceRun);
 
     try {
       return await _callPromise.promise;
     } catch (e) {
-      console.log('Device Run Error: ', e);
+      Log.debug('Device Run Error: ', e);
       return createResponseMessage(method.responseID, false, { error: e });
     }
   } catch (error) {
@@ -289,7 +289,7 @@ const closePopup = () => {
 };
 
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
-  console.log('onDevicePinHandler');
+  Log.debug('onDevicePinHandler');
   // create ui promise
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PIN, device);
   // request pin view
@@ -405,6 +405,9 @@ export const init = async (settings: ConnectSettings, Transport: any) => {
       Log.error('DataManager.load error');
     }
     enableLog(DataManager.getSettings('debug'));
+    if (DataManager.getSettings('env') !== 'react-native') {
+      setLoggerPostMessage(postMessage);
+    }
     initCore();
     initConnector();
 

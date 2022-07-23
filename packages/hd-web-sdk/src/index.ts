@@ -1,7 +1,6 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
   parseConnectSettings,
-  initLog,
   enableLog,
   PostMessageEvent,
   IFRAME,
@@ -11,6 +10,10 @@ import HardwareSdk, {
   CoreMessage,
   ConnectSettings,
   UiResponseEvent,
+  LOG_EVENT,
+  setLoggerPostMessage,
+  getLogger,
+  LoggerNames,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
@@ -18,7 +21,7 @@ import JSBridgeConfig from './iframe/bridge-config';
 import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
 
 const eventEmitter = new EventEmitter();
-const Log = initLog('@onekey/connect');
+const Log = getLogger(LoggerNames.Connect);
 
 let _settings = parseConnectSettings();
 
@@ -33,6 +36,9 @@ const handleMessage = async (message: CoreMessage) => {
       // pass UI event up
       eventEmitter.emit(message.event, message);
       eventEmitter.emit(message.type, message.payload);
+      break;
+    case LOG_EVENT:
+      eventEmitter.emit(message.event, message);
       break;
 
     default:
@@ -74,9 +80,13 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
-        console.log('Host Bridge Receive message: ', message);
+        if (message.event !== 'LOG_EVENT') {
+          Log.debug('Host Bridge Receive message: ', message);
+        }
         const response = await handleMessage(message);
-        Log.debug('Host Bridge response: ', response);
+        if (message.event !== 'LOG_EVENT') {
+          Log.debug('Host Bridge response: ', response);
+        }
         return response;
       },
     });
@@ -91,6 +101,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
   _settings = parseConnectSettings({ ..._settings, ...settings });
 
   enableLog(!!settings.debug);
+  setLoggerPostMessage(handleMessage);
 
   Log.debug('init');
 

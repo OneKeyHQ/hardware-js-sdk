@@ -5,7 +5,6 @@ import { createDeferred, Deferred, HardwareErrorCode, ERRORS } from '@onekeyfe/h
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
 
-import { initLog } from '../utils';
 import {
   getDeviceFirmwareVersion,
   getDeviceLabel,
@@ -18,6 +17,7 @@ import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '.
 import { DEVICE, DeviceButtonRequestPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
+import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
 
 type RunOptions = {
@@ -29,7 +29,7 @@ const parseRunOptions = (options?: RunOptions): RunOptions => {
   return options;
 };
 
-const Log = initLog('Device');
+const Log = getLogger(LoggerNames.Device);
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];

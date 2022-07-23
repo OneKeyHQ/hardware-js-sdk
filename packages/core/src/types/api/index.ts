@@ -42,6 +42,7 @@ import { stellarGetAddress } from './stellarGetAddress';
 import { stellarSignTransaction } from './stellarSignTransaction';
 import { cipherKeyValue } from './cipherKeyValue';
 import { firmwareUpdate } from './firmwareUpdate';
+import { getLogs } from './getLogs';
 
 export * from './export';
 
@@ -57,6 +58,7 @@ export type CoreApi = {
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
+  getLogs: typeof getLogs;
 
   /**
    * Core function

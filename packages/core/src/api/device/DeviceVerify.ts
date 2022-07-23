@@ -33,7 +33,7 @@ export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
         }
       );
       response = res.message;
-    } else if (deviceType === 'mini') {
+    } else {
       const signatureRes = await this.device.commands.typedCall(
         'SESignMessage',
         'SEMessageSignature',
