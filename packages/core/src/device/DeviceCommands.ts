@@ -206,7 +206,10 @@ export class DeviceCommands {
     }
 
     if (res.type === 'PassphraseRequest') {
-      // TODO: PassphraseRequest
+      /**
+       * Temporary, callback an empty passphrase
+       */
+      return this._commonCall('PassphraseAck', { passphrase: '' });
     }
 
     // TT fw lower than 2.3.0, device send his current state
