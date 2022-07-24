@@ -39,37 +39,37 @@ class Log {
 
   log(...args: any[]) {
     this.addMessage('log', this.prefix, ...args);
+    sendLogMessage(this.prefix, ...args);
     if (!this.enabled) {
       return;
     }
-    sendLogMessage(this.prefix, ...args);
     console.log(this.prefix, ...args);
   }
 
   error(...args: any[]) {
     this.addMessage('error', this.prefix, ...args);
+    sendLogMessage(this.prefix, ...args);
     if (!this.enabled) {
       return;
     }
-    sendLogMessage(this.prefix, ...args);
     console.error(this.prefix, ...args);
   }
 
   warn(...args: any[]) {
     this.addMessage('warn', this.prefix, ...args);
+    sendLogMessage(this.prefix, ...args);
     if (!this.enabled) {
       return;
     }
-    sendLogMessage(this.prefix, ...args);
     console.warn(this.prefix, ...args);
   }
 
   debug(...args: any[]) {
     this.addMessage('debug', this.prefix, ...args);
+    sendLogMessage(this.prefix, ...args);
     if (!this.enabled) {
       return;
     }
-    sendLogMessage(this.prefix, ...args);
     console.log(this.prefix, ...args);
   }
 }
