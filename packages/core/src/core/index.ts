@@ -38,7 +38,7 @@ let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
 let _callPromise: Deferred<any> | undefined;
-const callApiQueue = [];
+const callApiQueue: BaseMethod[] = [];
 
 const deviceCacheMap = new Map<string, Device>();
 
@@ -70,6 +70,10 @@ export const callAPI = async (message: CoreMessage) => {
 
   // push method to queue
   callApiQueue.push(method);
+
+  if (callApiQueue.length > 1) {
+    Log.debug('should cancel the previous method execution: ', callApiQueue);
+  }
 
   // update DeviceList every call and first configure transport messages
   try {
@@ -191,6 +195,13 @@ export const callAPI = async (message: CoreMessage) => {
       if (method) {
         method.dispose();
       }
+    }
+
+    // remove method from queue
+    const index = callApiQueue.findIndex(m => m.responseID === messageResponse.id);
+    if (index > -1) {
+      callApiQueue.splice(index, 1);
+      Log.debug('Remove the finished method from the queue： ', callApiQueue);
     }
 
     closePopup();
