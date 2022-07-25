@@ -212,7 +212,7 @@ async function initDeviceList(method: BaseMethod) {
     await TransportManager.configure();
     _deviceList.connector = _connector;
   }
-  await _deviceList.getDeviceLists();
+  await _deviceList.getDeviceLists(method.connectId);
 }
 
 function initDevice(method: BaseMethod) {
