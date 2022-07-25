@@ -298,7 +298,7 @@ export class Device extends EventEmitter {
 
   async run(fn?: () => Promise<void>, options?: RunOptions) {
     if (this.runPromise) {
-      this.interruption();
+      await this.interruption();
       Log.debug('[Device] run error:', 'Device is running, but will cancel previous operate');
     }
 
@@ -350,9 +350,9 @@ export class Device extends EventEmitter {
     this.runPromise = null;
   }
 
-  interruption() {
+  async interruption() {
     if (this.commands) {
-      this.commands.dispose();
+      await this.commands.dispose();
     }
     if (this.runPromise) {
       this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside));

@@ -54,7 +54,6 @@ export class DeviceList extends EventEmitter {
           const cache = cacheDeviceMap[uuid];
           cache?.updateFromCache(device);
           device = cache;
-          Log.debug('use cache device: ', uuid);
         }
         this.devices[uuid] = device;
         cacheDeviceMap[uuid] = device;

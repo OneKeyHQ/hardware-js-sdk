@@ -198,7 +198,10 @@ export const callAPI = async (message: CoreMessage) => {
     }
 
     // remove method from queue
-    const index = callApiQueue.findIndex(m => m.responseID === messageResponse.id);
+    const index =
+      messageResponse && messageResponse.id
+        ? callApiQueue.findIndex(m => m.responseID === messageResponse.id)
+        : -1;
     if (index > -1) {
       callApiQueue.splice(index, 1);
       Log.debug('Remove the finished method from the queue： ', callApiQueue);
