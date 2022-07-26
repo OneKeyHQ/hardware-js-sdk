@@ -313,6 +313,10 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         await initDeviceList(method);
       } catch (error) {
         console.log('device list error: ', error);
+        if (error.errorCode === HardwareErrorCode.BridgeNotInstalled) {
+          reject(error);
+          return;
+        }
       }
 
       const env = DataManager.getSettings('env');
