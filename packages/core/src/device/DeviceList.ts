@@ -32,6 +32,7 @@ export class DeviceList extends EventEmitter {
       if (device) {
         const exist = descriptorList.find(d => d.path === device.originalDescriptor.path);
         if (exist) {
+          device.updateDescriptor(exist, true);
           Log.debug('find existed Device: ', connectId);
           this.devices[connectId] = device;
           return [device];

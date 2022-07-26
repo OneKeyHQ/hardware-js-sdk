@@ -186,7 +186,7 @@ export class Device extends EventEmitter {
       }
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
-        this.commands.dispose(false);
+        await this.commands.dispose(false);
       }
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');

@@ -277,14 +277,19 @@ function initDeviceForBle(method: BaseMethod) {
 
 export const cancel = (connectId?: string) => {
   const env = DataManager.getSettings('env');
-  if (connectId) {
-    let device;
-    if (env === 'react-native') {
-      device = initDeviceForBle({ connectId } as BaseMethod);
-    } else {
-      device = initDevice({ connectId } as BaseMethod);
+  try {
+    if (connectId) {
+      let device;
+      if (env === 'react-native') {
+        device = initDeviceForBle({ connectId } as BaseMethod);
+      } else {
+        device = initDevice({ connectId } as BaseMethod);
+      }
+      device?.interruptionFromUser();
     }
-    device?.interruptionFromUser();
+  } catch (e) {
+    // Empty
+    Log.error('Cancel API Error: ', e);
   }
   cleanup();
   closePopup();
