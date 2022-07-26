@@ -75,24 +75,34 @@ export const callAPI = async (message: CoreMessage) => {
     Log.debug('should cancel the previous method execution: ', callApiQueue);
   }
 
-  // update DeviceList every call and first configure transport messages
-  try {
-    await initDeviceList(method);
-  } catch (error) {
-    return Promise.reject(error);
-  }
+  // TODO: 方法执行前进行 ensure connect
+  // 方式就是 initList + initDevice + acquire + initialize
+  // TODO: 执行后对 method setDevice
+  // TODO: method 中增加 deviceId 校验，不通过则抛出异常
+  // TODO: method 中增加 shouldEnsureConnect 属性，false 则不必要进行 ensure connect 轮询，直接返回结果即可
+  // runInner 中不再 acquire 和 initialize，减少不必要的请求
 
-  const env = DataManager.getSettings('env');
-  let device: Device;
-  try {
-    if (env === 'react-native') {
-      device = initDeviceForBle(method);
-    } else {
-      device = initDevice(method);
-    }
-  } catch (error) {
-    return Promise.reject(error);
-  }
+  // update DeviceList every call and first configure transport messages
+  // try {
+  //   await initDeviceList(method);
+  // } catch (error) {
+  //   return Promise.reject(error);
+  // }
+
+  // const env = DataManager.getSettings('env');
+  // let device: Device;
+  // try {
+  //   if (env === 'react-native') {
+  //     device = initDeviceForBle(method);
+  //   } else {
+  //     device = initDevice(method);
+  //   }
+  // } catch (error) {
+  //   // TODO: 重试，直到获取到设备
+  //   return Promise.reject(error);
+  // }
+
+  const device = await ensureConnected(method);
 
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
@@ -226,6 +236,7 @@ async function initDeviceList(method: BaseMethod) {
     await TransportManager.configure();
     _deviceList.connector = _connector;
   }
+
   await _deviceList.getDeviceLists(method.connectId);
 }
 
@@ -274,6 +285,56 @@ function initDeviceForBle(method: BaseMethod) {
   device.deviceConnector = _connector;
   return device;
 }
+
+type IPollFn<T> = (time?: number) => T;
+// eslint-disable-next-line @typescript-eslint/require-await
+const ensureConnected = async (method: BaseMethod) => {
+  console.log(1);
+  let tryCount = 0;
+  const MAX_RETRY_COUNT = (method.payload && method.payload.retryCount) || 5;
+  const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
+
+  Log.debug(
+    `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
+  );
+
+  const poll: IPollFn<Promise<Device>> = async (time = POLL_INTERVAL_TIME) => {
+    tryCount += 1;
+    Log.debug('EnsureConnected function try count: ', tryCount, ' poll interval time: ', time);
+    try {
+      await initDeviceList(method);
+    } catch (error) {
+      console.log('device list error: ', error);
+    }
+
+    const env = DataManager.getSettings('env');
+    let device: Device;
+    try {
+      if (env === 'react-native') {
+        device = initDeviceForBle(method);
+      } else {
+        device = initDevice(method);
+      }
+
+      if (device) {
+        return device;
+      }
+    } catch (error) {
+      console.log('device error: ', error);
+    }
+
+    if (tryCount > 5) {
+      Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
+      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+    }
+    return new Promise((resolve: (p: Promise<Device>) => void) =>
+      // eslint-disable-next-line no-promise-executor-return
+      setTimeout(() => resolve(poll(time * 1.5)), time)
+    );
+  };
+
+  return poll();
+};
 
 export const cancel = (connectId?: string) => {
   const env = DataManager.getSettings('env');

@@ -49,6 +49,11 @@ export abstract class BaseMethod<Params = undefined> {
    */
   requireDeviceMode: string[];
 
+  /**
+   * 是否需要轮询确认设备已连接
+   */
+  shouldEnsureConnected = true;
+
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 
