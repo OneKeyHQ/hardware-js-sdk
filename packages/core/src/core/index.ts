@@ -92,7 +92,6 @@ export const callAPI = async (message: CoreMessage) => {
   try {
     device = await ensureConnected(method, pollingId);
   } catch (e) {
-    console.log('eakdfjlajdflkj: ', e);
     return createResponseMessage(method.responseID, false, { error: e });
   }
 
@@ -328,6 +327,13 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         if (device) {
           if (timer) {
             clearTimeout(timer);
+          }
+          /**
+           * Bluetooth should call initialize here
+           */
+          if (env === 'react-native') {
+            await device.acquire();
+            await device.initialize();
           }
           resolve(device);
           return;
