@@ -54,8 +54,11 @@ export class DeviceCommands {
     this.disposed = false;
   }
 
-  async dispose() {
+  async dispose(cancelRequest: boolean) {
     this.disposed = true;
+    if (cancelRequest && this._cancelableRequest) {
+      this._cancelableRequest();
+    }
     this._cancelableRequest = undefined;
     await this.transport.cancel?.();
   }

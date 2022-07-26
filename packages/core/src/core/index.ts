@@ -284,7 +284,7 @@ export const cancel = (connectId?: string) => {
     } else {
       device = initDevice({ connectId } as BaseMethod);
     }
-    device?.interruption();
+    device?.interruptionFromUser();
   }
   cleanup();
   closePopup();
