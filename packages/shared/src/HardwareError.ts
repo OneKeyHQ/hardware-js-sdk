@@ -91,6 +91,8 @@ export const HardwareErrorCode = {
    */
   DeviceInterruptedFromUser: 109,
 
+  DeviceCheckDeviceIdError: 110,
+
   /**
    * Not initialized
    */
@@ -241,6 +243,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceInterruptedFromOutside]: 'Device interrupted',
   [HardwareErrorCode.DeviceInterruptedFromUser]: 'Device interrupted',
   [HardwareErrorCode.DeviceUnexpectedBootloaderMode]: 'Device should be in bootloader mode',
+  [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
 
   /**
    * Node Errors

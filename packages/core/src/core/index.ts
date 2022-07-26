@@ -77,13 +77,9 @@ export const callAPI = async (message: CoreMessage) => {
     Log.debug('should cancel the previous method execution: ', callApiQueue);
   }
 
-  // TODO: 方法执行前进行 ensure connect
-  // 方式就是 initList + initDevice + acquire + initialize
-  // TODO: 执行后对 method setDevice
-  // TODO: method 中增加 deviceId 校验，不通过则抛出异常
-  // TODO: method 中增加 shouldEnsureConnect 属性，false 则不必要进行 ensure connect 轮询，直接返回结果即可
-  // runInner 中不再 acquire 和 initialize，减少不必要的请求
-
+  /**
+   * Polling to ensure successful connection
+   */
   if (pollingState[pollingId]) {
     pollingState[pollingId] = false;
   }
@@ -154,10 +150,12 @@ export const callAPI = async (message: CoreMessage) => {
         );
       }
 
-      // const deviceTypeException = method.checkDeviceType();
-      // if (deviceTypeException) {
-      //   return Promise.reject(ERRORS.TypedError('Not_Use_Onekey_Device'));
-      // }
+      if (method.deviceId && method.checkDeviceId) {
+        const isSameDeviceID = device.checkDeviceId(method.deviceId);
+        if (!isSameDeviceID) {
+          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError));
+        }
+      }
 
       // reconfigure messages
       if (_deviceList) {
@@ -283,7 +281,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
   let tryCount = 0;
   const MAX_RETRY_COUNT = (method.payload && method.payload.retryCount) || 5;
   const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
-  const TIME_OUT = (method.payload && method.payload.timeOut) || 10000;
+  const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   Log.debug(
@@ -316,6 +314,9 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         if (error.errorCode === HardwareErrorCode.BridgeNotInstalled) {
           reject(error);
           return;
+        }
+        if (error.errorCode === HardwareErrorCode.TransportNotConfigured) {
+          await TransportManager.configure();
         }
       }
 

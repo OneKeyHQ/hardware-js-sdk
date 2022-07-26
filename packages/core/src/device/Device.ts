@@ -438,6 +438,13 @@ export class Device extends EventEmitter {
     }
     return null;
   }
+
+  checkDeviceId(deviceId: string) {
+    if (this.features) {
+      return this.features.device_id === deviceId;
+    }
+    return false;
+  }
 }
 
 export default Device;

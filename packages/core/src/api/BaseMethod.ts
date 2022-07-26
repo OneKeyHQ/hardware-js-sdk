@@ -20,6 +20,11 @@ export abstract class BaseMethod<Params = undefined> {
    */
   connectId?: string;
 
+  /**
+   * device id
+   */
+  deviceId?: string;
+
   deviceState?: string;
 
   /**
@@ -54,6 +59,11 @@ export abstract class BaseMethod<Params = undefined> {
    */
   shouldEnsureConnected = true;
 
+  /**
+   * 是否需要校验 features 的 deviceId 是否一致
+   */
+  checkDeviceId = false;
+
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 
@@ -63,6 +73,7 @@ export abstract class BaseMethod<Params = undefined> {
     this.payload = payload;
     this.responseID = message.id || 0;
     this.connectId = payload.connectId || '';
+    this.deviceId = payload.deviceId || '';
     this.useDevice = true;
     this.allowDeviceMode = [UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [];
