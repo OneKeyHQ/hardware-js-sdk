@@ -39,6 +39,7 @@
     "@typescript-eslint/no-use-before-define": "off",
     // webpack packages should put in devDependencies
     "import/no-extraneous-dependencies": "off",
-    "class-methods-use-this": "off"
+    "class-methods-use-this": "off",
+    "@typescript-eslint/restrict-template-expressions": "off"
   }
 }

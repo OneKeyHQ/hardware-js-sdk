@@ -41,6 +41,8 @@ let _callPromise: Deferred<any> | undefined;
 const callApiQueue: BaseMethod[] = [];
 
 const deviceCacheMap = new Map<string, Device>();
+let pollingId = 1;
+const pollingState: Record<number, boolean> = {};
 
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
@@ -82,27 +84,17 @@ export const callAPI = async (message: CoreMessage) => {
   // TODO: method 中增加 shouldEnsureConnect 属性，false 则不必要进行 ensure connect 轮询，直接返回结果即可
   // runInner 中不再 acquire 和 initialize，减少不必要的请求
 
-  // update DeviceList every call and first configure transport messages
-  // try {
-  //   await initDeviceList(method);
-  // } catch (error) {
-  //   return Promise.reject(error);
-  // }
-
-  // const env = DataManager.getSettings('env');
-  // let device: Device;
-  // try {
-  //   if (env === 'react-native') {
-  //     device = initDeviceForBle(method);
-  //   } else {
-  //     device = initDevice(method);
-  //   }
-  // } catch (error) {
-  //   // TODO: 重试，直到获取到设备
-  //   return Promise.reject(error);
-  // }
-
-  const device = await ensureConnected(method);
+  if (pollingState[pollingId]) {
+    pollingState[pollingId] = false;
+  }
+  pollingId += 1;
+  let device: Device;
+  try {
+    device = await ensureConnected(method, pollingId);
+  } catch (e) {
+    console.log('eakdfjlajdflkj: ', e);
+    return createResponseMessage(method.responseID, false, { error: e });
+  }
 
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
@@ -288,51 +280,74 @@ function initDeviceForBle(method: BaseMethod) {
 
 type IPollFn<T> = (time?: number) => T;
 // eslint-disable-next-line @typescript-eslint/require-await
-const ensureConnected = async (method: BaseMethod) => {
-  console.log(1);
+const ensureConnected = async (method: BaseMethod, pollingId: number) => {
   let tryCount = 0;
   const MAX_RETRY_COUNT = (method.payload && method.payload.retryCount) || 5;
   const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
+  const TIME_OUT = (method.payload && method.payload.timeOut) || 10000;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
   Log.debug(
     `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
   );
 
-  const poll: IPollFn<Promise<Device>> = async (time = POLL_INTERVAL_TIME) => {
-    tryCount += 1;
-    Log.debug('EnsureConnected function try count: ', tryCount, ' poll interval time: ', time);
-    try {
-      await initDeviceList(method);
-    } catch (error) {
-      console.log('device list error: ', error);
-    }
-
-    const env = DataManager.getSettings('env');
-    let device: Device;
-    try {
-      if (env === 'react-native') {
-        device = initDeviceForBle(method);
-      } else {
-        device = initDevice(method);
+  const poll: IPollFn<Promise<Device>> = async (time = POLL_INTERVAL_TIME) =>
+    // eslint-disable-next-line no-async-promise-executor
+    new Promise(async (resolve, reject) => {
+      if (!pollingState[pollingId]) {
+        Log.debug('EnsureConnected function stop, polling id: ', pollingId);
+        reject(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Polling stop'));
+        return;
       }
 
-      if (device) {
-        return device;
+      // 单次连接确保不超时
+      if (timer) {
+        clearTimeout(timer);
       }
-    } catch (error) {
-      console.log('device error: ', error);
-    }
+      timer = setTimeout(() => {
+        reject(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Polling timeout'));
+      }, TIME_OUT);
 
-    if (tryCount > 5) {
-      Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
-      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
-    }
-    return new Promise((resolve: (p: Promise<Device>) => void) =>
+      tryCount += 1;
+      Log.debug('EnsureConnected function try count: ', tryCount, ' poll interval time: ', time);
+      try {
+        await initDeviceList(method);
+      } catch (error) {
+        console.log('device list error: ', error);
+      }
+
+      const env = DataManager.getSettings('env');
+      let device: Device;
+      try {
+        if (env === 'react-native') {
+          device = initDeviceForBle(method);
+        } else {
+          device = initDevice(method);
+        }
+
+        if (device) {
+          if (timer) {
+            clearTimeout(timer);
+          }
+          resolve(device);
+          return;
+        }
+      } catch (error) {
+        console.log('device error: ', error);
+      }
+
+      if (tryCount > 5) {
+        if (timer) {
+          clearTimeout(timer);
+        }
+        Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
+        reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+        return;
+      }
       // eslint-disable-next-line no-promise-executor-return
-      setTimeout(() => resolve(poll(time * 1.5)), time)
-    );
-  };
-
+      return setTimeout(() => resolve(poll(time * 1.5)), time);
+    });
+  pollingState[pollingId] = true;
   return poll();
 };
 
