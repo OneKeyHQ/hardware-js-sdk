@@ -38,7 +38,7 @@ let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
 let _callPromise: Deferred<any> | undefined;
-const callApiQueue = [];
+const callApiQueue: BaseMethod[] = [];
 
 const deviceCacheMap = new Map<string, Device>();
 
@@ -70,6 +70,10 @@ export const callAPI = async (message: CoreMessage) => {
 
   // push method to queue
   callApiQueue.push(method);
+
+  if (callApiQueue.length > 1) {
+    Log.debug('should cancel the previous method execution: ', callApiQueue);
+  }
 
   // update DeviceList every call and first configure transport messages
   try {
@@ -193,6 +197,16 @@ export const callAPI = async (message: CoreMessage) => {
       }
     }
 
+    // remove method from queue
+    const index =
+      messageResponse && messageResponse.id
+        ? callApiQueue.findIndex(m => m.responseID === messageResponse.id)
+        : -1;
+    if (index > -1) {
+      callApiQueue.splice(index, 1);
+      Log.debug('Remove the finished method from the queue： ', callApiQueue);
+    }
+
     closePopup();
 
     cleanup();
@@ -212,7 +226,7 @@ async function initDeviceList(method: BaseMethod) {
     await TransportManager.configure();
     _deviceList.connector = _connector;
   }
-  await _deviceList.getDeviceLists();
+  await _deviceList.getDeviceLists(method.connectId);
 }
 
 function initDevice(method: BaseMethod) {
@@ -263,14 +277,19 @@ function initDeviceForBle(method: BaseMethod) {
 
 export const cancel = (connectId?: string) => {
   const env = DataManager.getSettings('env');
-  if (connectId) {
-    let device;
-    if (env === 'react-native') {
-      device = initDeviceForBle({ connectId } as BaseMethod);
-    } else {
-      device = initDevice({ connectId } as BaseMethod);
+  try {
+    if (connectId) {
+      let device;
+      if (env === 'react-native') {
+        device = initDeviceForBle({ connectId } as BaseMethod);
+      } else {
+        device = initDevice({ connectId } as BaseMethod);
+      }
+      device?.interruptionFromUser();
     }
-    device?.interruption();
+  } catch (e) {
+    // Empty
+    Log.error('Cancel API Error: ', e);
   }
   cleanup();
   closePopup();

@@ -186,7 +186,7 @@ export class Device extends EventEmitter {
       }
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
-        this.commands.dispose();
+        await this.commands.dispose(false);
       }
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');
@@ -207,7 +207,7 @@ export class Device extends EventEmitter {
       (this.mainId && env === 'react-native')
     ) {
       if (this.commands) {
-        this.commands.dispose();
+        this.commands.dispose(false);
         if (this.commands.callPromise) {
           try {
             await this.commands.callPromise;
@@ -298,7 +298,7 @@ export class Device extends EventEmitter {
 
   async run(fn?: () => Promise<void>, options?: RunOptions) {
     if (this.runPromise) {
-      this.interruption();
+      await this.interruptionFromOutside();
       Log.debug('[Device] run error:', 'Device is running, but will cancel previous operate');
     }
 
@@ -350,12 +350,21 @@ export class Device extends EventEmitter {
     this.runPromise = null;
   }
 
-  interruption() {
+  async interruptionFromOutside() {
     if (this.commands) {
-      this.commands.dispose();
+      await this.commands.dispose(false);
     }
     if (this.runPromise) {
       this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside));
+    }
+  }
+
+  async interruptionFromUser() {
+    if (this.commands) {
+      await this.commands.dispose(true);
+    }
+    if (this.runPromise) {
+      this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser));
     }
   }
 

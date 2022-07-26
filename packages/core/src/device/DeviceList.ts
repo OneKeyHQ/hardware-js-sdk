@@ -4,7 +4,8 @@ import { Device } from './Device';
 import { getDeviceUUID } from '../utils/deviceFeaturesUtils';
 import { getLogger, LoggerNames } from '../utils';
 
-const cacheDeviceMap = new Map<string, Device>();
+// const cacheDeviceMap = new Map<string, Device>();
+const cacheDeviceMap: Record<string, Device> = {};
 
 const Log = getLogger(LoggerNames.DeviceList);
 
@@ -17,13 +18,28 @@ export class DeviceList extends EventEmitter {
    * 获取已连接的设备列表
    * @returns {OneKeyDeviceInfo[]}
    */
-  async getDeviceLists() {
+  async getDeviceLists(connectId?: string) {
     const deviceDiff = await this.connector?.enumerate();
     const descriptorList = deviceDiff?.descriptors ?? [];
 
     this.devices = {};
     const deviceList = [];
     Log.debug('get device list');
+
+    // find existed device
+    if (connectId) {
+      const device = cacheDeviceMap[connectId];
+      if (device) {
+        const exist = descriptorList.find(d => d.path === device.originalDescriptor.path);
+        if (exist) {
+          device.updateDescriptor(exist, true);
+          Log.debug('find existed Device: ', connectId);
+          this.devices[connectId] = device;
+          return [device];
+        }
+      }
+    }
+
     for await (const descriptor of descriptorList) {
       let device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;
@@ -35,14 +51,13 @@ export class DeviceList extends EventEmitter {
       deviceList.push(device);
       if (device.features) {
         const uuid = getDeviceUUID(device.features);
-        if (cacheDeviceMap.has(uuid)) {
-          const cache = cacheDeviceMap.get(uuid);
+        if (cacheDeviceMap[uuid]) {
+          const cache = cacheDeviceMap[uuid];
           cache?.updateFromCache(device);
-          device = cache as Device;
-          Log.debug('use cache device: ', uuid);
+          device = cache;
         }
         this.devices[uuid] = device;
-        cacheDeviceMap.set(uuid, device);
+        cacheDeviceMap[uuid] = device;
       }
     }
 

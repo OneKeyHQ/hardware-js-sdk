@@ -15,6 +15,7 @@
     "access": "public"
   },
   "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
     "test": "echo \"Error: run tests from root\" && exit 1",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",

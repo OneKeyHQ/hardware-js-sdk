@@ -87,6 +87,11 @@ export const HardwareErrorCode = {
   DeviceUnexpectedBootloaderMode: 108,
 
   /**
+   * Device interrupted from user
+   */
+  DeviceInterruptedFromUser: 109,
+
+  /**
    * Not initialized
    */
   NotInitialized: 200,
@@ -229,6 +234,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceNotFound]: 'Device not found',
   [HardwareErrorCode.DeviceInitializeFailed]: 'Device initialization failed',
   [HardwareErrorCode.DeviceInterruptedFromOutside]: 'Device interrupted',
+  [HardwareErrorCode.DeviceInterruptedFromUser]: 'Device interrupted',
   [HardwareErrorCode.DeviceUnexpectedBootloaderMode]: 'Device should be in bootloader mode',
 
   /**
