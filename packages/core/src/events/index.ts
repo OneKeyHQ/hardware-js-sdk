@@ -6,3 +6,4 @@ export * from './ui-promise';
 export * from './ui-response';
 export * from './device';
 export * from './log';
+export * from './firmware';

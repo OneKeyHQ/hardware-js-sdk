@@ -157,6 +157,11 @@ export const callAPI = async (message: CoreMessage) => {
         }
       }
 
+      /**
+       * check firmware release info
+       */
+      method.checkFirmwareRelease();
+
       // reconfigure messages
       if (_deviceList) {
         await TransportManager.reconfigure(device.getFirmwareVersion());

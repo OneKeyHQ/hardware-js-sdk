@@ -1,7 +1,7 @@
 import { BaseMethod } from './BaseMethod';
 
 import { UI_REQUEST } from '../constants/ui-request';
-import { DataManager } from '../data-manager';
+import { getBleFirmwareReleaseInfo } from './firmware/releaseHelper';
 
 export default class CheckBLEFirmwareRelease extends BaseMethod {
   init() {
@@ -11,14 +11,8 @@ export default class CheckBLEFirmwareRelease extends BaseMethod {
 
   run() {
     if (this.device.features) {
-      const firmwareStatus = DataManager.getBLEFirmwareStatus(this.device.features);
-      const changelog = DataManager.getBleFirmwareChangelog(this.device.features);
-      const release = DataManager.getBleFirmwareLeatestRelease(this.device.features);
-      return Promise.resolve({
-        status: firmwareStatus,
-        changelog,
-        release,
-      });
+      const releaseInfo = getBleFirmwareReleaseInfo(this.device.features);
+      return Promise.resolve(releaseInfo);
     }
     return Promise.resolve(null);
   }

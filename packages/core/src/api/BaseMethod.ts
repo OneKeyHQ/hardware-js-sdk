@@ -2,7 +2,8 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange } from '../types';
-import { CoreMessage } from '../events';
+import { CoreMessage, createFirmwareMessage, FIRMWARE } from '../events';
+import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
 
 export abstract class BaseMethod<Params = undefined> {
   responseID: number;
@@ -90,6 +91,18 @@ export abstract class BaseMethod<Params = undefined> {
   setDevice(device: Device) {
     this.device = device;
     this.connectId = device.originalDescriptor.path;
+  }
+
+  checkFirmwareRelease() {
+    if (!this.device || !this.device.features) return;
+    const releaseInfo = getFirmwareReleaseInfo(this.device.features);
+    if (['outdated', 'required'].includes(releaseInfo.status)) {
+      this.postMessage(createFirmwareMessage(FIRMWARE.RELEASE_INFO, releaseInfo));
+    }
+    const bleReleaseInfo = getBleFirmwareReleaseInfo(this.device.features);
+    if (['outdated', 'required'].includes(bleReleaseInfo.status)) {
+      this.postMessage(createFirmwareMessage(FIRMWARE.BLE_RELEASE_INFO, bleReleaseInfo));
+    }
   }
 
   dispose() {}

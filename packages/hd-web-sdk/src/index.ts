@@ -14,6 +14,7 @@ import HardwareSdk, {
   setLoggerPostMessage,
   getLogger,
   LoggerNames,
+  FIRMWARE_EVENT,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
@@ -38,6 +39,7 @@ const handleMessage = async (message: CoreMessage) => {
       eventEmitter.emit(message.type, message.payload);
       break;
     case LOG_EVENT:
+    case FIRMWARE_EVENT:
       eventEmitter.emit(message.event, message);
       break;
 
