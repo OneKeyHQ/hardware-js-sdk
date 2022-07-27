@@ -226,6 +226,16 @@ export const HardwareErrorCode = {
    * Bridge not installed
    */
   BridgeNotInstalled: 808,
+
+  /**
+   * ensure connect timeout
+   */
+  PollingTimeout: 809,
+
+  /**
+   * ensure connect stop polling
+   */
+  PollingStop: 810,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -305,6 +315,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BridgeNetworkError]: 'Bridge network error',
   [HardwareErrorCode.BridgeTimeoutError]: 'Bridge network timeout',
   [HardwareErrorCode.BridgeNotInstalled]: 'Bridge not installed',
+  [HardwareErrorCode.PollingTimeout]: 'Polling timeout',
+  [HardwareErrorCode.PollingStop]: 'Polling stop',
 } as const;
 
 export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {

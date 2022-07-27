@@ -98,6 +98,7 @@ export const callAPI = async (message: CoreMessage) => {
   device.on(DEVICE.BUTTON, (d, code) => {
     onDeviceButtonHandler(d, code);
   });
+  device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
 
   try {
     const inner = async (): Promise<void> => {
@@ -298,7 +299,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
     new Promise(async (resolve, reject) => {
       if (!pollingState[pollingId]) {
         Log.debug('EnsureConnected function stop, polling id: ', pollingId);
-        reject(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Polling stop'));
+        reject(ERRORS.TypedError(HardwareErrorCode.PollingStop));
         return;
       }
 
@@ -307,7 +308,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         clearTimeout(timer);
       }
       timer = setTimeout(() => {
-        reject(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Polling timeout'));
+        reject(ERRORS.TypedError(HardwareErrorCode.PollingTimeout));
       }, TIME_OUT);
 
       tryCount += 1;
@@ -433,6 +434,10 @@ const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]
   } else {
     postMessage(createUiMessage(UI_REQUEST.REQUEST_BUTTON, { device: device.toMessageObject() }));
   }
+};
+
+const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]) => {
+  postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
 };
 
 /**

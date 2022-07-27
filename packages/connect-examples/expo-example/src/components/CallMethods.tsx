@@ -9,6 +9,7 @@ import {
   CoreApi,
   LOG_EVENT,
   FIRMWARE_EVENT,
+  DEVICE,
 } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
@@ -58,6 +59,10 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
 
     SDK.on(FIRMWARE_EVENT, (message: CoreMessage) => {
       console.log('example get firmware event: ', message);
+    });
+
+    SDK.on(DEVICE.FEATURES, (message: CoreMessage) => {
+      console.log('example get features event: ', message);
     });
     registerListener = true;
   }, [SDK]);

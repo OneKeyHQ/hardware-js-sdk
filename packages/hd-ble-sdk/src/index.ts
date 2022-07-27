@@ -18,6 +18,8 @@ import HardwareSdk, {
   LoggerNames,
   setLoggerPostMessage,
   FIRMWARE_EVENT,
+  DEVICE_EVENT,
+  DEVICE,
 } from '@onekeyfe/hd-core';
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
@@ -67,6 +69,11 @@ function handleMessage(message: CoreMessage) {
     case LOG_EVENT:
     case FIRMWARE_EVENT:
       eventEmitter.emit(message.event, message);
+      break;
+    case DEVICE_EVENT:
+      if (message.type === DEVICE.FEATURES) {
+        eventEmitter.emit(message.type, message.payload);
+      }
       break;
     default:
       Log.log('No need to be captured message', message.event);
