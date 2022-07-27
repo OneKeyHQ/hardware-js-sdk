@@ -10,6 +10,7 @@ type CallSolanaMethodsProps = {
 
 export function CallSolanaMethods({ SDK, selectedDevice: currentDevice }: CallSolanaMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>Solana Method Test</Text>
@@ -20,7 +21,7 @@ export function CallSolanaMethods({ SDK, selectedDevice: currentDevice }: CallSo
             { name: 'path', value: "m/44'/501'/0'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.solGetAddress(connectId, { ...data })}
+          onCall={data => SDK.solGetAddress(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -35,7 +36,7 @@ export function CallSolanaMethods({ SDK, selectedDevice: currentDevice }: CallSo
             },
           ]}
           onCall={data =>
-            SDK.solSignTransaction(connectId, {
+            SDK.solSignTransaction(connectId, deviceId, {
               ...data,
             } as unknown as any)
           }

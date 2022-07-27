@@ -10,6 +10,7 @@ type CallNEMMethodsProps = {
 
 export function CallNEMMethods({ SDK, selectedDevice: currentDevice }: CallNEMMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>NEM Method Test</Text>
@@ -20,7 +21,7 @@ export function CallNEMMethods({ SDK, selectedDevice: currentDevice }: CallNEMMe
             { name: 'path', value: "m/44'/43'/2'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.nemGetAddress(connectId, { ...data })}
+          onCall={data => SDK.nemGetAddress(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -41,7 +42,7 @@ export function CallNEMMethods({ SDK, selectedDevice: currentDevice }: CallNEMMe
             { name: 'transaction.version', value: -1744830464, type: 'number' },
           ]}
           onCall={data =>
-            SDK.nemSignTransaction(connectId, {
+            SDK.nemSignTransaction(connectId, deviceId, {
               // @ts-expect-error
               path: data.path,
               transaction: {

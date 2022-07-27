@@ -10,6 +10,7 @@ type CallBTCMethodsProps = {
 
 export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>BTC Method Test</Text>
@@ -23,7 +24,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
             { name: 'multisig', value: undefined, type: 'string' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
-          onCall={data => SDK.btcGetAddress(connectId, { ...data })}
+          onCall={data => SDK.btcGetAddress(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -34,7 +35,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
             { name: 'showOnOneKey', value: false, type: 'boolean' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
-          onCall={data => SDK.btcGetPublicKey(connectId, { ...data })}
+          onCall={data => SDK.btcGetPublicKey(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -48,7 +49,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
               type: 'string',
             },
           ]}
-          onCall={data => SDK.btcSignMessage(connectId, { ...data } as any)}
+          onCall={data => SDK.btcSignMessage(connectId, deviceId, { ...data } as any)}
         />
 
         <MethodInvoke
@@ -68,14 +69,14 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
               type: 'string',
             },
           ]}
-          onCall={data => SDK.btcVerifyMessage(connectId, { ...data } as unknown as any)}
+          onCall={data => SDK.btcVerifyMessage(connectId, deviceId, { ...data } as unknown as any)}
         />
 
         <MethodInvoke
           title="btcSignTransaction"
           options={[{ name: 'coin', value: 'test', type: 'string' }]}
           onCall={data =>
-            SDK.btcSignTransaction(connectId, {
+            SDK.btcSignTransaction(connectId, deviceId, {
               inputs: [
                 {
                   address_n: [2147483692, 2147483648, 2147483648, 0, 0],
