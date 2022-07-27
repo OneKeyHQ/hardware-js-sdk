@@ -98,6 +98,7 @@ export const callAPI = async (message: CoreMessage) => {
   device.on(DEVICE.BUTTON, (d, code) => {
     onDeviceButtonHandler(d, code);
   });
+  device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
 
   try {
     const inner = async (): Promise<void> => {
@@ -433,6 +434,10 @@ const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]
   } else {
     postMessage(createUiMessage(UI_REQUEST.REQUEST_BUTTON, { device: device.toMessageObject() }));
   }
+};
+
+const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]) => {
+  postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
 };
 
 /**

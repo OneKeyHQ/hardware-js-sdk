@@ -1,5 +1,5 @@
 import type { PROTO } from '../constants';
-import type { KnownDevice as Device } from '../types/device';
+import type { Features, KnownDevice as Device } from '../types/device';
 import { MessageFactoryFn } from './utils';
 
 export const DEVICE_EVENT = 'DEVICE_EVENT';
@@ -24,6 +24,8 @@ export const DEVICE = {
   PASSPHRASE: 'passphrase',
   PASSPHRASE_ON_DEVICE: 'passphrase_on_device',
   WORD: 'word',
+
+  FEATURES: 'features',
 } as const;
 
 export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'code'> {
@@ -35,7 +37,14 @@ export interface DeviceButtonRequest {
   payload: DeviceButtonRequestPayload & { device: Device | null };
 }
 
-export type DeviceEvent = DeviceButtonRequest;
+export type DeviceFeaturesPayload = Features;
+
+export interface DeviceSendFeatures {
+  type: typeof DEVICE.FEATURES;
+  payload: DeviceFeaturesPayload;
+}
+
+export type DeviceEvent = DeviceButtonRequest | DeviceSendFeatures;
 
 export type DeviceEventMessage = DeviceEvent & { event: typeof DEVICE_EVENT };
 

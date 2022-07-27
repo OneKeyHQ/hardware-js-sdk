@@ -14,7 +14,7 @@ import {
   getDeviceTypeOnBootloader,
 } from '../utils/deviceFeaturesUtils';
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
-import { DEVICE, DeviceButtonRequestPayload } from '../events';
+import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
 import { getLogger, LoggerNames } from '../utils';
@@ -35,6 +35,7 @@ export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
+  [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
 }
 
 export interface Device {
@@ -263,6 +264,7 @@ export class Device extends EventEmitter {
 
     this.features = feat;
     this.featuresNeedsReload = false;
+    this.emit(DEVICE.FEATURES, this, feat);
   }
 
   /**
