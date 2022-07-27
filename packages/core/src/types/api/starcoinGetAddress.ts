@@ -12,10 +12,12 @@ export type StarcoinGetAddressParams = {
 
 export declare function starcoinGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StarcoinGetAddressParams
 ): Response<StarcoinAddress>;
 
 export declare function starcoinGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: StarcoinGetAddressParams[] }
 ): Response<Array<StarcoinAddress>>;

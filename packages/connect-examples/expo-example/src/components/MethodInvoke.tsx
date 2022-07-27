@@ -48,6 +48,7 @@ const MethodInvoke: FC<MethodInvokeProps> = ({ title, options, onCall }) => {
     const res = await onCall(callData);
     setResultSUccess(res.success);
     setResult(JSON.stringify(res));
+    console.log('example get result', res);
   };
 
   const onChange = ({ name, value }: { name: string; value: any }) => {

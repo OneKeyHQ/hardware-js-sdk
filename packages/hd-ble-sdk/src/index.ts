@@ -17,6 +17,7 @@ import HardwareSdk, {
   getLogger,
   LoggerNames,
   setLoggerPostMessage,
+  FIRMWARE_EVENT,
 } from '@onekeyfe/hd-core';
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
@@ -64,6 +65,7 @@ function handleMessage(message: CoreMessage) {
       eventEmitter.emit(message.type, message.payload);
       break;
     case LOG_EVENT:
+    case FIRMWARE_EVENT:
       eventEmitter.emit(message.event, message);
       break;
     default:

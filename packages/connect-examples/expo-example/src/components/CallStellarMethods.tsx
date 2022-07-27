@@ -13,6 +13,7 @@ export function CallStellarMethods({
   selectedDevice: currentDevice,
 }: CallStellarMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>Stellar Method Test</Text>
@@ -23,7 +24,7 @@ export function CallStellarMethods({
             { name: 'path', value: "m/44'/148'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.stellarGetAddress(connectId, { ...data })}
+          onCall={data => SDK.stellarGetAddress(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -44,7 +45,7 @@ export function CallStellarMethods({
             { name: 'transaction.sequence', value: 4294967296, type: 'number' },
           ]}
           onCall={data =>
-            SDK.stellarSignTransaction(connectId, {
+            SDK.stellarSignTransaction(connectId, deviceId, {
               // @ts-expect-error
               path: data.path,
               // @ts-expect-error

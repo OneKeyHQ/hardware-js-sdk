@@ -41,6 +41,8 @@ let _callPromise: Deferred<any> | undefined;
 const callApiQueue: BaseMethod[] = [];
 
 const deviceCacheMap = new Map<string, Device>();
+let pollingId = 1;
+const pollingState: Record<number, boolean> = {};
 
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
@@ -75,23 +77,18 @@ export const callAPI = async (message: CoreMessage) => {
     Log.debug('should cancel the previous method execution: ', callApiQueue);
   }
 
-  // update DeviceList every call and first configure transport messages
-  try {
-    await initDeviceList(method);
-  } catch (error) {
-    return Promise.reject(error);
+  /**
+   * Polling to ensure successful connection
+   */
+  if (pollingState[pollingId]) {
+    pollingState[pollingId] = false;
   }
-
-  const env = DataManager.getSettings('env');
+  pollingId += 1;
   let device: Device;
   try {
-    if (env === 'react-native') {
-      device = initDeviceForBle(method);
-    } else {
-      device = initDevice(method);
-    }
-  } catch (error) {
-    return Promise.reject(error);
+    device = await ensureConnected(method, pollingId);
+  } catch (e) {
+    return createResponseMessage(method.responseID, false, { error: e });
   }
 
   Log.debug('Call API - setDevice: ', device.mainId);
@@ -153,10 +150,17 @@ export const callAPI = async (message: CoreMessage) => {
         );
       }
 
-      // const deviceTypeException = method.checkDeviceType();
-      // if (deviceTypeException) {
-      //   return Promise.reject(ERRORS.TypedError('Not_Use_Onekey_Device'));
-      // }
+      if (method.deviceId && method.checkDeviceId) {
+        const isSameDeviceID = device.checkDeviceId(method.deviceId);
+        if (!isSameDeviceID) {
+          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError));
+        }
+      }
+
+      /**
+       * check firmware release info
+       */
+      method.checkFirmwareRelease();
 
       // reconfigure messages
       if (_deviceList) {
@@ -226,6 +230,7 @@ async function initDeviceList(method: BaseMethod) {
     await TransportManager.configure();
     _deviceList.connector = _connector;
   }
+
   await _deviceList.getDeviceLists(method.connectId);
 }
 
@@ -274,6 +279,97 @@ function initDeviceForBle(method: BaseMethod) {
   device.deviceConnector = _connector;
   return device;
 }
+
+type IPollFn<T> = (time?: number) => T;
+// eslint-disable-next-line @typescript-eslint/require-await
+const ensureConnected = async (method: BaseMethod, pollingId: number) => {
+  let tryCount = 0;
+  const MAX_RETRY_COUNT = (method.payload && method.payload.retryCount) || 5;
+  const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
+  const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  Log.debug(
+    `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
+  );
+
+  const poll: IPollFn<Promise<Device>> = async (time = POLL_INTERVAL_TIME) =>
+    // eslint-disable-next-line no-async-promise-executor
+    new Promise(async (resolve, reject) => {
+      if (!pollingState[pollingId]) {
+        Log.debug('EnsureConnected function stop, polling id: ', pollingId);
+        reject(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Polling stop'));
+        return;
+      }
+
+      // 单次连接确保不超时
+      if (timer) {
+        clearTimeout(timer);
+      }
+      timer = setTimeout(() => {
+        reject(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Polling timeout'));
+      }, TIME_OUT);
+
+      tryCount += 1;
+      Log.debug('EnsureConnected function try count: ', tryCount, ' poll interval time: ', time);
+      try {
+        await initDeviceList(method);
+      } catch (error) {
+        Log.debug('device list error: ', error);
+        if (error.errorCode === HardwareErrorCode.BridgeNotInstalled) {
+          reject(error);
+          return;
+        }
+        if (error.errorCode === HardwareErrorCode.TransportNotConfigured) {
+          await TransportManager.configure();
+        }
+      }
+
+      const env = DataManager.getSettings('env');
+      let device: Device;
+      try {
+        if (env === 'react-native') {
+          device = initDeviceForBle(method);
+        } else {
+          device = initDevice(method);
+        }
+
+        if (device) {
+          if (timer) {
+            clearTimeout(timer);
+          }
+          /**
+           * Bluetooth should call initialize here
+           */
+          if (env === 'react-native') {
+            await device.acquire();
+            await device.initialize();
+          }
+          resolve(device);
+          return;
+        }
+      } catch (error) {
+        Log.debug('device error: ', error);
+        if (error.errorCode === HardwareErrorCode.BlePermissionError) {
+          reject(error);
+          return;
+        }
+      }
+
+      if (tryCount > 5) {
+        if (timer) {
+          clearTimeout(timer);
+        }
+        Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
+        reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+        return;
+      }
+      // eslint-disable-next-line no-promise-executor-return
+      return setTimeout(() => resolve(poll(time * 1.5)), time);
+    });
+  pollingState[pollingId] = true;
+  return poll();
+};
 
 export const cancel = (connectId?: string) => {
   const env = DataManager.getSettings('env');

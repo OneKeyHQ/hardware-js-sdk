@@ -8,6 +8,7 @@ import {
   UI_RESPONSE,
   CoreApi,
   LOG_EVENT,
+  FIRMWARE_EVENT,
 } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
@@ -40,18 +41,23 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       return;
     }
     SDK.on(UI_EVENT, (message: CoreMessage) => {
-      console.log(message);
-
       if (message.type === UI_REQUEST.REQUEST_PIN) {
-        setShowPinInput(true);
+        SDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PIN,
+          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+        });
       }
     });
 
-    SDK.on(LOG_EVENT, (message: CoreMessage) => {
-      if (Array.isArray(message.payload)) {
-        const msg = message.payload.join(' ');
-        console.log('receive log event: ', msg);
-      }
+    // SDK.on(LOG_EVENT, (message: CoreMessage) => {
+    //   if (Array.isArray(message.payload)) {
+    //     const msg = message.payload.join(' ');
+    //     console.log('receive log event: ', msg);
+    //   }
+    // });
+
+    SDK.on(FIRMWARE_EVENT, (message: CoreMessage) => {
+      console.log('example get firmware event: ', message);
     });
     registerListener = true;
   }, [SDK]);
@@ -76,6 +82,9 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const handleGetFeatures = async () => {
     const response = await SDK.getFeatures(selectedDevice?.connectId);
     console.log('example getFeatures response: ', response);
+    if (response.success) {
+      setSelectedDevice({ ...selectedDevice, features: response.payload } as Device);
+    }
   };
 
   const handleCheckFirmwareRelease = async () => {
@@ -168,8 +177,8 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       </View>
 
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
-      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallStarcoinMethods SDK={SDK} selectedDevice={selectedDevice} />

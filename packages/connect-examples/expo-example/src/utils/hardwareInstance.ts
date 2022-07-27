@@ -13,7 +13,7 @@ const promise: Promise<CoreApi> = new Promise(async resolve => {
   }
 
   const settings: Partial<ConnectSettings> = {
-    debug: false,
+    debug: true,
   };
 
   if (Platform.OS === 'android' || Platform.OS === 'ios') {

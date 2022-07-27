@@ -12,10 +12,12 @@ export type EVMGetPublicKeyParams = {
 
 export declare function evmGetPublicKey(
   connectId: string,
+  deviceId: string,
   params: CommonParams & EVMGetPublicKeyParams
 ): Response<EVMPublicKey>;
 
 export declare function evmGetPublicKey(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: EVMGetPublicKeyParams[] }
 ): Response<Array<EVMPublicKey>>;

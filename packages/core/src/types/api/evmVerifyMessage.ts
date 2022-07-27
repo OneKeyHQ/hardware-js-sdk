@@ -9,5 +9,6 @@ export type EVMVerifyMessageParams = {
 
 export declare function evmVerifyMessage(
   connectId: string,
+  deviceId: string,
   params: CommonParams & EVMVerifyMessageParams
 ): Response<Success>;

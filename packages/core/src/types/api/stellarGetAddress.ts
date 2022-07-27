@@ -12,10 +12,12 @@ export type StellarGetAddressParams = {
 
 export declare function stellarGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StellarGetAddressParams
 ): Response<StellarAddress>;
 
 export declare function stellarGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: StellarGetAddressParams[] }
 ): Response<Array<StellarAddress>>;

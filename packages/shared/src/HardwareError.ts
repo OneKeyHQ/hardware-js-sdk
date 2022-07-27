@@ -91,6 +91,8 @@ export const HardwareErrorCode = {
    */
   DeviceInterruptedFromUser: 109,
 
+  DeviceCheckDeviceIdError: 110,
+
   /**
    * Not initialized
    */
@@ -219,6 +221,11 @@ export const HardwareErrorCode = {
    * Bridge network timeout
    */
   BridgeTimeoutError: 807,
+
+  /**
+   * Bridge not installed
+   */
+  BridgeNotInstalled: 808,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -236,6 +243,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceInterruptedFromOutside]: 'Device interrupted',
   [HardwareErrorCode.DeviceInterruptedFromUser]: 'Device interrupted',
   [HardwareErrorCode.DeviceUnexpectedBootloaderMode]: 'Device should be in bootloader mode',
+  [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
 
   /**
    * Node Errors
@@ -296,6 +304,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.ResponseUnexpectTypeError]: 'Response type is not expected',
   [HardwareErrorCode.BridgeNetworkError]: 'Bridge network error',
   [HardwareErrorCode.BridgeTimeoutError]: 'Bridge network timeout',
+  [HardwareErrorCode.BridgeNotInstalled]: 'Bridge not installed',
 } as const;
 
 export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {

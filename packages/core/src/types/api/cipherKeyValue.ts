@@ -17,10 +17,12 @@ export type CipheredKeyValueParams = {
 
 export declare function cipherKeyValue(
   connectId: string,
+  deviceId: string,
   params: CommonParams & CipheredKeyValueParams
 ): Response<CipheredKeyValue>;
 
 export declare function cipherKeyValue(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: CipheredKeyValueParams[] }
 ): Response<Array<CipheredKeyValue>>;

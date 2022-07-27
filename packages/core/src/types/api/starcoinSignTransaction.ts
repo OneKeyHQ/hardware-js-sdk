@@ -8,5 +8,6 @@ export type StarcoinSignTransactionParams = {
 
 export declare function starcoinSignTransaction(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StarcoinSignTransactionParams
 ): Response<StarcoinSignedTx>;

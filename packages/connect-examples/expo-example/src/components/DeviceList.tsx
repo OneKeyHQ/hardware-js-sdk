@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type Device = {
   connectId: string;
   name: string;
+  features?: any;
 };
 
 const STORE_KEY = '@onekey/selectedId';
