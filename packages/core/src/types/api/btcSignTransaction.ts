@@ -93,5 +93,6 @@ export type BTCSignTransactionParams = {
 
 export declare function btcSignTransaction(
   connectId: string,
+  deviceId: string,
   params: CommonParams & BTCSignTransactionParams
 ): Response<SignedTransaction>;

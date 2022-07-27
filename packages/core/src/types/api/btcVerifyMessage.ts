@@ -10,5 +10,6 @@ export type BTCVerifyMessageParams = {
 
 export declare function btcVerifyMessage(
   connectId: string,
+  deviceId: string,
   params: CommonParams & BTCVerifyMessageParams
 ): Response<Success>;

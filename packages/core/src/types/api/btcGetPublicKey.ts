@@ -14,10 +14,12 @@ export type BTCGetPublicKeyParams = {
 
 export declare function btcGetPublicKey(
   connectId: string,
+  deviceId: string,
   params: CommonParams & BTCGetPublicKeyParams
 ): Response<BTCPublicKey>;
 
 export declare function btcGetPublicKey(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: BTCGetPublicKeyParams[] }
 ): Response<Array<BTCPublicKey>>;

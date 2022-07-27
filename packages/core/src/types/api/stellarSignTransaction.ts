@@ -149,5 +149,6 @@ export type StellarSignTransactionParams = {
 
 export declare function stellarSignTransaction(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StellarSignTransactionParams
 ): Response<StellarSignedTx>;

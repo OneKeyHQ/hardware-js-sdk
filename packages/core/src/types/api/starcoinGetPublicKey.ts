@@ -12,10 +12,12 @@ export type StarcoinGetPublicKeyParams = {
 
 export declare function starcoinGetPublicKey(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StarcoinGetPublicKeyParams
 ): Response<StarcoinPublicKey>;
 
 export declare function starcoinGetPublicKey(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: StarcoinGetPublicKeyParams[] }
 ): Response<Array<StarcoinPublicKey>>;

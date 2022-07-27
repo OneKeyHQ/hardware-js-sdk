@@ -12,10 +12,12 @@ export type SolanaGetAddressParams = {
 
 export declare function solGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & SolanaGetAddressParams
 ): Response<SolanaAddress>;
 
 export declare function solGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: SolanaGetAddressParams[] }
 ): Response<Array<SolanaAddress>>;
