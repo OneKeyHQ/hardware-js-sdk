@@ -315,7 +315,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
       try {
         await initDeviceList(method);
       } catch (error) {
-        console.log('device list error: ', error);
+        Log.debug('device list error: ', error);
         if (error.errorCode === HardwareErrorCode.BridgeNotInstalled) {
           reject(error);
           return;
@@ -349,7 +349,11 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
           return;
         }
       } catch (error) {
-        console.log('device error: ', error);
+        Log.debug('device error: ', error);
+        if (error.errorCode === HardwareErrorCode.BlePermissionError) {
+          reject(error);
+          return;
+        }
       }
 
       if (tryCount > 5) {
