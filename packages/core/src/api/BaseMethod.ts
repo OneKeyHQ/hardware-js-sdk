@@ -96,13 +96,19 @@ export abstract class BaseMethod<Params = undefined> {
   checkFirmwareRelease() {
     if (!this.device || !this.device.features) return;
     const releaseInfo = getFirmwareReleaseInfo(this.device.features);
-    if (['outdated', 'required'].includes(releaseInfo.status)) {
-      this.postMessage(createFirmwareMessage(FIRMWARE.RELEASE_INFO, releaseInfo));
-    }
+    this.postMessage(
+      createFirmwareMessage(FIRMWARE.RELEASE_INFO, {
+        ...releaseInfo,
+        features: this.device.features,
+      })
+    );
     const bleReleaseInfo = getBleFirmwareReleaseInfo(this.device.features);
-    if (['outdated', 'required'].includes(bleReleaseInfo.status)) {
-      this.postMessage(createFirmwareMessage(FIRMWARE.BLE_RELEASE_INFO, bleReleaseInfo));
-    }
+    this.postMessage(
+      createFirmwareMessage(FIRMWARE.BLE_RELEASE_INFO, {
+        ...bleReleaseInfo,
+        features: this.device.features,
+      })
+    );
   }
 
   dispose() {}
