@@ -1,6 +1,12 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
-import { createDeferred, Deferred, HardwareErrorCode, ERRORS } from '@onekeyfe/hd-shared';
+import {
+  createDeferred,
+  Deferred,
+  HardwareErrorCode,
+  ERRORS,
+  HardwareError,
+} from '@onekeyfe/hd-shared';
 
 import DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
@@ -319,6 +325,9 @@ export class Device extends EventEmitter {
         }
       } catch (error) {
         this.runPromise = null;
+        if (error instanceof HardwareError) {
+          return Promise.reject(error);
+        }
         return Promise.reject(
           ERRORS.TypedError(
             HardwareErrorCode.DeviceInitializeFailed,
