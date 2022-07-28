@@ -95,9 +95,7 @@ export const callAPI = async (message: CoreMessage) => {
   method.setDevice?.(device);
 
   device.on(DEVICE.PIN, onDevicePinHandler);
-  device.on(DEVICE.BUTTON, (d, code) => {
-    onDeviceButtonHandler(d, code);
-  });
+  device.on(DEVICE.BUTTON, onDeviceButtonHandler);
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
 
   try {
@@ -215,6 +213,8 @@ export const callAPI = async (message: CoreMessage) => {
     closePopup();
 
     cleanup();
+
+    removeDeviceListener(device);
     // TODO: 方法执行后，检查队列内是否有等待调用的 API，依次调用
   }
 };
@@ -400,6 +400,12 @@ export const cancel = (connectId?: string) => {
 const cleanup = () => {
   _uiPromises = [];
   Log.debug('Cleanup...');
+};
+
+const removeDeviceListener = (device: Device) => {
+  device.removeListener(DEVICE.PIN, onDevicePinHandler);
+  device.removeListener(DEVICE.BUTTON, onDeviceButtonHandler);
+  device.removeListener(DEVICE.FEATURES, onDeviceFeaturesHandler);
 };
 
 /**
