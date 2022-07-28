@@ -25,6 +25,7 @@ type Params = {
 };
 export default class BTCSignTransaction extends BaseMethod<Params> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [

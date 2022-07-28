@@ -26,6 +26,7 @@ export type EVMSignTypedDataParams = {
 
 export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [

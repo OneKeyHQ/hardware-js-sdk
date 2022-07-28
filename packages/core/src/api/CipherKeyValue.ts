@@ -10,6 +10,7 @@ export default class CipherKeyValue extends BaseMethod<HardwareCipherKeyValue[]>
   hasBundle = false;
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;

@@ -9,6 +9,7 @@ const { check, buildOne, receiveOne, parseConfigure } = transport;
 type IncompleteRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
   url: string;
+  timeout?: number;
 };
 
 export default class HttpTransport {
@@ -110,6 +111,7 @@ export default class HttpTransport {
     const resData = await this._post({
       url: `/call/${session}`,
       body: outData,
+      timeout: name === 'Initialize' ? 10000 : undefined,
     });
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
