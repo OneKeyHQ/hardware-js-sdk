@@ -22,6 +22,7 @@ export default class EVMSignTransaction extends BaseMethod {
   formattedTx: EVMTransaction | EVMTransactionEIP1559 | undefined;
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [

@@ -9,6 +9,7 @@ export default class StellarGetAddress extends BaseMethod<HardwareStellarGetAddr
   hasBundle = false;
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;

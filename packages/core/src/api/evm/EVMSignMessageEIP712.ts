@@ -7,6 +7,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 
 export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessageEIP712> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [

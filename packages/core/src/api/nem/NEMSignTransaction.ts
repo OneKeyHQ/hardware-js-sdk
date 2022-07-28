@@ -227,6 +227,7 @@ export default class NEMSignTransaction extends BaseMethod<NEMSignTx> {
   };
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [

@@ -9,6 +9,7 @@ export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
   hasBundle = false;
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;

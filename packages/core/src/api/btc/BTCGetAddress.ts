@@ -10,6 +10,7 @@ export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
   hasBundle = false;
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = Object.prototype.hasOwnProperty.call(this.payload, 'bundle');
