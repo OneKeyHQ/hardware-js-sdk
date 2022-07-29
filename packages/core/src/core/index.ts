@@ -356,7 +356,14 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         }
       } catch (error) {
         Log.debug('device error: ', error);
-        if (error.errorCode === HardwareErrorCode.BlePermissionError) {
+        if (
+          [
+            HardwareErrorCode.BlePermissionError,
+            HardwareErrorCode.BleLocationError,
+            HardwareErrorCode.BleDeviceNotBonded,
+            HardwareErrorCode.BleCharacteristicNotifyError,
+          ].includes(error.errorCode)
+        ) {
           reject(error);
           return;
         }
