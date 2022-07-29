@@ -462,7 +462,7 @@ export default class ReactNativeBleTransport {
       return check.call(jsonData);
     } catch (e) {
       this.Log.error('call error: ', e);
-      return e;
+      throw e;
     } finally {
       this.runPromise = null;
     }
