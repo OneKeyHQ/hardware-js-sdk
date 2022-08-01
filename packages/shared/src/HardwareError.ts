@@ -91,7 +91,15 @@ export const HardwareErrorCode = {
    */
   DeviceInterruptedFromUser: 109,
 
+  /**
+   * Check device id is same
+   */
   DeviceCheckDeviceIdError: 110,
+
+  /**
+   * Do not support passphrase
+   */
+  DeviceNotSupportPassphrase: 111,
 
   /**
    * Not initialized
@@ -254,6 +262,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceInterruptedFromUser]: 'Device interrupted',
   [HardwareErrorCode.DeviceUnexpectedBootloaderMode]: 'Device should be in bootloader mode',
   [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
+  [HardwareErrorCode.DeviceNotSupportPassphrase]: 'Device not support passphrase',
 
   /**
    * Node Errors

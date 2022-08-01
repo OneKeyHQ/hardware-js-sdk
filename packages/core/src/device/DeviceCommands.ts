@@ -207,9 +207,10 @@ export class DeviceCommands {
 
     if (res.type === 'PassphraseRequest') {
       /**
-       * Temporary, callback an empty passphrase
+       * Temporary, do not support passphrase
        */
-      return this._commonCall('PassphraseAck', { passphrase: '' });
+      // return this._commonCall('PassphraseAck', { passphrase: '' });
+      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportPassphrase));
     }
 
     // TT fw lower than 2.3.0, device send his current state
