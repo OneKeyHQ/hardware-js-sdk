@@ -74,7 +74,10 @@ export const callAPI = async (message: CoreMessage) => {
   callApiQueue.push(method);
 
   if (callApiQueue.length > 1) {
-    Log.debug('should cancel the previous method execution: ', callApiQueue);
+    Log.debug(
+      'should cancel the previous method execution: ',
+      callApiQueue.map(m => m.name)
+    );
   }
 
   /**
@@ -201,13 +204,15 @@ export const callAPI = async (message: CoreMessage) => {
     }
 
     // remove method from queue
-    const index =
-      messageResponse && messageResponse.id
-        ? callApiQueue.findIndex(m => m.responseID === messageResponse.id)
-        : -1;
+    const index = method.responseID
+      ? callApiQueue.findIndex(m => m.responseID === method.responseID)
+      : -1;
     if (index > -1) {
       callApiQueue.splice(index, 1);
-      Log.debug('Remove the finished method from the queue： ', callApiQueue);
+      Log.debug(
+        'Remove the finished method from the queue： ',
+        callApiQueue.map(m => m.name)
+      );
     }
 
     closePopup();
@@ -362,6 +367,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.BleLocationError,
             HardwareErrorCode.BleDeviceNotBonded,
             HardwareErrorCode.BleCharacteristicNotifyError,
+            HardwareErrorCode.BleWriteCharacteristicError,
           ].includes(error.errorCode)
         ) {
           reject(error);

@@ -318,22 +318,25 @@ export class Device extends EventEmitter {
 
   async _runInner<T>(fn: (() => Promise<T>) | undefined, options: RunOptions) {
     if (!this.isUsedHere() || this.commands.disposed) {
-      await this.acquire();
-      try {
-        if (fn) {
-          await this.initialize();
+      const env = DataManager.getSettings('env');
+      if (env !== 'react-native') {
+        await this.acquire();
+        try {
+          if (fn) {
+            await this.initialize();
+          }
+        } catch (error) {
+          this.runPromise = null;
+          if (error instanceof HardwareError) {
+            return Promise.reject(error);
+          }
+          return Promise.reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.DeviceInitializeFailed,
+              `Initialize failed: ${error.message as string}, code: ${error.code as string}`
+            )
+          );
         }
-      } catch (error) {
-        this.runPromise = null;
-        if (error instanceof HardwareError) {
-          return Promise.reject(error);
-        }
-        return Promise.reject(
-          ERRORS.TypedError(
-            HardwareErrorCode.DeviceInitializeFailed,
-            `Initialize failed: ${error.message as string}, code: ${error.code as string}`
-          )
-        );
       }
     }
 

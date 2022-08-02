@@ -29,7 +29,7 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 const transportCache: Record<string, any> = {};
 
 let connectOptions: Record<string, unknown> = {
-  requestMTU: 512,
+  requestMTU: 256,
   timeout: 3000,
 };
 
@@ -206,6 +206,7 @@ export default class ReactNativeBleTransport {
         ) {
           connectOptions = {};
           device = await blePlxManager.connectToDevice(uuid);
+          this.Log.debug('first try to reconnect without params');
         } else {
           throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }
@@ -222,13 +223,14 @@ export default class ReactNativeBleTransport {
       try {
         await device.connect(connectOptions);
       } catch (e) {
-        this.Log.debug('try to connect to device has error: ', e);
+        this.Log.debug('not connected, try to connect to device has error: ', e);
         if (
           e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
           connectOptions = {};
           await device.connect();
+          this.Log.debug('second try to reconnect without params');
         } else {
           throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }
@@ -440,11 +442,14 @@ export default class ReactNativeBleTransport {
         try {
           await transport.writeCharacteristic.writeWithoutResponse(outData);
         } catch (e) {
+          this.Log.debug('writeCharacteristic write error: ', e);
+          this.runPromise = null;
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
           }
-          this.runPromise = null;
-          this.Log.debug('writeCharacteristic write error: ', e);
+          if (e.errorCode === BleErrorCode.OperationStartFailed) {
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, e.reason);
+          }
           return;
         }
       }
