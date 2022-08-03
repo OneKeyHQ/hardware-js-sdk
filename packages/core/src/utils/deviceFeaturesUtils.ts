@@ -1,3 +1,4 @@
+import semver from 'semver';
 import type { Features, IVersionArray, IDeviceType, IDeviceModel } from '../types';
 
 export const getDeviceModel = (features?: Features): IDeviceModel => {
@@ -78,6 +79,9 @@ export const getDeviceFirmwareVersion = (features: Features | undefined): IVersi
  */
 export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray | null => {
   if (!features.ble_ver) {
+    return null;
+  }
+  if (!semver.valid(features.ble_ver)) {
     return null;
   }
   return features.ble_ver.split('.') as unknown as IVersionArray;
