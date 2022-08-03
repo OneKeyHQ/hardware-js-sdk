@@ -133,9 +133,12 @@ const call = async (params: any) => {
    */
   if (!iframe.instance && !iframe.timeout) {
     _settings = parseConnectSettings(_settings);
+    Log.debug("Try to recreate iframe if it's initialize failed: ", _settings);
     try {
       await init(_settings);
+      Log.debug('Recreate iframe success');
     } catch (error) {
+      Log.debug('Recreate iframe failed: ', error);
       return createErrorMessage(error);
     }
   }
