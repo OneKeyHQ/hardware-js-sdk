@@ -130,3 +130,7 @@ type FeaturesNarrowing =
     };
 
 export type StrictFeatures = Features & FeaturesNarrowing;
+
+export type SupportFeatures = {
+  inputPinOnSoftware: boolean;
+};

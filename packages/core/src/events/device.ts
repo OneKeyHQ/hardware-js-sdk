@@ -1,5 +1,5 @@
 import type { PROTO } from '../constants';
-import type { Features, KnownDevice as Device } from '../types/device';
+import type { Features, KnownDevice as Device, SupportFeatures } from '../types/device';
 import { MessageFactoryFn } from './utils';
 
 export const DEVICE_EVENT = 'DEVICE_EVENT';
@@ -24,6 +24,7 @@ export const DEVICE = {
   PASSPHRASE: 'passphrase',
   PASSPHRASE_ON_DEVICE: 'passphrase_on_device',
   WORD: 'word',
+  SUPPORT_FEATURES: 'support_features',
 
   FEATURES: 'features',
 } as const;
@@ -44,7 +45,13 @@ export interface DeviceSendFeatures {
   payload: DeviceFeaturesPayload;
 }
 
-export type DeviceEvent = DeviceButtonRequest | DeviceSendFeatures;
+export type DeviceSupportFeaturesPayload = SupportFeatures & { device: Device | null };
+export interface DeviceSendSupportFeatures {
+  type: typeof DEVICE.SUPPORT_FEATURES;
+  payload: DeviceSupportFeaturesPayload;
+}
+
+export type DeviceEvent = DeviceButtonRequest | DeviceSendFeatures | DeviceSendSupportFeatures;
 
 export type DeviceEventMessage = DeviceEvent & { event: typeof DEVICE_EVENT };
 

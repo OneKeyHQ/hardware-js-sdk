@@ -74,6 +74,9 @@ function handleMessage(message: CoreMessage) {
       if (message.type === DEVICE.FEATURES) {
         eventEmitter.emit(message.type, message.payload);
       }
+      if (message.type === DEVICE.SUPPORT_FEATURES) {
+        eventEmitter.emit(message.type, message.payload);
+      }
       break;
     default:
       Log.log('No need to be captured message', message.event);

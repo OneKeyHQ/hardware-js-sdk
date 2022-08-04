@@ -1,3 +1,4 @@
+import semver from 'semver';
 import type { Features, IVersionArray, IDeviceType, IDeviceModel } from '../types';
 
 export const getDeviceModel = (features?: Features): IDeviceModel => {
@@ -80,5 +81,20 @@ export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray |
   if (!features.ble_ver) {
     return null;
   }
+  if (!semver.valid(features.ble_ver)) {
+    return null;
+  }
   return features.ble_ver.split('.') as unknown as IVersionArray;
+};
+
+export const supportInputPinOnSoftware = (features: Features): boolean => {
+  if (!features) return false;
+
+  const deviceType = getDeviceType(features);
+  if (deviceType === 'touch') {
+    return false;
+  }
+
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+  return semver.gte(currentVersion, '2.3.0');
 };
