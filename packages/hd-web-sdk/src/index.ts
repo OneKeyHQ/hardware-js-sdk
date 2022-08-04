@@ -128,12 +128,17 @@ const init = async (settings: Partial<ConnectSettings>) => {
 
 const call = async (params: any) => {
   Log.debug('call : ', params);
-  // lazy load
+  /**
+   * Try to recreate iframe if it's initialize failed
+   */
   if (!iframe.instance && !iframe.timeout) {
     _settings = parseConnectSettings(_settings);
+    Log.debug("Try to recreate iframe if it's initialize failed: ", _settings);
     try {
-      init(_settings);
+      await init(_settings);
+      Log.debug('Recreate iframe success');
     } catch (error) {
+      Log.debug('Recreate iframe failed: ', error);
       return createErrorMessage(error);
     }
   }
