@@ -1,8 +1,10 @@
+import { supportInputPinOnSoftware } from '../utils/deviceFeaturesUtils';
+import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange } from '../types';
-import { CoreMessage, createFirmwareMessage, FIRMWARE } from '../events';
+import { CoreMessage, createFirmwareMessage, DEVICE, FIRMWARE } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
 
 export abstract class BaseMethod<Params = undefined> {
@@ -107,6 +109,17 @@ export abstract class BaseMethod<Params = undefined> {
       createFirmwareMessage(FIRMWARE.BLE_RELEASE_INFO, {
         ...bleReleaseInfo,
         features: this.device.features,
+      })
+    );
+  }
+
+  checkDeviceSupportFeature() {
+    if (!this.device || !this.device.features) return;
+    const inputPinOnSoftware = supportInputPinOnSoftware(this.device.features);
+    this.postMessage(
+      createDeviceMessage(DEVICE.SUPPORT_FEATURES, {
+        inputPinOnSoftware,
+        device: this.device.toMessageObject(),
       })
     );
   }

@@ -43,6 +43,7 @@ import { stellarSignTransaction } from './stellarSignTransaction';
 import { cipherKeyValue } from './cipherKeyValue';
 import { firmwareUpdate } from './firmwareUpdate';
 import { getLogs } from './getLogs';
+import { deviceSupportFeatures } from './deviceSupportFeatures';
 
 export * from './export';
 
@@ -85,6 +86,7 @@ export type CoreApi = {
   deviceReset: typeof deviceReset;
   deviceSettings: typeof deviceSettings;
   deviceUpdateReboot: typeof deviceUpdateReboot;
+  deviceSupportFeatures: typeof deviceSupportFeatures;
   deviceVerify: typeof deviceVerify;
   deviceWipe: typeof deviceWipe;
 

@@ -48,6 +48,9 @@ const handleMessage = async (message: CoreMessage) => {
       if (message.type === DEVICE.FEATURES) {
         eventEmitter.emit(message.type, message.payload);
       }
+      if (message.type === DEVICE.SUPPORT_FEATURES) {
+        eventEmitter.emit(message.type, message.payload);
+      }
       break;
 
     default:

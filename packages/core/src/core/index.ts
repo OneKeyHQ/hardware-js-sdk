@@ -164,6 +164,11 @@ export const callAPI = async (message: CoreMessage) => {
        */
       method.checkFirmwareRelease();
 
+      /**
+       * check additional supported feature
+       */
+      method.checkDeviceSupportFeature();
+
       // reconfigure messages
       if (_deviceList) {
         await TransportManager.reconfigure(device.getFirmwareVersion());
