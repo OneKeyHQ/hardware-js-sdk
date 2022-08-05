@@ -1,4 +1,8 @@
-import { IJsBridgeIframeConfig, JsBridgeIframe } from '@onekeyfe/cross-inpage-provider-core';
+import {
+  IJsBridgeIframeConfig,
+  JsBridgeIframe,
+  setPostMessageListenerFlag,
+} from '@onekeyfe/cross-inpage-provider-core';
 import { CoreMessage, getLogger, LoggerNames } from '@onekeyfe/hd-core';
 import { ERRORS } from '@onekeyfe/hd-shared';
 import JSBridgeConfig from '../iframe/bridge-config';
@@ -9,6 +13,8 @@ let frameBridge: JsBridgeIframe;
 let hostBridge: JsBridgeIframe;
 
 const Log = getLogger(LoggerNames.SendMessage);
+
+export const resetListenerFlag = () => setPostMessageListenerFlag(false);
 
 export const createJsBridge = (params: IJsBridgeIframeConfig & { isHost: boolean }) => {
   const bridge = new JsBridgeIframe(params);

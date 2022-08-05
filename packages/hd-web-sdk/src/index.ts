@@ -21,7 +21,7 @@ import HardwareSdk, {
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
-import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
+import { sendMessage, createJsBridge, hostBridge, resetListenerFlag } from './utils/bridgeUtils';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.Connect);
@@ -77,11 +77,13 @@ const cancel = (connectId?: string) => {
   sendMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
 };
 
+let prevFrameInstance: Window | null | undefined = null;
 const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
     return;
   }
-  if (!hostBridge) {
+  if (!hostBridge || prevFrameInstance !== iframe.instance?.contentWindow) {
+    resetListenerFlag();
     createJsBridge({
       isHost: true,
       remoteFrame: iframe.instance?.contentWindow as Window,
@@ -102,6 +104,8 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         return response;
       },
     });
+
+    prevFrameInstance = iframe.instance?.contentWindow;
   }
 };
 
