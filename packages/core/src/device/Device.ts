@@ -26,8 +26,9 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
 import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
+import { toHardened } from '../api/helpers/pathUtils';
 
-type RunOptions = {
+export type RunOptions = {
   keepSession?: boolean;
 };
 
@@ -101,6 +102,8 @@ export class Device extends EventEmitter {
    * 执行 API 方法后是否保留 SessionID
    */
   keepSession = false;
+
+  passphraseState = '';
 
   constructor(descriptor: DeviceDescriptor) {
     super();
@@ -337,6 +340,7 @@ export class Device extends EventEmitter {
         try {
           if (fn) {
             await this.initialize();
+            console.log('======: initialize initialize initialize: ');
           }
         } catch (error) {
           this.runPromise = null;
@@ -368,7 +372,12 @@ export class Device extends EventEmitter {
       }
     }
 
-    if (options.keepSession) {
+    console.log('======: keepSession', this.keepSession);
+    console.log('======: passphrase_protection', this.features?.passphrase_protection?.toString());
+    console.log('======: features', this.features);
+    console.log('======: checkPassphraseState', this.checkPassphraseState());
+
+    if (options.keepSession || this.features?.passphrase_protection) {
       this.keepSession = true;
     }
 
@@ -495,6 +504,23 @@ export class Device extends EventEmitter {
       return this.features.device_id === deviceId;
     }
     return false;
+  }
+
+  async checkPassphraseState() {
+    if (!this.features) return false;
+    const { message } = await this.commands.typedCall('GetAddress', 'Address', {
+      address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
+      coin_name: 'Testnet',
+      script_type: 'SPENDADDRESS',
+    });
+
+    const newState = `${message.address}@${this.features.device_id || 'device_id'}`;
+    if (this.passphraseState && this.passphraseState !== newState) {
+      return newState;
+    }
+    if (!this.passphraseState) {
+      this.passphraseState = newState;
+    }
   }
 }
 

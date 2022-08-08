@@ -2,7 +2,7 @@ import semver from 'semver';
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Device, DeviceEvents } from '../device/Device';
+import { Device, DeviceEvents, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
@@ -191,7 +191,11 @@ export const callAPI = async (message: CoreMessage) => {
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
-    const deviceRun = () => device.run(inner);
+
+    const runOptions: RunOptions = {
+      keepSession: method.payload.keepSession,
+    };
+    const deviceRun = () => device.run(inner, runOptions);
     _callPromise = createDeferred(deviceRun);
 
     try {

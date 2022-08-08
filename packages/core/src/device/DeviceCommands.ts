@@ -222,6 +222,8 @@ export class DeviceCommands {
     }
 
     if (res.type === 'PassphraseRequest') {
+      console.log('======:::: PassphraseRequest', res);
+
       /**
        * Temporary, do not support passphrase
        */
