@@ -8,7 +8,7 @@ import {
   HardwareError,
 } from '@onekeyfe/hd-shared';
 
-import DeviceConnector from './DeviceConnector';
+import type DeviceConnector from './DeviceConnector';
 import { DeviceCommands } from './DeviceCommands';
 
 import {

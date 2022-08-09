@@ -27,6 +27,8 @@ export default class DeviceConnector {
   async enumerate() {
     try {
       const descriptors = await this.transport.enumerate();
+      this.upcoming = descriptors;
+      this._reportDevicesChange();
       return { descriptors } as DeviceDescriptorDiff;
     } catch (error) {
       safeThrowError(error);
