@@ -3,7 +3,9 @@ import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import { Device } from './Device';
 import { DEVICE } from '../events';
 import type DeviceConnector from './DeviceConnector';
-import { getDeviceUUID } from '../utils';
+import { getDeviceUUID, getLogger, LoggerNames } from '../utils';
+
+const Log = getLogger(LoggerNames.DevicePool);
 
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;
@@ -86,10 +88,30 @@ export class DevicePool extends EventEmitter {
     this.connector = connector;
   }
 
-  static async getDevices(descriptors: DeviceDescriptor[]) {
+  static async getDevices(descriptorList: DeviceDescriptor[], connectId?: string) {
+    Log.debug('get device list');
+
     const devices: Record<string, Device> = {};
     const deviceList = [];
-    for await (const descriptor of descriptors) {
+
+    // If there is a connectId
+    // it means that you only want to get data from cache
+    if (connectId) {
+      const device = this.devicesCache[connectId];
+      if (device) {
+        const exist = descriptorList.find(d => d.path === device.originalDescriptor.path);
+        if (exist) {
+          Log.debug('find existed Device: ', connectId);
+          device.updateDescriptor(exist, true);
+          devices[connectId] = device;
+          deviceList.push(device);
+          return { devices, deviceList };
+        }
+        Log.debug('found device in cache, but path is different: ', connectId);
+      }
+    }
+
+    for await (const descriptor of descriptorList) {
       let device = this.getDeviceByPath(descriptor.path);
       if (!device) {
         device = Device.fromDescriptor(descriptor);
@@ -101,26 +123,30 @@ export class DevicePool extends EventEmitter {
 
       if (device.features) {
         const uuid = getDeviceUUID(device.features);
-        // if (this.devicesCache[uuid]) {
-        //   const cache = this.devicesCache[uuid];
-        // TODO: 什么时机更新 session id ？
-        //   cache?.updateFromCache(device);
-        // }
+        if (this.devicesCache[uuid]) {
+          const cache = this.devicesCache[uuid];
+          cache.updateDescriptor(descriptor, true);
+        }
         this.devicesCache[uuid] = device;
         devices[uuid] = device;
       }
 
       deviceList.push(device);
     }
-
+    Log.debug('get devices result : ', devices, deviceList);
+    console.log('device poll -> connected: ', this.connectedPool);
+    console.log('device poll -> disconnected: ', this.disconnectPool);
     return { devices, deviceList };
   }
 
   static reportDeviceChange(upcoming: DeviceDescriptor[]) {
     const diff = getDiff(this.current || [], upcoming);
 
+    this.upcoming = upcoming;
     this.current = this.upcoming;
 
+    console.log('device pool -> current: ', this.current);
+    console.log('device pool -> upcomming: ', this.upcoming);
     console.log('DeviceCache.reportDeviceChange diff: ', diff);
 
     if (!diff.didUpdate) {
@@ -133,6 +159,7 @@ export class DevicePool extends EventEmitter {
         this._addConnectedDeviceToPool(d);
         return;
       }
+      Log.debug('emit DEVICE.CONNECT: ', device);
       this.emitter.emit(DEVICE.CONNECT, device);
     });
 
@@ -144,6 +171,7 @@ export class DevicePool extends EventEmitter {
         return;
       }
 
+      Log.debug('emit DEVICE.DISCONNECT: ', device);
       this.emitter.emit(DEVICE.DISCONNECT, device);
     });
   }

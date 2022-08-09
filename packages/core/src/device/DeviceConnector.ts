@@ -22,6 +22,7 @@ export default class DeviceConnector {
   constructor() {
     TransportManager.load();
     this.transport = TransportManager.getTransport();
+    DevicePool.setConnector(this);
   }
 
   async enumerate() {
