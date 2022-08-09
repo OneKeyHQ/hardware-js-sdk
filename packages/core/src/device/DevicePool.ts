@@ -2,6 +2,8 @@ import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import { Device } from './Device';
 import { DEVICE } from '../events';
+import type DeviceConnector from './DeviceConnector';
+import { getDeviceUUID } from '../utils';
 
 export type DeviceDescriptorDiff = {
   didUpdate: boolean;
@@ -65,7 +67,7 @@ const getDiff = (
   };
 };
 
-export class DeviceCache extends EventEmitter {
+export class DevicePool extends EventEmitter {
   static current: DeviceDescriptor[] | null = null;
 
   static upcoming: DeviceDescriptor[] = [];
@@ -77,6 +79,42 @@ export class DeviceCache extends EventEmitter {
   static devicesCache: Record<string, Device> = {};
 
   static emitter = new EventEmitter();
+
+  static connector: DeviceConnector;
+
+  static setConnector(connector: DeviceConnector) {
+    this.connector = connector;
+  }
+
+  static async getDevices(descriptors: DeviceDescriptor[]) {
+    const devices: Record<string, Device> = {};
+    const deviceList = [];
+    for await (const descriptor of descriptors) {
+      let device = this.getDeviceByPath(descriptor.path);
+      if (!device) {
+        device = Device.fromDescriptor(descriptor);
+        device.deviceConnector = this.connector;
+        await device.connect();
+        await device.initialize();
+        await device.release();
+      }
+
+      if (device.features) {
+        const uuid = getDeviceUUID(device.features);
+        // if (this.devicesCache[uuid]) {
+        //   const cache = this.devicesCache[uuid];
+        // TODO: 什么时机更新 session id ？
+        //   cache?.updateFromCache(device);
+        // }
+        this.devicesCache[uuid] = device;
+        devices[uuid] = device;
+      }
+
+      deviceList.push(device);
+    }
+
+    return { devices, deviceList };
+  }
 
   static reportDeviceChange(upcoming: DeviceDescriptor[]) {
     const diff = getDiff(this.current || [], upcoming);
@@ -102,7 +140,7 @@ export class DeviceCache extends EventEmitter {
       this._removeDeviceFromConnectedPool(d.path);
       const device = this.getDeviceByPath(d.path);
       if (!device) {
-        this._removeDeviceFromConnectedPool(d.path);
+        this._addDisconnectedDeviceToPool(d);
         return;
       }
 

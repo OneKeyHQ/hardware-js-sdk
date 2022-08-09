@@ -2,7 +2,7 @@ import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-tr
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
-import { DeviceCache, DeviceDescriptorDiff } from './DeviceCache';
+import { DevicePool, DeviceDescriptorDiff } from './DevicePool';
 import { resolveAfter } from '../utils/promiseUtils';
 import { getLogger, LoggerNames } from '../utils';
 
@@ -98,6 +98,6 @@ export default class DeviceConnector {
   }
 
   _reportDevicesChange() {
-    DeviceCache.reportDeviceChange(this.upcoming);
+    DevicePool.reportDeviceChange(this.upcoming);
   }
 }
