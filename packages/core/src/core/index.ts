@@ -4,6 +4,7 @@ import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
+import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
 import { enableLog, getLogger, LoggerNames, setLoggerPostMessage } from '../utils';
@@ -60,6 +61,9 @@ export const callAPI = async (message: CoreMessage) => {
   } catch (error) {
     return Promise.reject(error);
   }
+
+  DevicePool.emitter.on(DEVICE.CONNECT, onDeviceConnectHandler);
+  DevicePool.emitter.on(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 
   if (!method.useDevice) {
     try {
@@ -424,6 +428,8 @@ const removeDeviceListener = (device: Device) => {
   device.removeListener(DEVICE.PIN, onDevicePinHandler);
   device.removeListener(DEVICE.BUTTON, onDeviceButtonHandler);
   device.removeListener(DEVICE.FEATURES, onDeviceFeaturesHandler);
+  DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
+  DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 };
 
 /**
@@ -431,6 +437,18 @@ const removeDeviceListener = (device: Device) => {
  */
 const closePopup = () => {
   postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW));
+};
+
+const onDeviceConnectHandler = (device: Device) => {
+  postMessage(
+    createDeviceMessage(DEVICE.CONNECT, { device: device.toMessageObject() as KnownDevice })
+  );
+};
+
+const onDeviceDisconnectHandler = (device: Device) => {
+  postMessage(
+    createDeviceMessage(DEVICE.DISCONNECT, { device: device.toMessageObject() as KnownDevice })
+  );
 };
 
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {

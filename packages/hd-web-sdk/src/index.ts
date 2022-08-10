@@ -40,15 +40,18 @@ const handleMessage = async (message: CoreMessage) => {
       eventEmitter.emit(message.event, message);
       eventEmitter.emit(message.type, message.payload);
       break;
+
     case LOG_EVENT:
     case FIRMWARE_EVENT:
       eventEmitter.emit(message.event, message);
       break;
+
     case DEVICE_EVENT:
-      if (message.type === DEVICE.FEATURES) {
-        eventEmitter.emit(message.type, message.payload);
-      }
-      if (message.type === DEVICE.SUPPORT_FEATURES) {
+      if (
+        (
+          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+        ).includes(message.type)
+      ) {
         eventEmitter.emit(message.type, message.payload);
       }
       break;

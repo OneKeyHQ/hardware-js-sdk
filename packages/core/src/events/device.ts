@@ -29,6 +29,16 @@ export const DEVICE = {
   FEATURES: 'features',
 } as const;
 
+export interface DeviceConnnectRequest {
+  type: typeof DEVICE.CONNECT;
+  payload: { device: Device };
+}
+
+export interface DeviceDisconnnectRequest {
+  type: typeof DEVICE.DISCONNECT;
+  payload: { device: Device };
+}
+
 export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'code'> {
   code?: PROTO.ButtonRequest['code'] | 'ButtonRequest_FirmwareUpdate';
 }
@@ -51,7 +61,12 @@ export interface DeviceSendSupportFeatures {
   payload: DeviceSupportFeaturesPayload;
 }
 
-export type DeviceEvent = DeviceButtonRequest | DeviceSendFeatures | DeviceSendSupportFeatures;
+export type DeviceEvent =
+  | DeviceButtonRequest
+  | DeviceSendFeatures
+  | DeviceSendSupportFeatures
+  | DeviceDisconnnectRequest
+  | DeviceConnnectRequest;
 
 export type DeviceEventMessage = DeviceEvent & { event: typeof DEVICE_EVENT };
 
