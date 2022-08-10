@@ -105,6 +105,7 @@ export class DevicePool extends EventEmitter {
           device.updateDescriptor(exist, true);
           devices[connectId] = device;
           deviceList.push(device);
+          await this._checkDevicePool();
           return { devices, deviceList };
         }
         Log.debug('found device in cache, but path is different: ', connectId);
@@ -112,14 +113,7 @@ export class DevicePool extends EventEmitter {
     }
 
     for await (const descriptor of descriptorList) {
-      let device = this.getDeviceByPath(descriptor.path);
-      if (!device) {
-        device = Device.fromDescriptor(descriptor);
-        device.deviceConnector = this.connector;
-        await device.connect();
-        await device.initialize();
-        await device.release();
-      }
+      const device = await this._createDevice(descriptor);
 
       if (device.features) {
         const uuid = getDeviceUUID(device.features);
@@ -136,7 +130,46 @@ export class DevicePool extends EventEmitter {
     Log.debug('get devices result : ', devices, deviceList);
     console.log('device poll -> connected: ', this.connectedPool);
     console.log('device poll -> disconnected: ', this.disconnectPool);
+    await this._checkDevicePool();
     return { devices, deviceList };
+  }
+
+  static async _createDevice(descriptor: DeviceDescriptor) {
+    let device = this.getDeviceByPath(descriptor.path);
+    if (!device) {
+      device = Device.fromDescriptor(descriptor);
+      device.deviceConnector = this.connector;
+      await device.connect();
+      await device.initialize();
+      await device.release();
+    }
+    return device;
+  }
+
+  static async _checkDevicePool() {
+    await this._sendConnectMessage();
+    this._sendDisconnectMessage();
+  }
+
+  static async _sendConnectMessage() {
+    for (let i = this.connectedPool.length - 1; i >= 0; i--) {
+      const descriptor = this.connectedPool[i];
+      const device = await this._createDevice(descriptor);
+      Log.debug('emit DEVICE.CONNECT: ', device);
+      this.emitter.emit(DEVICE.CONNECT, device);
+      this.connectedPool.splice(i, 1);
+    }
+  }
+
+  static _sendDisconnectMessage() {
+    for (let i = this.disconnectPool.length - 1; i >= 0; i--) {
+      const descriptor = this.connectedPool[i];
+      const device = this.getDeviceByPath(descriptor.path);
+      if (device) {
+        this.emitter.emit(DEVICE.DISCONNECT, device);
+      }
+      this.disconnectPool.splice(i, 1);
+    }
   }
 
   static reportDeviceChange(upcoming: DeviceDescriptor[]) {
