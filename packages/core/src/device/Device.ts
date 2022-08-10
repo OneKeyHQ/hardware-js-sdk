@@ -9,6 +9,7 @@ import {
 } from '@onekeyfe/hd-shared';
 
 import type DeviceConnector from './DeviceConnector';
+// eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 
 import {

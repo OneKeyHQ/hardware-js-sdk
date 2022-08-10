@@ -1,5 +1,6 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+// eslint-disable-next-line import/no-cycle
 import { Device } from './Device';
 import { DEVICE } from '../events';
 import type DeviceConnector from './DeviceConnector';

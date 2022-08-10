@@ -63,7 +63,6 @@ export const callAPI = async (message: CoreMessage) => {
   }
 
   DevicePool.emitter.on(DEVICE.CONNECT, onDeviceConnectHandler);
-  DevicePool.emitter.on(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 
   if (!method.useDevice) {
     try {
@@ -429,7 +428,7 @@ const removeDeviceListener = (device: Device) => {
   device.removeListener(DEVICE.BUTTON, onDeviceButtonHandler);
   device.removeListener(DEVICE.FEATURES, onDeviceFeaturesHandler);
   DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
-  DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
+  // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 };
 
 /**
@@ -440,15 +439,15 @@ const closePopup = () => {
 };
 
 const onDeviceConnectHandler = (device: Device) => {
-  postMessage(
-    createDeviceMessage(DEVICE.CONNECT, { device: device.toMessageObject() as KnownDevice })
-  );
+  const env = DataManager.getSettings('env');
+  const deviceObject = env === 'react-native' ? device : device.toMessageObject();
+  postMessage(createDeviceMessage(DEVICE.CONNECT, { device: deviceObject as KnownDevice }));
 };
 
 const onDeviceDisconnectHandler = (device: Device) => {
-  postMessage(
-    createDeviceMessage(DEVICE.DISCONNECT, { device: device.toMessageObject() as KnownDevice })
-  );
+  const env = DataManager.getSettings('env');
+  const deviceObject = env === 'react-native' ? device : device.toMessageObject();
+  postMessage(createDeviceMessage(DEVICE.DISCONNECT, { device: deviceObject as KnownDevice }));
 };
 
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
@@ -556,6 +555,7 @@ export const initCore = () => {
 
 export const initConnector = () => {
   _connector = new DeviceConnector();
+  DevicePool.emitter.on(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
   return _connector;
 };
 
