@@ -82,7 +82,7 @@ export default class WebUsbTransport {
     if (!input.path) return;
     try {
       await this.connect(input.path ?? '', true);
-      return await Promise.resolve(true);
+      return await Promise.resolve(input.path);
     } catch (e) {
       console.log('acquire error: ', e);
       throw e;
