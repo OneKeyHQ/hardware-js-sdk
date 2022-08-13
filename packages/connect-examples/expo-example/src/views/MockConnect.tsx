@@ -2,7 +2,6 @@ import { KnownDevice } from '@onekeyfe/hd-core';
 import { useState } from 'react';
 import { View, Button, Text } from 'react-native';
 import deviceUtils from '../utils/deviceUtils';
-import * as HidUtils from '../utils/hidDemo';
 
 export default function MockConnect() {
   const [devices, setDevices] = useState<KnownDevice[]>([]);
@@ -33,12 +32,6 @@ export default function MockConnect() {
       {devices.map(d => (
         <Button key={d.connectId} title={d.connectId ?? ''} onPress={() => connect(d)} />
       ))}
-
-      <Text>HID</Text>
-      <Button title="getDevices" onPress={() => HidUtils.getDevices()} />
-      <Button title="requestDevice" onPress={() => HidUtils.requestDevice()} />
-      <Button title="open" onPress={() => HidUtils.open()} />
-      <Button title="send" onPress={() => HidUtils.send()} />
     </View>
   );
 }
