@@ -22,22 +22,15 @@ export default class RequestWebUsbDevice extends BaseMethod {
       );
     }
 
-    const transport = TransportManager.getTransport();
-
     try {
-      const device = (await transport.requestDevice()) as any;
-      if (!device) {
-        return await Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Please select the device to connect')
-        );
-      }
-
       const deviceDiff = await this.connector?.enumerate();
       const devicesDescriptor = deviceDiff?.descriptors ?? [];
       const { deviceList } = await DevicePool.getDevices(devicesDescriptor);
-      const _device = deviceList.find(d => d.originalDescriptor.path === device.serialNumber);
-      if (_device) {
-        return { device: _device.toMessageObject() };
+      /**
+       * get first onekey device
+       */
+      if (deviceList.length > 0) {
+        return { device: deviceList[0].toMessageObject() };
       }
 
       return await Promise.reject(
