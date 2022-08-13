@@ -152,6 +152,7 @@ export enum LoggerNames {
   DeviceConnector = 'DeviceConnector',
   DeviceList = 'DeviceList',
   DevicePool = 'DevicePool',
+  HdCommonConnectSdk = '@onekey/common-connect-sdk',
   HdBleSdk = '@onekey/hd-ble-sdk',
   HdTransportHttp = '@onekey/hd-transport-http',
   HdBleTransport = '@onekey/hd-ble-transport',
@@ -176,6 +177,7 @@ export const LoggerMap = {
   [LoggerNames.Iframe]: initLog(LoggerNames.Iframe),
   [LoggerNames.SendMessage]: initLog(LoggerNames.SendMessage),
   [LoggerNames.Method]: initLog(LoggerNames.Method),
+  [LoggerNames.HdCommonConnectSdk]: initLog(LoggerNames.Method),
 };
 
 export const getLogger = (key: LoggerNames) => LoggerMap[key];

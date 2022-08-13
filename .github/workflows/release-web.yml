@@ -3,7 +3,7 @@ name: release-web
 on: workflow_dispatch
 
 jobs:
-  test-web:
+  release-web:
     runs-on: ubuntu-latest
     env:
       HOST_PATH: '${{ github.event.repository.name }}/${{ github.sha }}/'

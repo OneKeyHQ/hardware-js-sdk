@@ -1,6 +1,8 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+// eslint-disable-next-line import/no-cycle
 import TransportManager from '../data-manager/TransportManager';
+import DataManager from '../data-manager/DataManager';
 import { patchFeatures, getLogger, LoggerNames } from '../utils';
 import type { Device } from './Device';
 import { DEVICE } from '../events';
@@ -199,7 +201,14 @@ export class DeviceCommands {
       // TODO: EntropyRequest
     }
 
+    const isWebusbEnv = DataManager.getSettings('env') === 'webusb';
+
     if (res.type === 'PinMatrixRequest') {
+      if (isWebusbEnv) {
+        return Promise.reject(
+          ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Please unlock your device')
+        );
+      }
       return this._promptPin(res.message.type).then(
         pin => {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {

@@ -5,6 +5,7 @@ import type { ConnectSettings, CoreApi } from '@onekeyfe/hd-core';
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;
 let initialized = false;
+const useWebUSB = true;
 
 export const getHardwareSDKInstance = memoizee(
   async () =>
@@ -21,6 +22,9 @@ export const getHardwareSDKInstance = memoizee(
 
       if (Platform.OS === 'android' || Platform.OS === 'ios') {
         HardwareSDK = (await import('@onekeyfe/hd-ble-sdk')).default as unknown as CoreApi;
+      } else if (useWebUSB) {
+        HardwareSDK = (await import('@onekeyfe/hd-common-connect-sdk'))
+          .default as unknown as CoreApi;
       } else {
         HardwareSDK = (await import('@onekeyfe/hd-web-sdk')).default as unknown as CoreApi;
         settings.connectSrc = 'https://localhost:8088/';

@@ -45,4 +45,6 @@ export { default as stellarSignTransaction } from './stellar/StellarSignTransact
 
 export { default as firmwareUpdate } from './FirmwareUpdate';
 
+export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
+
 export { default as getLogs } from './GetLogs';

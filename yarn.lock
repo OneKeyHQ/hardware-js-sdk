@@ -3340,6 +3340,11 @@
     "@types/mime" "^1"
     "@types/node" "*"
 
+"@types/w3c-web-usb@^1.0.6":
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/@types/w3c-web-usb/-/w3c-web-usb-1.0.6.tgz#5d8560d0d9f585ffc80865bc773db7bc975b680c"
+  integrity sha512-cSjhgrr8g4KbPnnijAr/KJDNKa/bBa+ixYkywFRvrhvi9n1WEl7yYbtRyzE6jqNQiSxxJxoAW3STaOQwJHndaw==
+
 "@types/webpack-plugin-serve@^1.4.2":
   version "1.4.2"
   resolved "https://registry.yarnpkg.com/@types/webpack-plugin-serve/-/webpack-plugin-serve-1.4.2.tgz#30ca8f4b9f74e74b29be682265e92ceb23269a8c"

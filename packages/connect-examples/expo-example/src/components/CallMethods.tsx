@@ -152,6 +152,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     console.log('example getLogs response: ', res);
   };
 
+  const handleRequestWebUsbDevice = async () => {
+    const res = await SDK.requestWebUsbDevice();
+    console.log('example requestWebUsbDevice response: ', res);
+  };
+
   return (
     <View>
       <View style={styles.buttonContainer}>
@@ -167,6 +172,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         <Button title="cancel" onPress={() => cancel()} />
         <Button title="reset" onPress={() => RNRestart.Restart()} />
         <Button title="getLogs" onPress={() => handleGetLogs()} />
+        <Button title="requestWebUsbDevice" onPress={() => handleRequestWebUsbDevice()} />
       </View>
       {showPinInput && (
         <ReceivePin

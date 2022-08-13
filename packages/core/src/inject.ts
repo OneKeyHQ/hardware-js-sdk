@@ -142,6 +142,7 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'stellarSignTransaction' }),
 
     firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
+    requestWebUsbDevice: () => call({ method: 'requestWebUsbDevice' }),
   };
   return api;
 };

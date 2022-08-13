@@ -44,6 +44,7 @@ import { cipherKeyValue } from './cipherKeyValue';
 import { firmwareUpdate } from './firmwareUpdate';
 import { getLogs } from './getLogs';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
+import { requestWebUsbDevice } from './requestWebUsbDevice';
 
 export * from './export';
 
@@ -65,6 +66,8 @@ export type CoreApi = {
    * Core function
    */
   searchDevices: typeof searchDevices;
+
+  requestWebUsbDevice: typeof requestWebUsbDevice;
 
   getFeatures: typeof getFeatures;
 
