@@ -120,20 +120,22 @@ export const callAPI = async (message: CoreMessage) => {
         if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
           return Promise.reject(
             ERRORS.TypedError(
-              HardwareErrorCode.DeviceFwException,
-              `Device firmware version is too low, please update to ${versionRange.min}`
+              HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+              `Device firmware version is too low, please update to ${versionRange.min}`,
+              { current: currentVersion, require: versionRange.min }
             )
           );
         }
         if (
           versionRange.max &&
           semver.valid(versionRange.max) &&
-          semver.gt(currentVersion, versionRange.max)
+          semver.gte(currentVersion, versionRange.max)
         ) {
           return Promise.reject(
             ERRORS.TypedError(
-              HardwareErrorCode.DeviceFwException,
-              `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`
+              HardwareErrorCode.CallMethodDeprecated,
+              `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
+              { current: currentVersion, deprecated: versionRange.max }
             )
           );
         }

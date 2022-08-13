@@ -1,6 +1,7 @@
 export interface IHardwareError {
   errorCode: ValueOf<typeof HardwareErrorCode>;
   message?: string;
+  params?: any;
 }
 
 type ValueOf<P extends object> = P[keyof P];
@@ -19,6 +20,8 @@ export class HardwareError extends Error {
 
   message = '';
 
+  params: any = {};
+
   constructor(hardwareError: IHardwareError | string) {
     super();
     const errorMessageMapping = HardwareErrorCodeMessage;
@@ -32,6 +35,7 @@ export class HardwareError extends Error {
       if (message) {
         this.message = fillStringWithArguments(message, hardwareError);
       }
+      this.params = hardwareError.params;
       this.errorCode = hardwareError.errorCode;
     }
 
@@ -150,6 +154,18 @@ export const HardwareErrorCode = {
    * firmware update download failed
    */
   FirmwareUpdateDownloadFailed: 406,
+
+  /**
+   * Call method not supported, need update firmware
+   * @params: { current: string, require: string }
+   */
+  CallMethodNeedUpgradeFirmware: 407,
+
+  /**
+   * Call method not supported, is deprecated
+   * @params: { current: string, deprecated: string }
+   */
+  CallMethodDeprecated: 408,
 
   /**
    * Netword request error
@@ -285,6 +301,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.CallMethodNotResponse]: 'Method does not responding',
   [HardwareErrorCode.CallMethodInvalidParameter]: 'Call method invalid parameter',
   [HardwareErrorCode.FirmwareUpdateDownloadFailed]: 'Firmware update download failed',
+  [HardwareErrorCode.CallMethodNeedUpgradeFirmware]: 'Call method need upgrade firmware',
+  [HardwareErrorCode.CallMethodDeprecated]: 'Call method is deprecated',
 
   /**
    * Network Errors
@@ -330,16 +348,24 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.PollingStop]: 'Polling stop',
 } as const;
 
-export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {
+export const TypedError = (
+  hardwareError: ErrorCodeUnion | string,
+  message?: string,
+  params?: any
+) => {
   if (typeof hardwareError === 'string') {
     return new HardwareError(hardwareError);
   }
-  return new HardwareError({ errorCode: hardwareError, message: message ?? '' });
+  return new HardwareError({ errorCode: hardwareError, message: message ?? '', params });
 };
 
 export const serializeError = (payload: any) => {
   if (payload && payload.error instanceof HardwareError) {
-    return { error: payload.error.message, code: payload.error.errorCode };
+    return {
+      error: payload.error.message,
+      code: payload.error.errorCode,
+      params: payload.error.params,
+    };
   }
   if (payload && payload.error instanceof Error) {
     return { error: payload.error.message, code: payload.error.code };
