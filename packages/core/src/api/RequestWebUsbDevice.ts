@@ -3,6 +3,9 @@ import { BaseMethod } from './BaseMethod';
 import TransportManager from '../data-manager/TransportManager';
 import { DataManager } from '../data-manager';
 import { DevicePool } from '../device/DevicePool';
+import { getLogger, LoggerNames } from '../utils';
+
+const Log = getLogger(LoggerNames.Method);
 
 export default class RequestWebUsbDevice extends BaseMethod {
   init() {
@@ -41,7 +44,7 @@ export default class RequestWebUsbDevice extends BaseMethod {
         ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Please select the device to connect')
       );
     } catch (error) {
-      console.log(error);
+      Log.debug(error);
       return Promise.reject(
         ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Please select the device to connect')
       );

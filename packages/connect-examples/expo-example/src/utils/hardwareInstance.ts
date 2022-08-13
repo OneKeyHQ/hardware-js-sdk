@@ -33,6 +33,7 @@ export const getHardwareSDKInstance = memoizee(
       try {
         await HardwareSDK.init(settings);
         console.log('HardwareSDK initialized success');
+        console.log(HardwareSDK);
         initialized = true;
         resolve(HardwareSDK);
       } catch (e) {
