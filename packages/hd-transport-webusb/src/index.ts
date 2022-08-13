@@ -219,6 +219,11 @@ export default class WebUsbTransport {
 
   async requestDevice() {
     if (!this.usb) return;
-    await this.usb.requestDevice({ filters: ONEKEY_FILTER });
+    try {
+      const device = await this.usb.requestDevice({ filters: ONEKEY_FILTER });
+      return device;
+    } catch (e) {
+      this.Log.debug('requestDevice error: ', e);
+    }
   }
 }
