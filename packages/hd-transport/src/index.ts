@@ -1,6 +1,13 @@
 import * as protobuf from 'protobufjs/light';
 import * as Long from 'long';
-import { buildOne, buildBuffers, receiveOne, parseConfigure } from './serialization';
+import {
+  buildOne,
+  buildBuffers,
+  buildEncodeBuffers,
+  receiveOne,
+  parseConfigure,
+  decodeProtocol,
+} from './serialization';
 import * as check from './utils/highlevel-checks';
 
 protobuf.util.Long = Long;
@@ -24,6 +31,8 @@ export default {
   check,
   buildOne,
   buildBuffers,
+  buildEncodeBuffers,
   receiveOne,
   parseConfigure,
+  decodeProtocol,
 };

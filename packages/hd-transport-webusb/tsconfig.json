@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.lib.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "types": [
+      "w3c-web-usb"
+    ]
+  },
+  "include": ["./src"]
+}
