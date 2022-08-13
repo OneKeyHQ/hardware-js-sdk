@@ -1,6 +1,6 @@
 {
   "name": "expo-example",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "scripts": {
     "start": "expo start --dev-client",
     "android": "expo run:android",
@@ -9,9 +9,10 @@
     "eject": "expo eject"
   },
   "dependencies": {
-    "@onekeyfe/hd-ble-sdk": "^0.1.27",
-    "@onekeyfe/hd-core": "^0.1.27",
-    "@onekeyfe/hd-web-sdk": "^0.1.27",
+    "@onekeyfe/hd-ble-sdk": "^0.1.28",
+    "@onekeyfe/hd-common-connect-sdk": "^0.1.28",
+    "@onekeyfe/hd-core": "^0.1.28",
+    "@onekeyfe/hd-web-sdk": "^0.1.28",
     "@react-native-async-storage/async-storage": "^1.17.6",
     "@react-navigation/native": "^6.0.10",
     "@react-navigation/native-stack": "^6.6.2",
@@ -34,6 +35,7 @@
     "@types/memoizee": "^0.4.8",
     "@types/react": "~17.0.21",
     "@types/react-native": "~0.66.13",
+    "@types/w3c-web-usb": "^1.0.6",
     "typescript": "~4.3.5"
   },
   "private": true

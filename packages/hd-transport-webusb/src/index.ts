@@ -148,7 +148,7 @@ export default class WebUsbTransport {
       const newArray: Uint8Array = new Uint8Array(PACKET_SIZE);
       newArray[0] = 63;
       newArray.set(new Uint8Array(buffer), 1);
-      console.log('send packet: ', newArray);
+      // console.log('send packet: ', newArray);
       if (!device.opened) {
         await this.connect(path, false);
       }
@@ -170,11 +170,11 @@ export default class WebUsbTransport {
     }
 
     const firstPacket = await device.transferIn(this.endpointId, PACKET_SIZE);
-    console.log('receive first packet: ', firstPacket);
+    // console.log('receive first packet: ', firstPacket);
     const firstData = firstPacket.data?.buffer.slice(1);
     const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData as ArrayBuffer);
 
-    console.log('chunk length: ', length);
+    // console.log('chunk length: ', length);
 
     const lengthWithHeader = Number(length + HEADER_LENGTH);
     const decoded = new ByteBuffer(lengthWithHeader);
@@ -184,12 +184,12 @@ export default class WebUsbTransport {
       decoded.append(restBuffer);
     }
 
-    console.log('first decoded: ', decoded);
+    // console.log('first decoded: ', decoded);
 
     while (decoded.offset < lengthWithHeader) {
       const res = await device.transferIn(this.endpointId, PACKET_SIZE);
-      console.log('otherRes data: ', res?.data?.buffer);
-      console.log('otherRes length: ', res?.data?.byteLength);
+      // console.log('otherRes data: ', res?.data?.buffer);
+      // console.log('otherRes length: ', res?.data?.byteLength);
 
       if (!res.data) {
         throw new Error('no data');
@@ -204,7 +204,7 @@ export default class WebUsbTransport {
       } else {
         decoded.append(buffer.slice(0, lengthWithHeader - decoded.offset));
       }
-      console.log('current offset: ', decoded.offset);
+      // console.log('current offset: ', decoded.offset);
     }
     decoded.reset();
     const result = decoded.toBuffer();
