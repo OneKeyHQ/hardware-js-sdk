@@ -2,6 +2,8 @@ import { Transport } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import DataManager from './DataManager';
 import { getLogger, LoggerNames } from '../utils';
+// eslint-disable-next-line import/no-cycle
+import { DevicePool } from '../device/DevicePool';
 
 const Log = getLogger(LoggerNames.Transport);
 const BleLogger = getLogger(LoggerNames.HdBleTransport);
@@ -32,7 +34,7 @@ export default class TransportManager {
       Log.debug('Initializing transports');
       if (env === 'react-native') {
         if (!this.reactNativeInit) {
-          await this.transport.init(BleLogger);
+          await this.transport.init(BleLogger, DevicePool.emitter);
           this.reactNativeInit = true;
         } else {
           Log.debug('React Native Do Not Initializing transports');

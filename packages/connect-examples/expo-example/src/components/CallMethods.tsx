@@ -64,6 +64,14 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     SDK.on(DEVICE.FEATURES, (message: CoreMessage) => {
       console.log('example get features event: ', message);
     });
+
+    SDK.on(DEVICE.CONNECT, (message: CoreMessage) => {
+      console.log('example get connect event: ', message);
+    });
+
+    SDK.on(DEVICE.DISCONNECT, (message: CoreMessage) => {
+      console.log('example get disconnect event: ', message);
+    });
     registerListener = true;
   }, [SDK]);
 

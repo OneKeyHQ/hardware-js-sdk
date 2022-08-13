@@ -8,7 +8,8 @@ import {
   HardwareError,
 } from '@onekeyfe/hd-shared';
 
-import DeviceConnector from './DeviceConnector';
+import type DeviceConnector from './DeviceConnector';
+// eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 
 import {

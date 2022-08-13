@@ -1,3 +1,5 @@
+import type EventEmitter from 'events';
+
 export type OneKeyUsbDeviceInfo = {
   path: string;
 };
@@ -23,6 +25,8 @@ export type AcquireInput = {
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };
 
+type ITransportInitFn = (logger?: any, emitter?: EventEmitter) => Promise<string>;
+
 export type Transport = {
   enumerate(): Promise<Array<OneKeyDeviceInfo>>;
   listen(old?: Array<OneKeyDeviceInfo>): Promise<Array<OneKeyDeviceInfo>>;
@@ -35,7 +39,7 @@ export type Transport = {
   cancel(): Promise<void>;
 
   // resolves when the transport can be used; rejects when it cannot
-  init(logger: any): Promise<string>;
+  init: ITransportInitFn;
   stop(): void;
 
   configured: boolean;

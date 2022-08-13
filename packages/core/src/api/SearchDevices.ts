@@ -1,9 +1,9 @@
 import { BaseMethod } from './BaseMethod';
 import DeviceConnector from '../device/DeviceConnector';
 import TransportManager from '../data-manager/TransportManager';
-import { Device } from '../device/Device';
 import { DataManager } from '../data-manager';
 import { getDeviceTypeByBleName } from '../utils';
+import { DevicePool } from '../device/DevicePool';
 
 export default class SearchDevices extends BaseMethod {
   connector?: DeviceConnector;
@@ -31,15 +31,7 @@ export default class SearchDevices extends BaseMethod {
       }));
     }
 
-    const devices = [];
-    for await (const descriptor of devicesDescriptor) {
-      const device = Device.fromDescriptor(descriptor);
-      device.deviceConnector = this.connector;
-      await device.connect();
-      await device.initialize();
-      await device.release();
-      devices.push(device);
-    }
-    return devices.map(device => device.toMessageObject());
+    const { deviceList } = await DevicePool.getDevices(devicesDescriptor);
+    return deviceList.map(device => device.toMessageObject());
   }
 }

@@ -10,6 +10,7 @@ import {
 import ByteBuffer from 'bytebuffer';
 import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import type EventEmitter from 'events';
 import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
@@ -56,12 +57,15 @@ export default class ReactNativeBleTransport {
 
   Log?: any;
 
+  emitter?: EventEmitter;
+
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? 3000;
   }
 
-  init(logger: any) {
+  init(logger: any, emitter: EventEmitter) {
     this.Log = logger;
+    this.emitter = emitter;
   }
 
   configure(signedData: any) {
@@ -308,8 +312,19 @@ export default class ReactNativeBleTransport {
     transport.nofitySubscription = this._monitorCharacteristic(transport.notifyCharacteristic);
     transportCache[uuid] = transport;
 
+    this.emitter?.emit('device-connect', {
+      name: device.name,
+      id: device.id,
+      connectId: device.id,
+    });
+
     const disconnectSubscription = device.onDisconnected(() => {
       this.Log.debug('device disconnect: ', device?.id);
+      this.emitter?.emit('device-disconnect', {
+        name: device?.name,
+        id: device?.id,
+        connectId: device?.id,
+      });
       this.release(uuid);
       disconnectSubscription?.remove();
     });
