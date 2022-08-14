@@ -60,7 +60,7 @@ export default class EVMSignTransaction extends BaseMethod {
   processTxRequest = async (
     request: EthereumTxRequest,
     data: string,
-    chain_id: number | undefined
+    chain_id?: number | undefined
   ): Promise<EVMSignedTx> => {
     if (!request.data_length) {
       let v = request.signature_v;
@@ -175,7 +175,7 @@ export default class EVMSignTransaction extends BaseMethod {
       message
     );
 
-    return this.processTxRequest(response.message, rest, chainId);
+    return this.processTxRequest(response.message, rest);
   };
 
   getVersionRange() {
