@@ -181,13 +181,6 @@ export class DeviceCommands {
       return Promise.resolve(patchFeatures(res));
     }
 
-    /**
-     * Temporary, do not support passphrase
-     */
-    if (this.device.features?.passphrase_protection) {
-      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportPassphrase));
-    }
-
     if (res.type === 'ButtonRequest') {
       if (res.message.code === 'ButtonRequest_PassphraseEntry') {
         this.device.emit(DEVICE.PASSPHRASE_ON_DEVICE, this.device);
@@ -219,6 +212,13 @@ export class DeviceCommands {
         },
         () => this._commonCall('Cancel', {})
       );
+    }
+
+    /**
+     * Temporary, do not support passphrase
+     */
+    if (this.device.features?.passphrase_protection) {
+      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportPassphrase));
     }
 
     if (res.type === 'PassphraseRequest') {

@@ -28,7 +28,7 @@ export const getHardwareSDKInstance = memoizee(
       } else {
         HardwareSDK = (await import('@onekeyfe/hd-web-sdk')).default as unknown as CoreApi;
         settings.connectSrc = 'https://localhost:8088/';
-        settings.env = 'webusb';
+        settings.env = 'web';
       }
 
       try {
