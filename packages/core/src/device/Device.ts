@@ -255,6 +255,11 @@ export class Device extends EventEmitter {
 
     const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
     this._updateFeatures(message);
+    if (message.passphrase_protection) {
+      if (this.listenerCount(DEVICE.PIN) > 0) {
+        await this.commands.typedCall('ApplySettings', 'Success', { use_passphrase: false });
+      }
+    }
   }
 
   async getFeatures() {
