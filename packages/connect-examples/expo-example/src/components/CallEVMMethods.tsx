@@ -21,22 +21,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data =>
-            SDK.evmGetAddress(connectId, deviceId, {
-              bundle: [
-                { path: "m/44'/60'/0'/0/10", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/11", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/12", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/13", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/14", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/15", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/16", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/17", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/18", showOnOneKey: false },
-                { path: "m/44'/60'/0'/0/19", showOnOneKey: false },
-              ],
-            })
-          }
+          onCall={data => SDK.evmGetAddress(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
