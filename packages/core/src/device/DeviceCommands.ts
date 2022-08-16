@@ -214,16 +214,7 @@ export class DeviceCommands {
       );
     }
 
-    /**
-     * Temporary, do not support passphrase
-     */
-    if (this.device.features?.passphrase_protection) {
-      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportPassphrase));
-    }
-
     if (res.type === 'PassphraseRequest') {
-      console.log('======:::: PassphraseRequest', res);
-
       /**
        * Temporary, do not support passphrase
        */

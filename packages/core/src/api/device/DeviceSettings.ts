@@ -4,6 +4,8 @@ import { validateParams } from '../helpers/paramsValidator';
 
 export default class DeviceSettings extends BaseMethod<ApplySettings> {
   init() {
+    this.useDevicePassphraseState = false;
+
     // check payload
     validateParams(this.payload, [
       { name: 'language', type: 'string' },
@@ -18,8 +20,6 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       { name: 'experimentalFeatures', type: 'boolean' },
     ]);
 
-    console.log('DeviceSettings payload', this.payload);
-
     // init params
     this.params = {
       language: this.payload.language,
@@ -33,6 +33,17 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       safety_checks: this.payload.safetyChecks,
       experimental_features: this.payload.experimentalFeatures,
     };
+  }
+
+  getVersionRange() {
+    if (this.payload.usePassphrase) {
+      return {
+        model_mini: {
+          min: '2.4.0',
+        },
+      };
+    }
+    return {};
   }
 
   async run() {

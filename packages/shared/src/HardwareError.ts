@@ -105,6 +105,11 @@ export const HardwareErrorCode = {
    */
   DeviceNotSupportPassphrase: 111,
 
+  /*
+   * Device passphrase state error
+   */
+  DeviceCheckPassphraseStateError: 112,
+
   /**
    * Not initialized
    */
@@ -280,6 +285,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceUnexpectedBootloaderMode]: 'Device should be in bootloader mode',
   [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
   [HardwareErrorCode.DeviceNotSupportPassphrase]: 'Device not support passphrase',
+  [HardwareErrorCode.DeviceCheckPassphraseStateError]: 'Device passphrase state error',
 
   /**
    * Node Errors

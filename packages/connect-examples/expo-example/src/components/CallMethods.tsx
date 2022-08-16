@@ -155,6 +155,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     console.log('example getLogs response: ', res);
   };
 
+  const handleGetPassphraseState = async () => {
+    const res = await SDK.getPassphraseState(selectedDevice?.connectId);
+    console.log('example getLogs response: ', res);
+  };
+
   const handleRequestWebUsbDevice = async () => {
     const res = await SDK.requestWebUsbDevice();
     console.log('example requestWebUsbDevice response: ', res);
@@ -162,48 +167,47 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
 
   return (
     <View>
-      <View style={styles.container}>
-        <View style={styles.buttonContainer}>
-          <Button title="search devices" onPress={() => handleSearchDevices()} />
-          <Button title="get Features" onPress={() => handleGetFeatures()} />
-          <Button title="check firmware release" onPress={() => handleCheckFirmwareRelease()} />
-          <Button
-            title="check ble firmware release"
-            onPress={() => handleCheckBLEFirmwareRelease()}
-          />
-          <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
-          <Button title="check bridge status" onPress={() => handleCheckBridgeStatus()} />
-          <Button title="cancel" onPress={() => cancel()} />
-          <Button title="reset" onPress={() => RNRestart.Restart()} />
-          <Button title="getLogs" onPress={() => handleGetLogs()} />
-          <Button title="requestWebUsbDevice" onPress={() => handleRequestWebUsbDevice()} />
-        </View>
-        {showPinInput && (
-          <ReceivePin
-            value={pinValue}
-            onChange={val => setPinValue(val)}
-            onConfirm={val => onConfirmPin(val)}
-          />
-        )}
+      <View style={styles.buttonContainer}>
+        <Button title="search devices" onPress={() => handleSearchDevices()} />
+        <Button title="get Features" onPress={() => handleGetFeatures()} />
+        <Button title="check firmware release" onPress={() => handleCheckFirmwareRelease()} />
+        <Button
+          title="check ble firmware release"
+          onPress={() => handleCheckBLEFirmwareRelease()}
+        />
+        <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
+        <Button title="check bridge status" onPress={() => handleCheckBridgeStatus()} />
+        <Button title="cancel" onPress={() => cancel()} />
+        <Button title="reset" onPress={() => RNRestart.Restart()} />
+        <Button title="getLogs" onPress={() => handleGetLogs()} />
+        <Button title="getPassphraseState" onPress={() => handleGetPassphraseState()} />
+        <Button title="requestWebUsbDevice" onPress={() => handleRequestWebUsbDevice()} />
+      </View>
+      {showPinInput && (
+        <ReceivePin
+          value={pinValue}
+          onChange={val => setPinValue(val)}
+          onConfirm={val => onConfirmPin(val)}
+        />
+      )}
 
-        <View style={styles.buttonContainer}>
-          <View>
-            <Text>升级固件类型：{firmwareType ? 'firmware' : 'ble'}</Text>
-            <Switch onValueChange={() => setFirmwareType(!firmwareType)} value={firmwareType} />
-          </View>
-          <Button title="firmware update" onPress={() => handleFirmwareUpdate()} />
-          <Button
-            title="firmware update with local file"
-            onPress={() => handleFirmwareUpdate(selectedFile)}
-          />
-          {Platform.OS === 'web' ? <input type="file" onChange={onFileChange} /> : null}
+      <View style={styles.buttonContainer}>
+        <View>
+          <Text>升级固件类型：{firmwareType ? 'firmware' : 'ble'}</Text>
+          <Switch onValueChange={() => setFirmwareType(!firmwareType)} value={firmwareType} />
         </View>
-
-        <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
+        <Button title="firmware update" onPress={() => handleFirmwareUpdate()} />
+        <Button
+          title="firmware update with local file"
+          onPress={() => handleFirmwareUpdate(selectedFile)}
+        />
+        {Platform.OS === 'web' ? <input type="file" onChange={onFileChange} /> : null}
       </View>
 
+      <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
+
       <View style={styles.container}>
-        <h3>Common Parameters</h3>
+        <Text>Common Parameters</Text>
         <View style={{ flexDirection: 'row' }}>
           <View style={styles.commonParamItem}>
             <Text>保持 Session</Text>
@@ -248,17 +252,38 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
               }}
             />
           </View>
+          <View style={styles.commonParamItem}>
+            <Text>passphrase State</Text>
+            <TextInput
+              style={styles.input}
+              value={optionalParams?.passphraseState ?? ''}
+              onChangeText={v => {
+                setOptionalParams({ ...optionalParams, passphraseState: v });
+              }}
+            />
+          </View>
+          <View style={styles.commonParamItem}>
+            <Text>init session</Text>
+            <Switch
+              value={!!optionalParams?.initSession}
+              onValueChange={v => setOptionalParams({ ...optionalParams, initSession: v })}
+            />
+          </View>
         </View>
       </View>
 
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
-      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallStarcoinMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallStarcoinMethods
+        SDK={SDK}
+        selectedDevice={selectedDevice}
+        commonParams={optionalParams}
+      />
+      <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }

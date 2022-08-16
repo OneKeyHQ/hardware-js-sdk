@@ -3,7 +3,9 @@ import { supportInputPinOnSoftware } from '../../utils/deviceFeaturesUtils';
 import { BaseMethod } from '../BaseMethod';
 
 export default class DeviceSupportFeatures extends BaseMethod {
-  init() {}
+  init() {
+    this.useDevicePassphraseState = false;
+  }
 
   run() {
     if (!this.device.features)

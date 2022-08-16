@@ -47,4 +47,5 @@ export { default as firmwareUpdate } from './FirmwareUpdate';
 
 export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
 
+export { default as getPassphraseState } from './GetPassphraseState';
 export { default as getLogs } from './GetLogs';

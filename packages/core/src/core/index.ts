@@ -45,6 +45,9 @@ const deviceCacheMap = new Map<string, Device>();
 let pollingId = 1;
 const pollingState: Record<number, boolean> = {};
 
+let tempKeepSession: boolean | undefined;
+let tempPassphraseState: string | undefined;
+
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(ERRORS.TypedError('on call: message.id or message.payload is missing'));
@@ -102,6 +105,7 @@ export const callAPI = async (message: CoreMessage) => {
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
+  device.on(DEVICE.PASSPHRASE_ON_DEVICE, onDevicePassphraseHandler);
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
 
   try {
@@ -179,6 +183,16 @@ export const callAPI = async (message: CoreMessage) => {
         await TransportManager.reconfigure(device.getFirmwareVersion());
       }
 
+      // Check Device passphrase State
+      if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
+        const passphraseState = await device.checkPassphraseState();
+        if (passphraseState) {
+          return Promise.reject(
+            ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
+          );
+        }
+      }
+
       try {
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ');
@@ -193,7 +207,10 @@ export const callAPI = async (message: CoreMessage) => {
     Log.debug('Call API - Device Run: ', device.mainId);
 
     const runOptions: RunOptions = {
-      keepSession: method.payload.keepSession,
+      keepSession: method.payload.keepSession ?? true,
+      passphraseState: method.payload.passphraseState,
+      useEmptyPassphrase: method.payload.useEmptyPassphrase ?? false,
+      initSession: method.payload.initSession ?? false,
     };
     const deviceRun = () => device.run(inner, runOptions);
     _callPromise = createDeferred(deviceRun);
@@ -363,12 +380,23 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
           if (timer) {
             clearTimeout(timer);
           }
+
+          const stateChange =
+            tempKeepSession !== (method.payload.keepSession ?? true) ||
+            tempPassphraseState !== method.payload.passphraseState;
+
+          tempKeepSession = method.payload.keepSession;
+          tempPassphraseState = method.payload.passphraseState;
+
+          const initSession = method.payload.initSession ?? !tempPassphraseState;
           /**
            * Bluetooth should call initialize here
            */
-          if (env === 'react-native') {
+          if (env === 'react-native' || stateChange || initSession) {
             await device.acquire();
-            await device.initialize();
+            await device.initialize({
+              initSession,
+            });
           }
           resolve(device);
           return;
@@ -432,6 +460,7 @@ const cleanup = () => {
 const removeDeviceListener = (device: Device) => {
   device.removeListener(DEVICE.PIN, onDevicePinHandler);
   device.removeListener(DEVICE.BUTTON, onDeviceButtonHandler);
+  device.removeListener(DEVICE.PASSPHRASE_ON_DEVICE, onDevicePassphraseHandler);
   device.removeListener(DEVICE.FEATURES, onDeviceFeaturesHandler);
   DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
   // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
@@ -490,6 +519,14 @@ const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]
 
 const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]) => {
   postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
+};
+
+const onDevicePassphraseHandler = (...[device]: [...DeviceEvents['passphrase_on_device']]) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
+      device: device.toMessageObject() as KnownDevice,
+    })
+  );
 };
 
 /**

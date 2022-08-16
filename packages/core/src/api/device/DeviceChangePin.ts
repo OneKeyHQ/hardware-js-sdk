@@ -4,6 +4,8 @@ import { validateParams } from '../helpers/paramsValidator';
 
 export default class DeviceChangePin extends BaseMethod<ChangePin> {
   init() {
+    this.useDevicePassphraseState = false;
+
     // check payload
     validateParams(this.payload, [{ name: 'remove', type: 'boolean' }]);
 

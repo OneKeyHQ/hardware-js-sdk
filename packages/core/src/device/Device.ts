@@ -7,11 +7,6 @@ import {
   ERRORS,
   HardwareError,
 } from '@onekeyfe/hd-shared';
-
-import type DeviceConnector from './DeviceConnector';
-// eslint-disable-next-line import/no-cycle
-import { DeviceCommands } from './DeviceCommands';
-
 import {
   getDeviceFirmwareVersion,
   getDeviceLabel,
@@ -19,17 +14,25 @@ import {
   getDeviceUUID,
   getDeviceBLEFirmwareVersion,
   getDeviceTypeOnBootloader,
+  getPassphraseState,
 } from '../utils/deviceFeaturesUtils';
+
+import type DeviceConnector from './DeviceConnector';
+// eslint-disable-next-line import/no-cycle
+import { DeviceCommands } from './DeviceCommands';
+
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
 import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
-import { toHardened } from '../api/helpers/pathUtils';
 
 export type RunOptions = {
   keepSession?: boolean;
+  passphraseState?: string;
+  initSession?: boolean;
+  useEmptyPassphrase?: boolean;
 };
 
 const parseRunOptions = (options?: RunOptions): RunOptions => {
@@ -51,6 +54,8 @@ export interface Device {
   off<K extends keyof DeviceEvents>(type: K, listener: (...event: DeviceEvents[K]) => void): this;
   emit<K extends keyof DeviceEvents>(type: K, ...args: DeviceEvents[K]): boolean;
 }
+
+const deviceSessionCache: Record<string, string> = {};
 
 export class Device extends EventEmitter {
   /**
@@ -103,7 +108,7 @@ export class Device extends EventEmitter {
    */
   keepSession = false;
 
-  passphraseState = '';
+  passphraseState: string | undefined = undefined;
 
   constructor(descriptor: DeviceDescriptor) {
     super();
@@ -243,10 +248,41 @@ export class Device extends EventEmitter {
   }
 
   getInternalState() {
-    return this.internalState[this.instance];
+    if (!this.features) return undefined;
+    const key = `${this.features.device_id}`;
+    const usePassKey = `${this.features.device_id}@${this.passphraseState}`;
+    // When creating a wallet, use device_id as the key
+    const session = deviceSessionCache[key] ?? deviceSessionCache[usePassKey];
+    return this.keepSession ? session : undefined;
   }
 
-  async initialize() {
+  setInternalState(state: string) {
+    if (!this.features) return;
+    let key = `${this.features.device_id}`;
+    if (this.passphraseState) {
+      key += `@${this.passphraseState}`;
+    }
+    if (this.keepSession && state) {
+      deviceSessionCache[key] = state;
+    }
+  }
+
+  clearInternalState() {
+    if (!this.features) return;
+    const key = `${this.features.device_id}`;
+    delete deviceSessionCache[key];
+
+    if (this.passphraseState) {
+      const usePassKey = `${this.features.device_id}@${this.passphraseState}`;
+      delete deviceSessionCache[usePassKey];
+    }
+  }
+
+  async initialize(options?: { initSession?: boolean }) {
+    if (options?.initSession) {
+      this.clearInternalState();
+    }
+
     let payload: any;
     if (this.features) {
       const internalState = this.getInternalState();
@@ -258,18 +294,6 @@ export class Device extends EventEmitter {
 
     const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
     this._updateFeatures(message);
-    if (message.passphrase_protection) {
-      if (this.listenerCount(DEVICE.PIN) > 0) {
-        Log.debug('try to close passpharse');
-        try {
-          await this.commands.typedCall('ApplySettings', 'Success', { use_passphrase: false });
-        } catch (e) {
-          await this.release();
-          this.runPromise = null;
-          throw e;
-        }
-      }
-    }
   }
 
   async getFeatures() {
@@ -281,6 +305,9 @@ export class Device extends EventEmitter {
     // GetFeatures doesn't return 'session_id'
     if (this.features && this.features.session_id && !feat.session_id) {
       feat.session_id = this.features.session_id;
+    }
+    if (this.features && this.features.device_id && feat.session_id) {
+      this.setInternalState(feat.session_id);
     }
     feat.unlocked = feat.unlocked || true;
 
@@ -339,8 +366,9 @@ export class Device extends EventEmitter {
         await this.acquire();
         try {
           if (fn) {
-            await this.initialize();
-            console.log('======: initialize initialize initialize: ');
+            await this.initialize({
+              initSession: options.initSession,
+            });
           }
         } catch (error) {
           this.runPromise = null;
@@ -354,30 +382,12 @@ export class Device extends EventEmitter {
             )
           );
         }
-      } else if (env === 'react-native') {
-        /**
-         * The timing of the mobile initialization is different, so it needs to be closed here
-         */
-        if (this.features?.passphrase_protection) {
-          if (this.listenerCount(DEVICE.PIN) > 0) {
-            Log.debug('try to close passpharse for mobile');
-            try {
-              await this.commands.typedCall('ApplySettings', 'Success', { use_passphrase: false });
-            } catch (e) {
-              this.runPromise = null;
-              return Promise.reject(e);
-            }
-          }
-        }
       }
     }
 
-    console.log('======: keepSession', this.keepSession);
-    console.log('======: passphrase_protection', this.features?.passphrase_protection?.toString());
-    console.log('======: features', this.features);
-    console.log('======: checkPassphraseState', this.checkPassphraseState());
+    this.passphraseState = options.passphraseState;
 
-    if (options.keepSession || this.features?.passphrase_protection) {
+    if (options.keepSession) {
       this.keepSession = true;
     }
 
@@ -499,6 +509,14 @@ export class Device extends EventEmitter {
     return null;
   }
 
+  hasUsePassphrase() {
+    const isModeT =
+      getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
+    const preCheckTouch = isModeT && this.features?.unlocked === true;
+
+    return this.features && (!!this.features.passphrase_protection || preCheckTouch);
+  }
+
   checkDeviceId(deviceId: string) {
     if (this.features) {
       return this.features.device_id === deviceId;
@@ -508,18 +526,12 @@ export class Device extends EventEmitter {
 
   async checkPassphraseState() {
     if (!this.features) return false;
-    const { message } = await this.commands.typedCall('GetAddress', 'Address', {
-      address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
-      coin_name: 'Testnet',
-      script_type: 'SPENDADDRESS',
-    });
+    const newState = await getPassphraseState(this.features, this.commands);
 
-    const newState = `${message.address}@${this.features.device_id || 'device_id'}`;
+    // When exists passphraseState, check passphraseState
     if (this.passphraseState && this.passphraseState !== newState) {
+      this.clearInternalState();
       return newState;
-    }
-    if (!this.passphraseState) {
-      this.passphraseState = newState;
     }
   }
 }

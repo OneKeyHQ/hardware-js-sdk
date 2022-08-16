@@ -6,6 +6,7 @@ import { BaseMethod } from './BaseMethod';
 export default class CheckTransportRelease extends BaseMethod {
   init() {
     this.useDevice = false;
+    this.useDevicePassphraseState = false;
   }
 
   async run() {
