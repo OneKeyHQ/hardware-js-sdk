@@ -18,7 +18,7 @@ const dev = {
   resolve: config.resolve,
   plugins: [
     new WebpackPluginServe({
-      port: 8088,
+      port: 8087,
       hmr: true,
       https: {
         key: fs.readFileSync(path.join(__dirname, '../webpack/https_dev.key')),
