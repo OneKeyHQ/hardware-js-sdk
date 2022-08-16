@@ -258,7 +258,13 @@ export class Device extends EventEmitter {
     if (message.passphrase_protection) {
       if (this.listenerCount(DEVICE.PIN) > 0) {
         Log.debug('try to close passpharse');
-        await this.commands.typedCall('ApplySettings', 'Success', { use_passphrase: false });
+        try {
+          await this.commands.typedCall('ApplySettings', 'Success', { use_passphrase: false });
+        } catch (e) {
+          await this.release();
+          this.runPromise = null;
+          throw e;
+        }
       }
     }
   }
