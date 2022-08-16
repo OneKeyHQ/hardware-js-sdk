@@ -257,6 +257,7 @@ export class Device extends EventEmitter {
     this._updateFeatures(message);
     if (message.passphrase_protection) {
       if (this.listenerCount(DEVICE.PIN) > 0) {
+        Log.debug('try to close passpharse');
         await this.commands.typedCall('ApplySettings', 'Success', { use_passphrase: false });
       }
     }
@@ -343,6 +344,21 @@ export class Device extends EventEmitter {
             )
           );
         }
+      } else if (env === 'react-native') {
+        /**
+         * The timing of the mobile initialization is different, so it needs to be closed here
+         */
+        if (this.features?.passphrase_protection) {
+          if (this.listenerCount(DEVICE.PIN) > 0) {
+            Log.debug('try to close passpharse for mobile');
+            try {
+              await this.commands.typedCall('ApplySettings', 'Success', { use_passphrase: false });
+            } catch (e) {
+              this.runPromise = null;
+              return Promise.reject(e);
+            }
+          }
+        }
       }
     }
 
@@ -351,7 +367,16 @@ export class Device extends EventEmitter {
     }
 
     if (fn) {
-      await fn();
+      try {
+        await fn();
+      } catch (e) {
+        if (this.runPromise) {
+          this.runPromise.reject(e);
+        }
+
+        this.runPromise = null;
+        return;
+      }
     }
 
     if (
