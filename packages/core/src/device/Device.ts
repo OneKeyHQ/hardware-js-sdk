@@ -351,7 +351,16 @@ export class Device extends EventEmitter {
     }
 
     if (fn) {
-      await fn();
+      try {
+        await fn();
+      } catch (e) {
+        if (this.runPromise) {
+          this.runPromise.reject(e);
+        }
+
+        this.runPromise = null;
+        return;
+      }
     }
 
     if (
