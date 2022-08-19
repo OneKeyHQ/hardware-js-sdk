@@ -120,6 +120,11 @@ export default class ReactNativeBleTransport {
               reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
               reject(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
+            } else if (error.errorCode === BleErrorCode.ScanStartFailed) {
+              // Android Bluetooth will report an error when the search frequency is too fast,
+              // then nothing is processed and an empty array of devices is returned.
+              // Then the next search will be back to normal
+              timer.timeout(() => {}, this.scanTimeout);
             } else {
               reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.reason ?? ''));
             }
@@ -128,13 +133,11 @@ export default class ReactNativeBleTransport {
 
           if (isOnekeyDevice(device?.name ?? null, device?.id)) {
             this.Log.debug('search device start ======================');
-
             const { name, localName, id } = device ?? {};
             this.Log.debug(
               `device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`
             );
             addDevice(device as unknown as Device);
-
             this.Log.debug('search device end ======================\n');
           }
         }
