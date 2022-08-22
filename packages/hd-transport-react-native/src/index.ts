@@ -212,8 +212,8 @@ export default class ReactNativeBleTransport {
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
           connectOptions = {};
-          device = await blePlxManager.connectToDevice(uuid);
           this.Log.debug('first try to reconnect without params');
+          device = await blePlxManager.connectToDevice(uuid);
         } else {
           throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }
@@ -236,8 +236,19 @@ export default class ReactNativeBleTransport {
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
           connectOptions = {};
-          await device.connect();
           this.Log.debug('second try to reconnect without params');
+          try {
+            await device.connect();
+          } catch (e) {
+            this.Log.debug('last try to reconnect error: ', e);
+            // last try to reconnect device if this issue exists
+            // https://github.com/dotintent/react-native-ble-plx/issues/426
+            if (e.errorCode === BleErrorCode.OperationCancelled) {
+              this.Log.debug('last try to reconnect');
+              await device.cancelConnection();
+              await device.connect();
+            }
+          }
         } else {
           throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }

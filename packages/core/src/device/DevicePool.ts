@@ -165,7 +165,7 @@ export class DevicePool extends EventEmitter {
   static _sendDisconnectMessage() {
     for (let i = this.disconnectPool.length - 1; i >= 0; i--) {
       const descriptor = this.connectedPool[i];
-      const device = this.getDeviceByPath(descriptor.path);
+      const device = descriptor?.path ? this.getDeviceByPath(descriptor.path) : null;
       if (device) {
         this.emitter.emit(DEVICE.DISCONNECT, device);
       }
