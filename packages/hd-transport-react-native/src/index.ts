@@ -240,7 +240,7 @@ export default class ReactNativeBleTransport {
           try {
             await device.connect();
           } catch (e) {
-            console.log('last try to reconnect error: ', e);
+            this.Log.debug('last try to reconnect error: ', e);
             // last try to reconnect device if this issue exists
             // https://github.com/dotintent/react-native-ble-plx/issues/426
             if (e.errorCode === BleErrorCode.OperationCancelled) {
