@@ -111,6 +111,16 @@ export const HardwareErrorCode = {
   DeviceCheckPassphraseStateError: 112,
 
   /**
+   * use passphrase, but passphrase is not opened
+   */
+  DeviceNotOpenedPassphrase: 113,
+
+  /**
+   * not use passphrase, but passphrase is opened
+   */
+  DeviceOpenedPassphrase: 114,
+
+  /**
    * Not initialized
    */
   NotInitialized: 200,
@@ -286,6 +296,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
   [HardwareErrorCode.DeviceNotSupportPassphrase]: 'Device not support passphrase',
   [HardwareErrorCode.DeviceCheckPassphraseStateError]: 'Device passphrase state error',
+  [HardwareErrorCode.DeviceNotOpenedPassphrase]: 'Device not opened passphrase',
+  [HardwareErrorCode.DeviceOpenedPassphrase]: 'Device opened passphrase',
 
   /**
    * Node Errors

@@ -14,7 +14,7 @@ export default class GetPassphraseState extends BaseMethod {
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
 
     let { features } = this.device;
-    const locked = this.device?.features?.unlocked === false;
+    const locked = this.device?.features?.unlocked === true;
     const passphraseState = await getPassphraseState(this.device.features, this.device.commands);
     const isModeT = getDeviceType(features) === 'touch' || getDeviceType(features) === 'pro';
 

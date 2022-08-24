@@ -269,6 +269,13 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
               onValueChange={v => setOptionalParams({ ...optionalParams, initSession: v })}
             />
           </View>
+          <View style={styles.commonParamItem}>
+            <Text>not use passphrase</Text>
+            <Switch
+              value={!!optionalParams?.notUsePassphrase}
+              onValueChange={v => setOptionalParams({ ...optionalParams, notUsePassphrase: v })}
+            />
+          </View>
         </View>
       </View>
 

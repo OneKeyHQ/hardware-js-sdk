@@ -184,9 +184,22 @@ export const callAPI = async (message: CoreMessage) => {
       }
 
       // Check Device passphrase State
+      if (method.payload.notUsePassphrase && !!device.features?.passphrase_protection) {
+        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase));
+      }
+
       if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
         const passphraseState = await device.checkPassphraseState();
+
+        // handles the special case of Touch/Pro
+        if (method.payload.notUsePassphrase && !!device.features?.passphrase_protection) {
+          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase));
+        }
+
         if (passphraseState) {
+          if (device.features?.passphrase_protection === false) {
+            return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase));
+          }
           return Promise.reject(
             ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
           );

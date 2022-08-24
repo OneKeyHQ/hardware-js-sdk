@@ -526,7 +526,16 @@ export class Device extends EventEmitter {
 
   async checkPassphraseState() {
     if (!this.features) return false;
+    const locked = this.features?.unlocked === true;
+    const isModeT =
+      getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
+
     const newState = await getPassphraseState(this.features, this.commands);
+
+    // if Touch/Pro was locked before, refresh the passphrase state
+    if (isModeT && locked) {
+      await this.getFeatures();
+    }
 
     // When exists passphraseState, check passphraseState
     if (this.passphraseState && this.passphraseState !== newState) {
