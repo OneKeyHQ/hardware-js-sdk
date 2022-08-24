@@ -281,6 +281,12 @@ export default class ReactNativeBleTransport {
     }
 
     if (!infos) {
+      try {
+        this.Log.debug('cancel connection when service not found');
+        await device.cancelConnection();
+      } catch (e) {
+        this.Log.debug('cancel connection error when service not found: ', e.message || e.reason);
+      }
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
 
