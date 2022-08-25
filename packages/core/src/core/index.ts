@@ -2,7 +2,7 @@ import semver from 'semver';
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Device, DeviceEvents, RunOptions } from '../device/Device';
+import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
@@ -35,6 +35,12 @@ import {
 
 const Log = getLogger(LoggerNames.Core);
 
+const parseInitOptions = (method?: BaseMethod): InitOptions => ({
+  initSession: method?.payload.initSession,
+  passphraseState: method?.payload.passphraseState,
+  deviceId: method?.payload.deviceId,
+});
+
 let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
@@ -47,11 +53,11 @@ let pollingId = 1;
 const pollingState: Record<number, boolean> = {};
 
 let preConnectCache: {
-  initSession: boolean | undefined;
   passphraseState: string | undefined;
+  notUsePassphrase: boolean;
 } = {
-  initSession: undefined,
   passphraseState: undefined,
+  notUsePassphrase: false,
 };
 
 export const callAPI = async (message: CoreMessage) => {
@@ -93,17 +99,17 @@ export const callAPI = async (message: CoreMessage) => {
   }
 
   const connectStateChange =
-    preConnectCache.initSession !== method.payload.initSession ||
-    preConnectCache.passphraseState !== method.payload.passphraseState;
+    preConnectCache.passphraseState !== method.payload.passphraseState ||
+    preConnectCache.notUsePassphrase !== method.payload.notUsePassphrase;
 
   preConnectCache = {
-    initSession: method.payload.initSession,
     passphraseState: method.payload.passphraseState,
+    notUsePassphrase: method.payload.notUsePassphrase,
   };
 
-  if (connectStateChange) {
+  if (connectStateChange || method.payload.initSession) {
     Log.debug('passphrase state change, clear device cache');
-    DevicePool.clearDeviceCache(method.connectId);
+    DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
   /**
@@ -205,6 +211,7 @@ export const callAPI = async (message: CoreMessage) => {
 
       // Check Device passphrase opened
       if (method.payload.notUsePassphrase && !!device.features?.passphrase_protection) {
+        DevicePool.clearDeviceCache(method.payload.connectId);
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase));
       }
 
@@ -228,6 +235,7 @@ export const callAPI = async (message: CoreMessage) => {
 
         // handles the special case of Touch/Pro
         if (method.payload.notUsePassphrase && !!device.features?.passphrase_protection) {
+          DevicePool.clearDeviceCache(method.payload.connectId);
           return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase));
         }
 
@@ -256,9 +264,8 @@ export const callAPI = async (message: CoreMessage) => {
     Log.debug('Call API - Device Run: ', device.mainId);
 
     const runOptions: RunOptions = {
-      keepSession: method.payload.keepSession ?? true,
-      passphraseState: method.payload.passphraseState,
-      initSession: method.payload.initSession ?? false,
+      keepSession: method.payload.keepSession,
+      ...parseInitOptions(method),
     };
     const deviceRun = () => device.run(inner, runOptions);
     _callPromise = createDeferred(deviceRun);
@@ -316,11 +323,7 @@ async function initDeviceList(method: BaseMethod) {
     _deviceList.connector = _connector;
   }
 
-  await _deviceList.getDeviceLists(method.connectId, {
-    initSession: method.payload.initSession,
-    passphraseState: method.payload.passphraseState,
-    deviceId: method.payload.deviceId,
-  });
+  await _deviceList.getDeviceLists(method.connectId, parseInitOptions(method));
 }
 
 function initDevice(method: BaseMethod) {
@@ -572,6 +575,7 @@ const onDevicePassphraseHandler = (...[device]: [...DeviceEvents['passphrase_on_
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
       device: device.toMessageObject() as KnownDevice,
+      passphraseState: device.passphraseState,
     })
   );
 };

@@ -251,7 +251,14 @@ export class Device extends EventEmitter {
   }
 
   getInternalState(_deviceId?: string) {
+    Log.debug(
+      'getInternalState session param: ',
+      `device_id: ${_deviceId}`,
+      `features.device_id: ${this.features?.device_id}`,
+      `passphraseState: ${this.passphraseState}`
+    );
     Log.debug('getInternalState session cache: ', deviceSessionCache);
+
     const deviceId = _deviceId || this.features?.device_id;
     if (!deviceId) return undefined;
 
@@ -262,8 +269,18 @@ export class Device extends EventEmitter {
     return this.passphraseState ? session : undefined;
   }
 
-  setInternalState(state: string) {
+  setInternalState(state: string, initSession?: boolean) {
+    Log.debug(
+      'setInternalState session param: ',
+      `state: ${state}`,
+      `initSession: ${initSession}`,
+      `device_id: ${this.features?.device_id}`,
+      `passphraseState: ${this.passphraseState}`
+    );
+
     if (!this.features) return;
+    if (!this.passphraseState && !initSession) return;
+
     let key = `${this.features.device_id}`;
     if (this.passphraseState) {
       key += `@${this.passphraseState}`;
@@ -271,9 +288,12 @@ export class Device extends EventEmitter {
     if (state) {
       deviceSessionCache[key] = state;
     }
+    Log.debug('setInternalState done session cache: ', deviceSessionCache);
   }
 
   clearInternalState(_deviceId?: string) {
+    Log.debug('clearInternalState param: ', _deviceId);
+
     const deviceId = _deviceId || this.features?.device_id;
     if (!deviceId) return;
     const key = `${deviceId}`;
@@ -286,6 +306,8 @@ export class Device extends EventEmitter {
   }
 
   async initialize(options?: InitOptions) {
+    Log.debug('initialize param:', options);
+
     this.passphraseState = options?.passphraseState;
 
     if (options?.initSession) {
@@ -298,10 +320,10 @@ export class Device extends EventEmitter {
       payload.session_id = internalState;
     }
 
-    Log.debug('initialize: payload:', payload);
+    Log.debug('initialize payload:', payload);
 
     const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
-    this._updateFeatures(message);
+    this._updateFeatures(message, options?.initSession);
   }
 
   async getFeatures() {
@@ -309,13 +331,13 @@ export class Device extends EventEmitter {
     this._updateFeatures(message);
   }
 
-  _updateFeatures(feat: Features) {
+  _updateFeatures(feat: Features, initSession?: boolean) {
     // GetFeatures doesn't return 'session_id'
     if (this.features && this.features.session_id && !feat.session_id) {
       feat.session_id = this.features.session_id;
     }
     if (this.features && this.features.device_id && feat.session_id) {
-      this.setInternalState(feat.session_id);
+      this.setInternalState(feat.session_id, initSession);
     }
     feat.unlocked = feat.unlocked || true;
 
@@ -374,11 +396,7 @@ export class Device extends EventEmitter {
         await this.acquire();
         try {
           if (fn) {
-            await this.initialize({
-              initSession: options.initSession,
-              passphraseState: options.passphraseState,
-              deviceId: options.deviceId,
-            });
+            await this.initialize(options);
           }
         } catch (error) {
           this.runPromise = null;

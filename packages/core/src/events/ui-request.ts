@@ -46,6 +46,7 @@ export interface UiRequestPassphrase {
   type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE;
   payload: {
     device: Device;
+    passphraseState?: string;
   };
 }
 
