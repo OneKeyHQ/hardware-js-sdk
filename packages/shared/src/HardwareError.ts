@@ -206,6 +206,7 @@ export const HardwareErrorCode = {
   BleMonitorError: 708,
   BleCharacteristicNotifyError: 709,
   BleWriteCharacteristicError: 710,
+  BleAlreadyConnected: 711,
 
   /**
    * Hardware runtiome errors
@@ -331,6 +332,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleMonitorError]: 'Monitor Error: characteristic not found',
   [HardwareErrorCode.BleCharacteristicNotifyError]: 'Characteristic Notify Error',
   [HardwareErrorCode.BleWriteCharacteristicError]: 'Write Characteristic Error',
+  [HardwareErrorCode.BleAlreadyConnected]: 'Already connected to device',
 
   /**
    * Runtime Error

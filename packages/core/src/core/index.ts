@@ -378,6 +378,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.BleDeviceNotBonded,
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleWriteCharacteristicError,
+            HardwareErrorCode.BleAlreadyConnected,
           ].includes(error.errorCode)
         ) {
           reject(error);
