@@ -30,6 +30,7 @@ import {
   getDeviceFirmwareVersion,
   getDeviceModel,
   getDeviceType,
+  supportNewPassphrase,
 } from '../utils/deviceFeaturesUtils';
 
 const Log = getLogger(LoggerNames.Core);
@@ -45,8 +46,13 @@ const deviceCacheMap = new Map<string, Device>();
 let pollingId = 1;
 const pollingState: Record<number, boolean> = {};
 
-let tempKeepSession: boolean | undefined;
-let tempPassphraseState: string | undefined;
+let preConnectCache: {
+  initSession: boolean | undefined;
+  passphraseState: string | undefined;
+} = {
+  initSession: undefined,
+  passphraseState: undefined,
+};
 
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
@@ -84,6 +90,20 @@ export const callAPI = async (message: CoreMessage) => {
       'should cancel the previous method execution: ',
       callApiQueue.map(m => m.name)
     );
+  }
+
+  const connectStateChange =
+    preConnectCache.initSession !== method.payload.initSession ||
+    preConnectCache.passphraseState !== method.payload.passphraseState;
+
+  preConnectCache = {
+    initSession: method.payload.initSession,
+    passphraseState: method.payload.passphraseState,
+  };
+
+  if (connectStateChange) {
+    Log.debug('passphrase state change, clear device cache');
+    DevicePool.clearDeviceCache(method.connectId);
   }
 
   /**
@@ -183,12 +203,27 @@ export const callAPI = async (message: CoreMessage) => {
         await TransportManager.reconfigure(device.getFirmwareVersion());
       }
 
-      // Check Device passphrase State
+      // Check Device passphrase opened
       if (method.payload.notUsePassphrase && !!device.features?.passphrase_protection) {
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase));
       }
 
       if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
+        // check version
+        const support = supportNewPassphrase(device.features);
+        if (!support.support) {
+          return Promise.reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.DeviceNotSupportPassphrase,
+              `Device not support passphrase, please update to ${support.require}`,
+              {
+                require: support.require,
+              }
+            )
+          );
+        }
+
+        // Check Device passphrase State
         const passphraseState = await device.checkPassphraseState();
 
         // handles the special case of Touch/Pro
@@ -197,6 +232,7 @@ export const callAPI = async (message: CoreMessage) => {
         }
 
         if (passphraseState) {
+          DevicePool.clearDeviceCache(method.payload.connectId);
           if (device.features?.passphrase_protection === false) {
             return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase));
           }
@@ -222,7 +258,6 @@ export const callAPI = async (message: CoreMessage) => {
     const runOptions: RunOptions = {
       keepSession: method.payload.keepSession ?? true,
       passphraseState: method.payload.passphraseState,
-      useEmptyPassphrase: method.payload.useEmptyPassphrase ?? false,
       initSession: method.payload.initSession ?? false,
     };
     const deviceRun = () => device.run(inner, runOptions);
@@ -281,7 +316,11 @@ async function initDeviceList(method: BaseMethod) {
     _deviceList.connector = _connector;
   }
 
-  await _deviceList.getDeviceLists(method.connectId);
+  await _deviceList.getDeviceLists(method.connectId, {
+    initSession: method.payload.initSession,
+    passphraseState: method.payload.passphraseState,
+    deviceId: method.payload.deviceId,
+  });
 }
 
 function initDevice(method: BaseMethod) {
@@ -394,21 +433,16 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             clearTimeout(timer);
           }
 
-          const stateChange =
-            tempKeepSession !== (method.payload.keepSession ?? true) ||
-            tempPassphraseState !== method.payload.passphraseState;
-
-          tempKeepSession = method.payload.keepSession;
-          tempPassphraseState = method.payload.passphraseState;
-
-          const initSession = method.payload.initSession ?? !tempPassphraseState;
           /**
            * Bluetooth should call initialize here
            */
-          if (env === 'react-native' || stateChange || initSession) {
+          if (env === 'react-native') {
+            const { initSession, passphraseState, deviceId } = method.payload;
             await device.acquire();
             await device.initialize({
               initSession,
+              passphraseState,
+              deviceId,
             });
           }
           resolve(device);

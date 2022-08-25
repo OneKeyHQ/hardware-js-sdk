@@ -107,6 +107,19 @@ export const supportInputPinOnSoftware = (features: Features): SupportFeatureTyp
   return { support: semver.gte(currentVersion, '2.3.0'), require: '2.3.0' };
 };
 
+export const supportNewPassphrase = (features?: Features): SupportFeatureType => {
+  if (!features) return { support: false };
+
+  const deviceType = getDeviceType(features);
+  if (deviceType === 'touch' || deviceType === 'pro') {
+    return { support: true };
+  }
+
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
+  return { support: semver.gte(currentVersion, '2.4.0'), require: '2.4.0' };
+};
+
 export const getPassphraseState = async (features: Features, commands: DeviceCommands) => {
   if (!features) return false;
   const { message } = await commands.typedCall('GetAddress', 'Address', {

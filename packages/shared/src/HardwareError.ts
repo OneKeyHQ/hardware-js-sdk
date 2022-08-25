@@ -102,6 +102,7 @@ export const HardwareErrorCode = {
 
   /**
    * Do not support passphrase
+   * @params: { require: string }
    */
   DeviceNotSupportPassphrase: 111,
 

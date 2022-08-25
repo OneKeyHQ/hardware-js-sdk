@@ -28,12 +28,15 @@ import { PROTO } from '../constants';
 import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
 
+export type InitOptions = {
+  initSession?: boolean;
+  deviceId?: string;
+  passphraseState?: string;
+};
+
 export type RunOptions = {
   keepSession?: boolean;
-  passphraseState?: string;
-  initSession?: boolean;
-  useEmptyPassphrase?: boolean;
-};
+} & InitOptions;
 
 const parseRunOptions = (options?: RunOptions): RunOptions => {
   if (!options) options = {};
@@ -247,13 +250,16 @@ export class Device extends EventEmitter {
     return this.commands;
   }
 
-  getInternalState() {
-    if (!this.features) return undefined;
-    const key = `${this.features.device_id}`;
-    const usePassKey = `${this.features.device_id}@${this.passphraseState}`;
+  getInternalState(_deviceId?: string) {
+    Log.debug('getInternalState session cache: ', deviceSessionCache);
+    const deviceId = _deviceId || this.features?.device_id;
+    if (!deviceId) return undefined;
+
+    const key = `${deviceId}`;
+    const usePassKey = `${deviceId}@${this.passphraseState}`;
     // When creating a wallet, use device_id as the key
     const session = deviceSessionCache[key] ?? deviceSessionCache[usePassKey];
-    return this.keepSession ? session : undefined;
+    return this.passphraseState ? session : undefined;
   }
 
   setInternalState(state: string) {
@@ -262,35 +268,37 @@ export class Device extends EventEmitter {
     if (this.passphraseState) {
       key += `@${this.passphraseState}`;
     }
-    if (this.keepSession && state) {
+    if (state) {
       deviceSessionCache[key] = state;
     }
   }
 
-  clearInternalState() {
-    if (!this.features) return;
-    const key = `${this.features.device_id}`;
+  clearInternalState(_deviceId?: string) {
+    const deviceId = _deviceId || this.features?.device_id;
+    if (!deviceId) return;
+    const key = `${deviceId}`;
     delete deviceSessionCache[key];
 
     if (this.passphraseState) {
-      const usePassKey = `${this.features.device_id}@${this.passphraseState}`;
+      const usePassKey = `${deviceId}@${this.passphraseState}`;
       delete deviceSessionCache[usePassKey];
     }
   }
 
-  async initialize(options?: { initSession?: boolean }) {
+  async initialize(options?: InitOptions) {
+    this.passphraseState = options?.passphraseState;
+
     if (options?.initSession) {
-      this.clearInternalState();
+      this.clearInternalState(options?.deviceId);
     }
 
-    let payload: any;
-    if (this.features) {
-      const internalState = this.getInternalState();
-      payload = {};
-      if (internalState) {
-        payload.session_id = internalState;
-      }
+    const internalState = this.getInternalState(options?.deviceId);
+    const payload: any = {};
+    if (internalState) {
+      payload.session_id = internalState;
     }
+
+    Log.debug('initialize: payload:', payload);
 
     const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
     this._updateFeatures(message);
@@ -368,6 +376,8 @@ export class Device extends EventEmitter {
           if (fn) {
             await this.initialize({
               initSession: options.initSession,
+              passphraseState: options.passphraseState,
+              deviceId: options.deviceId,
             });
           }
         } catch (error) {
@@ -384,8 +394,6 @@ export class Device extends EventEmitter {
         }
       }
     }
-
-    this.passphraseState = options.passphraseState;
 
     if (options.keepSession) {
       this.keepSession = true;
