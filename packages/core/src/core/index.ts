@@ -440,13 +440,8 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
            * Bluetooth should call initialize here
            */
           if (env === 'react-native') {
-            const { initSession, passphraseState, deviceId } = method.payload;
             await device.acquire();
-            await device.initialize({
-              initSession,
-              passphraseState,
-              deviceId,
-            });
+            await device.initialize(parseInitOptions(method));
           }
           resolve(device);
           return;
