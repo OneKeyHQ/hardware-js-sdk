@@ -214,6 +214,9 @@ export default class ReactNativeBleTransport {
           connectOptions = {};
           this.Log.debug('first try to reconnect without params');
           device = await blePlxManager.connectToDevice(uuid);
+        } else if (e.errorCode === BleErrorCode.DeviceAlreadyConnected) {
+          this.Log.debug('device already connected');
+          throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
           throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }
@@ -281,6 +284,12 @@ export default class ReactNativeBleTransport {
     }
 
     if (!infos) {
+      try {
+        this.Log.debug('cancel connection when service not found');
+        await device.cancelConnection();
+      } catch (e) {
+        this.Log.debug('cancel connection error when service not found: ', e.message || e.reason);
+      }
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
 
@@ -412,8 +421,9 @@ export default class ReactNativeBleTransport {
     if (transport) {
       delete transportCache[uuid];
       transport.nofitySubscription?.();
+      // Temporary close the Android disconnect after each request
       if (Platform.OS === 'android') {
-        await this.blePlxManager?.cancelDeviceConnection(uuid);
+        // await this.blePlxManager?.cancelDeviceConnection(uuid);
       }
     }
 
