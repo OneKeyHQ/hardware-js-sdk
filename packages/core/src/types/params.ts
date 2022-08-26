@@ -20,10 +20,6 @@ export interface CommonParams {
    * Every init session
    */
   initSession?: boolean;
-  /**
-   * Do not use the passphrase
-   */
-  notUsePassphrase?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

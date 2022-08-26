@@ -1,7 +1,13 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import { Features, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  getDeviceFirmwareVersion,
+  getDeviceModel,
+  getDeviceType,
+  supportNewPassphrase,
+} from '../utils/deviceFeaturesUtils';
 import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
@@ -26,12 +32,6 @@ import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
-import {
-  getDeviceFirmwareVersion,
-  getDeviceModel,
-  getDeviceType,
-  supportNewPassphrase,
-} from '../utils/deviceFeaturesUtils';
 
 const Log = getLogger(LoggerNames.Core);
 
@@ -54,10 +54,8 @@ const pollingState: Record<number, boolean> = {};
 
 let preConnectCache: {
   passphraseState: string | undefined;
-  notUsePassphrase: boolean;
 } = {
   passphraseState: undefined,
-  notUsePassphrase: false,
 };
 
 export const callAPI = async (message: CoreMessage) => {
@@ -98,13 +96,10 @@ export const callAPI = async (message: CoreMessage) => {
     );
   }
 
-  const connectStateChange =
-    preConnectCache.passphraseState !== method.payload.passphraseState ||
-    preConnectCache.notUsePassphrase !== method.payload.notUsePassphrase;
+  const connectStateChange = preConnectCache.passphraseState !== method.payload.passphraseState;
 
   preConnectCache = {
     passphraseState: method.payload.passphraseState,
-    notUsePassphrase: method.payload.notUsePassphrase,
   };
 
   if (connectStateChange || method.payload.initSession) {
@@ -209,11 +204,8 @@ export const callAPI = async (message: CoreMessage) => {
         await TransportManager.reconfigure(device.getFirmwareVersion());
       }
 
-      // Check Device passphrase opened
-      if (method.payload.notUsePassphrase && !!device.features?.passphrase_protection) {
-        DevicePool.clearDeviceCache(method.payload.connectId);
-        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase));
-      }
+      // Check to see if it is safe to use Passphrase
+      checkPassphraseSafety(method, device.features);
 
       if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
         // check version
@@ -233,17 +225,11 @@ export const callAPI = async (message: CoreMessage) => {
         // Check Device passphrase State
         const passphraseState = await device.checkPassphraseState();
 
-        // handles the special case of Touch/Pro
-        if (method.payload.notUsePassphrase && !!device.features?.passphrase_protection) {
-          DevicePool.clearDeviceCache(method.payload.connectId);
-          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase));
-        }
+        // Double check, handles the special case of Touch/Pro
+        checkPassphraseSafety(method, device.features);
 
         if (passphraseState) {
           DevicePool.clearDeviceCache(method.payload.connectId);
-          if (device.features?.passphrase_protection === false) {
-            return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase));
-          }
           return Promise.reject(
             ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
           );
@@ -495,6 +481,20 @@ export const cancel = (connectId?: string) => {
   }
   cleanup();
   closePopup();
+};
+
+const checkPassphraseSafety = (method: BaseMethod, features?: Features) => {
+  if (!method.useDevicePassphraseState) return;
+
+  if (features?.passphrase_protection === true && !method.payload.passphraseState) {
+    DevicePool.clearDeviceCache(method.payload.connectId);
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
+  }
+
+  if (features?.passphrase_protection === false && method.payload.passphraseState) {
+    DevicePool.clearDeviceCache(method.payload.connectId);
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
+  }
 };
 
 const cleanup = () => {
