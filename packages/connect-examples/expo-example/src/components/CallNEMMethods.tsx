@@ -1,4 +1,4 @@
-import { CommonParams, CoreApi } from '@onekeyfe/hd-core';
+import { CoreApi } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
@@ -6,14 +6,9 @@ import MethodInvoke from './MethodInvoke';
 type CallNEMMethodsProps = {
   SDK: CoreApi;
   selectedDevice: Device | null;
-  commonParams?: CommonParams;
 };
 
-export function CallNEMMethods({
-  SDK,
-  selectedDevice: currentDevice,
-  commonParams,
-}: CallNEMMethodsProps) {
+export function CallNEMMethods({ SDK, selectedDevice: currentDevice }: CallNEMMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
   const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
@@ -26,7 +21,7 @@ export function CallNEMMethods({
             { name: 'path', value: "m/44'/43'/2'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.nemGetAddress(connectId, deviceId, { ...commonParams, ...data })}
+          onCall={data => SDK.nemGetAddress(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -48,7 +43,6 @@ export function CallNEMMethods({
           ]}
           onCall={data =>
             SDK.nemSignTransaction(connectId, deviceId, {
-              ...commonParams,
               // @ts-expect-error
               path: data.path,
               transaction: {

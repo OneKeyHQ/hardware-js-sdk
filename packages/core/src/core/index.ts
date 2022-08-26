@@ -1,14 +1,8 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { Features, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import {
-  getDeviceFirmwareVersion,
-  getDeviceModel,
-  getDeviceType,
-  supportNewPassphrase,
-} from '../utils/deviceFeaturesUtils';
-import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
+import { Device, DeviceEvents } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
@@ -32,14 +26,13 @@ import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
+import {
+  getDeviceFirmwareVersion,
+  getDeviceModel,
+  getDeviceType,
+} from '../utils/deviceFeaturesUtils';
 
 const Log = getLogger(LoggerNames.Core);
-
-const parseInitOptions = (method?: BaseMethod): InitOptions => ({
-  initSession: method?.payload.initSession,
-  passphraseState: method?.payload.passphraseState,
-  deviceId: method?.payload.deviceId,
-});
 
 let _core: Core;
 let _deviceList: DeviceList | undefined;
@@ -51,12 +44,6 @@ const callApiQueue: BaseMethod[] = [];
 const deviceCacheMap = new Map<string, Device>();
 let pollingId = 1;
 const pollingState: Record<number, boolean> = {};
-
-let preConnectCache: {
-  passphraseState: string | undefined;
-} = {
-  passphraseState: undefined,
-};
 
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
@@ -96,17 +83,6 @@ export const callAPI = async (message: CoreMessage) => {
     );
   }
 
-  const connectStateChange = preConnectCache.passphraseState !== method.payload.passphraseState;
-
-  preConnectCache = {
-    passphraseState: method.payload.passphraseState,
-  };
-
-  if (connectStateChange || method.payload.initSession) {
-    Log.debug('passphrase state change, clear device cache');
-    DevicePool.clearDeviceCache(method.payload.connectId);
-  }
-
   /**
    * Polling to ensure successful connection
    */
@@ -126,7 +102,6 @@ export const callAPI = async (message: CoreMessage) => {
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
-  device.on(DEVICE.PASSPHRASE_ON_DEVICE, onDevicePassphraseHandler);
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
 
   try {
@@ -204,38 +179,6 @@ export const callAPI = async (message: CoreMessage) => {
         await TransportManager.reconfigure(device.getFirmwareVersion());
       }
 
-      // Check to see if it is safe to use Passphrase
-      checkPassphraseSafety(method, device.features);
-
-      if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
-        // check version
-        const support = supportNewPassphrase(device.features);
-        if (!support.support) {
-          return Promise.reject(
-            ERRORS.TypedError(
-              HardwareErrorCode.DeviceNotSupportPassphrase,
-              `Device not support passphrase, please update to ${support.require}`,
-              {
-                require: support.require,
-              }
-            )
-          );
-        }
-
-        // Check Device passphrase State
-        const passphraseState = await device.checkPassphraseState();
-
-        // Double check, handles the special case of Touch/Pro
-        checkPassphraseSafety(method, device.features);
-
-        if (passphraseState) {
-          DevicePool.clearDeviceCache(method.payload.connectId);
-          return Promise.reject(
-            ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
-          );
-        }
-      }
-
       try {
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ');
@@ -248,12 +191,7 @@ export const callAPI = async (message: CoreMessage) => {
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
-
-    const runOptions: RunOptions = {
-      keepSession: method.payload.keepSession,
-      ...parseInitOptions(method),
-    };
-    const deviceRun = () => device.run(inner, runOptions);
+    const deviceRun = () => device.run(inner);
     _callPromise = createDeferred(deviceRun);
 
     try {
@@ -309,7 +247,7 @@ async function initDeviceList(method: BaseMethod) {
     _deviceList.connector = _connector;
   }
 
-  await _deviceList.getDeviceLists(method.connectId, parseInitOptions(method));
+  await _deviceList.getDeviceLists(method.connectId);
 }
 
 function initDevice(method: BaseMethod) {
@@ -421,13 +359,12 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
           if (timer) {
             clearTimeout(timer);
           }
-
           /**
            * Bluetooth should call initialize here
            */
           if (env === 'react-native') {
             await device.acquire();
-            await device.initialize(parseInitOptions(method));
+            await device.initialize();
           }
           resolve(device);
           return;
@@ -484,20 +421,6 @@ export const cancel = (connectId?: string) => {
   closePopup();
 };
 
-const checkPassphraseSafety = (method: BaseMethod, features?: Features) => {
-  if (!method.useDevicePassphraseState) return;
-
-  if (features?.passphrase_protection === true && !method.payload.passphraseState) {
-    DevicePool.clearDeviceCache(method.payload.connectId);
-    throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
-  }
-
-  if (features?.passphrase_protection === false && method.payload.passphraseState) {
-    DevicePool.clearDeviceCache(method.payload.connectId);
-    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
-  }
-};
-
 const cleanup = () => {
   _uiPromises = [];
   Log.debug('Cleanup...');
@@ -506,7 +429,6 @@ const cleanup = () => {
 const removeDeviceListener = (device: Device) => {
   device.removeListener(DEVICE.PIN, onDevicePinHandler);
   device.removeListener(DEVICE.BUTTON, onDeviceButtonHandler);
-  device.removeListener(DEVICE.PASSPHRASE_ON_DEVICE, onDevicePassphraseHandler);
   device.removeListener(DEVICE.FEATURES, onDeviceFeaturesHandler);
   DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
   // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
@@ -565,15 +487,6 @@ const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]
 
 const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]) => {
   postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
-};
-
-const onDevicePassphraseHandler = (...[device]: [...DeviceEvents['passphrase_on_device']]) => {
-  postMessage(
-    createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
-      device: device.toMessageObject() as KnownDevice,
-      passphraseState: device.passphraseState,
-    })
-  );
 };
 
 /**

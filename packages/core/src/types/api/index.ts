@@ -45,7 +45,6 @@ import { firmwareUpdate } from './firmwareUpdate';
 import { getLogs } from './getLogs';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
 import { requestWebUsbDevice } from './requestWebUsbDevice';
-import { getPassphraseState } from './getPassphraseState';
 
 export * from './export';
 
@@ -93,7 +92,6 @@ export type CoreApi = {
   deviceSupportFeatures: typeof deviceSupportFeatures;
   deviceVerify: typeof deviceVerify;
   deviceWipe: typeof deviceWipe;
-  getPassphraseState: typeof getPassphraseState;
 
   evmGetAddress: typeof evmGetAddress;
   evmGetPublicKey: typeof evmGetPublicKey;

@@ -9,7 +9,6 @@ export const UI_REQUEST = {
   REQUEST_PIN: 'ui-request_pin',
   INVALID_PIN: 'ui-invalid_pin',
   REQUEST_BUTTON: 'ui-button',
-  REQUEST_PASSPHRASE_ON_DEVICE: 'ui-request_passphrase_on_device',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
 
@@ -42,14 +41,6 @@ export interface UiRequestButton {
   payload: DeviceButtonRequest['payload'];
 }
 
-export interface UiRequestPassphrase {
-  type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE;
-  payload: {
-    device: Device;
-    passphraseState?: string;
-  };
-}
-
 export interface FirmwareProgress {
   type: typeof UI_REQUEST.FIRMWARE_PROGRESS;
   payload: {
@@ -62,7 +53,6 @@ export type UiEvent =
   | UiRequestWithoutPayload
   | UiRequestDeviceAction
   | UiRequestButton
-  | UiRequestPassphrase
   | FirmwareProgress;
 
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };

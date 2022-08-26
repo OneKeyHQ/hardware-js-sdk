@@ -67,11 +67,6 @@ export abstract class BaseMethod<Params = undefined> {
    */
   checkDeviceId = false;
 
-  /**
-   * 该方法是否需要校验 passphrase state
-   */
-  useDevicePassphraseState = true;
-
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 

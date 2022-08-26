@@ -5,7 +5,6 @@ import { BaseMethod } from './BaseMethod';
 export default class CheckBridgeStatus extends BaseMethod {
   init() {
     this.useDevice = false;
-    this.useDevicePassphraseState = false;
   }
 
   async run() {

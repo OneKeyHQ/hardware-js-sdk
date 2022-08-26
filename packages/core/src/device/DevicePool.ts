@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 // eslint-disable-next-line import/no-cycle
-import { Device, InitOptions } from './Device';
+import { Device } from './Device';
 import { DEVICE } from '../events';
 import type DeviceConnector from './DeviceConnector';
 import { getDeviceUUID, getLogger, LoggerNames } from '../utils';
@@ -89,12 +89,8 @@ export class DevicePool extends EventEmitter {
     this.connector = connector;
   }
 
-  static async getDevices(
-    descriptorList: DeviceDescriptor[],
-    connectId?: string,
-    initOptions?: InitOptions
-  ) {
-    Log.debug('get device list: connectId: ', connectId);
+  static async getDevices(descriptorList: DeviceDescriptor[], connectId?: string) {
+    Log.debug('get device list');
 
     const devices: Record<string, Device> = {};
     const deviceList = [];
@@ -110,7 +106,7 @@ export class DevicePool extends EventEmitter {
           device.updateDescriptor(exist, true);
           devices[connectId] = device;
           deviceList.push(device);
-          await this._checkDevicePool(initOptions);
+          await this._checkDevicePool();
           return { devices, deviceList };
         }
         Log.debug('found device in cache, but path is different: ', connectId);
@@ -118,7 +114,7 @@ export class DevicePool extends EventEmitter {
     }
 
     for await (const descriptor of descriptorList) {
-      const device = await this._createDevice(descriptor, initOptions);
+      const device = await this._createDevice(descriptor);
 
       if (device.features) {
         const uuid = getDeviceUUID(device.features);
@@ -135,39 +131,31 @@ export class DevicePool extends EventEmitter {
     Log.debug('get devices result : ', devices, deviceList);
     console.log('device poll -> connected: ', this.connectedPool);
     console.log('device poll -> disconnected: ', this.disconnectPool);
-    await this._checkDevicePool(initOptions);
+    await this._checkDevicePool();
     return { devices, deviceList };
   }
 
-  static clearDeviceCache(connectId?: string) {
-    Log.debug('clear device pool cache: connectId', connectId);
-    Log.debug('clear device pool cache: ', this.devicesCache);
-    if (connectId) {
-      delete this.devicesCache[connectId];
-    }
-  }
-
-  static async _createDevice(descriptor: DeviceDescriptor, initOptions?: InitOptions) {
+  static async _createDevice(descriptor: DeviceDescriptor) {
     let device = this.getDeviceByPath(descriptor.path);
     if (!device) {
       device = Device.fromDescriptor(descriptor);
       device.deviceConnector = this.connector;
       await device.connect();
-      await device.initialize(initOptions);
+      await device.initialize();
       await device.release();
     }
     return device;
   }
 
-  static async _checkDevicePool(initOptions?: InitOptions) {
-    await this._sendConnectMessage(initOptions);
+  static async _checkDevicePool() {
+    await this._sendConnectMessage();
     this._sendDisconnectMessage();
   }
 
-  static async _sendConnectMessage(initOptions?: InitOptions) {
+  static async _sendConnectMessage() {
     for (let i = this.connectedPool.length - 1; i >= 0; i--) {
       const descriptor = this.connectedPool[i];
-      const device = await this._createDevice(descriptor, initOptions);
+      const device = await this._createDevice(descriptor);
       Log.debug('emit DEVICE.CONNECT: ', device);
       this.emitter.emit(DEVICE.CONNECT, device);
       this.connectedPool.splice(i, 1);

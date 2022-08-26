@@ -9,8 +9,6 @@ import type { DeviceVerifySignature } from '../../types';
 
 export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
   init() {
-    this.useDevicePassphraseState = false;
-
     // check payload
     validateParams(this.payload, [{ name: 'dataHex', type: 'hexString' }]);
 

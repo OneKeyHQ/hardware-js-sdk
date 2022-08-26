@@ -10,7 +10,6 @@ const Log = getLogger(LoggerNames.Method);
 export default class RequestWebUsbDevice extends BaseMethod {
   init() {
     this.useDevice = false;
-    this.useDevicePassphraseState = false;
   }
 
   async run() {

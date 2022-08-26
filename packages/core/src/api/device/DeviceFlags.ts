@@ -4,8 +4,6 @@ import { validateParams } from '../helpers/paramsValidator';
 
 export default class DeviceFlags extends BaseMethod<ApplyFlags> {
   init() {
-    this.useDevicePassphraseState = false;
-
     // check payload
     validateParams(this.payload, [{ name: 'flags', type: 'number' }]);
 

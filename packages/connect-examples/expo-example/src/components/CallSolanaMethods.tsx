@@ -1,4 +1,4 @@
-import { CommonParams, CoreApi } from '@onekeyfe/hd-core';
+import { CoreApi } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
@@ -6,14 +6,9 @@ import MethodInvoke from './MethodInvoke';
 type CallSolanaMethodsProps = {
   SDK: CoreApi;
   selectedDevice: Device | null;
-  commonParams?: CommonParams;
 };
 
-export function CallSolanaMethods({
-  SDK,
-  selectedDevice: currentDevice,
-  commonParams,
-}: CallSolanaMethodsProps) {
+export function CallSolanaMethods({ SDK, selectedDevice: currentDevice }: CallSolanaMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
   const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
@@ -26,7 +21,7 @@ export function CallSolanaMethods({
             { name: 'path', value: "m/44'/501'/0'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.solGetAddress(connectId, deviceId, { ...commonParams, ...data })}
+          onCall={data => SDK.solGetAddress(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -42,7 +37,6 @@ export function CallSolanaMethods({
           ]}
           onCall={data =>
             SDK.solSignTransaction(connectId, deviceId, {
-              ...commonParams,
               ...data,
             } as unknown as any)
           }

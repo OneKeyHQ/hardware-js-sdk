@@ -1,13 +1,5 @@
 import semver from 'semver';
-import { toHardened } from '../api/helpers/pathUtils';
-import { DeviceCommands } from '../device/DeviceCommands';
-import type {
-  Features,
-  IVersionArray,
-  IDeviceType,
-  IDeviceModel,
-  SupportFeatureType,
-} from '../types';
+import type { Features, IVersionArray, IDeviceType, IDeviceModel } from '../types';
 
 export const getDeviceModel = (features?: Features): IDeviceModel => {
   if (!features || typeof features !== 'object') {
@@ -95,39 +87,14 @@ export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray |
   return features.ble_ver.split('.') as unknown as IVersionArray;
 };
 
-export const supportInputPinOnSoftware = (features: Features): SupportFeatureType => {
-  if (!features) return { support: false };
+export const supportInputPinOnSoftware = (features: Features): boolean => {
+  if (!features) return false;
 
   const deviceType = getDeviceType(features);
   if (deviceType === 'touch') {
-    return { support: false };
+    return false;
   }
 
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
-  return { support: semver.gte(currentVersion, '2.3.0'), require: '2.3.0' };
-};
-
-export const supportNewPassphrase = (features?: Features): SupportFeatureType => {
-  if (!features) return { support: false };
-
-  const deviceType = getDeviceType(features);
-  if (deviceType === 'touch' || deviceType === 'pro') {
-    return { support: true };
-  }
-
-  const currentVersion = getDeviceFirmwareVersion(features).join('.');
-
-  return { support: semver.gte(currentVersion, '2.4.0'), require: '2.4.0' };
-};
-
-export const getPassphraseState = async (features: Features, commands: DeviceCommands) => {
-  if (!features) return false;
-  const { message } = await commands.typedCall('GetAddress', 'Address', {
-    address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
-    coin_name: 'Testnet',
-    script_type: 'SPENDADDRESS',
-    show_display: false,
-  });
-
-  return message.address;
+  return semver.gte(currentVersion, '2.3.0');
 };

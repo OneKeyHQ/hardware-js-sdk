@@ -1,4 +1,4 @@
-import { CommonParams, CoreApi, PROTO } from '@onekeyfe/hd-core';
+import { CoreApi, PROTO } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
@@ -6,14 +6,9 @@ import MethodInvoke from './MethodInvoke';
 type CallBTCMethodsProps = {
   SDK: CoreApi;
   selectedDevice: Device | null;
-  commonParams?: CommonParams;
 };
 
-export function CallBTCMethods({
-  SDK,
-  selectedDevice: currentDevice,
-  commonParams,
-}: CallBTCMethodsProps) {
+export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
   const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
@@ -29,7 +24,7 @@ export function CallBTCMethods({
             { name: 'multisig', value: undefined, type: 'string' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
-          onCall={data => SDK.btcGetAddress(connectId, deviceId, { ...commonParams, ...data })}
+          onCall={data => SDK.btcGetAddress(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -40,7 +35,7 @@ export function CallBTCMethods({
             { name: 'showOnOneKey', value: false, type: 'boolean' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
-          onCall={data => SDK.btcGetPublicKey(connectId, deviceId, { ...commonParams, ...data })}
+          onCall={data => SDK.btcGetPublicKey(connectId, deviceId, { ...data })}
         />
 
         <MethodInvoke
@@ -54,9 +49,7 @@ export function CallBTCMethods({
               type: 'string',
             },
           ]}
-          onCall={data =>
-            SDK.btcSignMessage(connectId, deviceId, { ...commonParams, ...data } as any)
-          }
+          onCall={data => SDK.btcSignMessage(connectId, deviceId, { ...data } as any)}
         />
 
         <MethodInvoke
@@ -76,12 +69,7 @@ export function CallBTCMethods({
               type: 'string',
             },
           ]}
-          onCall={data =>
-            SDK.btcVerifyMessage(connectId, deviceId, {
-              ...commonParams,
-              ...data,
-            } as unknown as any)
-          }
+          onCall={data => SDK.btcVerifyMessage(connectId, deviceId, { ...data } as unknown as any)}
         />
 
         <MethodInvoke
@@ -134,7 +122,6 @@ export function CallBTCMethods({
                   version: 2,
                 },
               ],
-              ...commonParams,
               ...data,
             } as unknown as any)
           }

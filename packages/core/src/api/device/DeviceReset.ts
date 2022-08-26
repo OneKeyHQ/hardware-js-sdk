@@ -4,8 +4,6 @@ import { validateParams } from '../helpers/paramsValidator';
 
 export default class DeviceReset extends BaseMethod<ResetDevice> {
   init() {
-    this.useDevicePassphraseState = false;
-
     // check payload
     validateParams(this.payload, [
       { name: 'displayRandom', type: 'boolean' },

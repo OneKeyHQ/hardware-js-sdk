@@ -15,7 +15,6 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [UI_REQUEST.BOOTLOADER];
-    this.useDevicePassphraseState = false;
 
     const { payload } = this;
 

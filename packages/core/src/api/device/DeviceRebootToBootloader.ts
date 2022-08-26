@@ -3,9 +3,7 @@ import { BaseMethod } from '../BaseMethod';
 
 // Reboot BootLoader
 export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloader> {
-  init() {
-    this.useDevicePassphraseState = false;
-  }
+  init() {}
 
   getVersionRange() {
     return {

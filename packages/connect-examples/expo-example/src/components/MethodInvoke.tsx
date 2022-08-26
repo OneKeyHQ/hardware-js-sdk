@@ -79,10 +79,7 @@ const MethodInvoke: FC<MethodInvokeProps> = ({ title, options, onCall }) => {
         <TextInput
           style={styles.input}
           value={item.value?.toString() ?? ''}
-          onChangeText={v => {
-            const newText = v.replace(/[^\d]+/, '');
-            onChange({ name: item.name, value: newText });
-          }}
+          onChangeText={v => onChange({ name: item.name, value: v })}
         />
       );
     }
