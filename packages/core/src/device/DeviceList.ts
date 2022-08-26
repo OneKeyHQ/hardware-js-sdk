@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import DeviceConnector from './DeviceConnector';
-import { Device } from './Device';
+import { Device, InitOptions } from './Device';
 import { DevicePool } from './DevicePool';
 
 export class DeviceList extends EventEmitter {
@@ -12,13 +12,17 @@ export class DeviceList extends EventEmitter {
    * 获取已连接的设备列表
    * @returns {OneKeyDeviceInfo[]}
    */
-  async getDeviceLists(connectId?: string) {
+  async getDeviceLists(connectId?: string, initOptions?: InitOptions) {
     const deviceDiff = await this.connector?.enumerate();
     const descriptorList = deviceDiff?.descriptors ?? [];
 
     this.devices = {};
 
-    const { deviceList, devices } = await DevicePool.getDevices(descriptorList, connectId);
+    const { deviceList, devices } = await DevicePool.getDevices(
+      descriptorList,
+      connectId,
+      initOptions
+    );
     this.devices = devices;
     return deviceList;
   }

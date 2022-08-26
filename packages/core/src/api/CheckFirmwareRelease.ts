@@ -3,7 +3,9 @@ import { BaseMethod } from './BaseMethod';
 import { getFirmwareReleaseInfo } from './firmware/releaseHelper';
 
 export default class CheckFirmwareRelease extends BaseMethod {
-  init() {}
+  init() {
+    this.useDevicePassphraseState = false;
+  }
 
   run() {
     if (this.device.features) {

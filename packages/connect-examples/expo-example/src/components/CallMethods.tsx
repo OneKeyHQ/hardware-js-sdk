@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Button, StyleSheet, Platform, Switch, Text } from 'react-native';
+import { View, Button, StyleSheet, Platform, Switch, Text, TextInput } from 'react-native';
 import RNRestart from 'react-native-restart';
 import {
   UI_EVENT,
@@ -10,6 +10,7 @@ import {
   LOG_EVENT,
   FIRMWARE_EVENT,
   DEVICE,
+  CommonParams,
 } from '@onekeyfe/hd-core';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
@@ -35,6 +36,8 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [selectedFile, setSelectedFile] = useState<Uint8Array>();
   const [firmwareType, setFirmwareType] = useState<boolean>(false);
+
+  const [optionalParams, setOptionalParams] = useState<CommonParams>();
 
   useEffect(() => {
     // 监听 SDK 事件
@@ -152,6 +155,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     console.log('example getLogs response: ', res);
   };
 
+  const handleGetPassphraseState = async () => {
+    const res = await SDK.getPassphraseState(selectedDevice?.connectId);
+    console.log('example getLogs response: ', res);
+  };
+
   const handleRequestWebUsbDevice = async () => {
     const res = await SDK.requestWebUsbDevice();
     console.log('example requestWebUsbDevice response: ', res);
@@ -172,6 +180,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         <Button title="cancel" onPress={() => cancel()} />
         <Button title="reset" onPress={() => RNRestart.Restart()} />
         <Button title="getLogs" onPress={() => handleGetLogs()} />
+        <Button title="getPassphraseState" onPress={() => handleGetPassphraseState()} />
         <Button title="requestWebUsbDevice" onPress={() => handleRequestWebUsbDevice()} />
       </View>
       {showPinInput && (
@@ -183,7 +192,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       )}
 
       <View style={styles.buttonContainer}>
-        <View style={styles.buttonContainer}>
+        <View>
           <Text>升级固件类型：{firmwareType ? 'firmware' : 'ble'}</Text>
           <Switch onValueChange={() => setFirmwareType(!firmwareType)} value={firmwareType} />
         </View>
@@ -196,14 +205,85 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       </View>
 
       <DeviceList data={devices} onSelected={device => setSelectedDevice(device)} />
-      <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} />
+
+      <View style={styles.container}>
+        <Text>Common Parameters</Text>
+        <View style={{ flexDirection: 'row' }}>
+          <View style={styles.commonParamItem}>
+            <Text>保持 Session</Text>
+            <Switch
+              value={!!optionalParams?.keepSession}
+              onValueChange={v => setOptionalParams({ ...optionalParams, keepSession: v })}
+            />
+          </View>
+          <View style={styles.commonParamItem}>
+            <Text>重试次数</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={optionalParams?.retryCount?.toString() ?? ''}
+              onChangeText={v => {
+                const newText = v.replace(/[^\d]+/, '');
+                setOptionalParams({ ...optionalParams, retryCount: parseInt(newText) });
+              }}
+            />
+          </View>
+          <View style={styles.commonParamItem}>
+            <Text>重试间隔时长</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={optionalParams?.pollIntervalTime?.toString() ?? ''}
+              onChangeText={v => {
+                const newText = v.replace(/[^\d]+/, '');
+                setOptionalParams({ ...optionalParams, pollIntervalTime: parseInt(newText) });
+              }}
+            />
+          </View>
+          <View style={styles.commonParamItem}>
+            <Text>连接超时事件</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={optionalParams?.timeout?.toString() ?? ''}
+              onChangeText={v => {
+                const newText = v.replace(/[^\d]+/, '');
+                setOptionalParams({ ...optionalParams, timeout: parseInt(newText) });
+              }}
+            />
+          </View>
+          <View style={styles.commonParamItem}>
+            <Text>passphrase State</Text>
+            <TextInput
+              style={styles.input}
+              value={optionalParams?.passphraseState ?? ''}
+              onChangeText={v => {
+                setOptionalParams({ ...optionalParams, passphraseState: v });
+              }}
+            />
+          </View>
+          <View style={styles.commonParamItem}>
+            <Text>init session</Text>
+            <Switch
+              value={!!optionalParams?.initSession}
+              onValueChange={v => setOptionalParams({ ...optionalParams, initSession: v })}
+            />
+          </View>
+        </View>
+      </View>
+
+      <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallStarcoinMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} />
-      <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} />
+      <CallStarcoinMethods
+        SDK={SDK}
+        selectedDevice={selectedDevice}
+        commonParams={optionalParams}
+      />
+      <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }
@@ -216,5 +296,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  container: {
+    flexDirection: 'column',
+    borderRadius: 12,
+    borderColor: '#cccccc',
+    borderWidth: 1,
+    overflow: 'hidden',
+    margin: 12,
+    padding: 12,
+    height: 'auto',
+  },
+  commonParamItem: {
+    flexDirection: 'column',
+    paddingStart: 12,
+    paddingEnd: 12,
+  },
+  input: {
+    height: 35,
+    borderWidth: 1,
+    padding: 4,
   },
 });

@@ -4,6 +4,8 @@ import { validateParams } from '../helpers/paramsValidator';
 
 export default class DeviceRecovery extends BaseMethod<RecoveryDevice> {
   init() {
+    this.useDevicePassphraseState = false;
+
     // check payload
     validateParams(this.payload, [
       { name: 'wordCount', type: 'number' },

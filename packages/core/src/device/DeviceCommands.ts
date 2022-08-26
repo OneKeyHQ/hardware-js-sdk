@@ -214,19 +214,20 @@ export class DeviceCommands {
       );
     }
 
-    /**
-     * Temporary, do not support passphrase
-     */
-    if (this.device.features?.passphrase_protection) {
-      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportPassphrase));
-    }
-
     if (res.type === 'PassphraseRequest') {
       /**
        * Temporary, do not support passphrase
        */
       // return this._commonCall('PassphraseAck', { passphrase: '' });
-      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportPassphrase));
+      return Promise.reject(
+        ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotSupportPassphrase,
+          'Device not support passphrase',
+          {
+            require: '2.4.0',
+          }
+        )
+      );
     }
 
     // TT fw lower than 2.3.0, device send his current state

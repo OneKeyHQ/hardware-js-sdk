@@ -3,7 +3,9 @@ import { BaseMethod } from '../BaseMethod';
 
 // Upload hint Reboot BootLoader
 export default class DeviceUpdateReboot extends BaseMethod<BixinReboot> {
-  init() {}
+  init() {
+    this.useDevicePassphraseState = false;
+  }
 
   async run() {
     const res = await this.device.commands.typedCall('BixinReboot', 'Success');
