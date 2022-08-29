@@ -261,12 +261,18 @@ export class Device extends EventEmitter {
 
     const deviceId = _deviceId || this.features?.device_id;
     if (!deviceId) return undefined;
+    if (!this.passphraseState) return undefined;
 
-    const key = `${deviceId}`;
     const usePassKey = `${deviceId}@${this.passphraseState}`;
-    // When creating a wallet, use device_id as the key
-    const session = deviceSessionCache[key] ?? deviceSessionCache[usePassKey];
-    return this.passphraseState ? session : undefined;
+
+    if (!deviceSessionCache[usePassKey]) {
+      const key = `${deviceId}`;
+      if (deviceSessionCache[key]) {
+        deviceSessionCache[usePassKey] = deviceSessionCache[key];
+      }
+    }
+
+    return deviceSessionCache[usePassKey];
   }
 
   setInternalState(state: string, initSession?: boolean) {
