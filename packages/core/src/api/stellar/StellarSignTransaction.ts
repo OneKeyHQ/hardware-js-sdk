@@ -1,7 +1,4 @@
-import {
-  StellarSignedTx,
-  StellarSignTx as HardwareStellarSignTx,
-} from '@onekeyfe/hd-transport';
+import { StellarSignedTx, StellarSignTx as HardwareStellarSignTx } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -146,6 +143,7 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
   };
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     // check payload

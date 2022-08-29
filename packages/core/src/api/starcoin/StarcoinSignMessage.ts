@@ -7,6 +7,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 
 export default class StarcoinSignMessage extends BaseMethod<HardwareStarcoinSignMessage> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     // check payload

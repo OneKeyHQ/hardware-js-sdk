@@ -1,5 +1,5 @@
 import transport from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, enableLog, initLog } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
@@ -9,9 +9,8 @@ const { check, buildOne, receiveOne, parseConfigure } = transport;
 type IncompleteRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
   url: string;
+  timeout?: number;
 };
-
-const Log = initLog('@onekey/hd-transport-http');
 
 export default class HttpTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
@@ -22,9 +21,10 @@ export default class HttpTransport {
 
   url: string;
 
+  Log?: any;
+
   constructor(url?: string) {
     this.url = url == null ? DEFAULT_URL : url;
-    enableLog(true);
   }
 
   _post(options: IncompleteRequestOptions) {
@@ -38,7 +38,8 @@ export default class HttpTransport {
     });
   }
 
-  async init() {
+  async init(logger: any) {
+    this.Log = logger;
     const bridgeVersion = await this._silentInit();
     return bridgeVersion;
   }
@@ -47,6 +48,7 @@ export default class HttpTransport {
     const infoS = await http({
       url: this.url,
       method: 'POST',
+      timeout: 3000,
     });
     const info = check.info(infoS);
     return info.version;
@@ -103,12 +105,13 @@ export default class HttpTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    Log.debug('call-', ' name: ', name, ' data: ', data);
+    this.Log.debug('call-', ' name: ', name, ' data: ', data);
     const o = buildOne(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
       url: `/call/${session}`,
       body: outData,
+      timeout: name === 'Initialize' ? 10000 : undefined,
     });
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
@@ -154,6 +157,6 @@ export default class HttpTransport {
   }
 
   cancel() {
-    Log.debug('canceled');
+    this.Log.debug('canceled');
   }
 }

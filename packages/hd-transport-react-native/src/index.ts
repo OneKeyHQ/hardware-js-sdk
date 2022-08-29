@@ -9,14 +9,8 @@ import {
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
 import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
-import {
-  createDeferred,
-  Deferred,
-  ERRORS,
-  HardwareErrorCode,
-  enableLog,
-  initLog,
-} from '@onekeyfe/hd-shared';
+import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import type EventEmitter from 'events';
 import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
@@ -35,10 +29,8 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 
 const transportCache: Record<string, any> = {};
 
-const Log = initLog('@onekey/hd-ble-sdk');
-
 let connectOptions: Record<string, unknown> = {
-  requestMTU: 512,
+  requestMTU: 256,
   timeout: 3000,
 };
 
@@ -63,12 +55,18 @@ export default class ReactNativeBleTransport {
 
   runPromise: Deferred<any> | null = null;
 
+  Log?: any;
+
+  emitter?: EventEmitter;
+
   constructor(options: TransportOptions) {
     this.scanTimeout = options.scanTimeout ?? 3000;
-    enableLog(true);
   }
 
-  init() {}
+  init(logger: any, emitter: EventEmitter) {
+    this.Log = logger;
+    this.emitter = emitter;
+  }
 
   configure(signedData: any) {
     const messages = parseConfigure(signedData);
@@ -100,7 +98,7 @@ export default class ReactNativeBleTransport {
       try {
         await subscribeBleOn(blePlxManager);
       } catch (error) {
-        Log.debug('subscribeBleOn error: ', error);
+        this.Log.debug('subscribeBleOn error: ', error);
         reject(error);
         return;
       }
@@ -112,8 +110,8 @@ export default class ReactNativeBleTransport {
         },
         (error, device) => {
           if (error) {
-            Log.debug('ble scan manager: ', blePlxManager);
-            Log.debug('ble scan error: ', error);
+            this.Log.debug('ble scan manager: ', blePlxManager);
+            this.Log.debug('ble scan error: ', error);
             if (
               [BleErrorCode.BluetoothPoweredOff, BleErrorCode.BluetoothInUnknownState].includes(
                 error.errorCode
@@ -122,6 +120,11 @@ export default class ReactNativeBleTransport {
               reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
               reject(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
+            } else if (error.errorCode === BleErrorCode.ScanStartFailed) {
+              // Android Bluetooth will report an error when the search frequency is too fast,
+              // then nothing is processed and an empty array of devices is returned.
+              // Then the next search will be back to normal
+              timer.timeout(() => {}, this.scanTimeout);
             } else {
               reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.reason ?? ''));
             }
@@ -129,20 +132,20 @@ export default class ReactNativeBleTransport {
           }
 
           if (isOnekeyDevice(device?.name ?? null, device?.id)) {
-            Log.debug('search device start ======================');
-
+            this.Log.debug('search device start ======================');
             const { name, localName, id } = device ?? {};
-            Log.debug(`device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`);
+            this.Log.debug(
+              `device name: ${name ?? ''}\nlocalName: ${localName ?? ''}\nid: ${id ?? ''}`
+            );
             addDevice(device as unknown as Device);
-
-            Log.debug('search device end ======================\n');
+            this.Log.debug('search device end ======================\n');
           }
         }
       );
 
       getConnectedDeviceIds(getBluetoothServiceUuids()).then(devices => {
         for (const device of devices) {
-          Log.debug('search connected peripheral: ', device.id);
+          this.Log.debug('search connected peripheral: ', device.id);
           addDevice(device as unknown as Device);
         }
       });
@@ -174,7 +177,7 @@ export default class ReactNativeBleTransport {
        * If the transport is not released due to an exception operation
        * it will be handled again here
        */
-      Log.debug('transport not be released, will release: ', uuid);
+      this.Log.debug('transport not be released, will release: ', uuid);
       await this.release(uuid);
     }
 
@@ -182,7 +185,7 @@ export default class ReactNativeBleTransport {
     try {
       await subscribeBleOn(blePlxManager);
     } catch (error) {
-      Log.debug('subscribeBleOn error: ', error);
+      this.Log.debug('subscribeBleOn error: ', error);
       throw error;
     }
 
@@ -194,22 +197,26 @@ export default class ReactNativeBleTransport {
     if (!device) {
       const connectedDevice = await blePlxManager.connectedDevices(getBluetoothServiceUuids());
       const deviceFilter = connectedDevice.filter(device => device.id === uuid);
-      Log.debug(`found connected device count: ${deviceFilter.length}`);
+      this.Log.debug(`found connected device count: ${deviceFilter.length}`);
       [device] = deviceFilter;
     }
 
     if (!device) {
-      Log.debug('try to connect to device: ', uuid);
+      this.Log.debug('try to connect to device: ', uuid);
       try {
         device = await blePlxManager.connectToDevice(uuid, connectOptions);
       } catch (e) {
-        Log.debug('try to connect to device has error: ', e);
+        this.Log.debug('try to connect to device has error: ', e);
         if (
           e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
           connectOptions = {};
+          this.Log.debug('first try to reconnect without params');
           device = await blePlxManager.connectToDevice(uuid);
+        } else if (e.errorCode === BleErrorCode.DeviceAlreadyConnected) {
+          this.Log.debug('device already connected');
+          throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
           throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }
@@ -221,18 +228,30 @@ export default class ReactNativeBleTransport {
     }
 
     if (!(await device.isConnected())) {
-      Log.debug('not connected, try to connect to device: ', uuid);
+      this.Log.debug('not connected, try to connect to device: ', uuid);
 
       try {
         await device.connect(connectOptions);
       } catch (e) {
-        Log.debug('try to connect to device has error: ', e);
+        this.Log.debug('not connected, try to connect to device has error: ', e);
         if (
           e.errorCode === BleErrorCode.DeviceMTUChangeFailed ||
           e.errorCode === BleErrorCode.OperationCancelled
         ) {
           connectOptions = {};
-          await device.connect();
+          this.Log.debug('second try to reconnect without params');
+          try {
+            await device.connect();
+          } catch (e) {
+            this.Log.debug('last try to reconnect error: ', e);
+            // last try to reconnect device if this issue exists
+            // https://github.com/dotintent/react-native-ble-plx/issues/426
+            if (e.errorCode === BleErrorCode.OperationCancelled) {
+              this.Log.debug('last try to reconnect');
+              await device.cancelConnection();
+              await device.connect();
+            }
+          }
         } else {
           throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
         }
@@ -259,12 +278,18 @@ export default class ReactNativeBleTransport {
           infos = getInfosForServiceUuid(serviceUuid, 'classic');
           break;
         } catch (e) {
-          Log.error(e);
+          this.Log.error(e);
         }
       }
     }
 
     if (!infos) {
+      try {
+        this.Log.debug('cancel connection when service not found');
+        await device.cancelConnection();
+      } catch (e) {
+        this.Log.debug('cancel connection error when service not found: ', e.message || e.reason);
+      }
       throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
     }
 
@@ -310,8 +335,19 @@ export default class ReactNativeBleTransport {
     transport.nofitySubscription = this._monitorCharacteristic(transport.notifyCharacteristic);
     transportCache[uuid] = transport;
 
+    this.emitter?.emit('device-connect', {
+      name: device.name,
+      id: device.id,
+      connectId: device.id,
+    });
+
     const disconnectSubscription = device.onDisconnected(() => {
-      Log.debug('device disconnect: ', device?.id);
+      this.Log.debug('device disconnect: ', device?.id);
+      this.emitter?.emit('device-disconnect', {
+        name: device?.name,
+        id: device?.id,
+        connectId: device?.id,
+      });
       this.release(uuid);
       disconnectSubscription?.remove();
     });
@@ -324,7 +360,7 @@ export default class ReactNativeBleTransport {
     let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
       if (error) {
-        Log.debug(
+        this.Log.debug(
           `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
             error as unknown as string
           }`
@@ -336,7 +372,7 @@ export default class ReactNativeBleTransport {
               error.reason ?? error.message
             )
           );
-          Log.debug(': monitor notify error, and has unreleased Promise');
+          this.Log.debug(': monitor notify error, and has unreleased Promise');
         }
         return;
       }
@@ -368,13 +404,13 @@ export default class ReactNativeBleTransport {
           this.runPromise?.resolve(value.toString('hex'));
         }
       } catch (error) {
-        Log.debug('monitor data error: ', error);
+        this.Log.debug('monitor data error: ', error);
         this.runPromise?.reject(error);
       }
     });
 
     return () => {
-      Log.debug('remove characteristic monitor: ', characteristic.uuid);
+      this.Log.debug('remove characteristic monitor: ', characteristic.uuid);
       subscription.remove();
     };
   }
@@ -385,8 +421,9 @@ export default class ReactNativeBleTransport {
     if (transport) {
       delete transportCache[uuid];
       transport.nofitySubscription?.();
+      // Temporary close the Android disconnect after each request
       if (Platform.OS === 'android') {
-        await this.blePlxManager?.cancelDeviceConnection(uuid);
+        // await this.blePlxManager?.cancelDeviceConnection(uuid);
       }
     }
 
@@ -413,7 +450,7 @@ export default class ReactNativeBleTransport {
 
     this.runPromise = createDeferred();
     const messages = this._messages;
-    Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
+    this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
     const buffers = buildBuffers(messages, name, data);
 
     if (name === 'FirmwareUpload') {
@@ -426,13 +463,14 @@ export default class ReactNativeBleTransport {
         index += 1;
         if (chunk.offset === packetCapacity || index >= buffers.length) {
           chunk.reset();
-          Log.debug('send more packet hex strting: ', chunk.toString('hex'));
+          // Upgrading Packet Logs, Too much content to ignore
+          // this.Log.debug('send more packet hex strting: ', chunk.toString('hex'));
           try {
             await transport.writeCharacteristic.writeWithoutResponse(chunk.toString('base64'));
             chunk = ByteBuffer.allocate(packetCapacity);
           } catch (e) {
             this.runPromise = null;
-            Log.error('writeCharacteristic write error: ', e);
+            this.Log.error('writeCharacteristic write error: ', e);
             return;
           }
         }
@@ -440,15 +478,18 @@ export default class ReactNativeBleTransport {
     } else {
       for (const o of buffers) {
         const outData = o.toString('base64');
-        Log.debug('send hex strting: ', o.toString('hex'));
+        this.Log.debug('send hex strting: ', o.toString('hex'));
         try {
           await transport.writeCharacteristic.writeWithoutResponse(outData);
         } catch (e) {
+          this.Log.debug('writeCharacteristic write error: ', e);
+          this.runPromise = null;
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
           }
-          this.runPromise = null;
-          Log.debug('writeCharacteristic write error: ', e);
+          if (e.errorCode === BleErrorCode.OperationStartFailed) {
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, e.reason);
+          }
           return;
         }
       }
@@ -461,12 +502,12 @@ export default class ReactNativeBleTransport {
         throw new Error('Returning data is not string.');
       }
 
-      Log.debug('receive data: ', response);
+      this.Log.debug('receive data: ', response);
       const jsonData = receiveOne(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      Log.error('call error: ', e);
-      return e;
+      this.Log.error('call error: ', e);
+      throw e;
     } finally {
       this.runPromise = null;
     }
@@ -477,7 +518,7 @@ export default class ReactNativeBleTransport {
   }
 
   cancel() {
-    Log.debug('transport-react-native canceled');
+    this.Log.debug('transport-react-native canceled');
     if (this.runPromise) {
       // this.runPromise.reject(new Error('Transport_CallCanceled'));
     }

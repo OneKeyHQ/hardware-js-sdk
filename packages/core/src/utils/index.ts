@@ -1,5 +1,3 @@
-import { initLog, enableLog } from '@onekeyfe/hd-shared';
-
 export * from './assets';
 export * from './versionUtils';
 export * from './patch';
@@ -12,4 +10,4 @@ export {
 } from './deviceFeaturesUtils';
 export { getHDPath, getScriptType } from '../api/helpers/pathUtils';
 
-export { initLog, enableLog };
+export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';

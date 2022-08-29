@@ -42,6 +42,10 @@ import { stellarGetAddress } from './stellarGetAddress';
 import { stellarSignTransaction } from './stellarSignTransaction';
 import { cipherKeyValue } from './cipherKeyValue';
 import { firmwareUpdate } from './firmwareUpdate';
+import { getLogs } from './getLogs';
+import { deviceSupportFeatures } from './deviceSupportFeatures';
+import { requestWebUsbDevice } from './requestWebUsbDevice';
+import { getPassphraseState } from './getPassphraseState';
 
 export * from './export';
 
@@ -57,11 +61,14 @@ export type CoreApi = {
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
+  getLogs: typeof getLogs;
 
   /**
    * Core function
    */
   searchDevices: typeof searchDevices;
+
+  requestWebUsbDevice: typeof requestWebUsbDevice;
 
   getFeatures: typeof getFeatures;
 
@@ -83,8 +90,10 @@ export type CoreApi = {
   deviceReset: typeof deviceReset;
   deviceSettings: typeof deviceSettings;
   deviceUpdateReboot: typeof deviceUpdateReboot;
+  deviceSupportFeatures: typeof deviceSupportFeatures;
   deviceVerify: typeof deviceVerify;
   deviceWipe: typeof deviceWipe;
+  getPassphraseState: typeof getPassphraseState;
 
   evmGetAddress: typeof evmGetAddress;
   evmGetPublicKey: typeof evmGetPublicKey;

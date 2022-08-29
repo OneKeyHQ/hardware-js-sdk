@@ -18,6 +18,7 @@ export { default as deviceRecovery } from './device/DeviceRecovery';
 export { default as deviceReset } from './device/DeviceReset';
 export { default as deviceSettings } from './device/DeviceSettings';
 export { default as deviceUpdateReboot } from './device/DeviceUpdateReboot';
+export { default as deviceSupportFeatures } from './device/DeviceSupportFeatures';
 export { default as deviceVerify } from './device/DeviceVerify';
 export { default as deviceWipe } from './device/DeviceWipe';
 export { default as evmGetAddress } from './evm/EVMGetAddress';
@@ -43,3 +44,8 @@ export { default as stellarGetAddress } from './stellar/StellarGetAddress';
 export { default as stellarSignTransaction } from './stellar/StellarSignTransaction';
 
 export { default as firmwareUpdate } from './FirmwareUpdate';
+
+export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
+
+export { default as getPassphraseState } from './GetPassphraseState';
+export { default as getLogs } from './GetLogs';

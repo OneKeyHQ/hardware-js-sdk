@@ -41,6 +41,8 @@ export const inject = ({
     uiResponse,
 
     cancel,
+
+    getLogs: () => call({ method: 'getLogs' }),
     /**
      * 搜索设备
      */
@@ -71,7 +73,8 @@ export const inject = ({
      */
     checkBridgeStatus: () => call({ method: 'checkBridgeStatus' }),
 
-    cipherKeyValue: (connectId, params) => call({ ...params, connectId, method: 'cipherKeyValue' }),
+    cipherKeyValue: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
 
     deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
     deviceChangePin: (connectId, params) =>
@@ -82,56 +85,66 @@ export const inject = ({
     deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
     deviceSettings: (connectId, params) => call({ ...params, connectId, method: 'deviceSettings' }),
     deviceUpdateReboot: connectId => call({ connectId, method: 'deviceUpdateReboot' }),
+    deviceSupportFeatures: connectId => call({ connectId, method: 'deviceSupportFeatures' }),
     deviceVerify: (connectId, params) => call({ ...params, connectId, method: 'deviceVerify' }),
     deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
+    getPassphraseState: (connectId, params) =>
+      call({ ...params, connectId, method: 'getPassphraseState' }),
 
-    evmGetAddress: (connectId, params) => call({ ...params, connectId, method: 'evmGetAddress' }),
-    evmGetPublicKey: (connectId, params) =>
-      call({ ...params, connectId, method: 'evmGetPublicKey' }),
-    evmSignMessage: (connectId, params) => call({ ...params, connectId, method: 'evmSignMessage' }),
-    evmSignMessageEIP712: (connectId, params) =>
-      call({ ...params, connectId, method: 'evmSignMessageEIP712' }),
-    evmSignTransaction: (connectId, params) =>
-      call({ ...params, connectId, method: 'evmSignTransaction' }),
-    evmSignTypedData: (connectId, params) =>
-      call({ ...params, connectId, method: 'evmSignTypedData' }),
-    evmVerifyMessage: (connectId, params) =>
-      call({ ...params, connectId, method: 'evmVerifyMessage' }),
+    evmGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'evmGetAddress' }),
+    evmGetPublicKey: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'evmGetPublicKey' }),
+    evmSignMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'evmSignMessage' }),
+    evmSignMessageEIP712: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'evmSignMessageEIP712' }),
+    evmSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'evmSignTransaction' }),
+    evmSignTypedData: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'evmSignTypedData' }),
+    evmVerifyMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'evmVerifyMessage' }),
 
-    btcGetAddress: (connectId, params) => call({ ...params, connectId, method: 'btcGetAddress' }),
-    btcGetPublicKey: (connectId, params) =>
-      call({ ...params, connectId, method: 'btcGetPublicKey' }),
-    btcSignMessage: (connectId, params) => call({ ...params, connectId, method: 'btcSignMessage' }),
-    btcSignTransaction: (connectId, params) =>
-      call({ ...params, connectId, method: 'btcSignTransaction' }),
-    btcVerifyMessage: (connectId, params) =>
-      call({ ...params, connectId, method: 'btcVerifyMessage' }),
+    btcGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'btcGetAddress' }),
+    btcGetPublicKey: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'btcGetPublicKey' }),
+    btcSignMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'btcSignMessage' }),
+    btcSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'btcSignTransaction' }),
+    btcVerifyMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'btcVerifyMessage' }),
 
-    starcoinGetAddress: (connectId, params) =>
-      call({ ...params, connectId, method: 'starcoinGetAddress' }),
-    starcoinGetPublicKey: (connectId, params) =>
-      call({ ...params, connectId, method: 'starcoinGetPublicKey' }),
-    starcoinSignMessage: (connectId, params) =>
-      call({ ...params, connectId, method: 'starcoinSignMessage' }),
-    starcoinSignTransaction: (connectId, params) =>
-      call({ ...params, connectId, method: 'starcoinSignTransaction' }),
-    starcoinVerifyMessage: (connectId, params) =>
-      call({ ...params, connectId, method: 'starcoinVerifyMessage' }),
+    starcoinGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'starcoinGetAddress' }),
+    starcoinGetPublicKey: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'starcoinGetPublicKey' }),
+    starcoinSignMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'starcoinSignMessage' }),
+    starcoinSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'starcoinSignTransaction' }),
+    starcoinVerifyMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'starcoinVerifyMessage' }),
 
-    nemGetAddress: (connectId, params) => call({ ...params, connectId, method: 'nemGetAddress' }),
-    nemSignTransaction: (connectId, params) =>
-      call({ ...params, connectId, method: 'nemSignTransaction' }),
+    nemGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'nemGetAddress' }),
+    nemSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'nemSignTransaction' }),
 
-    solGetAddress: (connectId, params) => call({ ...params, connectId, method: 'solGetAddress' }),
-    solSignTransaction: (connectId, params) =>
-      call({ ...params, connectId, method: 'solSignTransaction' }),
+    solGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'solGetAddress' }),
+    solSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'solSignTransaction' }),
 
-    stellarGetAddress: (connectId, params) =>
-      call({ ...params, connectId, method: 'stellarGetAddress' }),
-    stellarSignTransaction: (connectId, params) =>
-      call({ ...params, connectId, method: 'stellarSignTransaction' }),
+    stellarGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'stellarGetAddress' }),
+    stellarSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'stellarSignTransaction' }),
 
     firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
+    requestWebUsbDevice: () => call({ method: 'requestWebUsbDevice' }),
   };
   return api;
 };

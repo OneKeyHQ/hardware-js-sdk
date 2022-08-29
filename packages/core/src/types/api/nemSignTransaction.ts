@@ -113,5 +113,6 @@ export type NEMSignTransactionParams = {
 
 export declare function nemSignTransaction(
   connectId: string,
+  deviceId: string,
   params: CommonParams & NEMSignTransactionParams
 ): Response<NEMSignedTx>;

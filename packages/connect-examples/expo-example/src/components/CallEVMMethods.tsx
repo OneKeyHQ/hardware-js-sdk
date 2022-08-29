@@ -1,4 +1,4 @@
-import { CoreApi } from '@onekeyfe/hd-core';
+import { CommonParams, CoreApi } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
@@ -6,10 +6,16 @@ import MethodInvoke from './MethodInvoke';
 type CallEVMMethodsProps = {
   SDK: CoreApi;
   selectedDevice: Device | null;
+  commonParams?: CommonParams;
 };
 
-export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMethodsProps) {
+export function CallEVMMethods({
+  SDK,
+  selectedDevice: currentDevice,
+  commonParams,
+}: CallEVMMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>EVM Method Test</Text>
@@ -20,7 +26,29 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.evmGetAddress(connectId, { ...data })}
+          onCall={data => SDK.evmGetAddress(connectId, deviceId, { ...commonParams, ...data })}
+        />
+
+        <MethodInvoke
+          title="evmGetAddress [bundle]"
+          options={[]}
+          onCall={data =>
+            SDK.evmGetAddress(connectId, deviceId, {
+              ...commonParams,
+              bundle: [
+                { path: "m/44'/60'/0'/0/10", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/11", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/12", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/13", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/14", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/15", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/16", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/17", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/18", showOnOneKey: false },
+                { path: "m/44'/60'/0'/0/19", showOnOneKey: false },
+              ],
+            })
+          }
         />
 
         <MethodInvoke
@@ -29,7 +57,7 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.evmGetPublicKey(connectId, { ...data })}
+          onCall={data => SDK.evmGetPublicKey(connectId, deviceId, { ...commonParams, ...data })}
         />
 
         <MethodInvoke
@@ -38,7 +66,9 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'messageHex', value: '0x6578616d706c65206d657373616765', type: 'string' },
           ]}
-          onCall={data => SDK.evmSignMessage(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.evmSignMessage(connectId, deviceId, { ...commonParams, ...data } as unknown as any)
+          }
         />
 
         <MethodInvoke
@@ -56,7 +86,12 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
               type: 'string',
             },
           ]}
-          onCall={data => SDK.evmSignMessageEIP712(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.evmSignMessageEIP712(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            } as unknown as any)
+          }
         />
 
         <MethodInvoke
@@ -104,7 +139,12 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
               type: 'number',
             },
           ]}
-          onCall={data => SDK.evmSignTransaction(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.evmSignTransaction(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            } as unknown as any)
+          }
         />
 
         <MethodInvoke
@@ -152,7 +192,12 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
               type: 'string',
             },
           ]}
-          onCall={data => SDK.evmSignTransaction(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.evmSignTransaction(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            } as unknown as any)
+          }
         />
 
         <MethodInvoke
@@ -176,7 +221,8 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
             },
           ]}
           onCall={data =>
-            SDK.evmSignTypedData(connectId, {
+            SDK.evmSignTypedData(connectId, deviceId, {
+              ...commonParams,
               ...data,
               data: {
                 types: {
@@ -230,7 +276,12 @@ export function CallEVMMethods({ SDK, selectedDevice: currentDevice }: CallEVMMe
               type: 'string',
             },
           ]}
-          onCall={data => SDK.evmVerifyMessage(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.evmVerifyMessage(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            } as unknown as any)
+          }
         />
       </View>
     </View>

@@ -5,6 +5,8 @@ import { DeviceEventMessage } from './device';
 import { IFrameEventMessage } from './iframe';
 import { UiEventMessage } from './ui-request';
 import { UiResponseMessage } from './ui-response';
+import { LogEventMessage } from './log';
+import { FirmwareMessage } from './firmware';
 
 export const CORE_EVENT = 'CORE_EVENT';
 
@@ -18,6 +20,8 @@ export type CoreMessage = {
   | UiResponseMessage
   | UiEventMessage
   | DeviceEventMessage
+  | LogEventMessage
+  | FirmwareMessage
 );
 
 export type PostMessageEvent = MessageEvent<any>;

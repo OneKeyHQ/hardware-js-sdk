@@ -1,8 +1,8 @@
 import HttpTransport from '@onekeyfe/hd-transport-http';
+import WebusbTransport from '@onekeyfe/hd-transport-webusb';
 import {
   PostMessageEvent,
   IFRAME,
-  initLog,
   parseMessage,
   DataManager,
   parseConnectSettings,
@@ -12,6 +12,8 @@ import {
   initCore,
   Core,
   CORE_EVENT,
+  getLogger,
+  LoggerNames,
 } from '@onekeyfe/hd-core';
 import { getOrigin } from '../utils/urlUtils';
 import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
@@ -19,7 +21,7 @@ import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
 import JSBridgeConfig from './bridge-config';
 
 let _core: Core | undefined;
-const Log = initLog('IFrame');
+const Log = getLogger(LoggerNames.Iframe);
 
 const handleMessage = (event: PostMessageEvent) => {
   if (event.source === window || !event.data) return;
@@ -44,7 +46,8 @@ export async function init(payload: IFrameInit['payload']) {
   Log.enabled = !!settings.debug;
 
   try {
-    _core = await initCore(settings, HttpTransport);
+    const Transport = settings.env === 'webusb' ? WebusbTransport : HttpTransport;
+    _core = await initCore(settings, Transport);
     _core?.on(CORE_EVENT, messages => sendMessage(messages, false));
   } catch (error) {
     return createErrorMessage(error);

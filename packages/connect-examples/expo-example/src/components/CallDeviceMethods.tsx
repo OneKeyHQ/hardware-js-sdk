@@ -101,6 +101,12 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
         />
 
         <MethodInvoke title="deviceWipe" options={[]} onCall={() => SDK.deviceWipe(connectId)} />
+
+        <MethodInvoke
+          title="deviceSupportFeatures"
+          options={[]}
+          onCall={() => SDK.deviceSupportFeatures(connectId)}
+        />
       </View>
     </View>
   );

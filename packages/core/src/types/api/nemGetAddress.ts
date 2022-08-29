@@ -13,10 +13,12 @@ export type NEMGetAddressParams = {
 
 export declare function nemGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & NEMGetAddressParams
 ): Response<NEMAddress>;
 
 export declare function nemGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: NEMGetAddressParams[] }
 ): Response<Array<NEMAddress>>;

@@ -9,5 +9,6 @@ export type StarcoinVerifyMessageParams = {
 
 export declare function starcoinVerifyMessage(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StarcoinVerifyMessageParams
 ): Response<Success>;

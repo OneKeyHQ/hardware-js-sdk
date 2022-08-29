@@ -1,7 +1,6 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
   parseConnectSettings,
-  initLog,
   enableLog,
   PostMessageEvent,
   IFRAME,
@@ -11,14 +10,21 @@ import HardwareSdk, {
   CoreMessage,
   ConnectSettings,
   UiResponseEvent,
+  LOG_EVENT,
+  setLoggerPostMessage,
+  getLogger,
+  LoggerNames,
+  FIRMWARE_EVENT,
+  DEVICE_EVENT,
+  DEVICE,
 } from '@onekeyfe/hd-core';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
-import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
+import { sendMessage, createJsBridge, hostBridge, resetListenerFlag } from './utils/bridgeUtils';
 
 const eventEmitter = new EventEmitter();
-const Log = initLog('@onekey/connect');
+const Log = getLogger(LoggerNames.Connect);
 
 let _settings = parseConnectSettings();
 
@@ -33,6 +39,21 @@ const handleMessage = async (message: CoreMessage) => {
       // pass UI event up
       eventEmitter.emit(message.event, message);
       eventEmitter.emit(message.type, message.payload);
+      break;
+
+    case LOG_EVENT:
+    case FIRMWARE_EVENT:
+      eventEmitter.emit(message.event, message);
+      break;
+
+    case DEVICE_EVENT:
+      if (
+        (
+          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+        ).includes(message.type)
+      ) {
+        eventEmitter.emit(message.type, message.payload);
+      }
       break;
 
     default:
@@ -59,11 +80,13 @@ const cancel = (connectId?: string) => {
   sendMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
 };
 
+let prevFrameInstance: Window | null | undefined = null;
 const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
     return;
   }
-  if (!hostBridge) {
+  if (!hostBridge || prevFrameInstance !== iframe.instance?.contentWindow) {
+    resetListenerFlag();
     createJsBridge({
       isHost: true,
       remoteFrame: iframe.instance?.contentWindow as Window,
@@ -74,12 +97,18 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
-        console.log('Host Bridge Receive message: ', message);
+        if (message.event !== 'LOG_EVENT') {
+          Log.debug('Host Bridge Receive message: ', message);
+        }
         const response = await handleMessage(message);
-        Log.debug('Host Bridge response: ', response);
+        if (message.event !== 'LOG_EVENT') {
+          Log.debug('Host Bridge response: ', response);
+        }
         return response;
       },
     });
+
+    prevFrameInstance = iframe.instance?.contentWindow;
   }
 };
 
@@ -91,6 +120,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
   _settings = parseConnectSettings({ ..._settings, ...settings });
 
   enableLog(!!settings.debug);
+  setLoggerPostMessage(handleMessage);
 
   Log.debug('init');
 
@@ -108,12 +138,17 @@ const init = async (settings: Partial<ConnectSettings>) => {
 
 const call = async (params: any) => {
   Log.debug('call : ', params);
-  // lazy load
+  /**
+   * Try to recreate iframe if it's initialize failed
+   */
   if (!iframe.instance && !iframe.timeout) {
     _settings = parseConnectSettings(_settings);
+    Log.debug("Try to recreate iframe if it's initialize failed: ", _settings);
     try {
-      init(_settings);
+      await init(_settings);
+      Log.debug('Recreate iframe success');
     } catch (error) {
+      Log.debug('Recreate iframe failed: ', error);
       return createErrorMessage(error);
     }
   }
@@ -131,7 +166,11 @@ const call = async (params: any) => {
     return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse));
   } catch (error) {
     Log.error('__call error: ', error);
-    return createErrorMessage(error);
+    let err = error;
+    if (!(err instanceof HardwareError)) {
+      err = ERRORS.CreateErrorByMessage(error.message);
+    }
+    return createErrorMessage(err);
   }
 };
 

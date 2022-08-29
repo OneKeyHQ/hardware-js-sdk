@@ -1,11 +1,12 @@
 import EventEmitter from 'events';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
-import { createDeferred, Deferred, HardwareErrorCode, ERRORS } from '@onekeyfe/hd-shared';
-
-import DeviceConnector from './DeviceConnector';
-import { DeviceCommands } from './DeviceCommands';
-
-import { initLog } from '../utils';
+import {
+  createDeferred,
+  Deferred,
+  HardwareErrorCode,
+  ERRORS,
+  HardwareError,
+} from '@onekeyfe/hd-shared';
 import {
   getDeviceFirmwareVersion,
   getDeviceLabel,
@@ -13,28 +14,42 @@ import {
   getDeviceUUID,
   getDeviceBLEFirmwareVersion,
   getDeviceTypeOnBootloader,
+  getPassphraseState,
 } from '../utils/deviceFeaturesUtils';
+
+import type DeviceConnector from './DeviceConnector';
+// eslint-disable-next-line import/no-cycle
+import { DeviceCommands } from './DeviceCommands';
+
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
-import { DEVICE, DeviceButtonRequestPayload } from '../events';
+import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
+import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
 
-type RunOptions = {
-  keepSession?: boolean;
+export type InitOptions = {
+  initSession?: boolean;
+  deviceId?: string;
+  passphraseState?: string;
 };
+
+export type RunOptions = {
+  keepSession?: boolean;
+} & InitOptions;
 
 const parseRunOptions = (options?: RunOptions): RunOptions => {
   if (!options) options = {};
   return options;
 };
 
-const Log = initLog('Device');
+const Log = getLogger(LoggerNames.Device);
 
 export interface DeviceEvents {
   [DEVICE.PIN]: [Device, PROTO.PinMatrixRequestType | undefined, (err: any, pin: string) => void];
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
+  [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
 }
 
 export interface Device {
@@ -42,6 +57,8 @@ export interface Device {
   off<K extends keyof DeviceEvents>(type: K, listener: (...event: DeviceEvents[K]) => void): this;
   emit<K extends keyof DeviceEvents>(type: K, ...args: DeviceEvents[K]): boolean;
 }
+
+const deviceSessionCache: Record<string, string> = {};
 
 export class Device extends EventEmitter {
   /**
@@ -93,6 +110,8 @@ export class Device extends EventEmitter {
    * 执行 API 方法后是否保留 SessionID
    */
   keepSession = false;
+
+  passphraseState: string | undefined = undefined;
 
   constructor(descriptor: DeviceDescriptor) {
     super();
@@ -186,7 +205,7 @@ export class Device extends EventEmitter {
       }
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
-        this.commands.dispose();
+        await this.commands.dispose(false);
       }
 
       this.commands = new DeviceCommands(this, this.mainId ?? '');
@@ -207,7 +226,7 @@ export class Device extends EventEmitter {
       (this.mainId && env === 'react-native')
     ) {
       if (this.commands) {
-        this.commands.dispose();
+        this.commands.dispose(false);
         if (this.commands.callPromise) {
           try {
             await this.commands.callPromise;
@@ -231,22 +250,80 @@ export class Device extends EventEmitter {
     return this.commands;
   }
 
-  getInternalState() {
-    return this.internalState[this.instance];
+  getInternalState(_deviceId?: string) {
+    Log.debug(
+      'getInternalState session param: ',
+      `device_id: ${_deviceId}`,
+      `features.device_id: ${this.features?.device_id}`,
+      `passphraseState: ${this.passphraseState}`
+    );
+    Log.debug('getInternalState session cache: ', deviceSessionCache);
+
+    const deviceId = _deviceId || this.features?.device_id;
+    if (!deviceId) return undefined;
+
+    const key = `${deviceId}`;
+    const usePassKey = `${deviceId}@${this.passphraseState}`;
+    // When creating a wallet, use device_id as the key
+    const session = deviceSessionCache[key] ?? deviceSessionCache[usePassKey];
+    return this.passphraseState ? session : undefined;
   }
 
-  async initialize() {
-    let payload: any;
-    if (this.features) {
-      const internalState = this.getInternalState();
-      payload = {};
-      if (internalState) {
-        payload.session_id = internalState;
-      }
+  setInternalState(state: string, initSession?: boolean) {
+    Log.debug(
+      'setInternalState session param: ',
+      `state: ${state}`,
+      `initSession: ${initSession}`,
+      `device_id: ${this.features?.device_id}`,
+      `passphraseState: ${this.passphraseState}`
+    );
+
+    if (!this.features) return;
+    if (!this.passphraseState && !initSession) return;
+
+    let key = `${this.features.device_id}`;
+    if (this.passphraseState) {
+      key += `@${this.passphraseState}`;
+    }
+    if (state) {
+      deviceSessionCache[key] = state;
+    }
+    Log.debug('setInternalState done session cache: ', deviceSessionCache);
+  }
+
+  clearInternalState(_deviceId?: string) {
+    Log.debug('clearInternalState param: ', _deviceId);
+
+    const deviceId = _deviceId || this.features?.device_id;
+    if (!deviceId) return;
+    const key = `${deviceId}`;
+    delete deviceSessionCache[key];
+
+    if (this.passphraseState) {
+      const usePassKey = `${deviceId}@${this.passphraseState}`;
+      delete deviceSessionCache[usePassKey];
+    }
+  }
+
+  async initialize(options?: InitOptions) {
+    Log.debug('initialize param:', options);
+
+    this.passphraseState = options?.passphraseState;
+
+    if (options?.initSession) {
+      this.clearInternalState(options?.deviceId);
     }
 
+    const internalState = this.getInternalState(options?.deviceId);
+    const payload: any = {};
+    if (internalState) {
+      payload.session_id = internalState;
+    }
+
+    Log.debug('initialize payload:', payload);
+
     const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
-    this._updateFeatures(message);
+    this._updateFeatures(message, options?.initSession);
   }
 
   async getFeatures() {
@@ -254,15 +331,19 @@ export class Device extends EventEmitter {
     this._updateFeatures(message);
   }
 
-  _updateFeatures(feat: Features) {
+  _updateFeatures(feat: Features, initSession?: boolean) {
     // GetFeatures doesn't return 'session_id'
     if (this.features && this.features.session_id && !feat.session_id) {
       feat.session_id = this.features.session_id;
+    }
+    if (this.features && this.features.device_id && feat.session_id) {
+      this.setInternalState(feat.session_id, initSession);
     }
     feat.unlocked = feat.unlocked || true;
 
     this.features = feat;
     this.featuresNeedsReload = false;
+    this.emit(DEVICE.FEATURES, this, feat);
   }
 
   /**
@@ -298,7 +379,7 @@ export class Device extends EventEmitter {
 
   async run(fn?: () => Promise<void>, options?: RunOptions) {
     if (this.runPromise) {
-      this.interruption();
+      await this.interruptionFromOutside();
       Log.debug('[Device] run error:', 'Device is running, but will cancel previous operate');
     }
 
@@ -310,19 +391,25 @@ export class Device extends EventEmitter {
 
   async _runInner<T>(fn: (() => Promise<T>) | undefined, options: RunOptions) {
     if (!this.isUsedHere() || this.commands.disposed) {
-      await this.acquire();
-      try {
-        if (fn) {
-          await this.initialize();
+      const env = DataManager.getSettings('env');
+      if (env !== 'react-native') {
+        await this.acquire();
+        try {
+          if (fn) {
+            await this.initialize(options);
+          }
+        } catch (error) {
+          this.runPromise = null;
+          if (error instanceof HardwareError) {
+            return Promise.reject(error);
+          }
+          return Promise.reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.DeviceInitializeFailed,
+              `Initialize failed: ${error.message as string}, code: ${error.code as string}`
+            )
+          );
         }
-      } catch (error) {
-        this.runPromise = null;
-        return Promise.reject(
-          ERRORS.TypedError(
-            HardwareErrorCode.DeviceInitializeFailed,
-            `Initialize failed: ${error.message as string}, code: ${error.code as string}`
-          )
-        );
       }
     }
 
@@ -331,7 +418,16 @@ export class Device extends EventEmitter {
     }
 
     if (fn) {
-      await fn();
+      try {
+        await fn();
+      } catch (e) {
+        if (this.runPromise) {
+          this.runPromise.reject(e);
+        }
+
+        this.runPromise = null;
+        return;
+      }
     }
 
     if (
@@ -350,12 +446,21 @@ export class Device extends EventEmitter {
     this.runPromise = null;
   }
 
-  interruption() {
+  async interruptionFromOutside() {
     if (this.commands) {
-      this.commands.dispose();
+      await this.commands.dispose(false);
     }
     if (this.runPromise) {
       this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside));
+    }
+  }
+
+  async interruptionFromUser() {
+    if (this.commands) {
+      await this.commands.dispose(true);
+    }
+    if (this.runPromise) {
+      this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser));
     }
   }
 
@@ -428,6 +533,41 @@ export class Device extends EventEmitter {
       }
     }
     return null;
+  }
+
+  hasUsePassphrase() {
+    const isModeT =
+      getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
+    const preCheckTouch = isModeT && this.features?.unlocked === true;
+
+    return this.features && (!!this.features.passphrase_protection || preCheckTouch);
+  }
+
+  checkDeviceId(deviceId: string) {
+    if (this.features) {
+      return this.features.device_id === deviceId;
+    }
+    return false;
+  }
+
+  async checkPassphraseState() {
+    if (!this.features) return false;
+    const locked = this.features?.unlocked === true;
+    const isModeT =
+      getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
+
+    const newState = await getPassphraseState(this.features, this.commands);
+
+    // if Touch/Pro was locked before, refresh the passphrase state
+    if (isModeT && locked) {
+      await this.getFeatures();
+    }
+
+    // When exists passphraseState, check passphraseState
+    if (this.passphraseState && this.passphraseState !== newState) {
+      this.clearInternalState();
+      return newState;
+    }
   }
 }
 

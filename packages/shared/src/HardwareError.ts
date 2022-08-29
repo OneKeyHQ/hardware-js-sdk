@@ -1,6 +1,7 @@
 export interface IHardwareError {
   errorCode: ValueOf<typeof HardwareErrorCode>;
   message?: string;
+  params?: any;
 }
 
 type ValueOf<P extends object> = P[keyof P];
@@ -10,6 +11,7 @@ type HardwareErrorCodeMessageMapping = { [P in ValueOf<typeof HardwareErrorCode>
 type ErrorCodeUnion = ValueOf<typeof HardwareErrorCode>;
 
 function fillStringWithArguments(value: string, object: object) {
+  if (typeof value !== 'string') return value;
   return value.replace(/\{([^}]+)\}/g, (_, arg: string) => (object as unknown as any)[arg] || '?');
 }
 
@@ -17,6 +19,8 @@ export class HardwareError extends Error {
   errorCode: ErrorCodeUnion = HardwareErrorCode.UnknownError;
 
   message = '';
+
+  params: any = {};
 
   constructor(hardwareError: IHardwareError | string) {
     super();
@@ -31,6 +35,7 @@ export class HardwareError extends Error {
       if (message) {
         this.message = fillStringWithArguments(message, hardwareError);
       }
+      this.params = hardwareError.params;
       this.errorCode = hardwareError.errorCode;
     }
 
@@ -86,6 +91,37 @@ export const HardwareErrorCode = {
   DeviceUnexpectedBootloaderMode: 108,
 
   /**
+   * Device interrupted from user
+   */
+  DeviceInterruptedFromUser: 109,
+
+  /**
+   * Check device id is same
+   */
+  DeviceCheckDeviceIdError: 110,
+
+  /**
+   * Do not support passphrase
+   * @params: { require: string }
+   */
+  DeviceNotSupportPassphrase: 111,
+
+  /*
+   * Device passphrase state error
+   */
+  DeviceCheckPassphraseStateError: 112,
+
+  /**
+   * use passphrase, but passphrase is not opened
+   */
+  DeviceNotOpenedPassphrase: 113,
+
+  /**
+   * not use passphrase, but passphrase is opened
+   */
+  DeviceOpenedPassphrase: 114,
+
+  /**
    * Not initialized
    */
   NotInitialized: 200,
@@ -136,6 +172,18 @@ export const HardwareErrorCode = {
   FirmwareUpdateDownloadFailed: 406,
 
   /**
+   * Call method not supported, need update firmware
+   * @params: { current: string, require: string }
+   */
+  CallMethodNeedUpgradeFirmware: 407,
+
+  /**
+   * Call method not supported, is deprecated
+   * @params: { current: string, deprecated: string }
+   */
+  CallMethodDeprecated: 408,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -173,6 +221,8 @@ export const HardwareErrorCode = {
   BleCharacteristicNotFound: 707,
   BleMonitorError: 708,
   BleCharacteristicNotifyError: 709,
+  BleWriteCharacteristicError: 710,
+  BleAlreadyConnected: 711,
 
   /**
    * Hardware runtiome errors
@@ -208,6 +258,31 @@ export const HardwareErrorCode = {
    * bridge network error
    */
   BridgeNetworkError: 806,
+
+  /**
+   * Bridge network timeout
+   */
+  BridgeTimeoutError: 807,
+
+  /**
+   * Bridge not installed
+   */
+  BridgeNotInstalled: 808,
+
+  /**
+   * ensure connect timeout
+   */
+  PollingTimeout: 809,
+
+  /**
+   * ensure connect stop polling
+   */
+  PollingStop: 810,
+
+  /**
+   * Device does not open blid sign
+   */
+  BlindSignDisabled: 811,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -223,7 +298,13 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceNotFound]: 'Device not found',
   [HardwareErrorCode.DeviceInitializeFailed]: 'Device initialization failed',
   [HardwareErrorCode.DeviceInterruptedFromOutside]: 'Device interrupted',
+  [HardwareErrorCode.DeviceInterruptedFromUser]: 'Device interrupted',
   [HardwareErrorCode.DeviceUnexpectedBootloaderMode]: 'Device should be in bootloader mode',
+  [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
+  [HardwareErrorCode.DeviceNotSupportPassphrase]: 'Device not support passphrase',
+  [HardwareErrorCode.DeviceCheckPassphraseStateError]: 'Device passphrase state error',
+  [HardwareErrorCode.DeviceNotOpenedPassphrase]: 'Device not opened passphrase',
+  [HardwareErrorCode.DeviceOpenedPassphrase]: 'Device opened passphrase',
 
   /**
    * Node Errors
@@ -245,6 +326,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.CallMethodNotResponse]: 'Method does not responding',
   [HardwareErrorCode.CallMethodInvalidParameter]: 'Call method invalid parameter',
   [HardwareErrorCode.FirmwareUpdateDownloadFailed]: 'Firmware update download failed',
+  [HardwareErrorCode.CallMethodNeedUpgradeFirmware]: 'Call method need upgrade firmware',
+  [HardwareErrorCode.CallMethodDeprecated]: 'Call method is deprecated',
 
   /**
    * Network Errors
@@ -272,6 +355,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleCharacteristicNotFound]: 'BLEServiceNotFound: service not found',
   [HardwareErrorCode.BleMonitorError]: 'Monitor Error: characteristic not found',
   [HardwareErrorCode.BleCharacteristicNotifyError]: 'Characteristic Notify Error',
+  [HardwareErrorCode.BleWriteCharacteristicError]: 'Write Characteristic Error',
+  [HardwareErrorCode.BleAlreadyConnected]: 'Already connected to device',
 
   /**
    * Runtime Error
@@ -283,21 +368,43 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FirmwareError]: 'Firmware installation failed',
   [HardwareErrorCode.ResponseUnexpectTypeError]: 'Response type is not expected',
   [HardwareErrorCode.BridgeNetworkError]: 'Bridge network error',
+  [HardwareErrorCode.BridgeTimeoutError]: 'Bridge network timeout',
+  [HardwareErrorCode.BridgeNotInstalled]: 'Bridge not installed',
+  [HardwareErrorCode.PollingTimeout]: 'Polling timeout',
+  [HardwareErrorCode.PollingStop]: 'Polling stop',
+  [HardwareErrorCode.BlindSignDisabled]: 'Please confirm the BlindSign enabled',
 } as const;
 
-export const TypedError = (hardwareError: ErrorCodeUnion | string, message?: string) => {
+export const TypedError = (
+  hardwareError: ErrorCodeUnion | string,
+  message?: string,
+  params?: any
+) => {
   if (typeof hardwareError === 'string') {
     return new HardwareError(hardwareError);
   }
-  return new HardwareError({ errorCode: hardwareError, message: message ?? '' });
+  return new HardwareError({ errorCode: hardwareError, message: message ?? '', params });
 };
 
 export const serializeError = (payload: any) => {
   if (payload && payload.error instanceof HardwareError) {
-    return { error: payload.error.message, code: payload.error.errorCode };
+    return {
+      error: payload.error.message,
+      code: payload.error.errorCode,
+      params: payload.error.params,
+    };
   }
   if (payload && payload.error instanceof Error) {
     return { error: payload.error.message, code: payload.error.code };
   }
   return payload;
+};
+
+export const CreateErrorByMessage = (message: string): HardwareError => {
+  for (const code of Object.values(HardwareErrorCode)) {
+    if (HardwareErrorCodeMessage[code] === message) {
+      return TypedError(code);
+    }
+  }
+  return new HardwareError(message);
 };

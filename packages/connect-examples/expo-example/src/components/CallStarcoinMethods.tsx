@@ -1,4 +1,4 @@
-import { CoreApi, PROTO } from '@onekeyfe/hd-core';
+import { CommonParams, CoreApi, PROTO } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
@@ -6,13 +6,16 @@ import MethodInvoke from './MethodInvoke';
 type CallStarcoinMethodsProps = {
   SDK: CoreApi;
   selectedDevice: Device | null;
+  commonParams?: CommonParams;
 };
 
 export function CallStarcoinMethods({
   SDK,
   selectedDevice: currentDevice,
+  commonParams,
 }: CallStarcoinMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>Starcoin Method Test</Text>
@@ -23,7 +26,7 @@ export function CallStarcoinMethods({
             { name: 'path', value: "m/44'/101010'/0'/0'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.starcoinGetAddress(connectId, { ...data })}
+          onCall={data => SDK.starcoinGetAddress(connectId, deviceId, { ...commonParams, ...data })}
         />
 
         <MethodInvoke
@@ -32,7 +35,9 @@ export function CallStarcoinMethods({
             { name: 'path', value: "m/44'/101010'/0'/0'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.starcoinGetPublicKey(connectId, { ...data })}
+          onCall={data =>
+            SDK.starcoinGetPublicKey(connectId, deviceId, { ...commonParams, ...data })
+          }
         />
 
         <MethodInvoke
@@ -45,7 +50,9 @@ export function CallStarcoinMethods({
               type: 'string',
             },
           ]}
-          onCall={data => SDK.starcoinSignMessage(connectId, { ...data } as any)}
+          onCall={data =>
+            SDK.starcoinSignMessage(connectId, deviceId, { ...commonParams, ...data })
+          }
         />
 
         <MethodInvoke
@@ -68,7 +75,12 @@ export function CallStarcoinMethods({
               type: 'string',
             },
           ]}
-          onCall={data => SDK.starcoinVerifyMessage(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.starcoinVerifyMessage(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            } as unknown as any)
+          }
         />
 
         <MethodInvoke
@@ -77,7 +89,12 @@ export function CallStarcoinMethods({
             { name: 'path', value: "m/44'/101010'/0'/0'/0'", type: 'string' },
             { name: 'rawTx', value: undefined, type: 'string' },
           ]}
-          onCall={data => SDK.starcoinSignTransaction(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.starcoinSignTransaction(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            } as unknown as any)
+          }
         />
       </View>
     </View>

@@ -1,7 +1,8 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
-import { initLog, patchFeatures } from '../utils';
+import DataManager from '../data-manager/DataManager';
+import { patchFeatures, getLogger, LoggerNames } from '../utils';
 import type { Device } from './Device';
 import { DEVICE } from '../events';
 
@@ -32,7 +33,7 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
   }
 };
 
-const Log = initLog('DeviceCommands');
+const Log = getLogger(LoggerNames.DeviceCommands);
 
 export class DeviceCommands {
   device: Device;
@@ -54,13 +55,13 @@ export class DeviceCommands {
     this.disposed = false;
   }
 
-  dispose() {
+  async dispose(cancelRequest: boolean) {
     this.disposed = true;
-    if (this._cancelableRequest) {
+    if (cancelRequest && this._cancelableRequest) {
       this._cancelableRequest();
     }
     this._cancelableRequest = undefined;
-    this.transport.cancel?.();
+    await this.transport.cancel?.();
   }
 
   // Sends an async message to the opened device.
@@ -68,7 +69,7 @@ export class DeviceCommands {
     type: MessageKey,
     msg: DefaultMessageResponse['message'] = {}
   ): Promise<DefaultMessageResponse> {
-    console.log('[DeviceCommands] [call] Sending', type);
+    Log.debug('[DeviceCommands] [call] Sending', type);
 
     try {
       const promise = this.transport.call(this.mainId, type, msg) as any;
@@ -117,7 +118,7 @@ export class DeviceCommands {
       // Bridge may have some unread message in buffer, read it
       // await this.transport.read?.(this.mainId);
 
-      console.log('DeviceCommands typedcall error: ', error);
+      Log.debug('DeviceCommands typedcall error: ', error);
 
       // throw bridge network error
       if (error instanceof HardwareError) {
@@ -140,7 +141,7 @@ export class DeviceCommands {
   }
 
   _filterCommonTypes(res: DefaultMessageResponse): Promise<DefaultMessageResponse> {
-    console.log('_filterCommonTypes: ', res);
+    Log.debug('_filterCommonTypes: ', res);
     if (res.type === 'Failure') {
       const { code } = res.message;
       const { message } = res.message;
@@ -160,6 +161,10 @@ export class DeviceCommands {
 
       if (code === 'Failure_PinCancelled') {
         error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
+      }
+
+      if (code === 'Failure_DataError' && message === 'Please confirm the BlindSign enabled') {
+        error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
       }
 
       if (error) {
@@ -192,7 +197,14 @@ export class DeviceCommands {
       // TODO: EntropyRequest
     }
 
+    const isWebusbEnv = DataManager.getSettings('env') === 'webusb';
+
     if (res.type === 'PinMatrixRequest') {
+      if (isWebusbEnv) {
+        return Promise.reject(
+          ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Please unlock your device')
+        );
+      }
       return this._promptPin(res.message.type).then(
         pin => {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
@@ -206,7 +218,19 @@ export class DeviceCommands {
     }
 
     if (res.type === 'PassphraseRequest') {
-      // TODO: PassphraseRequest
+      /**
+       * Temporary, do not support passphrase
+       */
+      // return this._commonCall('PassphraseAck', { passphrase: '' });
+      return Promise.reject(
+        ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotSupportPassphrase,
+          'Device not support passphrase',
+          {
+            require: '2.4.0',
+          }
+        )
+      );
     }
 
     // TT fw lower than 2.3.0, device send his current state

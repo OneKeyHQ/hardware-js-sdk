@@ -24,3 +24,14 @@ export const getBondedDevices = async () => {
     return { id, name, ...advertising };
   });
 };
+
+export const refreshCache = async (peripheralId: string) => {
+  try {
+    await BleManager.connect(peripheralId);
+    await BleManager.refreshCache(peripheralId);
+    await BleManager.disconnect(peripheralId, true);
+    console.log('refreshCache success');
+  } catch (error) {
+    console.log('refreshCache error: ', error);
+  }
+};

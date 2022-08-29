@@ -1,5 +1,25 @@
 export interface CommonParams {
   keepSession?: boolean;
+  /**
+   * polling connect max retry count
+   */
+  retryCount?: number;
+  /**
+   * polling interval time
+   */
+  pollIntervalTime?: number;
+  /**
+   * Timeout time for single polling
+   */
+  timeout?: number;
+  /**
+   * passphrase state
+   */
+  passphraseState?: string;
+  /**
+   * Every init session
+   */
+  initSession?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

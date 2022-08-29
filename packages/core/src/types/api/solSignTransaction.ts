@@ -12,10 +12,12 @@ export type SolanaSignTransactionParams = {
 
 export declare function solSignTransaction(
   connectId: string,
+  deviceId: string,
   params: CommonParams & SolanaSignTransactionParams
 ): Response<SolanaSignedTx>;
 
 export declare function solSignTransaction(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: SolanaSignTransactionParams[] }
 ): Response<Array<SolanaSignedTx>>;

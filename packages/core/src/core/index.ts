@@ -1,12 +1,19 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import { Features, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Device, DeviceEvents } from '../device/Device';
+import {
+  getDeviceFirmwareVersion,
+  getDeviceModel,
+  getDeviceType,
+  supportNewPassphrase,
+} from '../utils/deviceFeaturesUtils';
+import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
+import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { initLog, enableLog } from '../utils';
+import { enableLog, getLogger, LoggerNames, setLoggerPostMessage } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,
@@ -25,22 +32,31 @@ import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
-import {
-  getDeviceFirmwareVersion,
-  getDeviceModel,
-  getDeviceType,
-} from '../utils/deviceFeaturesUtils';
 
-const Log = initLog('Core');
+const Log = getLogger(LoggerNames.Core);
+
+const parseInitOptions = (method?: BaseMethod): InitOptions => ({
+  initSession: method?.payload.initSession,
+  passphraseState: method?.payload.passphraseState,
+  deviceId: method?.payload.deviceId,
+});
 
 let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
 let _callPromise: Deferred<any> | undefined;
-const callApiQueue = [];
+const callApiQueue: BaseMethod[] = [];
 
 const deviceCacheMap = new Map<string, Device>();
+let pollingId = 1;
+const pollingState: Record<number, boolean> = {};
+
+let preConnectCache: {
+  passphraseState: string | undefined;
+} = {
+  passphraseState: undefined,
+};
 
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
@@ -59,6 +75,8 @@ export const callAPI = async (message: CoreMessage) => {
     return Promise.reject(error);
   }
 
+  DevicePool.emitter.on(DEVICE.CONNECT, onDeviceConnectHandler);
+
   if (!method.useDevice) {
     try {
       const response = await method.run();
@@ -71,32 +89,45 @@ export const callAPI = async (message: CoreMessage) => {
   // push method to queue
   callApiQueue.push(method);
 
-  // update DeviceList every call and first configure transport messages
-  try {
-    await initDeviceList(method);
-  } catch (error) {
-    return Promise.reject(error);
+  if (callApiQueue.length > 1) {
+    Log.debug(
+      'should cancel the previous method execution: ',
+      callApiQueue.map(m => m.name)
+    );
   }
 
-  const env = DataManager.getSettings('env');
+  const connectStateChange = preConnectCache.passphraseState !== method.payload.passphraseState;
+
+  preConnectCache = {
+    passphraseState: method.payload.passphraseState,
+  };
+
+  if (connectStateChange || method.payload.initSession) {
+    Log.debug('passphrase state change, clear device cache');
+    DevicePool.clearDeviceCache(method.payload.connectId);
+  }
+
+  /**
+   * Polling to ensure successful connection
+   */
+  if (pollingState[pollingId]) {
+    pollingState[pollingId] = false;
+  }
+  pollingId += 1;
   let device: Device;
   try {
-    if (env === 'react-native') {
-      device = initDeviceForBle(method);
-    } else {
-      device = initDevice(method);
-    }
-  } catch (error) {
-    return Promise.reject(error);
+    device = await ensureConnected(method, pollingId);
+  } catch (e) {
+    return createResponseMessage(method.responseID, false, { error: e });
   }
 
-  Log.debug('Call API - setDevice: ', device);
+  Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
 
   device.on(DEVICE.PIN, onDevicePinHandler);
-  device.on(DEVICE.BUTTON, (d, code) => {
-    onDeviceButtonHandler(d, code);
-  });
+  device.on(DEVICE.BUTTON, onDeviceButtonHandler);
+  device.on(DEVICE.PASSPHRASE_ON_DEVICE, onDevicePassphraseHandler);
+  device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
 
   try {
     const inner = async (): Promise<void> => {
@@ -114,20 +145,22 @@ export const callAPI = async (message: CoreMessage) => {
         if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
           return Promise.reject(
             ERRORS.TypedError(
-              HardwareErrorCode.DeviceFwException,
-              `Device firmware version is too low, please update to ${versionRange.min}`
+              HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+              `Device firmware version is too low, please update to ${versionRange.min}`,
+              { current: currentVersion, require: versionRange.min }
             )
           );
         }
         if (
           versionRange.max &&
           semver.valid(versionRange.max) &&
-          semver.gt(currentVersion, versionRange.max)
+          semver.gte(currentVersion, versionRange.max)
         ) {
           return Promise.reject(
             ERRORS.TypedError(
-              HardwareErrorCode.DeviceFwException,
-              `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`
+              HardwareErrorCode.CallMethodDeprecated,
+              `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
+              { current: currentVersion, deprecated: versionRange.max }
             )
           );
         }
@@ -149,14 +182,58 @@ export const callAPI = async (message: CoreMessage) => {
         );
       }
 
-      // const deviceTypeException = method.checkDeviceType();
-      // if (deviceTypeException) {
-      //   return Promise.reject(ERRORS.TypedError('Not_Use_Onekey_Device'));
-      // }
+      if (method.deviceId && method.checkDeviceId) {
+        const isSameDeviceID = device.checkDeviceId(method.deviceId);
+        if (!isSameDeviceID) {
+          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckDeviceIdError));
+        }
+      }
+
+      /**
+       * check firmware release info
+       */
+      method.checkFirmwareRelease();
+
+      /**
+       * check additional supported feature
+       */
+      method.checkDeviceSupportFeature();
 
       // reconfigure messages
       if (_deviceList) {
         await TransportManager.reconfigure(device.getFirmwareVersion());
+      }
+
+      // Check to see if it is safe to use Passphrase
+      checkPassphraseSafety(method, device.features);
+
+      if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
+        // check version
+        const support = supportNewPassphrase(device.features);
+        if (!support.support) {
+          return Promise.reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.DeviceNotSupportPassphrase,
+              `Device not support passphrase, please update to ${support.require}`,
+              {
+                require: support.require,
+              }
+            )
+          );
+        }
+
+        // Check Device passphrase State
+        const passphraseState = await device.checkPassphraseState();
+
+        // Double check, handles the special case of Touch/Pro
+        checkPassphraseSafety(method, device.features);
+
+        if (passphraseState) {
+          DevicePool.clearDeviceCache(method.payload.connectId);
+          return Promise.reject(
+            ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
+          );
+        }
       }
 
       try {
@@ -170,14 +247,19 @@ export const callAPI = async (message: CoreMessage) => {
         _callPromise?.resolve(messageResponse);
       }
     };
-    Log.debug('Call API - Device Run: ', device);
-    const deviceRun = () => device.run(inner);
+    Log.debug('Call API - Device Run: ', device.mainId);
+
+    const runOptions: RunOptions = {
+      keepSession: method.payload.keepSession,
+      ...parseInitOptions(method),
+    };
+    const deviceRun = () => device.run(inner, runOptions);
     _callPromise = createDeferred(deviceRun);
 
     try {
       return await _callPromise.promise;
     } catch (e) {
-      console.log('Device Run Error: ', e);
+      Log.debug('Device Run Error: ', e);
       return createResponseMessage(method.responseID, false, { error: e });
     }
   } catch (error) {
@@ -193,9 +275,23 @@ export const callAPI = async (message: CoreMessage) => {
       }
     }
 
+    // remove method from queue
+    const index = method.responseID
+      ? callApiQueue.findIndex(m => m.responseID === method.responseID)
+      : -1;
+    if (index > -1) {
+      callApiQueue.splice(index, 1);
+      Log.debug(
+        'Remove the finished method from the queue： ',
+        callApiQueue.map(m => m.name)
+      );
+    }
+
     closePopup();
 
     cleanup();
+
+    removeDeviceListener(device);
     // TODO: 方法执行后，检查队列内是否有等待调用的 API，依次调用
   }
 };
@@ -212,7 +308,8 @@ async function initDeviceList(method: BaseMethod) {
     await TransportManager.configure();
     _deviceList.connector = _connector;
   }
-  await _deviceList.getDeviceLists();
+
+  await _deviceList.getDeviceLists(method.connectId, parseInitOptions(method));
 }
 
 function initDevice(method: BaseMethod) {
@@ -261,24 +358,158 @@ function initDeviceForBle(method: BaseMethod) {
   return device;
 }
 
+type IPollFn<T> = (time?: number) => T;
+// eslint-disable-next-line @typescript-eslint/require-await
+const ensureConnected = async (method: BaseMethod, pollingId: number) => {
+  let tryCount = 0;
+  const MAX_RETRY_COUNT = (method.payload && method.payload.retryCount) || 5;
+  const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
+  const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  Log.debug(
+    `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
+  );
+
+  const poll: IPollFn<Promise<Device>> = async (time = POLL_INTERVAL_TIME) =>
+    // eslint-disable-next-line no-async-promise-executor
+    new Promise(async (resolve, reject) => {
+      if (!pollingState[pollingId]) {
+        Log.debug('EnsureConnected function stop, polling id: ', pollingId);
+        reject(ERRORS.TypedError(HardwareErrorCode.PollingStop));
+        return;
+      }
+
+      // 单次连接确保不超时
+      if (timer) {
+        clearTimeout(timer);
+      }
+      timer = setTimeout(() => {
+        reject(ERRORS.TypedError(HardwareErrorCode.PollingTimeout));
+      }, TIME_OUT);
+
+      tryCount += 1;
+      Log.debug('EnsureConnected function try count: ', tryCount, ' poll interval time: ', time);
+      try {
+        await initDeviceList(method);
+      } catch (error) {
+        Log.debug('device list error: ', error);
+        if (
+          [HardwareErrorCode.BridgeNotInstalled, HardwareErrorCode.BridgeTimeoutError].includes(
+            error.errorCode
+          )
+        ) {
+          _deviceList = undefined;
+          reject(error);
+          return;
+        }
+        if (error.errorCode === HardwareErrorCode.TransportNotConfigured) {
+          await TransportManager.configure();
+        }
+      }
+
+      const env = DataManager.getSettings('env');
+      let device: Device;
+      try {
+        if (env === 'react-native') {
+          device = initDeviceForBle(method);
+        } else {
+          device = initDevice(method);
+        }
+
+        if (device) {
+          if (timer) {
+            clearTimeout(timer);
+          }
+
+          /**
+           * Bluetooth should call initialize here
+           */
+          if (env === 'react-native') {
+            await device.acquire();
+            await device.initialize(parseInitOptions(method));
+          }
+          resolve(device);
+          return;
+        }
+      } catch (error) {
+        Log.debug('device error: ', error);
+        if (
+          [
+            HardwareErrorCode.BlePermissionError,
+            HardwareErrorCode.BleLocationError,
+            HardwareErrorCode.BleDeviceNotBonded,
+            HardwareErrorCode.BleCharacteristicNotifyError,
+            HardwareErrorCode.BleWriteCharacteristicError,
+            HardwareErrorCode.BleAlreadyConnected,
+          ].includes(error.errorCode)
+        ) {
+          reject(error);
+          return;
+        }
+      }
+
+      if (tryCount > 5) {
+        if (timer) {
+          clearTimeout(timer);
+        }
+        Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
+        reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+        return;
+      }
+      // eslint-disable-next-line no-promise-executor-return
+      return setTimeout(() => resolve(poll(time * 1.5)), time);
+    });
+  pollingState[pollingId] = true;
+  return poll();
+};
+
 export const cancel = (connectId?: string) => {
   const env = DataManager.getSettings('env');
-  if (connectId) {
-    let device;
-    if (env === 'react-native') {
-      device = initDeviceForBle({ connectId } as BaseMethod);
-    } else {
-      device = initDevice({ connectId } as BaseMethod);
+  try {
+    if (connectId) {
+      let device;
+      if (env === 'react-native') {
+        device = initDeviceForBle({ connectId } as BaseMethod);
+      } else {
+        device = initDevice({ connectId } as BaseMethod);
+      }
+      device?.interruptionFromUser();
     }
-    device?.interruption();
+  } catch (e) {
+    // Empty
+    Log.error('Cancel API Error: ', e);
   }
   cleanup();
   closePopup();
 };
 
+const checkPassphraseSafety = (method: BaseMethod, features?: Features) => {
+  if (!method.useDevicePassphraseState) return;
+
+  if (features?.passphrase_protection === true && !method.payload.passphraseState) {
+    DevicePool.clearDeviceCache(method.payload.connectId);
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
+  }
+
+  if (features?.passphrase_protection === false && method.payload.passphraseState) {
+    DevicePool.clearDeviceCache(method.payload.connectId);
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotOpenedPassphrase);
+  }
+};
+
 const cleanup = () => {
   _uiPromises = [];
   Log.debug('Cleanup...');
+};
+
+const removeDeviceListener = (device: Device) => {
+  device.removeListener(DEVICE.PIN, onDevicePinHandler);
+  device.removeListener(DEVICE.BUTTON, onDeviceButtonHandler);
+  device.removeListener(DEVICE.PASSPHRASE_ON_DEVICE, onDevicePassphraseHandler);
+  device.removeListener(DEVICE.FEATURES, onDeviceFeaturesHandler);
+  DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
+  // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 };
 
 /**
@@ -288,8 +519,20 @@ const closePopup = () => {
   postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW));
 };
 
+const onDeviceConnectHandler = (device: Device) => {
+  const env = DataManager.getSettings('env');
+  const deviceObject = env === 'react-native' ? device : device.toMessageObject();
+  postMessage(createDeviceMessage(DEVICE.CONNECT, { device: deviceObject as KnownDevice }));
+};
+
+const onDeviceDisconnectHandler = (device: Device) => {
+  const env = DataManager.getSettings('env');
+  const deviceObject = env === 'react-native' ? device : device.toMessageObject();
+  postMessage(createDeviceMessage(DEVICE.DISCONNECT, { device: deviceObject as KnownDevice }));
+};
+
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
-  console.log('onDevicePinHandler');
+  Log.debug('onDevicePinHandler');
   // create ui promise
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PIN, device);
   // request pin view
@@ -318,6 +561,19 @@ const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]
   } else {
     postMessage(createUiMessage(UI_REQUEST.REQUEST_BUTTON, { device: device.toMessageObject() }));
   }
+};
+
+const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]) => {
+  postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
+};
+
+const onDevicePassphraseHandler = (...[device]: [...DeviceEvents['passphrase_on_device']]) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
+      device: device.toMessageObject() as KnownDevice,
+      passphraseState: device.passphraseState,
+    })
+  );
 };
 
 /**
@@ -389,6 +645,7 @@ export const initCore = () => {
 
 export const initConnector = () => {
   _connector = new DeviceConnector();
+  DevicePool.emitter.on(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
   return _connector;
 };
 
@@ -405,6 +662,9 @@ export const init = async (settings: ConnectSettings, Transport: any) => {
       Log.error('DataManager.load error');
     }
     enableLog(DataManager.getSettings('debug'));
+    if (DataManager.getSettings('env') !== 'react-native') {
+      setLoggerPostMessage(postMessage);
+    }
     initCore();
     initConnector();
 

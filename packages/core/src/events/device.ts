@@ -1,5 +1,5 @@
 import type { PROTO } from '../constants';
-import type { KnownDevice as Device } from '../types/device';
+import type { Features, KnownDevice as Device, SupportFeatures } from '../types/device';
 import { MessageFactoryFn } from './utils';
 
 export const DEVICE_EVENT = 'DEVICE_EVENT';
@@ -24,7 +24,20 @@ export const DEVICE = {
   PASSPHRASE: 'passphrase',
   PASSPHRASE_ON_DEVICE: 'passphrase_on_device',
   WORD: 'word',
+  SUPPORT_FEATURES: 'support_features',
+
+  FEATURES: 'features',
 } as const;
+
+export interface DeviceConnnectRequest {
+  type: typeof DEVICE.CONNECT;
+  payload: { device: Device };
+}
+
+export interface DeviceDisconnnectRequest {
+  type: typeof DEVICE.DISCONNECT;
+  payload: { device: Device };
+}
 
 export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'code'> {
   code?: PROTO.ButtonRequest['code'] | 'ButtonRequest_FirmwareUpdate';
@@ -35,7 +48,25 @@ export interface DeviceButtonRequest {
   payload: DeviceButtonRequestPayload & { device: Device | null };
 }
 
-export type DeviceEvent = DeviceButtonRequest;
+export type DeviceFeaturesPayload = Features;
+
+export interface DeviceSendFeatures {
+  type: typeof DEVICE.FEATURES;
+  payload: DeviceFeaturesPayload;
+}
+
+export type DeviceSupportFeaturesPayload = SupportFeatures & { device: Device | null };
+export interface DeviceSendSupportFeatures {
+  type: typeof DEVICE.SUPPORT_FEATURES;
+  payload: DeviceSupportFeaturesPayload;
+}
+
+export type DeviceEvent =
+  | DeviceButtonRequest
+  | DeviceSendFeatures
+  | DeviceSendSupportFeatures
+  | DeviceDisconnnectRequest
+  | DeviceConnnectRequest;
 
 export type DeviceEventMessage = DeviceEvent & { event: typeof DEVICE_EVENT };
 

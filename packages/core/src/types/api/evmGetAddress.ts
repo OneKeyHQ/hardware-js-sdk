@@ -12,10 +12,12 @@ export type EVMGetAddressParams = {
 
 export declare function evmGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & EVMGetAddressParams
 ): Response<EVMAddress>;
 
 export declare function evmGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: EVMGetAddressParams[] }
 ): Response<Array<EVMAddress>>;

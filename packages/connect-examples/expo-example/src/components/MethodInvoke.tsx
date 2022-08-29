@@ -48,6 +48,7 @@ const MethodInvoke: FC<MethodInvokeProps> = ({ title, options, onCall }) => {
     const res = await onCall(callData);
     setResultSUccess(res.success);
     setResult(JSON.stringify(res));
+    console.log('example get result', res);
   };
 
   const onChange = ({ name, value }: { name: string; value: any }) => {
@@ -78,7 +79,10 @@ const MethodInvoke: FC<MethodInvokeProps> = ({ title, options, onCall }) => {
         <TextInput
           style={styles.input}
           value={item.value?.toString() ?? ''}
-          onChangeText={v => onChange({ name: item.name, value: v })}
+          onChangeText={v => {
+            const newText = v.replace(/[^\d]+/, '');
+            onChange({ name: item.name, value: newText });
+          }}
         />
       );
     }
