@@ -1,6 +1,5 @@
 import type { Transport, Messages } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
-// eslint-disable-next-line import/no-cycle
 import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
 import { patchFeatures, getLogger, LoggerNames } from '../utils';
@@ -162,6 +161,10 @@ export class DeviceCommands {
 
       if (code === 'Failure_PinCancelled') {
         error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
+      }
+
+      if (code === 'Failure_DataError' && message === 'Please confirm the BlindSign enabled') {
+        error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
       }
 
       if (error) {
