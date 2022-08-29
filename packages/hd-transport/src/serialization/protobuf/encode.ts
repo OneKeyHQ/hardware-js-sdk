@@ -1,4 +1,4 @@
-import ByteBuffer from 'bytebuffer';
+import * as ByteBuffer from 'bytebuffer';
 import { Type } from 'protobufjs/light';
 import { Buffer } from 'buffer';
 
