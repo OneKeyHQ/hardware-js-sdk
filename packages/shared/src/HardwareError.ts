@@ -278,6 +278,11 @@ export const HardwareErrorCode = {
    * ensure connect stop polling
    */
   PollingStop: 810,
+
+  /**
+   * Device does not open blid sign
+   */
+  BlindSignDisabled: 811,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -367,6 +372,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BridgeNotInstalled]: 'Bridge not installed',
   [HardwareErrorCode.PollingTimeout]: 'Polling timeout',
   [HardwareErrorCode.PollingStop]: 'Polling stop',
+  [HardwareErrorCode.BlindSignDisabled]: 'Please confirm the BlindSign enabled',
 } as const;
 
 export const TypedError = (
