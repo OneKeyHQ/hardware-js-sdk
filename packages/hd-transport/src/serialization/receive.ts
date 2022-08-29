@@ -1,4 +1,4 @@
-import ByteBuffer from 'bytebuffer';
+import * as ByteBuffer from 'bytebuffer';
 import { Root } from 'protobufjs/light';
 
 import * as decodeProtobuf from './protobuf/decode';
