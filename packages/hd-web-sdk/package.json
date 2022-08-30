@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-web-sdk",
-  "version": "0.1.39",
+  "version": "0.1.40",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
@@ -17,14 +17,15 @@
     "build:sdk": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
     "build": "yarn build:sdk && yarn build:iframe && yarn build:lib",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "echo \"Error: run tests from root\" && exit 1"
   },
   "dependencies": {
     "@onekeyfe/cross-inpage-provider-core": "^0.0.17",
-    "@onekeyfe/hd-core": "^0.1.39",
-    "@onekeyfe/hd-shared": "^0.1.39",
-    "@onekeyfe/hd-transport-http": "^0.1.39",
-    "@onekeyfe/hd-transport-webusb": "^0.1.39"
+    "@onekeyfe/hd-core": "^0.1.40",
+    "@onekeyfe/hd-shared": "^0.1.40",
+    "@onekeyfe/hd-transport-http": "^0.1.40",
+    "@onekeyfe/hd-transport-webusb": "^0.1.40"
   },
   "devDependencies": {
     "@babel/plugin-proposal-optional-chaining": "^7.17.12",

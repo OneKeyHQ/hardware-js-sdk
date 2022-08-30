@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport",
-  "version": "0.1.39",
+  "version": "0.1.40",
   "description": "> TODO: description",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -13,7 +13,6 @@
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
-    "test": "jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-core",
-  "version": "0.1.39",
+  "version": "0.1.40",
   "description": "> TODO: description",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -15,6 +15,7 @@
     "access": "public"
   },
   "scripts": {
+    "test": "echo \"Error: run tests from root\" && exit 1",
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",
@@ -24,8 +25,8 @@
     "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^0.1.39",
-    "@onekeyfe/hd-transport": "^0.1.39",
+    "@onekeyfe/hd-shared": "^0.1.40",
+    "@onekeyfe/hd-transport": "^0.1.40",
     "axios": "^0.27.2",
     "bignumber.js": "^9.0.2",
     "js-sha256": "^0.9.0",
