@@ -1,7 +1,13 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import { Features, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
-import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  createDeferred,
+  Deferred,
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+} from '@onekeyfe/hd-shared';
 import {
   getDeviceFirmwareVersion,
   getDeviceModel,
@@ -234,6 +240,19 @@ export const callAPI = async (message: CoreMessage) => {
             ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
           );
         }
+      }
+
+      // Check the level of safety_check when performing transactions on the test network on touch
+      try {
+        await method.checkSafetyLevelOnTestNet();
+      } catch (e) {
+        const error =
+          e instanceof HardwareError
+            ? e
+            : ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'open safety check failed.');
+        messageResponse = createResponseMessage(method.responseID, false, { error });
+        _callPromise?.resolve(messageResponse);
+        return;
       }
 
       try {
