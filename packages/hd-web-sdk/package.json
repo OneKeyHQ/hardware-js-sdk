@@ -17,7 +17,8 @@
     "build:sdk": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
     "build": "yarn build:sdk && yarn build:iframe && yarn build:lib",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "echo \"Error: run tests from root\" && exit 1"
   },
   "dependencies": {
     "@onekeyfe/cross-inpage-provider-core": "^0.0.17",

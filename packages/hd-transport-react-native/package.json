@@ -13,6 +13,7 @@
     "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
   },
   "scripts": {
+    "test": "echo \"Error: run tests from root\" && exit 1",
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",
