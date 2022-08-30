@@ -19,7 +19,7 @@ const initialSettings: ConnectSettings = {
   trustedHost: false,
   connectSrc: DEFAULT_DOMAIN,
   iframeSrc: `${DEFAULT_DOMAIN}iframe.html`,
-  parentOrigin: window.location ? window.location.origin : '',
+  parentOrigin: window && window.location ? window.location.origin : '',
   supportedBrowser:
     typeof navigator !== 'undefined' ? !/Trident|MSIE|Edge/.test(navigator.userAgent) : true,
   env: 'web',

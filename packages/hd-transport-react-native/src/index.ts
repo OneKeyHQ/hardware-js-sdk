@@ -7,7 +7,7 @@ import {
   Characteristic,
   ScanMode,
 } from 'react-native-ble-plx';
-import ByteBuffer from 'bytebuffer';
+import * as ByteBuffer from 'bytebuffer';
 import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type EventEmitter from 'events';
