@@ -53,12 +53,10 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      // @ts-expect-error
       const res = await this.device.commands.typedCall('SolanaSignTx', 'SolanaSignedTx', {
         ...param,
       });
 
-      // @ts-expect-error
       const { signature } = res.message;
 
       responses.push({

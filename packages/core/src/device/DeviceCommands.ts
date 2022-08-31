@@ -1,4 +1,4 @@
-import type { Transport, Messages } from '@onekeyfe/hd-transport';
+import { Transport, Messages, FailureType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
@@ -147,23 +147,23 @@ export class DeviceCommands {
       const { message } = res.message;
       let error: HardwareError | null = null;
       // Model One does not send any message in firmware update
-      if (code === 'Failure_FirmwareError' && !message) {
+      if (code === FailureType.Failure_FirmwareError && !message) {
         error = ERRORS.TypedError(HardwareErrorCode.FirmwareError);
       }
       // Failure_ActionCancelled message could be also missing
-      if (code === 'Failure_ActionCancelled') {
+      if (code === FailureType.Failure_ActionCancelled) {
         error = ERRORS.TypedError(HardwareErrorCode.ActionCancelled);
       }
 
-      if (code === 'Failure_PinInvalid') {
+      if (code === FailureType.Failure_PinInvalid) {
         error = ERRORS.TypedError(HardwareErrorCode.PinInvalid, message);
       }
 
-      if (code === 'Failure_PinCancelled') {
+      if (code === FailureType.Failure_PinCancelled) {
         error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
       }
 
-      if (code === 'Failure_DataError' && message === 'Please confirm the BlindSign enabled') {
+      if (code === FailureType.Failure_DataError && message === 'Please confirm the BlindSign enabled') {
         error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
       }
 
@@ -208,7 +208,6 @@ export class DeviceCommands {
       return this._promptPin(res.message.type).then(
         pin => {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
-            // @ts-expect-error
             return this._commonCall('BixinPinInputOnDevice');
           }
           return this._commonCall('PinMatrixAck', { pin });
