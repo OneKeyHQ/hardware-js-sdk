@@ -1,4 +1,4 @@
-import { supportInputPinOnSoftware } from '../utils/deviceFeaturesUtils';
+import { supportInputPinOnSoftware, getDeviceType } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
@@ -6,6 +6,9 @@ import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange } from '../types';
 import { CoreMessage, createFirmwareMessage, DEVICE, FIRMWARE } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
+import { getLogger, LoggerNames } from '../utils';
+
+const Log = getLogger(LoggerNames.Method);
 
 export abstract class BaseMethod<Params = undefined> {
   responseID: number;
@@ -127,6 +130,25 @@ export abstract class BaseMethod<Params = undefined> {
         device: this.device.toMessageObject(),
       })
     );
+  }
+
+  /**
+   * Check the level of safety_check when performing transactions on the test network on touch
+   * @returns {void}
+   */
+  async checkSafetyLevelOnTestNet() {
+    const deviceType = getDeviceType(this.device.features);
+    if (deviceType !== 'touch') return;
+    let checkFlag = false;
+    if (this.name === 'evmSignTransaction' && Number(this.payload?.transaction?.chainId) !== 1) {
+      checkFlag = true;
+    }
+    if (checkFlag && this.device.features?.safety_checks === 'Strict') {
+      Log.debug('will change safety_checks level');
+      await this.device.commands.typedCall('ApplySettings', 'Success', {
+        safety_checks: 'PromptTemporarily',
+      });
+    }
   }
 
   dispose() {}

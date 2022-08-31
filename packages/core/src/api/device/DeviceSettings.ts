@@ -16,7 +16,7 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       { name: 'autoLockDelayMs', type: 'number' },
       { name: 'displayRotation', type: 'number' },
       { name: 'passphraseAlwaysOnDevice', type: 'boolean' },
-      { name: 'safetyChecks', type: 'object' },
+      { name: 'safetyChecks', type: 'number' },
       { name: 'experimentalFeatures', type: 'boolean' },
     ]);
 

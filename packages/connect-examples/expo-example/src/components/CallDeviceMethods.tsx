@@ -88,10 +88,15 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
             { name: 'autoLockDelayMs', value: undefined, type: 'number' },
             { name: 'displayRotation', value: undefined, type: 'number' },
             { name: 'passphraseAlwaysOnDevice', value: undefined, type: 'boolean' },
-            { name: 'safetyChecks', value: undefined, type: 'string' },
+            { name: 'safetyChecks', value: undefined, type: 'number' },
             { name: 'experimentalFeatures', value: undefined, type: 'boolean' },
           ]}
-          onCall={data => SDK.deviceSettings(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.deviceSettings(connectId, {
+              ...data,
+              safetyChecks: +data.safetyChecks,
+            } as unknown as any)
+          }
         />
 
         <MethodInvoke
