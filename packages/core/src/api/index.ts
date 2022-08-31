@@ -49,3 +49,7 @@ export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
 
 export { default as getPassphraseState } from './GetPassphraseState';
 export { default as getLogs } from './GetLogs';
+
+export { default as tronGetAddress } from './tron/TronGetAddress';
+export { default as tronSignMessage } from './tron/TronSignMessage';
+export { default as tronSignTransaction } from './tron/TronSignTransaction';

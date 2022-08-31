@@ -22,6 +22,7 @@ import { CallNEMMethods } from './CallNEMMethods';
 import { CallSolanaMethods } from './CallSolanaMethods';
 import { CallStellarMethods } from './CallStellarMethods';
 import { CallOtherMethods } from './CallOtherMethods';
+import { CallTronMethods } from './CallTronMethods';
 
 let registerListener = false;
 
@@ -284,6 +285,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallTronMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }

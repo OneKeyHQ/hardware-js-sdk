@@ -145,6 +145,13 @@ export const inject = ({
 
     firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
     requestWebUsbDevice: () => call({ method: 'requestWebUsbDevice' }),
+
+    tronGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'tronGetAddress' }),
+    tronSignMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'tronSignMessage' }),
+    tronSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'tronSignTransaction' }),
   };
   return api;
 };

@@ -70,3 +70,13 @@ export type {
   StellarTransaction,
   StellarSignTransactionParams,
 } from './stellarSignTransaction';
+
+export type { TronAddress, TronGetAddressParams } from './tronGetAddress';
+export type { TronSignMessageParams } from './tronSignMessage';
+export type {
+  TronTransaction,
+  TronSignTransactionParams,
+  TronTransactionContract,
+  TronTransferContract,
+  TronTriggerSmartContract,
+} from './tronSignTransaction';

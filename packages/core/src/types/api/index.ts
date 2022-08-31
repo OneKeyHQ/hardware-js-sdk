@@ -46,6 +46,9 @@ import { getLogs } from './getLogs';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
 import { requestWebUsbDevice } from './requestWebUsbDevice';
 import { getPassphraseState } from './getPassphraseState';
+import { tronGetAddress } from './tronGetAddress';
+import { tronSignTransaction } from './tronSignTransaction';
+import { tronSignMessage } from './tronSignMessage';
 
 export * from './export';
 
@@ -125,4 +128,8 @@ export type CoreApi = {
   stellarSignTransaction: typeof stellarSignTransaction;
 
   firmwareUpdate: typeof firmwareUpdate;
+
+  tronGetAddress: typeof tronGetAddress;
+  tronSignMessage: typeof tronSignMessage;
+  tronSignTransaction: typeof tronSignTransaction;
 };
