@@ -1,5 +1,5 @@
-import * as ByteBuffer from 'bytebuffer';
 import { Root } from 'protobufjs/light';
+import { ByteBuffer } from '../utils';
 
 import * as decodeProtobuf from './protobuf/decode';
 import * as decodeProtocol from './protocol/decode';

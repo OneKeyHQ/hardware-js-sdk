@@ -17,6 +17,7 @@
       "no-use-before-define": "off",
       "@typescript-eslint/no-use-before-define": ["error"],
       "@typescript-eslint/no-var-requires": "off",
-      "require-await": ["error"]
+      "require-await": ["error"],
+      "import/no-named-default": "off"
   }
 }
