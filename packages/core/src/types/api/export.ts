@@ -89,3 +89,6 @@ export type {
   ConfluxSignedTx,
   ConfluxTransaction,
 } from './confluxSignTransaction';
+
+export type { NearAddress, NearGetAddressParams } from './nearGetAddress';
+export type { NearSignTransactionParams } from './nearSignTransaction';

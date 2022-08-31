@@ -59,3 +59,6 @@ export { default as stellarSignTransaction } from './stellar/StellarSignTransact
 export { default as tronGetAddress } from './tron/TronGetAddress';
 export { default as tronSignMessage } from './tron/TronSignMessage';
 export { default as tronSignTransaction } from './tron/TronSignTransaction';
+
+export { default as nearGetAddress } from './near/NearGetAddress';
+export { default as nearSignTransaction } from './near/NearSignTransaction';

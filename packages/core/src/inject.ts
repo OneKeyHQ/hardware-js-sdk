@@ -161,6 +161,11 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'confluxSignMessageCIP23' }),
     confluxSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'confluxSignTransaction' }),
+
+    nearGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'nearGetAddress' }),
+    nearSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'nearSignTransaction' }),
   };
   return api;
 };
