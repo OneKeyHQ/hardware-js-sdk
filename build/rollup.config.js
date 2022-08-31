@@ -10,7 +10,7 @@ const config = [
     output: [
       {
         dir: 'dist',
-        format: 'cjs',
+        format: 'es',
       },
     ],
     plugins: [typescript(), commonjs(), json()],

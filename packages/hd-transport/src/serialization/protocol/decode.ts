@@ -1,4 +1,4 @@
-import ByteBuffer from 'bytebuffer';
+import { ByteBuffer } from '../../utils';
 import { MESSAGE_HEADER_BYTE } from '../../constants';
 
 /**
