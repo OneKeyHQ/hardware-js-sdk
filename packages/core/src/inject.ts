@@ -166,6 +166,11 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'nearGetAddress' }),
     nearSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'nearSignTransaction' }),
+
+    aptosGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'aptosGetAddress' }),
+    aptosSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'aptosSignTransaction' }),
   };
   return api;
 };

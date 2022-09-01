@@ -69,6 +69,9 @@ import { confluxSignTransaction } from './confluxSignTransaction';
 import { nearGetAddress } from './nearGetAddress';
 import { nearSignTransaction } from './nearSignTransaction';
 
+import { aptosGetAddress } from './aptosGetAddress';
+import { aptosSignTransaction } from './aptosSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -182,4 +185,10 @@ export type CoreApi = {
    */
   nearGetAddress: typeof nearGetAddress;
   nearSignTransaction: typeof nearSignTransaction;
+
+  /**
+   * Aptos function
+   */
+  aptosGetAddress: typeof aptosGetAddress;
+  aptosSignTransaction: typeof aptosSignTransaction;
 };

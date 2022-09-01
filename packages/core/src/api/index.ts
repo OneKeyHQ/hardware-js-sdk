@@ -62,3 +62,6 @@ export { default as tronSignTransaction } from './tron/TronSignTransaction';
 
 export { default as nearGetAddress } from './near/NearGetAddress';
 export { default as nearSignTransaction } from './near/NearSignTransaction';
+
+export { default as aptosGetAddress } from './aptos/AptosGetAddress';
+export { default as aptosSignTransaction } from './aptos/AptosSignTransaction';
