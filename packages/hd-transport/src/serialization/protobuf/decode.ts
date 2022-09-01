@@ -1,5 +1,5 @@
 import { Type, Message, Field } from 'protobufjs/light';
-import { ByteBuffer } from '../../utils';
+import ByteBuffer from 'bytebuffer';
 import { isPrimitiveField } from '../../utils/protobuf';
 
 const transform = (field: Field, value: any) => {

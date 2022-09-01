@@ -2,7 +2,7 @@
 //
 // Logic of "call" is broken to two parts - sending and receiving
 import { Root } from 'protobufjs/light';
-import { ByteBuffer } from '../utils';
+import ByteBuffer from 'bytebuffer';
 import { encode as encodeProtobuf } from './protobuf';
 import { encode as encodeProtocol } from './protocol';
 import { createMessageFromName } from './protobuf/messages';
