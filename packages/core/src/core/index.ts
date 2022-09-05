@@ -242,7 +242,7 @@ export const callAPI = async (message: CoreMessage) => {
         }
       }
 
-      // Check the level of safety_check when performing transactions on the test network on touch
+      // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
       try {
         await method.checkSafetyLevelOnTestNet();
       } catch (e) {

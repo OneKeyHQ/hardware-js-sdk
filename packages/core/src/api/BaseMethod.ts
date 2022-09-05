@@ -133,14 +133,17 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   /**
-   * Check the level of safety_check when performing transactions on the test network on touch
+   * Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
    * @returns {void}
    */
   async checkSafetyLevelOnTestNet() {
     const deviceType = getDeviceType(this.device.features);
     if (deviceType !== 'touch') return;
     let checkFlag = false;
-    if (this.name === 'evmSignTransaction' && Number(this.payload?.transaction?.chainId) !== 1) {
+    if (
+      this.name === 'evmSignTransaction' &&
+      [3, 4, 5, 42].includes(Number(this.payload?.transaction?.chainId))
+    ) {
       checkFlag = true;
     }
     if (checkFlag && this.device.features?.safety_checks === 'Strict') {
