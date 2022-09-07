@@ -640,7 +640,20 @@ export default class Core extends EventEmitter {
 
       case IFRAME.CALL: {
         const response = await callAPI(message);
-        return response;
+        const { success, payload } = response;
+
+        if (success) {
+          return response;
+        }
+
+        return {
+          ...response,
+          payload: {
+            ...payload,
+            connectId: message.payload?.connectId ?? '',
+            deviceId: message.payload?.deviceId ?? '',
+          },
+        };
       }
       case IFRAME.CANCEL: {
         cancel(message.payload.connectId);
