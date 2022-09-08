@@ -145,6 +145,32 @@ export const inject = ({
 
     firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
     requestWebUsbDevice: () => call({ method: 'requestWebUsbDevice' }),
+
+    tronGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'tronGetAddress' }),
+    tronSignMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'tronSignMessage' }),
+    tronSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'tronSignTransaction' }),
+
+    confluxGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'confluxGetAddress' }),
+    confluxSignMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'confluxSignMessage' }),
+    confluxSignMessageCIP23: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'confluxSignMessageCIP23' }),
+    confluxSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'confluxSignTransaction' }),
+
+    nearGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'nearGetAddress' }),
+    nearSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'nearSignTransaction' }),
+
+    aptosGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'aptosGetAddress' }),
+    aptosSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'aptosSignTransaction' }),
   };
   return api;
 };
