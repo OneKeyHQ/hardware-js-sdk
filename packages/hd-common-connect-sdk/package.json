@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-common-connect-sdk",
-  "version": "0.1.43",
+  "version": "0.1.44",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
@@ -20,8 +20,8 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-core": "^0.1.43",
-    "@onekeyfe/hd-shared": "^0.1.43",
-    "@onekeyfe/hd-transport-webusb": "^0.1.43"
+    "@onekeyfe/hd-core": "^0.1.44",
+    "@onekeyfe/hd-shared": "^0.1.44",
+    "@onekeyfe/hd-transport-webusb": "^0.1.44"
   }
 }
