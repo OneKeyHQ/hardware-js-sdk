@@ -20,6 +20,7 @@ import HardwareSdk, {
   DEVICE,
 } from '@onekeyfe/hd-core';
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import HttpTransport from '@onekeyfe/hd-transport-http';
 import WebusbTransport from '@onekeyfe/hd-transport-webusb';
 
 const eventEmitter = new EventEmitter();
@@ -100,14 +101,16 @@ async function postMessage(message: CoreMessage, usePromise = true) {
 }
 
 const init = async (settings: Partial<ConnectSettings>) => {
-  _settings = { ..._settings, ...settings, env: 'webusb' };
+  _settings = { ..._settings, ...settings, env: settings.env ?? 'node' };
 
   enableLog(!!settings.debug);
 
   Log.debug('init');
 
   try {
-    _core = await initCore(_settings, WebusbTransport);
+    console.log(_settings.env);
+    const Transport = _settings.env === 'webusb' ? WebusbTransport : HttpTransport;
+    _core = await initCore(_settings, Transport);
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);
 
