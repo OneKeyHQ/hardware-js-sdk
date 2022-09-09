@@ -8,7 +8,15 @@
   },
   "author": "OneKey",
   "workspaces": [
-    "packages/*",
+    "packages/core",
+    "packages/hd-web-sdk",
+    "packages/hd-ble-sdk",
+    "packages/hd-common-connect-sdk",
+    "packages/hd-transport",
+    "packages/hd-transport-http",
+    "packages/hd-transport-react-native",
+    "packages/hd-transport-webusb",
+    "packages/shared",
     "packages/connect-examples/expo-example"
   ],
   "scripts": {

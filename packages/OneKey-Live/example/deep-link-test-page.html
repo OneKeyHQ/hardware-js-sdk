@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <title>OneKey Live - Deep Link Example</title>
+</head>
+<body>
+  <header class="flex flex-col items-center justify-center">
+    <div class="mx-auto py-4 max-w-7xl px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold leading-tight tracking-tight text-gray-900">OneKey-Live - Deep Links</h2>
+    </div>
+  </header>
+  <div class="flex flex-col items-center justify-center">
+    <!-- onekeylive:// -->
+    <button class="text-base flex flex-row" onclick="onClick('onekeylive:\/\/')">
+      <p>onekeylive://</p> <p class="mx-4">🔗</p>
+    </button>
+    <div class="w-7/12 h-0.5 m-2 bg-red-300 divide-y divide-solid"></div>
+
+
+    <!-- onekeylive://bridge -->
+    <button class="text-base flex flex-row" onclick="onClick('onekeylive:\/\/bridge')">
+      <p>onekeylive://bridge</p> <p class="mx-4">🔗</p>
+    </button>
+    <div class="w-7/12 h-0.5 m-2 bg-red-300 divide-y divide-solid" />
+  </div>
+</body>
+<script>
+  function onClick(url) {
+    window.open(url, "_blank");
+  }
+</script>
+</html>
