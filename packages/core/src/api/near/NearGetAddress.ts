@@ -1,12 +1,11 @@
-import { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
+import { NearGetAddress as HardwareNearGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { SolanaSignedTx, SolanaSignTransactionParams } from '../../types';
-import { formatAnyHex } from '../helpers/hexUtils';
+import { NearGetAddressParams, NearAddress } from '../../types';
 
-export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[]> {
+export default class NearGetAddress extends BaseMethod<HardwareNearGetAddress[]> {
   hasBundle = false;
 
   init() {
@@ -21,47 +20,46 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
 
     // init params
     this.params = [];
-    payload.bundle.forEach((batch: SolanaSignTransactionParams) => {
+    payload.bundle.forEach((batch: NearGetAddressParams) => {
       const addressN = validatePath(batch.path, 3);
 
       validateParams(batch, [
         { name: 'path', required: true },
-        { name: 'rawTx', type: 'hexString', required: true },
+        { name: 'showOnOneKey', type: 'boolean' },
       ]);
+
+      const showOnOneKey = batch.showOnOneKey ?? true;
 
       this.params.push({
         address_n: addressN,
-        raw_tx: formatAnyHex(batch.rawTx),
+        show_display: showOnOneKey,
       });
     });
   }
 
   getVersionRange() {
     return {
-      classic: {
-        min: '2.1.9',
-      },
-      mini: {
-        min: '2.1.9',
+      model_mini: {
+        min: '2.4.0',
       },
     };
   }
 
   async run() {
-    const responses: SolanaSignedTx[] = [];
+    const responses: NearAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall('SolanaSignTx', 'SolanaSignedTx', {
+      const res = await this.device.commands.typedCall('NearGetAddress', 'NearAddress', {
         ...param,
       });
 
-      const { signature } = res.message;
+      const { address } = res.message;
 
       responses.push({
         path: serializedPath(param.address_n),
-        signature,
+        address,
       });
     }
 

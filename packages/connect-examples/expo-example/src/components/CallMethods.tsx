@@ -22,6 +22,10 @@ import { CallNEMMethods } from './CallNEMMethods';
 import { CallSolanaMethods } from './CallSolanaMethods';
 import { CallStellarMethods } from './CallStellarMethods';
 import { CallOtherMethods } from './CallOtherMethods';
+import { CallTronMethods } from './CallTronMethods';
+import { CallConfluxMethods } from './CallConfluxMethods';
+import { CallNearMethods } from './CallNearMethods';
+import { CallAptosMethods } from './CallAptosMethods';
 
 let registerListener = false;
 
@@ -130,7 +134,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     }
     const response = await SDK.firmwareUpdate(
       type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
-      params
+      params,
     );
     console.log('example firmwareUpdate response: ', response);
   };
@@ -284,6 +288,10 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallNEMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallSolanaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallStellarMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallTronMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallConfluxMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallNearMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallAptosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }

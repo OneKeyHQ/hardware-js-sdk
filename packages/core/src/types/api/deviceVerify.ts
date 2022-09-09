@@ -5,8 +5,8 @@ export type DeviceVerifyParams = {
 };
 
 export type DeviceVerifySignature = {
-  cert: Buffer;
-  signature: Buffer;
+  cert: string;
+  signature: string;
 };
 
 export declare function deviceVerify(

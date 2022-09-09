@@ -70,3 +70,28 @@ export type {
   StellarTransaction,
   StellarSignTransactionParams,
 } from './stellarSignTransaction';
+
+export type { TronAddress, TronGetAddressParams } from './tronGetAddress';
+export type { TronSignMessageParams } from './tronSignMessage';
+export type {
+  TronTransaction,
+  TronSignTransactionParams,
+  TronTransactionContract,
+  TronTransferContract,
+  TronTriggerSmartContract,
+} from './tronSignTransaction';
+
+export type { ConfluxAddress, ConfluxGetAddressParams } from './confluxGetAddress';
+export type { ConfluxSignMessageParams } from './confluxSignMessage';
+export type { ConfluxSignMessageCIP23Params } from './confluxSignMessageCIP23';
+export type {
+  ConfluxSignTransactionParams,
+  ConfluxSignedTx,
+  ConfluxTransaction,
+} from './confluxSignTransaction';
+
+export type { NearAddress, NearGetAddressParams } from './nearGetAddress';
+export type { NearSignTransactionParams } from './nearSignTransaction';
+
+export type { AptosAddress, AptosGetAddressParams } from './aptosGetAddress';
+export type { AptosSignedTx, AptosSignTransactionParams } from './aptosSignTransaction';
