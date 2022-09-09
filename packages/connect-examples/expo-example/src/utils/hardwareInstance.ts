@@ -5,7 +5,7 @@ import type { ConnectSettings, CoreApi } from '@onekeyfe/hd-core';
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;
 let initialized = false;
-const isNodeEnvironments = true;
+const isNodeEnvironments = false;
 
 export const getHardwareSDKInstance = memoizee(
   async () =>

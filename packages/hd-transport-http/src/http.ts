@@ -49,8 +49,29 @@ export async function request(options: HttpRequestOptions) {
   }
   const resJson = parseResult(res.data);
   if (typeof resJson === 'object' && resJson != null && resJson.error != null) {
-    throw new HardwareError({ errorCode: HardwareErrorCode.NetworkError, message: resJson.error });
+    throw new HardwareError({
+      errorCode: HardwareErrorCode.NetworkError,
+      message: resJson.error,
+    });
   } else {
     throw new HardwareError({ errorCode: HardwareErrorCode.NetworkError, message: res.data });
   }
 }
+
+axios.interceptors.request.use(config => {
+  if (typeof window !== 'undefined') {
+    return config;
+  }
+  // node environment
+  if (config.url?.startsWith('http://localhost:21320')) {
+    if (!config?.headers?.Origin) {
+      console.log('set node request origin');
+      // add Origin field for request headers
+      config.headers = {
+        ...config.headers,
+        Origin: 'https://jssdk.onekey.so',
+      };
+    }
+  }
+  return config;
+});
