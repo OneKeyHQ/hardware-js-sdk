@@ -1,16 +1,14 @@
-import { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
+import { ConfluxGetAddress as HardwareConfluxGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { SolanaSignedTx, SolanaSignTransactionParams } from '../../types';
-import { formatAnyHex } from '../helpers/hexUtils';
+import { ConfluxAddress, ConfluxGetAddressParams } from '../../types/api/confluxGetAddress';
 
-export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[]> {
+export default class ConfluxGetAddress extends BaseMethod<HardwareConfluxGetAddress[]> {
   hasBundle = false;
 
   init() {
-    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
@@ -21,47 +19,46 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
 
     // init params
     this.params = [];
-    payload.bundle.forEach((batch: SolanaSignTransactionParams) => {
+    payload.bundle.forEach((batch: ConfluxGetAddressParams) => {
       const addressN = validatePath(batch.path, 3);
 
       validateParams(batch, [
         { name: 'path', required: true },
-        { name: 'rawTx', type: 'hexString', required: true },
+        { name: 'chainId', type: 'number' },
+        { name: 'showOnOneKey', type: 'boolean' },
       ]);
+
+      const showOnOneKey = batch.showOnOneKey ?? true;
 
       this.params.push({
         address_n: addressN,
-        raw_tx: formatAnyHex(batch.rawTx),
+        chain_id: batch.chainId,
+        show_display: showOnOneKey,
       });
     });
   }
 
   getVersionRange() {
     return {
-      classic: {
-        min: '2.1.9',
-      },
-      mini: {
-        min: '2.1.9',
+      model_mini: {
+        min: '2.4.0',
       },
     };
   }
 
   async run() {
-    const responses: SolanaSignedTx[] = [];
+    const responses: ConfluxAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall('SolanaSignTx', 'SolanaSignedTx', {
+      const res = await this.device.commands.typedCall('ConfluxGetAddress', 'ConfluxAddress', {
         ...param,
       });
 
-      const { signature } = res.message;
-
       responses.push({
         path: serializedPath(param.address_n),
-        signature,
+        ...res.message,
       });
     }
 

@@ -1,9 +1,14 @@
-import { StellarSignedTx, StellarSignTx as HardwareStellarSignTx } from '@onekeyfe/hd-transport';
+import {
+  StellarMemoType,
+  StellarSignedTx,
+  StellarSignTx as HardwareStellarSignTx,
+} from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { StellarOperation, StellarSignTransactionParams } from '../../types';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 export default class StellarSignTransaction extends BaseMethod<HardwareStellarSignTx> {
   operations: any[] = [];
@@ -153,9 +158,13 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
       { name: 'transaction', type: 'object', required: true },
     ]);
 
+    const { transaction, networkPassphrase } = this.payload as StellarSignTransactionParams;
+    if (!transaction.timebounds) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, 'timebounds is required');
+    }
+
     // init params
     const addressN = validatePath(this.payload.path, 3);
-    const { transaction, networkPassphrase } = this.payload as StellarSignTransactionParams;
 
     this.params = {
       address_n: addressN,
@@ -164,12 +173,10 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
       fee: transaction.fee,
       sequence_number: transaction.sequence,
       num_operations: transaction.operations.length,
+      memo_type: StellarMemoType.NONE,
+      timebounds_start: transaction.timebounds.minTime,
+      timebounds_end: transaction.timebounds.maxTime,
     };
-
-    if (transaction.timebounds) {
-      this.params.timebounds_start = transaction.timebounds.minTime;
-      this.params.timebounds_end = transaction.timebounds.maxTime;
-    }
 
     if (transaction.memo) {
       this.params.memo_type = transaction.memo.type;
