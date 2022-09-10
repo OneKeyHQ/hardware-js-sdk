@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/restrict-plus-operands */
+/* eslint-disable no-promise-executor-return */
 /* eslint-disable no-alert */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 const BRIDGE_URL = 'http://localhost:8321';

@@ -1,4 +1,4 @@
 packages/**/build/
 lib/
 dist/
-example/
+# example/

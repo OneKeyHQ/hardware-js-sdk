@@ -1,4 +1,3 @@
-/* eslint import/no-relative-packages: off */
 /**
  * Base webpack config used across other specific configs
  */

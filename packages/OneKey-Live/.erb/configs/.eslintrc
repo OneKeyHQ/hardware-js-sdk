@@ -2,6 +2,10 @@
   "rules": {
     "no-console": "off",
     "global-require": "off",
-    "import/no-dynamic-require": "off"
+    "import/no-dynamic-require": "off",
+    "import/no-relative-packages": "off",
+    "import/no-unresolved": "off",
+    "import/no-self-import": "off",
+    "import/no-import-module-exports": "off"
   }
 }

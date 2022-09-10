@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { Alert } from '@onekeyhq/ui-components';
 import { UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-import { serviceHardware } from 'renderer/hardware';
+import { serviceHardware } from '../hardware';
 import type { RootState } from '../store';
 
 let lastParams = '';
