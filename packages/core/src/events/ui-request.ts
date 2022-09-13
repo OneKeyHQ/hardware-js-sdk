@@ -15,6 +15,7 @@ export const UI_REQUEST = {
 
   BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
   LOCATION_PERMISSION: 'ui-location_permission',
+  LOCATION_SERVICE_PERMISSION: 'ui-location_service_permission',
 
   FIRMWARE_PROGRESS: 'ui-firmware-progress',
 
@@ -25,7 +26,8 @@ export interface UiRequestWithoutPayload {
   type:
     | typeof UI_REQUEST.CLOSE_UI_WINDOW
     | typeof UI_REQUEST.BLUETOOTH_PERMISSION
-    | typeof UI_REQUEST.LOCATION_PERMISSION;
+    | typeof UI_REQUEST.LOCATION_PERMISSION
+    | typeof UI_REQUEST.LOCATION_SERVICE_PERMISSION;
   payload?: typeof undefined;
 }
 
