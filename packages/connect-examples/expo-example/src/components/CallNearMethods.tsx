@@ -23,7 +23,7 @@ export function CallNearMethods({
         <MethodInvoke
           title="nearGetAddress"
           options={[
-            { name: 'path', value: "m/44'/397'/0'/0/0", type: 'string' },
+            { name: 'path', value: "m/44'/397'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
           onCall={data => SDK.nearGetAddress(connectId, deviceId, { ...commonParams, ...data })}
@@ -32,7 +32,7 @@ export function CallNearMethods({
         <MethodInvoke
           title="nearSignTransaction"
           options={[
-            { name: 'path', value: "m/44'/397'/0'/0/0", type: 'string' },
+            { name: 'path', value: "m/44'/397'/0'", type: 'string' },
             {
               name: 'rawTx',
               value:

@@ -457,6 +457,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
           [
             HardwareErrorCode.BlePermissionError,
             HardwareErrorCode.BleLocationError,
+            HardwareErrorCode.BleLocationServicesDisabled,
             HardwareErrorCode.BleDeviceNotBonded,
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleWriteCharacteristicError,
