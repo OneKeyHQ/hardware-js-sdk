@@ -120,6 +120,8 @@ export default class ReactNativeBleTransport {
               reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
             } else if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
               reject(ERRORS.TypedError(HardwareErrorCode.BleLocationError));
+            } else if (error.errorCode === BleErrorCode.LocationServicesDisabled) {
+              reject(ERRORS.TypedError(HardwareErrorCode.BleLocationServicesDisabled));
             } else if (error.errorCode === BleErrorCode.ScanStartFailed) {
               // Android Bluetooth will report an error when the search frequency is too fast,
               // then nothing is processed and an empty array of devices is returned.

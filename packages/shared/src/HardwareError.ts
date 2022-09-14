@@ -223,6 +223,7 @@ export const HardwareErrorCode = {
   BleCharacteristicNotifyError: 709,
   BleWriteCharacteristicError: 710,
   BleAlreadyConnected: 711,
+  BleLocationServicesDisabled: 712,
 
   /**
    * Hardware runtiome errors
@@ -347,7 +348,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    */
   [HardwareErrorCode.BleScanError]: 'BLE scan error',
   [HardwareErrorCode.BlePermissionError]: 'Bluetooth required to be turned on',
-  [HardwareErrorCode.BleLocationError]: 'Device is not authorized to use BluetoothLE',
+  [HardwareErrorCode.BleLocationError]:
+    'Location permissions for the application are not available',
   [HardwareErrorCode.BleRequiredUUID]: 'uuid is required',
   [HardwareErrorCode.BleConnectedError]: 'connected error is always runtime error',
   [HardwareErrorCode.BleDeviceNotBonded]: 'device is not bonded',
@@ -357,6 +359,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleCharacteristicNotifyError]: 'Characteristic Notify Error',
   [HardwareErrorCode.BleWriteCharacteristicError]: 'Write Characteristic Error',
   [HardwareErrorCode.BleAlreadyConnected]: 'Already connected to device',
+  [HardwareErrorCode.BleLocationServicesDisabled]: 'Location Services disabled',
 
   /**
    * Runtime Error
