@@ -30,17 +30,12 @@ const getDiff = (
   const changedSessions = descriptors.filter(d => {
     const currentDescriptor = current.find(x => x.path === d.path);
     if (currentDescriptor) {
-      // return currentDescriptor.debug ? (currentDescriptor.debugSession !== d.debugSession) : (currentDescriptor.session !== d.session);
       return currentDescriptor.session !== d.session;
     }
     return false;
   });
   const acquired = changedSessions.filter(d => typeof d.session === 'string');
-  const released = changedSessions.filter(
-    d =>
-      // const session = descriptor.debug ? descriptor.debugSession : descriptor.session;
-      typeof d.session !== 'string'
-  );
+  const released = changedSessions.filter(d => typeof d.session !== 'string');
 
   const changedDebugSessions = descriptors.filter(d => {
     const currentDescriptor = current.find(x => x.path === d.path);
@@ -132,7 +127,7 @@ export class DevicePool extends EventEmitter {
 
       deviceList.push(device);
     }
-    Log.debug('get devices result : ', devices, deviceList);
+    // Log.debug('get devices result : ', devices, deviceList);
     console.log('device poll -> connected: ', this.connectedPool);
     console.log('device poll -> disconnected: ', this.disconnectPool);
     await this._checkDevicePool(initOptions);

@@ -19,7 +19,7 @@ import {
 
 import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
-import { DeviceCommands } from './DeviceCommands';
+import { DeviceCommands, PassphrasePromptResponse } from './DeviceCommands';
 
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
@@ -50,6 +50,7 @@ export interface DeviceEvents {
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
+  [DEVICE.PASSPHRASE]: [Device, (response: PassphrasePromptResponse, error?: Error) => void];
 }
 
 export interface Device {

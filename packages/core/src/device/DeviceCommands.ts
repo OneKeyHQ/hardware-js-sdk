@@ -163,7 +163,10 @@ export class DeviceCommands {
         error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
       }
 
-      if (code === FailureType.Failure_DataError && message === 'Please confirm the BlindSign enabled') {
+      if (
+        code === FailureType.Failure_DataError &&
+        message === 'Please confirm the BlindSign enabled'
+      ) {
         error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
       }
 
@@ -217,19 +220,13 @@ export class DeviceCommands {
     }
 
     if (res.type === 'PassphraseRequest') {
-      /**
-       * Temporary, do not support passphrase
-       */
-      // return this._commonCall('PassphraseAck', { passphrase: '' });
-      return Promise.reject(
-        ERRORS.TypedError(
-          HardwareErrorCode.DeviceNotSupportPassphrase,
-          'Device not support passphrase',
-          {
-            require: '2.4.0',
-          }
-        )
-      );
+      return this._promptPassphrase().then(response => {
+        const { passphrase, passphraseOnDevice, cache } = response;
+        console.log(cache);
+        return !passphraseOnDevice
+          ? this._commonCall('PassphraseAck', { passphrase })
+          : this._commonCall('PassphraseAck', { on_device: true });
+      });
     }
 
     // TT fw lower than 2.3.0, device send his current state
@@ -262,6 +259,34 @@ export class DeviceCommands {
           ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
             '_promptPin: PIN callback not configured'
+          )
+        );
+      }
+    });
+  }
+
+  _promptPassphrase() {
+    return new Promise<PassphrasePromptResponse>((resolve, reject) => {
+      if (this.device.listenerCount(DEVICE.PASSPHRASE) > 0) {
+        this._cancelableRequest = reject;
+        this.device.emit(
+          DEVICE.PASSPHRASE,
+          this.device,
+          (response: PassphrasePromptResponse, error?: Error) => {
+            this._cancelableRequest = undefined;
+            if (error) {
+              reject(error);
+            } else {
+              resolve(response);
+            }
+          }
+        );
+      } else {
+        Log.error('[DeviceCommands] [call] Passphrase callback not configured, cancelling request');
+        reject(
+          ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            '_promptPassphrase: Passphrase callback not configured'
           )
         );
       }
