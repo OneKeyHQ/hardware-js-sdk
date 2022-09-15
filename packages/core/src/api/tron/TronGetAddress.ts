@@ -1,9 +1,9 @@
+import { TronGetAddress as HardwareTronGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { TronGetAddressParams, TronAddress } from '../../types';
-import { TronGetAddress as HardwareTronGetAddress } from '@onekeyfe/hd-transport';
 
 export default class TronGetAddress extends BaseMethod<HardwareTronGetAddress[]> {
   hasBundle = false;
@@ -40,7 +40,7 @@ export default class TronGetAddress extends BaseMethod<HardwareTronGetAddress[]>
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.4.0',
+        min: '2.5.0',
       },
     };
   }

@@ -40,7 +40,7 @@ export default class NearGetAddress extends BaseMethod<HardwareNearGetAddress[]>
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.4.0',
+        min: '2.5.0',
       },
     };
   }

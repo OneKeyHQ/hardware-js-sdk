@@ -1,9 +1,9 @@
+import { TronSignTx } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { TronTransaction } from '../../types/api/tronSignTransaction';
-import { TronSignTx } from '@onekeyfe/hd-transport';
 import { formatAnyHex } from '../helpers/hexUtils';
 
 export default class TronSignTransaction extends BaseMethod<TronSignTx> {
@@ -72,7 +72,7 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.4.0',
+        min: '2.5.0',
       },
     };
   }
