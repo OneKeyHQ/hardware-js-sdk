@@ -73,7 +73,7 @@ const uiResponse = (response: UiResponseEvent) => {
     throw ERRORS.TypedError(HardwareErrorCode.IFrameNotInitialized);
   }
   const { type, payload } = response;
-  sendMessage({ event: UI_EVENT, type, payload });
+  sendMessage({ event: UI_EVENT, type, payload } as CoreMessage);
 };
 
 const cancel = (connectId?: string) => {
