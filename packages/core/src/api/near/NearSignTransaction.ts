@@ -30,7 +30,7 @@ export default class NearSignTransaction extends BaseMethod<HardwareNearSignTx> 
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.4.0',
+        min: '2.5.0',
       },
     };
   }
