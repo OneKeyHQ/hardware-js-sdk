@@ -145,7 +145,11 @@ const call = async (params: any) => {
     _settings = parseConnectSettings(_settings);
     Log.debug("Try to recreate iframe if it's initialize failed: ", _settings);
     try {
-      await init(_settings);
+      const initResult = await init(_settings);
+      if (!initResult) {
+        Log.debug('Recreate iframe failed');
+        return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.IFrameLoadFail));
+      }
       Log.debug('Recreate iframe success');
     } catch (error) {
       Log.debug('Recreate iframe failed: ', error);
