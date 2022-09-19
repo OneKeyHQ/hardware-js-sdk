@@ -140,6 +140,9 @@ const call = async (params: any) => {
         if (response.payload?.code === HardwareErrorCode.BleLocationError) {
           postMessage(createUiMessage(UI_REQUEST.LOCATION_PERMISSION), false);
         }
+        if (response.payload?.code === HardwareErrorCode.BleLocationServicesDisabled) {
+          postMessage(createUiMessage(UI_REQUEST.LOCATION_SERVICE_PERMISSION), false);
+        }
       }
 
       return response;
