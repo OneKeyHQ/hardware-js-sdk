@@ -11,3 +11,8 @@ export {
 export { getHDPath, getScriptType } from '../api/helpers/pathUtils';
 
 export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
+
+export const wait = (ms: number) =>
+  new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });

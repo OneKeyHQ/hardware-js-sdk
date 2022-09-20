@@ -115,6 +115,7 @@ export type CoreApi = {
   checkFirmwareRelease: typeof checkFirmwareRelease;
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;
+  firmwareUpdateV2: typeof firmwareUpdate;
 
   cipherKeyValue: typeof cipherKeyValue;
 

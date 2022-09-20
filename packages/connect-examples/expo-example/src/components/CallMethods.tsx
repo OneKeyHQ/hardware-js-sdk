@@ -139,6 +139,18 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     console.log('example firmwareUpdate response: ', response);
   };
 
+  const handleFirmwareUpdateV2 = async (file?: Uint8Array) => {
+    const params: any = { updateType: firmwareType ? 'firmware' : 'ble' };
+    if (file) {
+      params.binary = file;
+    }
+    const response = await SDK.firmwareUpdateV2(
+      type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
+      params
+    );
+    console.log('example firmwareUpdate response: ', response);
+  };
+
   const onFileChange = (e: any) => {
     const file = e.target.files?.[0];
     const reader = new FileReader();
@@ -201,6 +213,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
           <Switch onValueChange={() => setFirmwareType(!firmwareType)} value={firmwareType} />
         </View>
         <Button title="firmware update" onPress={() => handleFirmwareUpdate()} />
+        <Button title="firmware update v2" onPress={() => handleFirmwareUpdateV2()} />
         <Button
           title="firmware update with local file"
           onPress={() => handleFirmwareUpdate(selectedFile)}

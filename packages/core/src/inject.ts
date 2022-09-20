@@ -144,6 +144,8 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'stellarSignTransaction' }),
 
     firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
+    firmwareUpdateV2: (connectId, params) =>
+      call({ ...params, connectId, method: 'firmwareUpdateV2' }),
     requestWebUsbDevice: () => call({ method: 'requestWebUsbDevice' }),
 
     tronGetAddress: (connectId, deviceId, params) =>
