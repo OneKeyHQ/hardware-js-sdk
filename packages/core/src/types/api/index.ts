@@ -26,6 +26,7 @@ import { deviceFlags } from './deviceFlags';
 import { deviceUpdateReboot } from './deviceUpdateReboot';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
 
+import { batchGetPublicKey } from './batchGetPublicKey';
 import { cipherKeyValue } from './cipherKeyValue';
 
 import { evmGetAddress } from './evmGetAddress';
@@ -116,6 +117,7 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;
 
+  batchGetPublicKey: typeof batchGetPublicKey;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**
