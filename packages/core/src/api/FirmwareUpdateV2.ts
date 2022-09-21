@@ -5,7 +5,8 @@ import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary } from './firmware/getBinary';
 import { uploadFirmware } from './firmware/uploadFirmware';
-import { getDeviceType, wait } from '../utils';
+import { getDeviceType, getDeviceUUID, wait } from '../utils';
+import { Features } from '../types';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -60,6 +61,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       const deviceDiff = await this.device.deviceConnector?.enumerate();
       const devicesDescriptor = deviceDiff?.descriptors ?? [];
       const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
+      console.log('device list: ', deviceList);
       if (deviceList.length === 1 && deviceList[0].features?.bootloader_mode) {
         // should update current device from cache
         // because device was reboot and had some new requests
@@ -84,6 +86,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     const { device, params } = this;
     const { features, commands } = device;
     if (!features?.bootloader_mode) {
+      const uuid = getDeviceUUID(features as Features);
       const deviceType = getDeviceType(features);
       // mini should go to bootloader mode manually
       if (deviceType === 'mini') {
@@ -94,6 +97,12 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       try {
         await commands.typedCall('BixinReboot', 'Success');
         this.checkDeviceToBootloader();
+
+        // force clean classic device cache so that the device can initialize again
+        if (deviceType === 'classic') {
+          DevicePool.clearDeviceCache(uuid);
+        }
+        delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;
         this.checkPromise = null;
         await wait(1500);
