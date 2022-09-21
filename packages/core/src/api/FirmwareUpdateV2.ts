@@ -5,7 +5,7 @@ import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary } from './firmware/getBinary';
 import { uploadFirmware } from './firmware/uploadFirmware';
-import { wait } from '../utils';
+import { getDeviceType, wait } from '../utils';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -60,8 +60,12 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       const deviceDiff = await this.device.deviceConnector?.enumerate();
       const devicesDescriptor = deviceDiff?.descriptors ?? [];
       const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
-      console.log(deviceList);
       if (deviceList.length === 1 && deviceList[0].features?.bootloader_mode) {
+        // should update current device from cache
+        // because device was reboot and had some new requests
+        this.device.updateFromCache(deviceList[0]);
+        this.device.commands.disposed = false;
+
         clearInterval(intervalTimer);
         this.checkPromise?.resolve(true);
       }
@@ -79,20 +83,24 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   async run() {
     const { device, params } = this;
     const { features, commands } = device;
-
     if (!features?.bootloader_mode) {
-      // should go to bootloader mode
+      const deviceType = getDeviceType(features);
+      // mini should go to bootloader mode manually
+      if (deviceType === 'mini') {
+        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedBootloaderMode));
+      }
+
+      // auto go to bootloader mode
       try {
-        const response = await commands.typedCall('BixinReboot', 'Success');
-        console.log('firmware response: ', response);
+        await commands.typedCall('BixinReboot', 'Success');
         this.checkDeviceToBootloader();
         await this.checkPromise?.promise;
         this.checkPromise = null;
         await wait(1500);
       } catch (e) {
-        console.log('firmware response failed: ', e);
+        console.log('auto go to bootloader mode failed: ', e);
         return Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'go to bootloader mode fause')
+          ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'go to bootloader mode failed')
         );
       }
     }
@@ -119,6 +127,8 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
+
+    await this.device.acquire();
 
     return uploadFirmware(
       params.updateType,
