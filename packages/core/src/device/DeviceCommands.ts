@@ -217,7 +217,7 @@ export class DeviceCommands {
 
     if (res.type === 'PassphraseRequest') {
       return this._promptPassphrase().then(response => {
-        const { passphrase, passphraseOnDevice, cache } = response;
+        const { passphrase, passphraseOnDevice } = response;
         return !passphraseOnDevice
           ? this._commonCall('PassphraseAck', { passphrase })
           : this._commonCall('PassphraseAck', { on_device: true });
