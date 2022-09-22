@@ -12,7 +12,7 @@ import {
   getDeviceFirmwareVersion,
   getDeviceModel,
   getDeviceType,
-  // supportNewPassphrase,
+  supportNewPassphrase,
 } from '../utils/deviceFeaturesUtils';
 import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
@@ -216,19 +216,18 @@ export const callAPI = async (message: CoreMessage) => {
 
       if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
         // check version
-        // TODO: template comment
-        // const support = supportNewPassphrase(device.features);
-        // if (!support.support) {
-        //   return Promise.reject(
-        //     ERRORS.TypedError(
-        //       HardwareErrorCode.DeviceNotSupportPassphrase,
-        //       `Device not support passphrase, please update to ${support.require}`,
-        //       {
-        //         require: support.require,
-        //       }
-        //     )
-        //   );
-        // }
+        const support = supportNewPassphrase(device.features);
+        if (!support.support) {
+          return Promise.reject(
+            ERRORS.TypedError(
+              HardwareErrorCode.DeviceNotSupportPassphrase,
+              `Device not support passphrase, please update to ${support.require}`,
+              {
+                require: support.require,
+              }
+            )
+          );
+        }
 
         // Check Device passphrase State
         const passphraseState = await device.checkPassphraseState();
