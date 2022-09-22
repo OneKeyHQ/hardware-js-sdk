@@ -3,6 +3,7 @@ import type { MessageFactoryFn } from './utils';
 
 export const UI_RESPONSE = {
   RECEIVE_PIN: 'ui-receive_pin',
+  RECEIVE_PASSPHRASE: 'ui-receive_passphrase',
 } as const;
 
 export interface UiResponsePin {
@@ -10,7 +11,16 @@ export interface UiResponsePin {
   payload: string;
 }
 
-export type UiResponseEvent = UiResponsePin;
+export interface UiResponsePassphrase {
+  type: typeof UI_RESPONSE.RECEIVE_PASSPHRASE;
+  payload: {
+    value: string;
+    passphraseOnDevice?: boolean;
+    save?: boolean;
+  };
+}
+
+export type UiResponseEvent = UiResponsePin | UiResponsePassphrase;
 
 export type UiResponseMessage = UiResponseEvent & { event: typeof UI_EVENT };
 

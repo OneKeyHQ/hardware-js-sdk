@@ -132,7 +132,8 @@ export const callAPI = async (message: CoreMessage) => {
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
-  device.on(DEVICE.PASSPHRASE_ON_DEVICE, onDevicePassphraseHandler);
+  device.on(DEVICE.PASSPHRASE, onDevicePassphraseHandler);
+  device.on(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
 
   try {
@@ -526,7 +527,8 @@ const cleanup = () => {
 const removeDeviceListener = (device: Device) => {
   device.removeListener(DEVICE.PIN, onDevicePinHandler);
   device.removeListener(DEVICE.BUTTON, onDeviceButtonHandler);
-  device.removeListener(DEVICE.PASSPHRASE_ON_DEVICE, onDevicePassphraseHandler);
+  device.removeListener(DEVICE.PASSPHRASE, onDevicePassphraseHandler);
+  device.removeListener(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
   device.removeListener(DEVICE.FEATURES, onDeviceFeaturesHandler);
   DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
   // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
@@ -587,7 +589,28 @@ const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]
   postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
 };
 
-const onDevicePassphraseHandler = (...[device]: [...DeviceEvents['passphrase_on_device']]) => {
+const onDevicePassphraseHandler = async (...[device, callback]: DeviceEvents['passphrase']) => {
+  Log.debug('onDevicePassphraseHandler');
+  const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PASSPHRASE, device);
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE, {
+      device: device.toMessageObject() as KnownDevice,
+    })
+  );
+  // wait for passphrase
+  const uiResp = await uiPromise.promise;
+  const { value, passphraseOnDevice, save } = uiResp.payload;
+  // send as PassphrasePromptResponse
+  callback({
+    passphrase: value.normalize('NFKD'),
+    passphraseOnDevice,
+    cache: save,
+  });
+};
+
+const onEnterPassphraseOnDeviceHandler = (
+  ...[device]: [...DeviceEvents['passphrase_on_device']]
+) => {
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
       device: device.toMessageObject() as KnownDevice,
@@ -624,7 +647,8 @@ const removeUiPromise = (promise: Deferred<any>) => {
 export default class Core extends EventEmitter {
   async handleMessage(message: CoreMessage) {
     switch (message.type) {
-      case UI_RESPONSE.RECEIVE_PIN: {
+      case UI_RESPONSE.RECEIVE_PIN:
+      case UI_RESPONSE.RECEIVE_PASSPHRASE: {
         const uiPromise = findUiPromise(message.type);
         if (uiPromise) {
           uiPromise.resolve(message);
