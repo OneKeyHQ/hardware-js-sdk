@@ -41,7 +41,9 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const [selectedFile, setSelectedFile] = useState<Uint8Array>();
   const [firmwareType, setFirmwareType] = useState<boolean>(false);
 
-  const [optionalParams, setOptionalParams] = useState<CommonParams>();
+  const [optionalParams, setOptionalParams] = useState<CommonParams>({
+    skipPassphraseCheck: true,
+  });
 
   useEffect(() => {
     // 监听 SDK 事件
@@ -283,6 +285,13 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
             <Switch
               value={!!optionalParams?.initSession}
               onValueChange={v => setOptionalParams({ ...optionalParams, initSession: v })}
+            />
+          </View>
+          <View style={styles.commonParamItem}>
+            <Text>skip passphrase check</Text>
+            <Switch
+              value={!!optionalParams?.skipPassphraseCheck}
+              onValueChange={v => setOptionalParams({ ...optionalParams, skipPassphraseCheck: v })}
             />
           </View>
         </View>
