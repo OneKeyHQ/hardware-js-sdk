@@ -21,7 +21,14 @@
     "setup": "yarn && yarn bootstrap && yarn build",
     "publish-packages": "lerna publish from-package",
     "update-version": "lerna version --no-git-tag-version",
-    "example": "cd ./packages/connect-examples/expo-example && yarn start"
+    "example": "cd ./packages/connect-examples/expo-example && yarn start",
+    "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
+    "dev:ble": "cd ./packages/hd-ble-sdk && yarn dev",
+    "dev:core": "cd ./packages/core && yarn dev",
+    "dev:transport": "cd ./packages/hd-transport && yarn dev",
+    "dev:transport-http": "cd ./packages/hd-transport-web && yarn dev",
+    "dev:transport-rn": "cd ./packages/hd-transport-react-native && yarn dev",
+    "dev:shared": "cd ./packages/shared && yarn dev"
   },
   "devDependencies": {
     "@babel/eslint-parser": "^7.16.3",
