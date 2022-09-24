@@ -284,6 +284,8 @@ export const HardwareErrorCode = {
    * Device does not open blid sign
    */
   BlindSignDisabled: 811,
+
+  UnexpectPassphrase: 812,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -376,6 +378,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.PollingTimeout]: 'Polling timeout',
   [HardwareErrorCode.PollingStop]: 'Polling stop',
   [HardwareErrorCode.BlindSignDisabled]: 'Please confirm the BlindSign enabled',
+  [HardwareErrorCode.UnexpectPassphrase]: 'Unexpect passphrase',
 } as const;
 
 export const TypedError = (

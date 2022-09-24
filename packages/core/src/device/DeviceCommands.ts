@@ -137,10 +137,13 @@ export class DeviceCommands {
 
   async _commonCall(type: MessageKey, msg?: DefaultMessageResponse['message']) {
     const resp = await this.call(type, msg);
-    return this._filterCommonTypes(resp);
+    return this._filterCommonTypes(resp, type);
   }
 
-  _filterCommonTypes(res: DefaultMessageResponse): Promise<DefaultMessageResponse> {
+  _filterCommonTypes(
+    res: DefaultMessageResponse,
+    callType: MessageKey
+  ): Promise<DefaultMessageResponse> {
     Log.debug('_filterCommonTypes: ', res);
     if (res.type === 'Failure') {
       const { code, message } = res.message;
@@ -164,6 +167,10 @@ export class DeviceCommands {
 
       if (code === 'Failure_DataError' && message === 'Please confirm the BlindSign enabled') {
         error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
+      }
+
+      if (code === 'Failure_UnexpectedMessage' && callType === 'PassphraseAck') {
+        error = ERRORS.TypedError(HardwareErrorCode.UnexpectPassphrase);
       }
 
       if (error) {

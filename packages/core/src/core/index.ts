@@ -601,6 +601,7 @@ const onDevicePassphraseHandler = async (...[device, callback]: DeviceEvents['pa
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE, {
       device: device.toMessageObject() as KnownDevice,
+      passphraseState: device.passphraseState,
     })
   );
   // wait for passphrase
