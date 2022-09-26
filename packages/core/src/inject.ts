@@ -54,12 +54,6 @@ export const inject = ({
     getFeatures: connectId => call({ connectId, method: 'getFeatures' }),
 
     /**
-     * 批量获取公钥
-     */
-    batchGetPublicKey: (connectId, deviceId, params) =>
-      call({ ...params, connectId, deviceId, method: 'batchGetPublicKey' }),
-
-    /**
      * 检查固件版本
      */
     checkFirmwareRelease: connectId => call({ connectId, method: 'checkFirmwareRelease' }),
