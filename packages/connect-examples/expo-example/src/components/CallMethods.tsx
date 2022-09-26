@@ -41,7 +41,9 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const [selectedFile, setSelectedFile] = useState<Uint8Array>();
   const [firmwareType, setFirmwareType] = useState<boolean>(false);
 
-  const [optionalParams, setOptionalParams] = useState<CommonParams>();
+  const [optionalParams, setOptionalParams] = useState<CommonParams>({
+    skipPassphraseCheck: true,
+  });
 
   useEffect(() => {
     // 监听 SDK 事件
@@ -54,6 +56,18 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
           type: UI_RESPONSE.RECEIVE_PIN,
           payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
         });
+      }
+      if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+        setTimeout(() => {
+          SDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: {
+              value: '',
+              passphraseOnDevice: true,
+              save: false,
+            },
+          });
+        }, 2000);
       }
     });
 
@@ -134,7 +148,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     }
     const response = await SDK.firmwareUpdate(
       type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
-      params,
+      params
     );
     console.log('example firmwareUpdate response: ', response);
   };
@@ -271,6 +285,13 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
             <Switch
               value={!!optionalParams?.initSession}
               onValueChange={v => setOptionalParams({ ...optionalParams, initSession: v })}
+            />
+          </View>
+          <View style={styles.commonParamItem}>
+            <Text>skip passphrase check</Text>
+            <Switch
+              value={!!optionalParams?.skipPassphraseCheck}
+              onValueChange={v => setOptionalParams({ ...optionalParams, skipPassphraseCheck: v })}
             />
           </View>
         </View>

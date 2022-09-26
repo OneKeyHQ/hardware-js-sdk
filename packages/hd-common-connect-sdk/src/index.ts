@@ -42,7 +42,7 @@ const uiResponse = (response: UiResponseEvent) => {
     throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
   }
   const { type, payload } = response;
-  _core.handleMessage({ event: UI_EVENT, type, payload });
+  _core.handleMessage({ event: UI_EVENT, type, payload } as CoreMessage);
 };
 
 const cancel = (connectId?: string) => {

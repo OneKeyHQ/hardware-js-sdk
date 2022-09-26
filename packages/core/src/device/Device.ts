@@ -19,7 +19,7 @@ import {
 
 import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
-import { DeviceCommands } from './DeviceCommands';
+import { DeviceCommands, PassphrasePromptResponse } from './DeviceCommands';
 
 import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
 import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
@@ -32,6 +32,7 @@ export type InitOptions = {
   initSession?: boolean;
   deviceId?: string;
   passphraseState?: string;
+  skipPassphraseCheck?: boolean;
 };
 
 export type RunOptions = {
@@ -50,6 +51,7 @@ export interface DeviceEvents {
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
+  [DEVICE.PASSPHRASE]: [Device, (response: PassphrasePromptResponse, error?: Error) => void];
 }
 
 export interface Device {
@@ -112,6 +114,8 @@ export class Device extends EventEmitter {
   keepSession = false;
 
   passphraseState: string | undefined = undefined;
+
+  skipPassphraseCheck: boolean | undefined = false;
 
   constructor(descriptor: DeviceDescriptor) {
     super();
@@ -255,12 +259,14 @@ export class Device extends EventEmitter {
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
       `features.device_id: ${this.features?.device_id}`,
-      `passphraseState: ${this.passphraseState}`
+      `passphraseState: ${this.passphraseState}`,
+      `skipPassphraseCheck: ${this.skipPassphraseCheck}`
     );
     Log.debug('getInternalState session cache: ', deviceSessionCache);
 
     const deviceId = _deviceId || this.features?.device_id;
     if (!deviceId) return undefined;
+    if (this.skipPassphraseCheck) return deviceSessionCache[deviceId];
     if (!this.passphraseState) return undefined;
 
     const usePassKey = `${deviceId}@${this.passphraseState}`;
@@ -285,7 +291,9 @@ export class Device extends EventEmitter {
     );
 
     if (!this.features) return;
-    if (!this.passphraseState && !initSession) return;
+    if (!this.skipPassphraseCheck) {
+      if (!this.passphraseState && !initSession) return;
+    }
 
     let key = `${this.features.device_id}`;
     if (this.passphraseState) {
@@ -315,6 +323,7 @@ export class Device extends EventEmitter {
     Log.debug('initialize param:', options);
 
     this.passphraseState = options?.passphraseState;
+    this.skipPassphraseCheck = options?.skipPassphraseCheck;
 
     if (options?.initSession) {
       this.clearInternalState(options?.deviceId);
