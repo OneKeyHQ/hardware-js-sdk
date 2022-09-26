@@ -30,7 +30,7 @@ export default class AptosSignTransaction extends BaseMethod<HardwareAptosSignTx
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.4.0',
+        min: '2.6.0',
       },
     };
   }

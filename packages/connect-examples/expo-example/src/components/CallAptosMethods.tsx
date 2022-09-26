@@ -30,6 +30,15 @@ export function CallAptosMethods({
         />
 
         <MethodInvoke
+          title="AptosGetPublicKey"
+          options={[
+            { name: 'path', value: "m/44'/637'/0'/0'", type: 'string' },
+            { name: 'showOnOneKey', value: false, type: 'boolean' },
+          ]}
+          onCall={data => SDK.aptosGetPublicKey(connectId, deviceId, { ...commonParams, ...data })}
+        />
+
+        <MethodInvoke
           title="aptosSignTransaction"
           options={[
             { name: 'path', value: "m/44'/637'/0'/0'", type: 'string' },
