@@ -16,6 +16,14 @@ export default class BatchGetPublicKey extends BaseMethod {
     });
   }
 
+  getVersionRange() {
+    return {
+      model_mini: {
+        min: '2.6.0',
+      },
+    };
+  }
+
   async run() {
     // @ts-expect-error
     const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
