@@ -17,6 +17,7 @@ export default {
     fallback: {
       crypto: require.resolve('crypto-browserify'), // required by multiple dependencies
       stream: require.resolve('stream-browserify'),
+      buffer: require.resolve('buffer'),
     },
   },
 };
