@@ -20,6 +20,7 @@ export { default as deviceWipe } from './device/DeviceWipe';
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
 
+export { default as batchGetPublicKey } from './BatchGetPublicKey';
 export { default as cipherKeyValue } from './CipherKeyValue';
 
 export { default as btcGetAddress } from './btc/BTCGetAddress';
