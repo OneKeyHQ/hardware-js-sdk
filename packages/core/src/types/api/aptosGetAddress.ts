@@ -3,6 +3,7 @@ import type { CommonParams, Response } from '../params';
 
 export type AptosAddress = {
   path: string;
+  publicKey?: string;
 } & HardwareAptosAddress;
 
 export type AptosGetAddressParams = {

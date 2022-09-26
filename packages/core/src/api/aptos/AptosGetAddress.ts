@@ -4,7 +4,10 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { AptosAddress, AptosGetAddressParams } from '../../types';
-
+import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
+import sha3 from "js-sha3";
+import { hexToBytes } from '../helpers/hexUtils';
+const { sha3_256: sha3Hash } = sha3;
 export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[]> {
   hasBundle = false;
 
@@ -37,9 +40,30 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
     });
   }
 
-  async run() {
-    const responses: AptosAddress[] = [];
+  publicKeyToAddress(publicKey: string) {
+    const hash = sha3Hash.create();
+    hash.update(hexToBytes(publicKey));
+    hash.update("\x00");
+    return hash.hex();
+  }
 
+  async run() {
+    if (this.hasBundle && supportBatchPublicKey(this.device?.features)) {
+      // @ts-expect-error
+      const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
+        paths: this.params,
+        ecdsa_curve_name: 'ed25519',
+      });
+      // @ts-expect-error
+      const result =  res.message.public_keys.map((publicKey: string, index: number) => ({
+        path: serializedPath((this.params as unknown as any[])[index].address_n),
+        publicKey,
+        address: this.publicKeyToAddress(publicKey),
+      }));
+      return Promise.resolve(result);
+    }
+
+    const responses: AptosAddress[] = [];
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
