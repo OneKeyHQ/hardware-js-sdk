@@ -32,7 +32,6 @@ export type InitOptions = {
   initSession?: boolean;
   deviceId?: string;
   passphraseState?: string;
-  skipPassphraseCheck?: boolean;
 };
 
 export type RunOptions = {
@@ -114,8 +113,6 @@ export class Device extends EventEmitter {
   keepSession = false;
 
   passphraseState: string | undefined = undefined;
-
-  skipPassphraseCheck: boolean | undefined = false;
 
   constructor(descriptor: DeviceDescriptor) {
     super();
@@ -259,14 +256,12 @@ export class Device extends EventEmitter {
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
       `features.device_id: ${this.features?.device_id}`,
-      `passphraseState: ${this.passphraseState}`,
-      `skipPassphraseCheck: ${this.skipPassphraseCheck}`
+      `passphraseState: ${this.passphraseState}`
     );
     Log.debug('getInternalState session cache: ', deviceSessionCache);
 
     const deviceId = _deviceId || this.features?.device_id;
     if (!deviceId) return undefined;
-    if (this.skipPassphraseCheck) return deviceSessionCache[deviceId];
     if (!this.passphraseState) return undefined;
 
     const usePassKey = `${deviceId}@${this.passphraseState}`;
@@ -291,9 +286,7 @@ export class Device extends EventEmitter {
     );
 
     if (!this.features) return;
-    if (!this.skipPassphraseCheck) {
-      if (!this.passphraseState && !initSession) return;
-    }
+    if (!this.passphraseState && !initSession) return;
 
     let key = `${this.features.device_id}`;
     if (this.passphraseState) {
@@ -323,7 +316,6 @@ export class Device extends EventEmitter {
     Log.debug('initialize param:', options);
 
     this.passphraseState = options?.passphraseState;
-    this.skipPassphraseCheck = options?.skipPassphraseCheck;
 
     if (options?.initSession) {
       this.clearInternalState(options?.deviceId);

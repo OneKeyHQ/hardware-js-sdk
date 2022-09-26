@@ -20,12 +20,6 @@ export interface CommonParams {
    * Every init session
    */
   initSession?: boolean;
-
-  /**
-   * skip passhprase check
-   * !! Use with caution, there are safety risks !!
-   */
-  skipPassphraseCheck?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

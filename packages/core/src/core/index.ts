@@ -44,7 +44,6 @@ const Log = getLogger(LoggerNames.Core);
 const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   initSession: method?.payload.initSession,
   passphraseState: method?.payload.passphraseState,
-  skipPassphraseCheck: method?.payload.skipPassphraseCheck,
   deviceId: method?.payload.deviceId,
 });
 
@@ -230,19 +229,17 @@ export const callAPI = async (message: CoreMessage) => {
           );
         }
 
-        if (!method.payload.skipPassphraseCheck) {
-          // Check Device passphrase State
-          const passphraseState = await device.checkPassphraseState();
+        // Check Device passphrase State
+        const passphraseState = await device.checkPassphraseState();
 
-          // Double check, handles the special case of Touch/Pro
-          checkPassphraseSafety(method, device.features);
+        // Double check, handles the special case of Touch/Pro
+        checkPassphraseSafety(method, device.features);
 
-          if (passphraseState) {
-            DevicePool.clearDeviceCache(method.payload.connectId);
-            return Promise.reject(
-              ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
-            );
-          }
+        if (passphraseState) {
+          DevicePool.clearDeviceCache(method.payload.connectId);
+          return Promise.reject(
+            ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
+          );
         }
       }
 
@@ -510,9 +507,6 @@ export const cancel = (connectId?: string) => {
 
 const checkPassphraseSafety = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
-
-  // skip check passphrase status
-  if (method.payload.skipPassphraseCheck) return;
 
   if (features?.passphrase_protection === true && !method.payload.passphraseState) {
     DevicePool.clearDeviceCache(method.payload.connectId);
