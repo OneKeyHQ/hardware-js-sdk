@@ -20,10 +20,7 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'no firmware found for this device');
   }
 
-  if (
-    version &&
-    !semver.eq(releaseInfo.version as unknown as semver.SemVer, version as unknown as semver.SemVer)
-  ) {
+  if (version && !semver.eq(releaseInfo.version.join('.'), version.join('.'))) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware version mismatch');
   }
 
