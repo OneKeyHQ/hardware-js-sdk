@@ -25,6 +25,21 @@ const postProgressMessage = (
   );
 };
 
+const postProgressTip = (
+  device: Device,
+  message: string,
+  postMessage: (message: CoreMessage) => void
+) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
+      device: device.toMessageObject() as KnownDevice,
+      data: {
+        message,
+      },
+    })
+  );
+};
+
 export const uploadFirmware = async (
   updateType: 'firmware' | 'ble',
   typedCall: TypedCall,
@@ -34,8 +49,10 @@ export const uploadFirmware = async (
 ) => {
   if (device.features?.major_version === 1) {
     postConfirmationMessage(device);
+    postProgressTip(device, 'ConfirmOnDevice', postMessage);
     const eraseCommand = updateType === 'firmware' ? 'FirmwareErase' : 'FirmwareErase_ex';
     await typedCall(eraseCommand as unknown as any, 'Success', {});
+    postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
     postProgressMessage(device, 0, postMessage);
     const { message } = await typedCall('FirmwareUpload', 'Success', {
       payload,
@@ -46,9 +63,11 @@ export const uploadFirmware = async (
 
   if (device.features?.major_version === 2) {
     postConfirmationMessage(device);
+    postProgressTip(device, 'ConfirmOnDevice', postMessage);
     const length = payload.byteLength;
 
     let response = await typedCall('FirmwareErase', ['FirmwareRequest', 'Success'], { length });
+    postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
     while (response.type !== 'Success') {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const start = response.message.offset!;

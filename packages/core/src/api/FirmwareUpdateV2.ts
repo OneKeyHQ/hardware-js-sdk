@@ -6,7 +6,8 @@ import { DevicePool } from '../device/DevicePool';
 import { getBinary } from './firmware/getBinary';
 import { uploadFirmware } from './firmware/uploadFirmware';
 import { getDeviceType, getDeviceUUID, wait } from '../utils';
-import { Features } from '../types';
+import { createUiMessage } from '../events';
+import type { KnownDevice, Features } from '../types';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -53,6 +54,17 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     }
   }
 
+  postTipMessage = (message: string) => {
+    this.postMessage(
+      createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
+        device: this.device.toMessageObject() as KnownDevice,
+        data: {
+          message,
+        },
+      })
+    );
+  };
+
   checkDeviceToBootloader() {
     this.checkPromise = createDeferred();
 
@@ -95,7 +107,9 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
 
       // auto go to bootloader mode
       try {
+        this.postTipMessage('AutoRebootToBootloader');
         await commands.typedCall('BixinReboot', 'Success');
+        this.postTipMessage('GoToBootloaderSuccess');
         this.checkDeviceToBootloader();
 
         // force clean classic device cache so that the device can initialize again
@@ -126,12 +140,14 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
             'no features found for this device'
           );
         }
+        this.postTipMessage('DownloadFirmware');
         const firmware = await getBinary({
           features: device.features,
           version: params.version,
           updateType: params.updateType,
         });
         binary = firmware.binary;
+        this.postTipMessage('DownloadFirmwareSuccess');
       }
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
