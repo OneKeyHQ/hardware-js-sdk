@@ -30,6 +30,28 @@ export function CallAptosMethods({
         />
 
         <MethodInvoke
+          title="aptosGetAddress [bundle]"
+          options={[]}
+          onCall={data =>
+            SDK.aptosGetAddress(connectId, deviceId, {
+              ...commonParams,
+              bundle: [
+                { path: "m/44'/637'/0'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/1'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/2'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/3'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/4'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/5'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/6'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/7'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/8'/0'/0'", showOnOneKey: false },
+                { path: "m/44'/637'/9'/0'/0'", showOnOneKey: false },
+              ],
+            })
+          }
+        />
+
+        <MethodInvoke
           title="AptosGetPublicKey"
           options={[
             { name: 'path', value: "m/44'/637'/0'/0'", type: 'string' },
