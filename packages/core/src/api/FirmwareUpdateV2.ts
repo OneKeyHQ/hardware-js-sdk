@@ -6,7 +6,7 @@ import { DevicePool } from '../device/DevicePool';
 import { getBinary } from './firmware/getBinary';
 import { uploadFirmware } from './firmware/uploadFirmware';
 import { getDeviceType, getDeviceUUID, wait } from '../utils';
-import { createUiMessage } from '../events';
+import { createUiMessage } from '../events/ui-request';
 import type { KnownDevice, Features } from '../types';
 
 type Params = {
