@@ -184,6 +184,11 @@ export const HardwareErrorCode = {
   CallMethodDeprecated: 408,
 
   /**
+   * Only one device can be connected during firmware upgrade
+   */
+  FirmwareUpdateLimitOneDevice: 409,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -331,6 +336,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FirmwareUpdateDownloadFailed]: 'Firmware update download failed',
   [HardwareErrorCode.CallMethodNeedUpgradeFirmware]: 'Call method need upgrade firmware',
   [HardwareErrorCode.CallMethodDeprecated]: 'Call method is deprecated',
+  [HardwareErrorCode.FirmwareUpdateLimitOneDevice]:
+    'Only one device can be connected during firmware upgrade',
 
   /**
    * Network Errors

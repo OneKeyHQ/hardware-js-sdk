@@ -19,6 +19,7 @@ export const UI_REQUEST = {
   LOCATION_SERVICE_PERMISSION: 'ui-location_service_permission',
 
   FIRMWARE_PROGRESS: 'ui-firmware-progress',
+  FIRMWARE_TIP: 'ui-firmware-tip',
 
   NOT_IN_BOOTLOADER: 'ui-device_not_in_bootloader_mode',
 } as const;
@@ -69,13 +70,22 @@ export interface FirmwareProgress {
   };
 }
 
+export interface FirmwareTip {
+  type: typeof UI_REQUEST.FIRMWARE_TIP;
+  payload: {
+    device: Device;
+    data: { message: string };
+  };
+}
+
 export type UiEvent =
   | UiRequestWithoutPayload
   | UiRequestDeviceAction
   | UiRequestButton
   | UiRequestPassphraseOnDevice
+  | UiRequestPassphrase
   | FirmwareProgress
-  | UiRequestPassphrase;
+  | FirmwareTip;
 
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
 

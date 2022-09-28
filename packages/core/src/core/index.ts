@@ -345,7 +345,11 @@ function initDevice(method: BaseMethod) {
   } else if (allDevices.length === 1) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {
-    throw ERRORS.TypedError(HardwareErrorCode.SelectDevice);
+    throw ERRORS.TypedError(
+      method.name === 'firmwareUpdateV2'
+        ? HardwareErrorCode.FirmwareUpdateLimitOneDevice
+        : HardwareErrorCode.SelectDevice
+    );
   }
 
   if (!device) {
@@ -463,6 +467,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
+            HardwareErrorCode.FirmwareUpdateLimitOneDevice,
           ].includes(error.errorCode)
         ) {
           reject(error);
