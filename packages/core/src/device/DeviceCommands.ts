@@ -137,10 +137,13 @@ export class DeviceCommands {
 
   async _commonCall(type: MessageKey, msg?: DefaultMessageResponse['message']) {
     const resp = await this.call(type, msg);
-    return this._filterCommonTypes(resp);
+    return this._filterCommonTypes(resp, type);
   }
 
-  _filterCommonTypes(res: DefaultMessageResponse): Promise<DefaultMessageResponse> {
+  _filterCommonTypes(
+    res: DefaultMessageResponse,
+    callType: MessageKey
+  ): Promise<DefaultMessageResponse> {
     Log.debug('_filterCommonTypes: ', res);
     if (res.type === 'Failure') {
       const { code, message } = res.message;
@@ -164,6 +167,10 @@ export class DeviceCommands {
 
       if (code === 'Failure_DataError' && message === 'Please confirm the BlindSign enabled') {
         error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
+      }
+
+      if (code === 'Failure_UnexpectedMessage' && callType === 'PassphraseAck') {
+        error = ERRORS.TypedError(HardwareErrorCode.UnexpectPassphrase);
       }
 
       if (error) {
@@ -216,19 +223,12 @@ export class DeviceCommands {
     }
 
     if (res.type === 'PassphraseRequest') {
-      /**
-       * Temporary, do not support passphrase
-       */
-      // return this._commonCall('PassphraseAck', { passphrase: '' });
-      return Promise.reject(
-        ERRORS.TypedError(
-          HardwareErrorCode.DeviceNotSupportPassphrase,
-          'Device not support passphrase',
-          {
-            require: '2.4.0',
-          }
-        )
-      );
+      return this._promptPassphrase().then(response => {
+        const { passphrase, passphraseOnDevice } = response;
+        return !passphraseOnDevice
+          ? this._commonCall('PassphraseAck', { passphrase })
+          : this._commonCall('PassphraseAck', { on_device: true });
+      });
     }
 
     // TT fw lower than 2.3.0, device send his current state
@@ -261,6 +261,34 @@ export class DeviceCommands {
           ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
             '_promptPin: PIN callback not configured'
+          )
+        );
+      }
+    });
+  }
+
+  _promptPassphrase() {
+    return new Promise<PassphrasePromptResponse>((resolve, reject) => {
+      if (this.device.listenerCount(DEVICE.PASSPHRASE) > 0) {
+        this._cancelableRequest = reject;
+        this.device.emit(
+          DEVICE.PASSPHRASE,
+          this.device,
+          (response: PassphrasePromptResponse, error?: Error) => {
+            this._cancelableRequest = undefined;
+            if (error) {
+              reject(error);
+            } else {
+              resolve(response);
+            }
+          }
+        );
+      } else {
+        Log.error('[DeviceCommands] [call] Passphrase callback not configured, cancelling request');
+        reject(
+          ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            '_promptPassphrase: Passphrase callback not configured'
           )
         );
       }

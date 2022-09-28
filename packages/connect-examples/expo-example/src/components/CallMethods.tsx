@@ -55,6 +55,18 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
           payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
         });
       }
+      if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+        setTimeout(() => {
+          SDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: {
+              value: '',
+              passphraseOnDevice: true,
+              save: false,
+            },
+          });
+        }, 2000);
+      }
     });
 
     // SDK.on(LOG_EVENT, (message: CoreMessage) => {

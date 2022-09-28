@@ -3042,6 +3042,45 @@
         }
       }
     },
+    "BatchGetPublickeys": {
+      "fields": {
+        "ecdsa_curve_name": {
+          "type": "string",
+          "id": 1,
+          "options": {
+            "default": "ed25519"
+          }
+        },
+        "paths": {
+          "rule": "repeated",
+          "type": "Path",
+          "id": 2
+        }
+      },
+      "nested": {
+        "Path": {
+          "fields": {
+            "address_n": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 1,
+              "options": {
+                "packed": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "EcdsaPublicKeys": {
+      "fields": {
+        "public_keys": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "DebugLinkDecision": {
       "fields": {
         "yes_no": {
@@ -8203,6 +8242,8 @@
         "MessageType_CosiCommitment": 72,
         "MessageType_CosiSign": 73,
         "MessageType_CosiSignature": 74,
+        "MessageType_BatchGetPublickeys": 10016,
+        "MessageType_EcdsaPublicKeys": 10017,
         "MessageType_DebugLinkDecision": 100,
         "MessageType_DebugLinkGetState": 101,
         "MessageType_DebugLinkState": 102,
