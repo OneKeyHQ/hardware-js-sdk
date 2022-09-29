@@ -84,7 +84,7 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
 
       responses.push({
         path: serializedPath(param.address_n),
-        address,
+        address: address?.toLowerCase(),
       });
     }
 
