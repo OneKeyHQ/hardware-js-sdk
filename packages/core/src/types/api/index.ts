@@ -26,7 +26,6 @@ import { deviceFlags } from './deviceFlags';
 import { deviceUpdateReboot } from './deviceUpdateReboot';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
 
-import { batchGetPublicKey } from './batchGetPublicKey';
 import { cipherKeyValue } from './cipherKeyValue';
 
 import { evmGetAddress } from './evmGetAddress';
@@ -71,6 +70,7 @@ import { nearGetAddress } from './nearGetAddress';
 import { nearSignTransaction } from './nearSignTransaction';
 
 import { aptosGetAddress } from './aptosGetAddress';
+import { aptosGetPublicKey } from './aptosGetPublicKey';
 import { aptosSignTransaction } from './aptosSignTransaction';
 
 export * from './export';
@@ -118,7 +118,6 @@ export type CoreApi = {
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdate;
 
-  batchGetPublicKey: typeof batchGetPublicKey;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**
@@ -193,5 +192,6 @@ export type CoreApi = {
    * Aptos function
    */
   aptosGetAddress: typeof aptosGetAddress;
+  aptosGetPublicKey: typeof aptosGetPublicKey;
   aptosSignTransaction: typeof aptosSignTransaction;
 };

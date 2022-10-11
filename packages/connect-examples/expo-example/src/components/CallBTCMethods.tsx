@@ -44,32 +44,6 @@ export function CallBTCMethods({
         />
 
         <MethodInvoke
-          title="batchGetPublicKey"
-          options={[
-            { name: 'paths', value: '', type: 'string' },
-            { name: 'ecdsaCurveName', value: 'secp256k1', type: 'string' },
-          ]}
-          onCall={data =>
-            SDK.batchGetPublicKey(connectId, deviceId, {
-              ...commonParams,
-              paths: [
-                "m/49'/0'/0'",
-                "m/49'/0'/1'",
-                "m/49'/0'/2'",
-                "m/49'/0'/3'",
-                "m/49'/0'/4'",
-                "m/49'/0'/5'",
-                "m/49'/0'/6'",
-                "m/49'/0'/7'",
-                "m/49'/0'/8'",
-                "m/49'/0'/9'",
-              ],
-              ecdsaCurveName: 'secp256k1',
-            } as any)
-          }
-        />
-
-        <MethodInvoke
           title="btcSignMessage"
           options={[
             { name: 'path', value: "m/44'/0'/0'/0/0", type: 'string' },

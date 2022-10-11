@@ -21,7 +21,6 @@ export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
 
-export { default as batchGetPublicKey } from './BatchGetPublicKey';
 export { default as cipherKeyValue } from './CipherKeyValue';
 
 export { default as btcGetAddress } from './btc/BTCGetAddress';
@@ -66,4 +65,5 @@ export { default as nearGetAddress } from './near/NearGetAddress';
 export { default as nearSignTransaction } from './near/NearSignTransaction';
 
 export { default as aptosGetAddress } from './aptos/AptosGetAddress';
+export { default as aptosGetPublicKey } from './aptos/AptosGetPublicKey';
 export { default as aptosSignTransaction } from './aptos/AptosSignTransaction';

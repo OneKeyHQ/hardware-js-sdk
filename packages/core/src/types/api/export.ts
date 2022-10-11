@@ -94,4 +94,5 @@ export type { NearAddress, NearGetAddressParams } from './nearGetAddress';
 export type { NearSignTransactionParams } from './nearSignTransaction';
 
 export type { AptosAddress, AptosGetAddressParams } from './aptosGetAddress';
+export type { AptosPublicKey, AptosGetPublicKeyParams } from './aptosGetPublicKey';
 export type { AptosSignedTx, AptosSignTransactionParams } from './aptosSignTransaction';

@@ -1,12 +1,13 @@
 import { AptosGetAddress as HardwareAptosGetAddress } from '@onekeyfe/hd-transport';
+import sha3 from 'js-sha3';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { AptosAddress, AptosGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
-import sha3 from "js-sha3";
 import { hexToBytes } from '../helpers/hexUtils';
+
 const { sha3_256: sha3Hash } = sha3;
 export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[]> {
   hasBundle = false;
@@ -43,8 +44,16 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
   publicKeyToAddress(publicKey: string) {
     const hash = sha3Hash.create();
     hash.update(hexToBytes(publicKey));
-    hash.update("\x00");
+    hash.update('\x00');
     return hash.hex();
+  }
+
+  getVersionRange() {
+    return {
+      model_mini: {
+        min: '2.6.0',
+      },
+    };
   }
 
   async run() {
@@ -55,7 +64,7 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
         ecdsa_curve_name: 'ed25519',
       });
       // @ts-expect-error
-      const result =  res.message.public_keys.map((publicKey: string, index: number) => ({
+      const result = res.message.public_keys.map((publicKey: string, index: number) => ({
         path: serializedPath((this.params as unknown as any[])[index].address_n),
         publicKey,
         address: this.publicKeyToAddress(publicKey),
@@ -75,7 +84,7 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
 
       responses.push({
         path: serializedPath(param.address_n),
-        address,
+        address: address?.toLowerCase(),
       });
     }
 
