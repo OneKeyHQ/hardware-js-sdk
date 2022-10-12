@@ -24,6 +24,9 @@ export default class GetPassphraseState extends BaseMethod {
     }
 
     if (features && features.passphrase_protection === true) {
+      if (passphraseState && features.device_id) {
+        this.device.tryFixInternalState(passphraseState, features.device_id);
+      }
       return Promise.resolve(passphraseState);
     }
     return Promise.resolve(undefined);

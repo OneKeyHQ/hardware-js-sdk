@@ -251,6 +251,13 @@ export class Device extends EventEmitter {
     return this.commands;
   }
 
+  private generateStateKey(deviceId: string, passphraseState?: string) {
+    if (passphraseState) {
+      return `${deviceId}@${passphraseState}`;
+    }
+    return deviceId;
+  }
+
   getInternalState(_deviceId?: string) {
     Log.debug(
       'getInternalState session param: ',
@@ -264,19 +271,27 @@ export class Device extends EventEmitter {
     if (!deviceId) return undefined;
     if (!this.passphraseState) return undefined;
 
-    const usePassKey = `${deviceId}@${this.passphraseState}`;
-
-    if (!deviceSessionCache[usePassKey]) {
-      const key = `${deviceId}`;
-      if (deviceSessionCache[key]) {
-        deviceSessionCache[usePassKey] = deviceSessionCache[key];
-      }
-    }
-
+    const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
     return deviceSessionCache[usePassKey];
   }
 
-  setInternalState(state: string, initSession?: boolean) {
+  tryFixInternalState(state: string, deviceId: string) {
+    Log.debug(
+      'tryFixInternalState session param: ',
+      `device_id: ${deviceId}`,
+      `passphraseState: ${state}`
+    );
+
+    const key = `${deviceId}`;
+    const session = deviceSessionCache[key];
+    if (session) {
+      deviceSessionCache[this.generateStateKey(deviceId, state)] = session;
+      delete deviceSessionCache[key];
+    }
+    Log.debug('tryFixInternalState session cache: ', deviceSessionCache);
+  }
+
+  private setInternalState(state: string, initSession?: boolean) {
     Log.debug(
       'setInternalState session param: ',
       `state: ${state}`,
@@ -288,10 +303,11 @@ export class Device extends EventEmitter {
     if (!this.features) return;
     if (!this.passphraseState && !initSession) return;
 
-    let key = `${this.features.device_id}`;
-    if (this.passphraseState) {
-      key += `@${this.passphraseState}`;
-    }
+    const deviceId = this.features?.device_id;
+    if (!deviceId) return;
+
+    const key = this.generateStateKey(deviceId, this.passphraseState);
+
     if (state) {
       deviceSessionCache[key] = state;
     }
@@ -307,7 +323,7 @@ export class Device extends EventEmitter {
     delete deviceSessionCache[key];
 
     if (this.passphraseState) {
-      const usePassKey = `${deviceId}@${this.passphraseState}`;
+      const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
       delete deviceSessionCache[usePassKey];
     }
   }
