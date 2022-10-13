@@ -5011,7 +5011,7 @@
         }
       }
     },
-    "BixinReboot": {
+    "DeviceBackToBoot": {
       "fields": {}
     },
     "BixinBackupRequest": {
@@ -5278,6 +5278,104 @@
           "rule": "required",
           "type": "bytes",
           "id": 1
+        }
+      }
+    },
+    "ResourceUpload": {
+      "fields": {
+        "extension": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "res_type": {
+          "rule": "required",
+          "type": "ResourceType",
+          "id": 3
+        },
+        "zoom_data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 5
+        },
+        "nft_meta_data": {
+          "type": "bytes",
+          "id": 4
+        }
+      },
+      "nested": {
+        "ResourceType": {
+          "values": {
+            "WallPaper": 0,
+            "Nft": 1
+          }
+        }
+      }
+    },
+    "ZoomRequest": {
+      "fields": {
+        "offset": {
+          "type": "uint32",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "ResourceRequest": {
+      "fields": {
+        "offset": {
+          "type": "uint32",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "ResourceAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "hash": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ResourceUpdate": {
+      "fields": {
+        "file_name": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "initial_data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "hash": {
+          "type": "bytes",
+          "id": 4
         }
       }
     },
@@ -6277,6 +6375,7 @@
           }
         },
         "raw_tx": {
+          "rule": "required",
           "type": "bytes",
           "id": 2
         }
@@ -8405,16 +8504,6 @@
         "MessageType_StarcoinSignMessage": 10306,
         "MessageType_StarcoinMessageSignature": 10307,
         "MessageType_StarcoinVerifyMessage": 10308,
-        "MessageType_ConfluxGetAddress": 10401,
-        "MessageType_ConfluxAddress": 10402,
-        "MessageType_ConfluxSignTx": 10403,
-        "MessageType_ConfluxTxRequest": 10404,
-        "MessageType_ConfluxTxAck": 10405,
-        "MessageType_ConfluxSignMessage": 10406,
-        "MessageType_ConfluxSignMessageCIP23": 10407,
-        "MessageType_ConfluxMessageSignature": 10408,
-        "MessageType_ConfluxVerifyMessage": 10409,
-        "MessageType_ConfluxVerifyMessageCIP23": 10410,
         "MessageType_AptosGetAddress": 10600,
         "MessageType_AptosAddress": 10601,
         "MessageType_AptosSignTx": 10602,
@@ -8425,7 +8514,6 @@
         "MessageType_WebAuthnRemoveResidentCredential": 803,
         "MessageType_BixinSeedOperate": 901,
         "MessageType_BixinMessageSE": 902,
-        "MessageType_BixinReboot": 903,
         "MessageType_BixinOutMessageSE": 904,
         "MessageType_BixinBackupRequest": 905,
         "MessageType_BixinBackupAck": 906,
@@ -8442,6 +8530,14 @@
         "MessageType_EthereumSignMessageEIP712": 10200,
         "MessageType_GetPublicKeyMultiple": 10210,
         "MessageType_PublicKeyMultiple": 10211,
+        "MessageType_ConfluxGetAddress": 10112,
+        "MessageType_ConfluxAddress": 10113,
+        "MessageType_ConfluxSignTx": 10114,
+        "MessageType_ConfluxTxRequest": 10115,
+        "MessageType_ConfluxTxAck": 10116,
+        "MessageType_ConfluxSignMessage": 10117,
+        "MessageType_ConfluxSignMessageCIP23": 10118,
+        "MessageType_ConfluxMessageSignature": 10119,
         "MessageType_TronGetAddress": 10501,
         "MessageType_TronAddress": 10502,
         "MessageType_TronSignTx": 10503,
@@ -8452,6 +8548,7 @@
         "MessageType_NearAddress": 10702,
         "MessageType_NearSignTx": 10703,
         "MessageType_NearSignedTx": 10704,
+        "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
         "MessageType_DeviceInfo": 10003,
@@ -8466,7 +8563,12 @@
         "MessageType_SESignMessage": 10012,
         "MessageType_SEMessageSignature": 10013,
         "MessageType_NFTWriteInfo": 10014,
-        "MessageType_NFTWriteData": 10015
+        "MessageType_NFTWriteData": 10015,
+        "MessageType_ResourceUpload": 10018,
+        "MessageType_ZoomRequest": 10019,
+        "MessageType_ResourceRequest": 10020,
+        "MessageType_ResourceAck": 10021,
+        "MessageType_ResourceUpdate": 10022
       }
     },
     "google": {

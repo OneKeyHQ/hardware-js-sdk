@@ -1,4 +1,4 @@
-import type { Transport, Messages } from '@onekeyfe/hd-transport';
+import type { Transport, Messages, FailureType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
@@ -146,7 +146,10 @@ export class DeviceCommands {
   ): Promise<DefaultMessageResponse> {
     Log.debug('_filterCommonTypes: ', res);
     if (res.type === 'Failure') {
-      const { code, message } = res.message;
+      const { code, message } = res.message as {
+        code?: string | FailureType;
+        message?: string;
+      };
       let error: HardwareError | null = null;
       // Model One does not send any message in firmware update
       if (code === 'Failure_FirmwareError' && !message) {

@@ -58,12 +58,10 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
 
   async run() {
     if (this.hasBundle && supportBatchPublicKey(this.device?.features)) {
-      // @ts-expect-error
       const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
         paths: this.params,
         ecdsa_curve_name: 'ed25519',
       });
-      // @ts-expect-error
       const result = res.message.public_keys.map((publicKey: string, index: number) => ({
         path: serializedPath((this.params as unknown as any[])[index].address_n),
         publicKey,

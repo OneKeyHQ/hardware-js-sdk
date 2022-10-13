@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-types */
 // This file is auto generated from data/messages/message.json
 
 // custom type uint32/64 may be represented as string
@@ -962,7 +961,7 @@ export enum FailureType {
 
 // Failure
 export type Failure = {
-  code?: string;
+  code?: FailureType;
   message?: string;
 };
 
@@ -1155,6 +1154,21 @@ export type GetECDHSessionKey = {
 export type ECDHSessionKey = {
   session_key: string;
   public_key?: string;
+};
+
+export type Path = {
+  address_n: number[];
+};
+
+// BatchGetPublickeys
+export type BatchGetPublickeys = {
+  ecdsa_curve_name?: string;
+  paths: Path[];
+};
+
+// EcdsaPublicKeys
+export type EcdsaPublicKeys = {
+  public_keys: string[];
 };
 
 // EosGetPublicKey
@@ -1792,8 +1806,8 @@ export type BixinOutMessageSE = {
   outmessage?: string;
 };
 
-// BixinReboot
-export type BixinReboot = {};
+// DeviceBackToBoot
+export type DeviceBackToBoot = {};
 
 // BixinBackupRequest
 export type BixinBackupRequest = {};
@@ -1928,6 +1942,46 @@ export type SEMessageSignature = {
   signature: string;
 };
 
+export enum ResourceType {
+  WallPaper = 0,
+  Nft = 1,
+}
+
+// ResourceUpload
+export type ResourceUpload = {
+  extension: string;
+  data_length: number;
+  res_type: ResourceType;
+  zoom_data_length: number;
+  nft_meta_data?: string;
+};
+
+// ZoomRequest
+export type ZoomRequest = {
+  offset?: number;
+  data_length: number;
+};
+
+// ResourceRequest
+export type ResourceRequest = {
+  offset?: number;
+  data_length: number;
+};
+
+// ResourceAck
+export type ResourceAck = {
+  data_chunk: string;
+  hash?: string;
+};
+
+// ResourceUpdate
+export type ResourceUpdate = {
+  file_name: string;
+  data_length: number;
+  initial_data_chunk: string;
+  hash?: string;
+};
+
 // NFTWriteInfo
 export type NFTWriteInfo = {
   index: number;
@@ -1961,7 +2015,7 @@ export type NearAddress = {
 // NearSignTx
 export type NearSignTx = {
   address_n: number[];
-  raw_tx?: string;
+  raw_tx: string;
 };
 
 // NearSignedTx
@@ -2724,6 +2778,9 @@ export type MessageType = {
   SignedIdentity: SignedIdentity;
   GetECDHSessionKey: GetECDHSessionKey;
   ECDHSessionKey: ECDHSessionKey;
+  Path: Path;
+  BatchGetPublickeys: BatchGetPublickeys;
+  EcdsaPublicKeys: EcdsaPublicKeys;
   EosGetPublicKey: EosGetPublicKey;
   EosPublicKey: EosPublicKey;
   EosTxHeader: EosTxHeader;
@@ -2805,7 +2862,7 @@ export type MessageType = {
   BixinSeedOperate: BixinSeedOperate;
   BixinMessageSE: BixinMessageSE;
   BixinOutMessageSE: BixinOutMessageSE;
-  BixinReboot: BixinReboot;
+  DeviceBackToBoot: DeviceBackToBoot;
   BixinBackupRequest: BixinBackupRequest;
   BixinBackupAck: BixinBackupAck;
   BixinRestoreRequest: BixinRestoreRequest;
@@ -2830,6 +2887,11 @@ export type MessageType = {
   SpiFlashData: SpiFlashData;
   SESignMessage: SESignMessage;
   SEMessageSignature: SEMessageSignature;
+  ResourceUpload: ResourceUpload;
+  ZoomRequest: ZoomRequest;
+  ResourceRequest: ResourceRequest;
+  ResourceAck: ResourceAck;
+  ResourceUpdate: ResourceUpdate;
   NFTWriteInfo: NFTWriteInfo;
   NFTWriteData: NFTWriteData;
   RebootToBootloader: RebootToBootloader;
@@ -2927,5 +2989,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;
