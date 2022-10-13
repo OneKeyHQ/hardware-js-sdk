@@ -48,7 +48,7 @@ export const formatAnyHex: (value: any) => any = value => {
   return value;
 };
 
-const hexes = Array.from({ length: 256 }, (v, i) => i.toString(16).padStart(2, '0'));
+const hexes = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
 /**
  * @example bytesToHex(Uint8Array.from([0xde, 0xad, 0xbe, 0xef]))
  */

@@ -45,12 +45,11 @@ export default class AptosGetPublicKey extends BaseMethod<any> {
   }
 
   async run() {
-    // @ts-expect-error
     const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
       paths: this.params,
       ecdsa_curve_name: 'ed25519',
     });
-    // @ts-expect-error
+
     const responses = res.message.public_keys.map((publicKey: string, index: number) => ({
       path: serializedPath((this.params as unknown as any[])[index].address_n),
       publicKey,
