@@ -4,6 +4,7 @@
   { "name": "Testnet", "label": "TEST", "slip44": 1 },
   { "name": "Actinium", "label": "ACM", "slip44": 228 },
   { "name": "Axe", "label": "AXE", "slip44": 4242 },
+  { "name": "Bcash", "label": "BCH", "slip44": 145 },
   { "name": "Bitcore", "label": "BTX", "slip44": 160 },
   { "name": "Dash", "label": "DASH", "slip44": 5 },
   { "name": "Dash Testnet", "label": "tDASH", "slip44": 1 },
