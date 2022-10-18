@@ -27,6 +27,8 @@ export type ILocale = 'zh-CN' | 'en-US';
 export type IFirmwareReleaseInfo = {
   required: boolean;
   url: string;
+  /** Firmware UI resource */
+  resource?: string;
   fingerprint: string;
   version: IVersionArray;
   changelog: {

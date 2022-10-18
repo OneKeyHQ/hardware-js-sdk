@@ -24,7 +24,11 @@ function wrapBody(body: any) {
 
 function parseResult(text: string) {
   try {
-    return JSON.parse(text);
+    const result = JSON.parse(text);
+    if (typeof result !== 'object') {
+      throw new Error('Invalid response');
+    }
+    return result;
   } catch (e) {
     return text;
   }
@@ -45,7 +49,7 @@ export async function request(options: HttpRequestOptions) {
   const res = await axios.request(fetchOptions);
 
   if (+res.status === 200) {
-    return parseResult(res.data);
+    return parseResult(res.request.responseText);
   }
   const resJson = parseResult(res.data);
   if (typeof resJson === 'object' && resJson != null && resJson.error != null) {
