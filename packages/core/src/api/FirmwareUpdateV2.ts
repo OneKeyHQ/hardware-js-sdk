@@ -114,10 +114,10 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   }
 
   isSupportResourceUpdate(features: Features, updateType: string) {
-    if (updateType === 'firmware') return false;
+    if (updateType !== 'firmware') return false;
 
     const deviceType = getDeviceType(features);
-    const isTouchMode = deviceType === 'mini' || deviceType === 'pro';
+    const isTouchMode = deviceType === 'touch' || deviceType === 'pro';
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
 
     return isTouchMode && semver.gte(currentVersion, '3.2.0');
