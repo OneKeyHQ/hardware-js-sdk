@@ -9,6 +9,15 @@ type CallBTCMethodsProps = {
   commonParams?: CommonParams;
 };
 
+const DEFAULT_COIN_TYPE = '3';
+const CoinMap = {
+  0: 'btc',
+  2: 'ltc',
+  3: 'doge',
+  145: 'bch',
+};
+const DEFAULT_PATH = `m/44'/${DEFAULT_COIN_TYPE}'/0'/0/0`;
+
 export function CallBTCMethods({
   SDK,
   selectedDevice: currentDevice,
@@ -23,8 +32,8 @@ export function CallBTCMethods({
         <MethodInvoke
           title="btcGetAddress"
           options={[
-            { name: 'path', value: "m/44'/0'/0'/0/0", type: 'string' },
-            { name: 'coin', value: 'btc', type: 'string' },
+            { name: 'path', value: DEFAULT_PATH, type: 'string' },
+            { name: 'coin', value: CoinMap[DEFAULT_COIN_TYPE], type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
             { name: 'multisig', value: undefined, type: 'string' },
             { name: 'scriptType', value: undefined, type: 'string' },
@@ -35,8 +44,8 @@ export function CallBTCMethods({
         <MethodInvoke
           title="btcGetPublicKey"
           options={[
-            { name: 'path', value: "m/44'/0'/0'/0/0", type: 'string' },
-            { name: 'coin', value: 'btc', type: 'string' },
+            { name: 'path', value: DEFAULT_PATH, type: 'string' },
+            { name: 'coin', value: CoinMap[DEFAULT_COIN_TYPE], type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
@@ -46,8 +55,8 @@ export function CallBTCMethods({
         <MethodInvoke
           title="btcSignMessage"
           options={[
-            { name: 'path', value: "m/44'/0'/0'/0/0", type: 'string' },
-            { name: 'coin', value: 'btc', type: 'string' },
+            { name: 'path', value: DEFAULT_PATH, type: 'string' },
+            { name: 'coin', value: CoinMap[DEFAULT_COIN_TYPE], type: 'string' },
             {
               name: 'messageHex',
               value: '6578616d706c65206d657373616765', // 'example message'
@@ -62,8 +71,8 @@ export function CallBTCMethods({
         <MethodInvoke
           title="btcVerifyMessage"
           options={[
-            { name: 'address', value: '3BD8TL6iShVzizQzvo789SuynEKGpLTms9', type: 'string' },
-            { name: 'coin', value: 'btc', type: 'string' },
+            { name: 'address', value: 'DAZQi2vRPKEoC9RHTcKkXPemTz7uGd5ucC', type: 'string' },
+            { name: 'coin', value: CoinMap[DEFAULT_COIN_TYPE], type: 'string' },
             {
               name: 'messageHex',
               value: '0x6578616d706c65206d657373616765', // 'example message'
