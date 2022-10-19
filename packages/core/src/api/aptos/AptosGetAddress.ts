@@ -1,5 +1,7 @@
 import { AptosGetAddress as HardwareAptosGetAddress } from '@onekeyfe/hd-transport';
-import sha3 from 'js-sha3';
+
+import { sha3_256 as sha3Hash } from '@noble/hashes/sha3';
+import { bytesToHex } from '@noble/hashes/utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -8,7 +10,6 @@ import { AptosAddress, AptosGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { hexToBytes } from '../helpers/hexUtils';
 
-const { sha3_256: sha3Hash } = sha3;
 export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[]> {
   hasBundle = false;
 
@@ -45,7 +46,7 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
     const hash = sha3Hash.create();
     hash.update(hexToBytes(publicKey));
     hash.update('\x00');
-    return hash.hex();
+    return `0x${bytesToHex(hash.digest())}`;
   }
 
   getVersionRange() {

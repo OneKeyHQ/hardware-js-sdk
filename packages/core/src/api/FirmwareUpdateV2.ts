@@ -1,13 +1,22 @@
-import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  createDeferred,
+  Deferred,
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+} from '@onekeyfe/hd-shared';
+import semver from 'semver';
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
-import { getBinary } from './firmware/getBinary';
-import { uploadFirmware } from './firmware/uploadFirmware';
+import { getBinary, getSysResourceBinary } from './firmware/getBinary';
+import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
 import { getDeviceType, getDeviceUUID, wait } from '../utils';
 import { createUiMessage } from '../events/ui-request';
 import type { KnownDevice, Features } from '../types';
+import { DataManager } from '../data-manager';
+import { getDeviceFirmwareVersion } from '../utils/deviceFeaturesUtils';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -94,21 +103,61 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     }, 30000);
   }
 
+  isEnteredManuallyBoot(features: Features) {
+    const deviceType = getDeviceType(features);
+    const isMini = deviceType === 'mini';
+    const isBoot183ClassicUpBle =
+      this.params.updateType === 'firmware' &&
+      deviceType === 'classic' &&
+      features.bootloader_version === '1.8.3';
+    return isMini || isBoot183ClassicUpBle;
+  }
+
+  isSupportResourceUpdate(features: Features, updateType: string) {
+    if (updateType === 'firmware') return false;
+
+    const deviceType = getDeviceType(features);
+    const isTouchMode = deviceType === 'touch' || deviceType === 'pro';
+    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
+    return isTouchMode && semver.gte(currentVersion, '3.2.0');
+  }
+
   async run() {
     const { device, params } = this;
     const { features, commands } = device;
-    if (!features?.bootloader_mode) {
-      const uuid = getDeviceUUID(features as Features);
+
+    if (!features?.bootloader_mode && features) {
+      const uuid = getDeviceUUID(features);
       const deviceType = getDeviceType(features);
-      // mini should go to bootloader mode manually
-      if (deviceType === 'mini') {
-        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedBootloaderMode));
+      // should go to bootloader mode manually
+      if (this.isEnteredManuallyBoot(features)) {
+        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
+      }
+
+      // check & upgrade firmware resource
+      if (features && this.isSupportResourceUpdate(features, params.updateType)) {
+        this.postTipMessage('CheckLatestUiResource');
+        const resourceUrl = DataManager.getSysResourcesLatestRelease(features);
+        if (resourceUrl) {
+          this.postTipMessage('DownloadLatestUiResource');
+          const resource = await getSysResourceBinary(resourceUrl);
+          this.postTipMessage('DownloadLatestUiResourceSuccess');
+          if (resource) {
+            await updateResources(
+              this.device.getCommands().typedCall.bind(this.device.getCommands()),
+              this.postMessage,
+              device,
+              resource.binary
+            );
+          }
+        }
       }
 
       // auto go to bootloader mode
       try {
         this.postTipMessage('AutoRebootToBootloader');
-        await commands.typedCall('BixinReboot', 'Success');
+        await commands.typedCall('DeviceBackToBoot', 'Success');
         this.postTipMessage('GoToBootloaderSuccess');
         this.checkDeviceToBootloader();
 
@@ -121,9 +170,12 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         this.checkPromise = null;
         await wait(1500);
       } catch (e) {
+        if (e instanceof HardwareError) {
+          return Promise.reject(e);
+        }
         console.log('auto go to bootloader mode failed: ', e);
         return Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'go to bootloader mode failed')
+          ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
         );
       }
     }
