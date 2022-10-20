@@ -20,6 +20,8 @@ export type { DeviceResetParams } from './deviceReset';
 export type { DeviceSettingsParams } from './deviceSettings';
 export type { DeviceVerifyParams, DeviceVerifySignature } from './deviceVerify';
 export type { DeviceSupportFeatures } from './deviceSupportFeatures';
+export type { DeviceUploadResourceParams } from './deviceUploadResource';
+export type { FirmwareUpdateParams, FirmwareUpdateBinaryParams } from './firmwareUpdate';
 
 export type { EVMAddress, EVMGetAddressParams } from './evmGetAddress';
 export type { EVMPublicKey, EVMGetPublicKeyParams } from './evmGetPublicKey';
