@@ -28,5 +28,5 @@ export type ConfluxSignTransactionParams = {
 export declare function confluxSignTransaction(
   connectId: string,
   deviceId: string,
-  params: CommonParams & ConfluxSignTransactionParams
+  params: CommonParams & ConfluxTransaction
 ): Response<ConfluxSignedTx>;
