@@ -1,10 +1,5 @@
 import semver from 'semver';
-import {
-  IBLEFirmwareReleaseInfo,
-  IDeviceFirmwareStatus,
-  IFirmwareReleaseInfo,
-  IVersionArray,
-} from '../types';
+import { IBLEFirmwareReleaseInfo, IDeviceFirmwareStatus, IFirmwareReleaseInfo } from '../types';
 
 export const getReleaseStatus = (
   releases: (IFirmwareReleaseInfo | IBLEFirmwareReleaseInfo)[],
@@ -26,16 +21,4 @@ export const getReleaseChangelog = (
 ): IFirmwareReleaseInfo['changelog'][] => {
   const newVersions = releases.filter(r => semver.gt(r.version.join('.'), currentVersion));
   return newVersions.map(r => r.changelog);
-};
-
-export const findLatestRelease = <T extends { version: IVersionArray }>(
-  releases: T[]
-): T | undefined => {
-  let leastRelease = releases[0];
-  releases.forEach(release => {
-    if (semver.gt(release.version.join('.'), leastRelease.version.join('.'))) {
-      leastRelease = release;
-    }
-  });
-  return leastRelease;
 };

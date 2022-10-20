@@ -1,21 +1,21 @@
 import type { PROTO } from '../../constants';
 import type { Params, Response } from '../params';
 
-export interface FirmwareUpdateBinaryParams {
+export interface FirmwareUpdateBinary {
   binary: ArrayBuffer;
 }
 
-export interface FirmwareUpdateParams {
-  version?: number[];
+export interface FirmwareUpdate {
+  version: number[];
   btcOnly?: boolean;
   updateType: 'firmware' | 'ble';
 }
 
 export declare function firmwareUpdate(
   connectId: string | undefined,
-  params: Params<FirmwareUpdateParams>
+  params: Params<FirmwareUpdate>
 ): Response<PROTO.Success>;
 export declare function firmwareUpdate(
   connectId: string | undefined,
-  params: Params<FirmwareUpdateBinaryParams>
+  params: Params<FirmwareUpdateBinary>
 ): Response<PROTO.Success>;

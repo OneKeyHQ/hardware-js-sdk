@@ -40,7 +40,7 @@ export default class ConfluxSignMessage extends BaseMethod<HardwareConfluxSignMe
       'ConfluxMessageSignature',
       {
         ...this.params,
-      }
+      },
     );
 
     return Promise.resolve(res.message);

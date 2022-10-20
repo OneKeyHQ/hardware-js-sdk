@@ -24,7 +24,6 @@ import { deviceChangePin } from './deviceChangePin';
 import { deviceSettings } from './deviceSettings';
 import { deviceFlags } from './deviceFlags';
 import { deviceUpdateReboot } from './deviceUpdateReboot';
-import { deviceUploadResource } from './deviceUploadResource';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
 
 import { cipherKeyValue } from './cipherKeyValue';
@@ -111,7 +110,6 @@ export type CoreApi = {
   deviceReset: typeof deviceReset;
   deviceSettings: typeof deviceSettings;
   deviceUpdateReboot: typeof deviceUpdateReboot;
-  deviceUploadResource: typeof deviceUploadResource;
   deviceSupportFeatures: typeof deviceSupportFeatures;
   deviceVerify: typeof deviceVerify;
   deviceWipe: typeof deviceWipe;
