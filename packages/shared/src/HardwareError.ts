@@ -189,6 +189,16 @@ export const HardwareErrorCode = {
   FirmwareUpdateLimitOneDevice: 409,
 
   /**
+   * You need to manually enter boot
+   */
+  FirmwareUpdateManuallyEnterBoot: 410,
+
+  /**
+   * Manual entry fails. You must manually enter the boot
+   */
+  FirmwareUpdateAutoEnterBootFailure: 411,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -338,6 +348,9 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.CallMethodDeprecated]: 'Call method is deprecated',
   [HardwareErrorCode.FirmwareUpdateLimitOneDevice]:
     'Only one device can be connected during firmware upgrade',
+  [HardwareErrorCode.FirmwareUpdateManuallyEnterBoot]: 'You need to manually enter boot',
+  [HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure]:
+    'Description Failed to automatically enter boot',
 
   /**
    * Network Errors

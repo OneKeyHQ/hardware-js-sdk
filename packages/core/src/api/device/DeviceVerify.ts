@@ -1,6 +1,7 @@
-import sha256 from 'js-sha256';
+import { sha256 } from '@noble/hashes/sha256';
 import { BixinVerifyDeviceRequest } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { bytesToHex } from '@noble/hashes/utils';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -31,7 +32,7 @@ export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
         'BixinVerifyDeviceAck',
         {
           ...this.params,
-          data: sha256.sha256(this.params.data),
+          data: bytesToHex(sha256(this.params.data)),
         }
       );
       response = res.message;

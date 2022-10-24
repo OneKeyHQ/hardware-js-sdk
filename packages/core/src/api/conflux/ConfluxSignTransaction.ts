@@ -104,7 +104,7 @@ export default class ConfluxSignTransaction extends BaseMethod {
     const response = await this.device.commands.typedCall(
       'ConfluxSignTx',
       'ConfluxTxRequest',
-      message,
+      message
     );
 
     return this.processTxRequest(response.message, rest);
@@ -123,7 +123,7 @@ export default class ConfluxSignTransaction extends BaseMethod {
     if (formattedTx == null) {
       throw ERRORS.TypedError(
         HardwareErrorCode.CallMethodInvalidParameter,
-        'ConfluxSignTransaction: format tx error',
+        'ConfluxSignTransaction: format tx error'
       );
     }
 
