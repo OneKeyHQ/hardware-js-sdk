@@ -199,6 +199,11 @@ export const HardwareErrorCode = {
   FirmwareUpdateAutoEnterBootFailure: 411,
 
   /**
+   * The new firmware has not been released yet
+   */
+  NewFirmwareUnRelease: 412,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -351,6 +356,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FirmwareUpdateManuallyEnterBoot]: 'You need to manually enter boot',
   [HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure]:
     'Description Failed to automatically enter boot',
+  [HardwareErrorCode.NewFirmwareUnRelease]: 'new firmware has not been released yet',
 
   /**
    * Network Errors
