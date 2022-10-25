@@ -174,11 +174,7 @@ export const updateResources = async (
     const name = fileName.split('/').pop();
     if (!file.dir && fileName.indexOf('__MACOSX') === -1 && name) {
       const data = await file.async('arraybuffer');
-      try {
-        await updateResource(typedCall, name, data);
-      } catch (error) {
-        Log.error(error);
-      }
+      await updateResource(typedCall, name, data);
     }
 
     progress += stepProgress;
