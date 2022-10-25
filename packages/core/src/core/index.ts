@@ -150,6 +150,11 @@ export const callAPI = async (message: CoreMessage) => {
       if (versionRange && device.features) {
         const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
         if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
+          const newVersionUnReleased = DataManager.getFirmwareStatus(device.features);
+          if (newVersionUnReleased === 'none' || newVersionUnReleased === 'valid') {
+            throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
+          }
+
           return Promise.reject(
             ERRORS.TypedError(
               HardwareErrorCode.CallMethodNeedUpgradeFirmware,

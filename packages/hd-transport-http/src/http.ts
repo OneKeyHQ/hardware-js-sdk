@@ -44,12 +44,15 @@ export async function request(options: HttpRequestOptions) {
       'Content-Type': contentType(options.body == null ? '' : options.body),
     },
     timeout: options.timeout ?? undefined,
+    // Prevent string from converting to number
+    // see https://stackoverflow.com/questions/43787712/axios-how-to-deal-with-big-integers
+    transformResponse: data => data,
   };
 
   const res = await axios.request(fetchOptions);
 
   if (+res.status === 200) {
-    return parseResult(res.request.responseText);
+    return parseResult(res.data);
   }
   const resJson = parseResult(res.data);
   if (typeof resJson === 'object' && resJson != null && resJson.error != null) {
