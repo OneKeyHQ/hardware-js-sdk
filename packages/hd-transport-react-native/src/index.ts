@@ -452,7 +452,16 @@ export default class ReactNativeBleTransport {
 
     this.runPromise = createDeferred();
     const messages = this._messages;
-    this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
+    // Upload resources on low-end phones may OOM
+    if (name === 'ResourceUpdate' || name === 'ResourceAck') {
+      this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', {
+        file_name: data?.file_name,
+        hash: data?.hash,
+      });
+    } else {
+      this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
+    }
+
     const buffers = buildBuffers(messages, name, data);
 
     if (name === 'FirmwareUpload') {
@@ -480,7 +489,8 @@ export default class ReactNativeBleTransport {
     } else {
       for (const o of buffers) {
         const outData = o.toString('base64');
-        this.Log.debug('send hex strting: ', o.toString('hex'));
+        // Upload resources on low-end phones may OOM
+        // this.Log.debug('send hex strting: ', o.toString('hex'));
         try {
           await transport.writeCharacteristic.writeWithoutResponse(outData);
         } catch (e) {

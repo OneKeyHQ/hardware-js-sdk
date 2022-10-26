@@ -144,7 +144,16 @@ export class DeviceCommands {
     res: DefaultMessageResponse,
     callType: MessageKey
   ): Promise<DefaultMessageResponse> {
-    Log.debug('_filterCommonTypes: ', res);
+    try {
+      if (DataManager.getSettings('env') === 'react-native') {
+        Log.debug('_filterCommonTypes: ', JSON.stringify(res));
+      } else {
+        Log.debug('_filterCommonTypes: ', res);
+      }
+    } catch (error) {
+      // ignore
+    }
+
     if (res.type === 'Failure') {
       const { code, message } = res.message as {
         code?: string | FailureType;
