@@ -52,13 +52,25 @@ const cancel = (connectId?: string) => {
 };
 
 function handleMessage(message: CoreMessage) {
-  const { event } = message;
+  const { event, type } = message;
   if (!_core) {
     return;
   }
 
   if (event !== LOG_EVENT) {
-    Log.debug('hd-ble-sdk handleMessage', message);
+    try {
+      if (type === UI_REQUEST.FIRMWARE_PROGRESS) {
+        Log.debug('hd-ble-sdk handleMessage', {
+          event,
+          type,
+          progress: message?.payload?.progress,
+        });
+      } else {
+        Log.debug('hd-ble-sdk handleMessage', JSON.stringify(message));
+      }
+    } catch (error) {
+      // ignore
+    }
   }
   switch (event) {
     case UI_EVENT:

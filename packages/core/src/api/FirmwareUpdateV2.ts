@@ -12,7 +12,7 @@ import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
-import { getDeviceType, getDeviceUUID, wait } from '../utils';
+import { getDeviceType, getDeviceUUID, wait, getLogger, LoggerNames } from '../utils';
 import { createUiMessage } from '../events/ui-request';
 import type { KnownDevice, Features } from '../types';
 import { DataManager } from '../data-manager';
@@ -23,6 +23,8 @@ type Params = {
   version?: number[];
   updateType: 'firmware' | 'ble';
 };
+
+const Log = getLogger(LoggerNames.Method);
 
 export default class FirmwareUpdate extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
@@ -74,25 +76,41 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     );
   };
 
-  checkDeviceToBootloader() {
+  checkDeviceToBootloader(connectId: string | undefined) {
     this.checkPromise = createDeferred();
+    const env = DataManager.getSettings('env');
+    const isBleReconnect = connectId && env === 'react-native';
+
+    Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
 
     // check device goto bootloader mode
-    const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(async () => {
-      const deviceDiff = await this.device.deviceConnector?.enumerate();
-      const devicesDescriptor = deviceDiff?.descriptors ?? [];
-      const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
-      console.log('device list: ', deviceList);
-      if (deviceList.length === 1 && deviceList[0].features?.bootloader_mode) {
-        // should update current device from cache
-        // because device was reboot and had some new requests
-        this.device.updateFromCache(deviceList[0]);
-        this.device.commands.disposed = false;
+    const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
+      async () => {
+        if (isBleReconnect) {
+          await this.device.acquire();
+          await this.device.initialize();
+          if (this.device.features?.bootloader_mode) {
+            clearInterval(intervalTimer);
+            this.checkPromise?.resolve(true);
+          }
+        } else {
+          const deviceDiff = await this.device.deviceConnector?.enumerate();
+          const devicesDescriptor = deviceDiff?.descriptors ?? [];
+          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
 
-        clearInterval(intervalTimer);
-        this.checkPromise?.resolve(true);
-      }
-    }, 2000);
+          if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+            // should update current device from cache
+            // because device was reboot and had some new requests
+            this.device.updateFromCache(deviceList[0]);
+            this.device.commands.disposed = false;
+
+            clearInterval(intervalTimer);
+            this.checkPromise?.resolve(true);
+          }
+        }
+      },
+      isBleReconnect ? 3000 : 2000
+    );
 
     // check goto bootloader mode timeout and throw error
     setTimeout(() => {
@@ -159,7 +177,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         this.postTipMessage('AutoRebootToBootloader');
         await commands.typedCall('DeviceBackToBoot', 'Success');
         this.postTipMessage('GoToBootloaderSuccess');
-        this.checkDeviceToBootloader();
+        this.checkDeviceToBootloader(this.payload.connectId);
 
         // force clean classic device cache so that the device can initialize again
         if (deviceType === 'classic') {

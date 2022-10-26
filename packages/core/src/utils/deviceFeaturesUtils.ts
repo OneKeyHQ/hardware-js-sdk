@@ -134,14 +134,12 @@ export const getPassphraseState = async (features: Features, commands: DeviceCom
 
 export const supportBatchPublicKey = (features?: Features): boolean => {
   if (!features) return false;
-
-  // TODO: support batch public key for touch
-  // const deviceType = getDeviceType(features);
-  // if (deviceType === 'touch' || deviceType === 'pro') {
-  //   return true;
-  // }
-
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
+  const deviceType = getDeviceType(features);
+  if (deviceType === 'touch' || deviceType === 'pro') {
+    return semver.gte(currentVersion, '3.1.0');
+  }
 
   return semver.gte(currentVersion, '2.6.0');
 };
