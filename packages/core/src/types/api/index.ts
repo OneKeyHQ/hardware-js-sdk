@@ -74,6 +74,9 @@ import { aptosGetAddress } from './aptosGetAddress';
 import { aptosGetPublicKey } from './aptosGetPublicKey';
 import { aptosSignTransaction } from './aptosSignTransaction';
 
+import { algoGetAddress } from './algoGetAddress';
+import { algoSignTransaction } from './algoSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -196,4 +199,10 @@ export type CoreApi = {
   aptosGetAddress: typeof aptosGetAddress;
   aptosGetPublicKey: typeof aptosGetPublicKey;
   aptosSignTransaction: typeof aptosSignTransaction;
+
+  /**
+   * Algo function
+   */
+  algoGetAddress: typeof algoGetAddress;
+  algoSignTransaction: typeof algoSignTransaction;
 };

@@ -31,6 +31,7 @@ import { CallTronMethods } from './CallTronMethods';
 import { CallConfluxMethods } from './CallConfluxMethods';
 import { CallNearMethods } from './CallNearMethods';
 import { CallAptosMethods } from './CallAptosMethods';
+import { CallAlgoMethods } from './CallAlgoMethods';
 
 let registerListener = false;
 
@@ -443,6 +444,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallConfluxMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallNearMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallAptosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallAlgoMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }

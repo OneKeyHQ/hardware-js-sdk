@@ -68,3 +68,6 @@ export { default as nearSignTransaction } from './near/NearSignTransaction';
 export { default as aptosGetAddress } from './aptos/AptosGetAddress';
 export { default as aptosGetPublicKey } from './aptos/AptosGetPublicKey';
 export { default as aptosSignTransaction } from './aptos/AptosSignTransaction';
+
+export { default as algoGetAddress } from './algo/AlgoGetAddress';
+export { default as algoSignTransaction } from './algo/AlgoSignTransaction';

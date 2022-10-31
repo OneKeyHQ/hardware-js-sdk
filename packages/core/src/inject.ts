@@ -177,6 +177,11 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'aptosGetPublicKey' }),
     aptosSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'aptosSignTransaction' }),
+
+    algoGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'algoGetAddress' }),
+    algoSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'algoSignTransaction' }),
   };
   return api;
 };
