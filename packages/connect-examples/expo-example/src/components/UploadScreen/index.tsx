@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 import React, { useState } from 'react';
-import { Platform, Button, View, Text, StyleSheet, TextInput } from 'react-native';
+import { Platform, Button, View, Text, StyleSheet, TextInput, Image } from 'react-native';
 import { bytesToHex } from '@noble/hashes/utils';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -35,6 +35,7 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
   });
 
   const [image, setImage] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<string | null>(null);
 
   const compressImage = async (width: number, height: number) => {
     if (!image) return;
@@ -44,7 +45,6 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
         {
           resize: {
             height,
-            width,
           },
         },
       ],
@@ -68,6 +68,8 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
     console.log('data byte length: ', data?.arrayBuffer?.byteLength);
     console.log('thumbnail byte length: ', zoomData?.arrayBuffer?.byteLength);
 
+    setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+
     const params: DeviceUploadResourceParams = {
       resType: uploadScreenParams.resType === 0 ? ResourceType.WallPaper : ResourceType.Nft,
       suffix: 'png',
@@ -78,14 +80,14 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
 
     console.log(params);
 
-    // const response = await SDK.deviceUploadResource(
-    //   type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
-    //   {
-    //     ...commonParams,
-    //     ...params,
-    //   }
-    // );
-    // console.log('example firmwareUpdate response: ', response);
+    const response = await SDK.deviceUploadResource(
+      type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
+      {
+        ...commonParams,
+        ...params,
+      }
+    );
+    console.log('example firmwareUpdate response: ', response);
   };
 
   const pickImage = async () => {
@@ -93,7 +95,7 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
-      aspect: [4, 3],
+      // aspect: [4, 3],
       quality: 0.2,
     });
 
@@ -155,6 +157,10 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
           />
         </View>
         <Button title="Upload File" onPress={() => handleScreenUpdate()} />
+      </View>
+      <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+        {image && <Image style={{ height: 800, width: 480 }} source={{ uri: image }} />}
+        {previewData && <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />}
       </View>
     </View>
   );
