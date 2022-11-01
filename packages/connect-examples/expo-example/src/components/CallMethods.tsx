@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Button, StyleSheet, Platform, Switch, Text, TextInput } from 'react-native';
 import RNRestart from 'react-native-restart';
-import { bytesToHex } from '@noble/hashes/utils';
 import {
   UI_EVENT,
   UI_REQUEST,
@@ -11,12 +10,9 @@ import {
   FIRMWARE_EVENT,
   DEVICE,
   CommonParams,
-  DeviceUploadResourceParams,
+  KnownDevice,
 } from '@onekeyfe/hd-core';
-import Compressor from 'compressorjs';
 
-import { ResourceType } from '@onekeyfe/hd-transport';
-import { Picker } from '@react-native-picker/picker';
 import { ReceivePin } from './ReceivePin';
 import { Device, DeviceList } from './DeviceList';
 import { CallEVMMethods } from './CallEVMMethods';
@@ -33,10 +29,11 @@ import { CallNearMethods } from './CallNearMethods';
 import { CallAptosMethods } from './CallAptosMethods';
 import { CallAlgoMethods } from './CallAlgoMethods';
 import { CallCosmosMethods } from './CallCosmosMethods';
+import { UploadScreen } from './UploadScreen/index';
 
 let registerListener = false;
 
-type ICallMethodProps = {
+export type ICallMethodProps = {
   SDK: CoreApi;
   type: 'Bluetooth' | 'USB';
 };
@@ -174,58 +171,6 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     const response = await SDK.firmwareUpdateV2(
       type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
       params
-    );
-    console.log('example firmwareUpdate response: ', response);
-  };
-
-  const handleCompressImage = async (file: File, width: number, height: number) =>
-    new Promise<{ binary: Uint8Array; fileType: string }>((resolve, reject) => {
-      const a = new Compressor(file, {
-        quality: 0.6,
-        resize: 'cover',
-        width,
-        height,
-        mimeType: 'image/png',
-        success(result: File | Blob) {
-          console.log('compress success: ', result);
-
-          const reader = new FileReader();
-          reader.readAsArrayBuffer(result);
-          reader.onload = function () {
-            const arrayBuffer = reader.result;
-            const array = new Uint8Array(arrayBuffer as ArrayBuffer);
-            resolve({
-              binary: array,
-              fileType: result.type.split('/').pop() ?? '',
-            });
-          };
-        },
-        error(err) {
-          reject(err);
-        },
-      });
-    });
-
-  const handleScreenUpdate = async () => {
-    if (!uploadScreenParams?.file) return;
-
-    const data = await handleCompressImage(uploadScreenParams.file, 480, 800);
-    const zoomData = await handleCompressImage(uploadScreenParams.file, 144, 240);
-
-    const params: DeviceUploadResourceParams = {
-      resType: uploadScreenParams.resType === 0 ? ResourceType.WallPaper : ResourceType.Nft,
-      suffix: data.fileType,
-      dataHex: bytesToHex(data.binary),
-      thumbnailDataHex: bytesToHex(zoomData.binary),
-      nftMetaData: uploadScreenParams.nftMetaData ?? '',
-    };
-
-    const response = await SDK.deviceUploadResource(
-      type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
-      {
-        ...optionalParams,
-        ...params,
-      }
     );
     console.log('example firmwareUpdate response: ', response);
   };
@@ -373,61 +318,12 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         </View>
       </View>
 
-      <View style={styles.container}>
-        <Text>Upload Screen Image & Video</Text>
-        <View style={{ flexDirection: 'row' }}>
-          <View style={styles.commonParamItem}>
-            <Text>支持 PNG & MP4</Text>
-            {Platform.OS === 'web' ? (
-              <input
-                type="file"
-                onChange={e =>
-                  onFileChange(e, (data, fileType, file) =>
-                    setUploadScreenParams({
-                      ...uploadScreenParams,
-                      file,
-                      suffix: fileType?.split('/').pop(),
-                    })
-                  )
-                }
-              />
-            ) : null}
-          </View>
-          <View style={styles.commonParamItem}>
-            <Text>文件后缀</Text>
-            <TextInput
-              style={styles.input}
-              value={uploadScreenParams?.suffix ?? ''}
-              onChangeText={v => {
-                setUploadScreenParams({ ...uploadScreenParams, suffix: v });
-              }}
-            />
-          </View>
-          <View style={styles.commonParamItem}>
-            <Text>资源类型</Text>
-            <Picker
-              selectedValue={uploadScreenParams?.resType}
-              onValueChange={itemValue =>
-                setUploadScreenParams({ ...uploadScreenParams, resType: itemValue })
-              }
-            >
-              <Picker.Item label="WallPaper" value="0" />
-              <Picker.Item label="NFT" value="1" />
-            </Picker>
-          </View>
-          <View style={styles.commonParamItem}>
-            <Text>NFT 数据</Text>
-            <TextInput
-              style={styles.input}
-              value={uploadScreenParams?.nftMetaData ?? ''}
-              onChangeText={v => {
-                setUploadScreenParams({ ...uploadScreenParams, nftMetaData: v });
-              }}
-            />
-          </View>
-          <Button title="Upload File" onPress={() => handleScreenUpdate()} />
-        </View>
-      </View>
+      <UploadScreen
+        SDK={SDK}
+        type={type}
+        selectedDevice={selectedDevice as KnownDevice}
+        commonParams={optionalParams}
+      />
 
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
