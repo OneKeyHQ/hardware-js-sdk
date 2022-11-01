@@ -91,7 +91,6 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
   };
 
   const pickImage = async () => {
-    console.log(1);
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
@@ -158,10 +157,14 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
         </View>
         <Button title="Upload File" onPress={() => handleScreenUpdate()} />
       </View>
-      <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-        {image && <Image style={{ height: 800, width: 480 }} source={{ uri: image }} />}
-        {previewData && <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />}
-      </View>
+      {Platform.OS === 'web' && (
+        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+          {image && <Image style={{ height: 800, width: 480 }} source={{ uri: image }} />}
+          {previewData && (
+            <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />
+          )}
+        </View>
+      )}
     </View>
   );
 }
