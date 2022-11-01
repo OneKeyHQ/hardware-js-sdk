@@ -27,7 +27,7 @@ import { CallTronMethods } from './CallTronMethods';
 import { CallConfluxMethods } from './CallConfluxMethods';
 import { CallNearMethods } from './CallNearMethods';
 import { CallAptosMethods } from './CallAptosMethods';
-import { UploadScreen } from './UploadScreen';
+import { UploadScreen } from './UploadScreen/index';
 
 let registerListener = false;
 
