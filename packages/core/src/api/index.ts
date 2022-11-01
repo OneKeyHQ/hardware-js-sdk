@@ -71,3 +71,6 @@ export { default as aptosSignTransaction } from './aptos/AptosSignTransaction';
 
 export { default as algoGetAddress } from './algo/AlgoGetAddress';
 export { default as algoSignTransaction } from './algo/AlgoSignTransaction';
+
+export { default as cosmosGetAddress } from './cosmos/CosmosGetAddress';
+export { default as cosmosSignTransaction } from './cosmos/CosmosSignTransaction';

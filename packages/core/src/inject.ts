@@ -182,6 +182,11 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'algoGetAddress' }),
     algoSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'algoSignTransaction' }),
+
+    cosmosGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cosmosGetAddress' }),
+    cosmosSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cosmosSignTransaction' }),
   };
   return api;
 };

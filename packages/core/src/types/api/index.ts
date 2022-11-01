@@ -77,6 +77,9 @@ import { aptosSignTransaction } from './aptosSignTransaction';
 import { algoGetAddress } from './algoGetAddress';
 import { algoSignTransaction } from './algoSignTransaction';
 
+import { cosmosGetAddress } from './cosmosGetAddress';
+import { cosmosSignTransaction } from './cosmosSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -205,4 +208,10 @@ export type CoreApi = {
    */
   algoGetAddress: typeof algoGetAddress;
   algoSignTransaction: typeof algoSignTransaction;
+
+  /**
+   * Cosmos function
+   */
+  cosmosGetAddress: typeof cosmosGetAddress;
+  cosmosSignTransaction: typeof cosmosSignTransaction;
 };

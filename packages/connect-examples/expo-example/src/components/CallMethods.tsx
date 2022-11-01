@@ -32,6 +32,7 @@ import { CallConfluxMethods } from './CallConfluxMethods';
 import { CallNearMethods } from './CallNearMethods';
 import { CallAptosMethods } from './CallAptosMethods';
 import { CallAlgoMethods } from './CallAlgoMethods';
+import { CallCosmosMethods } from './CallCosmosMethods';
 
 let registerListener = false;
 
@@ -445,6 +446,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallNearMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallAptosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallAlgoMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallCosmosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }

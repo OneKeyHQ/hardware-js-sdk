@@ -101,3 +101,6 @@ export type { AptosSignedTx, AptosSignTransactionParams } from './aptosSignTrans
 
 export type { AlgoAddress, AlgoGetAddressParams } from './algoGetAddress';
 export type { AlgoSignedTx, AlgoSignTransactionParams } from './algoSignTransaction';
+
+export type { CosmosAddress, CosmosGetAddressParams } from './cosmosGetAddress';
+export type { CosmosSignedTx, CosmosSignTransactionParams } from './cosmosSignTransaction';
