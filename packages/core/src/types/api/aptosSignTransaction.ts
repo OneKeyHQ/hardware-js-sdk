@@ -13,5 +13,5 @@ export type AptosSignTransactionParams = {
 export declare function aptosSignTransaction(
   connectId: string,
   deviceId: string,
-  params: CommonParams & AptosSignTransactionParams,
+  params: CommonParams & AptosSignTransactionParams
 ): Response<AptosSignedTx>;

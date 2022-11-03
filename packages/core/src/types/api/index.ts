@@ -72,6 +72,7 @@ import { nearSignTransaction } from './nearSignTransaction';
 
 import { aptosGetAddress } from './aptosGetAddress';
 import { aptosGetPublicKey } from './aptosGetPublicKey';
+import { aptosSignMessage } from './aptosSignMessage';
 import { aptosSignTransaction } from './aptosSignTransaction';
 
 import { algoGetAddress } from './algoGetAddress';
@@ -201,6 +202,7 @@ export type CoreApi = {
    */
   aptosGetAddress: typeof aptosGetAddress;
   aptosGetPublicKey: typeof aptosGetPublicKey;
+  aptosSignMessage: typeof aptosSignMessage;
   aptosSignTransaction: typeof aptosSignTransaction;
 
   /**
