@@ -26,7 +26,7 @@ export function CallCosmosMethods({
             { name: 'path', value: "m/44'/118'/0'/0/0", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.solGetAddress(connectId, deviceId, { ...commonParams, ...data })}
+          onCall={data => SDK.cosmosGetAddress(connectId, deviceId, { ...commonParams, ...data })}
         />
 
         <MethodInvoke
@@ -41,7 +41,7 @@ export function CallCosmosMethods({
             },
           ]}
           onCall={data =>
-            SDK.solSignTransaction(connectId, deviceId, {
+            SDK.cosmosSignTransaction(connectId, deviceId, {
               ...commonParams,
               ...data,
             } as unknown as any)

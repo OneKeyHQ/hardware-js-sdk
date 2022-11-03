@@ -61,6 +61,24 @@ export function CallAptosMethods({
         />
 
         <MethodInvoke
+          title="AptosSignMessage"
+          options={[
+            { name: 'path', value: "m/44'/637'/0'/0'/0'", type: 'string' },
+            { name: 'payload.address', value: undefined, type: 'string' },
+            { name: 'payload.chainId', value: undefined, type: 'string' },
+            { name: 'payload.application', value: undefined, type: 'string' },
+            { name: 'payload.nonce', value: '12345', type: 'string' },
+            { name: 'payload.message', value: 'hello', type: 'string' },
+          ]}
+          onCall={data =>
+            SDK.aptosSignMessage(connectId, deviceId, {
+              ...commonParams,
+              ...(data as unknown as any),
+            })
+          }
+        />
+
+        <MethodInvoke
           title="aptosSignTransaction"
           options={[
             { name: 'path', value: "m/44'/637'/0'/0'", type: 'string' },

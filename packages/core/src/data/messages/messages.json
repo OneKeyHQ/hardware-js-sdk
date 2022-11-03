@@ -105,6 +105,65 @@
         }
       }
     },
+    "AptosSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "payload": {
+          "rule": "required",
+          "type": "AptosMessagePayload",
+          "id": 2
+        }
+      },
+      "nested": {
+        "AptosMessagePayload": {
+          "fields": {
+            "address": {
+              "type": "string",
+              "id": 2
+            },
+            "chain_id": {
+              "type": "string",
+              "id": 3
+            },
+            "application": {
+              "type": "string",
+              "id": 4
+            },
+            "nonce": {
+              "rule": "required",
+              "type": "string",
+              "id": 5
+            },
+            "message": {
+              "rule": "required",
+              "type": "string",
+              "id": 6
+            }
+          }
+        }
+      }
+    },
+    "AptosMessageSignature": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
     "BinanceGetAddress": {
       "fields": {
         "address_n": {
@@ -8612,6 +8671,8 @@
         "MessageType_AptosAddress": 10601,
         "MessageType_AptosSignTx": 10602,
         "MessageType_AptosSignedTx": 10603,
+        "MessageType_AptosSignMessage": 10604,
+        "MessageType_AptosMessageSignature": 10605,
         "MessageType_WebAuthnListResidentCredentials": 800,
         "MessageType_WebAuthnCredentials": 801,
         "MessageType_WebAuthnAddResidentCredential": 802,

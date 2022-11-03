@@ -9,6 +9,7 @@ export interface FirmwareUpdateParams {
   version?: number[];
   btcOnly?: boolean;
   updateType: 'firmware' | 'ble';
+  forcedUpdateRes?: boolean;
 }
 
 export declare function firmwareUpdate(

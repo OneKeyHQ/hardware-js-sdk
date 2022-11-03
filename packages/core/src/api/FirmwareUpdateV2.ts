@@ -22,6 +22,7 @@ type Params = {
   binary?: ArrayBuffer;
   version?: number[];
   updateType: 'firmware' | 'ble';
+  forcedUpdateRes?: boolean;
 };
 
 const Log = getLogger(LoggerNames.Method);
@@ -39,6 +40,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     validateParams(payload, [
       { name: 'version', type: 'array' },
       { name: 'binary', type: 'buffer' },
+      { name: 'forcedUpdateRes', type: 'boolean' },
     ]);
 
     if (!payload.updateType) {
@@ -48,7 +50,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       );
     }
 
-    this.params = { updateType: payload.updateType };
+    this.params = { updateType: payload.updateType, forcedUpdateRes: payload.forcedUpdateRes };
 
     if ('version' in payload) {
       this.params = {
@@ -156,7 +158,10 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       // check & upgrade firmware resource
       if (features && this.isSupportResourceUpdate(features, params.updateType)) {
         this.postTipMessage('CheckLatestUiResource');
-        const resourceUrl = DataManager.getSysResourcesLatestRelease(features);
+        const resourceUrl = DataManager.getSysResourcesLatestRelease(
+          features,
+          params.forcedUpdateRes
+        );
         if (resourceUrl) {
           this.postTipMessage('DownloadLatestUiResource');
           const resource = await getSysResourceBinary(resourceUrl);

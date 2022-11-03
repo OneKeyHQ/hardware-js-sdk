@@ -48,6 +48,26 @@ export type AptosSignedTx = {
   signature: string;
 };
 
+export type AptosMessagePayload = {
+  address?: string;
+  chain_id?: string;
+  application?: string;
+  nonce: string;
+  message: string;
+};
+
+// AptosSignMessage
+export type AptosSignMessage = {
+  address_n: number[];
+  payload: AptosMessagePayload;
+};
+
+// AptosMessageSignature
+export type AptosMessageSignature = {
+  signature: string;
+  address: string;
+};
+
 // BinanceGetAddress
 export type BinanceGetAddress = {
   address_n: number[];
@@ -2701,6 +2721,9 @@ export type MessageType = {
   AptosAddress: AptosAddress;
   AptosSignTx: AptosSignTx;
   AptosSignedTx: AptosSignedTx;
+  AptosMessagePayload: AptosMessagePayload;
+  AptosSignMessage: AptosSignMessage;
+  AptosMessageSignature: AptosMessageSignature;
   BinanceGetAddress: BinanceGetAddress;
   BinanceAddress: BinanceAddress;
   BinanceGetPublicKey: BinanceGetPublicKey;
