@@ -3,6 +3,28 @@
 // custom type uint32/64 may be represented as string
 export type UintType = string | number;
 
+// AlgorandGetAddress
+export type AlgorandGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// AlgorandAddress
+export type AlgorandAddress = {
+  address?: string;
+};
+
+// AlgorandSignTx
+export type AlgorandSignTx = {
+  address_n: number[];
+  raw_tx: string;
+};
+
+// AlgorandSignedTx
+export type AlgorandSignedTx = {
+  signature: string;
+};
+
 // AptosGetAddress
 export type AptosGetAddress = {
   address_n: number[];
@@ -24,6 +46,26 @@ export type AptosSignTx = {
 export type AptosSignedTx = {
   public_key: string;
   signature: string;
+};
+
+export type AptosMessagePayload = {
+  address?: string;
+  chain_id?: string;
+  application?: string;
+  nonce: string;
+  message: string;
+};
+
+// AptosSignMessage
+export type AptosSignMessage = {
+  address_n: number[];
+  payload: AptosMessagePayload;
+};
+
+// AptosMessageSignature
+export type AptosMessageSignature = {
+  signature: string;
+  address: string;
 };
 
 // BinanceGetAddress
@@ -1100,6 +1142,29 @@ export type ConfluxSignMessageCIP23 = {
   address_n: number[];
   domain_hash?: string;
   message_hash?: string;
+};
+
+// CosmosGetAddress
+export type CosmosGetAddress = {
+  address_n: number[];
+  hrp?: string;
+  show_display?: boolean;
+};
+
+// CosmosAddress
+export type CosmosAddress = {
+  address?: string;
+};
+
+// CosmosSignTx
+export type CosmosSignTx = {
+  address_n: number[];
+  raw_tx: string;
+};
+
+// CosmosSignedTx
+export type CosmosSignedTx = {
+  signature: string;
 };
 
 // CipherKeyValue
@@ -2648,10 +2713,17 @@ export enum CommandFlags {
 
 // custom connect definitions
 export type MessageType = {
+  AlgorandGetAddress: AlgorandGetAddress;
+  AlgorandAddress: AlgorandAddress;
+  AlgorandSignTx: AlgorandSignTx;
+  AlgorandSignedTx: AlgorandSignedTx;
   AptosGetAddress: AptosGetAddress;
   AptosAddress: AptosAddress;
   AptosSignTx: AptosSignTx;
   AptosSignedTx: AptosSignedTx;
+  AptosMessagePayload: AptosMessagePayload;
+  AptosSignMessage: AptosSignMessage;
+  AptosMessageSignature: AptosMessageSignature;
   BinanceGetAddress: BinanceGetAddress;
   BinanceAddress: BinanceAddress;
   BinanceGetPublicKey: BinanceGetPublicKey;
@@ -2771,6 +2843,10 @@ export type MessageType = {
   ConfluxSignMessage: ConfluxSignMessage;
   ConfluxMessageSignature: ConfluxMessageSignature;
   ConfluxSignMessageCIP23: ConfluxSignMessageCIP23;
+  CosmosGetAddress: CosmosGetAddress;
+  CosmosAddress: CosmosAddress;
+  CosmosSignTx: CosmosSignTx;
+  CosmosSignedTx: CosmosSignedTx;
   CipherKeyValue: CipherKeyValue;
   CipheredKeyValue: CipheredKeyValue;
   IdentityType: IdentityType;

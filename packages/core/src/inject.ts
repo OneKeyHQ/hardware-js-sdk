@@ -175,8 +175,20 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'aptosGetAddress' }),
     aptosGetPublicKey: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'aptosGetPublicKey' }),
+    aptosSignMessage: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'aptosSignMessage' }),
     aptosSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'aptosSignTransaction' }),
+
+    algoGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'algoGetAddress' }),
+    algoSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'algoSignTransaction' }),
+
+    cosmosGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cosmosGetAddress' }),
+    cosmosSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cosmosSignTransaction' }),
   };
   return api;
 };

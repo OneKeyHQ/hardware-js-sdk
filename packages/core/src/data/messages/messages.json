@@ -1,5 +1,55 @@
 {
   "nested": {
+    "AlgorandGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "AlgorandAddress": {
+      "fields": {
+        "address": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "AlgorandSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_tx": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "AlgorandSignedTx": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "AptosGetAddress": {
       "fields": {
         "address_n": {
@@ -51,6 +101,65 @@
         "signature": {
           "rule": "required",
           "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "AptosSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "payload": {
+          "rule": "required",
+          "type": "AptosMessagePayload",
+          "id": 2
+        }
+      },
+      "nested": {
+        "AptosMessagePayload": {
+          "fields": {
+            "address": {
+              "type": "string",
+              "id": 2
+            },
+            "chain_id": {
+              "type": "string",
+              "id": 3
+            },
+            "application": {
+              "type": "string",
+              "id": 4
+            },
+            "nonce": {
+              "rule": "required",
+              "type": "string",
+              "id": 5
+            },
+            "message": {
+              "rule": "required",
+              "type": "string",
+              "id": 6
+            }
+          }
+        }
+      }
+    },
+    "AptosMessageSignature": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
           "id": 2
         }
       }
@@ -2824,6 +2933,60 @@
         "message_hash": {
           "type": "bytes",
           "id": 3
+        }
+      }
+    },
+    "CosmosGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "hrp": {
+          "type": "string",
+          "id": 2
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "CosmosAddress": {
+      "fields": {
+        "address": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "CosmosSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_tx": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "CosmosSignedTx": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -8508,6 +8671,8 @@
         "MessageType_AptosAddress": 10601,
         "MessageType_AptosSignTx": 10602,
         "MessageType_AptosSignedTx": 10603,
+        "MessageType_AptosSignMessage": 10604,
+        "MessageType_AptosMessageSignature": 10605,
         "MessageType_WebAuthnListResidentCredentials": 800,
         "MessageType_WebAuthnCredentials": 801,
         "MessageType_WebAuthnAddResidentCredential": 802,
@@ -8548,6 +8713,14 @@
         "MessageType_NearAddress": 10702,
         "MessageType_NearSignTx": 10703,
         "MessageType_NearSignedTx": 10704,
+        "MessageType_CosmosGetAddress": 10800,
+        "MessageType_CosmosAddress": 10801,
+        "MessageType_CosmosSignTx": 10802,
+        "MessageType_CosmosSignedTx": 10803,
+        "MessageType_AlgorandGetAddress": 10900,
+        "MessageType_AlgorandAddress": 10901,
+        "MessageType_AlgorandSignTx": 10902,
+        "MessageType_AlgorandSignedTx": 10903,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,

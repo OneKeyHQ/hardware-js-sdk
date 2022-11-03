@@ -97,4 +97,11 @@ export type { NearSignTransactionParams } from './nearSignTransaction';
 
 export type { AptosAddress, AptosGetAddressParams } from './aptosGetAddress';
 export type { AptosPublicKey, AptosGetPublicKeyParams } from './aptosGetPublicKey';
+export type { AptosMessageSignature, AptosSignMessageParams } from './aptosSignMessage';
 export type { AptosSignedTx, AptosSignTransactionParams } from './aptosSignTransaction';
+
+export type { AlgoAddress, AlgoGetAddressParams } from './algoGetAddress';
+export type { AlgoSignedTx, AlgoSignTransactionParams } from './algoSignTransaction';
+
+export type { CosmosAddress, CosmosGetAddressParams } from './cosmosGetAddress';
+export type { CosmosSignedTx, CosmosSignTransactionParams } from './cosmosSignTransaction';
