@@ -68,7 +68,7 @@ export default class DataManager {
    * Touch、Pro System UI Resource Update
    * ** Interval upgrade is not considered **
    */
-  static getSysResourcesLatestRelease = (features: Features) => {
+  static getSysResourcesLatestRelease = (features: Features, forcedUpdateRes?: boolean) => {
     const deviceType = getDeviceType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
@@ -76,8 +76,10 @@ export default class DataManager {
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
-    const targetDeviceConfig = targetDeviceConfigList.filter(
-      item => semver.gt(item.version.join('.'), currentVersion) && !!item.resource
+    const targetDeviceConfig = targetDeviceConfigList.filter(item =>
+      forcedUpdateRes
+        ? !!item.resource
+        : semver.gt(item.version.join('.'), currentVersion) && !!item.resource
     );
 
     return findLatestRelease(targetDeviceConfig)?.resource;
