@@ -368,12 +368,14 @@ export default class ReactNativeBleTransport {
           }`
         );
         if (this.runPromise) {
-          this.runPromise.reject(
-            ERRORS.TypedError(
-              HardwareErrorCode.BleCharacteristicNotifyError,
-              error.reason ?? error.message
-            )
-          );
+          let ERROR:
+            | typeof HardwareErrorCode.BleCharacteristicNotifyError
+            | typeof HardwareErrorCode.BleTimeoutError =
+            HardwareErrorCode.BleCharacteristicNotifyError;
+          if (error.reason?.includes('The connection has timed out unexpectedly')) {
+            ERROR = HardwareErrorCode.BleTimeoutError;
+          }
+          this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
           this.Log.debug(': monitor notify error, and has unreleased Promise');
         }
         return;

@@ -19,7 +19,7 @@ import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { enableLog, getLogger, LoggerNames, setLoggerPostMessage } from '../utils';
+import { enableLog, getLogger, LoggerNames, setLoggerPostMessage, wait } from '../utils';
 import {
   CoreMessage,
   createResponseMessage,
@@ -387,6 +387,26 @@ function initDeviceForBle(method: BaseMethod) {
   return device;
 }
 
+/**
+ * If the Bluetooth connection times out, retry 6 times
+ */
+let bleTimeoutRetry = 0;
+async function connectDeviceForBle(method: BaseMethod, device: Device) {
+  try {
+    await device.acquire();
+    await device.initialize(parseInitOptions(method));
+  } catch (err) {
+    if (err.errorCode === HardwareErrorCode.BleTimeoutError && bleTimeoutRetry <= 5) {
+      bleTimeoutRetry += 1;
+      Log.debug(`Bletooth connect timeout and will retry, retry count: ${bleTimeoutRetry}`);
+      await wait(3000);
+      await connectDeviceForBle(method, device);
+    } else {
+      throw err;
+    }
+  }
+}
+
 type IPollFn<T> = (time?: number) => T;
 // eslint-disable-next-line @typescript-eslint/require-await
 const ensureConnected = async (method: BaseMethod, pollingId: number) => {
@@ -455,8 +475,8 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
            * Bluetooth should call initialize here
            */
           if (env === 'react-native') {
-            await device.acquire();
-            await device.initialize(parseInitOptions(method));
+            bleTimeoutRetry = 0;
+            await connectDeviceForBle(method, device);
           }
           resolve(device);
           return;
@@ -470,6 +490,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.BleLocationServicesDisabled,
             HardwareErrorCode.BleDeviceNotBonded,
             HardwareErrorCode.BleCharacteristicNotifyError,
+            HardwareErrorCode.BleTimeoutError,
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
