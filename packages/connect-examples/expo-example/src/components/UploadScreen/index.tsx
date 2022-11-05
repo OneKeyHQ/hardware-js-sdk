@@ -4,7 +4,7 @@ import { Platform, Button, View, Text, StyleSheet, TextInput, Image } from 'reac
 import { bytesToHex } from '@noble/hashes/utils';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 import { DeviceUploadResourceParams, CoreApi, CommonParams, KnownDevice } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
@@ -61,7 +61,15 @@ export const generateUploadResParams = async (
 
 function getOriginX(originW: number, originH: number, scaleW: number, scaleH: number) {
   const width = Math.ceil((scaleH / originH) * originW);
-  const originX = width <= scaleW ? 0 : Math.ceil(Math.ceil(width / 2) - Math.ceil(scaleW / 2));
+  console.log(`image true width: `, width);
+  console.log(`image should width: `, scaleW);
+  console.log(`image true height: `, scaleH);
+  if (width <= scaleW) {
+    return null;
+  }
+  const originX = Math.ceil(Math.ceil(width / 2) - Math.ceil(scaleW / 2));
+  console.log(`originX: `, originX);
+  console.log(`crop size: height: ${scaleH}, width: ${scaleW}, originX: ${originX}, originY: 0`);
   return originX;
 }
 
@@ -73,25 +81,30 @@ export const compressHomescreen = async (
   originH: number
 ) => {
   if (!uri) return;
-  const imageResult = await manipulateAsync(
-    uri,
-    [
-      {
-        resize: {
-          height,
-        },
+  console.log(`width: ${width}, height: ${height}, originW: ${originW}, originH: ${originH}`);
+  const actions: Action[] = [
+    {
+      resize: {
+        height,
       },
-      {
-        crop: {
-          height,
-          width,
-          originX: getOriginX(originW, originH, width, height),
-          originY: 0,
-        },
+    },
+  ];
+  const originX = getOriginX(originW, originH, width, height);
+  if (originX !== null) {
+    actions.push({
+      crop: {
+        height,
+        width,
+        originX,
+        originY: 0,
       },
-    ],
-    { compress: 0.9, format: SaveFormat.JPEG, base64: true }
-  );
+    });
+  }
+  const imageResult = await manipulateAsync(uri, actions, {
+    compress: 0.9,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
 
   const buffer = Buffer.from(imageResult.base64 ?? '', 'base64');
   const arrayBuffer = new Uint8Array(buffer);
