@@ -1,5 +1,8 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { supportInputPinOnSoftware } from '../../utils/deviceFeaturesUtils';
+import {
+  supportInputPinOnSoftware,
+  supportModifyHomescreen,
+} from '../../utils/deviceFeaturesUtils';
 import { BaseMethod } from '../BaseMethod';
 
 export default class DeviceSupportFeatures extends BaseMethod {
@@ -14,8 +17,10 @@ export default class DeviceSupportFeatures extends BaseMethod {
       );
 
     const inputPinOnSoftware = supportInputPinOnSoftware(this.device.features);
+    const modifyHomescreen = supportModifyHomescreen(this.device.features);
     return Promise.resolve({
       inputPinOnSoftware,
+      modifyHomescreen,
       device: this.device.toMessageObject(),
     });
   }
