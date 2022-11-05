@@ -29,79 +29,139 @@ function getUrlExtension(url: string) {
   return url.split(/[#?]/)[0].split('.').pop()?.trim();
 }
 
+export const generateUploadResParams = async (
+  uri: string,
+  width: number,
+  height: number,
+  cb?: (data: { base64?: string }) => void
+) => {
+  const data = await compressHomescreen(uri, 480, 800, width, height);
+  const zoomData = await compressHomescreen(uri, 144, 240, width, height);
+
+  cb?.(data as any);
+
+  if (!data?.arrayBuffer && !zoomData?.arrayBuffer) return;
+
+  console.log('homescreen data byte length: ', formatBytes(data?.arrayBuffer?.byteLength ?? 0, 3));
+  console.log(
+    'homescreen thumbnail byte length: ',
+    formatBytes(zoomData?.arrayBuffer?.byteLength ?? 0, 3)
+  );
+
+  const params: DeviceUploadResourceParams = {
+    resType: ResourceType.WallPaper,
+    suffix: 'jpeg',
+    dataHex: bytesToHex(data?.arrayBuffer as Uint8Array),
+    thumbnailDataHex: bytesToHex(zoomData?.arrayBuffer as Uint8Array),
+    nftMetaData: '',
+  };
+
+  return params;
+};
+
+function getOriginX(originW: number, originH: number, scaleW: number, scaleH: number) {
+  const width = Math.ceil((scaleH / originH) * originW);
+  const originX = width <= scaleW ? 0 : Math.ceil(Math.ceil(width / 2) - Math.ceil(scaleW / 2));
+  return originX;
+}
+
+export const compressHomescreen = async (
+  uri: string,
+  width: number,
+  height: number,
+  originW: number,
+  originH: number
+) => {
+  if (!uri) return;
+  const imageResult = await manipulateAsync(
+    uri,
+    [
+      {
+        resize: {
+          height,
+        },
+      },
+      {
+        crop: {
+          height,
+          width,
+          originX: getOriginX(originW, originH, width, height),
+          originY: 0,
+        },
+      },
+    ],
+    { compress: 0.9, format: SaveFormat.JPEG, base64: true }
+  );
+
+  const buffer = Buffer.from(imageResult.base64 ?? '', 'base64');
+  const arrayBuffer = new Uint8Array(buffer);
+  return {
+    ...imageResult,
+    arrayBuffer,
+  };
+};
+
+function formatBytes(bytes: number, decimals = 2) {
+  if (!+bytes) return '0 Bytes';
+
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
+}
+
 function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Props) {
   const [uploadScreenParams, setUploadScreenParams] = useState<UploadResourceParams>({
     resType: 0,
   });
 
-  const [image, setImage] = useState<string | null>(null);
+  const [image, setImage] = useState<ImagePicker.ImageInfo | null>(null);
   const [previewData, setPreviewData] = useState<string | null>(null);
 
-  const compressImage = async (width: number, height: number) => {
-    if (!image) return;
-    const imageResult = await manipulateAsync(
-      image,
-      [
-        {
-          resize: {
-            height,
-          },
-        },
-      ],
-      { compress: 0.2, format: SaveFormat.PNG, base64: true }
-    );
-
-    const buffer = Buffer.from(imageResult.base64 ?? '', 'base64');
-    const arrayBuffer = new Uint8Array(buffer);
-    return {
-      ...imageResult,
-      arrayBuffer,
-    };
-  };
-
   const handleScreenUpdate = async () => {
-    const data = await compressImage(480, 800);
-    const zoomData = await compressImage(144, 240);
+    // setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
 
-    if (!data?.arrayBuffer && !zoomData?.arrayBuffer) return;
+    let uploadResParams: DeviceUploadResourceParams | undefined;
+    try {
+      uploadResParams = await generateUploadResParams(
+        image?.uri ?? '',
+        image?.width ?? 0,
+        image?.height ?? 0,
+        data => {
+          setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+        }
+      );
+    } catch (e) {
+      console.log('image operate error: ', e);
+      return;
+    }
 
-    console.log('data byte length: ', data?.arrayBuffer?.byteLength);
-    console.log('thumbnail byte length: ', zoomData?.arrayBuffer?.byteLength);
-
-    setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
-
-    const params: DeviceUploadResourceParams = {
-      resType: uploadScreenParams.resType === 0 ? ResourceType.WallPaper : ResourceType.Nft,
-      suffix: 'png',
-      dataHex: bytesToHex(data?.arrayBuffer as Uint8Array),
-      thumbnailDataHex: bytesToHex(zoomData?.arrayBuffer as Uint8Array),
-      nftMetaData: uploadScreenParams.nftMetaData ?? '',
-    };
-
-    console.log(params);
-
-    const response = await SDK.deviceUploadResource(
-      type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
-      {
-        ...commonParams,
-        ...params,
-      }
-    );
-    console.log('example firmwareUpdate response: ', response);
+    if (uploadResParams) {
+      const response = await SDK.deviceUploadResource(
+        type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
+        {
+          ...commonParams,
+          ...uploadResParams,
+        }
+      );
+      console.log('example firmwareUpdate response: ', response);
+    }
   };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
-      // aspect: [4, 3],
-      quality: 0.2,
+      quality: 1,
     });
 
     console.log(result);
 
     if (!result.cancelled) {
-      setImage(result.uri);
+      setImage(result);
       setUploadScreenParams({
         ...uploadScreenParams,
         suffix: getUrlExtension(result.uri),
@@ -159,7 +219,7 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
       </View>
       {Platform.OS === 'web' && (
         <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-          {image && <Image style={{ height: 800, width: 480 }} source={{ uri: image }} />}
+          {image && <Image style={{ height: 800, width: 480 }} source={{ uri: image.uri }} />}
           {previewData && (
             <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />
           )}
