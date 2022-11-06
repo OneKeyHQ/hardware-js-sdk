@@ -6,6 +6,7 @@ import { DeviceUploadResourceParams } from '../../types';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { hexToBytes } from '../helpers/hexUtils';
+import { createUiMessage, UI_REQUEST } from '../../events';
 
 export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
   paramsData = {
@@ -98,6 +99,8 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       ['ResourceRequest', 'ZoomRequest', 'Success'],
       this.params
     );
+
+    this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW));
 
     return this.processResourceRequest(res);
   }

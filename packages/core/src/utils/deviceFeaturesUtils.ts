@@ -143,3 +143,15 @@ export const supportBatchPublicKey = (features?: Features): boolean => {
 
   return semver.gte(currentVersion, '2.6.0');
 };
+
+export const supportModifyHomescreen = (features?: Features): SupportFeatureType => {
+  if (!features) return { support: false };
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
+  const deviceType = getDeviceType(features);
+  if (deviceType === 'classic' || deviceType === 'mini') {
+    return { support: true };
+  }
+
+  return { support: semver.gte(currentVersion, '3.4.0') };
+};
