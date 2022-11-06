@@ -244,6 +244,7 @@ export const HardwareErrorCode = {
   BleWriteCharacteristicError: 710,
   BleAlreadyConnected: 711,
   BleLocationServicesDisabled: 712,
+  BleTimeoutError: 713,
 
   /**
    * Hardware runtiome errors
@@ -388,6 +389,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleWriteCharacteristicError]: 'Write Characteristic Error',
   [HardwareErrorCode.BleAlreadyConnected]: 'Already connected to device',
   [HardwareErrorCode.BleLocationServicesDisabled]: 'Location Services disabled',
+  [HardwareErrorCode.BleTimeoutError]: 'The connection has timed out unexpectedly.',
 
   /**
    * Runtime Error
