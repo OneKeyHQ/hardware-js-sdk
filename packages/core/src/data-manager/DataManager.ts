@@ -85,6 +85,21 @@ export default class DataManager {
     return findLatestRelease(targetDeviceConfig)?.resource;
   };
 
+  /**
+   * Touch、Pro System full UI Resource Update
+   * ** Interval upgrade is not considered **
+   */
+  static getSysFullResource = (features: Features) => {
+    const deviceType = getDeviceType(features);
+
+    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
+    const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.fullResource);
+
+    return findLatestRelease(targetDeviceConfig)?.fullResource;
+  };
+
   static getFirmwareChangelog = (features: Features) => {
     const deviceType = getDeviceType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
