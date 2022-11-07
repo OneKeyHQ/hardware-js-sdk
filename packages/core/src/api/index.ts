@@ -18,6 +18,8 @@ export { default as deviceUploadResource } from './device/DeviceUploadResource';
 export { default as deviceSupportFeatures } from './device/DeviceSupportFeatures';
 export { default as deviceVerify } from './device/DeviceVerify';
 export { default as deviceWipe } from './device/DeviceWipe';
+export { default as deviceFullyUploadResource } from './device/DeviceFullyUploadResource';
+
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as requestWebUsbDevice } from './RequestWebUsbDevice';

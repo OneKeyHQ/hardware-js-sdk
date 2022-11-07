@@ -90,6 +90,8 @@ export const inject = ({
     deviceSupportFeatures: connectId => call({ connectId, method: 'deviceSupportFeatures' }),
     deviceVerify: (connectId, params) => call({ ...params, connectId, method: 'deviceVerify' }),
     deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
+    deviceFullyUploadResource: connectId =>
+      call({ connectId, method: 'deviceFullyUploadResource' }),
     getPassphraseState: (connectId, params) =>
       call({ ...params, connectId, method: 'getPassphraseState' }),
 

@@ -229,6 +229,14 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
           />
         </View>
         <Button title="Upload File" onPress={() => handleScreenUpdate()} />
+        {Platform.OS === 'web' && (
+          <View style={styles.item}>
+            <Button
+              title="全量覆盖 RES"
+              onPress={() => SDK.deviceFullyUploadResource(selectedDevice?.connectId ?? '', {})}
+            />
+          </View>
+        )}
       </View>
       {Platform.OS === 'web' && (
         <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
