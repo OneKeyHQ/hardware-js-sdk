@@ -44,5 +44,6 @@ export type EVMSignTransactionParams = {
 
 export declare function evmSignTransaction(
   connectId: string,
+  deviceId: string,
   params: CommonParams & EVMSignTransactionParams
 ): Response<EVMSignedTx>;

@@ -1,9 +1,11 @@
-import { ChangePin } from '@onekeyfe/hd-transport/src/types/messages';
+import { ChangePin } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 
 export default class DeviceChangePin extends BaseMethod<ChangePin> {
   init() {
+    this.useDevicePassphraseState = false;
+
     // check payload
     validateParams(this.payload, [{ name: 'remove', type: 'boolean' }]);
 

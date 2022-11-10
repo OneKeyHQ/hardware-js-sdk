@@ -18,6 +18,10 @@ export type { DeviceFlagsParams } from './deviceFlags';
 export type { DeviceRecoveryParams } from './deviceRecovery';
 export type { DeviceResetParams } from './deviceReset';
 export type { DeviceSettingsParams } from './deviceSettings';
+export type { DeviceVerifyParams, DeviceVerifySignature } from './deviceVerify';
+export type { DeviceSupportFeatures } from './deviceSupportFeatures';
+export type { DeviceUploadResourceParams } from './deviceUploadResource';
+export type { FirmwareUpdateParams, FirmwareUpdateBinaryParams } from './firmwareUpdate';
 
 export type { EVMAddress, EVMGetAddressParams } from './evmGetAddress';
 export type { EVMPublicKey, EVMGetPublicKeyParams } from './evmGetPublicKey';
@@ -68,3 +72,36 @@ export type {
   StellarTransaction,
   StellarSignTransactionParams,
 } from './stellarSignTransaction';
+
+export type { TronAddress, TronGetAddressParams } from './tronGetAddress';
+export type { TronSignMessageParams } from './tronSignMessage';
+export type {
+  TronTransaction,
+  TronSignTransactionParams,
+  TronTransactionContract,
+  TronTransferContract,
+  TronTriggerSmartContract,
+} from './tronSignTransaction';
+
+export type { ConfluxAddress, ConfluxGetAddressParams } from './confluxGetAddress';
+export type { ConfluxSignMessageParams } from './confluxSignMessage';
+export type { ConfluxSignMessageCIP23Params } from './confluxSignMessageCIP23';
+export type {
+  ConfluxSignTransactionParams,
+  ConfluxSignedTx,
+  ConfluxTransaction,
+} from './confluxSignTransaction';
+
+export type { NearAddress, NearGetAddressParams } from './nearGetAddress';
+export type { NearSignTransactionParams } from './nearSignTransaction';
+
+export type { AptosAddress, AptosGetAddressParams } from './aptosGetAddress';
+export type { AptosPublicKey, AptosGetPublicKeyParams } from './aptosGetPublicKey';
+export type { AptosMessageSignature, AptosSignMessageParams } from './aptosSignMessage';
+export type { AptosSignedTx, AptosSignTransactionParams } from './aptosSignTransaction';
+
+export type { AlgoAddress, AlgoGetAddressParams } from './algoGetAddress';
+export type { AlgoSignedTx, AlgoSignTransactionParams } from './algoSignTransaction';
+
+export type { CosmosAddress, CosmosGetAddressParams } from './cosmosGetAddress';
+export type { CosmosSignedTx, CosmosSignTransactionParams } from './cosmosSignTransaction';

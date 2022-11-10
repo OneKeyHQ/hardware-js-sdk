@@ -1,9 +1,11 @@
-import { RebootToBootloader } from '@onekeyfe/hd-transport/src/types/messages';
+import { RebootToBootloader } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 
 // Reboot BootLoader
 export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloader> {
-  init() {}
+  init() {
+    this.useDevicePassphraseState = false;
+  }
 
   getVersionRange() {
     return {

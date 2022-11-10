@@ -1,4 +1,4 @@
-import { MessageSignature } from '@onekeyfe/hd-transport/src/types/messages';
+import { MessageSignature } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type BTCSignMessageParams = {
@@ -9,5 +9,6 @@ export type BTCSignMessageParams = {
 
 export declare function btcSignMessage(
   connectId: string,
+  deviceId: string,
   params: CommonParams & BTCSignMessageParams
 ): Response<MessageSignature>;

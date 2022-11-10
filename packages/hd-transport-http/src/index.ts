@@ -1,4 +1,5 @@
 import transport from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
@@ -8,6 +9,7 @@ const { check, buildOne, receiveOne, parseConfigure } = transport;
 type IncompleteRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
   url: string;
+  timeout?: number;
 };
 
 export default class HttpTransport {
@@ -19,14 +21,15 @@ export default class HttpTransport {
 
   url: string;
 
+  Log?: any;
+
   constructor(url?: string) {
     this.url = url == null ? DEFAULT_URL : url;
   }
 
   _post(options: IncompleteRequestOptions) {
     if (this.stopped) {
-      // eslint-disable-next-line prefer-promise-reject-errors
-      return Promise.reject('Transport stopped.');
+      return Promise.reject(ERRORS.TypedError('Transport stopped.'));
     }
     return http({
       ...options,
@@ -35,7 +38,8 @@ export default class HttpTransport {
     });
   }
 
-  async init() {
+  async init(logger: any) {
+    this.Log = logger;
     const bridgeVersion = await this._silentInit();
     return bridgeVersion;
   }
@@ -44,6 +48,7 @@ export default class HttpTransport {
     const infoS = await http({
       url: this.url,
       method: 'POST',
+      timeout: 3000,
     });
     const info = check.info(infoS);
     return info.version;
@@ -57,7 +62,7 @@ export default class HttpTransport {
 
   async listen(old?: Array<OneKeyDeviceInfoWithSession>) {
     if (old === null) {
-      throw new Error('Http-Transport does not support listen without previous.');
+      throw ERRORS.TypedError('Http-Transport does not support listen without previous.');
     }
     const devicesS = await this._post({
       url: '/listen',
@@ -97,27 +102,19 @@ export default class HttpTransport {
 
   async call(session: string, name: string, data: Record<string, unknown>) {
     if (this._messages == null) {
-      throw new Error('Transport not configured.');
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    console.log(
-      'transport-http',
-      'call-',
-      'messages: ',
-      messages,
-      ' name: ',
-      name,
-      ' data: ',
-      data
-    );
+    this.Log.debug('call-', ' name: ', name, ' data: ', data);
     const o = buildOne(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
       url: `/call/${session}`,
       body: outData,
+      timeout: name === 'Initialize' ? 10000 : undefined,
     });
     if (typeof resData !== 'string') {
-      throw new Error('Returning data is not string.');
+      throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
     const jsonData = receiveOne(messages, resData);
     return check.call(jsonData);
@@ -125,7 +122,7 @@ export default class HttpTransport {
 
   async post(session: string, name: string, data: Record<string, unknown>) {
     if (this._messages == null) {
-      throw new Error('Transport not configured.');
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
     const outData = buildOne(messages, name, data).toString('hex');
@@ -137,14 +134,14 @@ export default class HttpTransport {
 
   async read(session: string) {
     if (this._messages == null) {
-      throw new Error('Transport not configured.');
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
     const resData = await this._post({
       url: `/read/${session}`,
     });
     if (typeof resData !== 'string') {
-      throw new Error('Returning data is not string.');
+      throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
     const jsonData = receiveOne(messages, resData);
     return check.call(jsonData);
@@ -157,5 +154,9 @@ export default class HttpTransport {
 
   stop() {
     this.stopped = true;
+  }
+
+  cancel() {
+    this.Log.debug('canceled');
   }
 }

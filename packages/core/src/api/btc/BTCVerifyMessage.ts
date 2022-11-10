@@ -1,4 +1,4 @@
-import { VerifyMessage } from '@onekeyfe/hd-transport/src/types/messages';
+import { VerifyMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 
 import { BaseMethod } from '../BaseMethod';
@@ -8,6 +8,7 @@ import { getCoinInfo } from './helpers/btcParamsUtils';
 
 export default class BTCVerifyMessage extends BaseMethod<VerifyMessage> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [

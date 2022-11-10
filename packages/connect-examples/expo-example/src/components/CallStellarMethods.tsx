@@ -1,4 +1,4 @@
-import { CoreApi } from '@onekeyfe/hd-core';
+import { CommonParams, CoreApi } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
@@ -6,13 +6,16 @@ import MethodInvoke from './MethodInvoke';
 type CallStellarMethodsProps = {
   SDK: CoreApi;
   selectedDevice: Device | null;
+  commonParams?: CommonParams;
 };
 
 export function CallStellarMethods({
   SDK,
   selectedDevice: currentDevice,
+  commonParams,
 }: CallStellarMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>Stellar Method Test</Text>
@@ -23,7 +26,7 @@ export function CallStellarMethods({
             { name: 'path', value: "m/44'/148'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
-          onCall={data => SDK.stellarGetAddress(connectId, { ...data })}
+          onCall={data => SDK.stellarGetAddress(connectId, deviceId, { ...commonParams, ...data })}
         />
 
         <MethodInvoke
@@ -44,7 +47,8 @@ export function CallStellarMethods({
             { name: 'transaction.sequence', value: 4294967296, type: 'number' },
           ]}
           onCall={data =>
-            SDK.stellarSignTransaction(connectId, {
+            SDK.stellarSignTransaction(connectId, deviceId, {
+              ...commonParams,
               // @ts-expect-error
               path: data.path,
               // @ts-expect-error

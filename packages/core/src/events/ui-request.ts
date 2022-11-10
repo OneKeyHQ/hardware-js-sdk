@@ -9,20 +9,27 @@ export const UI_REQUEST = {
   REQUEST_PIN: 'ui-request_pin',
   INVALID_PIN: 'ui-invalid_pin',
   REQUEST_BUTTON: 'ui-button',
+  REQUEST_PASSPHRASE: 'ui-request_passphrase',
+  REQUEST_PASSPHRASE_ON_DEVICE: 'ui-request_passphrase_on_device',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
 
   BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
   LOCATION_PERMISSION: 'ui-location_permission',
+  LOCATION_SERVICE_PERMISSION: 'ui-location_service_permission',
 
   FIRMWARE_PROGRESS: 'ui-firmware-progress',
+  FIRMWARE_TIP: 'ui-firmware-tip',
+
+  NOT_IN_BOOTLOADER: 'ui-device_not_in_bootloader_mode',
 } as const;
 
 export interface UiRequestWithoutPayload {
   type:
     | typeof UI_REQUEST.CLOSE_UI_WINDOW
     | typeof UI_REQUEST.BLUETOOTH_PERMISSION
-    | typeof UI_REQUEST.LOCATION_PERMISSION;
+    | typeof UI_REQUEST.LOCATION_PERMISSION
+    | typeof UI_REQUEST.LOCATION_SERVICE_PERMISSION;
   payload?: typeof undefined;
 }
 
@@ -39,6 +46,22 @@ export interface UiRequestButton {
   payload: DeviceButtonRequest['payload'];
 }
 
+export interface UiRequestPassphrase {
+  type: typeof UI_REQUEST.REQUEST_PASSPHRASE;
+  payload: {
+    device: Device;
+    passphraseState?: string;
+  };
+}
+
+export interface UiRequestPassphraseOnDevice {
+  type: typeof UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE;
+  payload: {
+    device: Device;
+    passphraseState?: string;
+  };
+}
+
 export interface FirmwareProgress {
   type: typeof UI_REQUEST.FIRMWARE_PROGRESS;
   payload: {
@@ -47,11 +70,22 @@ export interface FirmwareProgress {
   };
 }
 
+export interface FirmwareTip {
+  type: typeof UI_REQUEST.FIRMWARE_TIP;
+  payload: {
+    device: Device;
+    data: { message: string };
+  };
+}
+
 export type UiEvent =
   | UiRequestWithoutPayload
   | UiRequestDeviceAction
   | UiRequestButton
-  | FirmwareProgress;
+  | UiRequestPassphraseOnDevice
+  | UiRequestPassphrase
+  | FirmwareProgress
+  | FirmwareTip;
 
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
 

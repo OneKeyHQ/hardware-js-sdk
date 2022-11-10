@@ -1,17 +1,5 @@
-const colors: Record<string, string> = {
-  // orange, api related
-  '@onekey/connect': 'color: #f4a742; background: #000;',
-  IFrame: 'color: #f4a742; background: #000;',
-  Core: 'color: #f4a742; background: #000;',
-  // green, device related
-  DescriptorStream: 'color: #77ab59; background: #000;',
-  DeviceList: 'color: #77ab59; background: #000;',
-  Device: 'color: #bada55; background: #000;',
-  DeviceCommands: 'color: #bada55; background: #000;',
-  DeviceConnector: 'color: #bada55; background: #000;',
-  // red, data-manager related
-  Transport: 'color: #ffb6c1; background: #000;',
-};
+import { CoreMessage } from '../events';
+import { createLogMessage, LOG } from '../events/log';
 
 type LogMessage = {
   level: string;
@@ -20,14 +8,14 @@ type LogMessage = {
   timestamp: number;
 };
 
-const MAX_ENTRIES = 100;
+const MAX_ENTRIES = 500;
+
+let postMessage: (message: CoreMessage) => void;
 
 class Log {
   prefix: string;
 
   enabled: boolean;
-
-  css: string;
 
   messages: LogMessage[];
 
@@ -35,7 +23,6 @@ class Log {
     this.prefix = prefix;
     this.enabled = enabled;
     this.messages = [];
-    this.css = typeof window !== 'undefined' && colors[prefix] ? colors[prefix] : '';
   }
 
   addMessage(level: string, prefix: string, ...args: any[]) {
@@ -52,34 +39,38 @@ class Log {
 
   log(...args: any[]) {
     this.addMessage('log', this.prefix, ...args);
-    if (this.enabled) {
-      console.log(this.prefix, ...args);
+    sendLogMessage(this.prefix, ...args);
+    if (!this.enabled) {
+      return;
     }
+    console.log(this.prefix, ...args);
   }
 
   error(...args: any[]) {
     this.addMessage('error', this.prefix, ...args);
-    if (this.enabled) {
-      console.error(this.prefix, ...args);
+    sendLogMessage(this.prefix, ...args);
+    if (!this.enabled) {
+      return;
     }
+    console.error(this.prefix, ...args);
   }
 
   warn(...args: any[]) {
     this.addMessage('warn', this.prefix, ...args);
-    if (this.enabled) {
-      console.warn(this.prefix, ...args);
+    sendLogMessage(this.prefix, ...args);
+    if (!this.enabled) {
+      return;
     }
+    console.warn(this.prefix, ...args);
   }
 
   debug(...args: any[]) {
     this.addMessage('debug', this.prefix, ...args);
-    if (this.enabled) {
-      if (this.css) {
-        console.log(`%c${this.prefix}`, this.css, ...args);
-      } else {
-        console.log(this.prefix, ...args);
-      }
+    sendLogMessage(this.prefix, ...args);
+    if (!this.enabled) {
+      return;
     }
+    console.log(this.prefix, ...args);
   }
 }
 
@@ -111,3 +102,82 @@ export const getLog = () => {
   logs.sort((a, b) => a.timestamp - b.timestamp);
   return logs;
 };
+
+export const setLoggerPostMessage = (postMessageFn: (message: CoreMessage) => void) => {
+  postMessage = postMessageFn;
+};
+
+const serializeLog = (...args: any[]) =>
+  args.map(arg => {
+    if (typeof arg === 'string') {
+      return arg;
+    }
+    if (typeof arg === 'number') {
+      return arg;
+    }
+    if (typeof arg === 'boolean') {
+      return arg;
+    }
+    if (typeof arg === 'undefined') {
+      return arg;
+    }
+    if (typeof arg === 'object') {
+      return JSON.stringify(arg, getCircularReplacer());
+    }
+    return arg;
+  });
+
+const getCircularReplacer = () => {
+  const seen = new WeakSet();
+  return (_: string, value: any) => {
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return;
+      }
+      seen.add(value);
+    }
+    return value;
+  };
+};
+
+const sendLogMessage = (prefix: string, ...args: any[]) => {
+  postMessage?.(createLogMessage(LOG.OUTPUT, serializeLog(prefix, ...args)));
+};
+
+export enum LoggerNames {
+  Core = 'Core',
+  Transport = 'Transport',
+  Device = 'Device',
+  DeviceCommands = 'DeviceCommands',
+  DeviceConnector = 'DeviceConnector',
+  DeviceList = 'DeviceList',
+  DevicePool = 'DevicePool',
+  HdCommonConnectSdk = '@onekey/common-connect-sdk',
+  HdBleSdk = '@onekey/hd-ble-sdk',
+  HdTransportHttp = '@onekey/hd-transport-http',
+  HdBleTransport = '@onekey/hd-ble-transport',
+  Connect = '@onekey/connect',
+  Iframe = 'IFrame',
+  SendMessage = '[SendMessage]',
+  Method = '[Method]',
+}
+
+export const LoggerMap = {
+  [LoggerNames.Core]: initLog(LoggerNames.Core),
+  [LoggerNames.Transport]: initLog(LoggerNames.Transport),
+  [LoggerNames.Device]: initLog(LoggerNames.Device),
+  [LoggerNames.DeviceCommands]: initLog(LoggerNames.DeviceCommands),
+  [LoggerNames.DeviceConnector]: initLog(LoggerNames.DeviceConnector),
+  [LoggerNames.DeviceList]: initLog(LoggerNames.DeviceList),
+  [LoggerNames.DevicePool]: initLog(LoggerNames.DevicePool),
+  [LoggerNames.HdBleSdk]: initLog(LoggerNames.HdBleSdk),
+  [LoggerNames.HdTransportHttp]: initLog(LoggerNames.HdTransportHttp),
+  [LoggerNames.HdBleTransport]: initLog(LoggerNames.HdBleTransport),
+  [LoggerNames.Connect]: initLog(LoggerNames.Connect),
+  [LoggerNames.Iframe]: initLog(LoggerNames.Iframe),
+  [LoggerNames.SendMessage]: initLog(LoggerNames.SendMessage),
+  [LoggerNames.Method]: initLog(LoggerNames.Method),
+  [LoggerNames.HdCommonConnectSdk]: initLog(LoggerNames.Method),
+};
+
+export const getLogger = (key: LoggerNames) => LoggerMap[key];

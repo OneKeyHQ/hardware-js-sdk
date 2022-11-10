@@ -10,6 +10,7 @@ type CallOtherMethodsProps = {
 
 export function CallOtherMethods({ SDK, selectedDevice: currentDevice }: CallOtherMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>Other Method Test</Text>
@@ -29,7 +30,7 @@ export function CallOtherMethods({ SDK, selectedDevice: currentDevice }: CallOth
             { name: 'askOnDecrypt', value: true, type: 'boolean' },
             { name: 'iv', value: undefined, type: 'string' },
           ]}
-          onCall={data => SDK.cipherKeyValue(connectId, { ...data })}
+          onCall={data => SDK.cipherKeyValue(connectId, deviceId, { ...data })}
         />
       </View>
     </View>

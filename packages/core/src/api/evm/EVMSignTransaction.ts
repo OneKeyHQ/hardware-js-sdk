@@ -1,9 +1,6 @@
-import {
-  EthereumSignTx,
-  EthereumSignTxEIP1559,
-  EthereumTxRequest,
-} from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumSignTx, EthereumSignTxEIP1559, EthereumTxRequest } from '@onekeyfe/hd-transport';
 
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -16,7 +13,6 @@ import {
 } from '../../types/api/evmSignTransaction';
 import { cutString } from '../helpers/stringUtils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
-import { ERRORS } from '../../constants';
 
 export default class EVMSignTransaction extends BaseMethod {
   addressN: number[] = [];
@@ -26,6 +22,7 @@ export default class EVMSignTransaction extends BaseMethod {
   formattedTx: EVMTransaction | EVMTransactionEIP1559 | undefined;
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [
@@ -63,7 +60,7 @@ export default class EVMSignTransaction extends BaseMethod {
   processTxRequest = async (
     request: EthereumTxRequest,
     data: string,
-    chain_id: number | undefined
+    chain_id?: number | undefined
   ): Promise<EVMSignedTx> => {
     if (!request.data_length) {
       let v = request.signature_v;
@@ -71,7 +68,10 @@ export default class EVMSignTransaction extends BaseMethod {
       const s = request.signature_s;
 
       if (v == null || r == null || s == null) {
-        throw ERRORS.TypedError('Runtime', 'processTxRequest: Unexpected request');
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'processTxRequest: Unexpected request'
+        );
       }
 
       // if v is not 27 or 28, it is a legacy transaction
@@ -175,7 +175,7 @@ export default class EVMSignTransaction extends BaseMethod {
       message
     );
 
-    return this.processTxRequest(response.message, rest, chainId);
+    return this.processTxRequest(response.message, rest);
   };
 
   getVersionRange() {

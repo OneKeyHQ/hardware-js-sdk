@@ -14,7 +14,7 @@ export type ConnectSettings = {
   priority: number;
   trustedHost: boolean;
   supportedBrowser?: boolean;
-  env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native';
+  env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native' | 'webusb';
   timestamp: number;
   isFrame?: boolean;
 };
@@ -27,6 +27,10 @@ export type ILocale = 'zh-CN' | 'en-US';
 export type IFirmwareReleaseInfo = {
   required: boolean;
   url: string;
+  /** Firmware UI resource */
+  resource?: string;
+  /** Firmware full UI resource */
+  fullResource?: string;
   fingerprint: string;
   version: IVersionArray;
   changelog: {

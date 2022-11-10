@@ -1,8 +1,6 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
-  ERRORS,
   parseConnectSettings,
-  initLog,
   enableLog,
   PostMessageEvent,
   IFRAME,
@@ -12,13 +10,21 @@ import HardwareSdk, {
   CoreMessage,
   ConnectSettings,
   UiResponseEvent,
+  LOG_EVENT,
+  setLoggerPostMessage,
+  getLogger,
+  LoggerNames,
+  FIRMWARE_EVENT,
+  DEVICE_EVENT,
+  DEVICE,
 } from '@onekeyfe/hd-core';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
-import { sendMessage, createJsBridge, hostBridge } from './utils/bridgeUtils';
+import { sendMessage, createJsBridge, hostBridge, resetListenerFlag } from './utils/bridgeUtils';
 
 const eventEmitter = new EventEmitter();
-const Log = initLog('@onekey/connect');
+const Log = getLogger(LoggerNames.Connect);
 
 let _settings = parseConnectSettings();
 
@@ -35,6 +41,21 @@ const handleMessage = async (message: CoreMessage) => {
       eventEmitter.emit(message.type, message.payload);
       break;
 
+    case LOG_EVENT:
+    case FIRMWARE_EVENT:
+      eventEmitter.emit(message.event, message);
+      break;
+
+    case DEVICE_EVENT:
+      if (
+        (
+          [DEVICE.CONNECT, DEVICE.DISCONNECT, DEVICE.FEATURES, DEVICE.SUPPORT_FEATURES] as string[]
+        ).includes(message.type)
+      ) {
+        eventEmitter.emit(message.type, message.payload);
+      }
+      break;
+
     default:
       Log.log('No need to be captured message', message.event);
   }
@@ -49,19 +70,23 @@ const dispose = () => {
 
 const uiResponse = (response: UiResponseEvent) => {
   if (!iframe.instance) {
-    throw ERRORS.TypedError('Init_NotInitialized');
+    throw ERRORS.TypedError(HardwareErrorCode.IFrameNotInitialized);
   }
   const { type, payload } = response;
-  sendMessage({ event: UI_EVENT, type, payload });
+  sendMessage({ event: UI_EVENT, type, payload } as CoreMessage);
 };
 
-const cancel = () => {};
+const cancel = (connectId?: string) => {
+  sendMessage({ event: IFRAME.CANCEL, type: IFRAME.CANCEL, payload: { connectId } });
+};
 
+let prevFrameInstance: Window | null | undefined = null;
 const createJSBridge = (messageEvent: PostMessageEvent) => {
   if (messageEvent.origin !== iframe.origin) {
     return;
   }
-  if (!hostBridge) {
+  if (!hostBridge || prevFrameInstance !== iframe.instance?.contentWindow) {
+    resetListenerFlag();
     createJsBridge({
       isHost: true,
       remoteFrame: iframe.instance?.contentWindow as Window,
@@ -72,23 +97,30 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
-        console.log('Host Bridge Receive message: ', message);
+        if (message.event !== 'LOG_EVENT') {
+          Log.debug('Host Bridge Receive message: ', message);
+        }
         const response = await handleMessage(message);
-        Log.debug('Host Bridge response: ', response);
+        if (message.event !== 'LOG_EVENT') {
+          Log.debug('Host Bridge response: ', response);
+        }
         return response;
       },
     });
+
+    prevFrameInstance = iframe.instance?.contentWindow;
   }
 };
 
 const init = async (settings: Partial<ConnectSettings>) => {
   if (iframe.instance) {
-    throw ERRORS.TypedError('Init_AlreadyInitialized');
+    throw ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized);
   }
 
   _settings = parseConnectSettings({ ..._settings, ...settings });
 
   enableLog(!!settings.debug);
+  setLoggerPostMessage(handleMessage);
 
   Log.debug('init');
 
@@ -96,7 +128,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
   window.addEventListener('unload', dispose);
 
   try {
-    await iframe.init(_settings);
+    await iframe.init({ ..._settings, version: process.env.VERSION });
     return true;
   } catch (e) {
     console.log('init error: ', e);
@@ -106,18 +138,27 @@ const init = async (settings: Partial<ConnectSettings>) => {
 
 const call = async (params: any) => {
   Log.debug('call : ', params);
-  // lazy load
+  /**
+   * Try to recreate iframe if it's initialize failed
+   */
   if (!iframe.instance && !iframe.timeout) {
     _settings = parseConnectSettings(_settings);
+    Log.debug("Try to recreate iframe if it's initialize failed: ", _settings);
     try {
-      init(_settings);
+      const initResult = await init(_settings);
+      if (!initResult) {
+        Log.debug('Recreate iframe failed');
+        return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.IFrameLoadFail));
+      }
+      Log.debug('Recreate iframe success');
     } catch (error) {
+      Log.debug('Recreate iframe failed: ', error);
       return createErrorMessage(error);
     }
   }
 
   if (iframe.timeout) {
-    return createErrorMessage(ERRORS.TypedError('Init_IframeLoadFail'));
+    return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.IFrameLoadFail));
   }
 
   try {
@@ -126,10 +167,14 @@ const call = async (params: any) => {
       return response;
     }
 
-    return createErrorMessage(ERRORS.TypedError('Call_NotResponse'));
+    return createErrorMessage(ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse));
   } catch (error) {
     Log.error('__call error: ', error);
-    return createErrorMessage(error);
+    let err = error;
+    if (!(err instanceof HardwareError)) {
+      err = ERRORS.CreateErrorByMessage(error.message);
+    }
+    return createErrorMessage(err);
   }
 };
 

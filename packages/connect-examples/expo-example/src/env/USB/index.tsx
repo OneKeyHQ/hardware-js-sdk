@@ -1,17 +1,16 @@
-import HardwareWebSdk from '@onekeyfe/hd-web-sdk';
+import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { CallMethods } from '../../components/CallMethods';
+import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 
 let isSdkInit = false;
-
 export default function USB() {
+  const [sdk, createSDK] = React.useState<CoreApi>();
   const sdkInit = () => {
-    const settings = {
-      debug: true,
-      connectSrc: 'https://localhost:8088/',
-    };
-    HardwareWebSdk.init(settings);
+    getHardwareSDKInstance().then(res => {
+      createSDK(res);
+    });
   };
 
   useEffect(() => {
@@ -24,7 +23,7 @@ export default function USB() {
   return (
     <View>
       <Text>This is USB example page, will run on desktop browser. </Text>
-      <CallMethods SDK={HardwareWebSdk} type="USB" />
+      {sdk && <CallMethods SDK={sdk} type="USB" />}
     </View>
   );
 }

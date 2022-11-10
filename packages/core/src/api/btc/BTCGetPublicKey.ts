@@ -1,4 +1,4 @@
-import { GetPublicKey } from '@onekeyfe/hd-transport/src/types/messages';
+import { GetPublicKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getScriptType, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -11,6 +11,7 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   hasBundle = false;
 
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = Object.prototype.hasOwnProperty.call(this.payload, 'bundle');

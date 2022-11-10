@@ -1,4 +1,4 @@
-import { Success } from '@onekeyfe/hd-transport/src/types/messages';
+import { Success } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type BTCVerifyMessageParams = {
@@ -10,5 +10,6 @@ export type BTCVerifyMessageParams = {
 
 export declare function btcVerifyMessage(
   connectId: string,
+  deviceId: string,
   params: CommonParams & BTCVerifyMessageParams
 ): Response<Success>;

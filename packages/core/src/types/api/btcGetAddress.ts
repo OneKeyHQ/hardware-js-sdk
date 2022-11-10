@@ -1,8 +1,4 @@
-import {
-  Address,
-  InputScriptType,
-  MultisigRedeemScriptType,
-} from '@onekeyfe/hd-transport/src/types/messages';
+import { Address, InputScriptType, MultisigRedeemScriptType } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type BTCAddress = {
@@ -19,10 +15,12 @@ export type BTCGetAddressParams = {
 
 export declare function btcGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & BTCGetAddressParams
 ): Response<BTCAddress>;
 
 export declare function btcGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: BTCGetAddressParams[] }
 ): Response<Array<BTCAddress>>;

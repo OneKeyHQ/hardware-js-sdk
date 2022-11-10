@@ -1,4 +1,4 @@
-import { StellarSignedTx } from '@onekeyfe/hd-transport/src/types/messages';
+import { StellarSignedTx } from '@onekeyfe/hd-transport';
 import { CommonParams, Response } from '../params';
 
 export type StellarAsset = {
@@ -149,5 +149,6 @@ export type StellarSignTransactionParams = {
 
 export declare function stellarSignTransaction(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StellarSignTransactionParams
 ): Response<StellarSignedTx>;

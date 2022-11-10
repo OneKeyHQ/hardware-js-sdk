@@ -1,4 +1,4 @@
-import { StarcoinAddress as HardwareStarcoinAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { StarcoinAddress as HardwareStarcoinAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type StarcoinAddress = {
@@ -12,10 +12,12 @@ export type StarcoinGetAddressParams = {
 
 export declare function starcoinGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StarcoinGetAddressParams
 ): Response<StarcoinAddress>;
 
 export declare function starcoinGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: StarcoinGetAddressParams[] }
 ): Response<Array<StarcoinAddress>>;

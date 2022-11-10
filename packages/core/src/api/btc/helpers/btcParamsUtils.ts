@@ -1,4 +1,4 @@
-import { ERRORS } from '../../../constants';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { getScriptType, isMultisigPath, fromHardened } from '../../helpers/pathUtils';
 import bitcoin from '../../../data/coins/bitcoin.json';
 
@@ -22,11 +22,17 @@ export const getCoinInfo = (path: number[] | undefined, coin: string | undefined
 
   if (!coinInfo) {
     if (coin) {
-      throw ERRORS.TypedError('Method_InvalidParameter', `Invalid coin name: ${coin}`);
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        `Invalid coin name: ${coin}`
+      );
     } else if (path) {
-      throw ERRORS.TypedError('Method_InvalidParameter', `Invalid path: ${path[0]}`);
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        `Invalid path: ${path[0]}`
+      );
     } else {
-      throw ERRORS.TypedError('Method_InvalidParameter');
+      throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter);
     }
   }
 

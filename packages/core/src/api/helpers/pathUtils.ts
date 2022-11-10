@@ -1,15 +1,18 @@
 /* eslint-disable no-bitwise */
 
-import { ChangeOutputScriptType, InputScriptType } from '@onekeyfe/hd-transport/src/types/messages';
-import { ERRORS } from '../../constants';
+import { ChangeOutputScriptType, InputScriptType } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 const HD_HARDENED = 0x80000000;
 export const toHardened = (n: number): number => (n | HD_HARDENED) >>> 0;
 export const fromHardened = (n: number): number => (n & ~HD_HARDENED) >>> 0;
 
-const PATH_NOT_VALID = ERRORS.TypedError('Method_InvalidParameter', 'Not a valid path');
+const PATH_NOT_VALID = ERRORS.TypedError(
+  HardwareErrorCode.CallMethodInvalidParameter,
+  'Not a valid path'
+);
 const PATH_NEGATIVE_VALUES = ERRORS.TypedError(
-  'Method_InvalidParameter',
+  HardwareErrorCode.CallMethodInvalidParameter,
   'Path cannot contain negative values'
 );
 

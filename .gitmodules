@@ -1,0 +1,3 @@
+[submodule "submodules/firmware"]
+	path = submodules/firmware
+	url = https://github.com/OneKeyHQ/firmware.git

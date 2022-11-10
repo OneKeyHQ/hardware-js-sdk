@@ -16,6 +16,8 @@
       // note you must disable the base rule as it can report incorrect errors
       "no-use-before-define": "off",
       "@typescript-eslint/no-use-before-define": ["error"],
-      "require-await": ["error"]
+      "@typescript-eslint/no-var-requires": "off",
+      "require-await": ["error"],
+      "import/no-named-default": "off"
   }
 }

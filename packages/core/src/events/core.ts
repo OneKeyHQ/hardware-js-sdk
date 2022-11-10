@@ -1,9 +1,12 @@
+import { HardwareError } from '@onekeyfe/hd-shared';
 import { Unsuccessful } from '../types/params';
-import { IFrameCallMessage } from './call';
+import { IFrameCallMessage, IFrameCancelMessage } from './call';
 import { DeviceEventMessage } from './device';
 import { IFrameEventMessage } from './iframe';
 import { UiEventMessage } from './ui-request';
 import { UiResponseMessage } from './ui-response';
+import { LogEventMessage } from './log';
+import { FirmwareMessage } from './firmware';
 
 export const CORE_EVENT = 'CORE_EVENT';
 
@@ -13,9 +16,12 @@ export type CoreMessage = {
 } & (
   | IFrameEventMessage
   | IFrameCallMessage
+  | IFrameCancelMessage
   | UiResponseMessage
   | UiEventMessage
   | DeviceEventMessage
+  | LogEventMessage
+  | FirmwareMessage
 );
 
 export type PostMessageEvent = MessageEvent<any>;
@@ -39,10 +45,13 @@ export const parseMessage = (messageData: any): CoreMessage => {
   return message;
 };
 
-export const createErrorMessage = (error: Error & { code?: string }): Unsuccessful => ({
-  success: false,
-  payload: {
-    error: error.message,
-    code: error.code,
-  },
-});
+export const createErrorMessage = (error: Error & { code?: string | number }): Unsuccessful => {
+  let payload = { error: error.message, code: error.code };
+  if (error instanceof HardwareError) {
+    payload = { error: error.message, code: error.errorCode };
+  }
+  return {
+    success: false,
+    payload,
+  };
+};

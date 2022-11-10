@@ -1,4 +1,4 @@
-import { StarcoinSignTx } from '@onekeyfe/hd-transport/src/types/messages';
+import { StarcoinSignTx } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -7,6 +7,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 
 export default class StarcoinSignTransaction extends BaseMethod<StarcoinSignTx> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     // check payload

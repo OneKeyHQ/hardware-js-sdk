@@ -1,7 +1,7 @@
 /* eslint-disable vars-on-top */
 
 import type { ConnectSettings } from '../types';
-import { VERSION, DEFAULT_DOMAIN } from '../data/version';
+import { DEFAULT_DOMAIN, getSDKVersion } from '../data/config';
 
 export const DEFAULT_PRIORITY = 2;
 
@@ -13,13 +13,13 @@ declare global {
 
 const initialSettings: ConnectSettings = {
   configSrc: './data/config.json', // constant
-  version: VERSION, // constant
+  version: '', // constant
   debug: false,
   priority: DEFAULT_PRIORITY,
   trustedHost: false,
   connectSrc: DEFAULT_DOMAIN,
   iframeSrc: `${DEFAULT_DOMAIN}iframe.html`,
-  parentOrigin: window.location ? window.location.origin : '',
+  parentOrigin: typeof window !== 'undefined' && window.location ? window.location.origin : '',
   supportedBrowser:
     typeof navigator !== 'undefined' ? !/Trident|MSIE|Edge/.test(navigator.userAgent) : true,
   env: 'web',
@@ -107,3 +107,5 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
 
   return settings;
 };
+
+export { getSDKVersion };

@@ -1,23 +1,20 @@
 import semver from 'semver';
-import {
-  EthereumMessageSignature,
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import type {
   EthereumTypedDataSignature,
   EthereumTypedDataStructAck,
-  MessageKey,
-} from '@onekeyfe/hd-transport/src/types/messages';
+} from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { ERRORS } from '../../constants';
 import { encodeData, getFieldType, parseArrayType } from '../helpers/typeNameUtils';
-import {
+import { getDeviceFirmwareVersion, getDeviceType } from '../../utils/deviceFeaturesUtils';
+import type {
   EthereumSignTypedDataMessage,
   EthereumSignTypedDataTypes,
 } from '../../types/api/evmSignTypedData';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../utils/deviceFeaturesUtils';
-import { TypedResponseMessage } from '../../device/DeviceCommands';
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -29,6 +26,7 @@ export type EVMSignTypedDataParams = {
 
 export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [
@@ -55,127 +53,126 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         this.params.messageHash = formatAnyHex(messageHash);
       } else if (!!data && (!data.primaryType || data.primaryType !== 'EIP712Domain')) {
         throw ERRORS.TypedError(
-          'Method_InvalidParameter',
+          HardwareErrorCode.CallMethodInvalidParameter,
           'message_hash should only be empty when data.primaryType=EIP712Domain'
         );
       }
     }
   }
 
-  // async signTypedData() {
-  //   const { commands } = this.device;
-  //   const { addressN, data, metamaskV4Compat } = this.params;
+  async signTypedData() {
+    const { commands } = this.device;
+    const { addressN, data, metamaskV4Compat } = this.params;
 
-  //   const {
-  //     types,
-  //     primaryType,
-  //     domain,
-  //     message,
-  //   }: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> = data;
+    const {
+      types,
+      primaryType,
+      domain,
+      message,
+    }: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> = data;
 
-  //   let response = await commands.typedCall(
-  //     'EthereumSignTypedData',
-  //     // 'EthereumTypedDataStructRequest|EthereumTypedDataValueRequest|EthereumTypedDataSignature',
-  //     [
-  //       'EthereumTypedDataStructRequest',
-  //       'EthereumTypedDataValueRequest',
-  //       'EthereumTypedDataSignature',
-  //     ],
-  //     {
-  //       address_n: addressN,
-  //       primary_type: primaryType as string,
-  //       metamask_v4_compat: metamaskV4Compat,
-  //     }
-  //   );
+    let response = await commands.typedCall(
+      'EthereumSignTypedData',
+      [
+        'EthereumTypedDataStructRequest',
+        'EthereumTypedDataValueRequest',
+        'EthereumTypedDataSignature',
+      ],
+      {
+        address_n: addressN,
+        primary_type: primaryType as string,
+        metamask_v4_compat: metamaskV4Compat,
+      }
+    );
 
-  //   while (response.type === 'EthereumTypedDataStructRequest') {
-  //     const { name: typeDefinitionName } = response.message;
-  //     const typeDefinition = types[typeDefinitionName];
-  //     if (typeDefinition === undefined) {
-  //       throw ERRORS.TypedError(
-  //         'Runtime',
-  //         `Type ${typeDefinitionName} was not defined in types object`
-  //       );
-  //     }
+    while (response.type === 'EthereumTypedDataStructRequest') {
+      const { name: typeDefinitionName } = response.message;
+      const typeDefinition = types[typeDefinitionName];
+      if (typeDefinition === undefined) {
+        throw ERRORS.TypedError(
+          'Runtime',
+          `Type ${typeDefinitionName} was not defined in types object`
+        );
+      }
 
-  //     const dataStruckAck: EthereumTypedDataStructAck = {
-  //       members: typeDefinition.map(({ name, type: typeName }) => ({
-  //         name,
-  //         type: getFieldType(typeName, types),
-  //       })),
-  //     };
+      const dataStruckAck: EthereumTypedDataStructAck = {
+        members: typeDefinition.map(({ name, type: typeName }) => ({
+          name,
+          type: getFieldType(typeName, types),
+        })),
+      };
 
-  //     response = await commands.typedCall(
-  //       'EthereumTypedDataStructAck',
-  //       [
-  //         'EthereumTypedDataStructRequest',
-  //         'EthereumTypedDataValueRequest',
-  //         'EthereumTypedDataSignature',
-  //       ] as MessageKey[],
-  //       dataStruckAck
-  //     );
-  //   }
+      response = await commands.typedCall(
+        'EthereumTypedDataStructAck',
+        [
+          'EthereumTypedDataStructRequest',
+          'EthereumTypedDataValueRequest',
+          'EthereumTypedDataSignature',
+        ],
+        dataStruckAck
+      );
+    }
 
-  //   while (response.type === 'EthereumTypedDataValueRequest') {
-  //     const { member_path } = response.message;
+    while (response.type === 'EthereumTypedDataValueRequest') {
+      const { member_path } = response.message;
 
-  //     let memberData;
-  //     let memberTypeName: string;
+      let memberData;
+      let memberTypeName: string;
 
-  //     const [rootIndex, ...nestedMemberPath] = member_path;
-  //     switch (rootIndex) {
-  //       case 0:
-  //         memberData = domain;
-  //         memberTypeName = 'EIP712Domain';
-  //         break;
-  //       case 1:
-  //         memberData = message;
-  //         memberTypeName = primaryType as string;
-  //         break;
-  //       default:
-  //         throw ERRORS.TypedError('Runtime', 'Root index can only be 0 or 1');
-  //     }
+      const [rootIndex, ...nestedMemberPath] = member_path;
+      switch (rootIndex) {
+        case 0:
+          memberData = domain;
+          memberTypeName = 'EIP712Domain';
+          break;
+        case 1:
+          memberData = message;
+          memberTypeName = primaryType as string;
+          break;
+        default:
+          throw ERRORS.TypedError('Runtime', 'Root index can only be 0 or 1');
+      }
 
-  //     for (const index of nestedMemberPath) {
-  //       if (Array.isArray(memberData)) {
-  //         memberTypeName = parseArrayType(memberTypeName).entryTypeName;
-  //         memberData = memberData[index];
-  //       } else if (typeof memberData === 'object' && memberData !== null) {
-  //         const memberTypeDefinition = types[memberTypeName][index];
-  //         memberTypeName = memberTypeDefinition.type;
-  //         memberData = memberData[memberTypeDefinition.name];
-  //       } else {
-  //         // TODO
-  //       }
-  //     }
+      for (const index of nestedMemberPath) {
+        if (Array.isArray(memberData)) {
+          memberTypeName = parseArrayType(memberTypeName).entryTypeName;
+          memberData = memberData[index];
+        } else if (typeof memberData === 'object' && memberData !== null) {
+          const memberTypeDefinition = types[memberTypeName][index];
+          memberTypeName = memberTypeDefinition.type;
+          memberData = memberData[memberTypeDefinition.name];
+        } else {
+          // TODO
+        }
+      }
 
-  //     let encodedData;
-  //     if (Array.isArray(memberData)) {
-  //       // Sending the length as uint16
-  //       encodedData = encodeData('uint16', memberData.length);
-  //     } else {
-  //       encodedData = encodeData(memberTypeName, memberData);
-  //     }
+      let encodedData;
+      if (Array.isArray(memberData)) {
+        // Sending the length as uint16
+        encodedData = encodeData('uint16', memberData.length);
+      } else {
+        encodedData = encodeData(memberTypeName, memberData);
+      }
 
-  //     response = await commands.typedCall(
-  //       'EthereumTypedDataValueAck',
-  //       ['EthereumTypedDataValueRequest', 'EthereumTypedDataSignature'] as MessageKey[],
-  //       {
-  //         value: encodedData,
-  //       }
-  //     );
-  //   }
+      response = await commands.typedCall(
+        'EthereumTypedDataValueAck',
+        ['EthereumTypedDataValueRequest', 'EthereumTypedDataSignature'],
+        {
+          value: encodedData,
+        }
+      );
+    }
 
-  //   if (response.type !== 'EthereumTypedDataSignature') {
-  //     throw ERRORS.TypedError('Runtime', 'Unexpected response type');
-  //   }
+    if (response.type !== 'EthereumTypedDataSignature') {
+      throw ERRORS.TypedError('Runtime', 'Unexpected response type');
+    }
 
-  //   const { address, signature }: EthereumTypedDataSignature = response.message;
-  //   return {
-  //     address,
-  //     signature,
-  //   };
-  // }
+    const { address, signature }: EthereumTypedDataSignature = response.message;
+    return {
+      address,
+      signature,
+    };
+  }
 
   getVersionRange() {
     return {
@@ -246,7 +243,6 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     }
 
     // For Touch、Pro we use EthereumSignTypedData
-    // return this.signTypedData();
-    return Promise.resolve(ERRORS.TypedError('Runtime', 'Not implemented'));
+    return this.signTypedData();
   }
 }

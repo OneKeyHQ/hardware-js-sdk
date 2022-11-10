@@ -1,4 +1,4 @@
-import { PERMISSION_ERROR } from './constants';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { BlePlxManager } from './types';
 import timer from './utils/timer';
 
@@ -21,6 +21,6 @@ export const subscribeBleOn = (bleManager: BlePlxManager, ms = 1000): Promise<vo
     const clearTimeout = timer.timeout(() => {
       if (done) return;
       subscription.remove();
-      reject(new Error(PERMISSION_ERROR));
+      reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
     }, ms);
   });

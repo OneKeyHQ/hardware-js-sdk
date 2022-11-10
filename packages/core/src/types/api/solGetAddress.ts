@@ -1,4 +1,4 @@
-import { SolanaAddress as HardwareSolanaAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { SolanaAddress as HardwareSolanaAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type SolanaAddress = {
@@ -12,10 +12,12 @@ export type SolanaGetAddressParams = {
 
 export declare function solGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & SolanaGetAddressParams
 ): Response<SolanaAddress>;
 
 export declare function solGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: SolanaGetAddressParams[] }
 ): Response<Array<SolanaAddress>>;

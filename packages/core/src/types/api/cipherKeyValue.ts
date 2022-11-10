@@ -1,4 +1,4 @@
-import { CipheredKeyValue as HardwareCipheredKeyValue } from '@onekeyfe/hd-transport/src/types/messages';
+import { CipheredKeyValue as HardwareCipheredKeyValue } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type CipheredKeyValue = {
@@ -17,10 +17,12 @@ export type CipheredKeyValueParams = {
 
 export declare function cipherKeyValue(
   connectId: string,
+  deviceId: string,
   params: CommonParams & CipheredKeyValueParams
 ): Response<CipheredKeyValue>;
 
 export declare function cipherKeyValue(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: CipheredKeyValueParams[] }
 ): Response<Array<CipheredKeyValue>>;

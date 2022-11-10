@@ -1,9 +1,11 @@
-import { ApplySettings } from '@onekeyfe/hd-transport/src/types/messages';
+import { ApplySettings } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 
 export default class DeviceSettings extends BaseMethod<ApplySettings> {
   init() {
+    this.useDevicePassphraseState = false;
+
     // check payload
     validateParams(this.payload, [
       { name: 'language', type: 'string' },
@@ -14,11 +16,9 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       { name: 'autoLockDelayMs', type: 'number' },
       { name: 'displayRotation', type: 'number' },
       { name: 'passphraseAlwaysOnDevice', type: 'boolean' },
-      { name: 'safetyChecks', type: 'object' },
+      { name: 'safetyChecks', type: 'number' },
       { name: 'experimentalFeatures', type: 'boolean' },
     ]);
-
-    console.log('DeviceSettings payload', this.payload);
 
     // init params
     this.params = {
@@ -33,6 +33,17 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       safety_checks: this.payload.safetyChecks,
       experimental_features: this.payload.experimentalFeatures,
     };
+  }
+
+  getVersionRange() {
+    if (this.payload.usePassphrase) {
+      return {
+        model_mini: {
+          min: '2.4.0',
+        },
+      };
+    }
+    return {};
   }
 
   async run() {

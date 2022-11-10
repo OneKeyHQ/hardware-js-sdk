@@ -1,14 +1,11 @@
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
-export { default as cipherKeyValue } from './CipherKeyValue';
-export { default as btcGetAddress } from './btc/BTCGetAddress';
-export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
-export { default as btcSignMessage } from './btc/BTCSignMessage';
-export { default as btcSignTransaction } from './btc/BTCSignTransaction';
-export { default as btcVerifyMessage } from './btc/BTCVerifyMessage';
+export { default as getPassphraseState } from './GetPassphraseState';
+export { default as getLogs } from './GetLogs';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkTransportRelease } from './CheckTransportRelease';
+export { default as checkBridgeStatus } from './CheckBridgeStatus';
 export { default as deviceBackup } from './device/DeviceBackup';
 export { default as deviceChangePin } from './device/DeviceChangePin';
 export { default as deviceFlags } from './device/DeviceFlags';
@@ -17,7 +14,29 @@ export { default as deviceRecovery } from './device/DeviceRecovery';
 export { default as deviceReset } from './device/DeviceReset';
 export { default as deviceSettings } from './device/DeviceSettings';
 export { default as deviceUpdateReboot } from './device/DeviceUpdateReboot';
+export { default as deviceUploadResource } from './device/DeviceUploadResource';
+export { default as deviceSupportFeatures } from './device/DeviceSupportFeatures';
+export { default as deviceVerify } from './device/DeviceVerify';
 export { default as deviceWipe } from './device/DeviceWipe';
+export { default as deviceFullyUploadResource } from './device/DeviceFullyUploadResource';
+
+export { default as firmwareUpdate } from './FirmwareUpdate';
+export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
+export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
+
+export { default as cipherKeyValue } from './CipherKeyValue';
+
+export { default as btcGetAddress } from './btc/BTCGetAddress';
+export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
+export { default as btcSignMessage } from './btc/BTCSignMessage';
+export { default as btcSignTransaction } from './btc/BTCSignTransaction';
+export { default as btcVerifyMessage } from './btc/BTCVerifyMessage';
+
+export { default as confluxGetAddress } from './conflux/ConfluxGetAddress';
+export { default as confluxSignMessage } from './conflux/ConfluxSignMessage';
+export { default as confluxSignMessageCIP23 } from './conflux/ConfluxSignMessageCIP23';
+export { default as confluxSignTransaction } from './conflux/ConfluxSignTransaction';
+
 export { default as evmGetAddress } from './evm/EVMGetAddress';
 export { default as evmGetPublicKey } from './evm/EVMGetPublicKey';
 export { default as evmSignMessage } from './evm/EVMSignMessage';
@@ -25,6 +44,7 @@ export { default as evmSignMessageEIP712 } from './evm/EVMSignMessageEIP712';
 export { default as evmSignTransaction } from './evm/EVMSignTransaction';
 export { default as evmSignTypedData } from './evm/EVMSignTypedData';
 export { default as evmVerifyMessage } from './evm/EVMVerifyMessage';
+
 export { default as starcoinGetAddress } from './starcoin/StarcoinGetAddress';
 export { default as starcoinGetPublicKey } from './starcoin/StarcoinGetPublicKey';
 export { default as starcoinSignMessage } from './starcoin/StarcoinSignMessage';
@@ -40,4 +60,20 @@ export { default as solSignTransaction } from './solana/SolSignTransaction';
 export { default as stellarGetAddress } from './stellar/StellarGetAddress';
 export { default as stellarSignTransaction } from './stellar/StellarSignTransaction';
 
-export { default as firmwareUpdate } from './FirmwareUpdate';
+export { default as tronGetAddress } from './tron/TronGetAddress';
+export { default as tronSignMessage } from './tron/TronSignMessage';
+export { default as tronSignTransaction } from './tron/TronSignTransaction';
+
+export { default as nearGetAddress } from './near/NearGetAddress';
+export { default as nearSignTransaction } from './near/NearSignTransaction';
+
+export { default as aptosGetAddress } from './aptos/AptosGetAddress';
+export { default as aptosGetPublicKey } from './aptos/AptosGetPublicKey';
+export { default as aptosSignTransaction } from './aptos/AptosSignTransaction';
+export { default as aptosSignMessage } from './aptos/AptosSignMessage';
+
+export { default as algoGetAddress } from './algo/AlgoGetAddress';
+export { default as algoSignTransaction } from './algo/AlgoSignTransaction';
+
+export { default as cosmosGetAddress } from './cosmos/CosmosGetAddress';
+export { default as cosmosSignTransaction } from './cosmos/CosmosSignTransaction';

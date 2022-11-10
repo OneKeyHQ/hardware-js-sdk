@@ -1,4 +1,13 @@
-import type { Features, IVersionArray, IDeviceType, IDeviceModel } from '../types';
+import semver from 'semver';
+import { toHardened } from '../api/helpers/pathUtils';
+import { DeviceCommands } from '../device/DeviceCommands';
+import type {
+  Features,
+  IVersionArray,
+  IDeviceType,
+  IDeviceModel,
+  SupportFeatureType,
+} from '../types';
 
 export const getDeviceModel = (features?: Features): IDeviceModel => {
   if (!features || typeof features !== 'object') {
@@ -24,6 +33,9 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   return 'classic';
 };
 
+export const getDeviceTypeOnBootloader = (features?: Features): IDeviceType =>
+  getDeviceType(features);
+
 export const getDeviceTypeByBleName = (name?: string): IDeviceType | null => {
   if (!name) return 'classic';
   if (name.startsWith('MI')) return 'mini';
@@ -44,9 +56,9 @@ export const getDeviceTypeByDeviceId = (deviceId?: string): IDeviceType => {
 export const getDeviceUUID = (features: Features) => {
   const deviceType = getDeviceType(features);
   if (deviceType === 'classic') {
-    return features.onekey_serial;
+    return features.onekey_serial ?? '';
   }
-  return features.serial_no;
+  return features.serial_no ?? '';
 };
 
 export const getDeviceLabel = (features: Features) => {
@@ -77,5 +89,69 @@ export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray |
   if (!features.ble_ver) {
     return null;
   }
+  if (!semver.valid(features.ble_ver)) {
+    return null;
+  }
   return features.ble_ver.split('.') as unknown as IVersionArray;
+};
+
+export const supportInputPinOnSoftware = (features: Features): SupportFeatureType => {
+  if (!features) return { support: false };
+
+  const deviceType = getDeviceType(features);
+  if (deviceType === 'touch') {
+    return { support: false };
+  }
+
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+  return { support: semver.gte(currentVersion, '2.3.0'), require: '2.3.0' };
+};
+
+export const supportNewPassphrase = (features?: Features): SupportFeatureType => {
+  if (!features) return { support: false };
+
+  const deviceType = getDeviceType(features);
+  if (deviceType === 'touch' || deviceType === 'pro') {
+    return { support: true };
+  }
+
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
+  return { support: semver.gte(currentVersion, '2.4.0'), require: '2.4.0' };
+};
+
+export const getPassphraseState = async (features: Features, commands: DeviceCommands) => {
+  if (!features) return false;
+  const { message } = await commands.typedCall('GetAddress', 'Address', {
+    address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
+    coin_name: 'Testnet',
+    script_type: 'SPENDADDRESS',
+    show_display: false,
+  });
+
+  return message.address;
+};
+
+export const supportBatchPublicKey = (features?: Features): boolean => {
+  if (!features) return false;
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
+  const deviceType = getDeviceType(features);
+  if (deviceType === 'touch' || deviceType === 'pro') {
+    return semver.gte(currentVersion, '3.1.0');
+  }
+
+  return semver.gte(currentVersion, '2.6.0');
+};
+
+export const supportModifyHomescreen = (features?: Features): SupportFeatureType => {
+  if (!features) return { support: false };
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+
+  const deviceType = getDeviceType(features);
+  if (deviceType === 'classic' || deviceType === 'mini') {
+    return { support: true };
+  }
+
+  return { support: semver.gte(currentVersion, '3.4.0') };
 };

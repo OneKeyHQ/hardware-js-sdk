@@ -1,4 +1,4 @@
-import { SignMessage } from '@onekeyfe/hd-transport/src/types/messages';
+import { SignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -8,6 +8,7 @@ import { getCoinAndScriptType } from './helpers/btcParamsUtils';
 
 export default class BTCSignMessage extends BaseMethod<SignMessage> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [

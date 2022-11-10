@@ -6,7 +6,7 @@ export type Deferred<T, I = any, D = any> = {
   reject: (e: Error) => void;
 };
 
-export function create<T, I = any, D = any>(arg?: I, data?: D): Deferred<T, I, D> {
+export function createDeferred<T, I = any, D = any>(arg?: I, data?: D): Deferred<T, I, D> {
   let localResolve: (t: T) => void = (_t: T) => {};
   let localReject: (e?: Error) => void = (_e?: Error) => {};
   let id: I | undefined;

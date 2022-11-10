@@ -1,4 +1,4 @@
-import { EthereumVerifyMessage } from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumVerifyMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -6,6 +6,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 
 export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessage> {
   init() {
+    this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [

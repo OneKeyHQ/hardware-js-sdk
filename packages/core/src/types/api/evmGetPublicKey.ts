@@ -1,4 +1,4 @@
-import { EthereumPublicKey } from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumPublicKey } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type EVMPublicKey = {
@@ -12,10 +12,12 @@ export type EVMGetPublicKeyParams = {
 
 export declare function evmGetPublicKey(
   connectId: string,
+  deviceId: string,
   params: CommonParams & EVMGetPublicKeyParams
 ): Response<EVMPublicKey>;
 
 export declare function evmGetPublicKey(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: EVMGetPublicKeyParams[] }
 ): Response<Array<EVMPublicKey>>;

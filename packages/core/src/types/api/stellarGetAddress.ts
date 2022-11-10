@@ -1,4 +1,4 @@
-import { StellarAddress as HardwareStellarAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { StellarAddress as HardwareStellarAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type StellarAddress = {
@@ -12,10 +12,12 @@ export type StellarGetAddressParams = {
 
 export declare function stellarGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StellarGetAddressParams
 ): Response<StellarAddress>;
 
 export declare function stellarGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: StellarGetAddressParams[] }
 ): Response<Array<StellarAddress>>;

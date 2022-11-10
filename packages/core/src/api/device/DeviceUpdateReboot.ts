@@ -1,12 +1,14 @@
-import { BixinReboot } from '@onekeyfe/hd-transport/src/types/messages';
+import { DeviceBackToBoot } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 
 // Upload hint Reboot BootLoader
-export default class DeviceUpdateReboot extends BaseMethod<BixinReboot> {
-  init() {}
+export default class DeviceUpdateReboot extends BaseMethod<DeviceBackToBoot> {
+  init() {
+    this.useDevicePassphraseState = false;
+  }
 
   async run() {
-    const res = await this.device.commands.typedCall('BixinReboot', 'Success');
+    const res = await this.device.commands.typedCall('DeviceBackToBoot', 'Success');
 
     return Promise.resolve(res.message);
   }

@@ -1,4 +1,4 @@
-import { Success } from '@onekeyfe/hd-transport/src/types/messages';
+import { Success } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type EVMVerifyMessageParams = {
@@ -9,5 +9,6 @@ export type EVMVerifyMessageParams = {
 
 export declare function evmVerifyMessage(
   connectId: string,
+  deviceId: string,
   params: CommonParams & EVMVerifyMessageParams
 ): Response<Success>;

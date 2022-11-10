@@ -1,4 +1,4 @@
-import { serializeError } from '../constants/errors';
+import { serializeError } from '@onekeyfe/hd-shared';
 import { IFRAME } from './iframe';
 import { CommonParams, CoreApi } from '../types';
 
@@ -44,6 +44,12 @@ export interface IFrameCallMessage {
   event: typeof IFRAME.CALL;
   type: typeof IFRAME.CALL;
   payload: CallMethodPayload;
+}
+
+export interface IFrameCancelMessage {
+  event: typeof IFRAME.CANCEL;
+  type: typeof IFRAME.CANCEL;
+  payload: { connectId?: string };
 }
 
 export const RESPONSE_EVENT = 'RESPONSE_EVENT';

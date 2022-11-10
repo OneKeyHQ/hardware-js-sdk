@@ -1,4 +1,4 @@
-import { EthereumMessageSignature } from '@onekeyfe/hd-transport/src/types/messages';
+import { EthereumMessageSignature } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type EthereumSignTypedDataTypeProperty = {
@@ -36,5 +36,6 @@ export type EVMSignTypedDataParams = {
 
 export declare function evmSignTypedData(
   connectId: string,
+  deviceId: string,
   params: CommonParams & EVMSignTypedDataParams
 ): Response<EthereumMessageSignature>;

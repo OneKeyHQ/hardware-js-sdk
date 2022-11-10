@@ -5,8 +5,8 @@ import {
   TxRequest,
   TxRequestSerializedType,
   TypedCall,
-} from '@onekeyfe/hd-transport/src/types/messages';
-import { ERRORS } from '../../../constants';
+} from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import {
   RefTransaction,
   SignedTransaction,
@@ -30,14 +30,23 @@ const requestPrevTxInfo = ({
 }: Props): TxAckResponse => {
   const { tx_hash } = details;
   if (!tx_hash) {
-    throw ERRORS.TypedError('Runtime', 'requestPrevTxInfo: unknown details.tx_hash');
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'requestPrevTxInfo: unknown details.tx_hash'
+    );
   }
   const tx = refTxs[tx_hash.toLowerCase()];
   if (!tx) {
-    throw ERRORS.TypedError('Runtime', `requestPrevTxInfo: Requested unknown tx: ${tx_hash}`);
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `requestPrevTxInfo: Requested unknown tx: ${tx_hash}`
+    );
   }
   if (!tx.bin_outputs) {
-    throw ERRORS.TypedError('Runtime', `requestPrevTxInfo: bin_outputs not set tx: ${tx_hash}`);
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      `requestPrevTxInfo: bin_outputs not set tx: ${tx_hash}`
+    );
   }
   if (request_type === 'TXINPUT') {
     return { inputs: [tx.inputs[details.request_index]] };
@@ -47,14 +56,20 @@ const requestPrevTxInfo = ({
   }
   if (request_type === 'TXEXTRADATA') {
     if (typeof details.extra_data_len !== 'number') {
-      throw ERRORS.TypedError('Runtime', 'requestPrevTxInfo: Missing extra_data_len');
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'requestPrevTxInfo: Missing extra_data_len'
+      );
     }
     if (typeof details.extra_data_offset !== 'number') {
-      throw ERRORS.TypedError('Runtime', 'requestPrevTxInfo: Missing extra_data_offset');
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'requestPrevTxInfo: Missing extra_data_offset'
+      );
     }
     if (typeof tx.extra_data !== 'string') {
       throw ERRORS.TypedError(
-        'Runtime',
+        HardwareErrorCode.RuntimeError,
         `requestPrevTxInfo: No extra data for transaction ${tx.hash}`
       );
     }
@@ -85,7 +100,10 @@ const requestPrevTxInfo = ({
     }
     return meta;
   }
-  throw ERRORS.TypedError('Runtime', `requestPrevTxInfo: Unknown request type: ${request_type}`);
+  throw ERRORS.TypedError(
+    HardwareErrorCode.RuntimeError,
+    `requestPrevTxInfo: Unknown request type: ${request_type}`
+  );
 };
 
 const requestSignedTxInfo = ({
@@ -101,17 +119,20 @@ const requestSignedTxInfo = ({
   }
   if (request_type === 'TXMETA') {
     throw ERRORS.TypedError(
-      'Runtime',
+      HardwareErrorCode.RuntimeError,
       'requestSignedTxInfo: Cannot read TXMETA from signed transaction'
     );
   }
   if (request_type === 'TXEXTRADATA') {
     throw ERRORS.TypedError(
-      'Runtime',
+      HardwareErrorCode.RuntimeError,
       'requestSignedTxInfo: Cannot read TXEXTRADATA from signed transaction'
     );
   }
-  throw ERRORS.TypedError('Runtime', `requestSignedTxInfo: Unknown request type: ${request_type}`);
+  throw ERRORS.TypedError(
+    HardwareErrorCode.RuntimeError,
+    `requestSignedTxInfo: Unknown request type: ${request_type}`
+  );
 };
 
 // requests information about a transaction
@@ -137,7 +158,7 @@ const saveTxSignatures = (
   if (typeof signature_index === 'number') {
     if (!signature) {
       throw ERRORS.TypedError(
-        'Runtime',
+        HardwareErrorCode.RuntimeError,
         'saveTxSignatures: Unexpected null in trezor:TxRequestSerialized signature.'
       );
     }

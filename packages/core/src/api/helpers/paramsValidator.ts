@@ -1,6 +1,6 @@
 import BigNumber from 'bignumber.js';
 
-import { ERRORS } from '../../constants';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { addHexPrefix, isHexString } from './hexUtils';
 
 export type SchemaParam = {
@@ -18,7 +18,8 @@ export type SchemaParam = {
   allowEmpty?: boolean;
 };
 
-const invalidParameter = (message: string) => ERRORS.TypedError('Method_InvalidParameter', message);
+const invalidParameter = (message: string) =>
+  ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, message);
 
 export const validateParams = (values: any, fields: Array<SchemaParam>): void => {
   fields.forEach(field => {

@@ -1,14 +1,16 @@
 import { BaseMethod } from './BaseMethod';
 
-import { DataManager } from '../data-manager';
+import { getFirmwareReleaseInfo } from './firmware/releaseHelper';
 
 export default class CheckFirmwareRelease extends BaseMethod {
-  init() {}
+  init() {
+    this.useDevicePassphraseState = false;
+  }
 
   run() {
     if (this.device.features) {
-      const firmwareStatus = DataManager.getFirmwareStatus(this.device.features);
-      return Promise.resolve(firmwareStatus);
+      const releaseInfo = getFirmwareReleaseInfo(this.device.features);
+      return Promise.resolve(releaseInfo);
     }
     return Promise.resolve(null);
   }

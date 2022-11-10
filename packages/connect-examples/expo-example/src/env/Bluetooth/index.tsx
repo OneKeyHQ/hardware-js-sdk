@@ -1,9 +1,9 @@
-import HardwareBleSdk from '@onekeyfe/hd-ble-sdk';
-import { UI_REQUEST } from '@onekeyfe/hd-core';
-import React, { useEffect, useState } from 'react';
+import { CoreApi } from '@onekeyfe/hd-core';
+import React, { useEffect } from 'react';
 import { View, Text, Platform, PermissionsAndroid, ScrollView } from 'react-native';
 
 import { CallMethods } from '../../components/CallMethods';
+import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 
 let isSdkInit = false;
 
@@ -34,16 +34,13 @@ const requestBluetoothScanPermission = async () => {
 };
 
 export default function Bluetooth() {
-  console.log(HardwareBleSdk);
-
+  const [sdk, createSDK] = React.useState<CoreApi>();
   const sdkInit = () => {
-    const settings = {
-      debug: true,
-    };
-    HardwareBleSdk.init(settings);
-
-    HardwareBleSdk.on('UI_EVENT', event => {
-      console.log('example received UI_EVENT: ', event);
+    getHardwareSDKInstance().then(res => {
+      createSDK(res);
+      res.on('UI_EVENT', event => {
+        console.log('example received UI_EVENT: ', event);
+      });
     });
   };
 
@@ -76,7 +73,7 @@ export default function Bluetooth() {
     <ScrollView>
       <View>
         <Text>This is Bluetooth example page, will run on iOS / Android device. </Text>
-        <CallMethods SDK={HardwareBleSdk} type="Bluetooth" />
+        {sdk && <CallMethods SDK={sdk} type="Bluetooth" />}
       </View>
     </ScrollView>
   );

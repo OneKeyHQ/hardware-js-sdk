@@ -1,4 +1,4 @@
-import { NEMAddress as HardwareNEMAddress } from '@onekeyfe/hd-transport/src/types/messages';
+import { NEMAddress as HardwareNEMAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type NEMAddress = {
@@ -13,10 +13,12 @@ export type NEMGetAddressParams = {
 
 export declare function nemGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & NEMGetAddressParams
 ): Response<NEMAddress>;
 
 export declare function nemGetAddress(
   connectId: string,
+  deviceId: string,
   params: CommonParams & { bundle?: NEMGetAddressParams[] }
 ): Response<Array<NEMAddress>>;

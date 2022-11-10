@@ -1,4 +1,4 @@
-import { Success } from '@onekeyfe/hd-transport/src/types/messages';
+import { Success } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type StarcoinVerifyMessageParams = {
@@ -9,5 +9,6 @@ export type StarcoinVerifyMessageParams = {
 
 export declare function starcoinVerifyMessage(
   connectId: string,
+  deviceId: string,
   params: CommonParams & StarcoinVerifyMessageParams
 ): Response<Success>;

@@ -1,4 +1,4 @@
-import { CoreApi, PROTO } from '@onekeyfe/hd-core';
+import { CommonParams, CoreApi, PROTO } from '@onekeyfe/hd-core';
 import React, { View, StyleSheet, Text } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
@@ -6,10 +6,25 @@ import MethodInvoke from './MethodInvoke';
 type CallBTCMethodsProps = {
   SDK: CoreApi;
   selectedDevice: Device | null;
+  commonParams?: CommonParams;
 };
 
-export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMethodsProps) {
+const DEFAULT_COIN_TYPE = '3';
+const CoinMap = {
+  0: 'btc',
+  2: 'ltc',
+  3: 'doge',
+  145: 'bch',
+};
+const DEFAULT_PATH = `m/44'/${DEFAULT_COIN_TYPE}'/0'/0/0`;
+
+export function CallBTCMethods({
+  SDK,
+  selectedDevice: currentDevice,
+  commonParams,
+}: CallBTCMethodsProps) {
   const connectId = currentDevice?.connectId ?? '';
+  const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>BTC Method Test</Text>
@@ -17,45 +32,47 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
         <MethodInvoke
           title="btcGetAddress"
           options={[
-            { name: 'path', value: "m/44'/0'/0'/0/0", type: 'string' },
-            { name: 'coin', value: 'btc', type: 'string' },
+            { name: 'path', value: DEFAULT_PATH, type: 'string' },
+            { name: 'coin', value: CoinMap[DEFAULT_COIN_TYPE], type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
             { name: 'multisig', value: undefined, type: 'string' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
-          onCall={data => SDK.btcGetAddress(connectId, { ...data })}
+          onCall={data => SDK.btcGetAddress(connectId, deviceId, { ...commonParams, ...data })}
         />
 
         <MethodInvoke
           title="btcGetPublicKey"
           options={[
-            { name: 'path', value: "m/44'/0'/0'/0/0", type: 'string' },
-            { name: 'coin', value: 'btc', type: 'string' },
+            { name: 'path', value: DEFAULT_PATH, type: 'string' },
+            { name: 'coin', value: CoinMap[DEFAULT_COIN_TYPE], type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
             { name: 'scriptType', value: undefined, type: 'string' },
           ]}
-          onCall={data => SDK.btcGetPublicKey(connectId, { ...data })}
+          onCall={data => SDK.btcGetPublicKey(connectId, deviceId, { ...commonParams, ...data })}
         />
 
         <MethodInvoke
           title="btcSignMessage"
           options={[
-            { name: 'path', value: "m/44'/0'/0'/0/0", type: 'string' },
-            { name: 'coin', value: 'btc', type: 'string' },
+            { name: 'path', value: DEFAULT_PATH, type: 'string' },
+            { name: 'coin', value: CoinMap[DEFAULT_COIN_TYPE], type: 'string' },
             {
               name: 'messageHex',
               value: '6578616d706c65206d657373616765', // 'example message'
               type: 'string',
             },
           ]}
-          onCall={data => SDK.btcSignMessage(connectId, { ...data } as any)}
+          onCall={data =>
+            SDK.btcSignMessage(connectId, deviceId, { ...commonParams, ...data } as any)
+          }
         />
 
         <MethodInvoke
           title="btcVerifyMessage"
           options={[
-            { name: 'address', value: '3BD8TL6iShVzizQzvo789SuynEKGpLTms9', type: 'string' },
-            { name: 'coin', value: 'btc', type: 'string' },
+            { name: 'address', value: 'DAZQi2vRPKEoC9RHTcKkXPemTz7uGd5ucC', type: 'string' },
+            { name: 'coin', value: CoinMap[DEFAULT_COIN_TYPE], type: 'string' },
             {
               name: 'messageHex',
               value: '0x6578616d706c65206d657373616765', // 'example message'
@@ -68,14 +85,19 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
               type: 'string',
             },
           ]}
-          onCall={data => SDK.btcVerifyMessage(connectId, { ...data } as unknown as any)}
+          onCall={data =>
+            SDK.btcVerifyMessage(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            } as unknown as any)
+          }
         />
 
         <MethodInvoke
           title="btcSignTransaction"
           options={[{ name: 'coin', value: 'test', type: 'string' }]}
           onCall={data =>
-            SDK.btcSignTransaction(connectId, {
+            SDK.btcSignTransaction(connectId, deviceId, {
               inputs: [
                 {
                   address_n: [2147483692, 2147483648, 2147483648, 0, 0],
@@ -121,6 +143,7 @@ export function CallBTCMethods({ SDK, selectedDevice: currentDevice }: CallBTCMe
                   version: 2,
                 },
               ],
+              ...commonParams,
               ...data,
             } as unknown as any)
           }

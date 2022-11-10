@@ -1,5 +1,5 @@
-export const PERMISSION_ERROR = 'Bluetooth required to be turned on';
-export const LOCATION_ERROR = 'Device is not authorized to use BluetoothLE';
+export const IOS_PACKET_LENGTH = 128;
+export const ANDROID_PACKET_LENGTH = 192;
 
 export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
   if (id?.startsWith?.('MI')) {
@@ -8,7 +8,7 @@ export const isOnekeyDevice = (name: string | null, id?: string): boolean => {
 
   // 过滤 BixinKeyxxx 和 Kxxxx 和 Txxxx
   // i 忽略大小写模式
-  const re = /(BixinKey\d{10})|(K\d{4})|(T\d{4})/i;
+  const re = /(BixinKey\d{10})|(K\d{4})|(T\d{4})|(Touch\s\w{4})/i;
   if (name && re.exec(name)) {
     return true;
   }

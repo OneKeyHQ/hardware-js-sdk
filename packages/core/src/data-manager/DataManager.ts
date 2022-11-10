@@ -18,6 +18,7 @@ import type {
   IDeviceBLEFirmwareStatus,
   ITransportStatus,
 } from '../types';
+import { getReleaseChangelog, getReleaseStatus, findLatestRelease } from '../utils/release';
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap = {
@@ -59,21 +60,77 @@ export default class DataManager {
     }
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
-    const latestFirmware = targetDeviceConfigList[targetDeviceConfigList.length - 1];
-
-    if (!latestFirmware) return 'valid';
-
-    const latestVersion = latestFirmware.version.join('.');
     const currentVersion = deviceFirmwareVersion.join('.');
+    return getReleaseStatus(targetDeviceConfigList, currentVersion);
+  };
 
-    /** latest is greater or equal current */
-    if (semver.gt(latestVersion, currentVersion)) {
-      if (latestFirmware.required) return 'required';
+  /**
+   * Touch、Pro System UI Resource Update
+   * ** Interval upgrade is not considered **
+   */
+  static getSysResourcesLatestRelease = (features: Features, forcedUpdateRes?: boolean) => {
+    const deviceType = getDeviceType(features);
+    const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
-      return 'outdated';
+    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
+    const currentVersion = deviceFirmwareVersion.join('.');
+    const targetDeviceConfig = targetDeviceConfigList.filter(item =>
+      forcedUpdateRes
+        ? !!item.resource
+        : semver.gt(item.version.join('.'), currentVersion) && !!item.resource
+    );
+
+    return findLatestRelease(targetDeviceConfig)?.resource;
+  };
+
+  /**
+   * Touch、Pro System full UI Resource Update
+   * ** Interval upgrade is not considered **
+   */
+  static getSysFullResource = (features: Features) => {
+    const deviceType = getDeviceType(features);
+
+    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
+    const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.fullResource);
+
+    return findLatestRelease(targetDeviceConfig)?.fullResource;
+  };
+
+  static getFirmwareChangelog = (features: Features) => {
+    const deviceType = getDeviceType(features);
+    const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
+
+    if (
+      features.firmware_present === false ||
+      (deviceType === 'classic' && features.bootloader_mode)
+    ) {
+      return [];
     }
 
-    return 'valid';
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
+    const currentVersion = deviceFirmwareVersion.join('.');
+    return getReleaseChangelog(targetDeviceConfigList, currentVersion);
+  };
+
+  static getFirmwareLatestRelease = (features: Features) => {
+    const deviceType = getDeviceType(features);
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
+
+    const target = findLatestRelease(targetDeviceConfigList);
+    if (!target) return target;
+
+    if (!target.resource) {
+      const resource = this.getSysResourcesLatestRelease(features);
+      return {
+        ...target,
+        resource,
+      };
+    }
+    return target;
   };
 
   static getBLEFirmwareStatus = (features: Features): IDeviceBLEFirmwareStatus => {
@@ -86,21 +143,27 @@ export default class DataManager {
     }
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
-    const latestBLEFirmware = targetDeviceConfigList[targetDeviceConfigList.length - 1];
-
-    if (!latestBLEFirmware) return 'valid';
-
-    const latestVersion = latestBLEFirmware.version.join('.');
     const currentVersion = deviceBLEFirmwareVersion.join('.');
+    return getReleaseStatus(targetDeviceConfigList, currentVersion);
+  };
 
-    /** latest is greater or equal current */
-    if (semver.gt(latestVersion, currentVersion)) {
-      if (latestBLEFirmware.required) return 'required';
+  static getBleFirmwareChangelog = (features: Features) => {
+    const deviceType = getDeviceType(features);
+    const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
-      return 'outdated';
+    if (!deviceBLEFirmwareVersion) {
+      return [];
     }
 
-    return 'valid';
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
+    const currentVersion = deviceBLEFirmwareVersion.join('.');
+    return getReleaseChangelog(targetDeviceConfigList, currentVersion);
+  };
+
+  static getBleFirmwareLatestRelease = (features: Features) => {
+    const deviceType = getDeviceType(features);
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
+    return findLatestRelease(targetDeviceConfigList);
   };
 
   static getTransportStatus = (localVersion: string): ITransportStatus => {

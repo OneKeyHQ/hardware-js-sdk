@@ -130,3 +130,10 @@ type FeaturesNarrowing =
     };
 
 export type StrictFeatures = Features & FeaturesNarrowing;
+
+export type SupportFeatureType = { support: boolean; require?: string };
+
+export type SupportFeatures = {
+  inputPinOnSoftware: SupportFeatureType;
+  modifyHomescreen: SupportFeatureType;
+};
