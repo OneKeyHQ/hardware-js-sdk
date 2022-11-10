@@ -20,7 +20,7 @@ const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 
 const T_UUID = '41391B3D-4DCE-47B3-7B19-E3171BA96D4B';
 // const C_UUID = '8CCA5EE6-8584-95A7-8C3A-6A68F8B6EFC0';
-const C_UUID = '10A16F2B-82E3-0752-0D70-5697080800F5';
+const C_UUID = '5BE57257-4880-C608-8274-B1651673DD4F';
 const C_MAC = 'CB:F9:80:A6:83:18'; // K1883
 let isInit = false;
 export default function App() {
