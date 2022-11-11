@@ -77,3 +77,5 @@ export { default as algoSignTransaction } from './algo/AlgoSignTransaction';
 
 export { default as cosmosGetAddress } from './cosmos/CosmosGetAddress';
 export { default as cosmosSignTransaction } from './cosmos/CosmosSignTransaction';
+
+export { default as xrpGetAddress } from './xrp/XrpGetAddress'

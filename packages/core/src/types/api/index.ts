@@ -82,6 +82,8 @@ import { algoSignTransaction } from './algoSignTransaction';
 import { cosmosGetAddress } from './cosmosGetAddress';
 import { cosmosSignTransaction } from './cosmosSignTransaction';
 
+import { xrpGetAddress } from './xrpGetAddress'
+
 export * from './export';
 
 export type CoreApi = {
@@ -218,4 +220,9 @@ export type CoreApi = {
    */
   cosmosGetAddress: typeof cosmosGetAddress;
   cosmosSignTransaction: typeof cosmosSignTransaction;
+
+  /**
+   * XRP function
+   */
+  xrpGetAddress: typeof xrpGetAddress;
 };
