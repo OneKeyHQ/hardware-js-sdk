@@ -82,7 +82,7 @@ import { algoSignTransaction } from './algoSignTransaction';
 import { cosmosGetAddress } from './cosmosGetAddress';
 import { cosmosSignTransaction } from './cosmosSignTransaction';
 
-import { xrpGetAddress } from './xrpGetAddress'
+import { xrpGetAddress } from './xrpGetAddress';
 
 export * from './export';
 
