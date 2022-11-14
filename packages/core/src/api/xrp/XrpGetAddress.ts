@@ -1,6 +1,7 @@
 import { deriveAddress } from 'ripple-keypairs';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { XrpGetAddressParams } from '../../types/api/xrpGetAddress';
+import { XrpAddress, XrpGetAddressParams } from '../../types/api/xrpGetAddress';
+import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
@@ -49,16 +50,35 @@ export default class XrpGetAddress extends BaseMethod<
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
-      paths: this.params,
-      ecdsa_curve_name: 'secp256k1',
-    });
-    const responses = res.message.public_keys.map((publicKey: string, index: number) => ({
-      path: serializedPath((this.params as unknown as any[])[index].address_n),
-      publicKey,
-      address: deriveAddress(publicKey),
-    }));
+    if (this.hasBundle && supportBatchPublicKey(this.device?.features)) {
+      const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
+        paths: this.params,
+        ecdsa_curve_name: 'secp256k1',
+      });
+      const result = res.message.public_keys.map((publicKey: string, index: number) => ({
+        path: serializedPath((this.params as unknown as any[])[index].address_n),
+        publicKey,
+        address: deriveAddress(publicKey),
+      }));
+      return Promise.resolve(result);
+    }
 
-    return responses;
+    const responses: XrpAddress[] = [];
+    for (let i = 0; i < this.params.length; i++) {
+      const param = this.params[i];
+
+      const res = await this.device.commands.typedCall('RippleGetAddress', 'RippleAddress', {
+        ...param,
+      });
+
+      const { address } = res.message;
+
+      responses.push({
+        path: serializedPath(param.address_n),
+        address,
+      });
+    }
+
+    return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }
 }
