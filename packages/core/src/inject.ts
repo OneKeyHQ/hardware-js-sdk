@@ -189,6 +189,8 @@ export const inject = ({
 
     cosmosGetAddress: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'cosmosGetAddress' }),
+    cosmosGetPublicKey: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cosmosGetPublicKey' }),
     cosmosSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'cosmosSignTransaction' }),
   };
