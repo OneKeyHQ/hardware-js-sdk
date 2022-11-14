@@ -194,6 +194,8 @@ export const inject = ({
 
     xrpGetAddress: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'xrpGetAddress' }),
+    xrpSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'xrpSignTransaction' }),
   };
   return api;
 };
