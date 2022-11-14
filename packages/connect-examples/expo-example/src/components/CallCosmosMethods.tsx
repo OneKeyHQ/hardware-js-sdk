@@ -24,9 +24,20 @@ export function CallCosmosMethods({
           title="cosmosGetAddress"
           options={[
             { name: 'path', value: "m/44'/118'/0'/0/0", type: 'string' },
+            { name: 'hrp', value: undefined, type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
           onCall={data => SDK.cosmosGetAddress(connectId, deviceId, { ...commonParams, ...data })}
+        />
+
+        <MethodInvoke
+          title="cosmosGetPublicKey"
+          options={[
+            { name: 'path', value: "m/44'/118'/0'/0/0", type: 'string' },
+            { name: 'curve', value: 'secp256k1', type: 'string' },
+            { name: 'showOnOneKey', value: false, type: 'boolean' },
+          ]}
+          onCall={data => SDK.cosmosGetPublicKey(connectId, deviceId, { ...commonParams, ...data })}
         />
 
         <MethodInvoke

@@ -80,6 +80,7 @@ import { algoGetAddress } from './algoGetAddress';
 import { algoSignTransaction } from './algoSignTransaction';
 
 import { cosmosGetAddress } from './cosmosGetAddress';
+import { cosmosGetPublicKey } from './cosmosGetPublicKey';
 import { cosmosSignTransaction } from './cosmosSignTransaction';
 
 export * from './export';
@@ -217,5 +218,6 @@ export type CoreApi = {
    * Cosmos function
    */
   cosmosGetAddress: typeof cosmosGetAddress;
+  cosmosGetPublicKey: typeof cosmosGetPublicKey;
   cosmosSignTransaction: typeof cosmosSignTransaction;
 };

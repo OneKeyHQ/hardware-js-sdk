@@ -7,6 +7,7 @@ export type CosmosAddress = {
 
 export type CosmosGetAddressParams = {
   path: string | number[];
+  hrp?: string;
   showOnOneKey?: boolean;
 };
 

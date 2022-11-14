@@ -76,4 +76,5 @@ export { default as algoGetAddress } from './algo/AlgoGetAddress';
 export { default as algoSignTransaction } from './algo/AlgoSignTransaction';
 
 export { default as cosmosGetAddress } from './cosmos/CosmosGetAddress';
+export { default as cosmosGetPublicKey } from './cosmos/CosmosGetPublicKey';
 export { default as cosmosSignTransaction } from './cosmos/CosmosSignTransaction';

@@ -1,16 +1,15 @@
-import { CosmosGetAddress as HardwareCosmosGetAddress } from '@onekeyfe/hd-transport';
-
+import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { CosmosAddress, CosmosGetAddressParams } from '../../types';
+import { CosmosGetPublicKeyParams } from '../../types';
 
-export default class CosmosGetAddress extends BaseMethod<HardwareCosmosGetAddress[]> {
+export default class CosmosGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
 
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -18,23 +17,31 @@ export default class CosmosGetAddress extends BaseMethod<HardwareCosmosGetAddres
     // check payload
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);
 
+    if (payload.bundle.length === 0) {
+      throw new Error('Bundle is empty');
+    }
+
     // init params
     this.params = [];
-    payload.bundle.forEach((batch: CosmosGetAddressParams) => {
+    payload.bundle.forEach((batch: CosmosGetPublicKeyParams) => {
       const addressN = validatePath(batch.path, 3);
 
       validateParams(batch, [
         { name: 'path', required: true },
-        { name: 'hrp', type: 'string' },
+        { name: 'curve', type: 'string' },
         { name: 'showOnOneKey', type: 'boolean' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
-      const { hrp } = batch;
+      const curveName = batch.curve ?? 'secp256k1';
+
+      if (curveName !== 'secp256k1') {
+        throw new Error('Curve name is not supported');
+      }
 
       this.params.push({
         address_n: addressN,
-        hrp,
+        curve: curveName,
         show_display: showOnOneKey,
       });
     });
@@ -49,22 +56,15 @@ export default class CosmosGetAddress extends BaseMethod<HardwareCosmosGetAddres
   }
 
   async run() {
-    // TODO: add batch support
-    const responses: CosmosAddress[] = [];
-    for (let i = 0; i < this.params.length; i++) {
-      const param = this.params[i];
+    const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
+      paths: this.params,
+      ecdsa_curve_name: this.params[0].curve,
+    });
 
-      const res = await this.device.commands.typedCall('CosmosGetAddress', 'CosmosAddress', {
-        ...param,
-      });
-
-      const { address } = res.message;
-
-      responses.push({
-        path: serializedPath(param.address_n),
-        address,
-      });
-    }
+    const responses = res.message.public_keys.map((publicKey: string, index: number) => ({
+      path: serializedPath((this.params as unknown as any[])[index].address_n),
+      publicKey,
+    }));
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

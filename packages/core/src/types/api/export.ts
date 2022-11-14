@@ -104,4 +104,5 @@ export type { AlgoAddress, AlgoGetAddressParams } from './algoGetAddress';
 export type { AlgoSignedTx, AlgoSignTransactionParams } from './algoSignTransaction';
 
 export type { CosmosAddress, CosmosGetAddressParams } from './cosmosGetAddress';
+export type { CosmosPublicKey, CosmosGetPublicKeyParams } from './cosmosGetPublicKey';
 export type { CosmosSignedTx, CosmosSignTransactionParams } from './cosmosSignTransaction';
