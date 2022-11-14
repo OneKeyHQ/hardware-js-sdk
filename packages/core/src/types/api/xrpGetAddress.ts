@@ -2,7 +2,7 @@ import type { CommonParams, Response } from '../params';
 
 export type XrpAddress = {
   path: string;
-  publicKey: string;
+  publicKey?: string;
   address: string;
 };
 
