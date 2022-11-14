@@ -326,7 +326,6 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         commonParams={optionalParams}
       />
 
-      <CallXrpMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
@@ -345,6 +344,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallAptosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallAlgoMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallCosmosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallXrpMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }
