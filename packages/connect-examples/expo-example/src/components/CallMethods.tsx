@@ -29,6 +29,7 @@ import { CallNearMethods } from './CallNearMethods';
 import { CallAptosMethods } from './CallAptosMethods';
 import { CallAlgoMethods } from './CallAlgoMethods';
 import { CallCosmosMethods } from './CallCosmosMethods';
+import { CallXrpMethods } from './CallXrpMethods';
 import { UploadScreen } from './UploadScreen/index';
 
 let registerListener = false;
@@ -325,6 +326,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         commonParams={optionalParams}
       />
 
+      <CallXrpMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />

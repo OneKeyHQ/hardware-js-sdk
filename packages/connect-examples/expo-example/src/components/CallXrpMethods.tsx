@@ -30,20 +30,54 @@ export function CallXrpMethods({
         />
 
         <MethodInvoke
-          title="cosmosSignTransaction"
+          title="xrpSignTransaction"
           options={[
-            { name: 'path', value: "m/44'/118'/0'/0/0", type: 'string' },
+            { name: 'path', value: "m/44'/144'/1'/0/0", type: 'string' },
             {
-              name: 'rawTx',
-              value:
-                '4301355cc18d85809872bcbd63cb6ea5ac3c2814a1bacf2e50d8ec62367211917b79ecd1f1a98fa0d793d7cb92ebd9a479dc6aba0ae8570253aa87c0da32db5ed2bd401f3bbee52c2bc55761fd8486fae2e28f46499282f4267b8b90fc8c1cc97bb659b6cc927f2ec1701ef2928ddb84759ba5c557f549db',
+              name: 'fee',
+              value: '12',
+              type: 'string',
+            },
+            {
+              name: 'flags',
+              value: 0,
+              type: 'number',
+            },
+            {
+              name: 'sequence',
+              value: 32841006,
+              type: 'number',
+            },
+            {
+              name: 'maxLedgerVersion',
+              value: 32841630,
+              type: 'number',
+            },
+            {
+              name: 'amount',
+              value: 1000000,
+              type: 'number',
+            },
+            {
+              name: 'destination',
+              value: 'rwgumKP89VhMrJ4dRkGVS4tafRfAmZmKf8',
               type: 'string',
             },
           ]}
-          onCall={data =>
-            SDK.cosmosSignTransaction(connectId, deviceId, {
+          onCall={(data: any) =>
+            SDK.xrpSignTransaction(connectId, deviceId, {
               ...commonParams,
-              ...data,
+              path: data.path,
+              transaction: {
+                fee: data.fee,
+                flags: data.flags,
+                sequence: data.sequence,
+                maxLedgerVersion: data.maxLedgerVersion,
+                payment: {
+                  amount: data.amount,
+                  destination: data.destination,
+                },
+              },
             } as unknown as any)
           }
         />
