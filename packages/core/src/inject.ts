@@ -193,6 +193,11 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'cosmosGetPublicKey' }),
     cosmosSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'cosmosSignTransaction' }),
+
+    xrpGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'xrpGetAddress' }),
+    xrpSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'xrpSignTransaction' }),
   };
   return api;
 };

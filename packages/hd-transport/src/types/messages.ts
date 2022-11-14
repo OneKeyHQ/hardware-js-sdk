@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-types */
 // This file is auto generated from data/messages/message.json
 
 // custom type uint32/64 may be represented as string
@@ -3065,5 +3066,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T],
+  message?: MessageType[T]
 ) => Promise<MessageResponse<R>>;
