@@ -15,7 +15,7 @@ export declare function xrpGetAddress(
   connectId: string,
   deviceId: string,
   params: CommonParams & XrpGetAddressParams
-): Response<XrpAddress[]>;
+): Response<XrpAddress>;
 
 export declare function xrpGetAddress(
   connectId: string,

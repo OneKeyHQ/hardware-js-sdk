@@ -70,12 +70,21 @@ export default class XrpGetAddress extends BaseMethod<
       const res = await this.device.commands.typedCall('RippleGetAddress', 'RippleAddress', {
         ...param,
       });
+      const publicKey = await this.device.commands.typedCall(
+        'BatchGetPublickeys',
+        'EcdsaPublicKeys',
+        {
+          paths: [{ address_n: param.address_n }],
+          ecdsa_curve_name: 'secp256k1',
+        }
+      );
 
       const { address } = res.message;
 
       responses.push({
         path: serializedPath(param.address_n),
         address,
+        publicKey: publicKey.message?.public_keys?.[0],
       });
     }
 
