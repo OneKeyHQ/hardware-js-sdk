@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 import { Buffer } from 'buffer';
 import {
   BleManager as BlePlxManager,
@@ -101,6 +101,24 @@ export default class ReactNativeBleTransport {
         this.Log.debug('subscribeBleOn error: ', error);
         reject(error);
         return;
+      }
+
+      if (Platform.OS === 'android') {
+        this.Log.debug('requesting permissions, please wait...');
+
+        const resultConnect = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        ]);
+
+        this.Log.debug('requesting permissions, result: ', resultConnect);
+        if (
+          resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] !== 'granted' ||
+          resultConnect[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] !== 'granted'
+        ) {
+          reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
+          return;
+        }
       }
 
       blePlxManager.startDeviceScan(
