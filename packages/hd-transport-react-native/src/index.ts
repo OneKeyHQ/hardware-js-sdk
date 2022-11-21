@@ -103,7 +103,7 @@ export default class ReactNativeBleTransport {
         return;
       }
 
-      if (Platform.OS === 'android') {
+      if (Platform.OS === 'android' && Platform.Version >= 31) {
         this.Log.debug('requesting permissions, please wait...');
 
         const resultConnect = await PermissionsAndroid.requestMultiple([
