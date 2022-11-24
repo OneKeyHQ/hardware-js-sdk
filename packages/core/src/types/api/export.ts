@@ -106,3 +106,7 @@ export type { AlgoSignedTx, AlgoSignTransactionParams } from './algoSignTransact
 export type { CosmosAddress, CosmosGetAddressParams } from './cosmosGetAddress';
 export type { CosmosPublicKey, CosmosGetPublicKeyParams } from './cosmosGetPublicKey';
 export type { CosmosSignedTx, CosmosSignTransactionParams } from './cosmosSignTransaction';
+
+export type { SuiAddress, SuiGetAddressParams } from './suiGetAddress';
+export type { SuiPublicKey, SuiGetPublicKeyParams } from './suiGetPublicKey';
+export type { SuiSignedTx, SuiSignTransactionParams } from './suiSignTransaction';

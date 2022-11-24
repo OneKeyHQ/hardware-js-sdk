@@ -31,6 +31,7 @@ import { CallAlgoMethods } from './CallAlgoMethods';
 import { CallCosmosMethods } from './CallCosmosMethods';
 import { CallXrpMethods } from './CallXrpMethods';
 import { UploadScreen } from './UploadScreen/index';
+import { CallSuiMethods } from './CallSuiMethods';
 
 let registerListener = false;
 
@@ -345,6 +346,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallAlgoMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallCosmosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallXrpMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallSuiMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }

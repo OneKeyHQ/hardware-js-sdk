@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-types */
 // This file is auto generated from data/messages/message.json
 
 // custom type uint32/64 may be represented as string
@@ -2067,6 +2066,29 @@ export type NFTWriteData = {
 // RebootToBootloader
 export type RebootToBootloader = {};
 
+// RebootToBoardloader
+export type RebootToBoardloader = {};
+
+// ListResDir
+export type ListResDir = {
+  path: string;
+};
+
+export type FileInfo = {
+  name: string;
+  size: number;
+};
+
+// FileInfoList
+export type FileInfoList = {
+  files: FileInfo[];
+};
+
+// DeviceEraseSector
+export type DeviceEraseSector = {
+  sector: number;
+};
+
 // NearGetAddress
 export type NearGetAddress = {
   address_n: number[];
@@ -2516,6 +2538,29 @@ export type StellarBumpSequenceOp = {
 
 // StellarSignedTx
 export type StellarSignedTx = {
+  public_key: string;
+  signature: string;
+};
+
+// SuiGetAddress
+export type SuiGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// SuiAddress
+export type SuiAddress = {
+  address?: string;
+};
+
+// SuiSignTx
+export type SuiSignTx = {
+  address_n: number[];
+  raw_tx: string;
+};
+
+// SuiSignedTx
+export type SuiSignedTx = {
   public_key: string;
   signature: string;
 };
@@ -2972,6 +3017,11 @@ export type MessageType = {
   NFTWriteInfo: NFTWriteInfo;
   NFTWriteData: NFTWriteData;
   RebootToBootloader: RebootToBootloader;
+  RebootToBoardloader: RebootToBoardloader;
+  ListResDir: ListResDir;
+  FileInfo: FileInfo;
+  FileInfoList: FileInfoList;
+  DeviceEraseSector: DeviceEraseSector;
   NearGetAddress: NearGetAddress;
   NearAddress: NearAddress;
   NearSignTx: NearSignTx;
@@ -3029,6 +3079,10 @@ export type MessageType = {
   StellarManageDataOp: StellarManageDataOp;
   StellarBumpSequenceOp: StellarBumpSequenceOp;
   StellarSignedTx: StellarSignedTx;
+  SuiGetAddress: SuiGetAddress;
+  SuiAddress: SuiAddress;
+  SuiSignTx: SuiSignTx;
+  SuiSignedTx: SuiSignedTx;
   TezosGetAddress: TezosGetAddress;
   TezosAddress: TezosAddress;
   TezosGetPublicKey: TezosGetPublicKey;
@@ -3066,5 +3120,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;

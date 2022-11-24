@@ -198,6 +198,13 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'xrpGetAddress' }),
     xrpSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'xrpSignTransaction' }),
+
+    suiGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'suiGetAddress' }),
+    suiGetPublicKey: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'suiGetPublicKey' }),
+    suiSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'suiSignTransaction' }),
   };
   return api;
 };

@@ -86,6 +86,10 @@ import { cosmosSignTransaction } from './cosmosSignTransaction';
 import { xrpGetAddress } from './xrpGetAddress';
 import { xrpSignTransaction } from './xrpSignTransaction';
 
+import { suiGetAddress } from './suiGetAddress';
+import { suiGetPublicKey } from './suiGetPublicKey';
+import { suiSignTransaction } from './suiSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -229,4 +233,11 @@ export type CoreApi = {
    */
   xrpGetAddress: typeof xrpGetAddress;
   xrpSignTransaction: typeof xrpSignTransaction;
+
+  /**
+   * SUI function
+   */
+  suiGetAddress: typeof suiGetAddress;
+  suiGetPublicKey: typeof suiGetPublicKey;
+  suiSignTransaction: typeof suiSignTransaction;
 };
