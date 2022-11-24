@@ -5591,6 +5591,52 @@
     "RebootToBootloader": {
       "fields": {}
     },
+    "RebootToBoardloader": {
+      "fields": {}
+    },
+    "ListResDir": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "FileInfoList": {
+      "fields": {
+        "files": {
+          "rule": "repeated",
+          "type": "FileInfo",
+          "id": 1
+        }
+      },
+      "nested": {
+        "FileInfo": {
+          "fields": {
+            "name": {
+              "rule": "required",
+              "type": "string",
+              "id": 1
+            },
+            "size": {
+              "rule": "required",
+              "type": "uint64",
+              "id": 2
+            }
+          }
+        }
+      }
+    },
+    "DeviceEraseSector": {
+      "fields": {
+        "sector": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
     "MoneroTransactionSourceEntry": {
       "fields": {
         "outputs": {
@@ -7724,6 +7770,61 @@
         }
       }
     },
+    "SuiGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "SuiAddress": {
+      "fields": {
+        "address": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "SuiSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_tx": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "SuiSignedTx": {
+      "fields": {
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
     "TezosGetAddress": {
       "fields": {
         "address_n": {
@@ -8721,6 +8822,10 @@
         "MessageType_AlgorandAddress": 10901,
         "MessageType_AlgorandSignTx": 10902,
         "MessageType_AlgorandSignedTx": 10903,
+        "MessageType_SuiGetAddress": 11100,
+        "MessageType_SuiAddress": 11101,
+        "MessageType_SuiSignTx": 11102,
+        "MessageType_SuiSignedTx": 11103,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
@@ -8741,7 +8846,11 @@
         "MessageType_ZoomRequest": 10019,
         "MessageType_ResourceRequest": 10020,
         "MessageType_ResourceAck": 10021,
-        "MessageType_ResourceUpdate": 10022
+        "MessageType_ResourceUpdate": 10022,
+        "MessageType_ListResDir": 10023,
+        "MessageType_FileInfoList": 10024,
+        "MessageType_RebootToBoardloader": 10025,
+        "MessageType_DeviceEraseSector": 10026
       }
     },
     "google": {
