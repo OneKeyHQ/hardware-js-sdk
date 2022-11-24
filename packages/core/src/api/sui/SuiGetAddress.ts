@@ -43,12 +43,12 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
   }
 
   publicKeyToAddress(publicKey: string) {
-    const tmp = new Uint8Array(32 + 1);
-    tmp.set([0x00]);
-    // tmp.set([0x01]); Secp256k1
-    tmp.set(hexToBytes(publicKey), 1);
-    const address = sha3_256(tmp).slice(0, 20);
-    return `0x${bytesToHex(address)}`;
+    const hash = sha3_256.create();
+    // Ed25519
+    hash.update('\x00');
+    // hash.update('\x01'); Secp256k1
+    hash.update(hexToBytes(publicKey));
+    return `0x${bytesToHex(hash.digest().slice(0, 20))}`;
   }
 
   getVersionRange() {
