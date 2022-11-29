@@ -42,7 +42,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
           typeof batch.derivationType !== 'undefined'
             ? batch.derivationType
             : PROTO.CardanoDerivationType.ICARUS_TREZOR,
-        show_display: typeof batch.showOnOneKey === 'boolean' ? batch.showOneKey : true,
+        show_display: typeof batch.showOnOneKey === 'boolean' ? !!batch.showOneKey : true,
       };
     });
   }
@@ -67,8 +67,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         networkId: batch.network_id,
         serializedPath: serializedPath(batch.address_parameters.address_n),
         serializedStakingPath: serializedPath(batch.address_parameters.address_n_staking),
-        // @ts-expect-error
-        address: response.address,
+        address: response.message.address,
       });
     }
 

@@ -37,10 +37,12 @@ export function CallCardanoMethods({
                 addressParameters: {
                   addressType: CardanoAddressType.BASE,
                   path: `m/1852'/1815'/0'/0/0`,
-                  // stakingPath: `m/1852'/1815'/0'/2/0`,
+                  stakingPath: `m/1852'/1815'/0'/2/0`,
                 },
                 protocolMagic: 764824073,
                 networkId: 1,
+                derivationType: 2,
+                showOnOneKey: false,
               },
             })
           }
