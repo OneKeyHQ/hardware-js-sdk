@@ -2,15 +2,13 @@ import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Success } from '@onekeyfe/hd-transport';
-import { wait, getLogger, LoggerNames } from '../../utils/index';
+import { wait } from '../../utils/index';
 import { DEVICE, CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
 import { PROTO } from '../../constants';
 import type { Device } from '../../device/Device';
 import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
 import { KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
-
-const Log = getLogger(LoggerNames.Device);
 
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation

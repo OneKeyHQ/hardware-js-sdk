@@ -1,4 +1,8 @@
-import { supportInputPinOnSoftware, getDeviceType } from '../utils/deviceFeaturesUtils';
+import {
+  supportInputPinOnSoftware,
+  supportModifyHomescreen,
+  getDeviceType,
+} from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
@@ -124,9 +128,11 @@ export abstract class BaseMethod<Params = undefined> {
   checkDeviceSupportFeature() {
     if (!this.device || !this.device.features) return;
     const inputPinOnSoftware = supportInputPinOnSoftware(this.device.features);
+    const modifyHomescreen = supportModifyHomescreen(this.device.features);
     this.postMessage(
       createDeviceMessage(DEVICE.SUPPORT_FEATURES, {
         inputPinOnSoftware,
+        modifyHomescreen,
         device: this.device.toMessageObject(),
       })
     );
