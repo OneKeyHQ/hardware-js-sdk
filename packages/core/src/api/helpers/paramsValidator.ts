@@ -10,12 +10,14 @@ export type SchemaParam = {
     | 'number'
     | 'boolean'
     | 'bigNumber'
+    | 'uint'
     | 'buffer'
     | 'object'
     | 'array'
     | 'hexString';
   required?: boolean;
   allowEmpty?: boolean;
+  allowNegative?: boolean;
 };
 
 const invalidParameter = (message: string) =>
@@ -42,7 +44,23 @@ export const validateParams = (values: any, fields: Array<SchemaParam>): void =>
             throw invalidParameter(`Parameter "${field.name}" is empty.`);
           }
           break;
-
+        case 'uint':
+          if (typeof value !== 'string' && typeof value !== 'number') {
+            throw invalidParameter(
+              `Parameter [${field.name}] has invalid type. "string|number" expected.`
+            );
+          }
+          if (
+            (typeof value === 'number' && !Number.isSafeInteger(value)) ||
+            !/^(?:[1-9]\d*|\d)$/.test(
+              value.toString().replace(/^-/, field.allowNegative ? '' : '-')
+            )
+          ) {
+            throw invalidParameter(
+              `Parameter [${field.name}] has invalid value "${value}". Integer representation expected.`
+            );
+          }
+          break;
         case 'bigNumber':
           if (typeof value !== 'string') {
             throw invalidParameter(

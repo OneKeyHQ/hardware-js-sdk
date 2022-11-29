@@ -1,7 +1,9 @@
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { validatePath } from '../../helpers/pathUtils';
 import { validateParams } from '../../helpers/paramsValidator';
-import type { PROTO } from '../../../constants';
+import { PROTO } from '../../../constants';
 import type { CardanoAddressParameters } from '../../../types/api/cardano';
+import type { Device } from '../../../device/Device';
 
 export const validateAddressParameters = (addressParameters: CardanoAddressParameters) => {
   validateParams(addressParameters, [
@@ -79,4 +81,39 @@ export const addressParametersFromProto = (
     stakingKeyHash: addressParameters.staking_key_hash,
     certificatePointer,
   };
+};
+
+export const modifyAddressParametersForBackwardsCompatibility = (
+  address_parameters: PROTO.CardanoAddressParametersType
+): PROTO.CardanoAddressParametersType => {
+  if (address_parameters.address_type === PROTO.CardanoAddressType.REWARD) {
+    // older firmware expects reward address path in path field instead of staking path
+    let { address_n, address_n_staking } = address_parameters;
+
+    if (address_n.length > 0 && address_n_staking.length > 0) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodInvalidParameter,
+        `Only stakingPath is allowed for CardanoAddressType.REWARD`
+      );
+    }
+
+    if (address_n.length > 0) {
+      address_n_staking = address_n;
+      address_n = [];
+    }
+    // TODO: version check
+    // if (device.atLeast(['0', '2.4.3'])) {
+    // } else if (address_n_staking.length > 0) {
+    //   address_n = address_n_staking;
+    //   address_n_staking = [];
+    // }
+
+    return {
+      ...address_parameters,
+      address_n,
+      address_n_staking,
+    };
+  }
+
+  return address_parameters;
 };
