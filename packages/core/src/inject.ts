@@ -208,6 +208,8 @@ export const inject = ({
 
     cardanoGetAddress: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'cardanoGetAddress' }),
+    cardanoGetPublicKey: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cardanoGetPublicKey' }),
   };
   return api;
 };

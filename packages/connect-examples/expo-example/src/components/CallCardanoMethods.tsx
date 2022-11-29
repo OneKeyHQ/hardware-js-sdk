@@ -46,6 +46,21 @@ export function CallCardanoMethods({
           }
         />
 
+        <MethodInvoke
+          title="CardanoGetPublicKey"
+          options={[
+            { name: 'path', value: "m/1852'/1815'/0'", type: 'string' },
+            { name: 'showOnOneKey', value: false, type: 'boolean' },
+            { name: 'derivationType', value: 2, type: 'number' },
+          ]}
+          onCall={data =>
+            SDK.cardanoGetPublicKey(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            })
+          }
+        />
+
         {/* <MethodInvoke
           title="CardanoSignTransaction"
           options={[

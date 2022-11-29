@@ -91,6 +91,7 @@ import { suiGetPublicKey } from './suiGetPublicKey';
 import { suiSignTransaction } from './suiSignTransaction';
 
 import { cardanoGetAddress } from './cardanoGetAddress';
+import { cardanoGetPublicKey } from './cardanoGetPublicKey';
 
 export * from './export';
 
@@ -247,4 +248,5 @@ export type CoreApi = {
    * Cardano function
    */
   cardanoGetAddress: typeof cardanoGetAddress;
+  cardanoGetPublicKey: typeof cardanoGetPublicKey;
 };

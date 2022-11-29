@@ -2,7 +2,7 @@ import type { CardanoAddressParametersType } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 import type { CardanoAddressParameters } from './cardano';
 
-export type CardanoGetAddressCallParams = {
+export type CardanoGetAddressMethodParams = {
   addressParameters: CardanoAddressParametersType;
   networkId: number;
   /**
@@ -36,11 +36,11 @@ export type CardanoAddress = {
 export declare function cardanoGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & CardanoGetAddressCallParams
+  params: CommonParams & CardanoGetAddressMethodParams
 ): Response<CardanoAddress>;
 
 export declare function cardanoGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & { bundle?: CardanoGetAddressCallParams[] }
+  params: CommonParams & { bundle?: CardanoGetAddressMethodParams[] }
 ): Response<CardanoAddress[]>;
