@@ -1,8 +1,7 @@
 import { validateParams } from '../../helpers/paramsValidator';
-import { validatePath } from '../../helpers/pathUtils';
 import { tokenBundleToProto } from './token';
 import { addressParametersToProto, validateAddressParameters } from './addressParameters';
-import { hexStringByteLength } from './utils';
+import { hexStringByteLength, sendChunkedHexString } from './utils';
 import type { PROTO } from '../../../constants';
 import type { AssetGroupWithTokens } from '../../../types/api/cardano';
 
@@ -55,4 +54,36 @@ export const transformOutput = (output: any): OutputWithData => {
   }
 
   return result;
+};
+
+export const sendOutput = async (typedCall: any, outputWithData: OutputWithData) => {
+  const MAX_CHUNK_SIZE = 1024 * 2; // 1024 hex-encoded bytes
+
+  const { output, tokenBundle, inlineDatum, referenceScript } = outputWithData;
+
+  await typedCall('CardanoTxOutput', 'CardanoTxItemAck', output);
+  if (tokenBundle) {
+    for (const assetGroup of tokenBundle) {
+      await typedCall('CardanoAssetGroup', 'CardanoTxItemAck', {
+        policy_id: assetGroup.policyId,
+        tokens_count: assetGroup.tokens.length,
+      });
+      for (const token of assetGroup.tokens) {
+        await typedCall('CardanoToken', 'CardanoTxItemAck', token);
+      }
+    }
+  }
+
+  if (inlineDatum) {
+    await sendChunkedHexString(typedCall, inlineDatum, MAX_CHUNK_SIZE, 'CardanoTxInlineDatumChunk');
+  }
+
+  if (referenceScript) {
+    await sendChunkedHexString(
+      typedCall,
+      referenceScript,
+      MAX_CHUNK_SIZE,
+      'CardanoTxReferenceScriptChunk'
+    );
+  }
 };

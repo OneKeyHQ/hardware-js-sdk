@@ -93,3 +93,22 @@ export interface CardanoCatalystRegistrationParameters {
   rewardAddressParameters: CardanoAddressParameters;
   nonce: string;
 }
+
+export interface CardanoSignedTxWitness {
+  type: PROTO.CardanoTxWitnessType;
+  pubKey: string;
+  signature: string;
+  chainCode?: string;
+}
+
+export interface CardanoAuxiliaryDataSupplement {
+  type: PROTO.CardanoTxAuxiliaryDataSupplementType;
+  auxiliaryDataHash: string;
+  catalystSignature?: string;
+}
+
+export interface CardanoSignedTxData {
+  hash: string;
+  witnesses: CardanoSignedTxWitness[];
+  auxiliaryDataSupplement?: CardanoAuxiliaryDataSupplement;
+}
