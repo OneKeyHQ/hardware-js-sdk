@@ -3,7 +3,7 @@ import type { CommonParams, Response } from '../params';
 import type { CardanoAddressParameters } from './cardano';
 
 export type CardanoGetAddressMethodParams = {
-  addressParameters: CardanoAddressParametersType;
+  addressParameters: CardanoAddressParameters;
   networkId: number;
   /**
    * Testnet	cip34:0-1097911063

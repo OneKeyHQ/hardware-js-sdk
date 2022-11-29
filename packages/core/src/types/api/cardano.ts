@@ -82,9 +82,52 @@ export interface CardanoPoolParameters {
   metadata: CardanoPoolMetadata;
 }
 
-export interface CardanoAuxiliaryData {
-  hash?: string;
-  catalystRegistrationParameters?: CardanoCatalystRegistrationParameters;
+export interface CardanoInput {
+  path?: string | number[];
+  prev_hash: string;
+  prev_index: number;
+}
+
+export type CardanoOutput = (
+  | {
+      addressParameters: CardanoAddressParameters;
+    }
+  | {
+      address: string;
+    }
+) & {
+  amount: string;
+  tokenBundle?: CardanoAssetGroup[];
+  datumHash?: string;
+  // @ts-expect-error
+  format?: PROTO.CardanoTxOutputSerializationFormat;
+  inlineDatum?: string;
+  referenceScript?: string;
+};
+
+export interface CardanoWithdrawal {
+  path?: string | number[];
+  amount: string;
+  scriptHash?: string;
+  keyHash?: string;
+}
+
+export type CardanoMint = CardanoAssetGroup[];
+
+export interface CardanoCollateralInput {
+  path?: string | number[];
+  prev_hash: string;
+  prev_index: number;
+}
+
+export interface CardanoRequiredSigner {
+  keyPath?: string | number[];
+  keyHash?: string;
+}
+
+export interface CardanoReferenceInput {
+  prev_hash: string;
+  prev_index: number;
 }
 
 export interface CardanoCatalystRegistrationParameters {
@@ -92,6 +135,35 @@ export interface CardanoCatalystRegistrationParameters {
   stakingPath: string | number[];
   rewardAddressParameters: CardanoAddressParameters;
   nonce: string;
+}
+
+export interface CardanoAuxiliaryData {
+  hash?: string;
+  catalystRegistrationParameters?: CardanoCatalystRegistrationParameters;
+}
+
+export interface CardanoSignTransaction {
+  inputs: CardanoInput[];
+  outputs: CardanoOutput[];
+  fee: string;
+  ttl?: string;
+  certificates?: CardanoCertificate[];
+  withdrawals?: CardanoWithdrawal[];
+  validityIntervalStart?: string;
+  auxiliaryData?: CardanoAuxiliaryData;
+  mint?: CardanoMint;
+  scriptDataHash?: string;
+  collateralInputs?: CardanoCollateralInput[];
+  requiredSigners?: CardanoRequiredSigner[];
+  collateralReturn?: CardanoOutput;
+  totalCollateral?: string;
+  referenceInputs?: CardanoReferenceInput[];
+  additionalWitnessRequests?: (string | number[])[];
+  protocolMagic: number;
+  networkId: number;
+  signingMode: PROTO.CardanoTxSigningMode;
+  derivationType?: PROTO.CardanoDerivationType;
+  includeNetworkId?: boolean;
 }
 
 export interface CardanoSignedTxWitness {

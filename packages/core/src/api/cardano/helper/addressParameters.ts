@@ -3,7 +3,6 @@ import { validatePath } from '../../helpers/pathUtils';
 import { validateParams } from '../../helpers/paramsValidator';
 import { PROTO } from '../../../constants';
 import type { CardanoAddressParameters } from '../../../types/api/cardano';
-import type { Device } from '../../../device/Device';
 
 export const validateAddressParameters = (addressParameters: CardanoAddressParameters) => {
   validateParams(addressParameters, [

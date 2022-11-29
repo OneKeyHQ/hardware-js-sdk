@@ -24,25 +24,36 @@ export function CallCardanoMethods({
         <MethodInvoke
           title="CardanoGetAddress"
           options={[
-            { name: 'path', value: "m/44'/144'/0'/0/0", type: 'string' },
-            { name: 'networkId', value: false, type: 'boolean' },
+            { name: 'addressType', value: 0, type: 'number' },
+            { name: 'path', value: `m/1852'/1815'/0'/0/0`, type: 'string' },
+            { name: 'stakingPath', value: `m/1852'/1815'/0'/2/0`, type: 'string' },
+            { name: 'stakingKeyHash', value: '', type: 'string' },
+            { name: 'paymentScriptHash', value: '', type: 'string' },
+            { name: 'stakingScriptHash', value: '', type: 'string' },
+            { name: 'networkId', value: 1, type: 'number' },
+            { name: 'protocolMagic', value: 764824073, type: 'number' },
+            { name: 'derivationType', value: 2, type: 'number' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
           // addr1qxfzjswzujgvn70cwpkxdal5dddtasjrljmx8upgzlaehqa2vx9039emchclmwwfmwtar32lp4x558nr8wa3f26rkn7qwne3ad
           // m/1852'/1815'/0'/0/0
-          onCall={data =>
+          onCall={(data: any) =>
             SDK.cardanoGetAddress(connectId, deviceId, {
               ...commonParams,
               ...{
                 addressParameters: {
-                  addressType: CardanoAddressType.BASE,
-                  path: `m/1852'/1815'/0'/0/0`,
-                  stakingPath: `m/1852'/1815'/0'/2/0`,
+                  addressType: data.addressType,
+                  path: data.path,
+                  stakingPath: data.stakingPath,
+                  stakingKeyHash: data.stakingKeyHash || undefined,
+                  paymentScriptHash: data.paymentScriptHash || undefined,
+                  stakingScriptHash: data.stakingScriptHash || undefined,
                 },
-                protocolMagic: 764824073,
-                networkId: 1,
-                derivationType: 2,
-                showOnOneKey: false,
+                protocolMagic: data.protocolMagic,
+                networkId: data.networkId,
+                derivationType: data.derivationType,
+                address: data.address,
+                showOnOneKey: data.showOnOneKey,
               },
             })
           }
@@ -63,58 +74,22 @@ export function CallCardanoMethods({
           }
         />
 
-        {/* <MethodInvoke
+        <MethodInvoke
           title="CardanoSignTransaction"
           options={[
-            { name: 'path', value: "m/44'/144'/1'/0/0", type: 'string' },
             {
-              name: 'fee',
-              value: '12',
-              type: 'string',
-            },
-            {
-              name: 'flags',
-              value: 0,
-              type: 'number',
-            },
-            {
-              name: 'sequence',
-              value: 32841006,
-              type: 'number',
-            },
-            {
-              name: 'maxLedgerVersion',
-              value: 32841630,
-              type: 'number',
-            },
-            {
-              name: 'amount',
-              value: 1000000,
-              type: 'number',
-            },
-            {
-              name: 'destination',
-              value: 'rwgumKP89VhMrJ4dRkGVS4tafRfAmZmKf8',
+              name: 'tip',
+              value: 'The parameters are too complicated, please use the source code to debug',
               type: 'string',
             },
           ]}
           onCall={(data: any) =>
-            SDK.CardanoSignTransaction(connectId, deviceId, {
+            SDK.cardanoSignTransaction(connectId, deviceId, {
               ...commonParams,
               path: data.path,
-              transaction: {
-                fee: data.fee,
-                flags: data.flags,
-                sequence: data.sequence,
-                maxLedgerVersion: data.maxLedgerVersion,
-                payment: {
-                  amount: data.amount,
-                  destination: data.destination,
-                },
-              },
             } as unknown as any)
           }
-        /> */}
+        />
       </View>
     </View>
   );
