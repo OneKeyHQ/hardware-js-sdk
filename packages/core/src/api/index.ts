@@ -85,3 +85,5 @@ export { default as xrpSignTransaction } from './xrp/XrpSignTransaction';
 export { default as suiGetAddress } from './sui/SuiGetAddress';
 export { default as suiGetPublicKey } from './sui/SuiGetPublicKey';
 export { default as suiSignTransaction } from './sui/SuiSignTransaction';
+
+export { default as cardanoGetAddress } from './cardano/CardanoGetAddress';
