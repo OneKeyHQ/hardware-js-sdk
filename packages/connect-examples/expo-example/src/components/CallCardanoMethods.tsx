@@ -88,14 +88,17 @@ export function CallCardanoMethods({
               signingMode: 0,
               inputs: [
                 {
+                  path: "m/1852'/1815'/0'/0/0",
                   prev_hash: '311940642e2f1ee1029a59c05f83c78fc27cc8a52bfd1e65721800dd8b026dec',
                   prev_index: 0,
                 },
                 {
+                  path: "m/1852'/1815'/0'/0/0",
                   prev_hash: '416538899e722e49c5a3670461d2bc6ce8aea8b307fae8bcec39d0019ee3c3d0',
                   prev_index: 0,
                 },
                 {
+                  path: "m/1852'/1815'/0'/0/0",
                   prev_hash: '416538899e722e49c5a3670461d2bc6ce8aea8b307fae8bcec39d0019ee3c3d0',
                   prev_index: 1,
                 },
@@ -126,7 +129,6 @@ export function CallCardanoMethods({
               networkId: 1,
               derivationType: 2,
             };
-
             return SDK.cardanoSignTransaction(connectId, deviceId, {
               ...commonParams,
               ...params,
