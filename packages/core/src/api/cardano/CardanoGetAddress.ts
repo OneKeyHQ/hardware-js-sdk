@@ -61,6 +61,16 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         show_display,
       });
 
+      const publicKeyRes = await this.device.commands.typedCall(
+        'CardanoGetPublicKey',
+        'CardanoPublicKey',
+        {
+          address_n: address_parameters.address_n.slice(0, 3),
+          derivation_type,
+          show_display,
+        }
+      );
+
       responses.push({
         addressParameters: addressParametersFromProto(batch.address_parameters),
         protocolMagic: batch.protocol_magic,
@@ -68,6 +78,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         serializedPath: serializedPath(batch.address_parameters.address_n),
         serializedStakingPath: serializedPath(batch.address_parameters.address_n_staking),
         address: response.message.address,
+        xpub: publicKeyRes.message.xpub,
       });
     }
 

@@ -31,6 +31,7 @@ export type CardanoAddress = {
   serializedPath: string;
   serializedStakingPath: string;
   address: string;
+  xpub: string;
 };
 
 export declare function cardanoGetAddress(
