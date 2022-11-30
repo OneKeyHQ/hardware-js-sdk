@@ -18,6 +18,7 @@
       "@typescript-eslint/no-use-before-define": ["error"],
       "@typescript-eslint/no-var-requires": "off",
       "require-await": ["error"],
-      "import/no-named-default": "off"
+      "import/no-named-default": "off",
+      "@typescript-eslint/ban-types": "off"
   }
 }

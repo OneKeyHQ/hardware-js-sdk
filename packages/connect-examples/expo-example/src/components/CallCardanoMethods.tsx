@@ -83,12 +83,55 @@ export function CallCardanoMethods({
               type: 'string',
             },
           ]}
-          onCall={(data: any) =>
-            SDK.cardanoSignTransaction(connectId, deviceId, {
+          onCall={(data: any) => {
+            const params = {
+              signingMode: 0,
+              inputs: [
+                {
+                  prev_hash: '311940642e2f1ee1029a59c05f83c78fc27cc8a52bfd1e65721800dd8b026dec',
+                  prev_index: 0,
+                },
+                {
+                  prev_hash: '416538899e722e49c5a3670461d2bc6ce8aea8b307fae8bcec39d0019ee3c3d0',
+                  prev_index: 0,
+                },
+                {
+                  prev_hash: '416538899e722e49c5a3670461d2bc6ce8aea8b307fae8bcec39d0019ee3c3d0',
+                  prev_index: 1,
+                },
+              ],
+              outputs: [
+                {
+                  address:
+                    'addr1qxfzjswzujgvn70cwpkxdal5dddtasjrljmx8upgzlaehqa2vx9039emchclmwwfmwtar32lp4x558nr8wa3f26rkn7qwne3ad',
+                  amount: '2613231',
+                },
+                {
+                  addressParameters: {
+                    path: "m/1852'/1815'/0'/0/0",
+                    addressType: 0,
+                    stakingPath: "m/1852'/1815'/0'/2/0",
+                  },
+                  amount: '1222487',
+                  tokenBundle: [
+                    {
+                      policyId: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6',
+                      tokenAmounts: [{ assetNameBytes: '4d494e', amount: '27828472' }],
+                    },
+                  ],
+                },
+              ],
+              fee: '177513',
+              protocolMagic: 764824073,
+              networkId: 1,
+              derivationType: 2,
+            };
+
+            return SDK.cardanoSignTransaction(connectId, deviceId, {
               ...commonParams,
-              path: data.path,
-            } as unknown as any)
-          }
+              ...params,
+            } as unknown as any);
+          }}
         />
       </View>
     </View>
