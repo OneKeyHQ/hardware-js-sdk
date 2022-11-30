@@ -110,3 +110,11 @@ export type { CosmosSignedTx, CosmosSignTransactionParams } from './cosmosSignTr
 export type { SuiAddress, SuiGetAddressParams } from './suiGetAddress';
 export type { SuiPublicKey, SuiGetPublicKeyParams } from './suiGetPublicKey';
 export type { SuiSignedTx, SuiSignTransactionParams } from './suiSignTransaction';
+
+export type {
+  CardanoGetAddressMethodParams,
+  CardanoAddress,
+  CardanoGetAddressParams,
+} from './cardanoGetAddress';
+
+export type { CardanoSignTransaction, CardanoSignedTxData } from './cardano';
