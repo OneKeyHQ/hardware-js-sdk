@@ -159,7 +159,7 @@ const saveTxSignatures = (
     if (!signature) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
-        'saveTxSignatures: Unexpected null in trezor:TxRequestSerialized signature.'
+        'saveTxSignatures: Unexpected null in oneKey:TxRequestSerialized signature.'
       );
     }
     signatures[signature_index] = signature;

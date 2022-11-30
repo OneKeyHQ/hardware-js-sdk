@@ -90,6 +90,10 @@ import { suiGetAddress } from './suiGetAddress';
 import { suiGetPublicKey } from './suiGetPublicKey';
 import { suiSignTransaction } from './suiSignTransaction';
 
+import { cardanoGetAddress } from './cardanoGetAddress';
+import { cardanoGetPublicKey } from './cardanoGetPublicKey';
+import { cardanoSignTransaction } from './cardanoSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -240,4 +244,11 @@ export type CoreApi = {
   suiGetAddress: typeof suiGetAddress;
   suiGetPublicKey: typeof suiGetPublicKey;
   suiSignTransaction: typeof suiSignTransaction;
+
+  /**
+   * Cardano function
+   */
+  cardanoGetAddress: typeof cardanoGetAddress;
+  cardanoGetPublicKey: typeof cardanoGetPublicKey;
+  cardanoSignTransaction: typeof cardanoSignTransaction;
 };

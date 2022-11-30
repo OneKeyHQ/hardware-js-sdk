@@ -45,6 +45,7 @@ const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   initSession: method?.payload.initSession,
   passphraseState: method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
+  deriveCardano: method?.name.startsWith('cardano'),
 });
 
 let _core: Core;

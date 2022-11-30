@@ -205,6 +205,13 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'suiGetPublicKey' }),
     suiSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'suiSignTransaction' }),
+
+    cardanoGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cardanoGetAddress' }),
+    cardanoGetPublicKey: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cardanoGetPublicKey' }),
+    cardanoSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'cardanoSignTransaction' }),
   };
   return api;
 };

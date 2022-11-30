@@ -1892,74 +1892,113 @@
     },
     "CardanoSignTxInit": {
       "fields": {
-        "signing_mode": {
-          "rule": "required",
-          "type": "CardanoTxSigningMode",
-          "id": 1
-        },
-        "protocol_magic": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        },
-        "network_id": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 3
-        },
-        "inputs_count": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 4
-        },
-        "outputs_count": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 5
-        },
-        "fee": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 6
-        },
-        "ttl": {
-          "type": "uint64",
-          "id": 7
-        },
-        "certificates_count": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 8
-        },
-        "withdrawals_count": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 9
-        },
-        "has_auxiliary_data": {
-          "rule": "required",
-          "type": "bool",
-          "id": 10
-        },
-        "validity_interval_start": {
-          "type": "uint64",
-          "id": 11
-        },
-        "witness_requests_count": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 12
-        },
-        "minting_asset_groups_count": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 13
-        },
-        "derivation_type": {
-          "rule": "required",
-          "type": "CardanoDerivationType",
-          "id": 14
-        }
+          "signing_mode": {
+              "rule": "required",
+              "type": "CardanoTxSigningMode",
+              "id": 1
+          },
+          "protocol_magic": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 2
+          },
+          "network_id": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 3
+          },
+          "inputs_count": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 4
+          },
+          "outputs_count": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 5
+          },
+          "fee": {
+              "rule": "required",
+              "type": "uint64",
+              "id": 6
+          },
+          "ttl": {
+              "type": "uint64",
+              "id": 7
+          },
+          "certificates_count": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 8
+          },
+          "withdrawals_count": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 9
+          },
+          "has_auxiliary_data": {
+              "rule": "required",
+              "type": "bool",
+              "id": 10
+          },
+          "validity_interval_start": {
+              "type": "uint64",
+              "id": 11
+          },
+          "witness_requests_count": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 12
+          },
+          "minting_asset_groups_count": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 13
+          },
+          "derivation_type": {
+              "rule": "required",
+              "type": "CardanoDerivationType",
+              "id": 14
+          },
+          "include_network_id": {
+              "type": "bool",
+              "id": 15,
+              "options": {
+                  "default": false
+              }
+          },
+          "script_data_hash": {
+              "type": "bytes",
+              "id": 16
+          },
+          "collateral_inputs_count": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 17
+          },
+          "required_signers_count": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 18
+          },
+          "has_collateral_return": {
+              "type": "bool",
+              "id": 19,
+              "options": {
+                  "default": false
+              }
+          },
+          "total_collateral": {
+              "type": "uint64",
+              "id": 20
+          },
+          "reference_inputs_count": {
+              "type": "uint32",
+              "id": 21,
+              "options": {
+                  "default": 0
+              }
+          }
       }
     },
     "CardanoTxInput": {

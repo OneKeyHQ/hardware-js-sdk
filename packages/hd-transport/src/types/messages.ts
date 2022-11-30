@@ -762,6 +762,13 @@ export type CardanoSignTxInit = {
   witness_requests_count: number;
   minting_asset_groups_count: number;
   derivation_type: CardanoDerivationType;
+  include_network_id?: boolean;
+  script_data_hash?: string;
+  collateral_inputs_count: number;
+  required_signers_count: number;
+  has_collateral_return?: boolean;
+  total_collateral?: UintType;
+  reference_inputs_count?: number;
 };
 
 // CardanoTxInput
@@ -3120,5 +3127,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T],
+  message?: MessageType[T]
 ) => Promise<MessageResponse<R>>;

@@ -32,6 +32,7 @@ export type InitOptions = {
   initSession?: boolean;
   deviceId?: string;
   passphraseState?: string;
+  deriveCardano?: boolean;
 };
 
 export type RunOptions = {
@@ -341,6 +342,10 @@ export class Device extends EventEmitter {
     const payload: any = {};
     if (internalState) {
       payload.session_id = internalState;
+    }
+
+    if (options?.deriveCardano) {
+      payload.derive_cardano = true;
     }
 
     Log.debug('initialize payload:', payload);
