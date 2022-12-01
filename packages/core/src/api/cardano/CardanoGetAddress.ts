@@ -31,7 +31,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         { name: 'protocolMagic', type: 'number', required: true },
         { name: 'derivationType', type: 'number' },
         { name: 'address', type: 'string' },
-        { name: 'showOnTrezor', type: 'boolean' },
+        { name: 'showOnOneKey', type: 'boolean' },
       ]);
 
       validateAddressParameters(batch.addressParameters);
@@ -45,7 +45,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
           typeof batch.derivationType !== 'undefined'
             ? batch.derivationType
             : PROTO.CardanoDerivationType.ICARUS_TREZOR,
-        show_display: typeof batch.showOnOneKey === 'boolean' ? !!batch.showOneKey : true,
+        show_display: typeof batch.showOnOneKey === 'boolean' ? !!batch.showOnOneKey : true,
       };
     });
   }

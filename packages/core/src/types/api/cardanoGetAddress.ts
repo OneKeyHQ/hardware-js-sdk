@@ -11,8 +11,8 @@ export type CardanoGetAddressMethodParams = {
    */
   protocolMagic: number;
   derivationType: number;
-  address: string;
-  isCheck: boolean;
+  address?: string;
+  isCheck?: boolean;
   showOnOneKey: boolean;
 };
 
