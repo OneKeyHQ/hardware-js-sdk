@@ -11,7 +11,8 @@ export type CardanoGetAddressMethodParams = {
    */
   protocolMagic: number;
   derivationType: number;
-  address: string;
+  address?: string;
+  isCheck?: boolean;
   showOnOneKey: boolean;
 };
 
@@ -31,7 +32,8 @@ export type CardanoAddress = {
   serializedPath: string;
   serializedStakingPath: string;
   address: string;
-  xpub: string;
+  xpub?: string;
+  stakeAddress?: string;
 };
 
 export declare function cardanoGetAddress(

@@ -13,11 +13,14 @@ import { CardanoGetAddressParams, CardanoAddress } from '../../types/api/cardano
 export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParams[]> {
   hasBundle?: boolean;
 
+  isCheck?: boolean;
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
+    this.isCheck = !!this.payload?.isCheck;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
     this.params = payload.bundle.map((batch: any) => {
@@ -28,7 +31,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         { name: 'protocolMagic', type: 'number', required: true },
         { name: 'derivationType', type: 'number' },
         { name: 'address', type: 'string' },
-        { name: 'showOnTrezor', type: 'boolean' },
+        { name: 'showOnOneKey', type: 'boolean' },
       ]);
 
       validateAddressParameters(batch.addressParameters);
@@ -42,7 +45,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
           typeof batch.derivationType !== 'undefined'
             ? batch.derivationType
             : PROTO.CardanoDerivationType.ICARUS_TREZOR,
-        show_display: typeof batch.showOnOneKey === 'boolean' ? !!batch.showOneKey : true,
+        show_display: typeof batch.showOnOneKey === 'boolean' ? !!batch.showOnOneKey : true,
       };
     });
   }
@@ -61,15 +64,38 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         show_display,
       });
 
-      const publicKeyRes = await this.device.commands.typedCall(
-        'CardanoGetPublicKey',
-        'CardanoPublicKey',
-        {
-          address_n: address_parameters.address_n.slice(0, 3),
-          derivation_type,
-          show_display,
-        }
-      );
+      let xpub;
+      let stakeAddress;
+      if (address_parameters.address_type === PROTO.CardanoAddressType.BASE && !this.isCheck) {
+        const publicKeyRes = await this.device.commands.typedCall(
+          'CardanoGetPublicKey',
+          'CardanoPublicKey',
+          {
+            address_n: address_parameters.address_n.slice(0, 3),
+            derivation_type,
+            show_display,
+          }
+        );
+        xpub = publicKeyRes.message.xpub;
+
+        const stakeAddressRes = await this.device.commands.typedCall(
+          'CardanoGetAddress',
+          'CardanoAddress',
+          {
+            address_parameters: {
+              address_type: PROTO.CardanoAddressType.REWARD,
+              address_n: [],
+              address_n_staking: address_parameters.address_n_staking,
+            },
+            protocol_magic,
+            network_id,
+            derivation_type,
+            show_display,
+          }
+        );
+
+        stakeAddress = stakeAddressRes.message.address;
+      }
 
       responses.push({
         addressParameters: addressParametersFromProto(batch.address_parameters),
@@ -78,7 +104,8 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         serializedPath: serializedPath(batch.address_parameters.address_n),
         serializedStakingPath: serializedPath(batch.address_parameters.address_n_staking),
         address: response.message.address,
-        xpub: publicKeyRes.message.xpub,
+        xpub,
+        stakeAddress,
       });
     }
 

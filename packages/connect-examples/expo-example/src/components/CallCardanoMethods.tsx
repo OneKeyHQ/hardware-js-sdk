@@ -34,6 +34,7 @@ export function CallCardanoMethods({
             { name: 'protocolMagic', value: 764824073, type: 'number' },
             { name: 'derivationType', value: 2, type: 'number' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
+            { name: 'isCheck', value: false, type: 'boolean' },
           ]}
           // addr1qxfzjswzujgvn70cwpkxdal5dddtasjrljmx8upgzlaehqa2vx9039emchclmwwfmwtar32lp4x558nr8wa3f26rkn7qwne3ad
           // m/1852'/1815'/0'/0/0
@@ -54,6 +55,7 @@ export function CallCardanoMethods({
                 derivationType: data.derivationType,
                 address: data.address,
                 showOnOneKey: data.showOnOneKey,
+                isCheck: data.isCheck,
               },
             })
           }
