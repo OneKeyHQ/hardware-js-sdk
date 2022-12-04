@@ -1,3 +1,4 @@
+import './shim';
 import { registerRootComponent } from 'expo';
 
 // eslint-disable-next-line import/no-unresolved
