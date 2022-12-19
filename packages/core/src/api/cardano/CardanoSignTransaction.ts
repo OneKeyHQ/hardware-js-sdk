@@ -29,6 +29,14 @@ import type {
 export default class CardanoSignTransaction extends BaseMethod<any> {
   hasBundle?: boolean;
 
+  getVersionRange() {
+    return {
+      model_mini: {
+        min: '2.10.0',
+      },
+    };
+  }
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];

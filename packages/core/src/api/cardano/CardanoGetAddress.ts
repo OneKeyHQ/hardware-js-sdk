@@ -50,6 +50,14 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
     });
   }
 
+  getVersionRange() {
+    return {
+      model_mini: {
+        min: '2.10.0',
+      },
+    };
+  }
+
   async run() {
     const responses: CardanoAddress[] = [];
 
