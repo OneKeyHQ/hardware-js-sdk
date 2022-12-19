@@ -37,6 +37,14 @@ export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyPara
     });
   }
 
+  getVersionRange() {
+    return {
+      model_mini: {
+        min: '2.10.0',
+      },
+    };
+  }
+
   async run() {
     const responses: CardanoPublicKey[] = [];
     const cmd = this.device.getCommands();
