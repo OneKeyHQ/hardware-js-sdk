@@ -8,7 +8,7 @@ export {
   getDeviceUUID,
   getDeviceLabel,
 } from './deviceFeaturesUtils';
-export { getHDPath, getScriptType } from '../api/helpers/pathUtils';
+export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pathUtils';
 
 export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
 
