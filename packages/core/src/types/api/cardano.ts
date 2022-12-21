@@ -99,7 +99,6 @@ export type CardanoOutput = (
   amount: string;
   tokenBundle?: CardanoAssetGroup[];
   datumHash?: string;
-  // @ts-expect-error
   format?: PROTO.CardanoTxOutputSerializationFormat;
   inlineDatum?: string;
   referenceScript?: string;

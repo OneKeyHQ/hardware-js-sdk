@@ -32,6 +32,7 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       { name: 'thumbnailDataHex', type: 'string', required: true },
       { name: 'resType', type: 'number', required: true },
       { name: 'nftMetaData', type: 'string' },
+      { name: 'file_name_no_ext', type: 'boolean' },
     ]);
 
     const { suffix, dataHex, thumbnailDataHex, resType, nftMetaData } = this
@@ -48,7 +49,8 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       data_length: this.paramsData.data.byteLength,
       zoom_data_length: this.paramsData.thumbnailData.byteLength,
       res_type: resType,
-      nft_meta_data: nftMetaData,
+      nft_metadata: nftMetaData,
+      file_name_no_ext: this.payload.file_name_no_ext,
     };
   }
 
