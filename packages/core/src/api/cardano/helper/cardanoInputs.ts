@@ -10,7 +10,6 @@ export type InputWithPath = {
 };
 
 export type CollateralInputWithPath = {
-  // @ts-expect-error
   collateralInput: PROTO.CardanoTxCollateralInput;
   path?: Path;
 };
@@ -43,7 +42,6 @@ export const transformCollateralInput = (collateralInput: any): CollateralInputW
   };
 };
 
-// @ts-expect-error
 export const transformReferenceInput = (referenceInput: any): PROTO.CardanoTxReferenceInput => {
   validateParams(referenceInput, [
     { name: 'prev_hash', type: 'string', required: true },

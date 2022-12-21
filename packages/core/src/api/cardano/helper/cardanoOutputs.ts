@@ -27,7 +27,6 @@ export const transformOutput = (output: any): OutputWithData => {
     output: {
       amount: output.amount,
       asset_groups_count: 0,
-      // @ts-expect-error
       datum_hash: output.datumHash,
       format: output.format,
       inline_datum_size: output.inlineDatum ? hexStringByteLength(output.inlineDatum) : undefined,

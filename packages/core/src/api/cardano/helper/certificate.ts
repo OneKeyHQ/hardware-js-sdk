@@ -130,7 +130,6 @@ const transformPoolParameters = (
   validatePoolParameters(poolParameters);
 
   return {
-    // @ts-expect-error
     poolParameters: {
       pool_id: poolParameters.poolId,
       vrf_key_hash: poolParameters.vrfKeyHash,
@@ -188,7 +187,6 @@ export const transformCertificate = (
       type: certificate.type,
       path: certificate.path ? validatePath(certificate.path, 5) : undefined,
       script_hash: certificate.scriptHash,
-      // @ts-expect-error
       key_hash: certificate.keyHash,
       pool: certificate.pool,
       pool_parameters: poolParameters,
