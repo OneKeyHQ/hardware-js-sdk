@@ -12,6 +12,8 @@ export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pa
 
 export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
 
+export { getHomeScreenHex } from './homescreen';
+
 export const wait = (ms: number) =>
   new Promise(resolve => {
     setTimeout(resolve, ms);
