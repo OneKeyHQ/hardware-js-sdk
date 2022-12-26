@@ -44,7 +44,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         derivation_type:
           typeof batch.derivationType !== 'undefined'
             ? batch.derivationType
-            : PROTO.CardanoDerivationType.ICARUS,
+            : PROTO.CardanoDerivationType.ICARUS_TREZOR,
         show_display: typeof batch.showOnOneKey === 'boolean' ? !!batch.showOnOneKey : true,
       };
     });

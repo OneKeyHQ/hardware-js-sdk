@@ -137,22 +137,6 @@ export function CallCardanoMethods({
             } as unknown as any);
           }}
         />
-
-        <MethodInvoke
-          title="CardanoSignMessage"
-          options={[
-            { name: 'path', value: "m/1852'/1815'/0'", type: 'string' },
-            { name: 'message', value: 'hello world', type: 'string' },
-            { name: 'derivationType', value: 1, type: 'number' },
-            { name: 'networkId', value: 1, type: 'number' },
-          ]}
-          onCall={data =>
-            SDK.cardanoSignMessage(connectId, deviceId, {
-              ...commonParams,
-              ...data,
-            } as unknown as any)
-          }
-        />
       </View>
     </View>
   );

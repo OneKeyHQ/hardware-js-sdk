@@ -13,7 +13,6 @@ import { PROTO } from '../../../constants';
 
 const transformCatalystRegistrationParameters = (
   catalystRegistrationParameters: CardanoCatalystRegistrationParameters
-  // @ts-expect-error
 ): PROTO.CardanoCatalystRegistrationParametersType => {
   validateParams(catalystRegistrationParameters, [
     { name: 'votingPublicKey', type: 'string', required: true },
@@ -51,7 +50,6 @@ export const transformAuxiliaryData = (
 
   return {
     hash: auxiliaryData.hash,
-    // @ts-expect-error
     catalyst_registration_parameters: catalystRegistrationParameters,
   };
 };
@@ -59,7 +57,6 @@ export const transformAuxiliaryData = (
 export const modifyAuxiliaryDataForBackwardsCompatibility = (
   auxiliary_data: PROTO.CardanoTxAuxiliaryData
 ): PROTO.CardanoTxAuxiliaryData => {
-  // @ts-expect-error
   const { catalyst_registration_parameters } = auxiliary_data;
   if (catalyst_registration_parameters) {
     catalyst_registration_parameters.reward_address_parameters =
@@ -69,7 +66,6 @@ export const modifyAuxiliaryDataForBackwardsCompatibility = (
 
     return {
       ...auxiliary_data,
-      // @ts-expect-error
       catalyst_registration_parameters,
     };
   }

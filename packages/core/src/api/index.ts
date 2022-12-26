@@ -89,4 +89,3 @@ export { default as suiSignTransaction } from './sui/SuiSignTransaction';
 export { default as cardanoGetAddress } from './cardano/CardanoGetAddress';
 export { default as cardanoGetPublicKey } from './cardano/CardanoGetPublicKey';
 export { default as cardanoSignTransaction } from './cardano/CardanoSignTransaction';
-export { default as cardanoSignMessage } from './cardano/CardanoSignMessage';

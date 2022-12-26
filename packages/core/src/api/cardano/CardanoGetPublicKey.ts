@@ -31,7 +31,7 @@ export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyPara
         derivation_type:
           typeof batch.derivationType !== 'undefined'
             ? batch.derivationType
-            : PROTO.CardanoDerivationType.ICARUS,
+            : PROTO.CardanoDerivationType.ICARUS_TREZOR,
         show_display: typeof batch.showOnOneKey === 'boolean' ? batch.showOnOneKey : false,
       };
     });
