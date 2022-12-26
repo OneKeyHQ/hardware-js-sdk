@@ -115,6 +115,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       collateralInputsWithPath = payload.collateralInputs.map(transformCollateralInput);
     }
 
+    // @ts-expect-error
     let requiredSigners: PROTO.CardanoTxRequiredSigner[] = [];
     if (payload.requiredSigners) {
       requiredSigners = payload.requiredSigners.map((requiredSigner: any) => {
@@ -122,6 +123,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
         return {
           key_path: requiredSigner.keyPath ? validatePath(requiredSigner.keyPath, 3) : undefined,
           key_hash: requiredSigner.keyHash,
+          // @ts-expect-error
         } as PROTO.CardanoTxRequiredSigner;
       });
     }
@@ -130,6 +132,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       ? transformOutput(payload.collateralReturn)
       : undefined;
 
+    // @ts-expect-error
     let referenceInputs: PROTO.CardanoTxReferenceInput[] = [];
     if (payload.referenceInputs) {
       referenceInputs = payload.referenceInputs.map(transformReferenceInput);
@@ -167,7 +170,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       derivationType:
         typeof payload.derivationType !== 'undefined'
           ? payload.derivationType
-          : PROTO.CardanoDerivationType.ICARUS,
+          : PROTO.CardanoDerivationType.ICARUS_TREZOR,
       includeNetworkId: payload.includeNetworkId,
     };
   }
@@ -248,7 +251,6 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
           type: auxiliaryDataType,
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           auxiliaryDataHash: message.auxiliary_data_hash!,
-          // @ts-expect-error
           catalystSignature: message.catalyst_signature,
         };
       }
@@ -271,10 +273,12 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
     }
     // collateral inputs
     for (const { collateralInput } of this.params.collateralInputsWithPath) {
+      // @ts-expect-error
       await typedCall('CardanoTxCollateralInput', 'CardanoTxItemAck', collateralInput);
     }
     // required signers
     for (const requiredSigner of this.params.requiredSigners) {
+      // @ts-expect-error
       await typedCall('CardanoTxRequiredSigner', 'CardanoTxItemAck', requiredSigner);
     }
     // collateral return
@@ -283,6 +287,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
     }
     // reference inputs
     for (const referenceInput of this.params.referenceInputs) {
+      // @ts-expect-error
       await typedCall('CardanoTxReferenceInput', 'CardanoTxItemAck', referenceInput);
     }
     // witnesses

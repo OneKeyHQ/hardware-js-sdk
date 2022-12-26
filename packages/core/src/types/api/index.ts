@@ -93,7 +93,6 @@ import { suiSignTransaction } from './suiSignTransaction';
 import { cardanoGetAddress } from './cardanoGetAddress';
 import { cardanoGetPublicKey } from './cardanoGetPublicKey';
 import { cardanoSignTransaction } from './cardanoSignTransaction';
-import { cardanoSignMessage } from './cardanoSignMessage';
 
 export * from './export';
 
@@ -252,5 +251,4 @@ export type CoreApi = {
   cardanoGetAddress: typeof cardanoGetAddress;
   cardanoGetPublicKey: typeof cardanoGetPublicKey;
   cardanoSignTransaction: typeof cardanoSignTransaction;
-  cardanoSignMessage: typeof cardanoSignMessage;
 };
