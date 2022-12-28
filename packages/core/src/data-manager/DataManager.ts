@@ -177,7 +177,11 @@ export default class DataManager {
     this.settings = settings;
     try {
       const { data } = await axios.get<RemoteConfigResponse>(
-        `https://data.onekey.so/config.json?noCache=${getTimeStamp()}`
+        `https://data.onekey.so/config.json?noCache=${getTimeStamp()}`,
+        // because of iframe timeout is 10000
+        {
+          timeout: 7000,
+        }
       );
       this.deviceMap = {
         classic: data.classic,
