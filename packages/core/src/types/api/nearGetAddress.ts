@@ -13,11 +13,11 @@ export type NearGetAddressParams = {
 export declare function nearGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & NearGetAddressParams,
+  params: CommonParams & NearGetAddressParams
 ): Response<NearAddress>;
 
 export declare function nearGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & { bundle?: NearGetAddressParams[] },
+  params: CommonParams & { bundle?: NearGetAddressParams[] }
 ): Response<Array<NearAddress>>;
