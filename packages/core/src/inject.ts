@@ -214,6 +214,11 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'cardanoGetPublicKey' }),
     cardanoSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'cardanoSignTransaction' }),
+
+    filecoinGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'filecoinGetAddress' }),
+    filecoinSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'filecoinSignTransaction' }),
   };
   return api;
 };

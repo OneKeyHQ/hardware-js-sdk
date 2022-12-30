@@ -33,6 +33,7 @@ import { CallCosmosMethods } from './CallCosmosMethods';
 import { CallXrpMethods } from './CallXrpMethods';
 import { CallSuiMethods } from './CallSuiMethods';
 import { CallCardanoMethods } from './CallCardanoMethods';
+import { CallFilecoinMethods } from './CallFilecoinMethods';
 
 let registerListener = false;
 
@@ -161,7 +162,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     }
     const response = await SDK.firmwareUpdate(
       type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
-      params
+      params,
     );
     console.log('example firmwareUpdate response: ', response);
   };
@@ -179,14 +180,14 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     }
     const response = await SDK.firmwareUpdateV2(
       type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
-      params
+      params,
     );
     console.log('example firmwareUpdate response: ', response);
   };
 
   const onFileChange = (
     e: any,
-    callback: (data: Uint8Array, fileType?: string, file?: File) => void
+    callback: (data: Uint8Array, fileType?: string, file?: File) => void,
   ) => {
     const file = e.target.files?.[0];
     const reader = new FileReader();
@@ -355,6 +356,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallCosmosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallXrpMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallSuiMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallFilecoinMethods
+        SDK={SDK}
+        selectedDevice={selectedDevice}
+        commonParams={optionalParams}
+      />
     </View>
   );
 }
