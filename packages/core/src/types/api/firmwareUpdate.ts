@@ -21,7 +21,8 @@ export declare function firmwareUpdate(
   params: Params<FirmwareUpdateBinaryParams>
 ): Response<PROTO.Success>;
 
-type Platform = { platform: 'android' | 'ios' | 'desktop' | 'ext' | 'web' };
+type IPlatform = 'native' | 'desktop' | 'ext' | 'web' | 'webEmbed';
+type Platform = { platform: IPlatform };
 
 export declare function firmwareUpdateV2(
   connectId: string | undefined,
