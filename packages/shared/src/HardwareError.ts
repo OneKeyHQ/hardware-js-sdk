@@ -204,6 +204,12 @@ export const HardwareErrorCode = {
   NewFirmwareUnRelease: 412,
 
   /**
+   * use OneKey desktop client to update the firmware
+   * because need copy resource file to Touch
+   */
+  UseDesktopToUpdateFirmware: 413,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -358,6 +364,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure]:
     'Description Failed to automatically enter boot',
   [HardwareErrorCode.NewFirmwareUnRelease]: 'new firmware has not been released yet',
+  [HardwareErrorCode.UseDesktopToUpdateFirmware]:
+    'Please use OneKey desktop client to update the firmware',
 
   /**
    * Network Errors

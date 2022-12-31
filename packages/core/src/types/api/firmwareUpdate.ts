@@ -20,3 +20,14 @@ export declare function firmwareUpdate(
   connectId: string | undefined,
   params: Params<FirmwareUpdateBinaryParams>
 ): Response<PROTO.Success>;
+
+type Platform = { platform: 'android' | 'ios' | 'desktop' | 'ext' | 'web' };
+
+export declare function firmwareUpdateV2(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateParams & Platform>
+): Response<PROTO.Success>;
+export declare function firmwareUpdateV2(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateBinaryParams & Platform>
+): Response<PROTO.Success>;

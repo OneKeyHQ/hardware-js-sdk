@@ -27,7 +27,7 @@ type Params = {
 
 const Log = getLogger(LoggerNames.Method);
 
-export default class FirmwareUpdate extends BaseMethod<Params> {
+export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
   init() {
@@ -41,6 +41,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       { name: 'version', type: 'array' },
       { name: 'binary', type: 'buffer' },
       { name: 'forcedUpdateRes', type: 'boolean' },
+      { name: 'platform', type: 'string', required: true },
     ]);
 
     if (!payload.updateType) {
@@ -143,13 +144,34 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     return isTouchMode && semver.gte(currentVersion, '3.2.0');
   }
 
+  /**
+   * Check the version number of Touch to determine if it
+   * needs to be upgraded via the desktop
+   */
+  checkVersionForCopyTouchResource(features?: Features) {
+    const deviceType = getDeviceType(features);
+    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    const targetVersion = this.params.version?.join('.');
+    if (deviceType === 'touch' && targetVersion) {
+      if (
+        semver.lt(currentVersion, '3.5.0') &&
+        semver.gte(targetVersion, '3.5.0') &&
+        this.payload.platform !== 'desktop'
+      ) {
+        throw ERRORS.TypedError(HardwareErrorCode.UseDesktopToUpdateFirmware);
+      }
+    }
+  }
+
   async run() {
     const { device, params } = this;
     const { features, commands } = device;
+    const deviceType = getDeviceType(features);
+
+    this.checkVersionForCopyTouchResource(features);
 
     if (!features?.bootloader_mode && features) {
       const uuid = getDeviceUUID(features);
-      const deviceType = getDeviceType(features);
       // should go to bootloader mode manually
       if (this.isEnteredManuallyBoot(features)) {
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
