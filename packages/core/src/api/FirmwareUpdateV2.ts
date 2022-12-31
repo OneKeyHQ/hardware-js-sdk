@@ -152,7 +152,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const deviceType = getDeviceType(features);
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
     const targetVersion = this.params.version?.join('.');
-    if (deviceType === 'touch' && targetVersion) {
+    const { updateType } = this.params;
+    if (deviceType === 'touch' && updateType === 'firmware' && targetVersion) {
       if (
         semver.lt(currentVersion, '3.5.0') &&
         semver.gte(targetVersion, '3.5.0') &&
