@@ -10,6 +10,7 @@ export { default as deviceBackup } from './device/DeviceBackup';
 export { default as deviceChangePin } from './device/DeviceChangePin';
 export { default as deviceFlags } from './device/DeviceFlags';
 export { default as deviceRebootToBootloader } from './device/DeviceRebootToBootloader';
+export { default as deviceRebootToBoardloader } from './device/DeviceRebootToBoardloader';
 export { default as deviceRecovery } from './device/DeviceRecovery';
 export { default as deviceReset } from './device/DeviceReset';
 export { default as deviceSettings } from './device/DeviceSettings';

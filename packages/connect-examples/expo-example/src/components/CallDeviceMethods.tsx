@@ -39,6 +39,12 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
         />
 
         <MethodInvoke
+          title="deviceRebootToBoardloader"
+          options={[]}
+          onCall={() => SDK.deviceRebootToBoardloader(connectId)}
+        />
+
+        <MethodInvoke
           title="deviceUpdateReboot"
           options={[]}
           onCall={() => SDK.deviceUpdateReboot(connectId)}
