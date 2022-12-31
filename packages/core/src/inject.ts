@@ -80,6 +80,8 @@ export const inject = ({
     deviceChangePin: (connectId, params) =>
       call({ ...params, connectId, method: 'deviceChangePin' }),
     deviceFlags: (connectId, params) => call({ ...params, connectId, method: 'deviceFlags' }),
+    deviceRebootToBoardloader: connectId =>
+      call({ connectId, method: 'deviceRebootToBoardloader' }),
     deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
     deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
     deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),

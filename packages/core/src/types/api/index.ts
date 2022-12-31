@@ -19,6 +19,7 @@ import { deviceRecovery } from './deviceRecovery';
 import { deviceVerify } from './deviceVerify';
 import { deviceWipe } from './deviceWipe';
 import { deviceRebootToBootloader } from './deviceRebootToBootloader';
+import { deviceRebootToBoardloader } from './deviceRebootToBoardloader';
 import { deviceBackup } from './deviceBackup';
 import { deviceChangePin } from './deviceChangePin';
 import { deviceSettings } from './deviceSettings';
@@ -126,6 +127,7 @@ export type CoreApi = {
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;
   deviceFlags: typeof deviceFlags;
+  deviceRebootToBoardloader: typeof deviceRebootToBoardloader;
   deviceRebootToBootloader: typeof deviceRebootToBootloader;
   deviceRecovery: typeof deviceRecovery;
   deviceReset: typeof deviceReset;
