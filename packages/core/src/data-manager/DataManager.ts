@@ -59,7 +59,8 @@ export default class DataManager {
       return 'unknown';
     }
 
-    const targetDeviceConfigList = this.deviceMap[deviceType]?.firmware ?? [];
+    const firmwareUpdateField = deviceType === 'touch' ? 'firmware-v2' : 'firmware';
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
     return getReleaseStatus(targetDeviceConfigList, currentVersion);
   };
