@@ -56,6 +56,7 @@ export type IBLEFirmwareReleaseInfo = {
 export type DeviceTypeMap = {
   [k in IDeviceType]: {
     firmware: IFirmwareReleaseInfo[];
+    'firmware-v2'?: IFirmwareReleaseInfo[];
     ble: IBLEFirmwareReleaseInfo[];
   };
 };

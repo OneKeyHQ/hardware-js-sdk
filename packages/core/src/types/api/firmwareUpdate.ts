@@ -20,3 +20,15 @@ export declare function firmwareUpdate(
   connectId: string | undefined,
   params: Params<FirmwareUpdateBinaryParams>
 ): Response<PROTO.Success>;
+
+type IPlatform = 'native' | 'desktop' | 'ext' | 'web' | 'webEmbed';
+type Platform = { platform: IPlatform };
+
+export declare function firmwareUpdateV2(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateParams & Platform>
+): Response<PROTO.Success>;
+export declare function firmwareUpdateV2(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateBinaryParams & Platform>
+): Response<PROTO.Success>;
