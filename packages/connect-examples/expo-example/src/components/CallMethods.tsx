@@ -169,9 +169,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const handleFirmwareUpdateV2 = async (file?: Uint8Array) => {
     const params: any = {
       updateType: firmwareType ? 'firmware' : 'ble',
-      version: [3, 4, 0],
+      version: [3, 5, 0],
       platform: 'desktop',
+      forcedUpdateRes: false,
     };
+
     if (file) {
       params.binary = file;
     }

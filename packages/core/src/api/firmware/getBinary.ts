@@ -1,6 +1,6 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Features } from '../../types';
+import { Features, IDeviceType } from '../../types';
 import { getDeviceType, httpRequest } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { findLatestRelease } from '../../utils/release';
@@ -53,9 +53,19 @@ export const getSysResourceBinary = async (url: string) => {
   };
 };
 
+const getFirmwareUpdateField = (deviceType: IDeviceType, updateType: 'firmware' | 'ble') => {
+  if (updateType === 'ble') {
+    return 'ble';
+  }
+
+  return deviceType === 'touch' ? 'firmware-v2' : 'firmware';
+};
+
 const getInfo = ({ features, updateType }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
   const { deviceMap } = DataManager;
-  const releaseInfo = deviceMap?.[deviceType]?.[updateType] ?? [];
+
+  const firmwareUpdateField = getFirmwareUpdateField(deviceType, updateType);
+  const releaseInfo = deviceMap?.[deviceType]?.[firmwareUpdateField] ?? [];
   return findLatestRelease(releaseInfo);
 };
