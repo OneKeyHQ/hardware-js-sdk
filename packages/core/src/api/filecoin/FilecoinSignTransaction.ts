@@ -31,7 +31,10 @@ export default class FilecoinSignTransaction extends BaseMethod<HardwareFilecoin
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.9.0',
+        min: '2.10.0',
+      },
+      model_touch: {
+        min: '3.5.0',
       },
     };
   }
