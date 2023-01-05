@@ -1417,6 +1417,7 @@ export type EthereumSignTypedData = {
   address_n: number[];
   primary_type: string;
   metamask_v4_compat?: boolean;
+  chain_id?: number;
 };
 
 // EthereumTypedDataStructRequest
@@ -1466,6 +1467,7 @@ export type EthereumTypedDataValueAck = {
 export type EthereumGetPublicKey = {
   address_n: number[];
   show_display?: boolean;
+  chain_id?: number;
 };
 
 // EthereumPublicKey
@@ -1478,6 +1480,7 @@ export type EthereumPublicKey = {
 export type EthereumGetAddress = {
   address_n: number[];
   show_display?: boolean;
+  chain_id?: number;
 };
 
 // EthereumAddress
@@ -1537,6 +1540,7 @@ export type EthereumTxAck = {
 export type EthereumSignMessage = {
   address_n: number[];
   message: string;
+  chain_id?: number;
 };
 
 // EthereumMessageSignature
@@ -1550,6 +1554,7 @@ export type EthereumVerifyMessage = {
   signature: string;
   message: string;
   address: string;
+  chain_id?: number;
 };
 
 // EthereumSignMessageEIP712
@@ -1564,6 +1569,7 @@ export type EthereumSignTypedHash = {
   address_n: number[];
   domain_separator_hash: string;
   message_hash?: string;
+  chain_id?: number;
 };
 
 // EthereumTypedDataSignature
@@ -2031,9 +2037,9 @@ export type ResourceUpload = {
   extension: string;
   data_length: number;
   res_type: ResourceType;
+  nft_meta_data?: string;
   zoom_data_length: number;
-  file_name_no_ext: string;
-  nft_metadata?: string;
+  file_name_no_ext?: string;
 };
 
 // ZoomRequest
@@ -2264,6 +2270,28 @@ export type NEMDecryptMessage = {
 // NEMDecryptedMessage
 export type NEMDecryptedMessage = {
   payload: string;
+};
+
+// PolkadotGetAddress
+export type PolkadotGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// PolkadotAddress
+export type PolkadotAddress = {
+  address?: string;
+};
+
+// PolkadotSignTx
+export type PolkadotSignTx = {
+  address_n: number[];
+  raw_tx: string;
+};
+
+// PolkadotSignedTx
+export type PolkadotSignedTx = {
+  signature: string;
 };
 
 // RippleGetAddress
@@ -3056,6 +3084,10 @@ export type MessageType = {
   NEMSignedTx: NEMSignedTx;
   NEMDecryptMessage: NEMDecryptMessage;
   NEMDecryptedMessage: NEMDecryptedMessage;
+  PolkadotGetAddress: PolkadotGetAddress;
+  PolkadotAddress: PolkadotAddress;
+  PolkadotSignTx: PolkadotSignTx;
+  PolkadotSignedTx: PolkadotSignedTx;
   RippleGetAddress: RippleGetAddress;
   RippleAddress: RippleAddress;
   RipplePayment: RipplePayment;
