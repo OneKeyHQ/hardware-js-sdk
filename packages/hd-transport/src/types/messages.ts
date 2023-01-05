@@ -649,6 +649,11 @@ export enum CardanoNativeScriptHashDisplayFormat {
   POLICY_ID = 2,
 }
 
+export enum CardanoTxOutputSerializationFormat {
+  ARRAY_LEGACY = 0,
+  MAP_BABBAGE = 1,
+}
+
 export enum CardanoCertificateType {
   STAKE_REGISTRATION = 0,
   STAKE_DEREGISTRATION = 1,
@@ -664,13 +669,19 @@ export enum CardanoPoolRelayType {
 
 export enum CardanoTxAuxiliaryDataSupplementType {
   NONE = 0,
-  CATALYST_REGISTRATION_SIGNATURE = 1,
+  GOVERNANCE_REGISTRATION_SIGNATURE = 1,
+}
+
+export enum CardanoGovernanceRegistrationFormat {
+  CIP15 = 0,
+  CIP36 = 1,
 }
 
 export enum CardanoTxSigningMode {
   ORDINARY_TRANSACTION = 0,
   POOL_REGISTRATION_AS_OWNER = 1,
   MULTISIG_TRANSACTION = 2,
+  PLUTUS_TRANSACTION = 3,
 }
 
 export enum CardanoTxWitnessType {
@@ -767,7 +778,7 @@ export type CardanoSignTxInit = {
   collateral_inputs_count: number;
   required_signers_count: number;
   has_collateral_return?: boolean;
-  total_collateral?: UintType;
+  total_collateral?: number;
   reference_inputs_count?: number;
 };
 
@@ -783,6 +794,10 @@ export type CardanoTxOutput = {
   address_parameters?: CardanoAddressParametersType;
   amount: UintType;
   asset_groups_count: number;
+  datum_hash?: string;
+  format?: CardanoTxOutputSerializationFormat;
+  inline_datum_size?: number;
+  reference_script_size?: number;
 };
 
 // CardanoAssetGroup
@@ -796,6 +811,16 @@ export type CardanoToken = {
   asset_name_bytes: string;
   amount?: UintType;
   mint_amount?: UintType;
+};
+
+// CardanoTxInlineDatumChunk
+export type CardanoTxInlineDatumChunk = {
+  data: string;
+};
+
+// CardanoTxReferenceScriptChunk
+export type CardanoTxReferenceScriptChunk = {
+  data: string;
 };
 
 // CardanoPoolOwner
@@ -828,8 +853,6 @@ export type CardanoPoolParametersType = {
   margin_numerator: UintType;
   margin_denominator: UintType;
   reward_account: string;
-  owners: CardanoPoolOwner[];
-  relays: CardanoPoolRelayParameters[];
   metadata?: CardanoPoolMetadataType;
   owners_count: number;
   relays_count: number;
@@ -842,6 +865,7 @@ export type CardanoTxCertificate = {
   pool?: string;
   pool_parameters?: CardanoPoolParametersType;
   script_hash?: string;
+  key_hash?: string;
 };
 
 // CardanoTxWithdrawal
@@ -849,25 +873,53 @@ export type CardanoTxWithdrawal = {
   path?: number[];
   amount: UintType;
   script_hash?: string;
+  key_hash?: string;
 };
 
-// CardanoCatalystRegistrationParametersType
-export type CardanoCatalystRegistrationParametersType = {
+// CardanoGovernanceRegistrationDelegation
+export type CardanoGovernanceRegistrationDelegation = {
   voting_public_key: string;
+  weight: number;
+};
+
+// CardanoGovernanceRegistrationParametersType
+export type CardanoGovernanceRegistrationParametersType = {
+  voting_public_key?: string;
   staking_path: number[];
   reward_address_parameters: CardanoAddressParametersType;
-  nonce: UintType;
+  nonce: number;
+  format?: CardanoGovernanceRegistrationFormat;
+  delegations: CardanoGovernanceRegistrationDelegation[];
+  voting_purpose?: number;
 };
 
 // CardanoTxAuxiliaryData
 export type CardanoTxAuxiliaryData = {
-  catalyst_registration_parameters?: CardanoCatalystRegistrationParametersType;
+  governance_registration_parameters?: CardanoGovernanceRegistrationParametersType;
   hash?: string;
 };
 
 // CardanoTxMint
 export type CardanoTxMint = {
   asset_groups_count: number;
+};
+
+// CardanoTxCollateralInput
+export type CardanoTxCollateralInput = {
+  prev_hash: string;
+  prev_index: number;
+};
+
+// CardanoTxRequiredSigner
+export type CardanoTxRequiredSigner = {
+  key_hash?: string;
+  key_path?: number[];
+};
+
+// CardanoTxReferenceInput
+export type CardanoTxReferenceInput = {
+  prev_hash: string;
+  prev_index: number;
 };
 
 // CardanoTxItemAck
@@ -877,7 +929,7 @@ export type CardanoTxItemAck = {};
 export type CardanoTxAuxiliaryDataSupplement = {
   type: CardanoTxAuxiliaryDataSupplementType;
   auxiliary_data_hash?: string;
-  catalyst_signature?: string;
+  governance_signature?: string;
 };
 
 // CardanoTxWitnessRequest
@@ -904,85 +956,18 @@ export type CardanoTxBodyHash = {
 // CardanoSignTxFinished
 export type CardanoSignTxFinished = {};
 
-export type CardanoTxInputType = {
-  address_n?: number[];
-  prev_hash: string;
-  prev_index: number;
-};
-
-export type CardanoTokenType = {
-  asset_name_bytes: string;
-  amount: UintType;
-};
-
-export type CardanoAssetGroupType = {
-  policy_id: string;
-  tokens: CardanoTokenType[];
-};
-
-export type CardanoTxOutputType = {
-  address?: string;
-  amount: UintType;
-  address_parameters?: CardanoAddressParametersType;
-  token_bundle: CardanoAssetGroupType[];
-};
-
-export type CardanoPoolOwnerType = {
-  staking_key_path?: number[];
-  staking_key_hash?: string;
-};
-
-export type CardanoPoolRelayParametersType = {
-  type: CardanoPoolRelayType;
-  ipv4_address?: string;
-  ipv6_address?: string;
-  host_name?: string;
-  port?: number;
-};
-
-export type CardanoTxCertificateType = {
-  type: CardanoCertificateType;
-  path?: number[];
-  pool?: string;
-  pool_parameters?: CardanoPoolParametersType;
-};
-
-export type CardanoTxWithdrawalType = {
-  path: number[];
-  amount: UintType;
-};
-
-export type CardanoTxAuxiliaryDataType = {
-  blob?: string;
-  catalyst_registration_parameters?: CardanoCatalystRegistrationParametersType;
-};
-
-// CardanoSignTx
-export type CardanoSignTx = {
-  inputs: CardanoTxInputType[];
-  outputs: CardanoTxOutputType[];
-  protocol_magic: number;
-  fee: UintType;
-  ttl?: UintType;
+// CardanoSignMessage
+export type CardanoSignMessage = {
+  address_n: number[];
+  message: string;
+  derivation_type: CardanoDerivationType;
   network_id: number;
-  certificates: CardanoTxCertificateType[];
-  withdrawals: CardanoTxWithdrawalType[];
-  validity_interval_start?: UintType;
-  auxiliary_data?: CardanoTxAuxiliaryDataType;
 };
 
-// CardanoSignedTxChunk
-export type CardanoSignedTxChunk = {
-  signed_tx_chunk: string;
-};
-
-// CardanoSignedTxChunkAck
-export type CardanoSignedTxChunkAck = {};
-
-// CardanoSignedTx
-export type CardanoSignedTx = {
-  tx_hash: string;
-  serialized_tx?: string;
+// CardanoMessageSignature
+export type CardanoMessageSignature = {
+  signature: string;
+  key: string;
 };
 
 // Success
@@ -1432,6 +1417,7 @@ export type EthereumSignTypedData = {
   address_n: number[];
   primary_type: string;
   metamask_v4_compat?: boolean;
+  chain_id?: number;
 };
 
 // EthereumTypedDataStructRequest
@@ -1481,6 +1467,7 @@ export type EthereumTypedDataValueAck = {
 export type EthereumGetPublicKey = {
   address_n: number[];
   show_display?: boolean;
+  chain_id?: number;
 };
 
 // EthereumPublicKey
@@ -1493,6 +1480,7 @@ export type EthereumPublicKey = {
 export type EthereumGetAddress = {
   address_n: number[];
   show_display?: boolean;
+  chain_id?: number;
 };
 
 // EthereumAddress
@@ -1552,6 +1540,7 @@ export type EthereumTxAck = {
 export type EthereumSignMessage = {
   address_n: number[];
   message: string;
+  chain_id?: number;
 };
 
 // EthereumMessageSignature
@@ -1565,6 +1554,7 @@ export type EthereumVerifyMessage = {
   signature: string;
   message: string;
   address: string;
+  chain_id?: number;
 };
 
 // EthereumSignMessageEIP712
@@ -1579,12 +1569,35 @@ export type EthereumSignTypedHash = {
   address_n: number[];
   domain_separator_hash: string;
   message_hash?: string;
+  chain_id?: number;
 };
 
 // EthereumTypedDataSignature
 export type EthereumTypedDataSignature = {
   signature: string;
   address: string;
+};
+
+// FilecoinGetAddress
+export type FilecoinGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// FilecoinAddress
+export type FilecoinAddress = {
+  address?: string;
+};
+
+// FilecoinSignTx
+export type FilecoinSignTx = {
+  address_n: number[];
+  raw_tx: string;
+};
+
+// FilecoinSignedTx
+export type FilecoinSignedTx = {
+  signature: string;
 };
 
 export enum Enum_BackupType {
@@ -2024,8 +2037,9 @@ export type ResourceUpload = {
   extension: string;
   data_length: number;
   res_type: ResourceType;
-  zoom_data_length: number;
   nft_meta_data?: string;
+  zoom_data_length: number;
+  file_name_no_ext?: string;
 };
 
 // ZoomRequest
@@ -2256,6 +2270,28 @@ export type NEMDecryptMessage = {
 // NEMDecryptedMessage
 export type NEMDecryptedMessage = {
   payload: string;
+};
+
+// PolkadotGetAddress
+export type PolkadotGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// PolkadotAddress
+export type PolkadotAddress = {
+  address?: string;
+};
+
+// PolkadotSignTx
+export type PolkadotSignTx = {
+  address_n: number[];
+  raw_tx: string;
+};
+
+// PolkadotSignedTx
+export type PolkadotSignedTx = {
+  signature: string;
 };
 
 // RippleGetAddress
@@ -2848,15 +2884,21 @@ export type MessageType = {
   CardanoTxOutput: CardanoTxOutput;
   CardanoAssetGroup: CardanoAssetGroup;
   CardanoToken: CardanoToken;
+  CardanoTxInlineDatumChunk: CardanoTxInlineDatumChunk;
+  CardanoTxReferenceScriptChunk: CardanoTxReferenceScriptChunk;
   CardanoPoolOwner: CardanoPoolOwner;
   CardanoPoolRelayParameters: CardanoPoolRelayParameters;
   CardanoPoolMetadataType: CardanoPoolMetadataType;
   CardanoPoolParametersType: CardanoPoolParametersType;
   CardanoTxCertificate: CardanoTxCertificate;
   CardanoTxWithdrawal: CardanoTxWithdrawal;
-  CardanoCatalystRegistrationParametersType: CardanoCatalystRegistrationParametersType;
+  CardanoGovernanceRegistrationDelegation: CardanoGovernanceRegistrationDelegation;
+  CardanoGovernanceRegistrationParametersType: CardanoGovernanceRegistrationParametersType;
   CardanoTxAuxiliaryData: CardanoTxAuxiliaryData;
   CardanoTxMint: CardanoTxMint;
+  CardanoTxCollateralInput: CardanoTxCollateralInput;
+  CardanoTxRequiredSigner: CardanoTxRequiredSigner;
+  CardanoTxReferenceInput: CardanoTxReferenceInput;
   CardanoTxItemAck: CardanoTxItemAck;
   CardanoTxAuxiliaryDataSupplement: CardanoTxAuxiliaryDataSupplement;
   CardanoTxWitnessRequest: CardanoTxWitnessRequest;
@@ -2864,19 +2906,8 @@ export type MessageType = {
   CardanoTxHostAck: CardanoTxHostAck;
   CardanoTxBodyHash: CardanoTxBodyHash;
   CardanoSignTxFinished: CardanoSignTxFinished;
-  CardanoTxInputType: CardanoTxInputType;
-  CardanoTokenType: CardanoTokenType;
-  CardanoAssetGroupType: CardanoAssetGroupType;
-  CardanoTxOutputType: CardanoTxOutputType;
-  CardanoPoolOwnerType: CardanoPoolOwnerType;
-  CardanoPoolRelayParametersType: CardanoPoolRelayParametersType;
-  CardanoTxCertificateType: CardanoTxCertificateType;
-  CardanoTxWithdrawalType: CardanoTxWithdrawalType;
-  CardanoTxAuxiliaryDataType: CardanoTxAuxiliaryDataType;
-  CardanoSignTx: CardanoSignTx;
-  CardanoSignedTxChunk: CardanoSignedTxChunk;
-  CardanoSignedTxChunkAck: CardanoSignedTxChunkAck;
-  CardanoSignedTx: CardanoSignedTx;
+  CardanoSignMessage: CardanoSignMessage;
+  CardanoMessageSignature: CardanoMessageSignature;
   Success: Success;
   Failure: Failure;
   ButtonRequest: ButtonRequest;
@@ -2960,6 +2991,10 @@ export type MessageType = {
   EthereumSignMessageEIP712: EthereumSignMessageEIP712;
   EthereumSignTypedHash: EthereumSignTypedHash;
   EthereumTypedDataSignature: EthereumTypedDataSignature;
+  FilecoinGetAddress: FilecoinGetAddress;
+  FilecoinAddress: FilecoinAddress;
+  FilecoinSignTx: FilecoinSignTx;
+  FilecoinSignedTx: FilecoinSignedTx;
   Initialize: Initialize;
   GetFeatures: GetFeatures;
   Features: Features;
@@ -3049,6 +3084,10 @@ export type MessageType = {
   NEMSignedTx: NEMSignedTx;
   NEMDecryptMessage: NEMDecryptMessage;
   NEMDecryptedMessage: NEMDecryptedMessage;
+  PolkadotGetAddress: PolkadotGetAddress;
+  PolkadotAddress: PolkadotAddress;
+  PolkadotSignTx: PolkadotSignTx;
+  PolkadotSignedTx: PolkadotSignedTx;
   RippleGetAddress: RippleGetAddress;
   RippleAddress: RippleAddress;
   RipplePayment: RipplePayment;
@@ -3127,5 +3166,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;

@@ -118,3 +118,6 @@ export type {
 } from './cardanoGetAddress';
 
 export type { CardanoSignTransaction, CardanoSignedTxData } from './cardano';
+
+export type { FilecoinAddress, FilecoinGetAddressParams } from './filecoinGetAddress';
+export type { FilecoinSignTransactionParams, FilecoinSignedTx } from './filecoinSignTransaction';
