@@ -21,10 +21,6 @@ jobs:
       matrix:
         node-version: [16.x]
 
-    env:
-      NODE_ENV: 'production'
-      CI: false
-
     steps:
       - uses: actions/checkout@v3
 
@@ -33,12 +29,8 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: 'https://npm.pkg.github.com'
-          always-auth: true
-          scope: '@onekeyhq'
 
       - name: Install Dependency
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn
           yarn bootstrap
