@@ -41,6 +41,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn
+          yarn bootstrap
 
       - name: Build Target
         run: |
