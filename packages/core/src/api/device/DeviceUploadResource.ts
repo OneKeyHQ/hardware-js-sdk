@@ -43,12 +43,18 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       thumbnailData: hexToBytes(thumbnailDataHex),
     };
 
+    const fileHash = bytesToHex(blake2s(this.payload.dataHex)).slice(0, 8);
+    const file_name_no_ext = `${resType === 0 ? 'wp' : 'nft'}-${fileHash}-${Math.floor(
+      Date.now() / 1000
+    )}`;
+
     this.params = {
       extension: suffix,
       data_length: this.paramsData.data.byteLength,
       zoom_data_length: this.paramsData.thumbnailData.byteLength,
       res_type: resType,
       nft_meta_data: nftMetaData,
+      file_name_no_ext,
     };
   }
 
