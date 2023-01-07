@@ -37,4 +37,5 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn
+          yarn bootstrap
           yarn lint
