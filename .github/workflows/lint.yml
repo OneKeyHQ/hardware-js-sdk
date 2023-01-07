@@ -38,4 +38,5 @@ jobs:
         run: |
           yarn
           yarn bootstrap
+          yarn build
           yarn lint
