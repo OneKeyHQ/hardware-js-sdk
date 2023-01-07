@@ -2,3 +2,7 @@ packages/**/build/
 lib/
 dist/
 example/
+packages/**/dist/
+submodules/
+packages/**/coverage/
+packages/hd-transport/scripts/protobuf-patches/

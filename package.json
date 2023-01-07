@@ -16,7 +16,7 @@
     "build": "lerna run build",
     "clean": "lerna clean --yes",
     "clean-workspace": "yarn clean && lerna run clean",
-    "lint": "lerna run lint",
+    "lint": "eslint .",
     "test": "lerna run test",
     "setup": "yarn && yarn bootstrap && yarn build",
     "publish-packages": "lerna publish from-package",

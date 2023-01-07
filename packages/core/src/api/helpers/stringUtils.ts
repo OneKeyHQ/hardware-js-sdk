@@ -8,4 +8,4 @@ export const cutString = (str: string | undefined, cutLen: number): [string, str
 };
 
 export const toSnakeCase = (val: string): string =>
-  val.replace(/([A-Z])/g, el => '_' + el.toLowerCase());
+  val.replace(/([A-Z])/g, el => `_${el.toLowerCase()}`);
