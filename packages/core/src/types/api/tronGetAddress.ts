@@ -13,11 +13,11 @@ export type TronGetAddressParams = {
 export declare function tronGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & TronGetAddressParams,
+  params: CommonParams & TronGetAddressParams
 ): Response<TronAddress>;
 
 export declare function tronGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & { bundle?: TronGetAddressParams[] },
+  params: CommonParams & { bundle?: TronGetAddressParams[] }
 ): Response<Array<TronAddress>>;

@@ -115,7 +115,7 @@ export function CallConfluxMethods({
               name: 'transaction.gasPrice',
               value: '0xbebc200',
               type: 'string',
-            }
+            },
           ]}
           onCall={data =>
             SDK.confluxSignTransaction(connectId, deviceId, {
