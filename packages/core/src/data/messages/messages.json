@@ -3952,6 +3952,10 @@
           "options": {
             "default": true
           }
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 4
         }
       }
     },
@@ -4056,6 +4060,10 @@
         "show_display": {
           "type": "bool",
           "id": 2
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 3
         }
       }
     },
@@ -4086,6 +4094,10 @@
         "show_display": {
           "type": "bool",
           "id": 2
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 3
         }
       }
     },
@@ -4295,6 +4307,10 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 3
         }
       }
     },
@@ -4328,6 +4344,10 @@
           "rule": "required",
           "type": "string",
           "id": 4
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 5
         }
       }
     },
@@ -4369,6 +4389,10 @@
         "message_hash": {
           "type": "bytes",
           "id": 3
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 4
         }
       }
     },
@@ -4383,6 +4407,56 @@
           "rule": "required",
           "type": "string",
           "id": 2
+        }
+      }
+    },
+    "FilecoinGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "FilecoinAddress": {
+      "fields": {
+        "address": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "FilecoinSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_tx": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "FilecoinSignedTx": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -5405,18 +5479,17 @@
           "type": "ResourceType",
           "id": 3
         },
+        "nft_meta_data": {
+          "type": "bytes",
+          "id": 4
+        },
         "zoom_data_length": {
           "rule": "required",
           "type": "uint32",
-          "id": 4
-        },
-        "file_name_no_ext": {
-          "rule": "required",
-          "type": "string",
           "id": 5
         },
-        "nft_metadata": {
-          "type": "bytes",
+        "file_name_no_ext": {
+          "type": "string",
           "id": 6
         }
       },
@@ -6932,6 +7005,56 @@
     "NEMDecryptedMessage": {
       "fields": {
         "payload": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "PolkadotGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "PolkadotAddress": {
+      "fields": {
+        "address": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "PolkadotSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_tx": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "PolkadotSignedTx": {
+      "fields": {
+        "signature": {
           "rule": "required",
           "type": "bytes",
           "id": 1
@@ -8774,10 +8897,18 @@
         "MessageType_AlgorandAddress": 10901,
         "MessageType_AlgorandSignTx": 10902,
         "MessageType_AlgorandSignedTx": 10903,
+        "MessageType_PolkadotGetAddress": 11000,
+        "MessageType_PolkadotAddress": 11001,
+        "MessageType_PolkadotSignTx": 11002,
+        "MessageType_PolkadotSignedTx": 11003,
         "MessageType_SuiGetAddress": 11100,
         "MessageType_SuiAddress": 11101,
         "MessageType_SuiSignTx": 11102,
         "MessageType_SuiSignedTx": 11103,
+        "MessageType_FilecoinGetAddress": 11200,
+        "MessageType_FilecoinAddress": 11201,
+        "MessageType_FilecoinSignTx": 11202,
+        "MessageType_FilecoinSignedTx": 11203,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,

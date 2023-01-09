@@ -80,6 +80,8 @@ export const inject = ({
     deviceChangePin: (connectId, params) =>
       call({ ...params, connectId, method: 'deviceChangePin' }),
     deviceFlags: (connectId, params) => call({ ...params, connectId, method: 'deviceFlags' }),
+    deviceRebootToBoardloader: connectId =>
+      call({ connectId, method: 'deviceRebootToBoardloader' }),
     deviceRebootToBootloader: connectId => call({ connectId, method: 'deviceRebootToBootloader' }),
     deviceRecovery: (connectId, params) => call({ ...params, connectId, method: 'deviceRecovery' }),
     deviceReset: (connectId, params) => call({ ...params, connectId, method: 'deviceReset' }),
@@ -214,6 +216,11 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'cardanoSignTransaction' }),
     cardanoSignMessage: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'cardanoSignMessage' }),
+
+    filecoinGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'filecoinGetAddress' }),
+    filecoinSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'filecoinSignTransaction' }),
   };
   return api;
 };

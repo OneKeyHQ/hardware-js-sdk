@@ -11,7 +11,7 @@ import { getFeatures } from './getFeatures';
 import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
-import { firmwareUpdate } from './firmwareUpdate';
+import { firmwareUpdate, firmwareUpdateV2 } from './firmwareUpdate';
 import { requestWebUsbDevice } from './requestWebUsbDevice';
 
 import { deviceReset } from './deviceReset';
@@ -19,6 +19,7 @@ import { deviceRecovery } from './deviceRecovery';
 import { deviceVerify } from './deviceVerify';
 import { deviceWipe } from './deviceWipe';
 import { deviceRebootToBootloader } from './deviceRebootToBootloader';
+import { deviceRebootToBoardloader } from './deviceRebootToBoardloader';
 import { deviceBackup } from './deviceBackup';
 import { deviceChangePin } from './deviceChangePin';
 import { deviceSettings } from './deviceSettings';
@@ -95,6 +96,9 @@ import { cardanoGetPublicKey } from './cardanoGetPublicKey';
 import { cardanoSignTransaction } from './cardanoSignTransaction';
 import { cardanoSignMessage } from './cardanoSignMessage';
 
+import { filecoinGetAddress } from './filecoinGetAddress';
+import { filecoinSignTransaction } from './filecoinSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -127,6 +131,7 @@ export type CoreApi = {
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;
   deviceFlags: typeof deviceFlags;
+  deviceRebootToBoardloader: typeof deviceRebootToBoardloader;
   deviceRebootToBootloader: typeof deviceRebootToBootloader;
   deviceRecovery: typeof deviceRecovery;
   deviceReset: typeof deviceReset;
@@ -140,7 +145,7 @@ export type CoreApi = {
   checkFirmwareRelease: typeof checkFirmwareRelease;
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;
-  firmwareUpdateV2: typeof firmwareUpdate;
+  firmwareUpdateV2: typeof firmwareUpdateV2;
 
   cipherKeyValue: typeof cipherKeyValue;
 
@@ -253,4 +258,10 @@ export type CoreApi = {
   cardanoGetPublicKey: typeof cardanoGetPublicKey;
   cardanoSignTransaction: typeof cardanoSignTransaction;
   cardanoSignMessage: typeof cardanoSignMessage;
+
+  /**
+   * Filecoin function
+   */
+  filecoinGetAddress: typeof filecoinGetAddress;
+  filecoinSignTransaction: typeof filecoinSignTransaction;
 };

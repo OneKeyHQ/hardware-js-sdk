@@ -16,6 +16,10 @@ Hardware-js-sdk is designed to allow third-party developers to quickly access th
 |[@onekeyfe/hd-transport-webusb](./packages/hd-transport-webusb)        |communication lib for WebUSB|
 |[@onekeyfe/hd-shared](./packages/shared)                               |Tools, error definitions, constants|
 
+## Documentation
+
+See the full documentation on [developer.onekey.so](https://developer.onekey.so/connect-to-hardware/hardware-sdk).
+
 ## hardware-js-sdk development
 
 Before you start make sure you have downloaded and installed NVM, Yarn and git with git lfs.

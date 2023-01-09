@@ -33,6 +33,7 @@ import { CallCosmosMethods } from './CallCosmosMethods';
 import { CallXrpMethods } from './CallXrpMethods';
 import { CallSuiMethods } from './CallSuiMethods';
 import { CallCardanoMethods } from './CallCardanoMethods';
+import { CallFilecoinMethods } from './CallFilecoinMethods';
 
 let registerListener = false;
 
@@ -167,7 +168,13 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   };
 
   const handleFirmwareUpdateV2 = async (file?: Uint8Array) => {
-    const params: any = { updateType: firmwareType ? 'firmware' : 'ble' };
+    const params: any = {
+      updateType: firmwareType ? 'firmware' : 'ble',
+      version: [3, 5, 0],
+      platform: 'desktop',
+      forcedUpdateRes: false,
+    };
+
     if (file) {
       params.binary = file;
     }
@@ -349,6 +356,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallCosmosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallXrpMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallSuiMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallFilecoinMethods
+        SDK={SDK}
+        selectedDevice={selectedDevice}
+        commonParams={optionalParams}
+      />
     </View>
   );
 }

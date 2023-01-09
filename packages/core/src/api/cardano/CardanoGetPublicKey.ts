@@ -22,7 +22,7 @@ export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyPara
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'derivationType', type: 'number' },
-        { name: 'showOnTrezor', type: 'boolean' },
+        { name: 'showOnOneKey', type: 'boolean' },
       ]);
 
       const path = validatePath(batch.path, 3);
