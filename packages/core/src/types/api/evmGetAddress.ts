@@ -8,6 +8,7 @@ export type EVMAddress = {
 export type EVMGetAddressParams = {
   path: string | number[];
   showOnOneKey?: boolean;
+  chainId?: number;
 };
 
 export declare function evmGetAddress(

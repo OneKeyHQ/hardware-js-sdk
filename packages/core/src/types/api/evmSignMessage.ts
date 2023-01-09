@@ -4,6 +4,7 @@ import type { CommonParams, Response } from '../params';
 export type EVMSignMessageParams = {
   path: string | number[];
   messageHex: string;
+  chainId?: number;
 };
 
 export declare function evmSignMessage(

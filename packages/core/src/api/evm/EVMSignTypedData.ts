@@ -22,6 +22,7 @@ export type EVMSignTypedDataParams = {
   data: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
   domainHash?: string;
   messageHash?: string;
+  chainId?: number;
 };
 
 export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
@@ -35,9 +36,10 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       { name: 'data', type: 'object' },
       { name: 'domainHash', type: 'hexString' },
       { name: 'messageHash', type: 'hexString' },
+      { name: 'chainId', type: 'number' },
     ]);
 
-    const { path, data, metamaskV4Compat, domainHash, messageHash } = this.payload;
+    const { path, data, metamaskV4Compat, domainHash, messageHash, chainId } = this.payload;
 
     const addressN = validatePath(path, 3);
 
@@ -45,6 +47,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       addressN,
       metamaskV4Compat,
       data,
+      chainId,
     };
 
     if (domainHash) {
@@ -62,7 +65,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
   async signTypedData() {
     const { commands } = this.device;
-    const { addressN, data, metamaskV4Compat } = this.params;
+    const { addressN, data, metamaskV4Compat, chainId } = this.params;
 
     const {
       types,
@@ -82,6 +85,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         address_n: addressN,
         primary_type: primaryType as string,
         metamask_v4_compat: metamaskV4Compat,
+        chain_id: chainId,
       }
     );
 
@@ -204,7 +208,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       );
     }
 
-    const { addressN } = this.params;
+    const { addressN, chainId } = this.params;
 
     // For Classic、Mini device we use EthereumSignTypedData
     const deviceType = getDeviceType(this.device.features);
@@ -225,6 +229,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
             address_n: addressN,
             domain_separator_hash: domainHash ?? '',
             message_hash: messageHash,
+            chain_id: chainId,
           }
         );
       } else {
