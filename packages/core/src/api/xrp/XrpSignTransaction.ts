@@ -50,7 +50,7 @@ export default class XrpGetAddress extends BaseMethod<XrpSignTransactionParams> 
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.6.0',
+        min: '2.9.0',
       },
     };
   }
