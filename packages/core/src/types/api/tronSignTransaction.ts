@@ -37,5 +37,5 @@ export type TronSignTransactionParams = {
 export declare function tronSignTransaction(
   connectId: string,
   deviceId: string,
-  params: CommonParams & TronSignTransactionParams,
+  params: CommonParams & TronSignTransactionParams
 ): Response<TronSignedTx>;

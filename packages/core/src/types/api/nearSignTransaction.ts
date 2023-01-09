@@ -9,5 +9,5 @@ export type NearSignTransactionParams = {
 export declare function nearSignTransaction(
   connectId: string,
   deviceId: string,
-  params: CommonParams & NearSignTransactionParams,
+  params: CommonParams & NearSignTransactionParams
 ): Response<NearSignedTx>;

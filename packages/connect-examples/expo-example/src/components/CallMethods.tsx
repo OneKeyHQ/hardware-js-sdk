@@ -162,7 +162,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     }
     const response = await SDK.firmwareUpdate(
       type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
-      params,
+      params
     );
     console.log('example firmwareUpdate response: ', response);
   };
@@ -180,14 +180,14 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     }
     const response = await SDK.firmwareUpdateV2(
       type === 'Bluetooth' ? selectedDevice?.connectId : undefined,
-      params,
+      params
     );
     console.log('example firmwareUpdate response: ', response);
   };
 
   const onFileChange = (
     e: any,
-    callback: (data: Uint8Array, fileType?: string, file?: File) => void,
+    callback: (data: Uint8Array, fileType?: string, file?: File) => void
   ) => {
     const file = e.target.files?.[0];
     const reader = new FileReader();
