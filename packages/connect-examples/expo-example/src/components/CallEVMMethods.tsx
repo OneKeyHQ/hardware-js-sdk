@@ -25,8 +25,15 @@ export function CallEVMMethods({
           options={[
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
+            { name: 'chainId', value: 1, type: 'number' },
           ]}
-          onCall={data => SDK.evmGetAddress(connectId, deviceId, { ...commonParams, ...data })}
+          onCall={(data: any) =>
+            SDK.evmGetAddress(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+              chainId: Number(data.chainId ?? 1),
+            })
+          }
         />
 
         <MethodInvoke
@@ -55,9 +62,16 @@ export function CallEVMMethods({
           title="evmGetPublicKey"
           options={[
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
-            { name: 'showOnOneKey', value: false, type: 'boolean' },
+            { name: 'showOnOneKey', value: true, type: 'boolean' },
+            { name: 'chainId', value: 1, type: 'number' },
           ]}
-          onCall={data => SDK.evmGetPublicKey(connectId, deviceId, { ...commonParams, ...data })}
+          onCall={(data: any) =>
+            SDK.evmGetPublicKey(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+              chainId: Number(data.chainId ?? 1),
+            })
+          }
         />
 
         <MethodInvoke
@@ -65,9 +79,14 @@ export function CallEVMMethods({
           options={[
             { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
             { name: 'messageHex', value: '0x6578616d706c65206d657373616765', type: 'string' },
+            { name: 'chainId', value: 1, type: 'number' },
           ]}
-          onCall={data =>
-            SDK.evmSignMessage(connectId, deviceId, { ...commonParams, ...data } as unknown as any)
+          onCall={(data: any) =>
+            SDK.evmSignMessage(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+              chainId: Number(data.chainId ?? 1),
+            } as unknown as any)
           }
         />
 
@@ -219,8 +238,9 @@ export function CallEVMMethods({
               value: '0x07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c644',
               type: 'string',
             },
+            { name: 'chainId', value: 1, type: 'number' },
           ]}
-          onCall={data =>
+          onCall={(data: any) =>
             SDK.evmSignTypedData(connectId, deviceId, {
               ...commonParams,
               ...data,
@@ -252,6 +272,7 @@ export function CallEVMMethods({
                   Number: '911112119',
                 },
               },
+              chainId: Number(data.chainId ?? 1),
             } as unknown as any)
           }
         />
@@ -275,11 +296,13 @@ export function CallEVMMethods({
                 '11dc86c631ef5d9388c5e245501d571b864af1a717cbbb3ca1f6dacbf330742957242aa52b36bbe7bb46dce6ff0ead0548cc5a5ce76d0aaed166fd40cb3fc6e51c', // 'Example message'
               type: 'string',
             },
+            { name: 'chainId', value: 1, type: 'number' },
           ]}
-          onCall={data =>
+          onCall={(data: any) =>
             SDK.evmVerifyMessage(connectId, deviceId, {
               ...commonParams,
               ...data,
+              chainId: Number(data.chainId ?? 1),
             } as unknown as any)
           }
         />
