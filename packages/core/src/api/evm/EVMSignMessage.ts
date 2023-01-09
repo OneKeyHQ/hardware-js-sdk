@@ -14,9 +14,10 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessage> {
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'messageHex', type: 'hexString', required: true },
+      { name: 'chainId', type: 'number' },
     ]);
 
-    const { path, messageHex } = this.payload;
+    const { path, messageHex, chainId } = this.payload;
 
     const addressN = validatePath(path, 3);
 
@@ -24,6 +25,7 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessage> {
     this.params = {
       address_n: addressN,
       message: formatAnyHex(messageHex),
+      chain_id: chainId,
     };
   }
 

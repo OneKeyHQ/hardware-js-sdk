@@ -5,6 +5,7 @@ export type EVMVerifyMessageParams = {
   address: string;
   messageHex: string;
   signature: string;
+  chainId?: number;
 };
 
 export declare function evmVerifyMessage(

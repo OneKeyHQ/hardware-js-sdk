@@ -13,6 +13,7 @@ export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessage> {
       { name: 'address', type: 'string', required: true },
       { name: 'messageHex', type: 'hexString', required: true },
       { name: 'signature', type: 'hexString', required: true },
+      { name: 'chainId', type: 'number' },
     ]);
 
     const { address, messageHex, signature } = formatAnyHex(this.payload);
@@ -21,6 +22,7 @@ export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessage> {
       address,
       message: messageHex,
       signature,
+      chain_id: this.payload.chainId,
     };
   }
 
