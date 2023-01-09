@@ -40,9 +40,9 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
       model_mini: {
         min: '2.10.0',
       },
-      // model_touch: {
-      //   min: '3.5.0',
-      // },
+      model_touch: {
+        min: '3.5.0',
+      },
     };
   }
 

@@ -129,6 +129,11 @@ export interface CardanoReferenceInput {
   prev_index: number;
 }
 
+export interface CardanoGovernanceRegistrationDelegation {
+  votingPublicKey: string;
+  weight: number;
+}
+
 export interface CardanoCatalystRegistrationParameters {
   votingPublicKey: string;
   stakingPath: string | number[];
@@ -136,9 +141,19 @@ export interface CardanoCatalystRegistrationParameters {
   nonce: string;
 }
 
+export interface CardanoGovernanceRegistrationParameters {
+  votingPublicKey?: string;
+  stakingPath: string | number[];
+  rewardAddressParameters: CardanoAddressParameters;
+  nonce: string;
+  format?: PROTO.CardanoGovernanceRegistrationFormat;
+  delegations?: CardanoGovernanceRegistrationDelegation[];
+  votingPurpose?: number;
+}
+
 export interface CardanoAuxiliaryData {
   hash?: string;
-  catalystRegistrationParameters?: CardanoCatalystRegistrationParameters;
+  governanceRegistrationParameters?: CardanoGovernanceRegistrationParameters;
 }
 
 export interface CardanoSignTransaction {

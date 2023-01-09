@@ -167,7 +167,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       derivationType:
         typeof payload.derivationType !== 'undefined'
           ? payload.derivationType
-          : PROTO.CardanoDerivationType.ICARUS,
+          : PROTO.CardanoDerivationType.ICARUS_TREZOR,
       includeNetworkId: payload.includeNetworkId,
     };
   }
@@ -246,10 +246,10 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       if (auxiliaryDataType !== PROTO.CardanoTxAuxiliaryDataSupplementType.NONE) {
         auxiliaryDataSupplement = {
           type: auxiliaryDataType,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          auxiliaryDataHash: message.auxiliary_data_hash!,
+          auxiliaryDataHash: message.auxiliary_data_hash as unknown as string,
           // @ts-expect-error
-          catalystSignature: message.catalyst_signature,
+          governanceSignature: message.governance_signature,
+          catalystSignature: message.governance_signature,
         };
       }
       await typedCall('CardanoTxHostAck', 'CardanoTxItemAck');
