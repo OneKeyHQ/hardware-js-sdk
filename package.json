@@ -20,6 +20,7 @@
     "test": "lerna run test",
     "setup": "yarn && yarn bootstrap && yarn build",
     "publish-packages": "lerna publish from-package",
+    "update-protobuf": "lerna run update:protobuf --scope=@onekeyfe/hd-transport",
     "update-version": "lerna version --no-git-tag-version",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
     "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
