@@ -8,6 +8,7 @@ export type FilecoinSignedTx = {
 export type FilecoinSignTransactionParams = {
   path: string | number[];
   rawTx?: string;
+  isTestnet?: boolean;
 };
 
 export declare function filecoinSignTransaction(

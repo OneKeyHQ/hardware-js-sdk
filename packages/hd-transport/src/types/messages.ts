@@ -1582,6 +1582,7 @@ export type EthereumTypedDataSignature = {
 export type FilecoinGetAddress = {
   address_n: number[];
   show_display?: boolean;
+  testnet?: boolean;
 };
 
 // FilecoinAddress
@@ -1593,6 +1594,7 @@ export type FilecoinAddress = {
 export type FilecoinSignTx = {
   address_n: number[];
   raw_tx: string;
+  testnet?: boolean;
 };
 
 // FilecoinSignedTx

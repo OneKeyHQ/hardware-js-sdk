@@ -16,15 +16,17 @@ export default class FilecoinSignTransaction extends BaseMethod<HardwareFilecoin
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'rawTx', type: 'hexString', required: true },
+      { name: 'isTestnet', type: 'boolean' },
     ]);
 
     // init params
-    const { path, rawTx } = this.payload as FilecoinSignTransactionParams;
+    const { path, rawTx, isTestnet } = this.payload as FilecoinSignTransactionParams;
     const addressN = validatePath(path, 3);
 
     this.params = {
       address_n: addressN,
       raw_tx: formatAnyHex(rawTx),
+      testnet: isTestnet,
     };
   }
 
