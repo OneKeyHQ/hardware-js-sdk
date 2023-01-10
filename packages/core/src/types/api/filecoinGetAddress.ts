@@ -8,6 +8,7 @@ export type FilecoinAddress = {
 export type FilecoinGetAddressParams = {
   path: string | number[];
   showOnOneKey?: boolean;
+  isTestnet?: boolean;
 };
 
 export declare function filecoinGetAddress(

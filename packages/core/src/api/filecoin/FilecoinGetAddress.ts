@@ -26,6 +26,7 @@ export default class FilecoinGetAddress extends BaseMethod<HardwareFilecoinGetAd
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'showOnOneKey', type: 'boolean' },
+        { name: 'isTestnet', type: 'boolean' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
@@ -33,6 +34,7 @@ export default class FilecoinGetAddress extends BaseMethod<HardwareFilecoinGetAd
       this.params.push({
         address_n: addressN,
         show_display: showOnOneKey,
+        testnet: batch.isTestnet,
       });
     });
   }
