@@ -171,7 +171,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     const params: any = {
       updateType: firmwareType ? 'firmware' : 'ble',
       version: [3, 5, 0],
-      platform: 'desktop',
+      platform: 'web',
       forcedUpdateRes: false,
     };
 

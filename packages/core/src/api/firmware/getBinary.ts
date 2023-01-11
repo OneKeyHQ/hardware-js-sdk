@@ -54,7 +54,7 @@ export const getSysResourceBinary = async (url: string) => {
   };
 };
 
-const getInfo = ({ features, updateType }: GetInfoProps) => {
+export const getInfo = ({ features, updateType }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
   const { deviceMap } = DataManager;
 
