@@ -7,6 +7,7 @@ export {
   getDeviceTypeByDeviceId,
   getDeviceUUID,
   getDeviceLabel,
+  getFirmwareUpdateField,
 } from './deviceFeaturesUtils';
 export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pathUtils';
 
