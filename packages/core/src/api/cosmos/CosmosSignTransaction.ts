@@ -31,7 +31,10 @@ export default class CosmosSignTransaction extends BaseMethod<HardwareCosmosSign
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.6.0',
+        min: '2.10.0',
+      },
+      model_touch: {
+        min: '4.0.0',
       },
     };
   }
