@@ -23,7 +23,10 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
   }
 
   if (version && !semver.eq(releaseInfo.version.join('.'), version.join('.'))) {
-    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware version mismatch');
+    const touchWithoutVersion = getDeviceType(features) === 'touch' && !features.onekey_version;
+    if (!touchWithoutVersion) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware version mismatch');
+    }
   }
 
   // @ts-expect-error
