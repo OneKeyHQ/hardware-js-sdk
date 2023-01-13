@@ -221,6 +221,13 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'filecoinGetAddress' }),
     filecoinSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'filecoinSignTransaction' }),
+
+    polkadotGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'polkadotGetAddress' }),
+    polkadotGetPublicKey: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'polkadotGetPublicKey' }),
+    polkadotSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'polkadotSignTransaction' }),
   };
   return api;
 };

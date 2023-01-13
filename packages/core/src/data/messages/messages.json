@@ -7040,6 +7040,10 @@
         "address": {
           "type": "string",
           "id": 1
+        },
+        "public_key": {
+          "type": "string",
+          "id": 2
         }
       }
     },
