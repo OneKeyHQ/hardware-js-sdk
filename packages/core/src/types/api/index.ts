@@ -98,6 +98,10 @@ import { cardanoSignTransaction } from './cardanoSignTransaction';
 import { filecoinGetAddress } from './filecoinGetAddress';
 import { filecoinSignTransaction } from './filecoinSignTransaction';
 
+import { polkadotGetAddress } from './polkadotGetAddress';
+import { polkadotGetPublicKey } from './polkadotGetPublicKey';
+import { polkadotSignTransaction } from './polkadotSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -262,4 +266,11 @@ export type CoreApi = {
    */
   filecoinGetAddress: typeof filecoinGetAddress;
   filecoinSignTransaction: typeof filecoinSignTransaction;
+
+  /**
+   * Polkadot function
+   */
+  polkadotGetAddress: typeof polkadotGetAddress;
+  polkadotGetPublicKey: typeof polkadotGetPublicKey;
+  polkadotSignTransaction: typeof polkadotSignTransaction;
 };
