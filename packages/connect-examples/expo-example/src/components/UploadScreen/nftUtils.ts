@@ -57,6 +57,20 @@ function getOriginX(originW: number, originH: number, scaleW: number, scaleH: nu
   return originX;
 }
 
+function getOriginY(originW: number, originH: number, scaleW: number, scaleH: number) {
+  const height = Math.ceil((scaleW / originW) * originH);
+  console.log(`image true height: `, height);
+  console.log(`image should height: `, scaleH);
+  console.log(`image true width: `, scaleW);
+  if (height <= scaleH) {
+    return null;
+  }
+  const originY = Math.ceil(Math.ceil(height / 2) - Math.ceil(scaleH / 2));
+  console.log(`originY: `, originY);
+  console.log(`crop size: height: ${scaleH}, width: ${scaleW}, , originX: 0, originY: ${originY}`);
+  return originY;
+}
+
 export const compressNFT = async (
   uri: string,
   width: number,
@@ -67,27 +81,51 @@ export const compressNFT = async (
 ) => {
   if (!uri) return;
   console.log(`width: ${width}, height: ${height}, originW: ${originW}, originH: ${originH}`);
-  const actions: Action[] = [
-    {
+  const aspectRatioLonger = originW > originH;
+  const aspectRatioEqueal = originW === originH;
+
+  const actions: Action[] = [];
+  if (!isThumbnail) {
+    actions.push({
+      resize: { width },
+    });
+  } else {
+    actions.push({
       resize: {
-        height: isThumbnail ? height : undefined,
-        width: isThumbnail ? undefined : width,
+        width: aspectRatioLonger ? undefined : width,
+        height: aspectRatioLonger ? height : undefined,
       },
-    },
-  ];
-  if (isThumbnail) {
-    const originX = getOriginX(originW, originH, width, height);
-    if (originX !== null) {
-      actions.push({
-        crop: {
-          height,
-          width,
-          originX,
-          originY: 0,
-        },
-      });
+    });
+  }
+
+  if (isThumbnail && !aspectRatioEqueal) {
+    if (aspectRatioLonger) {
+      const originX = getOriginX(originW, originH, width, height);
+      if (originX !== null) {
+        actions.push({
+          crop: {
+            height,
+            width,
+            originX,
+            originY: 0,
+          },
+        });
+      }
+    } else {
+      const originY = getOriginY(originW, originH, width, height);
+      if (originY !== null) {
+        actions.push({
+          crop: {
+            height,
+            width,
+            originX: 0,
+            originY,
+          },
+        });
+      }
     }
   }
+
   const imageResult = await manipulateAsync(uri, actions, {
     compress: 0.9,
     format: SaveFormat.JPEG,
@@ -113,7 +151,7 @@ export const generateUploadNFTParams = async (
   const data = await compressNFT(uri, 480, 800, width, height, false);
   const zoomData = await compressNFT(uri, 238, 238, width, height, true);
 
-  cb?.(data as any);
+  cb?.(zoomData as any);
 
   if (!data?.arrayBuffer && !zoomData?.arrayBuffer) return;
 
@@ -125,14 +163,11 @@ export const generateUploadNFTParams = async (
 
   const metaData = {
     header: 'Hello onekey',
-    // subheader: 'Hello NFT',
-    subheader:
-      'javascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascriptjavascript',
+    subheader: 'Hello NFT',
     network: 'BNB Chain',
     owner: '0x1234',
   };
   let metadataBuf = Buffer.from(JSON.stringify(metaData));
-  console.log('1');
   if (metadataBuf.length > 1024 * 2) {
     metaData.subheader = '';
     metadataBuf = Buffer.from(JSON.stringify(metaData));

@@ -285,7 +285,10 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
             />
           )}
           {previewData && (
-            <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />
+            // NFT
+            <Image style={{ height: 238, width: 238 }} source={{ uri: previewData }} />
+            // HOME SCREEN
+            // <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />
           )}
         </View>
       )}
