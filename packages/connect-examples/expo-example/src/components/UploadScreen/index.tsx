@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Platform, Button, View, Text, StyleSheet, TextInput, Image } from 'react-native';
 import { bytesToHex } from '@noble/hashes/utils';
 import { Picker } from '@react-native-picker/picker';
@@ -8,6 +8,7 @@ import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 import { DeviceUploadResourceParams, CoreApi, CommonParams, KnownDevice } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
+import { getImageSize, imageToBase64, formatBytes, generateUploadNFTParams } from './nftUtils';
 
 interface Props {
   SDK: CoreApi;
@@ -114,18 +115,6 @@ export const compressHomescreen = async (
   };
 };
 
-function formatBytes(bytes: number, decimals = 2) {
-  if (!+bytes) return '0 Bytes';
-
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
-}
-
 function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Props) {
   const [uploadScreenParams, setUploadScreenParams] = useState<UploadResourceParams>({
     resType: 0,
@@ -133,6 +122,43 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
 
   const [image, setImage] = useState<ImagePicker.ImageInfo | null>(null);
   const [previewData, setPreviewData] = useState<string | null>(null);
+  const [nftUrl, setNftUrl] = useState('');
+
+  useEffect(() => {
+    // generate nft data
+    if (nftUrl) {
+      const imageUrl = nftUrl;
+      (async () => {
+        const { width, height } = await getImageSize(imageUrl);
+        console.log('image size: ', { width, height });
+        const base64 = await imageToBase64(imageUrl);
+        console.log(base64);
+
+        let uploadResParams: DeviceUploadResourceParams | undefined;
+        try {
+          uploadResParams = await generateUploadNFTParams(base64, width, height, data => {
+            setImage({ uri: base64 } as any);
+            setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+          });
+        } catch (e) {
+          console.log('image operate error: ', e);
+          return;
+        }
+
+        if (uploadResParams) {
+          const response = await SDK.deviceUploadResource(
+            type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
+            {
+              ...commonParams,
+              ...uploadResParams,
+            }
+          );
+          console.log('example firmwareUpdate response: ', response);
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nftUrl]);
 
   const handleScreenUpdate = async () => {
     // setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
@@ -228,6 +254,16 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
             }}
           />
         </View>
+        <View style={styles.item}>
+          <Text>NFT URL</Text>
+          <TextInput
+            style={styles.input}
+            value={nftUrl}
+            onChangeText={v => {
+              setNftUrl(v);
+            }}
+          />
+        </View>
         <Button title="Upload File" onPress={() => handleScreenUpdate()} />
         {Platform.OS === 'web' && (
           <View style={styles.item}>
@@ -240,9 +276,19 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
       </View>
       {Platform.OS === 'web' && (
         <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-          {image && <Image style={{ height: 800, width: 480 }} source={{ uri: image.uri }} />}
+          {image && (
+            <Image
+              style={{ height: 800, width: 480 }}
+              source={{ uri: image.uri }}
+              // this resize mode for nft
+              resizeMode="contain"
+            />
+          )}
           {previewData && (
-            <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />
+            // NFT
+            <Image style={{ height: 238, width: 238 }} source={{ uri: previewData }} />
+            // HOME SCREEN
+            // <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />
           )}
         </View>
       )}
