@@ -177,8 +177,13 @@ export class DeviceCommands {
         error = ERRORS.TypedError(HardwareErrorCode.PinCancelled);
       }
 
-      if (code === 'Failure_DataError' && message === 'Please confirm the BlindSign enabled') {
-        error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
+      if (code === 'Failure_DataError') {
+        if (message === 'Please confirm the BlindSign enabled') {
+          error = ERRORS.TypedError(HardwareErrorCode.BlindSignDisabled);
+        }
+        if (message === 'File already exists') {
+          error = ERRORS.TypedError(HardwareErrorCode.FileAlreadyExists);
+        }
       }
 
       if (code === 'Failure_UnexpectedMessage' && callType === 'PassphraseAck') {
