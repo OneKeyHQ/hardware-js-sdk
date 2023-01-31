@@ -1,3 +1,5 @@
+import semver from 'semver';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { bytesToHex } from '@noble/hashes/utils';
 import { ResourceUpload, Success } from '@onekeyfe/hd-transport';
 import { blake2s } from '@noble/hashes/blake2s';
@@ -7,6 +9,9 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { hexToBytes } from '../helpers/hexUtils';
 import { createUiMessage, UI_REQUEST } from '../../events';
+import { getDeviceType } from '../../utils';
+import { getDeviceFirmwareVersion } from '../../utils/deviceFeaturesUtils';
+import { PROTO } from '../../constants';
 
 export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
   paramsData = {
@@ -20,6 +25,22 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
         min: '3.2.0',
       },
     };
+  }
+
+  checkUploadNFTSupport() {
+    const deviceType = getDeviceType(this.device.features);
+    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    if (deviceType !== 'touch') {
+      throw ERRORS.TypedError(HardwareErrorCode.CallMethodError, 'Device Not Support Upload NFT');
+    }
+
+    if (semver.lt(currentVersion, '4.1.0')) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+        `Device firmware version is too low, please update to 4.1.0`,
+        { current: currentVersion, require: '4.1.0' }
+      );
+    }
   }
 
   init() {
@@ -101,6 +122,10 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
   };
 
   async run() {
+    if (this.payload.resType === PROTO.ResourceType.Nft) {
+      this.checkUploadNFTSupport();
+    }
+
     const res = await this.device.commands.typedCall(
       'ResourceUpload',
       ['ResourceRequest', 'ZoomRequest', 'Success'],
