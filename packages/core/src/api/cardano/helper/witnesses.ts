@@ -7,7 +7,6 @@ export const gatherWitnessPaths = (
   certificatesWithPoolOwnersAndRelays: CertificateWithPoolOwnersAndRelays[],
   withdrawals: PROTO.CardanoTxWithdrawal[],
   collateralInputsWithPath: CollateralInputWithPath[],
-  // @ts-expect-error
   requiredSigners: PROTO.CardanoTxRequiredSigner[],
   additionalWitnessRequests: Path[],
   signingMode: PROTO.CardanoTxSigningMode
@@ -43,7 +42,6 @@ export const gatherWitnessPaths = (
   }
 
   // gather Plutus-related paths
-  // @ts-expect-error
   if (signingMode === PROTO.CardanoTxSigningMode.PLUTUS_TRANSACTION) {
     collateralInputsWithPath.forEach(({ path }) => {
       if (path) _insert(path);

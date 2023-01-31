@@ -31,7 +31,7 @@ export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyPara
         derivation_type:
           typeof batch.derivationType !== 'undefined'
             ? batch.derivationType
-            : PROTO.CardanoDerivationType.ICARUS_TREZOR,
+            : PROTO.CardanoDerivationType.ICARUS,
         show_display: typeof batch.showOnOneKey === 'boolean' ? batch.showOnOneKey : false,
       };
     });
@@ -40,7 +40,10 @@ export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyPara
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.10.0',
+        min: '2.11.0',
+      },
+      model_touch: {
+        min: '4.1.0',
       },
     };
   }

@@ -94,6 +94,7 @@ import { suiSignTransaction } from './suiSignTransaction';
 import { cardanoGetAddress } from './cardanoGetAddress';
 import { cardanoGetPublicKey } from './cardanoGetPublicKey';
 import { cardanoSignTransaction } from './cardanoSignTransaction';
+import { cardanoSignMessage } from './cardanoSignMessage';
 
 import { filecoinGetAddress } from './filecoinGetAddress';
 import { filecoinSignTransaction } from './filecoinSignTransaction';
@@ -256,6 +257,7 @@ export type CoreApi = {
   cardanoGetAddress: typeof cardanoGetAddress;
   cardanoGetPublicKey: typeof cardanoGetPublicKey;
   cardanoSignTransaction: typeof cardanoSignTransaction;
+  cardanoSignMessage: typeof cardanoSignMessage;
 
   /**
    * Filecoin function
