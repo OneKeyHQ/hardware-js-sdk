@@ -31,6 +31,7 @@ export type IFirmwareReleaseInfo = {
   resource?: string;
   /** Firmware full UI resource */
   fullResource?: string;
+  fullResourceRange?: string[];
   fingerprint: string;
   version: IVersionArray;
   changelog: {

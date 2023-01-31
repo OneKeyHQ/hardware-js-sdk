@@ -26,6 +26,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'showOnOneKey', type: 'boolean' },
+        { name: 'chainId', type: 'number' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
@@ -33,6 +34,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
       this.params.push({
         address_n: addressN,
         show_display: showOnOneKey,
+        chain_id: batch.chainId,
       });
     });
   }

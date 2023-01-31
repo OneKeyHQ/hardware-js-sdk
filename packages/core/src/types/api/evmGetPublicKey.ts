@@ -8,6 +8,7 @@ export type EVMPublicKey = {
 export type EVMGetPublicKeyParams = {
   path: string | number[];
   showOnOneKey?: boolean;
+  chainId?: number;
 };
 
 export declare function evmGetPublicKey(

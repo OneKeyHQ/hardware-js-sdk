@@ -10,7 +10,7 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
-import { getBinary, getSysResourceBinary } from './firmware/getBinary';
+import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
 import { getDeviceType, getDeviceUUID, wait, getLogger, LoggerNames } from '../utils';
 import { createUiMessage } from '../events/ui-request';
@@ -149,14 +149,22 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
    * needs to be upgraded via the desktop
    */
   checkVersionForCopyTouchResource(features?: Features) {
+    if (!features) return;
     const deviceType = getDeviceType(features);
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
     const targetVersion = this.params.version?.join('.');
     const { updateType } = this.params;
+
+    const releaseInfo = getInfo({ features, updateType });
+    if (!releaseInfo) return;
+    const { fullResourceRange } = releaseInfo;
+    if (!fullResourceRange) return;
+
+    const [minVersion, limitVersion] = fullResourceRange;
     if (deviceType === 'touch' && updateType === 'firmware' && targetVersion) {
       if (
-        semver.lt(currentVersion, '3.5.0') &&
-        semver.gte(targetVersion, '3.5.0') &&
+        semver.lt(currentVersion, minVersion) &&
+        semver.gte(targetVersion, limitVersion) &&
         this.payload.platform !== 'desktop'
       ) {
         throw ERRORS.TypedError(HardwareErrorCode.UseDesktopToUpdateFirmware);

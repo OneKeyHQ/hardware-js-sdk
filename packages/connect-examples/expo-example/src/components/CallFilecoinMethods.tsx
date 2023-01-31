@@ -25,6 +25,7 @@ export function CallFilecoinMethods({
           options={[
             { name: 'path', value: "m/44'/461'/0'/0/0", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
+            { name: 'isTestnet', value: true, type: 'boolean' },
           ]}
           onCall={data => SDK.filecoinGetAddress(connectId, deviceId, { ...commonParams, ...data })}
         />
@@ -32,6 +33,7 @@ export function CallFilecoinMethods({
           title="filecoinSignTransaction"
           options={[
             { name: 'path', value: "m/44'/461'/0'/0/0", type: 'string' },
+            { name: 'isTestnet', value: true, type: 'boolean' },
             {
               name: 'rawTx',
               value:

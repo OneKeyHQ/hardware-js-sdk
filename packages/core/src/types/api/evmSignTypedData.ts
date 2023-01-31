@@ -32,6 +32,7 @@ export type EVMSignTypedDataParams = {
   data: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
   domainHash?: string;
   messageHash?: string;
+  chainId?: number;
 };
 
 export declare function evmSignTypedData(
