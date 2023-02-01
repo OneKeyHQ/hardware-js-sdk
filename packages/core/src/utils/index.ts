@@ -8,6 +8,7 @@ export {
   getDeviceUUID,
   getDeviceLabel,
   getFirmwareUpdateField,
+  supportInputPinOnSoftware,
 } from './deviceFeaturesUtils';
 export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pathUtils';
 
