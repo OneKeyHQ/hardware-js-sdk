@@ -3045,6 +3045,11 @@
   resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-0.0.17.tgz#0c88c1a2febac44ec1600e0e59da732579cbd045"
   integrity sha512-QqjIPXQHb3UG9w79ujjL5L5Qd6oCrymQ/x2J2rYICtr56G6shHTmUvRZxAvne0ZsLv8UBGqZWbepVdnPipehYQ==
 
+"@onekeyfe/react-native-ble-plx@3.0.0":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-plx/-/react-native-ble-plx-3.0.0.tgz#508f40eb8d0b0ee3b81f3a2ec5ff7f23a9d6f24b"
+  integrity sha512-YckXy6XiOcd6a/J7HMcXi+GFDhtBTpN+12FfukJNINwJQxYxWpo1RHgzaa5Rxpx6LQ/f8yC/YEQC48HqZq4b7A==
+
 "@protobufjs/aspromise@^1.1.1", "@protobufjs/aspromise@^1.1.2":
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/@protobufjs/aspromise/-/aspromise-1.1.2.tgz#9b8b0cc663d669a7d8f6f5d0893a14d348f30fbf"
@@ -12239,11 +12244,6 @@ react-native-ble-manager@^8.3.0:
   version "8.3.0"
   resolved "https://registry.yarnpkg.com/react-native-ble-manager/-/react-native-ble-manager-8.3.0.tgz#851ab14ff33d9cbc9fd86d6c1f5938952f5c1c61"
   integrity sha512-h98Fp5Dn7Tfb9key4zZRD0BBc+K6KaYE+OmqmPo6asuQK6lheRT0vxuLli7hY4XQQQO3V+MQ8lkSflKgAgnUwQ==
-
-react-native-ble-plx@^2.0.3:
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/react-native-ble-plx/-/react-native-ble-plx-2.0.3.tgz#b0a746f33389dbf7fd7b158513330d487d5d0fbb"
-  integrity sha512-62LRDBPf/03K7sge+qq2ZuF8PWCGB782G+SBrpgNm5fA5Hs3FCY1ExTJZ1G0tB5ZhBPYEXcKRxPLuFegcDFrqA==
 
 react-native-codegen@^0.0.17:
   version "0.0.17"

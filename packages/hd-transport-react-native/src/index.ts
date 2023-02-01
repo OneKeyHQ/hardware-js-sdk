@@ -6,7 +6,7 @@ import {
   BleErrorCode,
   Characteristic,
   ScanMode,
-} from 'react-native-ble-plx';
+} from '@onekeyfe/react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
 import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
