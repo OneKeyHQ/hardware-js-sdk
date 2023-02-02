@@ -3,10 +3,13 @@ import type { CommonParams, Response } from '../params';
 
 export type PolkadotAddress = {
   path: string;
+  publicKey: string;
 } & HardwarePolkadotAddress;
 
 export type PolkadotGetAddressParams = {
   path: string | number[];
+  prefix: number;
+  network: string;
   showOnOneKey?: boolean;
 };
 

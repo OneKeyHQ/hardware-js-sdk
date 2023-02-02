@@ -7029,9 +7029,19 @@
             "packed": false
           }
         },
+        "prefix": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "network": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        },
         "show_display": {
           "type": "bool",
-          "id": 3
+          "id": 4
         }
       }
     },
@@ -7061,6 +7071,11 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "network": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
         }
       }
     },

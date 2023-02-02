@@ -31,7 +31,7 @@ const needPublishLibrary = [
 needPublishLibrary.forEach((library, index) => {
   console.log(chalk.green(`2.${index + 1} publish 「${library}」...`));
   shell.cd(`../${library}`);
-  shell.exec('yalc publish --changed');
+  shell.exec('yalc publish --replace --changed');
 });
 
 console.log(chalk.green('3. Done'));

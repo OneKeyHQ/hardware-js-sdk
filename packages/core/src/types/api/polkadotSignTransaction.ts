@@ -7,6 +7,7 @@ export type PolkadotSignedTx = {
 
 export type PolkadotSignTransactionParams = {
   path: string | number[];
+  network: string;
   rawTx?: string;
 };
 

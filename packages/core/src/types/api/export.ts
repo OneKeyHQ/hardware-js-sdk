@@ -122,5 +122,4 @@ export type { FilecoinAddress, FilecoinGetAddressParams } from './filecoinGetAdd
 export type { FilecoinSignTransactionParams, FilecoinSignedTx } from './filecoinSignTransaction';
 
 export type { PolkadotAddress, PolkadotGetAddressParams } from './polkadotGetAddress';
-export type { PolkadotPublicKey, PolkadotGetPublicKeyParams } from './polkadotGetPublicKey';
 export type { PolkadotSignedTx, PolkadotSignTransactionParams } from './polkadotSignTransaction';

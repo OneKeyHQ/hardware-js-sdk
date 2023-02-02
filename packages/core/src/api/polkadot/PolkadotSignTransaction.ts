@@ -15,15 +15,17 @@ export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadot
     // check payload
     validateParams(this.payload, [
       { name: 'path', required: true },
+      { name: 'network', required: true },
       { name: 'rawTx', type: 'hexString', required: true },
     ]);
 
     // init params
-    const { path, rawTx } = this.payload as PolkadotSignTransactionParams;
+    const { path, rawTx, network } = this.payload as PolkadotSignTransactionParams;
     const addressN = validatePath(path, 3);
 
     this.params = {
       address_n: addressN,
+      network,
       raw_tx: formatAnyHex(rawTx),
     };
   }

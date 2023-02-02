@@ -24,6 +24,8 @@ export function CallPolkadotMethods({
           title="polkadotGetAddress"
           options={[
             { name: 'path', value: "m/44'/354'/0'/0'/0'", type: 'string' },
+            { name: 'prefix', value: '0', type: 'number' },
+            { name: 'network', value: 'polkadot', type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
           onCall={data => SDK.polkadotGetAddress(connectId, deviceId, { ...commonParams, ...data })}
@@ -36,29 +38,68 @@ export function CallPolkadotMethods({
             SDK.polkadotGetAddress(connectId, deviceId, {
               ...commonParams,
               bundle: [
-                { path: "m/44'/354'/0'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/1'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/2'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/3'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/4'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/5'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/6'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/7'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/8'/0'/0'", showOnOneKey: false },
-                { path: "m/44'/354'/9'/0'/0'", showOnOneKey: false },
+                {
+                  path: "m/44'/354'/0'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/1'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/2'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/3'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/4'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/5'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/6'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/7'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/8'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/354'/9'/0'/0'",
+                  prefix: 0,
+                  network: 'polkadot',
+                  showOnOneKey: false,
+                },
               ],
             })
-          }
-        />
-
-        <MethodInvoke
-          title="polkadotGetPublicKey"
-          options={[
-            { name: 'path', value: "m/44'/354'/0'/0'/0'", type: 'string' },
-            { name: 'showOnOneKey', value: false, type: 'boolean' },
-          ]}
-          onCall={data =>
-            SDK.polkadotGetPublicKey(connectId, deviceId, { ...commonParams, ...data })
           }
         />
 

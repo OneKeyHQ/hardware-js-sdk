@@ -2277,6 +2277,8 @@ export type NEMDecryptedMessage = {
 // PolkadotGetAddress
 export type PolkadotGetAddress = {
   address_n: number[];
+  prefix: number;
+  network: string;
   show_display?: boolean;
 };
 
@@ -2290,6 +2292,7 @@ export type PolkadotAddress = {
 export type PolkadotSignTx = {
   address_n: number[];
   raw_tx: string;
+  network: string;
 };
 
 // PolkadotSignedTx

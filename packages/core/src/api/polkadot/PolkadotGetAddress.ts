@@ -1,11 +1,11 @@
-import { CosmosGetAddress as HardwareCosmosGetAddress } from '@onekeyfe/hd-transport';
+import { PolkadotGetAddress as HardwarePolkadotGetAddress } from '@onekeyfe/hd-transport';
 
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
 
-export default class PolkadotGetAddress extends BaseMethod<HardwareCosmosGetAddress[]> {
+export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAddress[]> {
   hasBundle = false;
 
   init() {
@@ -25,13 +25,18 @@ export default class PolkadotGetAddress extends BaseMethod<HardwareCosmosGetAddr
 
       validateParams(batch, [
         { name: 'path', required: true },
+        { name: 'prefix', required: true },
+        { name: 'network', required: true },
         { name: 'showOnOneKey', type: 'boolean' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
+      const { prefix, network } = batch;
 
       this.params.push({
         address_n: addressN,
+        prefix,
+        network,
         show_display: showOnOneKey,
       });
     });
@@ -63,7 +68,7 @@ export default class PolkadotGetAddress extends BaseMethod<HardwareCosmosGetAddr
       responses.push({
         path: serializedPath(param.address_n),
         address,
-        publicKey: public_key,
+        publicKey: public_key ?? '',
       });
     }
 
