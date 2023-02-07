@@ -45,7 +45,7 @@ export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAd
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.10.0',
+        min: '2.11.0',
       },
       model_touch: {
         min: '4.1.0',
