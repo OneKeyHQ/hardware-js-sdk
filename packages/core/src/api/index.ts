@@ -94,3 +94,6 @@ export { default as cardanoSignMessage } from './cardano/CardanoSignMessage';
 
 export { default as filecoinGetAddress } from './filecoin/FilecoinGetAddress';
 export { default as filecoinSignTransaction } from './filecoin/FilecoinSignTransaction';
+
+export { default as polkadotGetAddress } from './polkadot/PolkadotGetAddress';
+export { default as polkadotSignTransaction } from './polkadot/PolkadotSignTransaction';

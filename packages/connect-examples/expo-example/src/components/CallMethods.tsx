@@ -34,6 +34,7 @@ import { CallXrpMethods } from './CallXrpMethods';
 import { CallSuiMethods } from './CallSuiMethods';
 import { CallCardanoMethods } from './CallCardanoMethods';
 import { CallFilecoinMethods } from './CallFilecoinMethods';
+import { CallPolkadotMethods } from './CallPolkadotMethods';
 
 let registerListener = false;
 
@@ -357,6 +358,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallXrpMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallSuiMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallFilecoinMethods
+        SDK={SDK}
+        selectedDevice={selectedDevice}
+        commonParams={optionalParams}
+      />
+      <CallPolkadotMethods
         SDK={SDK}
         selectedDevice={selectedDevice}
         commonParams={optionalParams}

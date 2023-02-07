@@ -2277,18 +2277,22 @@ export type NEMDecryptedMessage = {
 // PolkadotGetAddress
 export type PolkadotGetAddress = {
   address_n: number[];
+  prefix: number;
+  network: string;
   show_display?: boolean;
 };
 
 // PolkadotAddress
 export type PolkadotAddress = {
   address?: string;
+  public_key?: string;
 };
 
 // PolkadotSignTx
 export type PolkadotSignTx = {
   address_n: number[];
   raw_tx: string;
+  network: string;
 };
 
 // PolkadotSignedTx
@@ -3168,5 +3172,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;
