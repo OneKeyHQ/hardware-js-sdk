@@ -36,7 +36,7 @@ export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadot
         min: '2.11.0',
       },
       model_touch: {
-        min: '4.1.0',
+        min: '4.2.0',
       },
     };
   }
