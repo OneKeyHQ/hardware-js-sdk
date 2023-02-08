@@ -1,4 +1,4 @@
-import { Device, Characteristic } from 'react-native-ble-plx';
+import { Device, Characteristic } from '@onekeyfe/react-native-ble-plx';
 
 export default class BleTransport {
   id: string;
