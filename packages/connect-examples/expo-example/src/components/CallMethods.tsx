@@ -336,7 +336,6 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         commonParams={optionalParams}
       />
 
-      <CallCardanoMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
@@ -356,6 +355,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       <CallAlgoMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallCosmosMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallXrpMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallCardanoMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallSuiMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallFilecoinMethods
         SDK={SDK}
