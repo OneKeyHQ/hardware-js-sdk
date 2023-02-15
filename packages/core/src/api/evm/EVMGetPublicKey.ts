@@ -4,15 +4,19 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { EVMGetPublicKeyParams, EVMPublicKey } from '../../types/api/evmGetPublicKey';
+import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 
 export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> {
   hasBundle = false;
+
+  useBatch = false;
 
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
+    this.useBatch = !!this.payload?.useBatch;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
     // check payload
@@ -42,6 +46,18 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
   async run() {
     const responses: EVMPublicKey[] = [];
 
+    if (this.useBatch && this.hasBundle && supportBatchPublicKey(this.device?.features)) {
+      const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
+        paths: this.params,
+        ecdsa_curve_name: 'secp256k1',
+      });
+      const result = res.message.public_keys.map((publicKey: string, index: number) => ({
+        path: serializedPath((this.params as unknown as any[])[index].address_n),
+        publicKey,
+      }));
+      return Promise.resolve(result);
+    }
+
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
@@ -55,6 +71,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
 
       responses.push({
         path: serializedPath(param.address_n),
+        publicKey: res.message.node.public_key,
         ...res.message,
       });
     }
