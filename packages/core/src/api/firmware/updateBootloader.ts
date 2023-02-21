@@ -17,7 +17,3 @@ export function checkNeedUpdateBoot(features: Features) {
     semver.lte(bootloaderVersion, '2.4.0')
   );
 }
-
-function prepareUpdateBoot() {
-  // TODO: get bootloader url
-}

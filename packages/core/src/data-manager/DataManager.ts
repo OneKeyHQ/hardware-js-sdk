@@ -21,7 +21,7 @@ import type {
 } from '../types';
 import { getReleaseChangelog, getReleaseStatus, findLatestRelease } from '../utils/release';
 
-type FirmwareField = 'firmware' | 'firmware-v2';
+type FirmwareField = 'firmware' | 'firmware-v3';
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap = {

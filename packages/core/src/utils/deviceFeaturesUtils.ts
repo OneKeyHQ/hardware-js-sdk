@@ -165,7 +165,7 @@ export const supportModifyHomescreen = (features?: Features): SupportFeatureType
 };
 
 /**
- *  Since 3.5.0, Touch uses the firmware-v2 field to get firmware release info
+ *  Since 3.5.0, Touch uses the firmware-v3 field to get firmware release info
  */
 export const getFirmwareUpdateField = (features: Features, updateType: 'firmware' | 'ble') => {
   const deviceType = getDeviceType(features);
@@ -176,7 +176,7 @@ export const getFirmwareUpdateField = (features: Features, updateType: 'firmware
 
   if (deviceType === 'touch') {
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
-    return 'firmware-v2';
+    return 'firmware-v3';
   }
   return 'firmware';
 };
