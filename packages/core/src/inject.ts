@@ -96,6 +96,7 @@ export const inject = ({
     deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
     deviceFullyUploadResource: connectId =>
       call({ connectId, method: 'deviceFullyUploadResource' }),
+    deviceUpdateBootloader: connectId => call({ connectId, method: 'deviceUpdateBootloader' }),
     getPassphraseState: (connectId, params) =>
       call({ ...params, connectId, method: 'getPassphraseState' }),
 

@@ -21,6 +21,7 @@ export { default as deviceSupportFeatures } from './device/DeviceSupportFeatures
 export { default as deviceVerify } from './device/DeviceVerify';
 export { default as deviceWipe } from './device/DeviceWipe';
 export { default as deviceFullyUploadResource } from './device/DeviceFullyUploadResource';
+export { default as deviceUpdateBootloader } from './device/DeviceUpdateBootloader';
 
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';

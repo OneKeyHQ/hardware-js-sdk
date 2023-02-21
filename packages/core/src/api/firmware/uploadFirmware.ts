@@ -158,7 +158,8 @@ export const updateResources = async (
   typedCall: TypedCall,
   postMessage: (message: CoreMessage) => void,
   device: Device,
-  source: ArrayBuffer
+  source: ArrayBuffer,
+  isUpdateBoot = false
 ) => {
   postProgressTip(device, 'UpdateSysResource', postMessage);
 
@@ -169,7 +170,7 @@ export const updateResources = async (
   const stepProgress = 100 / files.length;
 
   for (const [fileName, file] of files) {
-    const name = fileName.split('/').pop();
+    const name = isUpdateBoot ? 'bootloader.bin' : fileName.split('/').pop();
     if (!file.dir && fileName.indexOf('__MACOSX') === -1 && name) {
       const data = await file.async('arraybuffer');
       await updateResource(typedCall, name, data);

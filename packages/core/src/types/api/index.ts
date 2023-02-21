@@ -29,6 +29,7 @@ import { deviceUpdateReboot } from './deviceUpdateReboot';
 import { deviceUploadResource } from './deviceUploadResource';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
 import { deviceFullyUploadResource } from './deviceFullyUploadResource';
+import { deviceUpdateBootloader } from './deviceUpdateBootloader';
 
 import { cipherKeyValue } from './cipherKeyValue';
 
@@ -147,6 +148,7 @@ export type CoreApi = {
   deviceVerify: typeof deviceVerify;
   deviceWipe: typeof deviceWipe;
   deviceFullyUploadResource: typeof deviceFullyUploadResource;
+  deviceUpdateBootloader: typeof deviceUpdateBootloader;
   checkFirmwareRelease: typeof checkFirmwareRelease;
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;
