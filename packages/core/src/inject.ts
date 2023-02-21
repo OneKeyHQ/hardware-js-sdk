@@ -73,6 +73,8 @@ export const inject = ({
      */
     checkBridgeStatus: () => call({ method: 'checkBridgeStatus' }),
 
+    checkBootloaderRelease: connectId => call({ connectId, method: 'checkBootloaderRelease' }),
+
     cipherKeyValue: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
 

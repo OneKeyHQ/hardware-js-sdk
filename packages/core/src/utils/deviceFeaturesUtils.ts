@@ -95,6 +95,14 @@ export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray |
   return features.ble_ver.split('.') as unknown as IVersionArray;
 };
 
+export const getDeviceBootloaderVersion = (features: Features): IVersionArray => {
+  if (!features.bootloader_version) return [0, 0, 0];
+  if (semver.valid(features.bootloader_version)) {
+    return features.bootloader_version.split('.') as unknown as IVersionArray;
+  }
+  return [0, 0, 0];
+};
+
 export const supportInputPinOnSoftware = (features: Features): SupportFeatureType => {
   if (!features) return { support: false };
 

@@ -32,6 +32,7 @@ export type IFirmwareReleaseInfo = {
   /** Firmware full UI resource */
   fullResource?: string;
   fullResourceRange?: string[];
+  bootloaderResource?: string;
   fingerprint: string;
   version: IVersionArray;
   changelog: {
