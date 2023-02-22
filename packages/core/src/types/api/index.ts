@@ -5,6 +5,7 @@ import { init } from './init';
 import { getLogs } from './getLogs';
 import { checkTransportRelease } from './checkTransportRelease';
 import { checkBridgeStatus } from './checkBridgeStatus';
+import { checkBootloaderRelease } from './checkBootloaderRelease';
 
 import { searchDevices } from './searchDevices';
 import { getFeatures } from './getFeatures';
@@ -28,6 +29,7 @@ import { deviceUpdateReboot } from './deviceUpdateReboot';
 import { deviceUploadResource } from './deviceUploadResource';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
 import { deviceFullyUploadResource } from './deviceFullyUploadResource';
+import { deviceUpdateBootloader } from './deviceUpdateBootloader';
 
 import { cipherKeyValue } from './cipherKeyValue';
 
@@ -123,6 +125,7 @@ export type CoreApi = {
    */
   checkTransportRelease: typeof checkTransportRelease;
   checkBridgeStatus: typeof checkBridgeStatus;
+  checkBootloaderRelease: typeof checkBootloaderRelease;
 
   /**
    * Device function
@@ -145,6 +148,7 @@ export type CoreApi = {
   deviceVerify: typeof deviceVerify;
   deviceWipe: typeof deviceWipe;
   deviceFullyUploadResource: typeof deviceFullyUploadResource;
+  deviceUpdateBootloader: typeof deviceUpdateBootloader;
   checkFirmwareRelease: typeof checkFirmwareRelease;
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;

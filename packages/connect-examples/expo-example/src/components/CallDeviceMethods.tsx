@@ -118,6 +118,12 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
           options={[]}
           onCall={() => SDK.deviceSupportFeatures(connectId)}
         />
+
+        <MethodInvoke
+          title="deviceUpdateBootloader"
+          options={[]}
+          onCall={() => SDK.deviceUpdateBootloader(connectId)}
+        />
       </View>
     </View>
   );

@@ -6,6 +6,7 @@ export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
 export { default as checkTransportRelease } from './CheckTransportRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';
+export { default as checkBootloaderRelease } from './CheckBootloaderRelease';
 export { default as deviceBackup } from './device/DeviceBackup';
 export { default as deviceChangePin } from './device/DeviceChangePin';
 export { default as deviceFlags } from './device/DeviceFlags';
@@ -20,6 +21,7 @@ export { default as deviceSupportFeatures } from './device/DeviceSupportFeatures
 export { default as deviceVerify } from './device/DeviceVerify';
 export { default as deviceWipe } from './device/DeviceWipe';
 export { default as deviceFullyUploadResource } from './device/DeviceFullyUploadResource';
+export { default as deviceUpdateBootloader } from './device/DeviceUpdateBootloader';
 
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';

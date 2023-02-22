@@ -73,6 +73,8 @@ export const inject = ({
      */
     checkBridgeStatus: () => call({ method: 'checkBridgeStatus' }),
 
+    checkBootloaderRelease: connectId => call({ connectId, method: 'checkBootloaderRelease' }),
+
     cipherKeyValue: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
 
@@ -94,6 +96,7 @@ export const inject = ({
     deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
     deviceFullyUploadResource: connectId =>
       call({ connectId, method: 'deviceFullyUploadResource' }),
+    deviceUpdateBootloader: connectId => call({ connectId, method: 'deviceUpdateBootloader' }),
     getPassphraseState: (connectId, params) =>
       call({ ...params, connectId, method: 'getPassphraseState' }),
 

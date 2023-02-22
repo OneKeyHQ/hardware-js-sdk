@@ -21,7 +21,7 @@ import type {
 } from '../types';
 import { getReleaseChangelog, getReleaseStatus, findLatestRelease } from '../utils/release';
 
-type FirmwareField = 'firmware' | 'firmware-v2';
+type FirmwareField = 'firmware' | 'firmware-v3';
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap = {
@@ -104,6 +104,17 @@ export default class DataManager {
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.fullResource);
 
     return findLatestRelease(targetDeviceConfig)?.fullResource;
+  };
+
+  static getBootloaderResource = (features: Features) => {
+    const deviceType = getDeviceType(features);
+
+    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
+    const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
+
+    return findLatestRelease(targetDeviceConfig)?.bootloaderResource;
   };
 
   static getFirmwareChangelog = (features: Features) => {
