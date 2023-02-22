@@ -1,4 +1,4 @@
-import { Deferred } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, Deferred } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
@@ -42,18 +42,27 @@ export default class DeviceUpdateBootloader extends BaseMethod {
           const resource = await getSysResourceBinary(resourceUrl);
           this.postTipMessage('DownloadLatestBootloaderResourceSuccess');
           if (resource) {
-            await updateBootloader(
-              this.device.getCommands().typedCall.bind(this.device.getCommands()),
-              this.postMessage,
-              device,
-              resource.binary
-            );
-            return Promise.resolve();
+            try {
+              await updateBootloader(
+                this.device.getCommands().typedCall.bind(this.device.getCommands()),
+                this.postMessage,
+                device,
+                resource.binary
+              );
+              return await Promise.resolve(true);
+            } catch (e) {
+              return Promise.reject(
+                ERRORS.TypedError(
+                  HardwareErrorCode.RuntimeError,
+                  `update bootloader error, err: ${e}`
+                )
+              );
+            }
           }
         }
       }
     }
 
-    return Promise.reject();
+    return Promise.resolve(true);
   }
 }
