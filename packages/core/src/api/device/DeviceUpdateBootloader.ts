@@ -2,9 +2,9 @@ import { Deferred } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
-import { updateResources } from '../firmware/uploadFirmware';
+import { updateBootloader } from '../firmware/uploadFirmware';
 import { createUiMessage } from '../../events/ui-request';
-import type { KnownDevice, Features } from '../../types';
+import type { KnownDevice } from '../../types';
 import { DataManager } from '../../data-manager';
 import { checkNeedUpdateBoot } from '../firmware/updateBootloader';
 
@@ -42,12 +42,11 @@ export default class DeviceUpdateBootloader extends BaseMethod {
           const resource = await getSysResourceBinary(resourceUrl);
           this.postTipMessage('DownloadLatestBootloaderResourceSuccess');
           if (resource) {
-            await updateResources(
+            await updateBootloader(
               this.device.getCommands().typedCall.bind(this.device.getCommands()),
               this.postMessage,
               device,
-              resource.binary,
-              true
+              resource.binary
             );
             return Promise.resolve();
           }
