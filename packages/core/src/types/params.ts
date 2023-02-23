@@ -17,6 +17,10 @@ export interface CommonParams {
    */
   passphraseState?: string;
   /**
+   * Use empty passphrase
+   */
+  useEmptyPassphrase?: boolean;
+  /**
    * Every init session
    */
   initSession?: boolean;

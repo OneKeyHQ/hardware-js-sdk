@@ -14,16 +14,15 @@ export default class DeviceUnlock extends BaseMethod {
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
 
     let { features } = this.device;
-    const locked = this.device?.features?.unlocked === true;
+    const unlocked = this.device?.features?.unlocked === true;
 
-    if (!locked) {
+    if (!unlocked) {
       await getPassphraseState(this.device.features, this.device.commands);
-    }
 
-    if (locked) {
       const { message } = await this.device.commands.typedCall('GetFeatures', 'Features', {});
       features = message;
     }
+
     return Promise.resolve(features);
   }
 }
