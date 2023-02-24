@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-web-sdk",
-  "version": "0.2.29",
+  "version": "0.2.30",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
@@ -21,10 +21,10 @@
   },
   "dependencies": {
     "@onekeyfe/cross-inpage-provider-core": "^0.0.17",
-    "@onekeyfe/hd-core": "^0.2.29",
-    "@onekeyfe/hd-shared": "^0.2.29",
-    "@onekeyfe/hd-transport-http": "^0.2.29",
-    "@onekeyfe/hd-transport-webusb": "^0.2.29"
+    "@onekeyfe/hd-core": "^0.2.30",
+    "@onekeyfe/hd-shared": "^0.2.30",
+    "@onekeyfe/hd-transport-http": "^0.2.30",
+    "@onekeyfe/hd-transport-webusb": "^0.2.30"
   },
   "devDependencies": {
     "@babel/plugin-proposal-optional-chaining": "^7.17.12",
