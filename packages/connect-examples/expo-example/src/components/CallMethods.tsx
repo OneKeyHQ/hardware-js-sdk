@@ -161,6 +161,11 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     console.log('example checkBootloader response: ', response);
   };
 
+  const handleUpdateBootloader = async () => {
+    const response = await SDK.deviceUpdateBootloader(selectedDevice?.connectId ?? '');
+    console.log('example deviceUpdateBootloader response: ', response);
+  };
+
   const handleFirmwareUpdate = async (file?: Uint8Array) => {
     const params: any = { updateType: firmwareType ? 'firmware' : 'ble' };
     if (file) {
@@ -242,6 +247,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         <Button title="getLogs" onPress={() => handleGetLogs()} />
         <Button title="getPassphraseState" onPress={() => handleGetPassphraseState()} />
         <Button title="requestWebUsbDevice" onPress={() => handleRequestWebUsbDevice()} />
+        <Button title="updateBootloader" onPress={() => handleUpdateBootloader()} />
       </View>
       {showPinInput && (
         <ReceivePin
