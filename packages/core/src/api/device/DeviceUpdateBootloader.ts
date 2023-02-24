@@ -42,22 +42,13 @@ export default class DeviceUpdateBootloader extends BaseMethod {
           const resource = await getSysResourceBinary(resourceUrl);
           this.postTipMessage('DownloadLatestBootloaderResourceSuccess');
           if (resource) {
-            try {
-              await updateBootloader(
-                this.device.getCommands().typedCall.bind(this.device.getCommands()),
-                this.postMessage,
-                device,
-                resource.binary
-              );
-              return await Promise.resolve(true);
-            } catch (e) {
-              return Promise.reject(
-                ERRORS.TypedError(
-                  HardwareErrorCode.RuntimeError,
-                  `update bootloader error, err: ${e}`
-                )
-              );
-            }
+            await updateBootloader(
+              this.device.getCommands().typedCall.bind(this.device.getCommands()),
+              this.postMessage,
+              device,
+              resource.binary
+            );
+            return Promise.resolve(true);
           }
         }
       }
