@@ -247,8 +247,10 @@ PODS:
     - glog
   - react-native-ble-manager (8.3.0):
     - React-Core
-  - react-native-ble-plx (2.0.3):
+  - react-native-ble-plx (3.0.0):
     - MultiplatformBleAdapter (= 0.1.9)
+    - React-Core
+  - react-native-randombytes (3.6.1):
     - React-Core
   - react-native-restart (0.0.24):
     - React-Core
@@ -365,7 +367,8 @@ DEPENDENCIES:
   - React-jsinspector (from `../../../../node_modules/react-native/ReactCommon/jsinspector`)
   - React-logger (from `../../../../node_modules/react-native/ReactCommon/logger`)
   - react-native-ble-manager (from `../node_modules/react-native-ble-manager`)
-  - react-native-ble-plx (from `../../../../node_modules/react-native-ble-plx`)
+  - "react-native-ble-plx (from `../../../../node_modules/@onekeyfe/react-native-ble-plx`)"
+  - react-native-randombytes (from `../../../../node_modules/react-native-randombytes`)
   - react-native-restart (from `../../../../node_modules/react-native-restart`)
   - react-native-safe-area-context (from `../../../../node_modules/react-native-safe-area-context`)
   - React-perflogger (from `../../../../node_modules/react-native/ReactCommon/reactperflogger`)
@@ -452,7 +455,9 @@ EXTERNAL SOURCES:
   react-native-ble-manager:
     :path: "../node_modules/react-native-ble-manager"
   react-native-ble-plx:
-    :path: "../../../../node_modules/react-native-ble-plx"
+    :path: "../../../../node_modules/@onekeyfe/react-native-ble-plx"
+  react-native-randombytes:
+    :path: "../../../../node_modules/react-native-randombytes"
   react-native-restart:
     :path: "../../../../node_modules/react-native-restart"
   react-native-safe-area-context:
@@ -523,7 +528,8 @@ SPEC CHECKSUMS:
   React-jsinspector: c5989c77cb89ae6a69561095a61cce56a44ae8e8
   React-logger: a0833912d93b36b791b7a521672d8ee89107aff1
   react-native-ble-manager: ea456961ad9fc43f82305645163b76125d3387f7
-  react-native-ble-plx: f10240444452dfb2d2a13a0e4f58d7783e92d76e
+  react-native-ble-plx: 4b0b605e4c52453ecbeb82807878bc4a2652d1c9
+  react-native-randombytes: 421f1c7d48c0af8dbcd471b0324393ebf8fe7846
   react-native-restart: 45c8dca02491980f2958595333cbccd6877cb57e
   react-native-safe-area-context: f98b0b16d1546d208fc293b4661e3f81a895afd9
   React-perflogger: a18b4f0bd933b8b24ecf9f3c54f9bf65180f3fe6
