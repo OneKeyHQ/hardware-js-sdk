@@ -90,11 +90,16 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
         if (isBleReconnect) {
-          await this.device.acquire();
-          await this.device.initialize();
-          if (this.device.features?.bootloader_mode) {
-            clearInterval(intervalTimer);
-            this.checkPromise?.resolve(true);
+          try {
+            await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id);
+            await this.device.initialize();
+            if (this.device.features?.bootloader_mode) {
+              clearInterval(intervalTimer);
+              this.checkPromise?.resolve(true);
+            }
+          } catch (e) {
+            // ignore error because of device is not connected
+            Log.log('catch Bluetooth error when device is restarting: ', e);
           }
         } else {
           const deviceDiff = await this.device.deviceConnector?.enumerate();

@@ -1,4 +1,4 @@
-import { ERRORS, HardwareErrorCode, Deferred } from '@onekeyfe/hd-shared';
+import { Deferred } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
