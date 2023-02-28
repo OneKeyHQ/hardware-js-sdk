@@ -61,6 +61,8 @@ export const getScriptType = (path: Array<number>): InputScriptType => {
       return 'SPENDP2SHWITNESS';
     case 84:
       return 'SPENDWITNESS';
+    case 86:
+      return 'SPENDTAPROOT';
     default:
       return 'SPENDADDRESS';
   }
