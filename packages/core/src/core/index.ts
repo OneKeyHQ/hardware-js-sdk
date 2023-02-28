@@ -133,10 +133,7 @@ export const callAPI = async (message: CoreMessage) => {
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
-  device.on(
-    DEVICE.PASSPHRASE,
-    message.payload.useEmptyPassphrase ? onEmptyPassphraseHandler : onDevicePassphraseHandler
-  );
+  device.on(DEVICE.PASSPHRASE, onDevicePassphraseHandler);
   device.on(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
 
@@ -543,11 +540,7 @@ export const cancel = (connectId?: string) => {
 const checkPassphraseSafety = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
-  if (
-    features?.passphrase_protection === true &&
-    (method.payload.passphraseState == null || method.payload.passphraseState === '') &&
-    !method.payload.useEmptyPassphrase
-  ) {
+  if (features?.passphrase_protection === true && !method.payload.passphraseState) {
     DevicePool.clearDeviceCache(method.payload.connectId);
     throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
   }
@@ -564,7 +557,11 @@ const cleanup = () => {
 };
 
 const removeDeviceListener = (device: Device) => {
-  device.removeAllListeners();
+  device.removeListener(DEVICE.PIN, onDevicePinHandler);
+  device.removeListener(DEVICE.BUTTON, onDeviceButtonHandler);
+  device.removeListener(DEVICE.PASSPHRASE, onDevicePassphraseHandler);
+  device.removeListener(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
+  device.removeListener(DEVICE.FEATURES, onDeviceFeaturesHandler);
   DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
   // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 };
@@ -642,12 +639,6 @@ const onDevicePassphraseHandler = async (...[device, callback]: DeviceEvents['pa
     passphraseOnDevice,
     cache: save,
   });
-};
-
-const onEmptyPassphraseHandler = (...[_, callback]: DeviceEvents['passphrase']) => {
-  Log.debug('onEmptyPassphraseHandler');
-  // send as PassphrasePromptResponse
-  callback({ passphrase: '' });
 };
 
 const onEnterPassphraseOnDeviceHandler = (
