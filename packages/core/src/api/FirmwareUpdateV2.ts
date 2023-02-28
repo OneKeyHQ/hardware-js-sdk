@@ -91,7 +91,11 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       async () => {
         if (isBleReconnect) {
           try {
-            await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id);
+            await this.device.deviceConnector?.acquire(
+              this.device.originalDescriptor.id,
+              null,
+              true
+            );
             await this.device.initialize();
             if (this.device.features?.bootloader_mode) {
               clearInterval(intervalTimer);

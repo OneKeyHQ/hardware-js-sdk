@@ -73,13 +73,13 @@ export default class DeviceConnector {
     this.listening = false;
   }
 
-  async acquire(path: string, session?: string | null) {
+  async acquire(path: string, session?: string | null, forceCleanRunPromise?: boolean) {
     Log.debug('acquire', path, session);
     const env = DataManager.getSettings('env');
     try {
       let res;
       if (env === 'react-native') {
-        res = await this.transport.acquire({ uuid: path });
+        res = await this.transport.acquire({ uuid: path, forceCleanRunPromise });
       } else {
         res = await this.transport.acquire({ path, previous: session ?? null });
       }
