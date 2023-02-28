@@ -184,7 +184,7 @@ export default class ReactNativeBleTransport {
   }
 
   async acquire(input: BleAcquireInput) {
-    const { uuid } = input;
+    const { uuid, forceCleanRunPromise } = input;
 
     if (!uuid) {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
@@ -199,6 +199,14 @@ export default class ReactNativeBleTransport {
        */
       this.Log.debug('transport not be released, will release: ', uuid);
       await this.release(uuid);
+    }
+
+    if (forceCleanRunPromise && this.runPromise) {
+      this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise));
+      this.Log.debug(
+        'Force clean Bluetooth run promise, forceCleanRunPromise: ',
+        forceCleanRunPromise
+      );
     }
 
     const blePlxManager = await this.getPlxManager();
