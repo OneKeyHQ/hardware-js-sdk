@@ -18,6 +18,7 @@ import type {
   IDeviceFirmwareStatus,
   IDeviceBLEFirmwareStatus,
   ITransportStatus,
+  IVersionArray,
 } from '../types';
 import { getReleaseChangelog, getReleaseStatus, findLatestRelease } from '../utils/release';
 
@@ -115,6 +116,17 @@ export default class DataManager {
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
     return findLatestRelease(targetDeviceConfig)?.bootloaderResource;
+  };
+
+  static getBootloaderTargetVersion = (features: Features): IVersionArray | undefined => {
+    const deviceType = getDeviceType(features);
+
+    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
+    const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
+
+    return targetDeviceConfig?.[0]?.bootloaderVersion ?? undefined;
   };
 
   static getFirmwareChangelog = (features: Features) => {
