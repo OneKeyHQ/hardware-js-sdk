@@ -21,6 +21,7 @@ export type AcquireInput = {
   path?: string;
   previous?: string | null;
   uuid?: string;
+  forceCleanRunPromise?: boolean;
 };
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };

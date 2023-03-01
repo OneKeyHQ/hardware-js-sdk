@@ -251,6 +251,7 @@ export const HardwareErrorCode = {
   BleAlreadyConnected: 711,
   BleLocationServicesDisabled: 712,
   BleTimeoutError: 713,
+  BleForceCleanRunPromise: 714,
 
   /**
    * Hardware runtiome errors
@@ -403,6 +404,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleAlreadyConnected]: 'Already connected to device',
   [HardwareErrorCode.BleLocationServicesDisabled]: 'Location Services disabled',
   [HardwareErrorCode.BleTimeoutError]: 'The connection has timed out unexpectedly.',
+  [HardwareErrorCode.BleForceCleanRunPromise]: 'Force clean Bluetooth run promise',
 
   /**
    * Runtime Error

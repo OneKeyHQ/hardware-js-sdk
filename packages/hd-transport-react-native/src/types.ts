@@ -6,4 +6,5 @@ export type TransportOptions = {
 
 export type BleAcquireInput = {
   uuid: string;
+  forceCleanRunPromise?: boolean;
 };
