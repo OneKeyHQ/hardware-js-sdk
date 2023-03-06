@@ -65,6 +65,7 @@ export const getScriptType = (path: Array<number>): InputScriptType => {
     case 84:
       return 'SPENDWITNESS';
     case 86:
+    case 10025:
       return 'SPENDTAPROOT';
     default:
       return 'SPENDADDRESS';
@@ -87,6 +88,10 @@ export const getOutputScriptType = (path?: number[]): ChangeOutputScriptType => 
       return 'PAYTOP2SHWITNESS';
     case 84:
       return 'PAYTOWITNESS';
+    // 10025 - SLIP-25 https://github.com/satoshilabs/slips/blob/master/slip-0025.md#public-key-derivation
+    case 86:
+    case 10025:
+      return 'PAYTOTAPROOT';
     default:
       return 'PAYTOADDRESS';
   }
