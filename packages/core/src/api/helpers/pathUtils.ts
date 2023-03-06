@@ -50,6 +50,9 @@ export const isSegwitPath = (path: Array<number>): boolean =>
 export const isBech32Path = (path: Array<number>): boolean =>
   Array.isArray(path) && path[0] === toHardened(84);
 
+export const isTaprootPath = (path: number[] | undefined) =>
+  Array.isArray(path) && (path[0] === toHardened(86) || path[0] === toHardened(10025));
+
 export const getScriptType = (path: Array<number>): InputScriptType => {
   if (!Array.isArray(path) || path.length < 1) return 'SPENDADDRESS';
 

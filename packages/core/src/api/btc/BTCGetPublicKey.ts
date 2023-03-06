@@ -1,6 +1,6 @@
 import { GetPublicKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { getScriptType, serializedPath, validatePath } from '../helpers/pathUtils';
+import { getScriptType, isTaprootPath, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { BTCGetAddressParams } from '../../types/api/btcGetAddress';
@@ -54,6 +54,10 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
     });
   }
 
+  private isBtcNetwork(param: GetPublicKey) {
+    return param.coin_name === 'Testnet' || param.coin_name === 'Bitcoin';
+  }
+
   async run() {
     const responses: BTCPublicKey[] = [];
 
@@ -64,10 +68,22 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
         ...param,
       });
 
-      responses.push({
+      const response = {
         path: serializedPath(param.address_n),
         ...res.message,
-      });
+        xpubSegwit: res.message.xpub,
+      };
+
+      if (this.isBtcNetwork(param) && isTaprootPath(param.address_n)) {
+        // wrap regular xpub into bitcoind native descriptor
+        const fingerprint = Number(response.root_fingerprint || 0)
+          .toString(16)
+          .padStart(8, '0');
+        const descriptorPath = `${fingerprint}${response.path.substring(1)}`;
+        response.xpubSegwit = `tr([${descriptorPath}]${response.xpub}/<0;1>/*)`;
+      }
+
+      responses.push(response);
     }
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
