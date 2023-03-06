@@ -9,14 +9,15 @@ type CallBTCMethodsProps = {
   commonParams?: CommonParams;
 };
 
-const DEFAULT_COIN_TYPE = '3';
+const DEFAULT_COIN_TYPE = '0';
 const CoinMap = {
   0: 'btc',
   2: 'ltc',
   3: 'doge',
   145: 'bch',
 };
-const DEFAULT_PATH = `m/44'/${DEFAULT_COIN_TYPE}'/0'/0/0`;
+// const DEFAULT_PATH = `m/44'/${DEFAULT_COIN_TYPE}'/0'/0/0`;
+const DEFAULT_PATH = `m/86'/${DEFAULT_COIN_TYPE}'/0'/0/0`;
 
 export function CallBTCMethods({
   SDK,
