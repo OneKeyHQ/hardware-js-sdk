@@ -319,6 +319,11 @@ export const HardwareErrorCode = {
    * NFT file already exists
    */
   FileAlreadyExists: 813,
+
+  /**
+   * check file length error
+   */
+  CheckDownloadFileError: 814,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -423,6 +428,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BlindSignDisabled]: 'Please confirm the BlindSign enabled',
   [HardwareErrorCode.UnexpectPassphrase]: 'Unexpect passphrase',
   [HardwareErrorCode.FileAlreadyExists]: 'File already exists',
+  [HardwareErrorCode.CheckDownloadFileError]: 'Check download file error',
 } as const;
 
 export const TypedError = (
