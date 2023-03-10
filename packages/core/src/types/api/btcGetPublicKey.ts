@@ -3,6 +3,7 @@ import type { CommonParams, Response } from '../params';
 
 export type BTCPublicKey = {
   path: string;
+  xpubSegwit?: string;
 } & PublicKey;
 
 export type BTCGetPublicKeyParams = {
