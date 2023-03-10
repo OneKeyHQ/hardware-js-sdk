@@ -1,4 +1,4 @@
-import { Deferred } from '@onekeyfe/hd-shared';
+import { Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
@@ -6,7 +6,7 @@ import { updateBootloader } from '../firmware/uploadFirmware';
 import { createUiMessage } from '../../events/ui-request';
 import type { KnownDevice } from '../../types';
 import { DataManager } from '../../data-manager';
-import { checkNeedUpdateBoot } from '../firmware/updateBootloader';
+import { checkBootloaderLength, checkNeedUpdateBoot } from '../firmware/updateBootloader';
 
 export default class DeviceUpdateBootloader extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
@@ -42,6 +42,9 @@ export default class DeviceUpdateBootloader extends BaseMethod {
           const resource = await getSysResourceBinary(resourceUrl);
           this.postTipMessage('DownloadLatestBootloaderResourceSuccess');
           if (resource) {
+            if (!checkBootloaderLength(resource.binary)) {
+              throw ERRORS.TypedError(HardwareErrorCode.CheckDownloadFileError);
+            }
             await updateBootloader(
               this.device.getCommands().typedCall.bind(this.device.getCommands()),
               this.postMessage,
