@@ -170,7 +170,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       derivationType:
         typeof payload.derivationType !== 'undefined'
           ? payload.derivationType
-          : PROTO.CardanoDerivationType.ICARUS_TREZOR,
+          : PROTO.CardanoDerivationType.ICARUS,
       includeNetworkId: payload.includeNetworkId,
     };
   }
