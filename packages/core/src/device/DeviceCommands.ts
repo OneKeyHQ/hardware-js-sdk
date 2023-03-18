@@ -82,6 +82,9 @@ export class DeviceCommands {
       if (error?.response?.data?.error === 'device disconnected during action') {
         return { type: 'BridgeNetworkError', message: {} } as any;
       }
+      if (error?.response?.data?.error?.indexOf('Request failed with status code') !== -1) {
+        return { type: 'CallMethodError', message: {} } as any;
+      }
       throw error;
     }
   }

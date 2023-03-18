@@ -24,6 +24,11 @@ export interface CommonParams {
    * Every init session
    */
   initSession?: boolean;
+
+  /**
+   * Use derive cardano
+   */
+  deriveCardano?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };
