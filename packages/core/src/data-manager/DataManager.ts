@@ -52,6 +52,8 @@ export default class DataManager {
     default: MessagesJSON as unknown as JSON,
   };
 
+  static lastCheckTimestamp = 0;
+
   static getFirmwareStatus = (features: Features): IDeviceFirmwareStatus => {
     const deviceType = getDeviceType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
@@ -207,8 +209,12 @@ export default class DataManager {
   static async load(settings: ConnectSettings) {
     this.settings = settings;
     try {
+      const url = settings.preRelease
+        ? 'https://data.onekey.so/pre-config.json'
+        : 'https://data.onekey.so/config.json';
+
       const { data } = await axios.get<RemoteConfigResponse>(
-        `https://data.onekey.so/config.json?noCache=${getTimeStamp()}`,
+        `${url}?noCache=${getTimeStamp()}`,
         // because of iframe timeout is 10000
         {
           timeout: 7000,
@@ -225,6 +231,14 @@ export default class DataManager {
       };
     } catch (e) {
       // ignore
+    }
+  }
+
+  static async checkAndReloadData() {
+    if (getTimeStamp() - this.lastCheckTimestamp > 1000 * 60 * 60 * 3) {
+      await this.load(this.settings).then(() => {
+        this.lastCheckTimestamp = getTimeStamp();
+      });
     }
   }
 

@@ -105,6 +105,10 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
     settings.timestamp = input.timestamp;
   }
 
+  if (input.preRelease) {
+    settings.preRelease = input.preRelease;
+  }
+
   return settings;
 };
 

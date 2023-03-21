@@ -154,9 +154,11 @@ export const callAPI = async (message: CoreMessage) => {
       const versionRange = versionRangeType ?? versionRangeModel;
 
       if (device.features) {
+        await DataManager.checkAndReloadData();
         const newVersionStatus = DataManager.getFirmwareStatus(device.features);
+        const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
         if (
-          newVersionStatus === 'required' &&
+          (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
           !SkipCheckUpdate.some(s => method.name.startsWith(s) || s === method.name)
         ) {
           throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareForceUpdate);

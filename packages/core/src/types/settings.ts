@@ -17,6 +17,7 @@ export type ConnectSettings = {
   env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native' | 'webusb';
   timestamp: number;
   isFrame?: boolean;
+  preRelease?: boolean;
 };
 
 export type IVersionArray = [number, number, number];
