@@ -65,6 +65,8 @@ let preConnectCache: {
   passphraseState: undefined,
 };
 
+const SkipCheckUpdate = ['check', 'getFeatures', 'firmwareUpdate', 'firmwareUpdateV2'];
+
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(ERRORS.TypedError('on call: message.id or message.payload is missing'));
@@ -151,34 +153,43 @@ export const callAPI = async (message: CoreMessage) => {
       // Type has a higher priority than Model
       const versionRange = versionRangeType ?? versionRangeModel;
 
-      if (versionRange && device.features) {
-        const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
-        if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
-          const newVersionUnReleased = DataManager.getFirmwareStatus(device.features);
-          if (newVersionUnReleased === 'none' || newVersionUnReleased === 'valid') {
-            throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
-          }
-
-          return Promise.reject(
-            ERRORS.TypedError(
-              HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-              `Device firmware version is too low, please update to ${versionRange.min}`,
-              { current: currentVersion, require: versionRange.min }
-            )
-          );
-        }
+      if (device.features) {
+        const newVersionStatus = DataManager.getFirmwareStatus(device.features);
         if (
-          versionRange.max &&
-          semver.valid(versionRange.max) &&
-          semver.gte(currentVersion, versionRange.max)
+          newVersionStatus === 'required' &&
+          !SkipCheckUpdate.some(s => method.name.startsWith(s) || s === method.name)
         ) {
-          return Promise.reject(
-            ERRORS.TypedError(
-              HardwareErrorCode.CallMethodDeprecated,
-              `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
-              { current: currentVersion, deprecated: versionRange.max }
-            )
-          );
+          throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareForceUpdate);
+        }
+
+        if (versionRange) {
+          const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+          if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
+            if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
+              throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
+            }
+
+            return Promise.reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+                `Device firmware version is too low, please update to ${versionRange.min}`,
+                { current: currentVersion, require: versionRange.min }
+              )
+            );
+          }
+          if (
+            versionRange.max &&
+            semver.valid(versionRange.max) &&
+            semver.gte(currentVersion, versionRange.max)
+          ) {
+            return Promise.reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.CallMethodDeprecated,
+                `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
+                { current: currentVersion, deprecated: versionRange.max }
+              )
+            );
+          }
         }
       }
 
