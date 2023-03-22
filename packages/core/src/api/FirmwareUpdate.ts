@@ -13,9 +13,10 @@ type Params = {
 
 export default class FirmwareUpdate extends BaseMethod<Params> {
   init() {
-    this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [UI_REQUEST.BOOTLOADER];
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
 
     const { payload } = this;
 

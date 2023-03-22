@@ -5,6 +5,7 @@ import { getFirmwareReleaseInfo } from './firmware/releaseHelper';
 export default class CheckFirmwareRelease extends BaseMethod {
   init() {
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
   }
 
   run() {

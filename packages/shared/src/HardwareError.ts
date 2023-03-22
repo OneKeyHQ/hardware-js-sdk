@@ -210,6 +210,12 @@ export const HardwareErrorCode = {
   UseDesktopToUpdateFirmware: 413,
 
   /**
+   * Mandatory firmware update
+   * @params:{ connectId: string? , deviceId: string? }
+   */
+  NewFirmwareForceUpdate: 414,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -375,6 +381,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure]:
     'Description Failed to automatically enter boot',
   [HardwareErrorCode.NewFirmwareUnRelease]: 'new firmware has not been released yet',
+  [HardwareErrorCode.NewFirmwareForceUpdate]: 'new firmware has been released, please update',
   [HardwareErrorCode.UseDesktopToUpdateFirmware]:
     'Please use OneKey desktop client to update the firmware',
 

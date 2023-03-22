@@ -5,6 +5,7 @@ import type { RebootToBoardloaderParams } from '../../types/api/deviceRebootToBo
 export default class DeviceRebootToBoardloader extends BaseMethod<RebootToBoardloaderParams> {
   init() {
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
   }
 
   getVersionRange() {

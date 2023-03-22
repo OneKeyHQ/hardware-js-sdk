@@ -9,7 +9,7 @@ export default class ConfluxGetAddress extends BaseMethod<HardwareConfluxGetAddr
   hasBundle = false;
 
   init() {
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

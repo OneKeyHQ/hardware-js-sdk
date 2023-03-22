@@ -11,6 +11,7 @@ export default class RequestWebUsbDevice extends BaseMethod {
   init() {
     this.useDevice = false;
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
   }
 
   async run() {

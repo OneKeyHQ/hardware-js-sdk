@@ -31,9 +31,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
   init() {
-    this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [];
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
 
     const { payload } = this;
 

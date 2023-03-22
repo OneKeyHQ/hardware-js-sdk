@@ -23,7 +23,7 @@ export default class EVMSignTransaction extends BaseMethod {
 
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'path', required: true },

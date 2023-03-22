@@ -11,6 +11,7 @@ export default class SearchDevices extends BaseMethod {
   init() {
     this.useDevice = false;
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
   }
 
   async run() {

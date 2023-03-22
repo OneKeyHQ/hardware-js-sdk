@@ -13,7 +13,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
 
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     this.useBatch = !!this.payload?.useBatch;

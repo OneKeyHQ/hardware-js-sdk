@@ -9,7 +9,7 @@ export default class CosmosGetPublicKey extends BaseMethod<any> {
 
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };

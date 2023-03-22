@@ -45,6 +45,7 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
 
   init() {
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
 
     // check payload
     validateParams(this.payload, [

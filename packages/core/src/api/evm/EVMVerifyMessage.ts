@@ -7,7 +7,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessage> {
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'address', type: 'string', required: true },

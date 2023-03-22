@@ -5,6 +5,7 @@ import { BaseMethod } from '../BaseMethod';
 export default class DeviceUpdateReboot extends BaseMethod<DeviceBackToBoot> {
   init() {
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
   }
 
   async run() {
