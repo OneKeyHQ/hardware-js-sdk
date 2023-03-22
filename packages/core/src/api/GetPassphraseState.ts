@@ -5,7 +5,7 @@ import { BaseMethod } from './BaseMethod';
 
 export default class GetPassphraseState extends BaseMethod {
   init() {
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
     this.useDevicePassphraseState = false;
   }
 

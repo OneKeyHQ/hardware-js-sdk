@@ -17,7 +17,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
 
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     this.isCheck = !!this.payload?.isCheck;

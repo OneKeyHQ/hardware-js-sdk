@@ -10,7 +10,7 @@ export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadot
 
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
 
     // check payload
     validateParams(this.payload, [

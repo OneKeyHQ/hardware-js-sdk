@@ -10,7 +10,7 @@ export default class CosmosSignTransaction extends BaseMethod<HardwareCosmosSign
 
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
 
     // check payload
     validateParams(this.payload, [

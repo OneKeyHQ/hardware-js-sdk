@@ -55,9 +55,9 @@ export abstract class BaseMethod<Params = undefined> {
   useDevice: boolean;
 
   /**
-   * 许可的设备模式
+   * 不允许的设备模式。如果当前设备模式在该数组中，则抛出异常。
    */
-  allowDeviceMode: string[];
+  notAllowDeviceMode: string[];
 
   /**
    * 依赖的设备模式
@@ -79,6 +79,12 @@ export abstract class BaseMethod<Params = undefined> {
    */
   useDevicePassphraseState = true;
 
+  /**
+   * skip force update check
+   * @default false
+   */
+  skipForceUpdateCheck = false;
+
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 
@@ -90,7 +96,7 @@ export abstract class BaseMethod<Params = undefined> {
     this.connectId = payload.connectId || '';
     this.deviceId = payload.deviceId || '';
     this.useDevice = true;
-    this.allowDeviceMode = [UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [];
   }
 

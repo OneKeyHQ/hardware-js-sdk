@@ -65,8 +65,6 @@ let preConnectCache: {
   passphraseState: undefined,
 };
 
-const SkipCheckUpdate = ['check', 'getFeatures', 'firmwareUpdate', 'firmwareUpdateV2'];
-
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(ERRORS.TypedError('on call: message.id or message.payload is missing'));
@@ -159,9 +157,13 @@ export const callAPI = async (message: CoreMessage) => {
         const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
         if (
           (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
-          !SkipCheckUpdate.some(s => method.name.startsWith(s) || s === method.name)
+          method.skipForceUpdateCheck === false
         ) {
-          throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareForceUpdate);
+          throw ERRORS.TypedError(
+            HardwareErrorCode.NewFirmwareForceUpdate,
+            'Device firmware version is too low, please update to the latest version',
+            { connectId: method.connectId, deviceId: method.deviceId }
+          );
         }
 
         if (versionRange) {
@@ -197,7 +199,7 @@ export const callAPI = async (message: CoreMessage) => {
 
       // check call method mode
       const unexpectedMode = device.hasUnexpectedMode(
-        method.allowDeviceMode,
+        method.notAllowDeviceMode,
         method.requireDeviceMode
       );
       if (unexpectedMode) {

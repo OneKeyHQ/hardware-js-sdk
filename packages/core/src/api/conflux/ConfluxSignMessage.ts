@@ -7,7 +7,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 
 export default class ConfluxSignMessage extends BaseMethod<HardwareConfluxSignMessage> {
   init() {
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     // check payload
     validateParams(this.payload, [

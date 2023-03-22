@@ -5,6 +5,7 @@ import { BaseMethod } from '../BaseMethod';
 export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloader> {
   init() {
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
   }
 
   getVersionRange() {

@@ -149,7 +149,7 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
 
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     // check payload
     validateParams(this.payload, [

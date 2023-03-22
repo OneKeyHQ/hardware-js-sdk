@@ -210,7 +210,8 @@ export const HardwareErrorCode = {
   UseDesktopToUpdateFirmware: 413,
 
   /**
-   * require firmware version
+   * Mandatory firmware update
+   * @params:{ connectId: string? , deviceId: string? }
    */
   NewFirmwareForceUpdate: 414,
 

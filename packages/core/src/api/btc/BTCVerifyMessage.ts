@@ -9,7 +9,7 @@ import { getCoinInfo } from './helpers/btcParamsUtils';
 export default class BTCVerifyMessage extends BaseMethod<VerifyMessage> {
   init() {
     this.checkDeviceId = true;
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'address', type: 'string', required: true },

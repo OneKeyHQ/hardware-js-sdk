@@ -6,9 +6,10 @@ import { DataManager } from '../data-manager';
 
 export default class CheckBootloaderRelease extends BaseMethod {
   init() {
-    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.checkDeviceId = true;
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
   }
 
   async run() {

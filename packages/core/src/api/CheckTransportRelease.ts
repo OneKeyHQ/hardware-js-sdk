@@ -7,6 +7,7 @@ export default class CheckTransportRelease extends BaseMethod {
   init() {
     this.useDevice = false;
     this.useDevicePassphraseState = false;
+    this.skipForceUpdateCheck = true;
   }
 
   async run() {
