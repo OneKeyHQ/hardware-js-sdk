@@ -186,6 +186,36 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     };
   }
 
+  hasNestedArrays(item: any): boolean {
+    if (!item) return false;
+
+    if (Array.isArray(item)) {
+      // item is an array
+      for (const element of item) {
+        if (Array.isArray(element)) {
+          // element is a nested array
+          return true;
+        }
+        if (typeof element === 'object' && element !== null) {
+          // element is an object, so check its properties recursively
+          if (this.hasNestedArrays(element)) {
+            return true;
+          }
+        }
+      }
+    } else if (typeof item === 'object' && item !== null) {
+      // item is an object, so check its properties recursively
+      // eslint-disable-next-line no-restricted-syntax
+      for (const property in item) {
+        if (this.hasNestedArrays(item[property])) {
+          return true;
+        }
+      }
+    }
+    // no nested arrays found
+    return false;
+  }
+
   supportSignTyped() {
     const deviceType = getDeviceType(this.device.features);
     if (deviceType === 'classic' || deviceType === 'mini') {
@@ -245,6 +275,41 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       }
 
       return Promise.resolve(response.message);
+    }
+
+    // Touch Pro Sign NestedArrays
+    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    if (this.hasNestedArrays(this.params.data)) {
+      const supportNestedArraysSignVersion = '4.2.0';
+
+      // 4.2.0 is the first version that supports nested arrays in signTypedData
+      if (semver.gte(currentVersion, supportNestedArraysSignVersion)) {
+        validateParams(this.params, [
+          { name: 'domainHash', type: 'hexString', required: true },
+          { name: 'messageHash', type: 'hexString', required: true },
+        ]);
+
+        const { domainHash, messageHash } = this.params;
+
+        const response = await this.device.commands.typedCall(
+          'EthereumSignTypedHash',
+          'EthereumTypedDataSignature',
+          {
+            address_n: addressN,
+            domain_separator_hash: domainHash ?? '',
+            message_hash: messageHash,
+            chain_id: chainId,
+          }
+        );
+
+        return Promise.resolve(response.message);
+      }
+
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+        `Device firmware version is too low, please update to ${supportNestedArraysSignVersion}`,
+        { current: currentVersion, require: supportNestedArraysSignVersion }
+      );
     }
 
     // For Touch、Pro we use EthereumSignTypedData
