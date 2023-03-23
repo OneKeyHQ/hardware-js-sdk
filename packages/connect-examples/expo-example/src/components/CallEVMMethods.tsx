@@ -254,7 +254,7 @@ export function CallEVMMethods({
                   ],
                   Message: [
                     {
-                      name: 'Best Wallet',
+                      name: 'Wallet',
                       type: 'string',
                     },
                     {
@@ -270,6 +270,351 @@ export function CallEVMMethods({
                 message: {
                   Wallet: 'Onekey Touch',
                   Number: '911112119',
+                },
+              },
+              chainId: Number(data.chainId ?? 1),
+            } as unknown as any)
+          }
+        />
+
+        <MethodInvoke
+          title="evmSignTypedData(Nested array)"
+          options={[
+            { name: 'path', value: "m/44'/60'/0'/0/0", type: 'string' },
+            {
+              name: 'metamaskV4Compat',
+              value: true,
+              type: 'boolean',
+            },
+            {
+              name: 'domainHash',
+              value: '276bc64a43ff20d362b6c982bc21d1f83716496363478990aa0bbaa99044923a',
+              type: 'string',
+            },
+            {
+              name: 'messageHash',
+              value: 'f8d0b2b47784324fed641b26f594e164d78a7e53fd6b3c9db099ab5cbfa9fa30',
+              type: 'string',
+            },
+            { name: 'chainId', value: 1, type: 'number' },
+          ]}
+          onCall={(data: any) =>
+            SDK.evmSignTypedData(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+              data: {
+                types: {
+                  EIP712Domain: [
+                    { name: 'name', type: 'string' },
+                    { name: 'version', type: 'string' },
+                    { name: 'chainId', type: 'uint256' },
+                    { name: 'verifyingContract', type: 'address' },
+                  ],
+                  BulkOrder: [{ name: 'tree', type: 'OrderComponents[2][2][2]' }],
+                  OrderComponents: [
+                    { name: 'offerer', type: 'address' },
+                    { name: 'zone', type: 'address' },
+                    { name: 'offer', type: 'OfferItem[]' },
+                    { name: 'consideration', type: 'ConsiderationItem[]' },
+                    { name: 'orderType', type: 'uint8' },
+                    { name: 'startTime', type: 'uint256' },
+                    { name: 'endTime', type: 'uint256' },
+                    { name: 'zoneHash', type: 'bytes32' },
+                    { name: 'salt', type: 'uint256' },
+                    { name: 'conduitKey', type: 'bytes32' },
+                    { name: 'counter', type: 'uint256' },
+                  ],
+                  OfferItem: [
+                    { name: 'itemType', type: 'uint8' },
+                    { name: 'token', type: 'address' },
+                    { name: 'identifierOrCriteria', type: 'uint256' },
+                    { name: 'startAmount', type: 'uint256' },
+                    { name: 'endAmount', type: 'uint256' },
+                  ],
+                  ConsiderationItem: [
+                    { name: 'itemType', type: 'uint8' },
+                    { name: 'token', type: 'address' },
+                    { name: 'identifierOrCriteria', type: 'uint256' },
+                    { name: 'startAmount', type: 'uint256' },
+                    { name: 'endAmount', type: 'uint256' },
+                    { name: 'recipient', type: 'address' },
+                  ],
+                },
+                primaryType: 'BulkOrder',
+                domain: {
+                  name: 'Seaport',
+                  version: '1.4',
+                  chainId: '1',
+                  verifyingContract: '0x00000000000001ad428e4906aE43D8F9852d0dD6',
+                },
+                message: {
+                  tree: [
+                    [
+                      [
+                        {
+                          offerer: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                          offer: [
+                            {
+                              itemType: '2',
+                              token: '0x59325733eb952a92e069C87F0A6168b29E80627f',
+                              identifierOrCriteria: '3937',
+                              startAmount: '1',
+                              endAmount: '1',
+                            },
+                          ],
+                          consideration: [
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '1662500000000000000',
+                              endAmount: '1662500000000000000',
+                              recipient: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                            },
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '87500000000000000',
+                              endAmount: '87500000000000000',
+                              recipient: '0xA1640edd7B69A3BdF98cD9A6A61F663DCf6D2Aa2',
+                            },
+                          ],
+                          startTime: '1678331313',
+                          endTime: '1678936113',
+                          orderType: '0',
+                          zone: '0x004C00500000aD104D7DBd00e3ae0A5C00560C00',
+                          zoneHash:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          salt: '24446860302761739304752683030156737591518664810215442929803500646386929272332',
+                          conduitKey:
+                            '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000',
+                          totalOriginalConsiderationItems: '2',
+                          counter: '0',
+                        },
+                        {
+                          offerer: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                          offer: [
+                            {
+                              itemType: '2',
+                              token: '0x59325733eb952a92e069C87F0A6168b29E80627f',
+                              identifierOrCriteria: '3938',
+                              startAmount: '1',
+                              endAmount: '1',
+                            },
+                          ],
+                          consideration: [
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '1662500000000000000',
+                              endAmount: '1662500000000000000',
+                              recipient: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                            },
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '87500000000000000',
+                              endAmount: '87500000000000000',
+                              recipient: '0xA1640edd7B69A3BdF98cD9A6A61F663DCf6D2Aa2',
+                            },
+                          ],
+                          startTime: '1678331313',
+                          endTime: '1678936113',
+                          orderType: '0',
+                          zone: '0x004C00500000aD104D7DBd00e3ae0A5C00560C00',
+                          zoneHash:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          salt: '24446860302761739304752683030156737591518664810215442929803664649720063338326',
+                          conduitKey:
+                            '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000',
+                          totalOriginalConsiderationItems: '2',
+                          counter: '0',
+                        },
+                      ],
+                      [
+                        {
+                          offerer: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                          offer: [
+                            {
+                              itemType: '2',
+                              token: '0x59325733eb952a92e069C87F0A6168b29E80627f',
+                              identifierOrCriteria: '4229',
+                              startAmount: '1',
+                              endAmount: '1',
+                            },
+                          ],
+                          consideration: [
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '1662500000000000000',
+                              endAmount: '1662500000000000000',
+                              recipient: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                            },
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '87500000000000000',
+                              endAmount: '87500000000000000',
+                              recipient: '0xA1640edd7B69A3BdF98cD9A6A61F663DCf6D2Aa2',
+                            },
+                          ],
+                          startTime: '1678331313',
+                          endTime: '1678936113',
+                          orderType: '0',
+                          zone: '0x004C00500000aD104D7DBd00e3ae0A5C00560C00',
+                          zoneHash:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          salt: '24446860302761739304752683030156737591518664810215442929805272723565722202710',
+                          conduitKey:
+                            '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000',
+                          totalOriginalConsiderationItems: '2',
+                          counter: '0',
+                        },
+                        {
+                          offerer: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                          offer: [
+                            {
+                              itemType: '2',
+                              token: '0x59325733eb952a92e069C87F0A6168b29E80627f',
+                              identifierOrCriteria: '4230',
+                              startAmount: '1',
+                              endAmount: '1',
+                            },
+                          ],
+                          consideration: [
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '1662500000000000000',
+                              endAmount: '1662500000000000000',
+                              recipient: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                            },
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '87500000000000000',
+                              endAmount: '87500000000000000',
+                              recipient: '0xA1640edd7B69A3BdF98cD9A6A61F663DCf6D2Aa2',
+                            },
+                          ],
+                          startTime: '1678331313',
+                          endTime: '1678936113',
+                          orderType: '0',
+                          zone: '0x004C00500000aD104D7DBd00e3ae0A5C00560C00',
+                          zoneHash:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          salt: '24446860302761739304752683030156737591518664810215442929802817449467791056812',
+                          conduitKey:
+                            '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000',
+                          totalOriginalConsiderationItems: '2',
+                          counter: '0',
+                        },
+                      ],
+                    ],
+                    [
+                      [
+                        {
+                          offerer: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                          offer: [
+                            {
+                              itemType: '2',
+                              token: '0x59325733eb952a92e069C87F0A6168b29E80627f',
+                              identifierOrCriteria: '2129',
+                              startAmount: '1',
+                              endAmount: '1',
+                            },
+                          ],
+                          consideration: [
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '1662500000000000000',
+                              endAmount: '1662500000000000000',
+                              recipient: '0xa0ed981643B4a37BcfD6C397de2b92809807Abb3',
+                            },
+                            {
+                              itemType: '0',
+                              token: '0x0000000000000000000000000000000000000000',
+                              identifierOrCriteria: '0',
+                              startAmount: '87500000000000000',
+                              endAmount: '87500000000000000',
+                              recipient: '0xA1640edd7B69A3BdF98cD9A6A61F663DCf6D2Aa2',
+                            },
+                          ],
+                          startTime: '1678331313',
+                          endTime: '1678936113',
+                          orderType: '0',
+                          zone: '0x004C00500000aD104D7DBd00e3ae0A5C00560C00',
+                          zoneHash:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          salt: '24446860302761739304752683030156737591518664810215442929812710384782076106155',
+                          conduitKey:
+                            '0x0000007b02230091a7ed01230072f7006a004d60a8d4e71d599b8104250f0000',
+                          totalOriginalConsiderationItems: '2',
+                          counter: '0',
+                        },
+                        {
+                          offerer: '0x0000000000000000000000000000000000000000',
+                          zone: '0x0000000000000000000000000000000000000000',
+                          offer: [],
+                          consideration: [],
+                          orderType: '0',
+                          startTime: '0',
+                          endTime: '0',
+                          zoneHash:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          salt: '0',
+                          conduitKey:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          counter: '0',
+                          totalOriginalConsiderationItems: '0',
+                        },
+                      ],
+                      [
+                        {
+                          offerer: '0x0000000000000000000000000000000000000000',
+                          zone: '0x0000000000000000000000000000000000000000',
+                          offer: [],
+                          consideration: [],
+                          orderType: '0',
+                          startTime: '0',
+                          endTime: '0',
+                          zoneHash:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          salt: '0',
+                          conduitKey:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          counter: '0',
+                          totalOriginalConsiderationItems: '0',
+                        },
+                        {
+                          offerer: '0x0000000000000000000000000000000000000000',
+                          zone: '0x0000000000000000000000000000000000000000',
+                          offer: [],
+                          consideration: [],
+                          orderType: '0',
+                          startTime: '0',
+                          endTime: '0',
+                          zoneHash:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          salt: '0',
+                          conduitKey:
+                            '0x0000000000000000000000000000000000000000000000000000000000000000',
+                          counter: '0',
+                          totalOriginalConsiderationItems: '0',
+                        },
+                      ],
+                    ],
+                  ],
                 },
               },
               chainId: Number(data.chainId ?? 1),
