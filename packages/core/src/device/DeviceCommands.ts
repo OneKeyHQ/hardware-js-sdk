@@ -79,6 +79,9 @@ export class DeviceCommands {
       return res;
     } catch (error) {
       Log.debug('[DeviceCommands] [call] Received error', error);
+      if (error.response?.data) {
+        Log.debug('error response', error?.response.data);
+      }
       if (error?.response?.data?.error === 'device disconnected during action') {
         return { type: 'BridgeNetworkError', message: {} } as any;
       }
@@ -189,8 +192,13 @@ export class DeviceCommands {
         }
       }
 
-      if (code === 'Failure_UnexpectedMessage' && callType === 'PassphraseAck') {
-        error = ERRORS.TypedError(HardwareErrorCode.UnexpectPassphrase);
+      if (code === 'Failure_UnexpectedMessage') {
+        if (callType === 'PassphraseAck') {
+          error = ERRORS.TypedError(HardwareErrorCode.UnexpectPassphrase);
+        }
+        if (message === 'Not in Signing mode') {
+          error = ERRORS.TypedError(HardwareErrorCode.NotInSigningMode);
+        }
       }
 
       if (error) {
