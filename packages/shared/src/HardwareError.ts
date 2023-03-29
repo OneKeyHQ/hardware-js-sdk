@@ -330,6 +330,11 @@ export const HardwareErrorCode = {
    * check file length error
    */
   CheckDownloadFileError: 814,
+
+  /**
+   * not in signing mode
+   */
+  NotInSigningMode: 815,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -436,6 +441,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.UnexpectPassphrase]: 'Unexpect passphrase',
   [HardwareErrorCode.FileAlreadyExists]: 'File already exists',
   [HardwareErrorCode.CheckDownloadFileError]: 'Check download file error',
+  [HardwareErrorCode.NotInSigningMode]: 'not in signing mode',
 } as const;
 
 export const TypedError = (
