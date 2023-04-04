@@ -46,7 +46,6 @@ export default class AlgoGetAddress extends BaseMethod<HardwareAlgoGetAddress[]>
   }
 
   async run() {
-    // TODO: add batch support
     const responses: AlgoAddress[] = [];
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
@@ -57,10 +56,12 @@ export default class AlgoGetAddress extends BaseMethod<HardwareAlgoGetAddress[]>
 
       const { address } = res.message;
 
-      responses.push({
+      const result = {
         path: serializedPath(param.address_n),
         address,
-      });
+      };
+      responses.push(result);
+      this.postPreviousAddressMessage(result);
     }
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);

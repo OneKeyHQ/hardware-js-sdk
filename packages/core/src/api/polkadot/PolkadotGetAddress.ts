@@ -65,10 +65,16 @@ export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAd
 
       const { address, public_key } = res.message;
 
+      const path = serializedPath(param.address_n);
       responses.push({
-        path: serializedPath(param.address_n),
+        path,
         address,
         publicKey: public_key ?? '',
+      });
+
+      this.postPreviousAddressMessage({
+        path,
+        address,
       });
     }
 

@@ -57,10 +57,12 @@ export default class TronGetAddress extends BaseMethod<HardwareTronGetAddress[]>
 
       const { address } = res.message;
 
-      responses.push({
+      const result = {
         path: serializedPath(param.address_n),
         address,
-      });
+      };
+      responses.push(result);
+      this.postPreviousAddressMessage(result);
     }
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);

@@ -56,9 +56,15 @@ export default class ConfluxGetAddress extends BaseMethod<HardwareConfluxGetAddr
         ...param,
       });
 
+      const path = serializedPath(param.address_n);
       responses.push({
-        path: serializedPath(param.address_n),
+        path,
         ...res.message,
+      });
+
+      this.postPreviousAddressMessage({
+        path,
+        address: res.message.address,
       });
     }
 

@@ -11,4 +11,6 @@ export const UI_REQUEST = {
   NOT_USE_ONEKEY_DEVICE: 'ui-device_please_use_onekey_device',
 
   FIRMWARE_TIP: 'ui-firmware-tip',
+
+  PREVIOUS_ADDRESS_RESULT: 'ui-previous_address_result',
 } as const;
