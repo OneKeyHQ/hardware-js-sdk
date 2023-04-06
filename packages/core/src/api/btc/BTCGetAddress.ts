@@ -64,9 +64,15 @@ export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
         ...param,
       });
 
+      const path = serializedPath(param.address_n);
       responses.push({
-        path: serializedPath(param.address_n),
+        path,
         ...res.message,
+      });
+
+      this.postPreviousAddressMessage({
+        address: res.message.address,
+        path,
       });
     }
 

@@ -108,15 +108,21 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         stakeAddress = stakeAddressRes.message.address;
       }
 
+      const path = serializedPath(batch.address_parameters.address_n);
       responses.push({
         addressParameters: addressParametersFromProto(batch.address_parameters),
         protocolMagic: batch.protocol_magic,
         networkId: batch.network_id,
-        serializedPath: serializedPath(batch.address_parameters.address_n),
+        serializedPath: path,
         serializedStakingPath: serializedPath(batch.address_parameters.address_n_staking),
         address: response.message.address,
         xpub,
         stakeAddress,
+      });
+
+      this.postPreviousAddressMessage({
+        path,
+        address: response.message.address,
       });
     }
 

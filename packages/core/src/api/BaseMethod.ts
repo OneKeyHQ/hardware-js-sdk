@@ -7,8 +7,8 @@ import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import DeviceConnector from '../device/DeviceConnector';
-import { DeviceFirmwareRange } from '../types';
-import { CoreMessage, createFirmwareMessage, DEVICE, FIRMWARE } from '../events';
+import { DeviceFirmwareRange, KnownDevice } from '../types';
+import { CoreMessage, createFirmwareMessage, DEVICE, FIRMWARE, createUiMessage } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
 import { getLogger, LoggerNames } from '../utils';
 
@@ -167,4 +167,14 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   dispose() {}
+
+  // Reusable events
+  postPreviousAddressMessage = (data: { address?: string; path?: string }) => {
+    this.postMessage(
+      createUiMessage(UI_REQUEST.PREVIOUS_ADDRESS_RESULT, {
+        device: this.device.toMessageObject() as KnownDevice,
+        data,
+      })
+    );
+  };
 }

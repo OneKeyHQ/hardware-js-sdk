@@ -22,6 +22,8 @@ export const UI_REQUEST = {
   FIRMWARE_TIP: 'ui-firmware-tip',
 
   NOT_IN_BOOTLOADER: 'ui-device_not_in_bootloader_mode',
+
+  PREVIOUS_ADDRESS_RESULT: 'ui-previous_address_result',
 } as const;
 
 export interface UiRequestWithoutPayload {
@@ -78,6 +80,17 @@ export interface FirmwareTip {
   };
 }
 
+export interface PreviousAddressResult {
+  type: typeof UI_REQUEST.PREVIOUS_ADDRESS_RESULT;
+  payload: {
+    device: Device;
+    data: {
+      address?: string;
+      path?: string;
+    };
+  };
+}
+
 export type UiEvent =
   | UiRequestWithoutPayload
   | UiRequestDeviceAction
@@ -85,7 +98,8 @@ export type UiEvent =
   | UiRequestPassphraseOnDevice
   | UiRequestPassphrase
   | FirmwareProgress
-  | FirmwareTip;
+  | FirmwareTip
+  | PreviousAddressResult;
 
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
 

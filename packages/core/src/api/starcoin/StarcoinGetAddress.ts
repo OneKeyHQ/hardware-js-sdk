@@ -47,9 +47,15 @@ export default class StarcoinGetAddress extends BaseMethod<HardwareStarcoinGetAd
         ...param,
       });
 
+      const path = serializedPath(param.address_n);
       responses.push({
-        path: serializedPath(param.address_n),
+        path,
         ...res.message,
+      });
+
+      this.postPreviousAddressMessage({
+        path,
+        address: res.message.address,
       });
     }
 

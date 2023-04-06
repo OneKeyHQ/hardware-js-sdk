@@ -13,12 +13,18 @@ import { hexToBytes } from '../helpers/hexUtils';
 export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
   hasBundle = false;
 
+  shouldConfirm = false;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
+
+    this.shouldConfirm = this.hasBundle
+      ? this.payload.bundle.some((i: any) => !!i.showOnOneKey)
+      : false;
 
     // check payload
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);
@@ -63,7 +69,7 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
   }
 
   async run() {
-    if (this.hasBundle && supportBatchPublicKey(this.device?.features)) {
+    if (this.hasBundle && supportBatchPublicKey(this.device?.features) && !this.shouldConfirm) {
       const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
         paths: this.params,
         ecdsa_curve_name: 'ed25519',
@@ -86,10 +92,12 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
 
       const { address } = res.message;
 
-      responses.push({
+      const result = {
         path: serializedPath(param.address_n),
         address: address?.toLowerCase(),
-      });
+      };
+      responses.push(result);
+      this.postPreviousAddressMessage(result);
     }
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
