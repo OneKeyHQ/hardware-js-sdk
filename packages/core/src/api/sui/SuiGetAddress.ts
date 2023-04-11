@@ -1,14 +1,12 @@
 import { SuiGetAddress as HardwareSuiGetAddress } from '@onekeyfe/hd-transport';
 
-import { sha3_256 } from '@noble/hashes/sha3';
-import { bytesToHex } from '@noble/hashes/utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { SuiAddress, SuiGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
-import { hexToBytes } from '../helpers/hexUtils';
+import { publicKeyToAddress } from './normalize';
 
 export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
   hasBundle = false;
@@ -48,22 +46,13 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
     });
   }
 
-  publicKeyToAddress(publicKey: string) {
-    const hash = sha3_256.create();
-    // Ed25519
-    hash.update('\x00');
-    // hash.update('\x01'); Secp256k1
-    hash.update(hexToBytes(publicKey));
-    return `0x${bytesToHex(hash.digest().slice(0, 20))}`;
-  }
-
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.9.0',
+        min: '2.12.0',
       },
       model_touch: {
-        min: '3.5.0',
+        min: '4.3.0',
       },
     };
   }
@@ -77,7 +66,7 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
       const result = res.message.public_keys.map((publicKey: string, index: number) => ({
         path: serializedPath((this.params as unknown as any[])[index].address_n),
         publicKey,
-        address: this.publicKeyToAddress(publicKey),
+        address: publicKeyToAddress(publicKey),
       }));
       return Promise.resolve(result);
     }
