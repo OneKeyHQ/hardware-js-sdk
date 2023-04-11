@@ -30,10 +30,10 @@ export default class SuiSignTransaction extends BaseMethod<HardwareSuiSignTx> {
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.9.0',
+        min: '2.12.0',
       },
       model_touch: {
-        min: '3.5.0',
+        min: '4.3.0',
       },
     };
   }

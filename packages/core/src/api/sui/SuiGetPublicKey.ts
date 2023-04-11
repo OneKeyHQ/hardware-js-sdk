@@ -39,10 +39,10 @@ export default class SuiGetPublicKey extends BaseMethod<any> {
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.9.0',
+        min: '2.12.0',
       },
       model_touch: {
-        min: '3.5.0',
+        min: '4.3.0',
       },
     };
   }
