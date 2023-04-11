@@ -9,6 +9,7 @@ import {
 } from './helper/addressParameters';
 import { serializedPath } from '../helpers/pathUtils';
 import { CardanoGetAddressParams, CardanoAddress } from '../../types/api/cardanoGetAddress';
+import { CardanoGetAddressMethodParams } from '../../types';
 
 export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParams[]> {
   hasBundle?: boolean;
@@ -20,7 +21,9 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
-    this.isCheck = !!this.payload?.isCheck;
+    this.isCheck = this.hasBundle
+      ? !!this.payload?.bundle.every((i: CardanoGetAddressMethodParams) => !!i.isCheck)
+      : !!this.payload?.isCheck;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
     this.params = payload.bundle.map((batch: any) => {
@@ -84,7 +87,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
           {
             address_n: address_parameters.address_n.slice(0, 3),
             derivation_type,
-            show_display,
+            show_display: false,
           }
         );
         xpub = publicKeyRes.message.xpub;
@@ -101,7 +104,7 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
             protocol_magic,
             network_id,
             derivation_type,
-            show_display,
+            show_display: false,
           }
         );
 
