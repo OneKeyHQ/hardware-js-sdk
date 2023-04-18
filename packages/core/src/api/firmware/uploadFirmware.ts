@@ -9,6 +9,7 @@ import type { Device } from '../../device/Device';
 import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
 import { KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
+import { getDeviceModel } from '../../utils/deviceFeaturesUtils';
 
 const Log = getLogger(LoggerNames.Device);
 
@@ -61,7 +62,8 @@ export const uploadFirmware = async (
   device: Device,
   { payload }: PROTO.FirmwareUpload
 ) => {
-  if (device.features?.major_version === 1) {
+  const deviceModel = getDeviceModel(device.features);
+  if (deviceModel === 'model_mini') {
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
     const eraseCommand = updateType === 'firmware' ? 'FirmwareErase' : 'FirmwareErase_ex';
@@ -77,7 +79,7 @@ export const uploadFirmware = async (
     return message;
   }
 
-  if (device.features?.major_version === 2) {
+  if (deviceModel === 'model_touch') {
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
     const length = payload.byteLength;
