@@ -11,6 +11,7 @@ import {
   DEVICE,
   CommonParams,
   KnownDevice,
+  LowLevelCoreApi,
 } from '@onekeyfe/hd-core';
 
 import { ReceivePin } from './ReceivePin';
@@ -39,10 +40,11 @@ import { CallPolkadotMethods } from './CallPolkadotMethods';
 let registerListener = false;
 
 export type ICallMethodProps = {
+  HardwareLowLevelSDK: LowLevelCoreApi;
   SDK: CoreApi;
   type: 'Bluetooth' | 'USB';
 };
-export function CallMethods({ SDK, type }: ICallMethodProps) {
+export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps) {
   const [showPinInput, setShowPinInput] = useState(false);
   const [pinValue, setPinValue] = useState('');
   const [devices, setDevices] = useState<Device[]>([]);
@@ -65,7 +67,13 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
     if (registerListener) {
       return;
     }
+
+    HardwareLowLevelSDK.addHardwareGlobalEventListener(params => {
+      SDK.emit?.(params.event, { ...params });
+    });
+
     SDK.on(UI_EVENT, (message: CoreMessage) => {
+      console.log('TopLEVEL EVENT ===>>>>: ', message);
       if (message.type === UI_REQUEST.REQUEST_PIN) {
         SDK.uiResponse({
           type: UI_RESPONSE.RECEIVE_PIN,
@@ -109,7 +117,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
       console.log('example get disconnect event: ', message);
     });
     registerListener = true;
-  }, [SDK]);
+  }, [SDK, HardwareLowLevelSDK]);
 
   // 输入 pin 码的确认回调
   function onConfirmPin(payload: string) {

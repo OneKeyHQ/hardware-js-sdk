@@ -1,5 +1,7 @@
 import EventEmitter from 'events';
-import HardwareSdk, {
+import {
+  HardwareSDKLowLevel as HardwareLowLevelSdk,
+  HardwareTopLevelSdk,
   parseConnectSettings,
   enableLog,
   PostMessageEvent,
@@ -32,6 +34,7 @@ const handleMessage = async (message: CoreMessage) => {
   switch (message.event) {
     case UI_EVENT:
       if (message.type === IFRAME.INIT_BRIDGE) {
+        console.log('====> JSBridge Handshake Success');
         iframe.initPromise.resolve();
         return Promise.resolve({ success: true, payload: 'JSBridge Handshake Success' });
       }
@@ -178,13 +181,32 @@ const call = async (params: any) => {
   }
 };
 
-const HardwareWebSdk = HardwareSdk({
+const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void) => {
+  [
+    UI_EVENT,
+    LOG_EVENT,
+    FIRMWARE_EVENT,
+    DEVICE.CONNECT,
+    DEVICE.DISCONNECT,
+    DEVICE.FEATURES,
+    DEVICE.SUPPORT_FEATURES,
+  ].forEach(eventName => {
+    eventEmitter.on(eventName, (message: CoreMessage) => {
+      listener?.(message);
+    });
+  });
+};
+
+const HardwareSDKLowLevel = HardwareLowLevelSdk({
   eventEmitter,
   init,
   call,
   cancel,
   dispose,
+  addHardwareGlobalEventListener,
   uiResponse,
 });
 
-export default HardwareWebSdk;
+const HardwareWebSdk = HardwareTopLevelSdk();
+
+export default { HardwareSDKLowLevel, HardwareWebSdk };

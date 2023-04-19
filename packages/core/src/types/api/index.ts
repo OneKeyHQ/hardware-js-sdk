@@ -113,6 +113,7 @@ export type CoreApi = {
   init: typeof init;
   on: typeof on;
   off: typeof off;
+  emit?: (event: string, ...args: any[]) => void;
   removeAllListeners: typeof removeAllListeners;
   dispose: () => void;
   call: (params: any) => Promise<any>;
