@@ -24,6 +24,8 @@ export const inject = ({
       eventEmitter.on(type, fn);
     },
 
+    emit: () => {},
+
     off: (type, fn) => {
       eventEmitter.removeListener(type, fn);
     },
@@ -51,7 +53,15 @@ export const createCoreApi = (
   call: CoreApi['call']
 ): Omit<
   CoreApi,
-  'on' | 'off' | 'removeAllListeners' | 'init' | 'call' | 'dispose' | 'uiResponse' | 'cancel'
+  | 'on'
+  | 'off'
+  | 'emit'
+  | 'removeAllListeners'
+  | 'init'
+  | 'call'
+  | 'dispose'
+  | 'uiResponse'
+  | 'cancel'
 > => ({
   getLogs: () => call({ method: 'getLogs' }),
   /**

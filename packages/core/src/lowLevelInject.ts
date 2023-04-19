@@ -44,6 +44,8 @@ export const lowLevelInject = ({
 
     cancel,
 
+    emit: () => {},
+
     ...createCoreApi(call),
   };
   return api;
