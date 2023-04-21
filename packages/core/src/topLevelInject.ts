@@ -40,9 +40,10 @@ export const topLevelInject = () => {
 
     removeAllListeners: type => {
       eventEmitter.removeAllListeners(type);
+      lowLevelApi?.removeAllListeners(type);
     },
 
-    dispose: () => lowLevelApi?.dispose,
+    dispose: () => lowLevelApi?.dispose(),
 
     uiResponse: response => lowLevelApi?.uiResponse(response),
 

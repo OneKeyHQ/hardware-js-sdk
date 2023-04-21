@@ -336,7 +336,6 @@ export const callAPI = async (message: CoreMessage) => {
     cleanup();
 
     removeDeviceListener(device);
-    // TODO: 方法执行后，检查队列内是否有等待调用的 API，依次调用
   }
 };
 
@@ -580,7 +579,7 @@ const cleanup = () => {
 
 const removeDeviceListener = (device: Device) => {
   device.removeAllListeners();
-  DevicePool.emitter.removeListener(DEVICE.CONNECT, onDeviceConnectHandler);
+  DevicePool.emitter.removeAllListeners(DEVICE.CONNECT);
   // DevicePool.emitter.removeListener(DEVICE.DISCONNECT, onDeviceDisconnectHandler);
 };
 
