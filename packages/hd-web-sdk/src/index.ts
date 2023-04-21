@@ -19,6 +19,7 @@ import {
   FIRMWARE_EVENT,
   DEVICE_EVENT,
   DEVICE,
+  UI_REQUEST,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
@@ -190,6 +191,9 @@ const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void
     DEVICE.DISCONNECT,
     DEVICE.FEATURES,
     DEVICE.SUPPORT_FEATURES,
+    UI_REQUEST.FIRMWARE_PROGRESS,
+    UI_REQUEST.FIRMWARE_TIP,
+    UI_REQUEST.PREVIOUS_ADDRESS_RESULT,
   ].forEach(eventName => {
     eventEmitter.on(eventName, (message: CoreMessage) => {
       let emitMessage = message;
