@@ -75,6 +75,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
     SDK.on(UI_EVENT, (message: CoreMessage) => {
       console.log('TopLEVEL EVENT ===>>>>: ', message);
       if (message.type === UI_REQUEST.REQUEST_PIN) {
+        // setShowPinInput(true);
         SDK.uiResponse({
           type: UI_RESPONSE.RECEIVE_PIN,
           payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',

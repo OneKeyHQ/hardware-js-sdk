@@ -192,7 +192,16 @@ const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void
     DEVICE.SUPPORT_FEATURES,
   ].forEach(eventName => {
     eventEmitter.on(eventName, (message: CoreMessage) => {
-      listener?.(message);
+      let emitMessage = message;
+      if (!message.event && !(message as CoreMessage).type) {
+        emitMessage = {
+          // @ts-expect-error
+          ...message,
+          event: eventName,
+          type: eventName,
+        };
+      }
+      listener?.(emitMessage);
     });
   });
 };

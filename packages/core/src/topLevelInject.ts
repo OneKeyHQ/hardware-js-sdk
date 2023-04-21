@@ -10,8 +10,6 @@ export interface TopLevelInjectApi {
 
 const eventEmitter = new EventEmitter();
 
-const EmptyFN = () => {};
-
 export const topLevelInject = () => {
   let lowLevelApi: LowLevelCoreApi | undefined;
   const call = (params: any) => {
@@ -44,11 +42,11 @@ export const topLevelInject = () => {
       eventEmitter.removeAllListeners(type);
     },
 
-    dispose: lowLevelApi?.dispose ?? EmptyFN,
+    dispose: () => lowLevelApi?.dispose,
 
-    uiResponse: lowLevelApi?.uiResponse ?? EmptyFN,
+    uiResponse: response => lowLevelApi?.uiResponse(response),
 
-    cancel: lowLevelApi?.cancel ?? EmptyFN,
+    cancel: (connectId?: string) => lowLevelApi?.cancel(connectId),
   };
 
   return api;
