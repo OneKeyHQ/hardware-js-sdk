@@ -1,12 +1,17 @@
-name: test iframe page
+name: test_web
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    branches: [onekey]
+  pull_request:
+    branches: [onekey]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      TEST_ENDPOINT: hardware-sdk.test.onekey.so
+      TEST_ENDPOINT: hardware-example.onekeytest.com
     steps:
       - uses: actions/checkout@v2
       - name: Setup Environment
@@ -16,16 +21,18 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - name: Install Package
         run: |
-          yarn
+          npm i -g expo-cli@6.0.5 && yarn
           yarn bootstrap
       - name: Build Target
         run: |
           yarn build
+          cd packages/connect-examples/expo-example
+          npx expo build:web
 
       - name: Deploy Github Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./packages/hd-web-sdk/build
+          publish_dir: ./packages/connect-examples/expo-example/web-build
           cname: ${{ env.TEST_ENDPOINT }}
           force_orphan: true

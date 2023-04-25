@@ -2112,6 +2112,329 @@ export type DeviceEraseSector = {
   sector: number;
 };
 
+export type MoneroRctKeyPublic = {
+  dest?: string;
+  commitment?: string;
+};
+
+export type MoneroOutputEntry = {
+  idx?: number;
+  key?: MoneroRctKeyPublic;
+};
+
+export type MoneroMultisigKLRki = {
+  K?: string;
+  L?: string;
+  R?: string;
+  ki?: string;
+};
+
+// MoneroTransactionSourceEntry
+export type MoneroTransactionSourceEntry = {
+  outputs: MoneroOutputEntry[];
+  real_output?: number;
+  real_out_tx_key?: string;
+  real_out_additional_tx_keys: string[];
+  real_output_in_tx_index?: number;
+  amount?: UintType;
+  rct?: boolean;
+  mask?: string;
+  multisig_kLRki?: MoneroMultisigKLRki;
+  subaddr_minor?: number;
+};
+
+export type MoneroAccountPublicAddress = {
+  spend_public_key?: string;
+  view_public_key?: string;
+};
+
+// MoneroTransactionDestinationEntry
+export type MoneroTransactionDestinationEntry = {
+  amount?: UintType;
+  addr?: MoneroAccountPublicAddress;
+  is_subaddress?: boolean;
+  original?: string;
+  is_integrated?: boolean;
+};
+
+// MoneroTransactionRsigData
+export type MoneroTransactionRsigData = {
+  rsig_type?: number;
+  offload_type?: number;
+  grouping: number[];
+  mask?: string;
+  rsig?: string;
+  rsig_parts: string[];
+  bp_version?: number;
+};
+
+// MoneroGetAddress
+export type MoneroGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+  network_type?: number;
+  account?: number;
+  minor?: number;
+  payment_id?: string;
+};
+
+// MoneroAddress
+export type MoneroAddress = {
+  address?: string;
+};
+
+// MoneroGetWatchKey
+export type MoneroGetWatchKey = {
+  address_n: number[];
+  network_type?: number;
+};
+
+// MoneroWatchKey
+export type MoneroWatchKey = {
+  watch_key?: string;
+  address?: string;
+};
+
+export type MoneroTransactionData = {
+  version?: number;
+  payment_id?: string;
+  unlock_time?: number;
+  outputs: MoneroTransactionDestinationEntry[];
+  change_dts?: MoneroTransactionDestinationEntry;
+  num_inputs?: number;
+  mixin?: number;
+  fee?: UintType;
+  account?: number;
+  minor_indices: number[];
+  rsig_data?: MoneroTransactionRsigData;
+  integrated_indices: number[];
+  client_version?: number;
+  hard_fork?: number;
+  monero_version?: string;
+};
+
+// MoneroTransactionInitRequest
+export type MoneroTransactionInitRequest = {
+  version?: number;
+  address_n: number[];
+  network_type?: number;
+  tsx_data?: MoneroTransactionData;
+};
+
+// MoneroTransactionInitAck
+export type MoneroTransactionInitAck = {
+  hmacs: string[];
+  rsig_data?: MoneroTransactionRsigData;
+};
+
+// MoneroTransactionSetInputRequest
+export type MoneroTransactionSetInputRequest = {
+  src_entr?: MoneroTransactionSourceEntry;
+};
+
+// MoneroTransactionSetInputAck
+export type MoneroTransactionSetInputAck = {
+  vini?: string;
+  vini_hmac?: string;
+  pseudo_out?: string;
+  pseudo_out_hmac?: string;
+  pseudo_out_alpha?: string;
+  spend_key?: string;
+};
+
+// MoneroTransactionInputsPermutationRequest
+export type MoneroTransactionInputsPermutationRequest = {
+  perm: number[];
+};
+
+// MoneroTransactionInputsPermutationAck
+export type MoneroTransactionInputsPermutationAck = {};
+
+// MoneroTransactionInputViniRequest
+export type MoneroTransactionInputViniRequest = {
+  src_entr?: MoneroTransactionSourceEntry;
+  vini?: string;
+  vini_hmac?: string;
+  pseudo_out?: string;
+  pseudo_out_hmac?: string;
+  orig_idx?: number;
+};
+
+// MoneroTransactionInputViniAck
+export type MoneroTransactionInputViniAck = {};
+
+// MoneroTransactionAllInputsSetRequest
+export type MoneroTransactionAllInputsSetRequest = {};
+
+// MoneroTransactionAllInputsSetAck
+export type MoneroTransactionAllInputsSetAck = {
+  rsig_data?: MoneroTransactionRsigData;
+};
+
+// MoneroTransactionSetOutputRequest
+export type MoneroTransactionSetOutputRequest = {
+  dst_entr?: MoneroTransactionDestinationEntry;
+  dst_entr_hmac?: string;
+  rsig_data?: MoneroTransactionRsigData;
+  is_offloaded_bp?: boolean;
+};
+
+// MoneroTransactionSetOutputAck
+export type MoneroTransactionSetOutputAck = {
+  tx_out?: string;
+  vouti_hmac?: string;
+  rsig_data?: MoneroTransactionRsigData;
+  out_pk?: string;
+  ecdh_info?: string;
+};
+
+// MoneroTransactionAllOutSetRequest
+export type MoneroTransactionAllOutSetRequest = {
+  rsig_data?: MoneroTransactionRsigData;
+};
+
+export type MoneroRingCtSig = {
+  txn_fee?: number;
+  message?: string;
+  rv_type?: number;
+};
+
+// MoneroTransactionAllOutSetAck
+export type MoneroTransactionAllOutSetAck = {
+  extra?: string;
+  tx_prefix_hash?: string;
+  rv?: MoneroRingCtSig;
+  full_message_hash?: string;
+};
+
+// MoneroTransactionSignInputRequest
+export type MoneroTransactionSignInputRequest = {
+  src_entr?: MoneroTransactionSourceEntry;
+  vini?: string;
+  vini_hmac?: string;
+  pseudo_out?: string;
+  pseudo_out_hmac?: string;
+  pseudo_out_alpha?: string;
+  spend_key?: string;
+  orig_idx?: number;
+};
+
+// MoneroTransactionSignInputAck
+export type MoneroTransactionSignInputAck = {
+  signature?: string;
+  pseudo_out?: string;
+};
+
+// MoneroTransactionFinalRequest
+export type MoneroTransactionFinalRequest = {};
+
+// MoneroTransactionFinalAck
+export type MoneroTransactionFinalAck = {
+  cout_key?: string;
+  salt?: string;
+  rand_mult?: string;
+  tx_enc_keys?: string;
+  opening_key?: string;
+};
+
+export type MoneroSubAddressIndicesList = {
+  account?: number;
+  minor_indices: number[];
+};
+
+// MoneroKeyImageExportInitRequest
+export type MoneroKeyImageExportInitRequest = {
+  num?: number;
+  hash?: string;
+  address_n: number[];
+  network_type?: number;
+  subs: MoneroSubAddressIndicesList[];
+};
+
+// MoneroKeyImageExportInitAck
+export type MoneroKeyImageExportInitAck = {};
+
+export type MoneroTransferDetails = {
+  out_key?: string;
+  tx_pub_key?: string;
+  additional_tx_pub_keys: string[];
+  internal_output_index?: number;
+  sub_addr_major?: number;
+  sub_addr_minor?: number;
+};
+
+// MoneroKeyImageSyncStepRequest
+export type MoneroKeyImageSyncStepRequest = {
+  tdis: MoneroTransferDetails[];
+};
+
+export type MoneroExportedKeyImage = {
+  iv?: string;
+  blob?: string;
+};
+
+// MoneroKeyImageSyncStepAck
+export type MoneroKeyImageSyncStepAck = {
+  kis: MoneroExportedKeyImage[];
+};
+
+// MoneroKeyImageSyncFinalRequest
+export type MoneroKeyImageSyncFinalRequest = {};
+
+// MoneroKeyImageSyncFinalAck
+export type MoneroKeyImageSyncFinalAck = {
+  enc_key?: string;
+};
+
+// MoneroGetTxKeyRequest
+export type MoneroGetTxKeyRequest = {
+  address_n: number[];
+  network_type?: number;
+  salt1?: string;
+  salt2?: string;
+  tx_enc_keys?: string;
+  tx_prefix_hash?: string;
+  reason?: number;
+  view_public_key?: string;
+};
+
+// MoneroGetTxKeyAck
+export type MoneroGetTxKeyAck = {
+  salt?: string;
+  tx_keys?: string;
+  tx_derivations?: string;
+};
+
+// MoneroLiveRefreshStartRequest
+export type MoneroLiveRefreshStartRequest = {
+  address_n: number[];
+  network_type?: number;
+};
+
+// MoneroLiveRefreshStartAck
+export type MoneroLiveRefreshStartAck = {};
+
+// MoneroLiveRefreshStepRequest
+export type MoneroLiveRefreshStepRequest = {
+  out_key?: string;
+  recv_deriv?: string;
+  real_out_idx?: number;
+  sub_addr_major?: number;
+  sub_addr_minor?: number;
+};
+
+// MoneroLiveRefreshStepAck
+export type MoneroLiveRefreshStepAck = {
+  salt?: string;
+  key_image?: string;
+};
+
+// MoneroLiveRefreshFinalRequest
+export type MoneroLiveRefreshFinalRequest = {};
+
+// MoneroLiveRefreshFinalAck
+export type MoneroLiveRefreshFinalAck = {};
+
 // NearGetAddress
 export type NearGetAddress = {
   address_n: number[];
@@ -3070,6 +3393,54 @@ export type MessageType = {
   FileInfo: FileInfo;
   FileInfoList: FileInfoList;
   DeviceEraseSector: DeviceEraseSector;
+  MoneroRctKeyPublic: MoneroRctKeyPublic;
+  MoneroOutputEntry: MoneroOutputEntry;
+  MoneroMultisigKLRki: MoneroMultisigKLRki;
+  MoneroTransactionSourceEntry: MoneroTransactionSourceEntry;
+  MoneroAccountPublicAddress: MoneroAccountPublicAddress;
+  MoneroTransactionDestinationEntry: MoneroTransactionDestinationEntry;
+  MoneroTransactionRsigData: MoneroTransactionRsigData;
+  MoneroGetAddress: MoneroGetAddress;
+  MoneroAddress: MoneroAddress;
+  MoneroGetWatchKey: MoneroGetWatchKey;
+  MoneroWatchKey: MoneroWatchKey;
+  MoneroTransactionData: MoneroTransactionData;
+  MoneroTransactionInitRequest: MoneroTransactionInitRequest;
+  MoneroTransactionInitAck: MoneroTransactionInitAck;
+  MoneroTransactionSetInputRequest: MoneroTransactionSetInputRequest;
+  MoneroTransactionSetInputAck: MoneroTransactionSetInputAck;
+  MoneroTransactionInputsPermutationRequest: MoneroTransactionInputsPermutationRequest;
+  MoneroTransactionInputsPermutationAck: MoneroTransactionInputsPermutationAck;
+  MoneroTransactionInputViniRequest: MoneroTransactionInputViniRequest;
+  MoneroTransactionInputViniAck: MoneroTransactionInputViniAck;
+  MoneroTransactionAllInputsSetRequest: MoneroTransactionAllInputsSetRequest;
+  MoneroTransactionAllInputsSetAck: MoneroTransactionAllInputsSetAck;
+  MoneroTransactionSetOutputRequest: MoneroTransactionSetOutputRequest;
+  MoneroTransactionSetOutputAck: MoneroTransactionSetOutputAck;
+  MoneroTransactionAllOutSetRequest: MoneroTransactionAllOutSetRequest;
+  MoneroRingCtSig: MoneroRingCtSig;
+  MoneroTransactionAllOutSetAck: MoneroTransactionAllOutSetAck;
+  MoneroTransactionSignInputRequest: MoneroTransactionSignInputRequest;
+  MoneroTransactionSignInputAck: MoneroTransactionSignInputAck;
+  MoneroTransactionFinalRequest: MoneroTransactionFinalRequest;
+  MoneroTransactionFinalAck: MoneroTransactionFinalAck;
+  MoneroSubAddressIndicesList: MoneroSubAddressIndicesList;
+  MoneroKeyImageExportInitRequest: MoneroKeyImageExportInitRequest;
+  MoneroKeyImageExportInitAck: MoneroKeyImageExportInitAck;
+  MoneroTransferDetails: MoneroTransferDetails;
+  MoneroKeyImageSyncStepRequest: MoneroKeyImageSyncStepRequest;
+  MoneroExportedKeyImage: MoneroExportedKeyImage;
+  MoneroKeyImageSyncStepAck: MoneroKeyImageSyncStepAck;
+  MoneroKeyImageSyncFinalRequest: MoneroKeyImageSyncFinalRequest;
+  MoneroKeyImageSyncFinalAck: MoneroKeyImageSyncFinalAck;
+  MoneroGetTxKeyRequest: MoneroGetTxKeyRequest;
+  MoneroGetTxKeyAck: MoneroGetTxKeyAck;
+  MoneroLiveRefreshStartRequest: MoneroLiveRefreshStartRequest;
+  MoneroLiveRefreshStartAck: MoneroLiveRefreshStartAck;
+  MoneroLiveRefreshStepRequest: MoneroLiveRefreshStepRequest;
+  MoneroLiveRefreshStepAck: MoneroLiveRefreshStepAck;
+  MoneroLiveRefreshFinalRequest: MoneroLiveRefreshFinalRequest;
+  MoneroLiveRefreshFinalAck: MoneroLiveRefreshFinalAck;
   NearGetAddress: NearGetAddress;
   NearAddress: NearAddress;
   NearSignTx: NearSignTx;
