@@ -89,6 +89,7 @@ export const callAPI = async (message: CoreMessage) => {
       const response = await method.run();
       return createResponseMessage(method.responseID, true, response);
     } catch (error) {
+      console.log('!method.useDevice error =====>>> ', error);
       return createResponseMessage(method.responseID, false, { error });
     }
   }
