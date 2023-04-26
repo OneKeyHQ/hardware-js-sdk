@@ -27,6 +27,7 @@ export function checkNeedUpdateBootForTouch(features: Features) {
 }
 
 export function checkNeedUpdateBootForClassic(features: Features, willUpdateFirmware: string) {
+  console.log('checkNeedUpdateBootForClassiccheckNeedUpdateBootForClassic');
   const deviceType = getDeviceType(features);
   if (deviceType !== 'classic') return false;
   if (!willUpdateFirmware) return false;
@@ -37,6 +38,16 @@ export function checkNeedUpdateBootForClassic(features: Features, willUpdateFirm
     DataManager.getBootloaderRelatedFirmwareVersion(features);
   if (!bootloaderRelatedFirmwareVersion) return false;
   // There are two situations that require an upgrade
+  console.log(
+    '1. The target version of the upgrade is lower or equal to relatedVersion: ',
+    semver.lte(willUpdateFirmware, bootloaderRelatedFirmwareVersion.join('.'))
+  );
+  console.log(
+    '2. The current version is greater than the relatedVersion and the bootloader version is lower than the target bootloader version: ',
+    semver.gte(currentVersion, bootloaderRelatedFirmwareVersion.join('.')) &&
+      targetBootloaderVersion &&
+      semver.lt(bootloaderVersion, targetBootloaderVersion.join('.'))
+  );
   return (
     // 1、The target version of the upgrade is lower or equal to relatedVersion
     semver.lte(willUpdateFirmware, bootloaderRelatedFirmwareVersion.join('.')) ||
