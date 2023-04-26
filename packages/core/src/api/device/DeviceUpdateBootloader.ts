@@ -4,9 +4,11 @@ import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
 import { updateBootloader } from '../firmware/uploadFirmware';
 import { createUiMessage } from '../../events/ui-request';
-import type { KnownDevice } from '../../types';
+import type { Features, KnownDevice } from '../../types';
 import { DataManager } from '../../data-manager';
-import { checkBootloaderLength, checkNeedUpdateBoot } from '../firmware/updateBootloader';
+import { checkBootloaderLength, checkNeedUpdateBootForTouch } from '../firmware/updateBootloader';
+import type { Device } from '../../device/Device';
+import { getDeviceType } from '../../utils';
 
 export default class DeviceUpdateBootloader extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
@@ -29,13 +31,10 @@ export default class DeviceUpdateBootloader extends BaseMethod {
     );
   };
 
-  async run() {
-    const { device } = this;
-    const { features } = device;
-
-    if (!features?.bootloader_mode && features) {
+  async updateTouchBootloader(device: Device, features?: Features) {
+    if (features && !features.bootloader_mode) {
       // check & upgrade firmware resource
-      if (features && checkNeedUpdateBoot(features)) {
+      if (features && checkNeedUpdateBootForTouch(features)) {
         this.postTipMessage('CheckLatestUiResource');
         const resourceUrl = DataManager.getBootloaderResource(features);
         if (resourceUrl) {
@@ -56,6 +55,18 @@ export default class DeviceUpdateBootloader extends BaseMethod {
           }
         }
       }
+    }
+
+    return Promise.resolve(true);
+  }
+
+  async run() {
+    const { device } = this;
+    const { features } = device;
+
+    const deviceType = getDeviceType(features);
+    if (deviceType === 'touch') {
+      return this.updateTouchBootloader(device, features);
     }
 
     return Promise.resolve(true);

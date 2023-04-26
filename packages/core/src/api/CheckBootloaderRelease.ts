@@ -1,8 +1,12 @@
 import { BaseMethod } from './BaseMethod';
 
 import { UI_REQUEST } from '../constants/ui-request';
-import { checkNeedUpdateBoot } from './firmware/updateBootloader';
+import {
+  checkNeedUpdateBootForClassic,
+  checkNeedUpdateBootForTouch,
+} from './firmware/updateBootloader';
 import { DataManager } from '../data-manager';
+import { getDeviceType } from '../utils';
 
 export default class CheckBootloaderRelease extends BaseMethod {
   init() {
@@ -13,15 +17,22 @@ export default class CheckBootloaderRelease extends BaseMethod {
   }
 
   async run() {
-    if (this.device.features) {
-      const shouldUpdate = checkNeedUpdateBoot(this.device.features);
-      const resource = DataManager.getBootloaderResource(this.device.features);
-      return Promise.resolve({
-        shouldUpdate,
-        status: shouldUpdate ? 'outdated' : 'valid',
-        release: resource,
-      });
+    if (!this.device.features) {
+      return null;
     }
-    return null;
+    const { features } = this.device;
+    const deviceType = getDeviceType(features);
+    let shouldUpdate = false;
+    if (deviceType === 'classic') {
+      shouldUpdate = !!checkNeedUpdateBootForClassic(features, this.payload.willUpdateFirmware);
+    } else if (deviceType === 'touch') {
+      shouldUpdate = checkNeedUpdateBootForTouch(features);
+    }
+    const resource = DataManager.getBootloaderResource(features);
+    return Promise.resolve({
+      shouldUpdate,
+      status: shouldUpdate ? 'outdated' : 'valid',
+      release: resource,
+    });
   }
 }

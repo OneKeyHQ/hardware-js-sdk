@@ -96,7 +96,13 @@ export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray |
 };
 
 export const getDeviceBootloaderVersion = (features: Features): IVersionArray => {
-  if (!features.bootloader_version) return [0, 0, 0];
+  const deviceType = getDeviceType(features);
+  if (!features.bootloader_version) {
+    if (deviceType === 'classic' && features.bootloader_mode) {
+      return [features.major_version, features.minor_version, features.patch_version];
+    }
+    return [0, 0, 0];
+  }
   if (semver.valid(features.bootloader_version)) {
     return features.bootloader_version.split('.') as unknown as IVersionArray;
   }

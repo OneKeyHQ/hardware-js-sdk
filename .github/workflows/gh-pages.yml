@@ -1,11 +1,6 @@
 name: test_web
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [onekey]
-  pull_request:
-    branches: [onekey]
+on: workflow_dispatch
 
 jobs:
   deploy:
