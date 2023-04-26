@@ -23,6 +23,7 @@ type Params = {
   version?: number[];
   updateType: 'firmware' | 'ble';
   forcedUpdateRes?: boolean;
+  isUpdateBootloader?: boolean;
 };
 
 const Log = getLogger(LoggerNames.Method);
@@ -52,7 +53,11 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       );
     }
 
-    this.params = { updateType: payload.updateType, forcedUpdateRes: payload.forcedUpdateRes };
+    this.params = {
+      updateType: payload.updateType,
+      forcedUpdateRes: payload.forcedUpdateRes,
+      isUpdateBootloader: payload.isUpdateBootloader,
+    };
 
     if ('version' in payload) {
       this.params = {
@@ -261,6 +266,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           features: device.features,
           version: params.version,
           updateType: params.updateType,
+          isUpdateBootloader: params.isUpdateBootloader,
         });
         binary = firmware.binary;
         this.postTipMessage('DownloadFirmwareSuccess');

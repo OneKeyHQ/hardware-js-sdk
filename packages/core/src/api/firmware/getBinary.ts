@@ -9,13 +9,19 @@ import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
 export interface GetInfoProps {
   features: Features;
   updateType: 'firmware' | 'ble';
+  isUpdateBootloader?: boolean;
 }
 
 interface GetBinaryProps extends GetInfoProps {
   version?: number[];
 }
 
-export const getBinary = async ({ features, updateType, version }: GetBinaryProps) => {
+export const getBinary = async ({
+  features,
+  updateType,
+  version,
+  isUpdateBootloader,
+}: GetBinaryProps) => {
   const releaseInfo = getInfo({ features, updateType });
 
   if (!releaseInfo) {
@@ -29,8 +35,14 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
     }
   }
 
-  // @ts-expect-error
-  const url = updateType === 'ble' ? releaseInfo.webUpdate : releaseInfo.url;
+  const url =
+    // eslint-disable-next-line no-nested-ternary
+    updateType === 'ble'
+      ? // @ts-expect-error
+        releaseInfo.webUpdate
+      : isUpdateBootloader
+      ? releaseInfo.bootloaderResource
+      : releaseInfo.url;
   let fw;
   try {
     fw = await httpRequest(url, 'binary');
