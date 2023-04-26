@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import {
+import HardwareSdk, {
   HardwareSDKLowLevel as HardwareLowLevelSdk,
   HardwareTopLevelSdk,
   parseConnectSettings,
@@ -35,7 +35,6 @@ const handleMessage = async (message: CoreMessage) => {
   switch (message.event) {
     case UI_EVENT:
       if (message.type === IFRAME.INIT_BRIDGE) {
-        console.log('====> JSBridge Handshake Success');
         iframe.initPromise.resolve();
         return Promise.resolve({ success: true, payload: 'JSBridge Handshake Success' });
       }
@@ -220,6 +219,15 @@ const HardwareSDKLowLevel = HardwareLowLevelSdk({
   uiResponse,
 });
 
-const HardwareWebSdk = HardwareTopLevelSdk();
+const HardwareSDKTopLevel = HardwareTopLevelSdk();
 
-export default { HardwareSDKLowLevel, HardwareWebSdk };
+const HardwareWebSdk = HardwareSdk({
+  eventEmitter,
+  init,
+  call,
+  cancel,
+  dispose,
+  uiResponse,
+});
+
+export default { HardwareSDKLowLevel, HardwareSDKTopLevel, HardwareWebSdk };

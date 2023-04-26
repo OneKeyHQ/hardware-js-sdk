@@ -1,7 +1,7 @@
 import memoizee from 'memoizee';
 import { Platform } from 'react-native';
-import type { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
-import { importLowLevelSDK, importSdk } from './importSdk';
+import { ConnectSettings, CoreApi, HardwareTopLevelSdk, LowLevelCoreApi } from '@onekeyfe/hd-core';
+import { importLowLevelSDK, importTopLevelSdk, importSdk } from './importSdk';
 
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;
@@ -12,11 +12,16 @@ const isNodeEnvironments = false;
 export const getHardwareSDKInstance = memoizee(
   async () =>
     // eslint-disable-next-line no-async-promise-executor
-    new Promise<{ HardwareSDK: CoreApi; HardwareLowLevelSDK: LowLevelCoreApi }>(
+    new Promise<{
+      HardwareSDK: CoreApi;
+      HardwareLowLevelSDK: LowLevelCoreApi;
+      useLowLevelApi: boolean;
+    }>(
       // eslint-disable-next-line no-async-promise-executor
       async (resolve, reject) => {
+        const useLowLevelApi = false;
         if (initialized) {
-          resolve({ HardwareSDK, HardwareLowLevelSDK });
+          resolve({ HardwareSDK, HardwareLowLevelSDK, useLowLevelApi });
           return;
         }
 
@@ -25,19 +30,22 @@ export const getHardwareSDKInstance = memoizee(
         };
 
         HardwareSDK = await importSdk();
+        // HardwareSDK = await importTopLevelSdk();
+        console.log(HardwareSDK);
 
         if (Platform.OS === 'web') {
           settings.connectSrc = 'https://localhost:8087/';
           settings.env = 'web';
-          HardwareLowLevelSDK = await importLowLevelSDK();
+          // HardwareLowLevelSDK = await importLowLevelSDK();
         }
 
         try {
-          await HardwareSDK.init(settings, HardwareLowLevelSDK);
+          await HardwareSDK.init(settings);
+          // await HardwareSDK.init(settings, HardwareLowLevelSDK);
           console.log('HardwareSDK initialized success');
           initialized = true;
 
-          resolve({ HardwareSDK, HardwareLowLevelSDK });
+          resolve({ HardwareSDK, HardwareLowLevelSDK, useLowLevelApi });
         } catch (e) {
           reject(e);
         }

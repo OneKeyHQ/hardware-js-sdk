@@ -40,7 +40,7 @@ import { CallPolkadotMethods } from './CallPolkadotMethods';
 let registerListener = false;
 
 export type ICallMethodProps = {
-  HardwareLowLevelSDK: LowLevelCoreApi;
+  HardwareLowLevelSDK?: LowLevelCoreApi;
   SDK: CoreApi;
   type: 'Bluetooth' | 'USB';
 };
@@ -68,7 +68,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
       return;
     }
 
-    HardwareLowLevelSDK.addHardwareGlobalEventListener(params => {
+    HardwareLowLevelSDK?.addHardwareGlobalEventListener(params => {
       SDK.emit?.(params.event, { ...params });
     });
 

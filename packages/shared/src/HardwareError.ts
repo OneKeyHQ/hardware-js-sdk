@@ -456,7 +456,6 @@ export const TypedError = (
 };
 
 export const serializeError = (payload: any) => {
-  console.log('serializeError =====>>>>>>', payload);
   if (payload && payload.error instanceof HardwareError) {
     return {
       error: payload.error.message,
