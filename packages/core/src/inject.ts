@@ -230,6 +230,11 @@ export const inject = ({
       call({ ...params, connectId, deviceId, method: 'polkadotGetAddress' }),
     polkadotSignTransaction: (connectId, deviceId, params) =>
       call({ ...params, connectId, deviceId, method: 'polkadotSignTransaction' }),
+
+    kaspaGetAddress: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'kaspaGetAddress' }),
+    kaspaSignTransaction: (connectId, deviceId, params) =>
+      call({ ...params, connectId, deviceId, method: 'kaspaSignTransaction' }),
   };
   return api;
 };

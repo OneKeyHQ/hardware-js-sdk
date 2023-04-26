@@ -123,3 +123,11 @@ export type { FilecoinSignTransactionParams, FilecoinSignedTx } from './filecoin
 
 export type { PolkadotAddress, PolkadotGetAddressParams } from './polkadotGetAddress';
 export type { PolkadotSignedTx, PolkadotSignTransactionParams } from './polkadotSignTransaction';
+
+export type { KaspaAddress, KaspaGetAddressParams } from './kaspaGetAddress';
+export type {
+  KaspaSignature,
+  KaspaSignTransactionParams,
+  KaspaSignInputParams,
+  KaspaSignOutputParams,
+} from './kaspaSignTransaction';
