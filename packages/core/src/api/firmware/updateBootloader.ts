@@ -34,20 +34,14 @@ export function checkNeedUpdateBootForClassic(features: Features, willUpdateFirm
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
   const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features);
+  if (targetBootloaderVersion && semver.gte(bootloaderVersion, targetBootloaderVersion.join('.'))) {
+    return false;
+  }
+
   const bootloaderRelatedFirmwareVersion =
     DataManager.getBootloaderRelatedFirmwareVersion(features);
   if (!bootloaderRelatedFirmwareVersion) return false;
-  // There are two situations that require an upgrade
-  console.log(
-    '1. The target version of the upgrade is lower or equal to relatedVersion: ',
-    semver.lte(willUpdateFirmware, bootloaderRelatedFirmwareVersion.join('.'))
-  );
-  console.log(
-    '2. The current version is greater than the relatedVersion and the bootloader version is lower than the target bootloader version: ',
-    semver.gte(currentVersion, bootloaderRelatedFirmwareVersion.join('.')) &&
-      targetBootloaderVersion &&
-      semver.lt(bootloaderVersion, targetBootloaderVersion.join('.'))
-  );
+
   return (
     // 1、The target version of the upgrade is lower or equal to relatedVersion
     semver.lte(willUpdateFirmware, bootloaderRelatedFirmwareVersion.join('.')) ||
