@@ -12,7 +12,10 @@ export {
 } from './deviceFeaturesUtils';
 export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pathUtils';
 
-export { checkNeedUpdateBoot } from '../api/firmware/updateBootloader';
+export {
+  checkNeedUpdateBootForTouch,
+  checkNeedUpdateBootForClassic,
+} from '../api/firmware/updateBootloader';
 
 export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
 

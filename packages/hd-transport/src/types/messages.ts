@@ -1602,6 +1602,45 @@ export type FilecoinSignedTx = {
   signature: string;
 };
 
+// KaspaGetAddress
+export type KaspaGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+  prefix?: string;
+  scheme?: string;
+};
+
+// KaspaAddress
+export type KaspaAddress = {
+  address: string;
+};
+
+// KaspaSignTx
+export type KaspaSignTx = {
+  address_n: number[];
+  raw_message: string;
+  scheme?: string;
+  prefix?: string;
+  input_count?: number;
+};
+
+// KaspaTxInputRequest
+export type KaspaTxInputRequest = {
+  request_index: number;
+  signature?: string;
+};
+
+// KaspaTxInputAck
+export type KaspaTxInputAck = {
+  address_n: number[];
+  raw_message: string;
+};
+
+// KaspaSignedTx
+export type KaspaSignedTx = {
+  signature: string;
+};
+
 export enum Enum_BackupType {
   Bip39 = 0,
   Slip39_Basic = 1,
@@ -1706,6 +1745,7 @@ export type Features = {
   pre_firmware?: string;
   coin_switch?: number;
   build_id?: string;
+  battery_level?: number;
 };
 
 // LockDevice
@@ -3324,6 +3364,12 @@ export type MessageType = {
   FilecoinAddress: FilecoinAddress;
   FilecoinSignTx: FilecoinSignTx;
   FilecoinSignedTx: FilecoinSignedTx;
+  KaspaGetAddress: KaspaGetAddress;
+  KaspaAddress: KaspaAddress;
+  KaspaSignTx: KaspaSignTx;
+  KaspaTxInputRequest: KaspaTxInputRequest;
+  KaspaTxInputAck: KaspaTxInputAck;
+  KaspaSignedTx: KaspaSignedTx;
   Initialize: Initialize;
   GetFeatures: GetFeatures;
   Features: Features;

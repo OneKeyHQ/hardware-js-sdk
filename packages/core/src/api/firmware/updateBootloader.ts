@@ -8,7 +8,7 @@ import {
 } from '../../utils/deviceFeaturesUtils';
 import { DataManager } from '../../data-manager';
 
-export function checkNeedUpdateBoot(features: Features) {
+export function checkNeedUpdateBootForTouch(features: Features) {
   const deviceType = getDeviceType(features);
   if (deviceType !== 'touch') return false;
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
@@ -23,6 +23,32 @@ export function checkNeedUpdateBoot(features: Features) {
     semver.gte(currentVersion, '4.1.0') &&
     // target bootloader version
     semver.lte(bootloaderVersion, targetBootloaderVersion.join('.'))
+  );
+}
+
+export function checkNeedUpdateBootForClassic(features: Features, willUpdateFirmware: string) {
+  console.log('checkNeedUpdateBootForClassiccheckNeedUpdateBootForClassic');
+  const deviceType = getDeviceType(features);
+  if (deviceType !== 'classic') return false;
+  if (!willUpdateFirmware) return false;
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+  const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+  const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features);
+  if (targetBootloaderVersion && semver.gte(bootloaderVersion, targetBootloaderVersion.join('.'))) {
+    return false;
+  }
+
+  const bootloaderRelatedFirmwareVersion =
+    DataManager.getBootloaderRelatedFirmwareVersion(features);
+  if (!bootloaderRelatedFirmwareVersion) return false;
+
+  return (
+    // 1、The target version of the upgrade is lower or equal to relatedVersion
+    semver.lte(willUpdateFirmware, bootloaderRelatedFirmwareVersion.join('.')) ||
+    // 2、The current version is greater than the relatedVersion and the bootloader version is lower than the target bootloader version
+    (semver.gte(currentVersion, bootloaderRelatedFirmwareVersion.join('.')) &&
+      targetBootloaderVersion &&
+      semver.lt(bootloaderVersion, targetBootloaderVersion.join('.')))
   );
 }
 
