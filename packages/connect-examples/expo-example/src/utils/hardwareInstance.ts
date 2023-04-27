@@ -24,7 +24,7 @@ export const getHardwareSDKInstance = memoizee(
       HardwareSDK = await importSdk(isNodeEnvironments);
 
       if (Platform.OS === 'web') {
-        settings.connectSrc = 'https://jssdk.onekey.so/0.2.49/';
+        settings.connectSrc = 'https://jssdk.onekey.so/0.2.51/';
         // settings.connectSrc = 'https://localhost:8087/';
         settings.env = 'web';
       }

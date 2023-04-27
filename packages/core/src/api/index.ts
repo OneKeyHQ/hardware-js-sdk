@@ -99,3 +99,6 @@ export { default as filecoinSignTransaction } from './filecoin/FilecoinSignTrans
 
 export { default as polkadotGetAddress } from './polkadot/PolkadotGetAddress';
 export { default as polkadotSignTransaction } from './polkadot/PolkadotSignTransaction';
+
+export { default as kaspaGetAddress } from './kaspa/KaspaGetAddress';
+export { default as kaspaSignTransaction } from './kaspa/KaspaSignTransaction';
