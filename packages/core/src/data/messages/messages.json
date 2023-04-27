@@ -4468,6 +4468,122 @@
         }
       }
     },
+    "KaspaGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "prefix": {
+          "type": "string",
+          "id": 3,
+          "options": {
+            "default": "kaspa"
+          }
+        },
+        "scheme": {
+          "type": "string",
+          "id": 4,
+          "options": {
+            "default": "schnorr"
+          }
+        }
+      }
+    },
+    "KaspaAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "KaspaSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "scheme": {
+          "type": "string",
+          "id": 3,
+          "options": {
+            "default": "schnorr"
+          }
+        },
+        "prefix": {
+          "type": "string",
+          "id": 4,
+          "options": {
+            "default": "kaspa"
+          }
+        },
+        "input_count": {
+          "type": "uint32",
+          "id": 5,
+          "options": {
+            "default": 1
+          }
+        }
+      }
+    },
+    "KaspaTxInputRequest": {
+      "fields": {
+        "request_index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "KaspaTxInputAck": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "KaspaSignedTx": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
     "BackupType": {
       "values": {
         "Bip39": 0,
@@ -4743,6 +4859,10 @@
         "build_id": {
           "type": "string",
           "id": 518
+        },
+        "battery_level": {
+          "type": "uint32",
+          "id": 520
         }
       },
       "nested": {
@@ -8936,6 +9056,12 @@
         "MessageType_FilecoinAddress": 11201,
         "MessageType_FilecoinSignTx": 11202,
         "MessageType_FilecoinSignedTx": 11203,
+        "MessageType_KaspaGetAddress": 11300,
+        "MessageType_KaspaAddress": 11301,
+        "MessageType_KaspaSignTx": 11302,
+        "MessageType_KaspaSignedTx": 11303,
+        "MessageType_KaspaTxInputRequest": 11304,
+        "MessageType_KaspaTxInputAck": 11305,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
