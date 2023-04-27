@@ -1,6 +1,4 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import BigNumber from 'bignumber.js';
-import { bytesToHex } from '@noble/hashes/utils';
 import {
   KaspaSignTransactionParams,
   KaspaSignInputParams,

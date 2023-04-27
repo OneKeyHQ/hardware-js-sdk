@@ -35,6 +35,7 @@ import { CallSuiMethods } from './CallSuiMethods';
 import { CallCardanoMethods } from './CallCardanoMethods';
 import { CallFilecoinMethods } from './CallFilecoinMethods';
 import { CallPolkadotMethods } from './CallPolkadotMethods';
+import { CallKaspaMethods } from './CallKaspaMethods';
 
 let registerListener = false;
 
@@ -380,6 +381,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
         selectedDevice={selectedDevice}
         commonParams={optionalParams}
       />
+      <CallKaspaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }
