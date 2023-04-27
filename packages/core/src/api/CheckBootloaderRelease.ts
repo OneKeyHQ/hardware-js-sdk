@@ -17,20 +17,17 @@ export default class CheckBootloaderRelease extends BaseMethod {
   }
 
   async run() {
-    console.log('=====>>>>>>>>>.');
     if (!this.device.features) {
       return null;
     }
     const { features } = this.device;
     const deviceType = getDeviceType(features);
     let shouldUpdate = false;
-    console.log('checkClassicbootloader deviceType => ', deviceType);
     if (deviceType === 'classic') {
       shouldUpdate = !!checkNeedUpdateBootForClassic(
         features,
         this.payload.willUpdateFirmwareVersion
       );
-      console.log('checkClassicbootloader update => ', shouldUpdate);
     } else if (deviceType === 'touch') {
       shouldUpdate = checkNeedUpdateBootForTouch(features);
     }
