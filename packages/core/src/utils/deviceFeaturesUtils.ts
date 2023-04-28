@@ -14,6 +14,10 @@ export const getDeviceModel = (features?: Features): IDeviceModel => {
     return 'model_mini';
   }
 
+  if (!features.model) {
+    return 'model_mini';
+  }
+
   if (features.model === '1') {
     return 'model_mini';
   }
