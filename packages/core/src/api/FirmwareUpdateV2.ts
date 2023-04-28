@@ -226,7 +226,13 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       // auto go to bootloader mode
       try {
         this.postTipMessage('AutoRebootToBootloader');
-        await commands.typedCall('DeviceBackToBoot', 'Success');
+        const bootRes = await commands.typedCall('DeviceBackToBoot', 'Success');
+        // @ts-expect-error
+        if (bootRes.type === 'CallMethodError') {
+          return await Promise.reject(
+            ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
+          );
+        }
         this.postTipMessage('GoToBootloaderSuccess');
         this.checkDeviceToBootloader(this.payload.connectId);
 
