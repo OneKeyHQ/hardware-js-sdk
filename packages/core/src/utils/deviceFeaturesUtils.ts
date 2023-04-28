@@ -180,6 +180,10 @@ export const getFirmwareUpdateField = (features: Features, updateType: 'firmware
     return 'ble';
   }
 
+  if (deviceType === 'classic') {
+    return 'firmware-v2';
+  }
+
   if (deviceType === 'touch') {
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
     return 'firmware-v3';

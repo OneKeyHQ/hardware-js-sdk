@@ -89,7 +89,7 @@ export class DevicePool extends EventEmitter {
     connectId?: string,
     initOptions?: InitOptions
   ) {
-    Log.debug('get device list: connectId: ', connectId);
+    // Log.debug('get device list: connectId: ', connectId);
 
     const devices: Record<string, Device> = {};
     const deviceList = [];
@@ -101,7 +101,7 @@ export class DevicePool extends EventEmitter {
       if (device) {
         const exist = descriptorList.find(d => d.path === device.originalDescriptor.path);
         if (exist) {
-          Log.debug('find existed Device: ', connectId);
+          // Log.debug('find existed Device: ', connectId);
           device.updateDescriptor(exist, true);
           devices[connectId] = device;
           deviceList.push(device);
@@ -128,15 +128,15 @@ export class DevicePool extends EventEmitter {
       deviceList.push(device);
     }
     // Log.debug('get devices result : ', devices, deviceList);
-    console.log('device poll -> connected: ', this.connectedPool);
-    console.log('device poll -> disconnected: ', this.disconnectPool);
+    // console.log('device poll -> connected: ', this.connectedPool);
+    // console.log('device poll -> disconnected: ', this.disconnectPool);
     await this._checkDevicePool(initOptions);
     return { devices, deviceList };
   }
 
   static clearDeviceCache(connectId?: string) {
-    Log.debug('clear device pool cache: connectId', connectId);
-    Log.debug('clear device pool cache: ', this.devicesCache);
+    // Log.debug('clear device pool cache: connectId', connectId);
+    // Log.debug('clear device pool cache: ', this.devicesCache);
     if (connectId) {
       delete this.devicesCache[connectId];
     }
