@@ -133,7 +133,7 @@ export default class DataManager {
   static getBootloaderRelatedFirmwareVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
 
-    if (deviceType !== 'classic') return undefined;
+    if (!(deviceType === 'classic' || deviceType === 'mini')) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(
