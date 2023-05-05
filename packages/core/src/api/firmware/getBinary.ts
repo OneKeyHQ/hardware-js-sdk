@@ -10,6 +10,7 @@ export interface GetInfoProps {
   features: Features;
   updateType: 'firmware' | 'ble';
   isUpdateBootloader?: boolean;
+  targetVersion?: string;
 }
 
 interface GetBinaryProps extends GetInfoProps {
@@ -22,7 +23,7 @@ export const getBinary = async ({
   version,
   isUpdateBootloader,
 }: GetBinaryProps) => {
-  const releaseInfo = getInfo({ features, updateType });
+  const releaseInfo = getInfo({ features, updateType, targetVersion: version?.join('.') });
 
   if (!releaseInfo) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'no firmware found for this device');
@@ -69,11 +70,21 @@ export const getSysResourceBinary = async (url: string) => {
   };
 };
 
-export const getInfo = ({ features, updateType }: GetInfoProps) => {
+export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
   const { deviceMap } = DataManager;
 
-  const firmwareUpdateField = getFirmwareUpdateField(features, updateType);
+  let firmwareUpdateField: 'firmware' | 'ble' | 'firmware-v2' | 'firmware-v3' =
+    getFirmwareUpdateField(features, updateType);
+  if (deviceType === 'touch' && targetVersion) {
+    if (semver.eq(targetVersion, '4.0.0')) {
+      firmwareUpdateField = 'firmware-v2';
+    } else if (semver.gt(targetVersion, '4.0.0')) {
+      firmwareUpdateField = 'firmware-v3';
+    }
+  }
+
+  console.log('=====>>>getInfo: ', firmwareUpdateField);
   const releaseInfo = deviceMap?.[deviceType]?.[firmwareUpdateField] ?? [];
   return findLatestRelease(releaseInfo);
 };

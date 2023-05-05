@@ -49,7 +49,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [selectedFile, setSelectedFile] = useState<Uint8Array>();
-  const [firmwareType, setFirmwareType] = useState<boolean>(false);
+  const [firmwareType, setFirmwareType] = useState<boolean>(true);
 
   const [optionalParams, setOptionalParams] = useState<CommonParams>();
   const [uploadScreenParams, setUploadScreenParams] = useState<{
@@ -182,7 +182,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const handleFirmwareUpdateV2 = async (file?: Uint8Array) => {
     const params: any = {
       updateType: firmwareType ? 'firmware' : 'ble',
-      version: [3, 5, 0],
+      version: [4, 2, 0],
       platform: 'web',
       forcedUpdateRes: false,
     };
