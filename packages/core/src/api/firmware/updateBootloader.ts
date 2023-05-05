@@ -26,10 +26,12 @@ export function checkNeedUpdateBootForTouch(features: Features) {
   );
 }
 
-export function checkNeedUpdateBootForClassic(features: Features, willUpdateFirmware: string) {
-  console.log('checkNeedUpdateBootForClassiccheckNeedUpdateBootForClassic');
+export function checkNeedUpdateBootForClassicAndMini(
+  features: Features,
+  willUpdateFirmware: string
+) {
   const deviceType = getDeviceType(features);
-  if (deviceType !== 'classic') return false;
+  if (!(deviceType === 'classic' || deviceType === 'mini')) return false;
   if (!willUpdateFirmware) return false;
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');

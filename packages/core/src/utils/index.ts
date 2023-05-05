@@ -14,7 +14,7 @@ export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pa
 
 export {
   checkNeedUpdateBootForTouch,
-  checkNeedUpdateBootForClassic,
+  checkNeedUpdateBootForClassicAndMini,
 } from '../api/firmware/updateBootloader';
 
 export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
