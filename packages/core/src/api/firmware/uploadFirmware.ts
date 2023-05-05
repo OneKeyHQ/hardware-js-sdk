@@ -98,6 +98,10 @@ export const uploadFirmware = async (
       response = await typedCall('FirmwareUpload', ['FirmwareRequest', 'Success'], {
         payload: chunk,
       });
+      // @ts-expect-error
+      if (response.type === 'CallMethodError') {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'upload firmware error');
+      }
     }
 
     postProgressMessage(device, 100, postMessage);
