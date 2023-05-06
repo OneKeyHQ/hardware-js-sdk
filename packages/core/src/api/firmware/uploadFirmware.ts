@@ -65,7 +65,10 @@ export const uploadFirmware = async (
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
     const eraseCommand = updateType === 'firmware' ? 'FirmwareErase' : 'FirmwareErase_ex';
-    await typedCall(eraseCommand as unknown as any, 'Success', {});
+    const eraseRes = await typedCall(eraseCommand as unknown as any, 'Success', {});
+    if (eraseRes.type !== 'Success') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
+    }
     postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
     postProgressMessage(device, 0, postMessage);
     const { message } = await typedCall('FirmwareUpload', 'Success', {
