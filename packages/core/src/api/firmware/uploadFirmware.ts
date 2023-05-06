@@ -71,12 +71,15 @@ export const uploadFirmware = async (
     }
     postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
     postProgressMessage(device, 0, postMessage);
-    const { message } = await typedCall('FirmwareUpload', 'Success', {
+    const { message, type } = await typedCall('FirmwareUpload', 'Success', {
       payload,
     });
     postProgressMessage(device, 100, postMessage);
 
     await waitBleInstall(updateType);
+    if (type !== 'Success') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'install firmware error');
+    }
     return message;
   }
 

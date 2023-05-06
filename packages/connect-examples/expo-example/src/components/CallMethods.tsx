@@ -158,7 +158,9 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   };
 
   const handleCheckBootloaderRelease = async () => {
-    const response = await SDK.checkBootloaderRelease(selectedDevice?.connectId);
+    const response = await SDK.checkBootloaderRelease(selectedDevice?.connectId, {
+      willUpdateFirmwareVersion: '3.0.0',
+    });
     console.log('example checkBootloader response: ', response);
   };
 
@@ -182,7 +184,7 @@ export function CallMethods({ SDK, type }: ICallMethodProps) {
   const handleFirmwareUpdateV2 = async (file?: Uint8Array) => {
     const params: any = {
       updateType: firmwareType ? 'firmware' : 'ble',
-      version: [4, 2, 0],
+      version: [3, 0, 0],
       platform: 'web',
       forcedUpdateRes: false,
     };
