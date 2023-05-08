@@ -19,7 +19,7 @@ yarn add @onekeyfe/hd-web-sdk
 ## Initialization
 
 ```javascript
-import HardwareSDK from '@onekeyfe/hd-web-sdk';
+import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
 
 function init() {
   HardwareSDK.init({
@@ -32,6 +32,3 @@ function init() {
 ## Docs
 
 Documentation is available [hardware-js-sdk](https://developer.onekey.so/connect-to-hardware/hardware-sdk/start)
-
-## Examples
-// TODO: add example url

@@ -1,5 +1,10 @@
 import { inject, InjectApi } from './inject';
+import { lowLevelInject, LowLevelInjectApi, LowLevelCoreApi } from './lowLevelInject';
+import { topLevelInject } from './topLevelInject';
 import { CoreApi } from './types/api';
+
+export type { LowLevelCoreApi, LowLevelInjectApi } from './lowLevelInject';
+export type { TopLevelInjectApi } from './topLevelInject';
 
 export { default as Core, init as initCore } from './core';
 
@@ -25,5 +30,28 @@ const HardwareSdk = ({
     uiResponse,
     cancel,
   });
+
+const HardwareSDKLowLevel = ({
+  init,
+  call,
+  dispose,
+  eventEmitter,
+  addHardwareGlobalEventListener,
+  uiResponse,
+  cancel,
+}: LowLevelInjectApi): LowLevelCoreApi =>
+  lowLevelInject({
+    init,
+    call,
+    dispose,
+    eventEmitter,
+    addHardwareGlobalEventListener,
+    uiResponse,
+    cancel,
+  });
+
+const HardwareTopLevelSdk = (): CoreApi => topLevelInject();
+
+export { HardwareTopLevelSdk, HardwareSDKLowLevel };
 
 export default HardwareSdk;

@@ -1,5 +1,7 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
+  HardwareSDKLowLevel as HardwareLowLevelSdk,
+  HardwareTopLevelSdk,
   parseConnectSettings,
   enableLog,
   PostMessageEvent,
@@ -17,6 +19,7 @@ import HardwareSdk, {
   FIRMWARE_EVENT,
   DEVICE_EVENT,
   DEVICE,
+  UI_REQUEST,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
@@ -178,6 +181,46 @@ const call = async (params: any) => {
   }
 };
 
+const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void) => {
+  [
+    UI_EVENT,
+    LOG_EVENT,
+    FIRMWARE_EVENT,
+    DEVICE.CONNECT,
+    DEVICE.DISCONNECT,
+    DEVICE.FEATURES,
+    DEVICE.SUPPORT_FEATURES,
+    UI_REQUEST.FIRMWARE_PROGRESS,
+    UI_REQUEST.FIRMWARE_TIP,
+    UI_REQUEST.PREVIOUS_ADDRESS_RESULT,
+  ].forEach(eventName => {
+    eventEmitter.on(eventName, (message: CoreMessage) => {
+      let emitMessage = message;
+      if (!message.event && !(message as CoreMessage).type) {
+        emitMessage = {
+          // @ts-expect-error
+          ...message,
+          event: eventName,
+          type: eventName,
+        };
+      }
+      listener?.(emitMessage);
+    });
+  });
+};
+
+const HardwareSDKLowLevel = HardwareLowLevelSdk({
+  eventEmitter,
+  init,
+  call,
+  cancel,
+  dispose,
+  addHardwareGlobalEventListener,
+  uiResponse,
+});
+
+const HardwareSDKTopLevel = HardwareTopLevelSdk();
+
 const HardwareWebSdk = HardwareSdk({
   eventEmitter,
   init,
@@ -187,4 +230,4 @@ const HardwareWebSdk = HardwareSdk({
   uiResponse,
 });
 
-export default HardwareWebSdk;
+export default { HardwareSDKLowLevel, HardwareSDKTopLevel, HardwareWebSdk };
