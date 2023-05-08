@@ -149,8 +149,6 @@ export abstract class BaseMethod<Params = undefined> {
    * @returns {void}
    */
   async checkSafetyLevelOnTestNet() {
-    const deviceType = getDeviceType(this.device.features);
-    if (deviceType !== 'touch') return;
     let checkFlag = false;
     if (
       this.name === 'evmSignTransaction' &&
