@@ -65,15 +65,21 @@ export const uploadFirmware = async (
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
     const eraseCommand = updateType === 'firmware' ? 'FirmwareErase' : 'FirmwareErase_ex';
-    await typedCall(eraseCommand as unknown as any, 'Success', {});
+    const eraseRes = await typedCall(eraseCommand as unknown as any, 'Success', {});
+    if (eraseRes.type !== 'Success') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
+    }
     postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
     postProgressMessage(device, 0, postMessage);
-    const { message } = await typedCall('FirmwareUpload', 'Success', {
+    const { message, type } = await typedCall('FirmwareUpload', 'Success', {
       payload,
     });
     postProgressMessage(device, 100, postMessage);
 
     await waitBleInstall(updateType);
+    if (type !== 'Success') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'install firmware error');
+    }
     return message;
   }
 
@@ -98,6 +104,10 @@ export const uploadFirmware = async (
       response = await typedCall('FirmwareUpload', ['FirmwareRequest', 'Success'], {
         payload: chunk,
       });
+      // @ts-expect-error
+      if (response.type === 'CallMethodError') {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'upload firmware error');
+      }
     }
 
     postProgressMessage(device, 100, postMessage);

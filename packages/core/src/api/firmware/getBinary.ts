@@ -9,14 +9,21 @@ import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
 export interface GetInfoProps {
   features: Features;
   updateType: 'firmware' | 'ble';
+  isUpdateBootloader?: boolean;
+  targetVersion?: string;
 }
 
 interface GetBinaryProps extends GetInfoProps {
   version?: number[];
 }
 
-export const getBinary = async ({ features, updateType, version }: GetBinaryProps) => {
-  const releaseInfo = getInfo({ features, updateType });
+export const getBinary = async ({
+  features,
+  updateType,
+  version,
+  isUpdateBootloader,
+}: GetBinaryProps) => {
+  const releaseInfo = getInfo({ features, updateType, targetVersion: version?.join('.') });
 
   if (!releaseInfo) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'no firmware found for this device');
@@ -29,8 +36,14 @@ export const getBinary = async ({ features, updateType, version }: GetBinaryProp
     }
   }
 
-  // @ts-expect-error
-  const url = updateType === 'ble' ? releaseInfo.webUpdate : releaseInfo.url;
+  const url =
+    // eslint-disable-next-line no-nested-ternary
+    updateType === 'ble'
+      ? // @ts-expect-error
+        releaseInfo.webUpdate
+      : isUpdateBootloader
+      ? releaseInfo.bootloaderResource
+      : releaseInfo.url;
   let fw;
   try {
     fw = await httpRequest(url, 'binary');
@@ -57,11 +70,21 @@ export const getSysResourceBinary = async (url: string) => {
   };
 };
 
-export const getInfo = ({ features, updateType }: GetInfoProps) => {
+export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
   const { deviceMap } = DataManager;
 
-  const firmwareUpdateField = getFirmwareUpdateField(features, updateType);
+  let firmwareUpdateField: 'firmware' | 'ble' | 'firmware-v2' | 'firmware-v3' =
+    getFirmwareUpdateField(features, updateType);
+  if (deviceType === 'touch' && targetVersion) {
+    if (semver.eq(targetVersion, '4.0.0')) {
+      firmwareUpdateField = 'firmware-v2';
+    } else if (semver.gt(targetVersion, '4.0.0')) {
+      firmwareUpdateField = 'firmware-v3';
+    }
+  }
+
+  console.log('=====>>>getInfo: ', firmwareUpdateField);
   const releaseInfo = deviceMap?.[deviceType]?.[firmwareUpdateField] ?? [];
   return findLatestRelease(releaseInfo);
 };

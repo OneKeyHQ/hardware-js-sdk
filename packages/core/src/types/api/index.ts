@@ -104,6 +104,9 @@ import { filecoinSignTransaction } from './filecoinSignTransaction';
 import { polkadotGetAddress } from './polkadotGetAddress';
 import { polkadotSignTransaction } from './polkadotSignTransaction';
 
+import { kaspaGetAddress } from './kaspaGetAddress';
+import { kaspaSignTransaction } from './kaspaSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -278,4 +281,10 @@ export type CoreApi = {
    */
   polkadotGetAddress: typeof polkadotGetAddress;
   polkadotSignTransaction: typeof polkadotSignTransaction;
+
+  /**
+   * Kaspa function
+   */
+  kaspaGetAddress: typeof kaspaGetAddress;
+  kaspaSignTransaction: typeof kaspaSignTransaction;
 };

@@ -14,6 +14,10 @@ export const getDeviceModel = (features?: Features): IDeviceModel => {
     return 'model_mini';
   }
 
+  if (!features.model) {
+    return 'model_mini';
+  }
+
   if (features.model === '1') {
     return 'model_mini';
   }
@@ -96,7 +100,13 @@ export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray |
 };
 
 export const getDeviceBootloaderVersion = (features: Features): IVersionArray => {
-  if (!features.bootloader_version) return [0, 0, 0];
+  const deviceType = getDeviceType(features);
+  if (!features.bootloader_version) {
+    if ((deviceType === 'classic' || deviceType === 'mini') && features.bootloader_mode) {
+      return [features.major_version, features.minor_version, features.patch_version];
+    }
+    return [0, 0, 0];
+  }
   if (semver.valid(features.bootloader_version)) {
     return features.bootloader_version.split('.') as unknown as IVersionArray;
   }
@@ -172,6 +182,10 @@ export const getFirmwareUpdateField = (features: Features, updateType: 'firmware
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
   if (updateType === 'ble') {
     return 'ble';
+  }
+
+  if (deviceType === 'classic') {
+    return 'firmware-v2';
   }
 
   if (deviceType === 'touch') {

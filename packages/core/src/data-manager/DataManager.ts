@@ -22,7 +22,7 @@ import type {
 } from '../types';
 import { getReleaseChangelog, getReleaseStatus, findLatestRelease } from '../utils/release';
 
-type FirmwareField = 'firmware' | 'firmware-v3';
+type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v3';
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap = {
@@ -123,12 +123,24 @@ export default class DataManager {
   static getBootloaderTargetVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
 
-    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
     const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
     return targetDeviceConfig?.[0]?.bootloaderVersion ?? undefined;
+  };
+
+  static getBootloaderRelatedFirmwareVersion = (features: Features): IVersionArray | undefined => {
+    const deviceType = getDeviceType(features);
+
+    if (!(deviceType === 'classic' || deviceType === 'mini')) return undefined;
+    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
+    const targetDeviceConfig = targetDeviceConfigList.filter(
+      item => !!item.bootloaderRelatedFirmwareVersion
+    );
+
+    return targetDeviceConfig?.[0]?.bootloaderRelatedFirmwareVersion ?? undefined;
   };
 
   static getFirmwareChangelog = (features: Features) => {

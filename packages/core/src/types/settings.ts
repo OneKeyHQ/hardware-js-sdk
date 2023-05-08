@@ -35,6 +35,10 @@ export type IFirmwareReleaseInfo = {
   fullResourceRange?: string[];
   bootloaderResource?: string;
   bootloaderVersion?: IVersionArray;
+  bootloaderRelatedFirmwareVersion?: IVersionArray;
+  bootloaderChangelog?: {
+    [k in ILocale]: string;
+  };
   fingerprint: string;
   version: IVersionArray;
   changelog: {
@@ -60,6 +64,7 @@ export type IBLEFirmwareReleaseInfo = {
 export type DeviceTypeMap = {
   [k in IDeviceType]: {
     firmware: IFirmwareReleaseInfo[];
+    'firmware-v2'?: IFirmwareReleaseInfo[];
     'firmware-v3'?: IFirmwareReleaseInfo[];
     ble: IBLEFirmwareReleaseInfo[];
   };

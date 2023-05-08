@@ -14,11 +14,11 @@ export type SuiGetAddressParams = {
 export declare function suiGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & HardwareSuiAddress
+  params: CommonParams & SuiGetAddressParams
 ): Response<SuiAddress>;
 
 export declare function suiGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & { bundle?: HardwareSuiAddress[] }
+  params: CommonParams & { bundle?: SuiGetAddressParams[] }
 ): Response<Array<SuiAddress>>;

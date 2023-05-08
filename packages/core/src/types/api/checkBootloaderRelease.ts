@@ -1,4 +1,4 @@
-import type { Response } from '../params';
+import type { CommonParams, Response } from '../params';
 
 export type CheckBootloaderReleaseResponse = {
   shouldUpdate: boolean;
@@ -7,5 +7,8 @@ export type CheckBootloaderReleaseResponse = {
 } | null;
 
 export declare function checkBootloaderRelease(
-  connectId?: string
+  connectId?: string,
+  params?: CommonParams & {
+    willUpdateFirmwareVersion?: string;
+  }
 ): Response<CheckBootloaderReleaseResponse>;

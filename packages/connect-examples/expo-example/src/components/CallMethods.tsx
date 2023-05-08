@@ -36,6 +36,7 @@ import { CallSuiMethods } from './CallSuiMethods';
 import { CallCardanoMethods } from './CallCardanoMethods';
 import { CallFilecoinMethods } from './CallFilecoinMethods';
 import { CallPolkadotMethods } from './CallPolkadotMethods';
+import { CallKaspaMethods } from './CallKaspaMethods';
 
 let registerListener = false;
 
@@ -50,7 +51,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [selectedFile, setSelectedFile] = useState<Uint8Array>();
-  const [firmwareType, setFirmwareType] = useState<boolean>(false);
+  const [firmwareType, setFirmwareType] = useState<boolean>(true);
 
   const [optionalParams, setOptionalParams] = useState<CommonParams>();
   const [uploadScreenParams, setUploadScreenParams] = useState<{
@@ -166,7 +167,9 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
   };
 
   const handleCheckBootloaderRelease = async () => {
-    const response = await SDK.checkBootloaderRelease(selectedDevice?.connectId);
+    const response = await SDK.checkBootloaderRelease(selectedDevice?.connectId, {
+      willUpdateFirmwareVersion: '3.0.0',
+    });
     console.log('example checkBootloader response: ', response);
   };
 
@@ -190,7 +193,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
   const handleFirmwareUpdateV2 = async (file?: Uint8Array) => {
     const params: any = {
       updateType: firmwareType ? 'firmware' : 'ble',
-      version: [3, 5, 0],
+      version: [3, 0, 0],
       platform: 'web',
       forcedUpdateRes: false,
     };
@@ -389,6 +392,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
         selectedDevice={selectedDevice}
         commonParams={optionalParams}
       />
+      <CallKaspaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }
