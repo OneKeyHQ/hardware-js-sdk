@@ -184,7 +184,7 @@ export const getFirmwareUpdateField = (features: Features, updateType: 'firmware
     return 'ble';
   }
 
-  if (deviceType === 'classic') {
+  if (deviceType === 'classic' || deviceType === 'mini') {
     return 'firmware-v2';
   }
 
