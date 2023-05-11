@@ -23,7 +23,7 @@ export default class CheckBootloaderRelease extends BaseMethod {
     const { features } = this.device;
     const deviceType = getDeviceType(features);
     let shouldUpdate = false;
-    if (deviceType === 'classic') {
+    if (deviceType === 'classic' || deviceType === 'mini') {
       shouldUpdate = !!checkNeedUpdateBootForClassicAndMini(
         features,
         this.payload.willUpdateFirmwareVersion
