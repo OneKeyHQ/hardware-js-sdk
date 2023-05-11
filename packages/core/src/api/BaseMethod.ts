@@ -1,8 +1,4 @@
-import {
-  supportInputPinOnSoftware,
-  supportModifyHomescreen,
-  getDeviceType,
-} from '../utils/deviceFeaturesUtils';
+import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
