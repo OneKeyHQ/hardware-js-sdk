@@ -94,7 +94,8 @@ export const createCoreApi = (
    */
   checkBridgeStatus: () => call({ method: 'checkBridgeStatus' }),
 
-  checkBootloaderRelease: connectId => call({ connectId, method: 'checkBootloaderRelease' }),
+  checkBootloaderRelease: (connectId, params) =>
+    call({ ...params, connectId, method: 'checkBootloaderRelease' }),
 
   cipherKeyValue: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
