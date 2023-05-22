@@ -1,7 +1,9 @@
+import semver from 'semver';
 import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Success } from '@onekeyfe/hd-transport';
+import { arrayBuffer } from 'stream/consumers';
 import { wait } from '../../utils/index';
 import { DEVICE, CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
 import { PROTO } from '../../constants';
@@ -9,7 +11,9 @@ import type { Device } from '../../device/Device';
 import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
 import { KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
-import { getDeviceModel } from '../../utils/deviceFeaturesUtils';
+import { getDeviceBootloaderVersion, getDeviceModel } from '../../utils/deviceFeaturesUtils';
+
+const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.2';
 
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
@@ -84,36 +88,75 @@ export const uploadFirmware = async (
   }
 
   if (deviceModel === 'model_touch') {
-    postConfirmationMessage(device);
-    postProgressTip(device, 'ConfirmOnDevice', postMessage);
-    const length = payload.byteLength;
+    if (device.features) {
+      console.log('=======>>>>>>NEW UPDATE');
+      const bootloaderVersion = getDeviceBootloaderVersion(device.features);
+      if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
+        // Write File
+        const chunkSize = 1024 * 128;
+        const totalChunks = Math.ceil(payload.byteLength / chunkSize);
+        let offset = 0;
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkStart = i * chunkSize;
+          const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
+          const chunkLength = chunkEnd - chunkStart;
+          const chunk = payload.slice(chunkStart, chunkEnd);
+          const overwrite = i === 0;
+          // @ts-expect-error
+          const writeRes = await typedCall('EmmcFileWrite', 'EmmcFile', {
+            file: {
+              path: '0:test-firmware.bin',
+              len: chunkLength,
+              offset,
+              data: chunk,
+            },
+            overwrite,
+            append: offset !== 0,
+          });
+          // @ts-expect-error
+          offset += writeRes.message.processed_byte;
+        }
 
-    let response = await typedCall('FirmwareErase', ['FirmwareRequest', 'Success'], { length });
-    postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
-    while (response.type !== 'Success') {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const start = response.message.offset!;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const end = response.message.offset! + response.message.length!;
-      const chunk = payload.slice(start, end);
-
-      if (start > 0) {
-        postProgressMessage(device, Math.round((start / length) * 100), postMessage);
-      }
-
-      response = await typedCall('FirmwareUpload', ['FirmwareRequest', 'Success'], {
-        payload: chunk,
-      });
-      // @ts-expect-error
-      if (response.type === 'CallMethodError') {
-        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'upload firmware error');
+        // Firmware Update
+        const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
+          path: '0:test-firmware.bin',
+          force_erease: true,
+          reboot_on_success: true,
+        });
+        console.log('response= ====> :', response);
+        return;
       }
     }
+    // postConfirmationMessage(device);
+    // postProgressTip(device, 'ConfirmOnDevice', postMessage);
+    // const length = payload.byteLength;
 
-    postProgressMessage(device, 100, postMessage);
+    // let response = await typedCall('FirmwareErase', ['FirmwareRequest', 'Success'], { length });
+    // postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
+    // while (response.type !== 'Success') {
+    //   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    //   const start = response.message.offset!;
+    //   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    //   const end = response.message.offset! + response.message.length!;
+    //   const chunk = payload.slice(start, end);
 
-    await waitBleInstall(updateType);
-    return response.message;
+    //   if (start > 0) {
+    //     postProgressMessage(device, Math.round((start / length) * 100), postMessage);
+    //   }
+
+    //   response = await typedCall('FirmwareUpload', ['FirmwareRequest', 'Success'], {
+    //     payload: chunk,
+    //   });
+    //   // @ts-expect-error
+    //   if (response.type === 'CallMethodError') {
+    //     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'upload firmware error');
+    //   }
+    // }
+
+    // postProgressMessage(device, 100, postMessage);
+
+    // await waitBleInstall(updateType);
+    // return response.message;
   }
 
   throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'uploadFirmware: unknown device model');
