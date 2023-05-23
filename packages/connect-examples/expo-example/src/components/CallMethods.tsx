@@ -166,6 +166,13 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
     console.log('example checkBridgeStatus response: ', response);
   };
 
+  const handleCheckBridgeRelease = async () => {
+    const response = await SDK.checkBridgeRelease(selectedDevice?.connectId, {
+      willUpdateFirmwareVersion: '4.2.0',
+    });
+    console.log('example checkBridgeRelease response: ', response);
+  };
+
   const handleCheckBootloaderRelease = async () => {
     const response = await SDK.checkBootloaderRelease(selectedDevice?.connectId, {
       willUpdateFirmwareVersion: '3.0.0',
@@ -253,6 +260,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
         />
         <Button title="check transport release" onPress={() => handleCheckTransportRelease()} />
         <Button title="check bridge status" onPress={() => handleCheckBridgeStatus()} />
+        <Button title="check bridge release" onPress={() => handleCheckBridgeRelease()} />
         <Button title="check bootloader release" onPress={() => handleCheckBootloaderRelease()} />
         <Button title="cancel" onPress={() => cancel()} />
         <Button title="reset" onPress={() => RNRestart.Restart()} />

@@ -11,7 +11,6 @@ import { getDeviceType } from '../utils';
 export default class CheckBootloaderRelease extends BaseMethod {
   init() {
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
-    this.checkDeviceId = true;
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
   }
