@@ -131,6 +131,101 @@ export function CallTronMethods({
             } as unknown as any)
           }
         />
+        <MethodInvoke
+          title="tronSignTransaction Stake"
+          options={[
+            { name: 'path', value: "m/44'/195'/0'/0/0", type: 'string' },
+            { name: 'resource', value: 0, type: 'number' },
+            {
+              name: 'transaction.refBlockBytes',
+              value: 'f37c',
+              type: 'string',
+            },
+            {
+              name: 'transaction.refBlockHash',
+              value: 'aadfb347dabb84de',
+              type: 'string',
+            },
+            {
+              name: 'transaction.data',
+              value: undefined,
+              type: 'string',
+            },
+            {
+              name: 'transaction.feeLimit',
+              value: 1000000,
+              type: 'number',
+            },
+            { name: 'transaction.expiration', value: 1657770198000, type: 'number' },
+            { name: 'transaction.timestamp', value: 1657770139291, type: 'number' },
+          ]}
+          onCall={data =>
+            SDK.tronSignTransaction(connectId, deviceId, {
+              ...commonParams,
+              // @ts-expect-error
+              path: data.path,
+              transaction: {
+                // @ts-expect-error
+                ...data.transaction,
+                contract: {
+                  freezeBalanceContract: {
+                    frozenBalance: 100,
+                    // @ts-expect-error
+                    resource: data.resource,
+                    receiverAddress: 'TSL3enaaPaL19yMsJSye2GwkwqtsB3EVr9',
+                  },
+                },
+              },
+            } as unknown as any)
+          }
+        />
+        <MethodInvoke
+          title="tronSignTransaction Unstake"
+          options={[
+            { name: 'path', value: "m/44'/195'/0'/0/0", type: 'string' },
+            { name: 'resource', value: 0, type: 'number' },
+            {
+              name: 'transaction.refBlockBytes',
+              value: 'f37c',
+              type: 'string',
+            },
+            {
+              name: 'transaction.refBlockHash',
+              value: 'aadfb347dabb84de',
+              type: 'string',
+            },
+            {
+              name: 'transaction.data',
+              value: undefined,
+              type: 'string',
+            },
+            {
+              name: 'transaction.feeLimit',
+              value: 1000000,
+              type: 'number',
+            },
+            { name: 'transaction.expiration', value: 1657770198000, type: 'number' },
+            { name: 'transaction.timestamp', value: 1657770139291, type: 'number' },
+          ]}
+          onCall={data =>
+            SDK.tronSignTransaction(connectId, deviceId, {
+              ...commonParams,
+              // @ts-expect-error
+              path: data.path,
+              transaction: {
+                // @ts-expect-error
+                ...data.transaction,
+                contract: {
+                  unfreezeBalanceContract: {
+                    // @ts-expect-error
+                    resource: data.resource,
+                    receiverAddress: 'TSL3enaaPaL19yMsJSye2GwkwqtsB3EVr9',
+                  },
+                },
+              },
+            } as unknown as any)
+          }
+        />
       </View>
     </View>
   );
