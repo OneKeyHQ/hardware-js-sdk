@@ -1,4 +1,4 @@
-import { UintType, TronSignedTx } from '@onekeyfe/hd-transport';
+import { UintType, TronSignedTx, TronResourceCode } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type TronTransferContract = {
@@ -14,9 +14,23 @@ export type TronTriggerSmartContract = {
   assetId?: number;
 };
 
+export type TronFreezeBalanceContract = {
+  frozenBalance?: number;
+  frozenDuration?: number;
+  resource?: TronResourceCode;
+  receiverAddress?: string;
+};
+
+export type TronUnfreezeBalanceContract = {
+  resource?: TronResourceCode;
+  receiverAddress?: string;
+};
+
 export type TronTransactionContract = {
   transferContract?: TronTransferContract;
   triggerSmartContract?: TronTriggerSmartContract;
+  freezeBalanceContract?: TronFreezeBalanceContract;
+  unfreezeBalanceContract: TronUnfreezeBalanceContract;
 };
 
 export type TronTransaction = {

@@ -3126,8 +3126,27 @@ export type TronTriggerSmartContract = {
   asset_id?: number;
 };
 
+export enum TronResourceCode {
+  BANDWIDTH = 0,
+  ENERGY = 1,
+}
+
+export type TronFreezeBalanceContract = {
+  frozen_balance?: number;
+  frozen_duration?: number;
+  resource?: TronResourceCode;
+  receiver_address?: string;
+};
+
+export type TronUnfreezeBalanceContract = {
+  resource?: TronResourceCode;
+  receiver_address?: string;
+};
+
 export type TronContract = {
   transfer_contract?: TronTransferContract;
+  freeze_balance_contract?: TronFreezeBalanceContract;
+  unfreeze_balance_contract?: TronUnfreezeBalanceContract;
   trigger_smart_contract?: TronTriggerSmartContract;
 };
 
@@ -3571,6 +3590,8 @@ export type MessageType = {
   TronAddress: TronAddress;
   TronTransferContract: TronTransferContract;
   TronTriggerSmartContract: TronTriggerSmartContract;
+  TronFreezeBalanceContract: TronFreezeBalanceContract;
+  TronUnfreezeBalanceContract: TronUnfreezeBalanceContract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;

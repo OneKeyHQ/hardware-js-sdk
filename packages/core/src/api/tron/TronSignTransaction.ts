@@ -39,6 +39,26 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
           },
         };
       }
+
+      if (tx.contract.freezeBalanceContract) {
+        unSignTx.contract = {
+          freeze_balance_contract: {
+            frozen_balance: tx.contract.freezeBalanceContract.frozenBalance,
+            frozen_duration: tx.contract.freezeBalanceContract.frozenDuration,
+            resource: tx.contract.freezeBalanceContract.resource,
+            receiver_address: tx.contract.freezeBalanceContract.receiverAddress,
+          },
+        };
+      }
+
+      if (tx.contract.unfreezeBalanceContract) {
+        unSignTx.contract = {
+          unfreeze_balance_contract: {
+            resource: tx.contract.unfreezeBalanceContract.resource,
+            receiver_address: tx.contract.unfreezeBalanceContract.receiverAddress,
+          },
+        };
+      }
     }
 
     return unSignTx;
