@@ -225,10 +225,12 @@
           }
         },
         "msg_count": {
+          "rule": "required",
           "type": "uint32",
           "id": 2
         },
         "account_number": {
+          "rule": "required",
           "type": "sint64",
           "id": 3
         },
@@ -241,10 +243,12 @@
           "id": 5
         },
         "sequence": {
+          "rule": "required",
           "type": "sint64",
           "id": 6
         },
         "source": {
+          "rule": "required",
           "type": "sint64",
           "id": 7
         }
@@ -270,6 +274,7 @@
         "BinanceInputOutput": {
           "fields": {
             "address": {
+              "rule": "required",
               "type": "string",
               "id": 1
             },
@@ -283,10 +288,12 @@
         "BinanceCoin": {
           "fields": {
             "amount": {
+              "rule": "required",
               "type": "sint64",
               "id": 1
             },
             "denom": {
+              "rule": "required",
               "type": "string",
               "id": 2
             }
@@ -301,14 +308,17 @@
           "id": 1
         },
         "ordertype": {
+          "rule": "required",
           "type": "BinanceOrderType",
           "id": 2
         },
         "price": {
+          "rule": "required",
           "type": "sint64",
           "id": 3
         },
         "quantity": {
+          "rule": "required",
           "type": "sint64",
           "id": 4
         },
@@ -317,6 +327,7 @@
           "id": 5
         },
         "side": {
+          "rule": "required",
           "type": "BinanceOrderSide",
           "id": 6
         },
@@ -325,6 +336,7 @@
           "id": 7
         },
         "timeinforce": {
+          "rule": "required",
           "type": "BinanceTimeInForce",
           "id": 8
         }
@@ -571,6 +583,10 @@
           "rule": "required",
           "type": "string",
           "id": 1
+        },
+        "mac": {
+          "type": "bytes",
+          "id": 2
         }
       }
     },
@@ -757,6 +773,48 @@
           "options": {
             "default": false
           }
+        },
+        "serialize": {
+          "type": "bool",
+          "id": 13,
+          "options": {
+            "default": true
+          }
+        },
+        "coinjoin_request": {
+          "type": "CoinJoinRequest",
+          "id": 14
+        }
+      },
+      "nested": {
+        "CoinJoinRequest": {
+          "fields": {
+            "fee_rate": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 1
+            },
+            "no_fee_threshold": {
+              "rule": "required",
+              "type": "uint64",
+              "id": 2
+            },
+            "min_registrable_amount": {
+              "rule": "required",
+              "type": "uint64",
+              "id": 3
+            },
+            "mask_public_key": {
+              "rule": "required",
+              "type": "bytes",
+              "id": 4
+            },
+            "signature": {
+              "rule": "required",
+              "type": "bytes",
+              "id": 5
+            }
+          }
         }
       }
     },
@@ -784,7 +842,8 @@
             "TXFINISHED": 3,
             "TXEXTRADATA": 4,
             "TXORIGINPUT": 5,
-            "TXORIGOUTPUT": 6
+            "TXORIGOUTPUT": 6,
+            "TXPAYMENTREQ": 7
           }
         },
         "TxRequestDetailsType": {
@@ -979,6 +1038,13 @@
                 "script_pubkey": {
                   "type": "bytes",
                   "id": 19
+                },
+                "coinjoin_flags": {
+                  "type": "uint32",
+                  "id": 20,
+                  "options": {
+                    "default": 0
+                  }
                 }
               }
             },
@@ -1041,6 +1107,13 @@
                 "orig_index": {
                   "type": "uint32",
                   "id": 11
+                },
+                "payment_req_index": {
+                  "type": "uint32",
+                  "id": 12,
+                  "options": {
+                    "(experimental_field)": true
+                  }
                 }
               }
             }
@@ -1126,6 +1199,13 @@
         "script_pubkey": {
           "type": "bytes",
           "id": 19
+        },
+        "coinjoin_flags": {
+          "type": "uint32",
+          "id": 20,
+          "options": {
+            "default": 0
+          }
         }
       }
     },
@@ -1170,6 +1250,13 @@
         "orig_index": {
           "type": "uint32",
           "id": 11
+        },
+        "payment_req_index": {
+          "type": "uint32",
+          "id": 12,
+          "options": {
+            "(experimental_field)": true
+          }
         }
       }
     },
@@ -1263,6 +1350,101 @@
         "decred_script_version": {
           "type": "uint32",
           "id": 3
+        }
+      }
+    },
+    "TxAckPaymentRequest": {
+      "options": {
+        "(experimental_message)": true
+      },
+      "fields": {
+        "nonce": {
+          "type": "bytes",
+          "id": 1
+        },
+        "recipient_name": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "memos": {
+          "rule": "repeated",
+          "type": "PaymentRequestMemo",
+          "id": 3
+        },
+        "amount": {
+          "type": "uint64",
+          "id": 4
+        },
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        }
+      },
+      "nested": {
+        "PaymentRequestMemo": {
+          "fields": {
+            "text_memo": {
+              "type": "TextMemo",
+              "id": 1
+            },
+            "refund_memo": {
+              "type": "RefundMemo",
+              "id": 2
+            },
+            "coin_purchase_memo": {
+              "type": "CoinPurchaseMemo",
+              "id": 3
+            }
+          }
+        },
+        "TextMemo": {
+          "fields": {
+            "text": {
+              "rule": "required",
+              "type": "string",
+              "id": 1
+            }
+          }
+        },
+        "RefundMemo": {
+          "fields": {
+            "address": {
+              "rule": "required",
+              "type": "string",
+              "id": 1
+            },
+            "mac": {
+              "rule": "required",
+              "type": "bytes",
+              "id": 2
+            }
+          }
+        },
+        "CoinPurchaseMemo": {
+          "fields": {
+            "coin_type": {
+              "rule": "required",
+              "type": "uint32",
+              "id": 1
+            },
+            "amount": {
+              "rule": "required",
+              "type": "string",
+              "id": 2
+            },
+            "address": {
+              "rule": "required",
+              "type": "string",
+              "id": 3
+            },
+            "mac": {
+              "rule": "required",
+              "type": "bytes",
+              "id": 4
+            }
+          }
         }
       }
     },
@@ -1457,117 +1639,67 @@
       }
     },
     "AuthorizeCoinJoin": {
-      "options": {
-        "(unstable)": true
-      },
       "fields": {
         "coordinator": {
           "rule": "required",
           "type": "string",
           "id": 1
         },
-        "max_total_fee": {
+        "max_rounds": {
           "rule": "required",
           "type": "uint64",
           "id": 2
         },
-        "fee_per_anonymity": {
+        "max_coordinator_fee_rate": {
+          "rule": "required",
           "type": "uint32",
-          "id": 3,
-          "options": {
-            "default": 0
-          }
+          "id": 3
+        },
+        "max_fee_per_kvbyte": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
         },
         "address_n": {
           "rule": "repeated",
           "type": "uint32",
-          "id": 4,
+          "id": 5,
           "options": {
             "packed": false
           }
         },
         "coin_name": {
           "type": "string",
-          "id": 5,
+          "id": 6,
           "options": {
             "default": "Bitcoin"
           }
         },
         "script_type": {
           "type": "InputScriptType",
-          "id": 6,
+          "id": 7,
           "options": {
             "default": "SPENDADDRESS"
           }
         },
         "amount_unit": {
           "type": "AmountUnit",
-          "id": 11,
+          "id": 8,
           "options": {
             "default": "BITCOIN"
           }
         }
       }
     },
-    "GetPublicKeyMultiple": {
-      "fields": {
-        "addresses": {
-          "rule": "repeated",
-          "type": "BIP32Address",
-          "id": 1
-        },
-        "ecdsa_curve_name": {
-          "type": "string",
-          "id": 2
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 3
-        },
-        "coin_name": {
-          "type": "string",
-          "id": 4,
-          "options": {
-            "default": "Bitcoin"
-          }
-        },
-        "script_type": {
-          "type": "InputScriptType",
-          "id": 5,
-          "options": {
-            "default": "SPENDADDRESS"
-          }
-        },
-        "ignore_xpub_magic": {
-          "type": "bool",
-          "id": 6
-        }
-      },
-      "nested": {
-        "BIP32Address": {
-          "fields": {
-            "address_n": {
-              "rule": "repeated",
-              "type": "uint32",
-              "id": 1,
-              "options": {
-                "packed": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "PublicKeyMultiple": {
-      "fields": {
-        "xpubs": {
-          "rule": "repeated",
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
     "FirmwareErase": {
+      "fields": {
+        "length": {
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "FirmwareErase_ex": {
       "fields": {
         "length": {
           "type": "uint32",
@@ -1604,14 +1736,6 @@
       "fields": {
         "payload": {
           "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "FirmwareErase_ex": {
-      "fields": {
-        "length": {
-          "type": "uint32",
           "id": 1
         }
       }
@@ -2621,9 +2745,7 @@
             "PinMatrixRequestType_NewFirst": 2,
             "PinMatrixRequestType_NewSecond": 3,
             "PinMatrixRequestType_WipeCodeFirst": 4,
-            "PinMatrixRequestType_WipeCodeSecond": 5,
-            "PinMatrixRequestType_BackupFirst": 6,
-            "PinMatrixRequestType_BackupSecond": 7
+            "PinMatrixRequestType_WipeCodeSecond": 5
           }
         }
       }
@@ -2634,10 +2756,6 @@
           "rule": "required",
           "type": "string",
           "id": 1
-        },
-        "new_pin": {
-          "type": "string",
-          "id": 2
         }
       }
     },
@@ -2720,9 +2838,6 @@
           "id": 6
         }
       }
-    },
-    "BixinPinInputOnDevice": {
-      "fields": {}
     },
     "ConfluxGetAddress": {
       "fields": {
@@ -3100,7 +3215,10 @@
         },
         "data": {
           "type": "bytes",
-          "id": 2
+          "id": 2,
+          "options": {
+            "deprecated": true
+          }
         }
       }
     },
@@ -3190,8 +3308,8 @@
     },
     "DebugLinkDecision": {
       "fields": {
-        "yes_no": {
-          "type": "bool",
+        "button": {
+          "type": "DebugButton",
           "id": 1
         },
         "swipe": {
@@ -3226,6 +3344,13 @@
             "DOWN": 1,
             "LEFT": 2,
             "RIGHT": 3
+          }
+        },
+        "DebugButton": {
+          "values": {
+            "NO": 0,
+            "YES": 1,
+            "INFO": 2
           }
         }
       }
@@ -3448,14 +3573,17 @@
           }
         },
         "chain_id": {
+          "rule": "required",
           "type": "bytes",
           "id": 2
         },
         "header": {
+          "rule": "required",
           "type": "EosTxHeader",
           "id": 3
         },
         "num_actions": {
+          "rule": "required",
           "type": "uint32",
           "id": 4
         }
@@ -3508,6 +3636,7 @@
     "EosTxActionAck": {
       "fields": {
         "common": {
+          "rule": "required",
           "type": "EosActionCommon",
           "id": 1
         },
@@ -3572,10 +3701,12 @@
         "EosAsset": {
           "fields": {
             "amount": {
+              "rule": "required",
               "type": "sint64",
               "id": 1
             },
             "symbol": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             }
@@ -3584,10 +3715,12 @@
         "EosPermissionLevel": {
           "fields": {
             "actor": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "permission": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             }
@@ -3622,10 +3755,12 @@
         "EosAuthorizationAccount": {
           "fields": {
             "account": {
+              "rule": "required",
               "type": "EosPermissionLevel",
               "id": 1
             },
             "weight": {
+              "rule": "required",
               "type": "uint32",
               "id": 2
             }
@@ -3634,10 +3769,12 @@
         "EosAuthorizationWait": {
           "fields": {
             "wait_sec": {
+              "rule": "required",
               "type": "uint32",
               "id": 1
             },
             "weight": {
+              "rule": "required",
               "type": "uint32",
               "id": 2
             }
@@ -3646,6 +3783,7 @@
         "EosAuthorization": {
           "fields": {
             "threshold": {
+              "rule": "required",
               "type": "uint32",
               "id": 1
             },
@@ -3669,10 +3807,12 @@
         "EosActionCommon": {
           "fields": {
             "account": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "name": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
@@ -3686,18 +3826,22 @@
         "EosActionTransfer": {
           "fields": {
             "sender": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "receiver": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "quantity": {
+              "rule": "required",
               "type": "EosAsset",
               "id": 3
             },
             "memo": {
+              "rule": "required",
               "type": "string",
               "id": 4
             }
@@ -3706,22 +3850,27 @@
         "EosActionDelegate": {
           "fields": {
             "sender": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "receiver": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "net_quantity": {
+              "rule": "required",
               "type": "EosAsset",
               "id": 3
             },
             "cpu_quantity": {
+              "rule": "required",
               "type": "EosAsset",
               "id": 4
             },
             "transfer": {
+              "rule": "required",
               "type": "bool",
               "id": 5
             }
@@ -3730,18 +3879,22 @@
         "EosActionUndelegate": {
           "fields": {
             "sender": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "receiver": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "net_quantity": {
+              "rule": "required",
               "type": "EosAsset",
               "id": 3
             },
             "cpu_quantity": {
+              "rule": "required",
               "type": "EosAsset",
               "id": 4
             }
@@ -3750,6 +3903,7 @@
         "EosActionRefund": {
           "fields": {
             "owner": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             }
@@ -3758,14 +3912,17 @@
         "EosActionBuyRam": {
           "fields": {
             "payer": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "receiver": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "quantity": {
+              "rule": "required",
               "type": "EosAsset",
               "id": 3
             }
@@ -3774,14 +3931,17 @@
         "EosActionBuyRamBytes": {
           "fields": {
             "payer": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "receiver": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "bytes": {
+              "rule": "required",
               "type": "uint32",
               "id": 3
             }
@@ -3790,10 +3950,12 @@
         "EosActionSellRam": {
           "fields": {
             "account": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "bytes": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             }
@@ -3802,10 +3964,12 @@
         "EosActionVoteProducer": {
           "fields": {
             "voter": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "proxy": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
@@ -3822,18 +3986,22 @@
         "EosActionUpdateAuth": {
           "fields": {
             "account": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "permission": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "parent": {
+              "rule": "required",
               "type": "uint64",
               "id": 3
             },
             "auth": {
+              "rule": "required",
               "type": "EosAuthorization",
               "id": 4
             }
@@ -3842,10 +4010,12 @@
         "EosActionDeleteAuth": {
           "fields": {
             "account": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "permission": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             }
@@ -3854,18 +4024,22 @@
         "EosActionLinkAuth": {
           "fields": {
             "account": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "code": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "type": {
+              "rule": "required",
               "type": "uint64",
               "id": 3
             },
             "requirement": {
+              "rule": "required",
               "type": "uint64",
               "id": 4
             }
@@ -3874,14 +4048,17 @@
         "EosActionUnlinkAuth": {
           "fields": {
             "account": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "code": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "type": {
+              "rule": "required",
               "type": "uint64",
               "id": 3
             }
@@ -3890,18 +4067,22 @@
         "EosActionNewAccount": {
           "fields": {
             "creator": {
+              "rule": "required",
               "type": "uint64",
               "id": 1
             },
             "name": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "owner": {
+              "rule": "required",
               "type": "EosAuthorization",
               "id": 3
             },
             "active": {
+              "rule": "required",
               "type": "EosAuthorization",
               "id": 4
             }
@@ -3915,6 +4096,7 @@
               "id": 1
             },
             "data_chunk": {
+              "rule": "required",
               "type": "bytes",
               "id": 2
             }
@@ -4351,26 +4533,6 @@
         }
       }
     },
-    "EthereumSignMessageEIP712": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "domain_hash": {
-          "type": "bytes",
-          "id": 2
-        },
-        "message_hash": {
-          "type": "bytes",
-          "id": 3
-        }
-      }
-    },
     "EthereumSignTypedHash": {
       "fields": {
         "address_n": {
@@ -4724,10 +4886,6 @@
           "type": "string",
           "id": 25
         },
-        "fw_vendor_keys": {
-          "type": "bytes",
-          "id": 26
-        },
         "unfinished_backup": {
           "type": "bool",
           "id": 27
@@ -4857,12 +5015,16 @@
           "id": 517
         },
         "build_id": {
-          "type": "string",
+          "type": "bytes",
           "id": 518
         },
-        "battery_level": {
-          "type": "uint32",
-          "id": 520
+        "boardloader_version": {
+          "type": "string",
+          "id": 519
+        },
+        "busy": {
+          "type": "bool",
+          "id": 41
         }
       },
       "nested": {
@@ -4894,6 +5056,14 @@
     },
     "LockDevice": {
       "fields": {}
+    },
+    "SetBusy": {
+      "fields": {
+        "expiry_ms": {
+          "type": "uint32",
+          "id": 1
+        }
+      }
     },
     "EndSession": {
       "fields": {}
@@ -4942,43 +5112,6 @@
         "experimental_features": {
           "type": "bool",
           "id": 10
-        },
-        "use_ble": {
-          "type": "bool",
-          "id": 100
-        },
-        "use_se": {
-          "type": "bool",
-          "id": 101
-        },
-        "is_bixinapp": {
-          "type": "bool",
-          "id": 102
-        },
-        "fastpay_pin": {
-          "type": "bool",
-          "id": 103
-        },
-        "fastpay_confirm": {
-          "type": "bool",
-          "id": 104
-        },
-        "fastpay_money_limit": {
-          "type": "uint64",
-          "id": 105
-        },
-        "fastpay_times": {
-          "type": "uint32",
-          "id": 106
-        }
-      },
-      "nested": {
-        "ExportType": {
-          "values": {
-            "SeedEncExportType_NO": 0,
-            "SeedEncExportType_YES": 1,
-            "MnemonicPlainExportType_YES": 2
-          }
         }
       }
     },
@@ -5055,6 +5188,23 @@
     "Entropy": {
       "fields": {
         "entropy": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "GetFirmwareHash": {
+      "fields": {
+        "challenge": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "FirmwareHash": {
+      "fields": {
+        "hash": {
           "rule": "required",
           "type": "bytes",
           "id": 1
@@ -5281,40 +5431,25 @@
     "CancelAuthorization": {
       "fields": {}
     },
-    "BixinSeedOperate": {
-      "fields": {
-        "type": {
-          "rule": "required",
-          "type": "SeedRequestType",
-          "id": 1
-        },
-        "seed_importData": {
-          "type": "bytes",
-          "id": 2
-        }
+    "RebootToBootloader": {
+      "fields": {}
+    },
+    "RebootToBoardloader": {
+      "fields": {}
+    },
+    "GetNonce": {
+      "options": {
+        "(experimental_message)": true
       },
-      "nested": {
-        "SeedRequestType": {
-          "values": {
-            "SeedRequestType_Gen": 0,
-            "SeedRequestType_EncExport": 1,
-            "SeedRequestType_EncImport": 2
-          }
-        }
-      }
+      "fields": {}
     },
-    "BixinMessageSE": {
+    "Nonce": {
+      "options": {
+        "(experimental_message)": true
+      },
       "fields": {
-        "inputmessage": {
+        "nonce": {
           "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "BixinOutMessageSE": {
-      "fields": {
-        "outmessage": {
           "type": "bytes",
           "id": 1
         }
@@ -5322,138 +5457,6 @@
     },
     "DeviceBackToBoot": {
       "fields": {}
-    },
-    "BixinBackupRequest": {
-      "fields": {}
-    },
-    "BixinBackupAck": {
-      "fields": {
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "BixinRestoreRequest": {
-      "fields": {
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
-        "language": {
-          "type": "string",
-          "id": 2
-        },
-        "label": {
-          "type": "string",
-          "id": 3
-        },
-        "passphrase_protection": {
-          "type": "bool",
-          "id": 4
-        }
-      }
-    },
-    "BixinRestoreAck": {
-      "fields": {
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "BixinVerifyDeviceRequest": {
-      "fields": {
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "BixinVerifyDeviceAck": {
-      "fields": {
-        "cert": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "BixinWhiteListRequest": {
-      "fields": {
-        "type": {
-          "rule": "required",
-          "type": "WL_OperationType",
-          "id": 1
-        },
-        "addr_in": {
-          "type": "string",
-          "id": 2
-        }
-      },
-      "nested": {
-        "WL_OperationType": {
-          "values": {
-            "WL_OperationType_Add": 0,
-            "WL_OperationType_Delete": 1,
-            "WL_OperationType_Inquire": 2
-          }
-        }
-      }
-    },
-    "BixinWhiteListAck": {
-      "fields": {
-        "address": {
-          "rule": "repeated",
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
-    "BixinLoadDevice": {
-      "fields": {
-        "mnemonics": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        },
-        "language": {
-          "type": "string",
-          "id": 5,
-          "options": {
-            "default": "en-US"
-          }
-        },
-        "label": {
-          "type": "string",
-          "id": 6
-        },
-        "skip_checksum": {
-          "type": "bool",
-          "id": 7
-        }
-      }
-    },
-    "BixinBackupDevice": {
-      "fields": {}
-    },
-    "BixinBackupDeviceAck": {
-      "fields": {
-        "mnemonics": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        }
-      }
     },
     "DeviceInfoSettings": {
       "fields": {
@@ -5529,43 +5532,6 @@
     "SEPublicCert": {
       "fields": {
         "public_cert": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "SpiFlashWrite": {
-      "fields": {
-        "address": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "SpiFlashRead": {
-      "fields": {
-        "address": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "len": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        }
-      }
-    },
-    "SpiFlashData": {
-      "fields": {
-        "data": {
           "rule": "required",
           "type": "bytes",
           "id": 1
@@ -5692,58 +5658,6 @@
         }
       }
     },
-    "NFTWriteInfo": {
-      "fields": {
-        "index": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "width": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        },
-        "height": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 3
-        },
-        "name_zh": {
-          "type": "string",
-          "id": 4
-        },
-        "name_en": {
-          "type": "string",
-          "id": 5
-        }
-      }
-    },
-    "NFTWriteData": {
-      "fields": {
-        "index": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "offset": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 3
-        }
-      }
-    },
-    "RebootToBootloader": {
-      "fields": {}
-    },
-    "RebootToBoardloader": {
-      "fields": {}
-    },
     "ListResDir": {
       "fields": {
         "path": {
@@ -5778,13 +5692,36 @@
         }
       }
     },
-    "DeviceEraseSector": {
+    "UnlockPath": {
       "fields": {
-        "sector": {
-          "rule": "required",
+        "address_n": {
+          "rule": "repeated",
           "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "mac": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "UnlockedPathRequest": {
+      "fields": {
+        "mac": {
+          "type": "bytes",
           "id": 1
         }
+      }
+    },
+    "MoneroNetworkType": {
+      "values": {
+        "MAINNET": 0,
+        "TESTNET": 1,
+        "STAGENET": 2,
+        "FAKECHAIN": 3
       }
     },
     "MoneroTransactionSourceEntry": {
@@ -5848,10 +5785,12 @@
             "MoneroRctKeyPublic": {
               "fields": {
                 "dest": {
+                  "rule": "required",
                   "type": "bytes",
                   "id": 1
                 },
                 "commitment": {
+                  "rule": "required",
                   "type": "bytes",
                   "id": 2
                 }
@@ -5971,8 +5910,11 @@
           "id": 2
         },
         "network_type": {
-          "type": "uint32",
-          "id": 3
+          "type": "MoneroNetworkType",
+          "id": 3,
+          "options": {
+            "default": "MAINNET"
+          }
         },
         "account": {
           "type": "uint32",
@@ -6007,8 +5949,11 @@
           }
         },
         "network_type": {
-          "type": "uint32",
-          "id": 2
+          "type": "MoneroNetworkType",
+          "id": 2,
+          "options": {
+            "default": "MAINNET"
+          }
         }
       }
     },
@@ -6039,8 +5984,11 @@
           }
         },
         "network_type": {
-          "type": "uint32",
-          "id": 3
+          "type": "MoneroNetworkType",
+          "id": 3,
+          "options": {
+            "default": "MAINNET"
+          }
         },
         "tsx_data": {
           "type": "MoneroTransactionData",
@@ -6171,21 +6119,6 @@
           "id": 6
         }
       }
-    },
-    "MoneroTransactionInputsPermutationRequest": {
-      "fields": {
-        "perm": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        }
-      }
-    },
-    "MoneroTransactionInputsPermutationAck": {
-      "fields": {}
     },
     "MoneroTransactionInputViniRequest": {
       "fields": {
@@ -6397,10 +6330,12 @@
     "MoneroKeyImageExportInitRequest": {
       "fields": {
         "num": {
+          "rule": "required",
           "type": "uint64",
           "id": 1
         },
         "hash": {
+          "rule": "required",
           "type": "bytes",
           "id": 2
         },
@@ -6413,8 +6348,11 @@
           }
         },
         "network_type": {
-          "type": "uint32",
-          "id": 4
+          "type": "MoneroNetworkType",
+          "id": 4,
+          "options": {
+            "default": "MAINNET"
+          }
         },
         "subs": {
           "rule": "repeated",
@@ -6426,6 +6364,7 @@
         "MoneroSubAddressIndicesList": {
           "fields": {
             "account": {
+              "rule": "required",
               "type": "uint32",
               "id": 1
             },
@@ -6456,10 +6395,12 @@
         "MoneroTransferDetails": {
           "fields": {
             "out_key": {
+              "rule": "required",
               "type": "bytes",
               "id": 1
             },
             "tx_pub_key": {
+              "rule": "required",
               "type": "bytes",
               "id": 2
             },
@@ -6469,6 +6410,7 @@
               "id": 3
             },
             "internal_output_index": {
+              "rule": "required",
               "type": "uint64",
               "id": 4
             },
@@ -6529,22 +6471,29 @@
           }
         },
         "network_type": {
-          "type": "uint32",
-          "id": 2
+          "type": "MoneroNetworkType",
+          "id": 2,
+          "options": {
+            "default": "MAINNET"
+          }
         },
         "salt1": {
+          "rule": "required",
           "type": "bytes",
           "id": 3
         },
         "salt2": {
+          "rule": "required",
           "type": "bytes",
           "id": 4
         },
         "tx_enc_keys": {
+          "rule": "required",
           "type": "bytes",
           "id": 5
         },
         "tx_prefix_hash": {
+          "rule": "required",
           "type": "bytes",
           "id": 6
         },
@@ -6585,8 +6534,11 @@
           }
         },
         "network_type": {
-          "type": "uint32",
-          "id": 2
+          "type": "MoneroNetworkType",
+          "id": 2,
+          "options": {
+            "default": "MAINNET"
+          }
         }
       }
     },
@@ -6596,22 +6548,27 @@
     "MoneroLiveRefreshStepRequest": {
       "fields": {
         "out_key": {
+          "rule": "required",
           "type": "bytes",
           "id": 1
         },
         "recv_deriv": {
+          "rule": "required",
           "type": "bytes",
           "id": 2
         },
         "real_out_idx": {
+          "rule": "required",
           "type": "uint64",
           "id": 3
         },
         "sub_addr_major": {
+          "rule": "required",
           "type": "uint32",
           "id": 4
         },
         "sub_addr_minor": {
+          "rule": "required",
           "type": "uint32",
           "id": 5
         }
@@ -6761,7 +6718,10 @@
         },
         "network": {
           "type": "uint32",
-          "id": 2
+          "id": 2,
+          "options": {
+            "default": 104
+          }
         },
         "show_display": {
           "type": "bool",
@@ -6781,6 +6741,7 @@
     "NEMSignTx": {
       "fields": {
         "transaction": {
+          "rule": "required",
           "type": "NEMTransactionCommon",
           "id": 1
         },
@@ -6830,17 +6791,23 @@
             },
             "network": {
               "type": "uint32",
-              "id": 2
+              "id": 2,
+              "options": {
+                "default": 104
+              }
             },
             "timestamp": {
+              "rule": "required",
               "type": "uint32",
               "id": 3
             },
             "fee": {
+              "rule": "required",
               "type": "uint64",
               "id": 4
             },
             "deadline": {
+              "rule": "required",
               "type": "uint32",
               "id": 5
             },
@@ -6853,16 +6820,21 @@
         "NEMTransfer": {
           "fields": {
             "recipient": {
+              "rule": "required",
               "type": "string",
               "id": 1
             },
             "amount": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "payload": {
               "type": "bytes",
-              "id": 3
+              "id": 3,
+              "options": {
+                "default": ""
+              }
             },
             "public_key": {
               "type": "bytes",
@@ -6878,14 +6850,17 @@
             "NEMMosaic": {
               "fields": {
                 "namespace": {
+                  "rule": "required",
                   "type": "string",
                   "id": 1
                 },
                 "mosaic": {
+                  "rule": "required",
                   "type": "string",
                   "id": 2
                 },
                 "quantity": {
+                  "rule": "required",
                   "type": "uint64",
                   "id": 3
                 }
@@ -6896,6 +6871,7 @@
         "NEMProvisionNamespace": {
           "fields": {
             "namespace": {
+              "rule": "required",
               "type": "string",
               "id": 1
             },
@@ -6904,10 +6880,12 @@
               "id": 2
             },
             "sink": {
+              "rule": "required",
               "type": "string",
               "id": 3
             },
             "fee": {
+              "rule": "required",
               "type": "uint64",
               "id": 4
             }
@@ -6916,14 +6894,17 @@
         "NEMMosaicCreation": {
           "fields": {
             "definition": {
+              "rule": "required",
               "type": "NEMMosaicDefinition",
               "id": 1
             },
             "sink": {
+              "rule": "required",
               "type": "string",
               "id": 2
             },
             "fee": {
+              "rule": "required",
               "type": "uint64",
               "id": 3
             }
@@ -6940,10 +6921,12 @@
                   "id": 2
                 },
                 "namespace": {
+                  "rule": "required",
                   "type": "string",
                   "id": 3
                 },
                 "mosaic": {
+                  "rule": "required",
                   "type": "string",
                   "id": 4
                 },
@@ -6984,6 +6967,7 @@
                   "id": 13
                 },
                 "description": {
+                  "rule": "required",
                   "type": "string",
                   "id": 14
                 },
@@ -7010,18 +6994,22 @@
         "NEMMosaicSupplyChange": {
           "fields": {
             "namespace": {
+              "rule": "required",
               "type": "string",
               "id": 1
             },
             "mosaic": {
+              "rule": "required",
               "type": "string",
               "id": 2
             },
             "type": {
+              "rule": "required",
               "type": "NEMSupplyChangeType",
               "id": 3
             },
             "delta": {
+              "rule": "required",
               "type": "uint64",
               "id": 4
             }
@@ -7051,10 +7039,12 @@
             "NEMCosignatoryModification": {
               "fields": {
                 "type": {
+                  "rule": "required",
                   "type": "NEMModificationType",
                   "id": 1
                 },
                 "public_key": {
+                  "rule": "required",
                   "type": "bytes",
                   "id": 2
                 }
@@ -7073,10 +7063,12 @@
         "NEMImportanceTransfer": {
           "fields": {
             "mode": {
+              "rule": "required",
               "type": "NEMImportanceTransferMode",
               "id": 1
             },
             "public_key": {
+              "rule": "required",
               "type": "bytes",
               "id": 2
             }
@@ -7244,14 +7236,19 @@
           }
         },
         "fee": {
+          "rule": "required",
           "type": "uint64",
           "id": 2
         },
         "flags": {
           "type": "uint32",
-          "id": 3
+          "id": 3,
+          "options": {
+            "default": 0
+          }
         },
         "sequence": {
+          "rule": "required",
           "type": "uint32",
           "id": 4
         },
@@ -7260,6 +7257,7 @@
           "id": 5
         },
         "payment": {
+          "rule": "required",
           "type": "RipplePayment",
           "id": 6
         }
@@ -7318,6 +7316,7 @@
     "SolanaAddress": {
       "fields": {
         "address": {
+          "rule": "required",
           "type": "string",
           "id": 1
         }
@@ -7343,6 +7342,7 @@
     "SolanaSignedTx": {
       "fields": {
         "signature": {
+          "rule": "required",
           "type": "bytes",
           "id": 1
         }
@@ -7408,6 +7408,7 @@
           }
         },
         "raw_tx": {
+          "rule": "required",
           "type": "bytes",
           "id": 2
         }
@@ -8257,10 +8258,12 @@
                 "TezosManagerTransfer": {
                   "fields": {
                     "destination": {
+                      "rule": "required",
                       "type": "TezosContractID",
                       "id": 1
                     },
                     "amount": {
+                      "rule": "required",
                       "type": "uint64",
                       "id": 2
                     }
@@ -8362,10 +8365,12 @@
         "TezosProposalOp": {
           "fields": {
             "source": {
+              "rule": "required",
               "type": "bytes",
               "id": 1
             },
             "period": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
@@ -8379,18 +8384,22 @@
         "TezosBallotOp": {
           "fields": {
             "source": {
+              "rule": "required",
               "type": "bytes",
               "id": 1
             },
             "period": {
+              "rule": "required",
               "type": "uint64",
               "id": 2
             },
             "proposal": {
+              "rule": "required",
               "type": "bytes",
               "id": 3
             },
             "ballot": {
+              "rule": "required",
               "type": "TezosBallotType",
               "id": 4
             }
@@ -8501,6 +8510,14 @@
               "type": "TronTransferContract",
               "id": 2
             },
+            "freeze_balance_contract": {
+              "type": "TronFreezeBalanceContract",
+              "id": 11
+            },
+            "unfreeze_balance_contract": {
+              "type": "TronUnfreezeBalanceContract",
+              "id": 12
+            },
             "trigger_smart_contract": {
               "type": "TronTriggerSmartContract",
               "id": 31
@@ -8540,6 +8557,44 @@
                 "asset_id": {
                   "type": "uint64",
                   "id": 6
+                }
+              }
+            },
+            "TronResourceCode": {
+              "values": {
+                "BANDWIDTH": 0,
+                "ENERGY": 1
+              }
+            },
+            "TronFreezeBalanceContract": {
+              "fields": {
+                "frozen_balance": {
+                  "type": "uint64",
+                  "id": 1
+                },
+                "frozen_duration": {
+                  "type": "uint64",
+                  "id": 2
+                },
+                "resource": {
+                  "type": "TronResourceCode",
+                  "id": 3
+                },
+                "receiver_address": {
+                  "type": "string",
+                  "id": 4
+                }
+              }
+            },
+            "TronUnfreezeBalanceContract": {
+              "fields": {
+                "resource": {
+                  "type": "TronResourceCode",
+                  "id": 1
+                },
+                "receiver_address": {
+                  "type": "string",
+                  "id": 2
                 }
               }
             }
@@ -8708,11 +8763,6 @@
       "id": 50008,
       "extend": "google.protobuf.EnumValueOptions"
     },
-    "facotry": {
-      "type": "bool",
-      "id": 50501,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
     "bitcoin_only": {
       "type": "bool",
       "id": 60000,
@@ -8723,7 +8773,7 @@
       "id": 51001,
       "extend": "google.protobuf.EnumOptions"
     },
-    "unstable": {
+    "experimental_message": {
       "type": "bool",
       "id": 52001,
       "extend": "google.protobuf.MessageOptions"
@@ -8733,7 +8783,7 @@
       "id": 52002,
       "extend": "google.protobuf.MessageOptions"
     },
-    "experimental": {
+    "experimental_field": {
       "type": "bool",
       "id": 53001,
       "extend": "google.protobuf.FieldOptions"
@@ -8743,15 +8793,10 @@
       "id": 60000,
       "extend": "google.protobuf.FileOptions"
     },
-    "CommandFlags": {
-      "values": {
-        "Default": 0,
-        "Factory_Only": 1
-      }
-    },
     "MessageType": {
       "options": {
-        "(has_bitcoin_only_values)": true
+        "(has_bitcoin_only_values)": true,
+        "allow_alias": true
       },
       "values": {
         "MessageType_Initialize": 0,
@@ -8764,6 +8809,7 @@
         "MessageType_Entropy": 10,
         "MessageType_LoadDevice": 13,
         "MessageType_ResetDevice": 14,
+        "MessageType_SetBusy": 16,
         "MessageType_Features": 17,
         "MessageType_PinMatrixRequest": 18,
         "MessageType_PinMatrixAck": 19,
@@ -8773,6 +8819,8 @@
         "MessageType_ButtonRequest": 26,
         "MessageType_ButtonAck": 27,
         "MessageType_ApplyFlags": 28,
+        "MessageType_GetNonce": 31,
+        "MessageType_Nonce": 33,
         "MessageType_BackupDevice": 34,
         "MessageType_EntropyRequest": 35,
         "MessageType_EntropyAck": 36,
@@ -8789,15 +8837,19 @@
         "MessageType_PreauthorizedRequest": 85,
         "MessageType_CancelAuthorization": 86,
         "MessageType_RebootToBootloader": 87,
+        "MessageType_GetFirmwareHash": 88,
+        "MessageType_FirmwareHash": 89,
+        "MessageType_UnlockPath": 93,
+        "MessageType_UnlockedPathRequest": 94,
         "MessageType_SetU2FCounter": 63,
         "MessageType_GetNextU2FCounter": 80,
         "MessageType_NextU2FCounter": 81,
         "MessageType_Deprecated_PassphraseStateRequest": 77,
         "MessageType_Deprecated_PassphraseStateAck": 78,
         "MessageType_FirmwareErase": 6,
-        "MessageType_FirmwareErase_ex": 16,
         "MessageType_FirmwareUpload": 7,
         "MessageType_FirmwareRequest": 8,
+        "MessageType_FirmwareErase_ex": 16,
         "MessageType_SelfTest": 32,
         "MessageType_GetPublicKey": 11,
         "MessageType_PublicKey": 12,
@@ -8806,6 +8858,7 @@
         "MessageType_TxAck": 22,
         "MessageType_GetAddress": 29,
         "MessageType_Address": 30,
+        "MessageType_TxAckPaymentRequest": 37,
         "MessageType_SignMessage": 38,
         "MessageType_VerifyMessage": 39,
         "MessageType_MessageSignature": 40,
@@ -8927,8 +8980,6 @@
         "MessageType_MoneroTransactionInitAck": 502,
         "MessageType_MoneroTransactionSetInputRequest": 503,
         "MessageType_MoneroTransactionSetInputAck": 504,
-        "MessageType_MoneroTransactionInputsPermutationRequest": 505,
-        "MessageType_MoneroTransactionInputsPermutationAck": 506,
         "MessageType_MoneroTransactionInputViniRequest": 507,
         "MessageType_MoneroTransactionInputViniAck": 508,
         "MessageType_MoneroTransactionAllInputsSetRequest": 509,
@@ -8977,10 +9028,6 @@
         "MessageType_BinanceOrderMsg": 707,
         "MessageType_BinanceCancelMsg": 708,
         "MessageType_BinanceSignedTx": 709,
-        "MessageType_SolanaGetAddress": 10100,
-        "MessageType_SolanaAddress": 10101,
-        "MessageType_SolanaSignTx": 10102,
-        "MessageType_SolanaSignedTx": 10103,
         "MessageType_StarcoinGetAddress": 10300,
         "MessageType_StarcoinAddress": 10301,
         "MessageType_StarcoinGetPublicKey": 10302,
@@ -8990,34 +9037,6 @@
         "MessageType_StarcoinSignMessage": 10306,
         "MessageType_StarcoinMessageSignature": 10307,
         "MessageType_StarcoinVerifyMessage": 10308,
-        "MessageType_AptosGetAddress": 10600,
-        "MessageType_AptosAddress": 10601,
-        "MessageType_AptosSignTx": 10602,
-        "MessageType_AptosSignedTx": 10603,
-        "MessageType_AptosSignMessage": 10604,
-        "MessageType_AptosMessageSignature": 10605,
-        "MessageType_WebAuthnListResidentCredentials": 800,
-        "MessageType_WebAuthnCredentials": 801,
-        "MessageType_WebAuthnAddResidentCredential": 802,
-        "MessageType_WebAuthnRemoveResidentCredential": 803,
-        "MessageType_BixinSeedOperate": 901,
-        "MessageType_BixinMessageSE": 902,
-        "MessageType_BixinOutMessageSE": 904,
-        "MessageType_BixinBackupRequest": 905,
-        "MessageType_BixinBackupAck": 906,
-        "MessageType_BixinRestoreRequest": 907,
-        "MessageType_BixinRestoreAck": 908,
-        "MessageType_BixinVerifyDeviceRequest": 909,
-        "MessageType_BixinVerifyDeviceAck": 910,
-        "MessageType_BixinWhiteListRequest": 911,
-        "MessageType_BixinWhiteListAck": 912,
-        "MessageType_BixinLoadDevice": 913,
-        "MessageType_BixinBackupDevice": 914,
-        "MessageType_BixinBackupDeviceAck": 915,
-        "MessageType_BixinPinInputOnDevice": 10000,
-        "MessageType_EthereumSignMessageEIP712": 10200,
-        "MessageType_GetPublicKeyMultiple": 10210,
-        "MessageType_PublicKeyMultiple": 10211,
         "MessageType_ConfluxGetAddress": 10112,
         "MessageType_ConfluxAddress": 10113,
         "MessageType_ConfluxSignTx": 10114,
@@ -9036,6 +9055,20 @@
         "MessageType_NearAddress": 10702,
         "MessageType_NearSignTx": 10703,
         "MessageType_NearSignedTx": 10704,
+        "MessageType_AptosGetAddress": 10600,
+        "MessageType_AptosAddress": 10601,
+        "MessageType_AptosSignTx": 10602,
+        "MessageType_AptosSignedTx": 10603,
+        "MessageType_AptosSignMessage": 10604,
+        "MessageType_AptosMessageSignature": 10605,
+        "MessageType_WebAuthnListResidentCredentials": 800,
+        "MessageType_WebAuthnCredentials": 801,
+        "MessageType_WebAuthnAddResidentCredential": 802,
+        "MessageType_WebAuthnRemoveResidentCredential": 803,
+        "MessageType_SolanaGetAddress": 10100,
+        "MessageType_SolanaAddress": 10101,
+        "MessageType_SolanaSignTx": 10102,
+        "MessageType_SolanaSignedTx": 10103,
         "MessageType_CosmosGetAddress": 10800,
         "MessageType_CosmosAddress": 10801,
         "MessageType_CosmosSignTx": 10802,
@@ -9063,6 +9096,7 @@
         "MessageType_KaspaTxInputRequest": 11304,
         "MessageType_KaspaTxInputAck": 11305,
         "MessageType_DeviceBackToBoot": 903,
+        "MessageType_RebootToBoardloader": 904,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
         "MessageType_DeviceInfo": 10003,
@@ -9071,22 +9105,15 @@
         "MessageType_WriteSEPublicCert": 10006,
         "MessageType_ReadSEPublicCert": 10007,
         "MessageType_SEPublicCert": 10008,
-        "MessageType_SpiFlashWrite": 10009,
-        "MessageType_SpiFlashRead": 10010,
-        "MessageType_SpiFlashData": 10011,
         "MessageType_SESignMessage": 10012,
         "MessageType_SEMessageSignature": 10013,
-        "MessageType_NFTWriteInfo": 10014,
-        "MessageType_NFTWriteData": 10015,
         "MessageType_ResourceUpload": 10018,
         "MessageType_ZoomRequest": 10019,
         "MessageType_ResourceRequest": 10020,
         "MessageType_ResourceAck": 10021,
         "MessageType_ResourceUpdate": 10022,
         "MessageType_ListResDir": 10023,
-        "MessageType_FileInfoList": 10024,
-        "MessageType_RebootToBoardloader": 10025,
-        "MessageType_DeviceEraseSector": 10026
+        "MessageType_FileInfoList": 10024
       }
     },
     "google": {

@@ -93,24 +93,24 @@ export type BinancePublicKey = {
 // BinanceSignTx
 export type BinanceSignTx = {
   address_n: number[];
-  msg_count?: number;
-  account_number?: number;
+  msg_count: number;
+  account_number: number;
   chain_id?: string;
   memo?: string;
-  sequence?: number;
-  source?: number;
+  sequence: number;
+  source: number;
 };
 
 // BinanceTxRequest
 export type BinanceTxRequest = {};
 
 export type BinanceCoin = {
-  amount?: UintType;
-  denom?: string;
+  amount: UintType;
+  denom: string;
 };
 
 export type BinanceInputOutput = {
-  address?: string;
+  address: string;
   coins: BinanceCoin[];
 };
 
@@ -143,13 +143,13 @@ export enum BinanceTimeInForce {
 // BinanceOrderMsg
 export type BinanceOrderMsg = {
   id?: string;
-  ordertype?: BinanceOrderType;
-  price?: number;
-  quantity?: number;
+  ordertype: BinanceOrderType;
+  price: number;
+  quantity: number;
   sender?: string;
-  side?: BinanceOrderSide;
+  side: BinanceOrderSide;
   symbol?: string;
-  timeinforce?: BinanceTimeInForce;
+  timeinforce: BinanceTimeInForce;
 };
 
 // BinanceCancelMsg
@@ -252,6 +252,7 @@ export type GetAddress = {
 // Address
 export type Address = {
   address: string;
+  mac?: string;
 };
 
 // GetOwnershipId
@@ -290,6 +291,14 @@ export type VerifyMessage = {
   coin_name?: string;
 };
 
+export type CoinJoinRequest = {
+  fee_rate: number;
+  no_fee_threshold: number;
+  min_registrable_amount: number;
+  mask_public_key: string;
+  signature: string;
+};
+
 // SignTx
 export type SignTx = {
   outputs_count: number;
@@ -304,6 +313,8 @@ export type SignTx = {
   branch_id?: number;
   amount_unit?: AmountUnit;
   decred_staking_ticket?: boolean;
+  serialize?: boolean;
+  coinjoin_request?: CoinJoinRequest;
 };
 
 export enum Enum_RequestType {
@@ -314,6 +325,7 @@ export enum Enum_RequestType {
   TXEXTRADATA = 4,
   TXORIGINPUT = 5,
   TXORIGOUTPUT = 6,
+  TXPAYMENTREQ = 7,
 }
 export type RequestType = keyof typeof Enum_RequestType;
 
@@ -452,6 +464,37 @@ export type PrevOutput = {
   decred_script_version?: number;
 };
 
+export type TextMemo = {
+  text: string;
+};
+
+export type RefundMemo = {
+  address: string;
+  mac: string;
+};
+
+export type CoinPurchaseMemo = {
+  coin_type: number;
+  amount: UintType;
+  address: string;
+  mac: string;
+};
+
+export type PaymentRequestMemo = {
+  text_memo?: TextMemo;
+  refund_memo?: RefundMemo;
+  coin_purchase_memo?: CoinPurchaseMemo;
+};
+
+// TxAckPaymentRequest
+export type TxAckPaymentRequest = {
+  nonce?: string;
+  recipient_name: string;
+  memos?: PaymentRequestMemo[];
+  amount?: UintType;
+  signature: string;
+};
+
 // TxAck
 
 // TxAck replacement
@@ -560,35 +603,22 @@ export type OwnershipProof = {
 // AuthorizeCoinJoin
 export type AuthorizeCoinJoin = {
   coordinator: string;
-  max_total_fee: number;
-  fee_per_anonymity?: number;
+  max_rounds: number;
+  max_coordinator_fee_rate: number;
+  max_fee_per_kvbyte: number;
   address_n: number[];
   coin_name?: string;
   script_type?: InputScriptType;
   amount_unit?: AmountUnit;
 };
 
-export type BIP32Address = {
-  address_n: number[];
-};
-
-// GetPublicKeyMultiple
-export type GetPublicKeyMultiple = {
-  addresses: BIP32Address[];
-  ecdsa_curve_name?: string;
-  show_display?: boolean;
-  coin_name?: string;
-  script_type?: InputScriptType;
-  ignore_xpub_magic?: boolean;
-};
-
-// PublicKeyMultiple
-export type PublicKeyMultiple = {
-  xpubs: string[];
-};
-
 // FirmwareErase
 export type FirmwareErase = {
+  length?: number;
+};
+
+// FirmwareErase_ex
+export type FirmwareErase_ex = {
   length?: number;
 };
 
@@ -607,11 +637,6 @@ export type FirmwareUpload = {
 // SelfTest
 export type SelfTest = {
   payload?: string;
-};
-
-// FirmwareErase_ex
-export type FirmwareErase_ex = {
-  length?: number;
 };
 
 export enum CardanoDerivationType {
@@ -1038,8 +1063,6 @@ export enum Enum_PinMatrixRequestType {
   PinMatrixRequestType_NewSecond = 3,
   PinMatrixRequestType_WipeCodeFirst = 4,
   PinMatrixRequestType_WipeCodeSecond = 5,
-  PinMatrixRequestType_BackupFirst = 6,
-  PinMatrixRequestType_BackupSecond = 7,
 }
 export type PinMatrixRequestType = keyof typeof Enum_PinMatrixRequestType;
 
@@ -1051,7 +1074,6 @@ export type PinMatrixRequest = {
 // PinMatrixAck
 export type PinMatrixAck = {
   pin: string;
-  new_pin?: string;
 };
 
 // PassphraseRequest
@@ -1073,9 +1095,6 @@ export type Deprecated_PassphraseStateRequest = {
 
 // Deprecated_PassphraseStateAck
 export type Deprecated_PassphraseStateAck = {};
-
-// BixinPinInputOnDevice
-export type BixinPinInputOnDevice = {};
 
 // ConfluxGetAddress
 export type ConfluxGetAddress = {
@@ -1228,6 +1247,12 @@ export type EcdsaPublicKeys = {
   public_keys: string[];
 };
 
+export enum DebugButton {
+  NO = 0,
+  YES = 1,
+  INFO = 2,
+}
+
 // EosGetPublicKey
 export type EosGetPublicKey = {
   address_n: number[];
@@ -1252,9 +1277,9 @@ export type EosTxHeader = {
 // EosSignTx
 export type EosSignTx = {
   address_n: number[];
-  chain_id?: string;
-  header?: EosTxHeader;
-  num_actions?: number;
+  chain_id: string;
+  header: EosTxHeader;
+  num_actions: number;
 };
 
 // EosTxActionRequest
@@ -1263,13 +1288,13 @@ export type EosTxActionRequest = {
 };
 
 export type EosAsset = {
-  amount?: UintType;
-  symbol?: string;
+  amount: UintType;
+  symbol: string;
 };
 
 export type EosPermissionLevel = {
-  actor?: string;
-  permission?: string;
+  actor: string;
+  permission: string;
 };
 
 export type EosAuthorizationKey = {
@@ -1280,117 +1305,117 @@ export type EosAuthorizationKey = {
 };
 
 export type EosAuthorizationAccount = {
-  account?: EosPermissionLevel;
-  weight?: number;
+  account: EosPermissionLevel;
+  weight: number;
 };
 
 export type EosAuthorizationWait = {
-  wait_sec?: number;
-  weight?: number;
+  wait_sec: number;
+  weight: number;
 };
 
 export type EosAuthorization = {
-  threshold?: number;
+  threshold: number;
   keys: EosAuthorizationKey[];
   accounts: EosAuthorizationAccount[];
   waits: EosAuthorizationWait[];
 };
 
 export type EosActionCommon = {
-  account?: string;
-  name?: string;
+  account: string;
+  name: string;
   authorization: EosPermissionLevel[];
 };
 
 export type EosActionTransfer = {
-  sender?: string;
-  receiver?: string;
-  quantity?: EosAsset;
-  memo?: string;
+  sender: string;
+  receiver: string;
+  quantity: EosAsset;
+  memo: string;
 };
 
 export type EosActionDelegate = {
-  sender?: string;
-  receiver?: string;
-  net_quantity?: EosAsset;
-  cpu_quantity?: EosAsset;
-  transfer?: boolean;
+  sender: string;
+  receiver: string;
+  net_quantity: EosAsset;
+  cpu_quantity: EosAsset;
+  transfer: boolean;
 };
 
 export type EosActionUndelegate = {
-  sender?: string;
-  receiver?: string;
-  net_quantity?: EosAsset;
-  cpu_quantity?: EosAsset;
+  sender: string;
+  receiver: string;
+  net_quantity: EosAsset;
+  cpu_quantity: EosAsset;
 };
 
 export type EosActionRefund = {
-  owner?: string;
+  owner: string;
 };
 
 export type EosActionBuyRam = {
-  payer?: string;
-  receiver?: string;
-  quantity?: EosAsset;
+  payer: string;
+  receiver: string;
+  quantity: EosAsset;
 };
 
 export type EosActionBuyRamBytes = {
-  payer?: string;
-  receiver?: string;
-  bytes?: number;
+  payer: string;
+  receiver: string;
+  bytes: number;
 };
 
 export type EosActionSellRam = {
-  account?: string;
-  bytes?: number;
+  account: string;
+  bytes: number;
 };
 
 export type EosActionVoteProducer = {
-  voter?: string;
-  proxy?: string;
+  voter: string;
+  proxy: string;
   producers: string[];
 };
 
 export type EosActionUpdateAuth = {
-  account?: string;
-  permission?: string;
-  parent?: string;
-  auth?: EosAuthorization;
+  account: string;
+  permission: string;
+  parent: string;
+  auth: EosAuthorization;
 };
 
 export type EosActionDeleteAuth = {
-  account?: string;
-  permission?: string;
+  account: string;
+  permission: string;
 };
 
 export type EosActionLinkAuth = {
-  account?: string;
-  code?: string;
-  type?: string;
-  requirement?: string;
+  account: string;
+  code: string;
+  type: string;
+  requirement: string;
 };
 
 export type EosActionUnlinkAuth = {
-  account?: string;
-  code?: string;
-  type?: string;
+  account: string;
+  code: string;
+  type: string;
 };
 
 export type EosActionNewAccount = {
-  creator?: string;
-  name?: string;
-  owner?: EosAuthorization;
-  active?: EosAuthorization;
+  creator: string;
+  name: string;
+  owner: EosAuthorization;
+  active: EosAuthorization;
 };
 
 export type EosActionUnknown = {
   data_size: number;
-  data_chunk?: string;
+  data_chunk: string;
 };
 
 // EosTxActionAck
 export type EosTxActionAck = {
-  common?: EosActionCommon;
+  common: EosActionCommon;
   transfer?: EosActionTransfer;
   delegate?: EosActionDelegate;
   undelegate?: EosActionUndelegate;
@@ -1557,13 +1582,6 @@ export type EthereumVerifyMessage = {
   chain_id?: number;
 };
 
-// EthereumSignMessageEIP712
-export type EthereumSignMessageEIP712 = {
-  address_n: number[];
-  domain_hash?: string;
-  message_hash?: string;
-};
-
 // EthereumSignTypedHash
 export type EthereumSignTypedHash = {
   address_n: number[];
@@ -1712,7 +1730,6 @@ export type Features = {
   fw_minor: number | null;
   fw_patch: number | null;
   fw_vendor: string | null;
-  fw_vendor_keys?: string;
   unfinished_backup: boolean | null;
   no_backup: boolean | null;
   recovery_mode: boolean | null;
@@ -1745,20 +1762,20 @@ export type Features = {
   pre_firmware?: string;
   coin_switch?: number;
   build_id?: string;
-  battery_level?: number;
+  boardloader_version?: string;
+  busy?: boolean;
 };
 
 // LockDevice
 export type LockDevice = {};
 
+// SetBusy
+export type SetBusy = {
+  expiry_ms?: number;
+};
+
 // EndSession
 export type EndSession = {};
-
-export enum ExportType {
-  SeedEncExportType_NO = 0,
-  SeedEncExportType_YES = 1,
-  MnemonicPlainExportType_YES = 2,
-}
 
 // ApplySettings
 export type ApplySettings = {
@@ -1772,13 +1789,6 @@ export type ApplySettings = {
   passphrase_always_on_device?: boolean;
   safety_checks?: SafetyCheckLevel;
   experimental_features?: boolean;
-  use_ble?: boolean;
-  use_se?: boolean;
-  is_bixinapp?: boolean;
-  fastpay_pin?: boolean;
-  fastpay_confirm?: boolean;
-  fastpay_money_limit?: number;
-  fastpay_times?: number;
 };
 
 // ApplyFlags
@@ -1824,6 +1834,16 @@ export type GetEntropy = {
 // Entropy
 export type Entropy = {
   entropy: string;
+};
+
+// GetFirmwareHash
+export type GetFirmwareHash = {
+  challenge?: string;
+};
+
+// FirmwareHash
+export type FirmwareHash = {
+  hash: string;
 };
 
 // WipeDevice
@@ -1911,95 +1931,22 @@ export type PreauthorizedRequest = {};
 // CancelAuthorization
 export type CancelAuthorization = {};
 
-export enum SeedRequestType {
-  SeedRequestType_Gen = 0,
-  SeedRequestType_EncExport = 1,
-  SeedRequestType_EncImport = 2,
-}
+// RebootToBootloader
+export type RebootToBootloader = {};
 
-// BixinSeedOperate
-export type BixinSeedOperate = {
-  type: SeedRequestType;
-  seed_importData?: string;
-};
+// RebootToBoardloader
+export type RebootToBoardloader = {};
 
-// BixinMessageSE
-export type BixinMessageSE = {
-  inputmessage: string;
-};
+// GetNonce
+export type GetNonce = {};
 
-// BixinOutMessageSE
-export type BixinOutMessageSE = {
-  outmessage?: string;
+// Nonce
+export type Nonce = {
+  nonce: string;
 };
 
 // DeviceBackToBoot
 export type DeviceBackToBoot = {};
-
-// BixinBackupRequest
-export type BixinBackupRequest = {};
-
-// BixinBackupAck
-export type BixinBackupAck = {
-  data: string;
-};
-
-// BixinRestoreRequest
-export type BixinRestoreRequest = {
-  data: string;
-  language?: string;
-  label?: string;
-  passphrase_protection?: boolean;
-};
-
-// BixinRestoreAck
-export type BixinRestoreAck = {
-  data: string;
-};
-
-// BixinVerifyDeviceRequest
-export type BixinVerifyDeviceRequest = {
-  data: string;
-};
-
-// BixinVerifyDeviceAck
-export type BixinVerifyDeviceAck = {
-  cert: string;
-  signature: string;
-};
-
-export enum WL_OperationType {
-  WL_OperationType_Add = 0,
-  WL_OperationType_Delete = 1,
-  WL_OperationType_Inquire = 2,
-}
-
-// BixinWhiteListRequest
-export type BixinWhiteListRequest = {
-  type: WL_OperationType;
-  addr_in?: string;
-};
-
-// BixinWhiteListAck
-export type BixinWhiteListAck = {
-  address: string[];
-};
-
-// BixinLoadDevice
-export type BixinLoadDevice = {
-  mnemonics: string;
-  language?: string;
-  label?: string;
-  skip_checksum?: boolean;
-};
-
-// BixinBackupDevice
-export type BixinBackupDevice = {};
-
-// BixinBackupDeviceAck
-export type BixinBackupDeviceAck = {
-  mnemonics: string;
-};
 
 // DeviceInfoSettings
 export type DeviceInfoSettings = {
@@ -2040,23 +1987,6 @@ export type ReadSEPublicCert = {};
 // SEPublicCert
 export type SEPublicCert = {
   public_cert: string;
-};
-
-// SpiFlashWrite
-export type SpiFlashWrite = {
-  address: number;
-  data: string;
-};
-
-// SpiFlashRead
-export type SpiFlashRead = {
-  address: number;
-  len: number;
-};
-
-// SpiFlashData
-export type SpiFlashData = {
-  data: string;
 };
 
 // SESignMessage
@@ -2110,28 +2040,6 @@ export type ResourceUpdate = {
   hash?: string;
 };
 
-// NFTWriteInfo
-export type NFTWriteInfo = {
-  index: number;
-  width: number;
-  height: number;
-  name_zh?: string;
-  name_en?: string;
-};
-
-// NFTWriteData
-export type NFTWriteData = {
-  index: number;
-  data: string;
-  offset: number;
-};
-
-// RebootToBootloader
-export type RebootToBootloader = {};
-
-// RebootToBoardloader
-export type RebootToBoardloader = {};
-
 // ListResDir
 export type ListResDir = {
   path: string;
@@ -2147,14 +2055,27 @@ export type FileInfoList = {
   files: FileInfo[];
 };
 
-// DeviceEraseSector
-export type DeviceEraseSector = {
-  sector: number;
+// UnlockPath
+export type UnlockPath = {
+  address_n: number[];
+  mac?: string;
 };
 
+// UnlockedPathRequest
+export type UnlockedPathRequest = {
+  mac?: string;
+};
+
+export enum MoneroNetworkType {
+  MAINNET = 0,
+  TESTNET = 1,
+  STAGENET = 2,
+  FAKECHAIN = 3,
+}
+
 export type MoneroRctKeyPublic = {
-  dest?: string;
-  commitment?: string;
+  dest: string;
+  commitment: string;
 };
 
 export type MoneroOutputEntry = {
@@ -2212,7 +2133,7 @@ export type MoneroTransactionRsigData = {
 export type MoneroGetAddress = {
   address_n: number[];
   show_display?: boolean;
-  network_type?: number;
+  network_type?: MoneroNetworkType;
   account?: number;
   minor?: number;
   payment_id?: string;
@@ -2226,7 +2147,7 @@ export type MoneroAddress = {
 // MoneroGetWatchKey
 export type MoneroGetWatchKey = {
   address_n: number[];
-  network_type?: number;
+  network_type?: MoneroNetworkType;
 };
 
 // MoneroWatchKey
@@ -2257,7 +2178,7 @@ export type MoneroTransactionData = {
 export type MoneroTransactionInitRequest = {
   version?: number;
   address_n: number[];
-  network_type?: number;
+  network_type?: MoneroNetworkType;
   tsx_data?: MoneroTransactionData;
 };
 
@@ -2281,14 +2202,6 @@ export type MoneroTransactionSetInputAck = {
   pseudo_out_alpha?: string;
   spend_key?: string;
 };
-
-// MoneroTransactionInputsPermutationRequest
-export type MoneroTransactionInputsPermutationRequest = {
-  perm: number[];
-};
-
-// MoneroTransactionInputsPermutationAck
-export type MoneroTransactionInputsPermutationAck = {};
 
 // MoneroTransactionInputViniRequest
 export type MoneroTransactionInputViniRequest = {
@@ -2378,16 +2291,16 @@ export type MoneroTransactionFinalAck = {
 };
 
 export type MoneroSubAddressIndicesList = {
-  account?: number;
+  account: number;
   minor_indices: number[];
 };
 
 // MoneroKeyImageExportInitRequest
 export type MoneroKeyImageExportInitRequest = {
-  num?: number;
-  hash?: string;
+  num: number;
+  hash: string;
   address_n: number[];
-  network_type?: number;
+  network_type?: MoneroNetworkType;
   subs: MoneroSubAddressIndicesList[];
 };
 
@@ -2395,10 +2308,10 @@ export type MoneroKeyImageExportInitRequest = {
 export type MoneroKeyImageExportInitAck = {};
 
 export type MoneroTransferDetails = {
-  out_key?: string;
-  tx_pub_key?: string;
+  out_key: string;
+  tx_pub_key: string;
   additional_tx_pub_keys: string[];
-  internal_output_index?: number;
+  internal_output_index: number;
   sub_addr_major?: number;
   sub_addr_minor?: number;
 };
@@ -2429,11 +2342,11 @@ export type MoneroKeyImageSyncFinalAck = {
 // MoneroGetTxKeyRequest
 export type MoneroGetTxKeyRequest = {
   address_n: number[];
-  network_type?: number;
-  salt1?: string;
-  salt2?: string;
-  tx_enc_keys?: string;
-  tx_prefix_hash?: string;
+  network_type?: MoneroNetworkType;
+  salt1: string;
+  salt2: string;
+  tx_enc_keys: string;
+  tx_prefix_hash: string;
   reason?: number;
   view_public_key?: string;
 };
@@ -2448,7 +2361,7 @@ export type MoneroGetTxKeyAck = {
 // MoneroLiveRefreshStartRequest
 export type MoneroLiveRefreshStartRequest = {
   address_n: number[];
-  network_type?: number;
+  network_type?: MoneroNetworkType;
 };
 
 // MoneroLiveRefreshStartAck
@@ -2456,11 +2369,11 @@ export type MoneroLiveRefreshStartAck = {};
 
 // MoneroLiveRefreshStepRequest
 export type MoneroLiveRefreshStepRequest = {
-  out_key?: string;
-  recv_deriv?: string;
-  real_out_idx?: number;
-  sub_addr_major?: number;
-  sub_addr_minor?: number;
+  out_key: string;
+  recv_deriv: string;
+  real_out_idx: number;
+  sub_addr_major: number;
+  sub_addr_minor: number;
 };
 
 // MoneroLiveRefreshStepAck
@@ -2512,31 +2425,31 @@ export type NEMAddress = {
 export type NEMTransactionCommon = {
   address_n?: number[];
   network?: number;
-  timestamp?: number;
-  fee?: UintType;
-  deadline?: number;
+  timestamp: number;
+  fee: UintType;
+  deadline: number;
   signer?: string;
 };
 
 export type NEMMosaic = {
-  namespace?: string;
-  mosaic?: string;
-  quantity?: number;
+  namespace: string;
+  mosaic: string;
+  quantity: number;
 };
 
 export type NEMTransfer = {
-  recipient?: string;
-  amount?: UintType;
+  recipient: string;
+  amount: UintType;
   payload?: string;
   public_key?: string;
   mosaics?: NEMMosaic[];
 };
 
 export type NEMProvisionNamespace = {
-  namespace?: string;
+  namespace: string;
   parent?: string;
-  sink?: string;
-  fee?: UintType;
+  sink: string;
+  fee: UintType;
 };
 
 export enum NEMMosaicLevy {
@@ -2547,8 +2460,8 @@ export enum NEMMosaicLevy {
 export type NEMMosaicDefinition = {
   name?: string;
   ticker?: string;
-  namespace?: string;
-  mosaic?: string;
+  namespace: string;
+  mosaic: string;
   divisibility?: number;
   levy?: NEMMosaicLevy;
   fee?: UintType;
@@ -2558,14 +2471,14 @@ export type NEMMosaicDefinition = {
   supply?: number;
   mutable_supply?: boolean;
   transferable?: boolean;
-  description?: string;
+  description: string;
   networks?: number[];
 };
 
 export type NEMMosaicCreation = {
-  definition?: NEMMosaicDefinition;
-  sink?: string;
-  fee?: UintType;
+  definition: NEMMosaicDefinition;
+  sink: string;
+  fee: UintType;
 };
 
 export enum NEMSupplyChangeType {
@@ -2574,10 +2487,10 @@ export enum NEMSupplyChangeType {
 }
 
 export type NEMMosaicSupplyChange = {
-  namespace?: string;
-  mosaic?: string;
-  type?: NEMSupplyChangeType;
-  delta?: number;
+  namespace: string;
+  mosaic: string;
+  type: NEMSupplyChangeType;
+  delta: number;
 };
 
 export enum NEMModificationType {
@@ -2586,8 +2499,8 @@ export enum NEMModificationType {
 }
 
 export type NEMCosignatoryModification = {
-  type?: NEMModificationType;
-  public_key?: string;
+  type: NEMModificationType;
+  public_key: string;
 };
 
 export type NEMAggregateModification = {
@@ -2601,13 +2514,13 @@ export enum NEMImportanceTransferMode {
 }
 
 export type NEMImportanceTransfer = {
-  mode?: NEMImportanceTransferMode;
-  public_key?: string;
+  mode: NEMImportanceTransferMode;
+  public_key: string;
 };
 
 // NEMSignTx
 export type NEMSignTx = {
-  transaction?: NEMTransactionCommon;
+  transaction: NEMTransactionCommon;
   multisig?: NEMTransactionCommon;
   transfer?: NEMTransfer;
   cosigning?: boolean;
@@ -2683,11 +2596,11 @@ export type RipplePayment = {
 // RippleSignTx
 export type RippleSignTx = {
   address_n: number[];
-  fee?: UintType;
+  fee: UintType;
   flags?: number;
-  sequence?: number;
+  sequence: number;
   last_ledger_sequence?: number;
-  payment?: RipplePayment;
+  payment: RipplePayment;
 };
 
 // RippleSignedTx
@@ -2704,7 +2617,7 @@ export type SolanaGetAddress = {
 
 // SolanaAddress
 export type SolanaAddress = {
-  address?: string;
+  address: string;
 };
 
 // SolanaSignTx
@@ -2715,7 +2628,7 @@ export type SolanaSignTx = {
 
 // SolanaSignedTx
 export type SolanaSignedTx = {
-  signature?: string;
+  signature: string;
 };
 
 // StarcoinGetAddress
@@ -2743,7 +2656,7 @@ export type StarcoinPublicKey = {
 // StarcoinSignTx
 export type StarcoinSignTx = {
   address_n: number[];
-  raw_tx?: string;
+  raw_tx: string;
 };
 
 // StarcoinSignedTx
@@ -3019,8 +2932,8 @@ export type TezosRevealOp = {
 };
 
 export type TezosManagerTransfer = {
-  destination?: TezosContractID;
-  amount?: UintType;
+  destination: TezosContractID;
+  amount: UintType;
 };
 
 export type TezosParametersManager = {
@@ -3065,8 +2978,8 @@ export type TezosDelegationOp = {
 };
 
 export type TezosProposalOp = {
-  source?: string;
-  period?: number;
+  source: string;
+  period: number;
   proposals: string[];
 };
 
@@ -3077,10 +2990,10 @@ export enum TezosBallotType {
 }
 
 export type TezosBallotOp = {
-  source?: string;
-  period?: number;
-  proposal?: string;
-  ballot?: TezosBallotType;
+  source: string;
+  period: number;
+  proposal: string;
+  ballot: TezosBallotType;
 };
 
 // TezosSignTx
@@ -3126,8 +3039,27 @@ export type TronTriggerSmartContract = {
   asset_id?: number;
 };
 
+export enum TronResourceCode {
+  BANDWIDTH = 0,
+  ENERGY = 1,
+}
+
+export type TronFreezeBalanceContract = {
+  frozen_balance?: number;
+  frozen_duration?: number;
+  resource?: TronResourceCode;
+  receiver_address?: string;
+};
+
+export type TronUnfreezeBalanceContract = {
+  resource?: TronResourceCode;
+  receiver_address?: string;
+};
+
 export type TronContract = {
   transfer_contract?: TronTransferContract;
+  freeze_balance_contract?: TronFreezeBalanceContract;
+  unfreeze_balance_contract?: TronUnfreezeBalanceContract;
   trigger_smart_contract?: TronTriggerSmartContract;
 };
 
@@ -3161,13 +3093,11 @@ export type TronMessageSignature = {
   signature: string;
 };
 
-// facotry
-export type facotry = {};
+// experimental_message
+export type experimental_message = {};
 
-export enum CommandFlags {
-  Default = 0,
-  Factory_Only = 1,
-}
+// experimental_field
+export type experimental_field = {};
 
 // custom connect definitions
 export type MessageType = {
@@ -3206,6 +3136,7 @@ export type MessageType = {
   SignMessage: SignMessage;
   MessageSignature: MessageSignature;
   VerifyMessage: VerifyMessage;
+  CoinJoinRequest: CoinJoinRequest;
   SignTx: SignTx;
   TxRequestDetailsType: TxRequestDetailsType;
   TxRequestSerializedType: TxRequestSerializedType;
@@ -3216,6 +3147,11 @@ export type MessageType = {
   PrevTx: PrevTx;
   PrevInput: PrevInput;
   PrevOutput: PrevOutput;
+  TextMemo: TextMemo;
+  RefundMemo: RefundMemo;
+  CoinPurchaseMemo: CoinPurchaseMemo;
+  PaymentRequestMemo: PaymentRequestMemo;
+  TxAckPaymentRequest: TxAckPaymentRequest;
   TxAck: TxAck;
   TxAckInputWrapper: TxAckInputWrapper;
   TxAckInput: TxAckInput;
@@ -3231,14 +3167,11 @@ export type MessageType = {
   GetOwnershipProof: GetOwnershipProof;
   OwnershipProof: OwnershipProof;
   AuthorizeCoinJoin: AuthorizeCoinJoin;
-  BIP32Address: BIP32Address;
-  GetPublicKeyMultiple: GetPublicKeyMultiple;
-  PublicKeyMultiple: PublicKeyMultiple;
   FirmwareErase: FirmwareErase;
+  FirmwareErase_ex: FirmwareErase_ex;
   FirmwareRequest: FirmwareRequest;
   FirmwareUpload: FirmwareUpload;
   SelfTest: SelfTest;
-  FirmwareErase_ex: FirmwareErase_ex;
   CardanoBlockchainPointerType: CardanoBlockchainPointerType;
   CardanoNativeScript: CardanoNativeScript;
   CardanoGetNativeScriptHash: CardanoGetNativeScriptHash;
@@ -3287,7 +3220,6 @@ export type MessageType = {
   PassphraseAck: PassphraseAck;
   Deprecated_PassphraseStateRequest: Deprecated_PassphraseStateRequest;
   Deprecated_PassphraseStateAck: Deprecated_PassphraseStateAck;
-  BixinPinInputOnDevice: BixinPinInputOnDevice;
   ConfluxGetAddress: ConfluxGetAddress;
   ConfluxAddress: ConfluxAddress;
   ConfluxSignTx: ConfluxSignTx;
@@ -3357,7 +3289,6 @@ export type MessageType = {
   EthereumSignMessage: EthereumSignMessage;
   EthereumMessageSignature: EthereumMessageSignature;
   EthereumVerifyMessage: EthereumVerifyMessage;
-  EthereumSignMessageEIP712: EthereumSignMessageEIP712;
   EthereumSignTypedHash: EthereumSignTypedHash;
   EthereumTypedDataSignature: EthereumTypedDataSignature;
   FilecoinGetAddress: FilecoinGetAddress;
@@ -3374,6 +3305,7 @@ export type MessageType = {
   GetFeatures: GetFeatures;
   Features: Features;
   LockDevice: LockDevice;
+  SetBusy: SetBusy;
   EndSession: EndSession;
   ApplySettings: ApplySettings;
   ApplyFlags: ApplyFlags;
@@ -3384,6 +3316,8 @@ export type MessageType = {
   Cancel: Cancel;
   GetEntropy: GetEntropy;
   Entropy: Entropy;
+  GetFirmwareHash: GetFirmwareHash;
+  FirmwareHash: FirmwareHash;
   WipeDevice: WipeDevice;
   ResetDevice: ResetDevice;
   BackupDevice: BackupDevice;
@@ -3398,21 +3332,11 @@ export type MessageType = {
   DoPreauthorized: DoPreauthorized;
   PreauthorizedRequest: PreauthorizedRequest;
   CancelAuthorization: CancelAuthorization;
-  BixinSeedOperate: BixinSeedOperate;
-  BixinMessageSE: BixinMessageSE;
-  BixinOutMessageSE: BixinOutMessageSE;
+  RebootToBootloader: RebootToBootloader;
+  RebootToBoardloader: RebootToBoardloader;
+  GetNonce: GetNonce;
+  Nonce: Nonce;
   DeviceBackToBoot: DeviceBackToBoot;
-  BixinBackupRequest: BixinBackupRequest;
-  BixinBackupAck: BixinBackupAck;
-  BixinRestoreRequest: BixinRestoreRequest;
-  BixinRestoreAck: BixinRestoreAck;
-  BixinVerifyDeviceRequest: BixinVerifyDeviceRequest;
-  BixinVerifyDeviceAck: BixinVerifyDeviceAck;
-  BixinWhiteListRequest: BixinWhiteListRequest;
-  BixinWhiteListAck: BixinWhiteListAck;
-  BixinLoadDevice: BixinLoadDevice;
-  BixinBackupDevice: BixinBackupDevice;
-  BixinBackupDeviceAck: BixinBackupDeviceAck;
   DeviceInfoSettings: DeviceInfoSettings;
   GetDeviceInfo: GetDeviceInfo;
   DeviceInfo: DeviceInfo;
@@ -3421,9 +3345,6 @@ export type MessageType = {
   WriteSEPublicCert: WriteSEPublicCert;
   ReadSEPublicCert: ReadSEPublicCert;
   SEPublicCert: SEPublicCert;
-  SpiFlashWrite: SpiFlashWrite;
-  SpiFlashRead: SpiFlashRead;
-  SpiFlashData: SpiFlashData;
   SESignMessage: SESignMessage;
   SEMessageSignature: SEMessageSignature;
   ResourceUpload: ResourceUpload;
@@ -3431,14 +3352,11 @@ export type MessageType = {
   ResourceRequest: ResourceRequest;
   ResourceAck: ResourceAck;
   ResourceUpdate: ResourceUpdate;
-  NFTWriteInfo: NFTWriteInfo;
-  NFTWriteData: NFTWriteData;
-  RebootToBootloader: RebootToBootloader;
-  RebootToBoardloader: RebootToBoardloader;
   ListResDir: ListResDir;
   FileInfo: FileInfo;
   FileInfoList: FileInfoList;
-  DeviceEraseSector: DeviceEraseSector;
+  UnlockPath: UnlockPath;
+  UnlockedPathRequest: UnlockedPathRequest;
   MoneroRctKeyPublic: MoneroRctKeyPublic;
   MoneroOutputEntry: MoneroOutputEntry;
   MoneroMultisigKLRki: MoneroMultisigKLRki;
@@ -3455,8 +3373,6 @@ export type MessageType = {
   MoneroTransactionInitAck: MoneroTransactionInitAck;
   MoneroTransactionSetInputRequest: MoneroTransactionSetInputRequest;
   MoneroTransactionSetInputAck: MoneroTransactionSetInputAck;
-  MoneroTransactionInputsPermutationRequest: MoneroTransactionInputsPermutationRequest;
-  MoneroTransactionInputsPermutationAck: MoneroTransactionInputsPermutationAck;
   MoneroTransactionInputViniRequest: MoneroTransactionInputViniRequest;
   MoneroTransactionInputViniAck: MoneroTransactionInputViniAck;
   MoneroTransactionAllInputsSetRequest: MoneroTransactionAllInputsSetRequest;
@@ -3571,12 +3487,15 @@ export type MessageType = {
   TronAddress: TronAddress;
   TronTransferContract: TronTransferContract;
   TronTriggerSmartContract: TronTriggerSmartContract;
+  TronFreezeBalanceContract: TronFreezeBalanceContract;
+  TronUnfreezeBalanceContract: TronUnfreezeBalanceContract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
-  facotry: facotry;
+  experimental_message: experimental_message;
+  experimental_field: experimental_field;
 };
 
 export type MessageKey = keyof MessageType;
