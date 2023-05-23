@@ -4,6 +4,11 @@ import semver from 'semver';
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 import { getDeviceType } from '../utils';
+import { getDeviceFirmwareVersion } from '../utils/deviceFeaturesUtils';
+
+const BridgeVersion = '2.2.0';
+const TouchNeedUpdateVersion = '4.2.0';
+const ClassicAndMiniNeedUpdateVersion = '3.0.0';
 
 export default class CheckBridgeRelease extends BaseMethod {
   init() {
@@ -24,15 +29,33 @@ export default class CheckBridgeRelease extends BaseMethod {
         timeout: 3000,
       });
       const { version = '0.0.0' } = data;
+      console.log('===?>>BRIDGE VERSION: ', version);
 
+      const { willUpdateFirmwareVersion } = this.payload;
       const { features } = this.device;
       const deviceType = getDeviceType(features);
+      const currentFirmwareVersion = getDeviceFirmwareVersion(features).join('.');
+      const isOldVersionBridge = semver.lt(version, BridgeVersion);
+
       let shouldUpdate = false;
-      console.log('===?>>BRIDGE VERSION: ', version);
       if (deviceType === 'touch') {
+        if (semver.gte(willUpdateFirmwareVersion, TouchNeedUpdateVersion) && isOldVersionBridge) {
+          shouldUpdate = true;
+        }
+        if (semver.gte(currentFirmwareVersion, TouchNeedUpdateVersion) && isOldVersionBridge) {
+          shouldUpdate = true;
+        }
+      }
+      if (deviceType === 'classic' || deviceType === 'mini') {
         if (
-          semver.gte(this.payload.willUpdateFirmwareVersion, '4.2.0') &&
-          semver.lt(version, '2.2.0')
+          semver.gte(willUpdateFirmwareVersion, ClassicAndMiniNeedUpdateVersion) &&
+          isOldVersionBridge
+        ) {
+          shouldUpdate = true;
+        }
+        if (
+          semver.gte(currentFirmwareVersion, ClassicAndMiniNeedUpdateVersion) &&
+          isOldVersionBridge
         ) {
           shouldUpdate = true;
         }
