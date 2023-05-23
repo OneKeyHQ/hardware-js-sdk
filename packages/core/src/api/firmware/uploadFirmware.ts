@@ -3,7 +3,6 @@ import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Success } from '@onekeyfe/hd-transport';
-import { arrayBuffer } from 'stream/consumers';
 import { wait } from '../../utils/index';
 import { DEVICE, CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
 import { PROTO } from '../../constants';
@@ -92,74 +91,133 @@ export const uploadFirmware = async (
       console.log('=======>>>>>>NEW UPDATE');
       const bootloaderVersion = getDeviceBootloaderVersion(device.features);
       if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
-        // Write File
-        const chunkSize = 1024 * 128;
-        const totalChunks = Math.ceil(payload.byteLength / chunkSize);
-        let offset = 0;
-        for (let i = 0; i < totalChunks; i++) {
-          const chunkStart = i * chunkSize;
-          const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
-          const chunkLength = chunkEnd - chunkStart;
-          const chunk = payload.slice(chunkStart, chunkEnd);
-          const overwrite = i === 0;
-          // @ts-expect-error
-          const writeRes = await typedCall('EmmcFileWrite', 'EmmcFile', {
-            file: {
-              path: '0:test-firmware.bin',
-              len: chunkLength,
-              offset,
-              data: chunk,
-            },
-            overwrite,
-            append: offset !== 0,
-          });
-          // @ts-expect-error
-          offset += writeRes.message.processed_byte;
-        }
-
-        // Firmware Update
-        const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
-          path: '0:test-firmware.bin',
-          force_erease: true,
-          reboot_on_success: true,
+        const response = await newTouchUpdateProcess(updateType, typedCall, postMessage, device, {
+          payload,
         });
-        console.log('response= ====> :', response);
-        return;
+        return response.message;
       }
     }
-    // postConfirmationMessage(device);
-    // postProgressTip(device, 'ConfirmOnDevice', postMessage);
-    // const length = payload.byteLength;
 
-    // let response = await typedCall('FirmwareErase', ['FirmwareRequest', 'Success'], { length });
-    // postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
-    // while (response.type !== 'Success') {
-    //   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    //   const start = response.message.offset!;
-    //   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    //   const end = response.message.offset! + response.message.length!;
-    //   const chunk = payload.slice(start, end);
+    postConfirmationMessage(device);
+    postProgressTip(device, 'ConfirmOnDevice', postMessage);
+    const length = payload.byteLength;
 
-    //   if (start > 0) {
-    //     postProgressMessage(device, Math.round((start / length) * 100), postMessage);
-    //   }
+    let response = await typedCall('FirmwareErase', ['FirmwareRequest', 'Success'], { length });
+    postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
+    while (response.type !== 'Success') {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const start = response.message.offset!;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const end = response.message.offset! + response.message.length!;
+      const chunk = payload.slice(start, end);
 
-    //   response = await typedCall('FirmwareUpload', ['FirmwareRequest', 'Success'], {
-    //     payload: chunk,
-    //   });
-    //   // @ts-expect-error
-    //   if (response.type === 'CallMethodError') {
-    //     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'upload firmware error');
-    //   }
-    // }
+      if (start > 0) {
+        postProgressMessage(device, Math.round((start / length) * 100), postMessage);
+      }
 
-    // postProgressMessage(device, 100, postMessage);
+      response = await typedCall('FirmwareUpload', ['FirmwareRequest', 'Success'], {
+        payload: chunk,
+      });
+      // @ts-expect-error
+      if (response.type === 'CallMethodError') {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'upload firmware error');
+      }
+    }
 
-    // await waitBleInstall(updateType);
-    // return response.message;
+    postProgressMessage(device, 100, postMessage);
+
+    await waitBleInstall(updateType);
+    return response.message;
   }
 
   throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'uploadFirmware: unknown device model');
+};
+
+const newTouchUpdateProcess = async (
+  updateType: 'firmware' | 'ble',
+  typedCall: TypedCall,
+  postMessage: (message: CoreMessage) => void,
+  device: Device,
+  { payload }: PROTO.FirmwareUpload
+) => {
+  // Write File
+  const filePath = `0:${updateType === 'ble' ? 'ble' : ''}-firmware-${Date.now()}.bin`;
+  const chunkSize = 1024 * 128;
+  const totalChunks = Math.ceil(payload.byteLength / chunkSize);
+  let offset = 0;
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkStart = i * chunkSize;
+    const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
+    const chunkLength = chunkEnd - chunkStart;
+    const chunk = payload.slice(chunkStart, chunkEnd);
+    const overwrite = i === 0;
+    const progress = Math.round((i / totalChunks) * 100);
+    const writeRes = await emmcFileWriteWithRetry(
+      typedCall,
+      filePath,
+      chunkLength,
+      offset,
+      chunk,
+      overwrite
+    );
+    // @ts-expect-error
+    offset += writeRes.message.processed_byte;
+    postProgressMessage(device, progress, postMessage);
+  }
+
+  postConfirmationMessage(device);
+  postProgressTip(device, 'ConfirmOnDevice', postMessage);
+  // Firmware Update
+  // @ts-expect-error
+  const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
+    path: filePath,
+    force_erease: true,
+    reboot_on_success: true,
+  });
+  console.log('response= ====> :', response);
+  return response;
+};
+
+const emmcFileWriteWithRetry = async (
+  typedCall: TypedCall,
+  filePath: string,
+  chunkLength: number,
+  offset: number,
+  chunk: ArrayBuffer,
+  overwrite: boolean
+) => {
+  const writeFunc = async () => {
+    // @ts-expect-error
+    const writeRes = await typedCall('EmmcFileWrite', 'EmmcFile', {
+      file: {
+        path: filePath,
+        len: chunkLength,
+        offset,
+        data: chunk,
+      },
+      overwrite,
+      append: offset !== 0,
+    });
+    if (writeRes.type !== 'EmmcFile') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write chunk once error');
+    }
+    return writeRes;
+  };
+
+  let retryCount = 5;
+  while (retryCount > 0) {
+    try {
+      const result = await writeFunc();
+      return result;
+    } catch (error) {
+      console.error(`emmcWrite error: `, error);
+      retryCount--;
+      if (retryCount === 0) {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
+      }
+      await wait(3000);
+    }
+  }
 };
 
 const processResourceRequest = async (
