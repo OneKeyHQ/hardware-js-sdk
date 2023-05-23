@@ -30,7 +30,7 @@ export type TronTransactionContract = {
   transferContract?: TronTransferContract;
   triggerSmartContract?: TronTriggerSmartContract;
   freezeBalanceContract?: TronFreezeBalanceContract;
-  unfreezeBalanceContract: TronUnfreezeBalanceContract;
+  unfreezeBalanceContract?: TronUnfreezeBalanceContract;
 };
 
 export type TronTransaction = {
