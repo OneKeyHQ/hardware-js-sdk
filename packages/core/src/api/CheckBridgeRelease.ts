@@ -64,6 +64,7 @@ export default class CheckBridgeRelease extends BaseMethod {
       return {
         shouldUpdate,
         status: shouldUpdate ? 'outdated' : 'valid',
+        releaseVersion: version,
       };
     } catch (e) {
       if (e.code === 'ECONNABORTED') {
