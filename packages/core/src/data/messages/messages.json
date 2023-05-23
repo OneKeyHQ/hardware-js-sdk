@@ -1616,6 +1616,39 @@
         }
       }
     },
+    "RebootType": {
+      "values": {
+        "Normal": 0,
+        "Boardloader": 1,
+        "BootLoader": 2
+      }
+    },
+    "Reboot": {
+      "fields": {
+        "reboot_type": {
+          "rule": "required",
+          "type": "RebootType",
+          "id": 1
+        }
+      }
+    },
+    "FirmwareUpdateEmmc": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "reboot_on_success": {
+          "type": "bool",
+          "id": 2
+        },
+        "force_erase": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
     "CardanoDerivationType": {
       "values": {
         "LEDGER": 0,
@@ -3403,6 +3436,207 @@
       "fields": {
         "watch": {
           "type": "bool",
+          "id": 1
+        }
+      }
+    },
+    "EmmcFixPermission": {
+      "fields": {}
+    },
+    "EmmcPath": {
+      "fields": {
+        "exist": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        },
+        "size": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 2
+        },
+        "year": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "month": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "day": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 5
+        },
+        "hour": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 6
+        },
+        "minute": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 7
+        },
+        "second": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 8
+        },
+        "readonly": {
+          "rule": "required",
+          "type": "bool",
+          "id": 9
+        },
+        "hidden": {
+          "rule": "required",
+          "type": "bool",
+          "id": 10
+        },
+        "system": {
+          "rule": "required",
+          "type": "bool",
+          "id": 11
+        },
+        "archive": {
+          "rule": "required",
+          "type": "bool",
+          "id": 12
+        },
+        "directory": {
+          "rule": "required",
+          "type": "bool",
+          "id": 13
+        }
+      }
+    },
+    "EmmcPathInfo": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EmmcFile": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "offset": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "len": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "data": {
+          "type": "bytes",
+          "id": 4
+        },
+        "data_hash": {
+          "type": "uint32",
+          "id": 5
+        },
+        "processed_byte": {
+          "type": "uint32",
+          "id": 6
+        }
+      }
+    },
+    "EmmcFileRead": {
+      "fields": {
+        "file": {
+          "rule": "required",
+          "type": "EmmcFile",
+          "id": 1
+        },
+        "ui_percentage": {
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "EmmcFileWrite": {
+      "fields": {
+        "file": {
+          "rule": "required",
+          "type": "EmmcFile",
+          "id": 1
+        },
+        "overwrite": {
+          "rule": "required",
+          "type": "bool",
+          "id": 2
+        },
+        "append": {
+          "rule": "required",
+          "type": "bool",
+          "id": 3
+        },
+        "ui_percentage": {
+          "type": "uint32",
+          "id": 4
+        }
+      }
+    },
+    "EmmcFileDelete": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EmmcDir": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "child_dirs": {
+          "type": "string",
+          "id": 2
+        },
+        "child_files": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "EmmcDirList": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EmmcDirMake": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EmmcDirRemove": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
           "id": 1
         }
       }
@@ -8799,6 +9033,8 @@
         "MessageType_FirmwareUpload": 7,
         "MessageType_FirmwareRequest": 8,
         "MessageType_SelfTest": 32,
+        "MessageType_Reboot": 30000,
+        "MessageType_FirmwareUpdateEmmc": 30001,
         "MessageType_GetPublicKey": 11,
         "MessageType_PublicKey": 12,
         "MessageType_SignTx": 15,
@@ -8840,6 +9076,17 @@
         "MessageType_DebugLinkRecordScreen": 9003,
         "MessageType_DebugLinkEraseSdCard": 9005,
         "MessageType_DebugLinkWatchLayout": 9006,
+        "MessageType_EmmcFixPermission": 30100,
+        "MessageType_EmmcPath": 30101,
+        "MessageType_EmmcPathInfo": 30102,
+        "MessageType_EmmcFile": 30103,
+        "MessageType_EmmcFileRead": 30104,
+        "MessageType_EmmcFileWrite": 30105,
+        "MessageType_EmmcFileDelete": 30106,
+        "MessageType_EmmcDir": 30107,
+        "MessageType_EmmcDirList": 30108,
+        "MessageType_EmmcDirMake": 30109,
+        "MessageType_EmmcDirRemove": 30110,
         "MessageType_EthereumGetPublicKey": 450,
         "MessageType_EthereumPublicKey": 451,
         "MessageType_EthereumGetAddress": 56,
