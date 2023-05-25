@@ -88,7 +88,6 @@ export const uploadFirmware = async (
 
   if (deviceModel === 'model_touch') {
     if (device.features) {
-      console.log('=======>>>>>>NEW UPDATE');
       const bootloaderVersion = getDeviceBootloaderVersion(device.features);
       if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
         const response = await newTouchUpdateProcess(updateType, typedCall, postMessage, device, {
@@ -140,9 +139,10 @@ const newTouchUpdateProcess = async (
   device: Device,
   { payload }: PROTO.FirmwareUpload
 ) => {
+  postProgressTip(device, 'StartTransferData', postMessage);
   // Write File
   const filePath = `0:${updateType === 'ble' ? 'ble' : ''}-firmware-${Date.now()}.bin`;
-  const chunkSize = 1024 * 128;
+  const chunkSize = 1024 * 64;
   const totalChunks = Math.ceil(payload.byteLength / chunkSize);
   let offset = 0;
   for (let i = 0; i < totalChunks; i++) {
@@ -158,7 +158,8 @@ const newTouchUpdateProcess = async (
       chunkLength,
       offset,
       chunk,
-      overwrite
+      overwrite,
+      progress
     );
     // @ts-expect-error
     offset += writeRes.message.processed_byte;
@@ -167,6 +168,9 @@ const newTouchUpdateProcess = async (
 
   postConfirmationMessage(device);
   postProgressTip(device, 'ConfirmOnDevice', postMessage);
+  setTimeout(() => {
+    postProgressTip(device, 'InstallingFirmware', postMessage);
+  }, 1000);
   // Firmware Update
   // @ts-expect-error
   const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
@@ -174,7 +178,6 @@ const newTouchUpdateProcess = async (
     force_erease: true,
     reboot_on_success: true,
   });
-  console.log('response= ====> :', response);
   return response;
 };
 
@@ -184,7 +187,8 @@ const emmcFileWriteWithRetry = async (
   chunkLength: number,
   offset: number,
   chunk: ArrayBuffer,
-  overwrite: boolean
+  overwrite: boolean,
+  progress: number
 ) => {
   const writeFunc = async () => {
     // @ts-expect-error
@@ -197,6 +201,7 @@ const emmcFileWriteWithRetry = async (
       },
       overwrite,
       append: offset !== 0,
+      ui_percentage: progress,
     });
     if (writeRes.type !== 'EmmcFile') {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write chunk once error');
