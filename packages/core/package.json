@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-core",
-  "version": "0.3.6-alpha.0",
+  "version": "0.3.6",
   "description": "> TODO: description",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -24,8 +24,8 @@
     "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^0.3.6-alpha.0",
-    "@onekeyfe/hd-transport": "^0.3.6-alpha.0",
+    "@onekeyfe/hd-shared": "^0.3.6",
+    "@onekeyfe/hd-transport": "^0.3.6",
     "axios": "^0.27.2",
     "bignumber.js": "^9.0.2",
     "bytebuffer": "^5.0.1",
