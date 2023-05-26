@@ -11,8 +11,11 @@ import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommand
 import { KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
 import { getDeviceBootloaderVersion, getDeviceModel } from '../../utils/deviceFeaturesUtils';
+import { DataManager } from '../../data-manager';
+import { DevicePool } from '../../device/DevicePool';
 
 const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.2';
+const SESSION_ERROR = 'session not found';
 
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
@@ -90,7 +93,7 @@ export const uploadFirmware = async (
     if (device.features) {
       const bootloaderVersion = getDeviceBootloaderVersion(device.features);
       if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
-        const response = await newTouchUpdateProcess(updateType, typedCall, postMessage, device, {
+        const response = await newTouchUpdateProcess(updateType, postMessage, device, {
           payload,
         });
         return response.message;
@@ -134,15 +137,17 @@ export const uploadFirmware = async (
 
 const newTouchUpdateProcess = async (
   updateType: 'firmware' | 'ble',
-  typedCall: TypedCall,
   postMessage: (message: CoreMessage) => void,
   device: Device,
   { payload }: PROTO.FirmwareUpload
 ) => {
+  let typedCall = device.getCommands().typedCall.bind(device.getCommands());
   postProgressTip(device, 'StartTransferData', postMessage);
   // Write File
   const filePath = `0:${updateType === 'ble' ? 'ble-' : ''}firmware.bin`;
-  const chunkSize = 1024 * 128;
+  const env = DataManager.getSettings('env');
+  const perPackageSize = env === 'react-native' ? 16 : 128;
+  const chunkSize = 1024 * perPackageSize;
   const totalChunks = Math.ceil(payload.byteLength / chunkSize);
   let offset = 0;
   for (let i = 0; i < totalChunks; i++) {
@@ -153,7 +158,7 @@ const newTouchUpdateProcess = async (
     const overwrite = i === 0;
     const progress = Math.round((i / totalChunks) * 100);
     const writeRes = await emmcFileWriteWithRetry(
-      typedCall,
+      device,
       filePath,
       chunkLength,
       offset,
@@ -168,9 +173,8 @@ const newTouchUpdateProcess = async (
 
   postConfirmationMessage(device);
   postProgressTip(device, 'ConfirmOnDevice', postMessage);
-  setTimeout(() => {
-    postProgressTip(device, 'InstallingFirmware', postMessage);
-  }, 1000);
+  postProgressTip(device, 'InstallingFirmware', postMessage);
+  typedCall = device.getCommands().typedCall.bind(device.getCommands());
   // Firmware Update
   // @ts-expect-error
   const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
@@ -182,7 +186,7 @@ const newTouchUpdateProcess = async (
 };
 
 const emmcFileWriteWithRetry = async (
-  typedCall: TypedCall,
+  device: Device,
   filePath: string,
   chunkLength: number,
   offset: number,
@@ -191,6 +195,7 @@ const emmcFileWriteWithRetry = async (
   progress: number
 ) => {
   const writeFunc = async () => {
+    const typedCall = device.getCommands().typedCall.bind(device.getCommands());
     // @ts-expect-error
     const writeRes = await typedCall('EmmcFileWrite', 'EmmcFile', {
       file: {
@@ -204,12 +209,18 @@ const emmcFileWriteWithRetry = async (
       ui_percentage: progress,
     });
     if (writeRes.type !== 'EmmcFile') {
+      // @ts-expect-error
+      if (writeRes.type === 'CallMethodError') {
+        if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
+        }
+      }
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write chunk once error');
     }
     return writeRes;
   };
 
-  let retryCount = 5;
+  let retryCount = 10;
   while (retryCount > 0) {
     try {
       const result = await writeFunc();
@@ -219,6 +230,16 @@ const emmcFileWriteWithRetry = async (
       retryCount--;
       if (retryCount === 0) {
         throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
+      }
+      if (error.message.indexOf(SESSION_ERROR) > -1) {
+        const deviceDiff = await device.deviceConnector?.enumerate();
+        const devicesDescriptor = deviceDiff?.descriptors ?? [];
+        const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
+        if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+          device.updateFromCache(deviceList[0]);
+          await device.acquire();
+          device.getCommands().mainId = device.mainId ?? '';
+        }
       }
       await wait(3000);
     }
