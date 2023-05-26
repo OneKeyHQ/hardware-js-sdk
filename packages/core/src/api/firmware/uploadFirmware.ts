@@ -231,7 +231,12 @@ const emmcFileWriteWithRetry = async (
       if (retryCount === 0) {
         throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
       }
-      if (error.message.indexOf(SESSION_ERROR) > -1) {
+      const env = DataManager.getSettings('env');
+      if (env === 'react-native') {
+        await wait(3000);
+        await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
+        await device.initialize();
+      } else if (error.message.indexOf(SESSION_ERROR) > -1) {
         const deviceDiff = await device.deviceConnector?.enumerate();
         const devicesDescriptor = deviceDiff?.descriptors ?? [];
         const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
