@@ -200,7 +200,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
   const handleFirmwareUpdateV2 = async () => {
     const params: any = {
       updateType: firmwareType ? 'firmware' : 'ble',
-      // version: [4, 2, 0],
+      version: [4, 3, 0],
       platform: 'web',
       forcedUpdateRes: false,
     };

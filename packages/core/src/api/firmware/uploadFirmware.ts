@@ -141,8 +141,8 @@ const newTouchUpdateProcess = async (
 ) => {
   postProgressTip(device, 'StartTransferData', postMessage);
   // Write File
-  const filePath = `0:${updateType === 'ble' ? 'ble' : ''}-firmware-${Date.now()}.bin`;
-  const chunkSize = 1024 * 64;
+  const filePath = `0:${updateType === 'ble' ? 'ble-' : ''}firmware.bin`;
+  const chunkSize = 1024 * 128;
   const totalChunks = Math.ceil(payload.byteLength / chunkSize);
   let offset = 0;
   for (let i = 0; i < totalChunks; i++) {
