@@ -5,6 +5,7 @@ import { init } from './init';
 import { getLogs } from './getLogs';
 import { checkTransportRelease } from './checkTransportRelease';
 import { checkBridgeStatus } from './checkBridgeStatus';
+import { checkBridgeRelease } from './checkBridgeRelease';
 import { checkBootloaderRelease } from './checkBootloaderRelease';
 
 import { searchDevices } from './searchDevices';
@@ -129,6 +130,7 @@ export type CoreApi = {
    */
   checkTransportRelease: typeof checkTransportRelease;
   checkBridgeStatus: typeof checkBridgeStatus;
+  checkBridgeRelease: typeof checkBridgeRelease;
   checkBootloaderRelease: typeof checkBootloaderRelease;
 
   /**

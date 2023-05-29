@@ -1,10 +1,15 @@
 import axios from 'axios';
 
 export const httpRequest = async (url: string, type = 'text') => {
+  const headers: any = {};
+  if (url.indexOf('ngrok-free.app') > -1) {
+    headers['ngrok-skip-browser-warning'] = true;
+  }
   const response = await axios.request({
     url,
     withCredentials: false,
     responseType: type === 'binary' ? 'arraybuffer' : 'json',
+    headers,
   });
 
   if (+response.status === 200) {

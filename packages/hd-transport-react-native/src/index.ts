@@ -492,7 +492,7 @@ export default class ReactNativeBleTransport {
 
     const buffers = buildBuffers(messages, name, data);
 
-    if (name === 'FirmwareUpload') {
+    if (name === 'FirmwareUpload' || name === 'EmmcFileWrite') {
       const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
       let index = 0;
       let chunk = ByteBuffer.allocate(packetCapacity);

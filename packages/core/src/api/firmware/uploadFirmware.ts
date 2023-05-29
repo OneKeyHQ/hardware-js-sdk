@@ -1,3 +1,4 @@
+import semver from 'semver';
 import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
@@ -9,7 +10,12 @@ import type { Device } from '../../device/Device';
 import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
 import { KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
-import { getDeviceModel } from '../../utils/deviceFeaturesUtils';
+import { getDeviceBootloaderVersion, getDeviceModel } from '../../utils/deviceFeaturesUtils';
+import { DataManager } from '../../data-manager';
+import { DevicePool } from '../../device/DevicePool';
+
+const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.2';
+const SESSION_ERROR = 'session not found';
 
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
@@ -84,6 +90,16 @@ export const uploadFirmware = async (
   }
 
   if (deviceModel === 'model_touch') {
+    if (device.features) {
+      const bootloaderVersion = getDeviceBootloaderVersion(device.features);
+      if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
+        const response = await newTouchUpdateProcess(updateType, postMessage, device, {
+          payload,
+        });
+        return response.message;
+      }
+    }
+
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
     const length = payload.byteLength;
@@ -117,6 +133,122 @@ export const uploadFirmware = async (
   }
 
   throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'uploadFirmware: unknown device model');
+};
+
+const newTouchUpdateProcess = async (
+  updateType: 'firmware' | 'ble',
+  postMessage: (message: CoreMessage) => void,
+  device: Device,
+  { payload }: PROTO.FirmwareUpload
+) => {
+  let typedCall = device.getCommands().typedCall.bind(device.getCommands());
+  postProgressTip(device, 'StartTransferData', postMessage);
+  // Write File
+  const filePath = `0:${updateType === 'ble' ? 'ble-' : ''}firmware.bin`;
+  const env = DataManager.getSettings('env');
+  const perPackageSize = env === 'react-native' ? 16 : 128;
+  const chunkSize = 1024 * perPackageSize;
+  const totalChunks = Math.ceil(payload.byteLength / chunkSize);
+  let offset = 0;
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkStart = i * chunkSize;
+    const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
+    const chunkLength = chunkEnd - chunkStart;
+    const chunk = payload.slice(chunkStart, chunkEnd);
+    const overwrite = i === 0;
+    const progress = Math.round((i / totalChunks) * 100);
+    const writeRes = await emmcFileWriteWithRetry(
+      device,
+      filePath,
+      chunkLength,
+      offset,
+      chunk,
+      overwrite,
+      progress
+    );
+    // @ts-expect-error
+    offset += writeRes.message.processed_byte;
+    postProgressMessage(device, progress, postMessage);
+  }
+
+  postConfirmationMessage(device);
+  postProgressTip(device, 'ConfirmOnDevice', postMessage);
+  postProgressTip(device, 'InstallingFirmware', postMessage);
+  typedCall = device.getCommands().typedCall.bind(device.getCommands());
+  // Firmware Update
+  // @ts-expect-error
+  const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
+    path: filePath,
+    force_erease: true,
+    reboot_on_success: true,
+  });
+  return response;
+};
+
+const emmcFileWriteWithRetry = async (
+  device: Device,
+  filePath: string,
+  chunkLength: number,
+  offset: number,
+  chunk: ArrayBuffer,
+  overwrite: boolean,
+  progress: number
+) => {
+  const writeFunc = async () => {
+    const typedCall = device.getCommands().typedCall.bind(device.getCommands());
+    // @ts-expect-error
+    const writeRes = await typedCall('EmmcFileWrite', 'EmmcFile', {
+      file: {
+        path: filePath,
+        len: chunkLength,
+        offset,
+        data: chunk,
+      },
+      overwrite,
+      append: offset !== 0,
+      ui_percentage: progress,
+    });
+    if (writeRes.type !== 'EmmcFile') {
+      // @ts-expect-error
+      if (writeRes.type === 'CallMethodError') {
+        if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
+        }
+      }
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write chunk once error');
+    }
+    return writeRes;
+  };
+
+  let retryCount = 10;
+  while (retryCount > 0) {
+    try {
+      const result = await writeFunc();
+      return result;
+    } catch (error) {
+      console.error(`emmcWrite error: `, error);
+      retryCount--;
+      if (retryCount === 0) {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
+      }
+      const env = DataManager.getSettings('env');
+      if (env === 'react-native') {
+        await wait(3000);
+        await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
+        await device.initialize();
+      } else if (error.message.indexOf(SESSION_ERROR) > -1) {
+        const deviceDiff = await device.deviceConnector?.enumerate();
+        const devicesDescriptor = deviceDiff?.descriptors ?? [];
+        const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
+        if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+          device.updateFromCache(deviceList[0]);
+          await device.acquire();
+          device.getCommands().mainId = device.mainId ?? '';
+        }
+      }
+      await wait(3000);
+    }
+  }
 };
 
 const processResourceRequest = async (
