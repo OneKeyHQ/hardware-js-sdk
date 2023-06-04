@@ -614,6 +614,7 @@ export type FirmwareErase_ex = {
   length?: number;
 };
 
+<<<<<<< HEAD
 export enum RebootType {
   Normal = 0,
   Boardloader = 1,
@@ -631,6 +632,8 @@ export type FirmwareUpdateEmmc = {
   reboot_on_success?: boolean;
 };
 
+=======
+>>>>>>> 4689e81 (feat: support new staking on tron)
 export enum CardanoDerivationType {
   LEDGER = 0,
   ICARUS = 1,
@@ -1243,82 +1246,6 @@ export type BatchGetPublickeys = {
 // EcdsaPublicKeys
 export type EcdsaPublicKeys = {
   public_keys: string[];
-};
-
-// EmmcFixPermission
-export type EmmcFixPermission = {};
-
-// EmmcPath
-export type EmmcPath = {
-  exist: boolean;
-  size: number;
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-  readonly: boolean;
-  hidden: boolean;
-  system: boolean;
-  archive: boolean;
-  directory: boolean;
-};
-
-// EmmcPathInfo
-export type EmmcPathInfo = {
-  path: string;
-};
-
-// EmmcFile
-export type EmmcFile = {
-  path: string;
-  offset: number;
-  len: number;
-  data?: string;
-  data_hash?: number;
-  processed_byte?: number;
-};
-
-// EmmcFileRead
-export type EmmcFileRead = {
-  file: EmmcFile;
-  ui_percentage?: number;
-};
-
-// EmmcFileWrite
-export type EmmcFileWrite = {
-  file: EmmcFile;
-  overwrite: boolean;
-  append: boolean;
-  ui_percentage?: number;
-};
-
-// EmmcFileDelete
-export type EmmcFileDelete = {
-  path: string;
-};
-
-// EmmcDir
-export type EmmcDir = {
-  path: string;
-  child_dirs?: string;
-  child_files?: string;
-};
-
-// EmmcDirList
-export type EmmcDirList = {
-  path: string;
-};
-
-// EmmcDirMake
-export type EmmcDirMake = {
-  path: string;
-};
-
-// EmmcDirRemove
-export type EmmcDirRemove = {
-  path: string;
 };
 
 // EosGetPublicKey
@@ -3219,9 +3146,63 @@ export type TronTriggerSmartContract = {
   asset_id?: number;
 };
 
+export enum TronResourceCode {
+  BANDWIDTH = 0,
+  ENERGY = 1,
+}
+
+export type TronFreezeBalanceContract = {
+  frozen_balance?: number;
+  frozen_duration?: number;
+  resource?: TronResourceCode;
+  receiver_address?: string;
+};
+
+export type TronUnfreezeBalanceContract = {
+  resource?: TronResourceCode;
+  receiver_address?: string;
+};
+
+export type TronWithdrawBalanceContract = {
+  owner_address?: string;
+};
+
+export type FreezeBalanceV2Contract = {
+  frozen_balance?: number;
+  resource?: TronResourceCode;
+};
+
+export type UnfreezeBalanceV2Contract = {
+  unfreeze_balance?: number;
+  resource?: TronResourceCode;
+};
+
+export type WithdrawExpireUnfreezeContract = {};
+
+export type DelegateResourceContract = {
+  resource?: TronResourceCode;
+  balance?: number;
+  receiver_address?: string;
+  lock?: boolean;
+};
+
+export type UnDelegateResourceContract = {
+  resource?: TronResourceCode;
+  balance?: number;
+  receiver_address?: string;
+};
+
 export type TronContract = {
   transfer_contract?: TronTransferContract;
+  freeze_balance_contract?: TronFreezeBalanceContract;
+  unfreeze_balance_contract?: TronUnfreezeBalanceContract;
+  withdraw_balance_contract?: TronWithdrawBalanceContract;
   trigger_smart_contract?: TronTriggerSmartContract;
+  freeze_balance_v2_contract?: FreezeBalanceV2Contract;
+  unfreeze_balance_v2_contract?: UnfreezeBalanceV2Contract;
+  withdraw_expire_unfreeze_contract?: WithdrawExpireUnfreezeContract;
+  delegate_resource_contract?: DelegateResourceContract;
+  undelegate_resource_contract?: UnDelegateResourceContract;
 };
 
 // TronSignTx
@@ -3332,8 +3313,6 @@ export type MessageType = {
   FirmwareUpload: FirmwareUpload;
   SelfTest: SelfTest;
   FirmwareErase_ex: FirmwareErase_ex;
-  Reboot: Reboot;
-  FirmwareUpdateEmmc: FirmwareUpdateEmmc;
   CardanoBlockchainPointerType: CardanoBlockchainPointerType;
   CardanoNativeScript: CardanoNativeScript;
   CardanoGetNativeScriptHash: CardanoGetNativeScriptHash;
@@ -3405,17 +3384,6 @@ export type MessageType = {
   Path: Path;
   BatchGetPublickeys: BatchGetPublickeys;
   EcdsaPublicKeys: EcdsaPublicKeys;
-  EmmcFixPermission: EmmcFixPermission;
-  EmmcPath: EmmcPath;
-  EmmcPathInfo: EmmcPathInfo;
-  EmmcFile: EmmcFile;
-  EmmcFileRead: EmmcFileRead;
-  EmmcFileWrite: EmmcFileWrite;
-  EmmcFileDelete: EmmcFileDelete;
-  EmmcDir: EmmcDir;
-  EmmcDirList: EmmcDirList;
-  EmmcDirMake: EmmcDirMake;
-  EmmcDirRemove: EmmcDirRemove;
   EosGetPublicKey: EosGetPublicKey;
   EosPublicKey: EosPublicKey;
   EosTxHeader: EosTxHeader;
@@ -3677,6 +3645,14 @@ export type MessageType = {
   TronAddress: TronAddress;
   TronTransferContract: TronTransferContract;
   TronTriggerSmartContract: TronTriggerSmartContract;
+  TronFreezeBalanceContract: TronFreezeBalanceContract;
+  TronUnfreezeBalanceContract: TronUnfreezeBalanceContract;
+  TronWithdrawBalanceContract: TronWithdrawBalanceContract;
+  FreezeBalanceV2Contract: FreezeBalanceV2Contract;
+  UnfreezeBalanceV2Contract: UnfreezeBalanceV2Contract;
+  WithdrawExpireUnfreezeContract: WithdrawExpireUnfreezeContract;
+  DelegateResourceContract: DelegateResourceContract;
+  UnDelegateResourceContract: UnDelegateResourceContract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;

@@ -168,11 +168,10 @@ export function CallTronMethods({
                 // @ts-expect-error
                 ...data.transaction,
                 contract: {
-                  freezeBalanceContract: {
+                  freezeBalanceV2Contract: {
                     frozenBalance: 100,
                     // @ts-expect-error
                     resource: data.resource,
-                    receiverAddress: 'TSL3enaaPaL19yMsJSye2GwkwqtsB3EVr9',
                   },
                 },
               },
@@ -216,10 +215,10 @@ export function CallTronMethods({
                 // @ts-expect-error
                 ...data.transaction,
                 contract: {
-                  unfreezeBalanceContract: {
+                  unfreezeBalanceV2Contract: {
+                    unfreezeBalance: 100,
                     // @ts-expect-error
                     resource: data.resource,
-                    receiverAddress: 'TSL3enaaPaL19yMsJSye2GwkwqtsB3EVr9',
                   },
                 },
               },
