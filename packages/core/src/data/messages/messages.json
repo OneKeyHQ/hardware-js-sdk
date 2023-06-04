@@ -1642,10 +1642,6 @@
         "reboot_on_success": {
           "type": "bool",
           "id": 2
-        },
-        "force_erase": {
-          "type": "bool",
-          "id": 3
         }
       }
     },
@@ -8735,14 +8731,6 @@
               "type": "TronTransferContract",
               "id": 2
             },
-            "freeze_balance_contract": {
-              "type": "TronFreezeBalanceContract",
-              "id": 11
-            },
-            "unfreeze_balance_contract": {
-              "type": "TronUnfreezeBalanceContract",
-              "id": 12
-            },
             "trigger_smart_contract": {
               "type": "TronTriggerSmartContract",
               "id": 31
@@ -8782,44 +8770,6 @@
                 "asset_id": {
                   "type": "uint64",
                   "id": 6
-                }
-              }
-            },
-            "TronResourceCode": {
-              "values": {
-                "BANDWIDTH": 0,
-                "ENERGY": 1
-              }
-            },
-            "TronFreezeBalanceContract": {
-              "fields": {
-                "frozen_balance": {
-                  "type": "uint64",
-                  "id": 1
-                },
-                "frozen_duration": {
-                  "type": "uint64",
-                  "id": 2
-                },
-                "resource": {
-                  "type": "TronResourceCode",
-                  "id": 3
-                },
-                "receiver_address": {
-                  "type": "string",
-                  "id": 4
-                }
-              }
-            },
-            "TronUnfreezeBalanceContract": {
-              "fields": {
-                "resource": {
-                  "type": "TronResourceCode",
-                  "id": 1
-                },
-                "receiver_address": {
-                  "type": "string",
-                  "id": 2
                 }
               }
             }

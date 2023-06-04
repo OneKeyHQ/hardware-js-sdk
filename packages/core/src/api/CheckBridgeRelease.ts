@@ -7,8 +7,8 @@ import { getDeviceType } from '../utils';
 import { getDeviceFirmwareVersion } from '../utils/deviceFeaturesUtils';
 
 const BridgeVersion = '2.2.0';
-const TouchNeedUpdateVersion = '4.2.0';
-const ClassicAndMiniNeedUpdateVersion = '3.0.0';
+const TouchNeedUpdateVersion = '4.3.0';
+const ClassicAndMiniNeedUpdateVersion = '3.1.0';
 
 export default class CheckBridgeRelease extends BaseMethod {
   init() {
@@ -29,7 +29,6 @@ export default class CheckBridgeRelease extends BaseMethod {
         timeout: 3000,
       });
       const { version = '0.0.0' } = data;
-      console.log('===?>>BRIDGE VERSION: ', version);
 
       const { willUpdateFirmwareVersion } = this.payload;
       const { features } = this.device;
@@ -64,7 +63,7 @@ export default class CheckBridgeRelease extends BaseMethod {
       return {
         shouldUpdate,
         status: shouldUpdate ? 'outdated' : 'valid',
-        releaseVersion: version,
+        releaseVersion: BridgeVersion,
       };
     } catch (e) {
       if (e.code === 'ECONNABORTED') {
