@@ -40,22 +40,55 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
         };
       }
 
-      if (tx.contract.freezeBalanceContract) {
+      if (tx.contract.freezeBalanceV2Contract) {
         unSignTx.contract = {
-          freeze_balance_contract: {
-            frozen_balance: tx.contract.freezeBalanceContract.frozenBalance,
-            frozen_duration: tx.contract.freezeBalanceContract.frozenDuration,
-            resource: tx.contract.freezeBalanceContract.resource,
-            receiver_address: tx.contract.freezeBalanceContract.receiverAddress,
+          freeze_balance_v2_contract: {
+            frozen_balance: tx.contract.freezeBalanceV2Contract.frozenBalance,
+            resource: tx.contract.freezeBalanceV2Contract.resource,
           },
         };
       }
 
-      if (tx.contract.unfreezeBalanceContract) {
+      if (tx.contract.unfreezeBalanceV2Contract) {
         unSignTx.contract = {
-          unfreeze_balance_contract: {
-            resource: tx.contract.unfreezeBalanceContract.resource,
-            receiver_address: tx.contract.unfreezeBalanceContract.receiverAddress,
+          unfreeze_balance_v2_contract: {
+            unfreeze_balance: tx.contract.unfreezeBalanceV2Contract.unfreezeBalance,
+            resource: tx.contract.unfreezeBalanceV2Contract.resource,
+          },
+        };
+      }
+
+      if (tx.contract.delegateResourceContract) {
+        unSignTx.contract = {
+          delegate_resource_contract: {
+            resource: tx.contract.delegateResourceContract.resource,
+            balance: tx.contract.delegateResourceContract.balance,
+            receiver_address: tx.contract.delegateResourceContract.receiverAddress,
+            lock: tx.contract.delegateResourceContract.lock,
+          },
+        };
+      }
+
+      if (tx.contract.unDelegateResourceContract) {
+        unSignTx.contract = {
+          undelegate_resource_contract: {
+            resource: tx.contract.unDelegateResourceContract.resource,
+            balance: tx.contract.unDelegateResourceContract.balance,
+            receiver_address: tx.contract.unDelegateResourceContract.receiverAddress,
+          },
+        };
+      }
+
+      if (tx.contract.withdrawExpireUnfreezeContract) {
+        unSignTx.contract = {
+          withdraw_expire_unfreeze_contract: {},
+        };
+      }
+
+      if (tx.contract.withdrawBalanceContract) {
+        unSignTx.contract = {
+          withdraw_balance_contract: {
+            owner_address: tx.contract.withdrawBalanceContract.ownerAddress,
           },
         };
       }

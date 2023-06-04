@@ -8731,9 +8731,41 @@
               "type": "TronTransferContract",
               "id": 2
             },
+            "freeze_balance_contract": {
+              "type": "TronFreezeBalanceContract",
+              "id": 11
+            },
+            "unfreeze_balance_contract": {
+              "type": "TronUnfreezeBalanceContract",
+              "id": 12
+            },
+            "withdraw_balance_contract": {
+              "type": "TronWithdrawBalanceContract",
+              "id": 13
+            },
             "trigger_smart_contract": {
               "type": "TronTriggerSmartContract",
               "id": 31
+            },
+            "freeze_balance_v2_contract": {
+              "type": "FreezeBalanceV2Contract",
+              "id": 54
+            },
+            "unfreeze_balance_v2_contract": {
+              "type": "UnfreezeBalanceV2Contract",
+              "id": 55
+            },
+            "withdraw_expire_unfreeze_contract": {
+              "type": "WithdrawExpireUnfreezeContract",
+              "id": 56
+            },
+            "delegate_resource_contract": {
+              "type": "DelegateResourceContract",
+              "id": 57
+            },
+            "undelegate_resource_contract": {
+              "type": "UnDelegateResourceContract",
+              "id": 58
             }
           },
           "nested": {
@@ -8770,6 +8802,115 @@
                 "asset_id": {
                   "type": "uint64",
                   "id": 6
+                }
+              }
+            },
+            "TronResourceCode": {
+              "values": {
+                "BANDWIDTH": 0,
+                "ENERGY": 1
+              }
+            },
+            "TronFreezeBalanceContract": {
+              "fields": {
+                "frozen_balance": {
+                  "type": "uint64",
+                  "id": 1
+                },
+                "frozen_duration": {
+                  "type": "uint64",
+                  "id": 2
+                },
+                "resource": {
+                  "type": "TronResourceCode",
+                  "id": 3
+                },
+                "receiver_address": {
+                  "type": "string",
+                  "id": 4
+                }
+              }
+            },
+            "TronUnfreezeBalanceContract": {
+              "fields": {
+                "resource": {
+                  "type": "TronResourceCode",
+                  "id": 1
+                },
+                "receiver_address": {
+                  "type": "string",
+                  "id": 2
+                }
+              }
+            },
+            "TronWithdrawBalanceContract": {
+              "fields": {
+                "owner_address": {
+                  "type": "bytes",
+                  "id": 1
+                }
+              }
+            },
+            "FreezeBalanceV2Contract": {
+              "fields": {
+                "frozen_balance": {
+                  "type": "uint64",
+                  "id": 2
+                },
+                "resource": {
+                  "type": "TronResourceCode",
+                  "id": 3
+                }
+              }
+            },
+            "UnfreezeBalanceV2Contract": {
+              "fields": {
+                "unfreeze_balance": {
+                  "type": "uint64",
+                  "id": 2
+                },
+                "resource": {
+                  "type": "TronResourceCode",
+                  "id": 3
+                }
+              }
+            },
+            "WithdrawExpireUnfreezeContract": {
+              "fields": {}
+            },
+            "DelegateResourceContract": {
+              "fields": {
+                "resource": {
+                  "type": "TronResourceCode",
+                  "id": 2
+                },
+                "balance": {
+                  "type": "uint64",
+                  "id": 3
+                },
+                "receiver_address": {
+                  "type": "string",
+                  "id": 4
+                },
+                "lock": {
+                  "type": "bool",
+                  "id": 5
+                }
+              }
+            },
+            "UnDelegateResourceContract": {
+              "fields": {
+                "resource": {
+                  "type": "TronResourceCode",
+                  "id": 2
+                },
+                "balance": {
+                  "type": "uint64",
+                  "id": 3
+                },
+                "receiver_address": {
+                  "type": "string",
+                  "id": 4
                 }
               }
             }

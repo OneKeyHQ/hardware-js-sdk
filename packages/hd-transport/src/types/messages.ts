@@ -3219,9 +3219,63 @@ export type TronTriggerSmartContract = {
   asset_id?: number;
 };
 
+export enum TronResourceCode {
+  BANDWIDTH = 0,
+  ENERGY = 1,
+}
+
+export type TronFreezeBalanceContract = {
+  frozen_balance?: number;
+  frozen_duration?: number;
+  resource?: TronResourceCode;
+  receiver_address?: string;
+};
+
+export type TronUnfreezeBalanceContract = {
+  resource?: TronResourceCode;
+  receiver_address?: string;
+};
+
+export type TronWithdrawBalanceContract = {
+  owner_address?: string;
+};
+
+export type FreezeBalanceV2Contract = {
+  frozen_balance?: number;
+  resource?: TronResourceCode;
+};
+
+export type UnfreezeBalanceV2Contract = {
+  unfreeze_balance?: number;
+  resource?: TronResourceCode;
+};
+
+export type WithdrawExpireUnfreezeContract = {};
+
+export type DelegateResourceContract = {
+  resource?: TronResourceCode;
+  balance?: number;
+  receiver_address?: string;
+  lock?: boolean;
+};
+
+export type UnDelegateResourceContract = {
+  resource?: TronResourceCode;
+  balance?: number;
+  receiver_address?: string;
+};
+
 export type TronContract = {
   transfer_contract?: TronTransferContract;
+  freeze_balance_contract?: TronFreezeBalanceContract;
+  unfreeze_balance_contract?: TronUnfreezeBalanceContract;
+  withdraw_balance_contract?: TronWithdrawBalanceContract;
   trigger_smart_contract?: TronTriggerSmartContract;
+  freeze_balance_v2_contract?: FreezeBalanceV2Contract;
+  unfreeze_balance_v2_contract?: UnfreezeBalanceV2Contract;
+  withdraw_expire_unfreeze_contract?: WithdrawExpireUnfreezeContract;
+  delegate_resource_contract?: DelegateResourceContract;
+  undelegate_resource_contract?: UnDelegateResourceContract;
 };
 
 // TronSignTx
@@ -3677,6 +3731,14 @@ export type MessageType = {
   TronAddress: TronAddress;
   TronTransferContract: TronTransferContract;
   TronTriggerSmartContract: TronTriggerSmartContract;
+  TronFreezeBalanceContract: TronFreezeBalanceContract;
+  TronUnfreezeBalanceContract: TronUnfreezeBalanceContract;
+  TronWithdrawBalanceContract: TronWithdrawBalanceContract;
+  FreezeBalanceV2Contract: FreezeBalanceV2Contract;
+  UnfreezeBalanceV2Contract: UnfreezeBalanceV2Contract;
+  WithdrawExpireUnfreezeContract: WithdrawExpireUnfreezeContract;
+  DelegateResourceContract: DelegateResourceContract;
+  UnDelegateResourceContract: UnDelegateResourceContract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;

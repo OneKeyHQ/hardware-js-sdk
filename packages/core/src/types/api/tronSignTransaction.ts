@@ -14,23 +14,44 @@ export type TronTriggerSmartContract = {
   assetId?: number;
 };
 
-export type TronFreezeBalanceContract = {
+export type TronFreezeBalanceV2Contract = {
   frozenBalance?: number;
-  frozenDuration?: number;
   resource?: TronResourceCode;
+};
+
+export type TronUnfreezeBalanceV2Contract = {
+  resource?: TronResourceCode;
+  unfreezeBalance?: number;
+};
+
+export type TronDelegateResourceContract = {
+  resource?: TronResourceCode;
+  balance?: number;
+  receiverAddress?: string;
+  lock?: boolean;
+};
+
+export type TronUnDelegateResourceContract = {
+  resource?: TronResourceCode;
+  balance?: number;
   receiverAddress?: string;
 };
 
-export type TronUnfreezeBalanceContract = {
-  resource?: TronResourceCode;
-  receiverAddress?: string;
+export type TronWithdrawBalanceContract = {
+  ownerAddress?: string;
 };
+
+export type TronWithdrawExpireUnfreezeContract = undefined;
 
 export type TronTransactionContract = {
   transferContract?: TronTransferContract;
   triggerSmartContract?: TronTriggerSmartContract;
-  freezeBalanceContract?: TronFreezeBalanceContract;
-  unfreezeBalanceContract?: TronUnfreezeBalanceContract;
+  freezeBalanceV2Contract?: TronFreezeBalanceV2Contract;
+  unfreezeBalanceV2Contract?: TronUnfreezeBalanceV2Contract;
+  delegateResourceContract?: TronDelegateResourceContract;
+  unDelegateResourceContract?: TronUnDelegateResourceContract;
+  withdrawBalanceContract?: TronWithdrawBalanceContract;
+  withdrawExpireUnfreezeContract?: TronWithdrawExpireUnfreezeContract;
 };
 
 export type TronTransaction = {
