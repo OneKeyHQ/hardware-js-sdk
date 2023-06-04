@@ -1616,35 +1616,6 @@
         }
       }
     },
-    "RebootType": {
-      "values": {
-        "Normal": 0,
-        "Boardloader": 1,
-        "BootLoader": 2
-      }
-    },
-    "Reboot": {
-      "fields": {
-        "reboot_type": {
-          "rule": "required",
-          "type": "RebootType",
-          "id": 1
-        }
-      }
-    },
-    "FirmwareUpdateEmmc": {
-      "fields": {
-        "path": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        },
-        "reboot_on_success": {
-          "type": "bool",
-          "id": 2
-        }
-      }
-    },
     "CardanoDerivationType": {
       "values": {
         "LEDGER": 0,

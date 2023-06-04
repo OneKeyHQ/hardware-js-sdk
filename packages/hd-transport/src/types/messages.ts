@@ -614,26 +614,6 @@ export type FirmwareErase_ex = {
   length?: number;
 };
 
-<<<<<<< HEAD
-export enum RebootType {
-  Normal = 0,
-  Boardloader = 1,
-  BootLoader = 2,
-}
-
-// Reboot
-export type Reboot = {
-  reboot_type: RebootType;
-};
-
-// FirmwareUpdateEmmc
-export type FirmwareUpdateEmmc = {
-  path: string;
-  reboot_on_success?: boolean;
-};
-
-=======
->>>>>>> 4689e81 (feat: support new staking on tron)
 export enum CardanoDerivationType {
   LEDGER = 0,
   ICARUS = 1,
@@ -3671,5 +3651,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;
