@@ -614,6 +614,23 @@ export type FirmwareErase_ex = {
   length?: number;
 };
 
+export enum RebootType {
+  Normal = 0,
+  Boardloader = 1,
+  BootLoader = 2,
+}
+
+// Reboot
+export type Reboot = {
+  reboot_type: RebootType;
+};
+
+// FirmwareUpdateEmmc
+export type FirmwareUpdateEmmc = {
+  path: string;
+  reboot_on_success?: boolean;
+};
+
 export enum CardanoDerivationType {
   LEDGER = 0,
   ICARUS = 1,
@@ -1226,6 +1243,82 @@ export type BatchGetPublickeys = {
 // EcdsaPublicKeys
 export type EcdsaPublicKeys = {
   public_keys: string[];
+};
+
+// EmmcFixPermission
+export type EmmcFixPermission = {};
+
+// EmmcPath
+export type EmmcPath = {
+  exist: boolean;
+  size: number;
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  readonly: boolean;
+  hidden: boolean;
+  system: boolean;
+  archive: boolean;
+  directory: boolean;
+};
+
+// EmmcPathInfo
+export type EmmcPathInfo = {
+  path: string;
+};
+
+// EmmcFile
+export type EmmcFile = {
+  path: string;
+  offset: number;
+  len: number;
+  data?: string;
+  data_hash?: number;
+  processed_byte?: number;
+};
+
+// EmmcFileRead
+export type EmmcFileRead = {
+  file: EmmcFile;
+  ui_percentage?: number;
+};
+
+// EmmcFileWrite
+export type EmmcFileWrite = {
+  file: EmmcFile;
+  overwrite: boolean;
+  append: boolean;
+  ui_percentage?: number;
+};
+
+// EmmcFileDelete
+export type EmmcFileDelete = {
+  path: string;
+};
+
+// EmmcDir
+export type EmmcDir = {
+  path: string;
+  child_dirs?: string;
+  child_files?: string;
+};
+
+// EmmcDirList
+export type EmmcDirList = {
+  path: string;
+};
+
+// EmmcDirMake
+export type EmmcDirMake = {
+  path: string;
+};
+
+// EmmcDirRemove
+export type EmmcDirRemove = {
+  path: string;
 };
 
 // EosGetPublicKey
@@ -3293,6 +3386,8 @@ export type MessageType = {
   FirmwareUpload: FirmwareUpload;
   SelfTest: SelfTest;
   FirmwareErase_ex: FirmwareErase_ex;
+  Reboot: Reboot;
+  FirmwareUpdateEmmc: FirmwareUpdateEmmc;
   CardanoBlockchainPointerType: CardanoBlockchainPointerType;
   CardanoNativeScript: CardanoNativeScript;
   CardanoGetNativeScriptHash: CardanoGetNativeScriptHash;
@@ -3364,6 +3459,17 @@ export type MessageType = {
   Path: Path;
   BatchGetPublickeys: BatchGetPublickeys;
   EcdsaPublicKeys: EcdsaPublicKeys;
+  EmmcFixPermission: EmmcFixPermission;
+  EmmcPath: EmmcPath;
+  EmmcPathInfo: EmmcPathInfo;
+  EmmcFile: EmmcFile;
+  EmmcFileRead: EmmcFileRead;
+  EmmcFileWrite: EmmcFileWrite;
+  EmmcFileDelete: EmmcFileDelete;
+  EmmcDir: EmmcDir;
+  EmmcDirList: EmmcDirList;
+  EmmcDirMake: EmmcDirMake;
+  EmmcDirRemove: EmmcDirRemove;
   EosGetPublicKey: EosGetPublicKey;
   EosPublicKey: EosPublicKey;
   EosTxHeader: EosTxHeader;
