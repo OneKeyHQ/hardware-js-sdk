@@ -86,7 +86,7 @@ export type {
   TronDelegateResourceContract,
   TronUnDelegateResourceContract,
   TronWithdrawBalanceContract,
-  TronWithdrawExpireUnfreezeContract
+  TronWithdrawExpireUnfreezeContract,
 } from './tronSignTransaction';
 
 export type { ConfluxAddress, ConfluxGetAddressParams } from './confluxGetAddress';
