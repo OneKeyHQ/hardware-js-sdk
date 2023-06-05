@@ -20,6 +20,9 @@ export default class CheckBridgeStatus extends BaseMethod {
         })
         .then(() => resolve(true))
         .catch(e => {
+          if (e.response?.status === 403) {
+            reject(ERRORS.TypedError(HardwareErrorCode.BridgeForbiddenError));
+          }
           if (e.code === 'ECONNABORTED') {
             reject(ERRORS.TypedError(HardwareErrorCode.BridgeTimeoutError));
           } else {
