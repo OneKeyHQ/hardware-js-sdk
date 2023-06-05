@@ -21,6 +21,7 @@ const HardwareSdk = ({
   eventEmitter,
   uiResponse,
   cancel,
+  updateSettings,
 }: InjectApi): CoreApi =>
   inject({
     init,
@@ -29,6 +30,7 @@ const HardwareSdk = ({
     eventEmitter,
     uiResponse,
     cancel,
+    updateSettings,
   });
 
 const HardwareSDKLowLevel = ({
@@ -39,6 +41,7 @@ const HardwareSDKLowLevel = ({
   addHardwareGlobalEventListener,
   uiResponse,
   cancel,
+  updateSettings,
 }: LowLevelInjectApi): LowLevelCoreApi =>
   lowLevelInject({
     init,
@@ -48,6 +51,7 @@ const HardwareSDKLowLevel = ({
     addHardwareGlobalEventListener,
     uiResponse,
     cancel,
+    updateSettings,
   });
 
 const HardwareTopLevelSdk = (): CoreApi => topLevelInject();

@@ -140,6 +140,8 @@ const call = async (params: any) => {
   }
 };
 
+const updateSettings = () => Promise.resolve(true);
+
 const HardwareCommonConnectSdk = HardwareSdk({
   eventEmitter,
   init,
@@ -147,6 +149,7 @@ const HardwareCommonConnectSdk = HardwareSdk({
   cancel,
   dispose,
   uiResponse,
+  updateSettings,
 });
 
 export default HardwareCommonConnectSdk;

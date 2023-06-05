@@ -181,6 +181,16 @@ const call = async (params: any) => {
   }
 };
 
+const updateSettings = async (settings: Partial<ConnectSettings>) => {
+  if (iframe.instance) {
+    throw ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized);
+  }
+
+  _settings = parseConnectSettings({ ..._settings, ...settings });
+
+  return Promise.resolve(true);
+};
+
 const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void) => {
   [
     UI_EVENT,
@@ -217,6 +227,7 @@ const HardwareSDKLowLevel = HardwareLowLevelSdk({
   dispose,
   addHardwareGlobalEventListener,
   uiResponse,
+  updateSettings,
 });
 
 const HardwareSDKTopLevel = HardwareTopLevelSdk();
@@ -228,6 +239,7 @@ const HardwareWebSdk = HardwareSdk({
   cancel,
   dispose,
   uiResponse,
+  updateSettings,
 });
 
 export default { HardwareSDKLowLevel, HardwareSDKTopLevel, HardwareWebSdk };

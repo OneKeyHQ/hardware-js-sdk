@@ -1,6 +1,6 @@
 import { on, off, removeAllListeners } from './event';
 import { uiResponse } from './uiResponse';
-import { init } from './init';
+import { init, updateSettings } from './init';
 
 import { getLogs } from './getLogs';
 import { checkTransportRelease } from './checkTransportRelease';
@@ -123,6 +123,7 @@ export type CoreApi = {
   call: (params: any) => Promise<any>;
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
+  updateSettings: typeof updateSettings;
   getLogs: typeof getLogs;
 
   /**

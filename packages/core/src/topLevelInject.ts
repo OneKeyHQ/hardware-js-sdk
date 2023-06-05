@@ -48,6 +48,8 @@ export const topLevelInject = () => {
     uiResponse: response => lowLevelApi?.uiResponse(response),
 
     cancel: (connectId?: string) => lowLevelApi?.cancel(connectId),
+
+    updateSettings: settings => lowLevelApi?.updateSettings(settings) ?? Promise.resolve(false),
   };
 
   return api;

@@ -6,6 +6,7 @@ export interface InjectApi {
   call: CallMethod;
   eventEmitter: EventEmitter;
   init: CoreApi['init'];
+  updateSettings: CoreApi['updateSettings'];
   dispose: CoreApi['dispose'];
   uiResponse: CoreApi['uiResponse'];
   cancel: CoreApi['cancel'];
@@ -17,6 +18,7 @@ export const inject = ({
   dispose,
   eventEmitter,
   init,
+  updateSettings,
   uiResponse,
 }: InjectApi): CoreApi => {
   const api: CoreApi = {
@@ -44,6 +46,8 @@ export const inject = ({
 
     cancel,
 
+    updateSettings,
+
     ...createCoreApi(call),
   };
   return api;
@@ -62,6 +66,7 @@ export const createCoreApi = (
   | 'dispose'
   | 'uiResponse'
   | 'cancel'
+  | 'updateSettings'
 > => ({
   getLogs: () => call({ method: 'getLogs' }),
   /**

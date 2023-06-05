@@ -185,6 +185,13 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
     console.log('example deviceUpdateBootloader response: ', response);
   };
 
+  const handleUpdateSettings = async () => {
+    const response = await SDK.updateSettings({
+      connectSrc: 'https://jssdk.onekey.so/0.3.8/',
+    });
+    console.log('example updateSettings response: ', response);
+  };
+
   const handleFirmwareUpdate = async (file?: Uint8Array) => {
     const params: any = { updateType: firmwareType ? 'firmware' : 'ble' };
     if (file) {
@@ -268,6 +275,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
         <Button title="getPassphraseState" onPress={() => handleGetPassphraseState()} />
         <Button title="requestWebUsbDevice" onPress={() => handleRequestWebUsbDevice()} />
         <Button title="updateBootloader" onPress={() => handleUpdateBootloader()} />
+        <Button title="updateSettings" onPress={() => handleUpdateSettings()} />
       </View>
       {showPinInput && (
         <ReceivePin
