@@ -2,4 +2,4 @@
 const pkg = require('../package.json');
 
 export const getSDKVersion = () => pkg.version;
-export const DEFAULT_DOMAIN = `https://jssdk.onekeycn.com/${getSDKVersion()}/`;
+export const DEFAULT_DOMAIN = `https://jssdk.onekey.so/${getSDKVersion()}/`;
