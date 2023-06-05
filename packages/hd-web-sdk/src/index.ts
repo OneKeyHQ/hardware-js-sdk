@@ -186,8 +186,9 @@ const updateSettings = async (settings: Partial<ConnectSettings>) => {
     throw ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized);
   }
 
+  Log.debug('updateSettings API Called =>: old settings: ', _settings);
   _settings = parseConnectSettings({ ..._settings, ...settings });
-
+  Log.debug('updateSettings API Called =>: new settings: ', _settings);
   return Promise.resolve(true);
 };
 
