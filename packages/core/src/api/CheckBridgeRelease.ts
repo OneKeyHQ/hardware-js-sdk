@@ -66,9 +66,6 @@ export default class CheckBridgeRelease extends BaseMethod {
         releaseVersion: BridgeVersion,
       };
     } catch (e) {
-      if (e.response?.status === 403) {
-        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.BridgeForbiddenError));
-      }
       if (e.code === 'ECONNABORTED') {
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.BridgeTimeoutError));
       }

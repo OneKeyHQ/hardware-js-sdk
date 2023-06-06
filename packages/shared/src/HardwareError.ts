@@ -335,8 +335,6 @@ export const HardwareErrorCode = {
    * not in signing mode
    */
   NotInSigningMode: 815,
-
-  BridgeForbiddenError: 816,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -444,7 +442,6 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FileAlreadyExists]: 'File already exists',
   [HardwareErrorCode.CheckDownloadFileError]: 'Check download file error',
   [HardwareErrorCode.NotInSigningMode]: 'not in signing mode',
-  [HardwareErrorCode.BridgeForbiddenError]: 'Bridge forbidden error',
 } as const;
 
 export const TypedError = (

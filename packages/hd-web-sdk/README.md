@@ -24,7 +24,7 @@ import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
 function init() {
   HardwareSDK.init({
     debug: false,
-    connectSrc: 'https://jssdk.onekeycn.com/'
+    connectSrc: 'https://jssdk.onekey.so/'
   });
 }
 ```
