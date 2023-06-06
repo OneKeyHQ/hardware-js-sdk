@@ -395,6 +395,7 @@ export default class ReactNativeBleTransport {
         );
         if (this.runPromise) {
           let ERROR:
+            | typeof HardwareErrorCode.BleDeviceBondError
             | typeof HardwareErrorCode.BleCharacteristicNotifyError
             | typeof HardwareErrorCode.BleTimeoutError =
             HardwareErrorCode.BleCharacteristicNotifyError;
@@ -402,7 +403,7 @@ export default class ReactNativeBleTransport {
             ERROR = HardwareErrorCode.BleTimeoutError;
           }
           if (error.reason?.includes('Encryption is insufficient')) {
-            throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
+            ERROR = HardwareErrorCode.BleDeviceBondError;
           }
           this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
           this.Log.debug(': monitor notify error, and has unreleased Promise');

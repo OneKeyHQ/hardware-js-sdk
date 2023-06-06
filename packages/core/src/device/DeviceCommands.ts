@@ -79,6 +79,14 @@ export class DeviceCommands {
       return res;
     } catch (error) {
       Log.debug('[DeviceCommands] [call] Received error', error);
+      if (error.errorCode === HardwareErrorCode.BleDeviceBondError) {
+        return {
+          type: 'BleDeviceBondError',
+          message: {
+            error: error?.message,
+          },
+        } as any;
+      }
       if (error.response?.data) {
         Log.debug('error response', error?.response.data);
       }
@@ -136,6 +144,9 @@ export class DeviceCommands {
         if (error.errorCode === HardwareErrorCode.ResponseUnexpectTypeError) {
           if (error.message.indexOf('BridgeNetworkError') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BridgeNetworkError);
+          }
+          if (error.message.indexOf('BleDeviceBondError') > -1) {
+            throw ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
           }
         }
       } else {
