@@ -462,11 +462,9 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
       } catch (error) {
         Log.debug('device list error: ', error);
         if (
-          [
-            HardwareErrorCode.BridgeNotInstalled,
-            HardwareErrorCode.BridgeTimeoutError,
-            HardwareErrorCode.BridgeForbiddenError,
-          ].includes(error.errorCode)
+          [HardwareErrorCode.BridgeNotInstalled, HardwareErrorCode.BridgeTimeoutError].includes(
+            error.errorCode
+          )
         ) {
           _deviceList = undefined;
           reject(error);

@@ -401,6 +401,9 @@ export default class ReactNativeBleTransport {
           if (error.reason?.includes('The connection has timed out unexpectedly')) {
             ERROR = HardwareErrorCode.BleTimeoutError;
           }
+          if (error.reason?.includes('Encryption is insufficient')) {
+            throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
+          }
           this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
           this.Log.debug(': monitor notify error, and has unreleased Promise');
         }

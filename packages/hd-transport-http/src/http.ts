@@ -76,7 +76,7 @@ axios.interceptors.request.use(config => {
       // add Origin field for request headers
       config.headers = {
         ...config.headers,
-        Origin: 'https://jssdk.onekeycn.com',
+        Origin: 'https://jssdk.onekey.so',
       };
     }
   }
