@@ -258,6 +258,7 @@ export const HardwareErrorCode = {
   BleLocationServicesDisabled: 712,
   BleTimeoutError: 713,
   BleForceCleanRunPromise: 714,
+  BleDeviceBondError: 715,
 
   /**
    * Hardware runtiome errors
@@ -422,6 +423,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleLocationServicesDisabled]: 'Location Services disabled',
   [HardwareErrorCode.BleTimeoutError]: 'The connection has timed out unexpectedly.',
   [HardwareErrorCode.BleForceCleanRunPromise]: 'Force clean Bluetooth run promise',
+  [HardwareErrorCode.BleDeviceBondError]: 'Bluetooth pairing failed',
 
   /**
    * Runtime Error
