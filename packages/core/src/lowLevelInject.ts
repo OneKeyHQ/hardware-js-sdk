@@ -12,6 +12,7 @@ export interface LowLevelInjectApi {
   dispose: CoreApi['dispose'];
   uiResponse: CoreApi['uiResponse'];
   cancel: CoreApi['cancel'];
+  updateSettings: CoreApi['updateSettings'];
   addHardwareGlobalEventListener: (listener: IAddHardwareGlobalEventListener) => void;
 }
 
@@ -26,6 +27,7 @@ export const lowLevelInject = ({
   eventEmitter,
   init,
   uiResponse,
+  updateSettings,
   addHardwareGlobalEventListener,
 }: LowLevelInjectApi): LowLevelCoreApi => {
   const api: LowLevelCoreApi = {
@@ -43,6 +45,8 @@ export const lowLevelInject = ({
     uiResponse,
 
     cancel,
+
+    updateSettings,
 
     emit: () => {},
 

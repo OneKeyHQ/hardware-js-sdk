@@ -167,6 +167,8 @@ const call = async (params: any) => {
   }
 };
 
+const updateSettings = () => Promise.resolve(true);
+
 const HardwareBleSdk = HardwareSdk({
   eventEmitter,
   init,
@@ -174,6 +176,7 @@ const HardwareBleSdk = HardwareSdk({
   cancel,
   dispose,
   uiResponse,
+  updateSettings,
 });
 
 export default HardwareBleSdk;
