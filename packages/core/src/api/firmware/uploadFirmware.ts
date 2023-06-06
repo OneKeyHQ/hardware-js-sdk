@@ -14,7 +14,7 @@ import { getDeviceBootloaderVersion, getDeviceModel } from '../../utils/deviceFe
 import { DataManager } from '../../data-manager';
 import { DevicePool } from '../../device/DevicePool';
 
-const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.2';
+const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
 
 const postConfirmationMessage = (device: Device) => {
