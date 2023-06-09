@@ -156,7 +156,7 @@ const newTouchUpdateProcess = async (
     const chunkLength = chunkEnd - chunkStart;
     const chunk = payload.slice(chunkStart, chunkEnd);
     const overwrite = i === 0;
-    const progress = Math.round((i / totalChunks) * 100);
+    const progress = Math.round(((i + 1) / totalChunks) * 100);
     const writeRes = await emmcFileWriteWithRetry(
       device,
       filePath,
@@ -176,10 +176,8 @@ const newTouchUpdateProcess = async (
   postProgressTip(device, 'InstallingFirmware', postMessage);
   typedCall = device.getCommands().typedCall.bind(device.getCommands());
   // Firmware Update
-  // @ts-expect-error
   const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
     path: filePath,
-    force_erease: true,
     reboot_on_success: true,
   });
   return response;
