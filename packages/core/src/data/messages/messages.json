@@ -8748,23 +8748,23 @@
               "id": 31
             },
             "freeze_balance_v2_contract": {
-              "type": "FreezeBalanceV2Contract",
+              "type": "TronFreezeBalanceV2Contract",
               "id": 54
             },
             "unfreeze_balance_v2_contract": {
-              "type": "UnfreezeBalanceV2Contract",
+              "type": "TronUnfreezeBalanceV2Contract",
               "id": 55
             },
             "withdraw_expire_unfreeze_contract": {
-              "type": "WithdrawExpireUnfreezeContract",
+              "type": "TronWithdrawExpireUnfreezeContract",
               "id": 56
             },
             "delegate_resource_contract": {
-              "type": "DelegateResourceContract",
+              "type": "TronDelegateResourceContract",
               "id": 57
             },
             "undelegate_resource_contract": {
-              "type": "UnDelegateResourceContract",
+              "type": "TronUnDelegateResourceContract",
               "id": 58
             }
           },
@@ -8851,7 +8851,7 @@
                 }
               }
             },
-            "FreezeBalanceV2Contract": {
+            "TronFreezeBalanceV2Contract": {
               "fields": {
                 "frozen_balance": {
                   "type": "uint64",
@@ -8863,7 +8863,7 @@
                 }
               }
             },
-            "UnfreezeBalanceV2Contract": {
+            "TronUnfreezeBalanceV2Contract": {
               "fields": {
                 "unfreeze_balance": {
                   "type": "uint64",
@@ -8875,10 +8875,10 @@
                 }
               }
             },
-            "WithdrawExpireUnfreezeContract": {
+            "TronWithdrawExpireUnfreezeContract": {
               "fields": {}
             },
-            "DelegateResourceContract": {
+            "TronDelegateResourceContract": {
               "fields": {
                 "resource": {
                   "type": "TronResourceCode",
@@ -8898,7 +8898,7 @@
                 }
               }
             },
-            "UnDelegateResourceContract": {
+            "TronUnDelegateResourceContract": {
               "fields": {
                 "resource": {
                   "type": "TronResourceCode",
