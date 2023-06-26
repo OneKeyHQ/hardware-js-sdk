@@ -276,11 +276,12 @@ export class Device extends EventEmitter {
     return deviceSessionCache[usePassKey];
   }
 
-  tryFixInternalState(state: string, deviceId: string) {
+  tryFixInternalState(state: string, deviceId: string, sessionId: string | null = null) {
     Log.debug(
       'tryFixInternalState session param: ',
       `device_id: ${deviceId}`,
-      `passphraseState: ${state}`
+      `passphraseState: ${state}`,
+      `sessionId: ${sessionId}`
     );
 
     const key = `${deviceId}`;
@@ -288,6 +289,8 @@ export class Device extends EventEmitter {
     if (session) {
       deviceSessionCache[this.generateStateKey(deviceId, state)] = session;
       delete deviceSessionCache[key];
+    } else if (sessionId) {
+      deviceSessionCache[this.generateStateKey(deviceId, state)] = sessionId;
     }
     Log.debug('tryFixInternalState session cache: ', deviceSessionCache);
   }
