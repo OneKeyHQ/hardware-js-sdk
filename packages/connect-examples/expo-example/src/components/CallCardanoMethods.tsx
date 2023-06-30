@@ -32,7 +32,7 @@ export function CallCardanoMethods({
             { name: 'stakingScriptHash', value: '', type: 'string' },
             { name: 'networkId', value: 1, type: 'number' },
             { name: 'protocolMagic', value: 764824073, type: 'number' },
-            { name: 'derivationType', value: 2, type: 'number' },
+            { name: 'derivationType', value: 1, type: 'number' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
             { name: 'isCheck', value: false, type: 'boolean' },
           ]}
@@ -52,7 +52,7 @@ export function CallCardanoMethods({
                 },
                 protocolMagic: data.protocolMagic,
                 networkId: data.networkId,
-                derivationType: data.derivationType,
+                derivationType: Number(data.derivationType),
                 address: data.address,
                 showOnOneKey: data.showOnOneKey,
                 isCheck: data.isCheck,
