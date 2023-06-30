@@ -23,7 +23,7 @@ export function CallAptosMethods({
         <MethodInvoke
           title="aptosGetAddress"
           options={[
-            { name: 'path', value: "m/44'/637'/0'/0'", type: 'string' },
+            { name: 'path', value: "m/44'/637'/0'/0'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
           onCall={data => SDK.aptosGetAddress(connectId, deviceId, { ...commonParams, ...data })}
@@ -54,7 +54,7 @@ export function CallAptosMethods({
         <MethodInvoke
           title="AptosGetPublicKey"
           options={[
-            { name: 'path', value: "m/44'/637'/0'/0'", type: 'string' },
+            { name: 'path', value: "m/44'/637'/0'/0'/0'", type: 'string' },
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
           onCall={data => SDK.aptosGetPublicKey(connectId, deviceId, { ...commonParams, ...data })}
@@ -81,7 +81,7 @@ export function CallAptosMethods({
         <MethodInvoke
           title="aptosSignTransaction"
           options={[
-            { name: 'path', value: "m/44'/637'/0'/0'", type: 'string' },
+            { name: 'path', value: "m/44'/637'/0'/0'/0'", type: 'string' },
             {
               name: 'rawTx',
               value:
