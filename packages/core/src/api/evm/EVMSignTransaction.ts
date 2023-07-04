@@ -1,4 +1,10 @@
-import { EthereumSignTx, EthereumSignTxEIP1559, EthereumTxRequest } from '@onekeyfe/hd-transport';
+import {
+  EthereumSignTx,
+  EthereumSignTxEIP1559,
+  EthereumTxRequest,
+  EthereumTxRequestOneKey,
+  EthereumDefinitions,
+} from '@onekeyfe/hd-transport';
 
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
@@ -13,6 +19,7 @@ import {
 } from '../../types/api/evmSignTransaction';
 import { cutString } from '../helpers/stringUtils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
+import { getEvmDefinitionParams } from './getEthereumDefinitions';
 
 export default class EVMSignTransaction extends BaseMethod {
   addressN: number[] = [];
@@ -58,7 +65,7 @@ export default class EVMSignTransaction extends BaseMethod {
   }
 
   processTxRequest = async (
-    request: EthereumTxRequest,
+    request: EthereumTxRequest | EthereumTxRequestOneKey,
     data: string,
     chain_id?: number | undefined
   ): Promise<EVMSignedTx> => {
@@ -94,7 +101,7 @@ export default class EVMSignTransaction extends BaseMethod {
     return this.processTxRequest(response.message, rest, chain_id);
   };
 
-  evmSignTx = async (addressN: number[], tx: EVMTransaction) => {
+  evmSignTx = async (addressN: number[], tx: EVMTransaction, definitions: EthereumDefinitions) => {
     const { to, value, gasPrice, gasLimit, nonce, data, chainId, txType } = tx;
 
     const length = data == null ? 0 : data.length / 2;
@@ -109,6 +116,7 @@ export default class EVMSignTransaction extends BaseMethod {
       to,
       value: stripHexStartZeroes(value),
       chain_id: chainId,
+      definitions,
     };
 
     if (length !== 0) {
@@ -126,16 +134,33 @@ export default class EVMSignTransaction extends BaseMethod {
       };
     }
 
-    const response = await this.device.commands.typedCall(
-      'EthereumSignTx',
-      'EthereumTxRequest',
-      message
-    );
+    let response;
+    if (this.supportTrezor) {
+      message = {
+        ...message,
+        definitions,
+      };
+      response = await this.device.commands.typedCall(
+        'EthereumSignTx',
+        'EthereumTxRequest',
+        message
+      );
+    } else {
+      response = await this.device.commands.typedCall(
+        'EthereumSignTxOneKey',
+        'EthereumTxRequestOneKey',
+        message
+      );
+    }
 
     return this.processTxRequest(response.message, rest, chainId);
   };
 
-  evmSignTxEip1559 = async (addressN: number[], tx: EVMTransactionEIP1559) => {
+  evmSignTxEip1559 = async (
+    addressN: number[],
+    tx: EVMTransactionEIP1559,
+    definitions: EthereumDefinitions
+  ) => {
     const {
       to,
       value,
@@ -152,7 +177,7 @@ export default class EVMSignTransaction extends BaseMethod {
 
     const [first, rest] = cutString(data, 1024 * 2);
 
-    const message: EthereumSignTxEIP1559 = {
+    let message: EthereumSignTxEIP1559 = {
       address_n: addressN,
       nonce: stripHexStartZeroes(nonce),
       max_gas_fee: stripHexStartZeroes(maxFeePerGas),
@@ -169,11 +194,24 @@ export default class EVMSignTransaction extends BaseMethod {
       })),
     };
 
-    const response = await this.device.commands.typedCall(
-      'EthereumSignTxEIP1559',
-      'EthereumTxRequest',
-      message
-    );
+    let response;
+    if (this.supportTrezor) {
+      message = {
+        ...message,
+        definitions,
+      };
+      response = await this.device.commands.typedCall(
+        'EthereumSignTxEIP1559',
+        'EthereumTxRequest',
+        message
+      );
+    } else {
+      response = await this.device.commands.typedCall(
+        'EthereumSignTxEIP1559OneKey',
+        'EthereumTxRequestOneKey',
+        message
+      );
+    }
 
     return this.processTxRequest(response.message, rest);
   };
@@ -196,9 +234,15 @@ export default class EVMSignTransaction extends BaseMethod {
   async run() {
     const { addressN, isEIP1559, formattedTx } = this;
 
+    const definitionParams = await getEvmDefinitionParams({
+      addressN,
+      chainId: formattedTx?.chainId,
+      device: this.device,
+    });
+
     const signedTx = await (isEIP1559
-      ? this.evmSignTxEip1559(addressN, formattedTx as EVMTransactionEIP1559)
-      : this.evmSignTx(addressN, formattedTx as EVMTransaction));
+      ? this.evmSignTxEip1559(addressN, formattedTx as EVMTransactionEIP1559, definitionParams)
+      : this.evmSignTx(addressN, formattedTx as EVMTransaction, definitionParams));
 
     return Promise.resolve(signedTx);
   }

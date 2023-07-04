@@ -4,6 +4,7 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { EVMAddress, EVMGetAddressParams } from '../../types/api/evmGetAddress';
+import { getEvmDefinitionParams } from './getEthereumDefinitions';
 
 export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
   hasBundle = false;
@@ -45,9 +46,26 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall('EthereumGetAddress', 'EthereumAddress', {
-        ...param,
-      });
+      let res;
+      if (this.supportTrezor) {
+        const definitionParams = await getEvmDefinitionParams({
+          addressN: param.address_n,
+          chainId: param.chain_id,
+          device: this.device,
+        });
+        res = await this.device.commands.typedCall('EthereumGetAddress', 'EthereumAddress', {
+          ...param,
+          ...definitionParams,
+        });
+      } else {
+        res = await this.device.commands.typedCall(
+          'EthereumGetAddressOneKey',
+          'EthereumAddressOneKey',
+          {
+            ...param,
+          }
+        );
+      }
 
       const { address } = res.message;
 

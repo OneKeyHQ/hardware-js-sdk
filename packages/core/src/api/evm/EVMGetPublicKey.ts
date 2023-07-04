@@ -5,6 +5,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { EVMGetPublicKeyParams, EVMPublicKey } from '../../types/api/evmGetPublicKey';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
+import { getEvmDefinitionParams } from './getEthereumDefinitions';
 
 export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> {
   hasBundle = false;
@@ -61,13 +62,26 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall(
-        'EthereumGetPublicKey',
-        'EthereumPublicKey',
-        {
+      let res;
+      if (this.supportTrezor) {
+        const definitionParams = await getEvmDefinitionParams({
+          addressN: param.address_n,
+          chainId: param.chain_id,
+          device: this.device,
+        });
+        res = await this.device.commands.typedCall('EthereumGetPublicKey', 'EthereumPublicKey', {
           ...param,
-        }
-      );
+          ...definitionParams,
+        });
+      } else {
+        res = await this.device.commands.typedCall(
+          'EthereumGetPublicKeyOneKey',
+          'EthereumPublicKeyOneKey',
+          {
+            ...param,
+          }
+        );
+      }
 
       responses.push({
         path: serializedPath(param.address_n),

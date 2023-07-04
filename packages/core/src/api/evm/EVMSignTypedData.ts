@@ -4,6 +4,7 @@ import type {
   EthereumTypedDataSignature,
   EthereumTypedDataStructAck,
 } from '@onekeyfe/hd-transport';
+import { EthereumTypedDataSignatureOneKey } from '@onekeyfe/hd-transport/src/types/messages';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -15,6 +16,7 @@ import type {
   EthereumSignTypedDataMessage,
   EthereumSignTypedDataTypes,
 } from '../../types/api/evmSignTypedData';
+import { getEvmDefinitionParams } from './getEthereumDefinitions';
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -252,16 +254,34 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
       let response;
       if (this.supportSignTyped()) {
-        response = await this.device.commands.typedCall(
-          'EthereumSignTypedHash',
-          'EthereumTypedDataSignature',
-          {
-            address_n: addressN,
-            domain_separator_hash: domainHash ?? '',
-            message_hash: messageHash,
-            chain_id: chainId,
-          }
-        );
+        if (this.supportTrezor) {
+          const definitionParams = await getEvmDefinitionParams({
+            addressN: this.params.addressN,
+            chainId: this.params.chainId,
+            device: this.device,
+          });
+          response = await this.device.commands.typedCall(
+            'EthereumSignTypedHash',
+            'EthereumTypedDataSignature',
+            {
+              address_n: addressN,
+              domain_separator_hash: domainHash ?? '',
+              message_hash: messageHash,
+              ...definitionParams,
+            }
+          );
+        } else {
+          response = await this.device.commands.typedCall(
+            'EthereumSignTypedHashOneKey',
+            'EthereumTypedDataSignatureOneKey',
+            {
+              address_n: addressN,
+              domain_separator_hash: domainHash ?? '',
+              message_hash: messageHash,
+              chain_id: chainId,
+            }
+          );
+        }
       } else {
         response = await this.device.commands.typedCall(
           'EthereumSignMessageEIP712',
@@ -291,16 +311,35 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
         const { domainHash, messageHash } = this.params;
 
-        const response = await this.device.commands.typedCall(
-          'EthereumSignTypedHash',
-          'EthereumTypedDataSignature',
-          {
-            address_n: addressN,
-            domain_separator_hash: domainHash ?? '',
-            message_hash: messageHash,
-            chain_id: chainId,
-          }
-        );
+        let response;
+        if (this.supportTrezor) {
+          const definitionParams = await getEvmDefinitionParams({
+            addressN: this.params.addressN,
+            chainId: this.params.chainId,
+            device: this.device,
+          });
+          response = await this.device.commands.typedCall(
+            'EthereumSignMessage',
+            'EthereumMessageSignature',
+            {
+              address_n: addressN,
+              domain_separator_hash: domainHash ?? '',
+              message_hash: messageHash,
+              ...definitionParams,
+            }
+          );
+        } else {
+          response = await this.device.commands.typedCall(
+            'EthereumSignTypedHashOneKey',
+            'EthereumTypedDataSignatureOneKey   ',
+            {
+              address_n: addressN,
+              domain_separator_hash: domainHash ?? '',
+              message_hash: messageHash,
+              chain_id: chainId,
+            }
+          );
+        }
 
         return Promise.resolve(response.message);
       }

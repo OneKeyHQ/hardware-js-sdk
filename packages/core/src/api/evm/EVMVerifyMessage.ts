@@ -27,9 +27,16 @@ export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessage> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('EthereumVerifyMessage', 'Success', {
-      ...this.params,
-    });
+    let res;
+    if (this.supportTrezor) {
+      res = await this.device.commands.typedCall('EthereumVerifyMessage', 'Success', {
+        ...this.params,
+      });
+    } else {
+      res = await this.device.commands.typedCall('EthereumVerifyMessageOneKey', 'Success', {
+        ...this.params,
+      });
+    }
 
     return Promise.resolve(res.message);
   }

@@ -1,7 +1,7 @@
 import memoizee from 'memoizee';
 import { Platform } from 'react-native';
-import { ConnectSettings, CoreApi, HardwareTopLevelSdk, LowLevelCoreApi } from '@onekeyfe/hd-core';
-import { importLowLevelSDK, importTopLevelSdk, importSdk } from './importSdk';
+import { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
+import { importSdk } from './importSdk';
 
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;

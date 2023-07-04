@@ -4,6 +4,7 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
+import { getEvmDefinitionParams } from './getEthereumDefinitions';
 
 export default class EVMSignMessage extends BaseMethod<EthereumSignMessage> {
   init() {
@@ -30,13 +31,30 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessage> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall(
-      'EthereumSignMessage',
-      'EthereumMessageSignature',
-      {
-        ...this.params,
-      }
-    );
+    let res;
+    if (this.supportTrezor) {
+      const definitionParams = await getEvmDefinitionParams({
+        addressN: this.params.address_n,
+        chainId: this.params.chain_id,
+        device: this.device,
+      });
+      res = await this.device.commands.typedCall(
+        'EthereumSignMessage',
+        'EthereumMessageSignature',
+        {
+          ...this.params,
+          ...definitionParams,
+        }
+      );
+    } else {
+      res = await this.device.commands.typedCall(
+        'EthereumSignMessageOneKey',
+        'EthereumMessageSignatureOneKey',
+        {
+          ...this.params,
+        }
+      );
+    }
 
     return Promise.resolve(res.message);
   }

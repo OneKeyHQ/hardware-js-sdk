@@ -113,6 +113,23 @@ export const getDeviceBootloaderVersion = (features: Features): IVersionArray =>
   return [0, 0, 0];
 };
 
+export const supportTrezorMode = (features: Features | undefined): boolean => {
+  if (!features) return false;
+
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+  const deviceType = getDeviceType(features);
+
+  // Trezor mode is not supported on OneKey Mini
+  if ((deviceType === 'touch' || deviceType === 'pro') && semver.lt(currentVersion, '4.3.0')) {
+    return true;
+  }
+  if ((deviceType === 'classic' || deviceType === 'mini') && semver.lt(currentVersion, '3.1.0')) {
+    return true;
+  }
+
+  return features?.trezor_compat_mode ?? false;
+};
+
 export const supportInputPinOnSoftware = (features: Features): SupportFeatureType => {
   if (!features) return { support: false };
 
