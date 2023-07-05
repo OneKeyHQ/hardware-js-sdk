@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HOST_PATH: '${{ github.event.repository.name }}/${{ github.sha }}/'
-      PUBLIC_PATH: 'https://web.onekey-asset.com/${{ github.event.repository.name }}/${{ github.sha }}/'
+      PUBLIC_PATH: 'https://asset.onekey-asset.com/${{ github.event.repository.name }}/${{ github.sha }}/'
     steps:
       - uses: actions/checkout@v2
       - name: Setup Environment
