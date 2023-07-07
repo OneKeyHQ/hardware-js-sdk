@@ -14,42 +14,42 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
     <View>
       <Text style={{ textAlign: 'center', fontSize: 24 }}>Device Method Test</Text>
       <View style={styles.buttonContainer}>
+        <MethodInvoke title="getFeatures" options={[]} onCall={() => SDK.getFeatures(connectId)} />
+        <MethodInvoke
+          title="getPassphraseState"
+          options={[]}
+          onCall={() => SDK.getPassphraseState(connectId)}
+        />
         <MethodInvoke
           title="deviceBackup"
           options={[]}
           onCall={() => SDK.deviceBackup(connectId)}
         />
-
         <MethodInvoke
           title="deviceChangePin"
           options={[{ name: 'remove', value: undefined, type: 'boolean' }]}
           onCall={data => SDK.deviceChangePin(connectId, { ...data })}
         />
-
         <MethodInvoke
           title="deviceFlags"
           options={[{ name: 'flags', value: undefined, type: 'number' }]}
           onCall={data => SDK.deviceFlags(connectId, { ...data })}
         />
-
         <MethodInvoke
           title="deviceRebootToBootloader"
           options={[]}
           onCall={() => SDK.deviceRebootToBootloader(connectId)}
         />
-
         <MethodInvoke
           title="deviceRebootToBoardloader"
           options={[]}
           onCall={() => SDK.deviceRebootToBoardloader(connectId)}
         />
-
         <MethodInvoke
           title="deviceUpdateReboot"
           options={[]}
           onCall={() => SDK.deviceUpdateReboot(connectId)}
         />
-
         <MethodInvoke
           title="deviceRecovery"
           options={[
@@ -65,7 +65,6 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
           ]}
           onCall={data => SDK.deviceRecovery(connectId, { ...data })}
         />
-
         <MethodInvoke
           title="deviceReset"
           options={[
@@ -82,7 +81,6 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
           ]}
           onCall={data => SDK.deviceReset(connectId, { ...data })}
         />
-
         <MethodInvoke
           title="deviceSettings"
           options={[
@@ -104,25 +102,41 @@ export function CallDeviceMethods({ SDK, selectedDevice: currentDevice }: CallDe
             } as unknown as any)
           }
         />
-
         <MethodInvoke
           title="deviceVerify"
           options={[{ name: 'dataHex', value: '36d5e8bb396f4497c5cb876cac5c7fe1', type: 'string' }]}
           onCall={data => SDK.deviceVerify(connectId, { ...data } as unknown as any)}
         />
-
         <MethodInvoke title="deviceWipe" options={[]} onCall={() => SDK.deviceWipe(connectId)} />
-
         <MethodInvoke
           title="deviceSupportFeatures"
           options={[]}
           onCall={() => SDK.deviceSupportFeatures(connectId)}
         />
-
         <MethodInvoke
           title="deviceUpdateBootloader"
           options={[]}
           onCall={() => SDK.deviceUpdateBootloader(connectId)}
+        />
+        <MethodInvoke
+          title="checkBridgeStatus"
+          options={[]}
+          onCall={() => SDK.checkBridgeStatus()}
+        />{' '}
+        <MethodInvoke
+          title="checkTransportRelease"
+          options={[]}
+          onCall={() => SDK.checkTransportRelease()}
+        />
+        <MethodInvoke
+          title="checkFirmwareRelease"
+          options={[]}
+          onCall={() => SDK.checkFirmwareRelease(connectId)}
+        />
+        <MethodInvoke
+          title="checkBLEFirmwareRelease"
+          options={[]}
+          onCall={() => SDK.checkBLEFirmwareRelease(connectId)}
         />
       </View>
     </View>
