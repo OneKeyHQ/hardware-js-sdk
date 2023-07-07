@@ -1,4 +1,5 @@
 import semver from 'semver';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
 import type {
@@ -139,12 +140,17 @@ export const supportNewPassphrase = (features?: Features): SupportFeatureType =>
 
 export const getPassphraseState = async (features: Features, commands: DeviceCommands) => {
   if (!features) return false;
-  const { message } = await commands.typedCall('GetAddress', 'Address', {
+  const { message, type } = await commands.typedCall('GetAddress', 'Address', {
     address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
     coin_name: 'Testnet',
     script_type: 'SPENDADDRESS',
     show_display: false,
   });
+
+  // @ts-expect-error
+  if (type === 'CallMethodError') {
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Get the passphrase state error');
+  }
 
   return message.address;
 };

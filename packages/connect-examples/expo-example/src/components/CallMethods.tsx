@@ -377,9 +377,9 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
         commonParams={optionalParams}
       />
 
+      <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallBTCMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
       <CallEVMMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
-      <CallDeviceMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallOtherMethods SDK={SDK} selectedDevice={selectedDevice} />
       <CallStarcoinMethods
         SDK={SDK}

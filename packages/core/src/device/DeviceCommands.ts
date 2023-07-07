@@ -142,6 +142,10 @@ export class DeviceCommands {
       // throw bridge network error
       if (error instanceof HardwareError) {
         if (error.errorCode === HardwareErrorCode.ResponseUnexpectTypeError) {
+          // Do not intercept CallMethodError
+          // Do not intercept “assertType: Response of unexpected type” error
+          // Blocking the above two messages will not know what the specific error message is, and the specific error should be handled by the subsequent business logic.
+
           if (error.message.indexOf('BridgeNetworkError') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BridgeNetworkError);
           }
