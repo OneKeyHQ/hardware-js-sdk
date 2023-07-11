@@ -137,3 +137,11 @@ export type {
   KaspaSignInputParams,
   KaspaSignOutputParams,
 } from './kaspaSignTransaction';
+
+export type { nexaAddress, nexaGetAddressParams } from './nexaGetAddress';
+export type {
+  NexaSignature,
+  NexaSignTransactionParams,
+  NexaSignInputParams,
+  NexaSignOutputParams,
+} from './nexaSignTransaction';
