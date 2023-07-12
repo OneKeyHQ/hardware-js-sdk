@@ -6,15 +6,9 @@ export type NexaSignature = {
 };
 
 export type NexaSignInputParams = {
-  path: string | number[];
-  prevTxId: string;
-  outputIndex: number;
-  sequenceNumber: number | string;
-  output: {
-    satoshis: number | string;
-    script: string;
-  };
-  sigOpCount?: number;
+  path: string;
+  message: string;
+  prefix: string;
 };
 
 export type NexaSignOutputParams = {
@@ -24,10 +18,7 @@ export type NexaSignOutputParams = {
 };
 
 export type NexaSignTransactionParams = {
-  inputPath: string;
-  message: string;
-  prefix: string;
-  inputCount: number;
+  inputs: NexaSignInputParams[];
 };
 
 export declare function nexaSignTransaction(
