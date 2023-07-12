@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-http",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "description": "hardware http transport",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -16,7 +16,6 @@
   },
   "scripts": {
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
-    "test": "echo \"Error: run tests from root\" && exit 1",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
@@ -25,8 +24,8 @@
     "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^0.3.14",
-    "@onekeyfe/hd-transport": "^0.3.14",
+    "@onekeyfe/hd-shared": "^0.3.15",
+    "@onekeyfe/hd-transport": "^0.3.15",
     "axios": "^0.27.2"
   }
 }
