@@ -44,14 +44,21 @@ export function checkNeedUpdateBootForClassicAndMini(
     DataManager.getBootloaderRelatedFirmwareVersion(features);
   if (!bootloaderRelatedFirmwareVersion) return false;
 
-  return (
-    // 1、The target version of the upgrade is lower or equal to relatedVersion
-    semver.lte(willUpdateFirmware, bootloaderRelatedFirmwareVersion.join('.')) ||
-    // 2、The current version is greater than the relatedVersion and the bootloader version is lower than the target bootloader version
-    (semver.gte(currentVersion, bootloaderRelatedFirmwareVersion.join('.')) &&
-      targetBootloaderVersion &&
-      semver.lt(bootloaderVersion, targetBootloaderVersion.join('.')))
-  );
+  // If the current bootloader version is greater than or equal to the version that needs to be upgraded, then no upgrade is required
+  if (targetBootloaderVersion && semver.gte(bootloaderVersion, targetBootloaderVersion.join('.'))) {
+    return false;
+  }
+
+  if (semver.gte(willUpdateFirmware, bootloaderRelatedFirmwareVersion.join('.'))) {
+    return true;
+  }
+
+  // The current version is greater than the relatedVersion and the bootloader version is lower than the target bootloader version
+  if (semver.gte(currentVersion, bootloaderRelatedFirmwareVersion.join('.'))) {
+    return true;
+  }
+
+  return false;
 }
 
 const INIT_DATA_CHUNK_SIZE = 16 * 1024;

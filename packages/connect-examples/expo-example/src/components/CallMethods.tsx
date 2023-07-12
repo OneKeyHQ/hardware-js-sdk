@@ -175,7 +175,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
 
   const handleCheckBootloaderRelease = async () => {
     const response = await SDK.checkBootloaderRelease(selectedDevice?.connectId, {
-      willUpdateFirmwareVersion: '3.0.0',
+      willUpdateFirmwareVersion: '3.1.0',
     });
     console.log('example checkBootloader response: ', response);
   };
