@@ -1,11 +1,11 @@
 import { NexaAddress as HardwareNexaAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
-export type nexaAddress = {
+export type NexaAddress = {
   path: string;
 } & HardwareNexaAddress;
 
-export type nexaGetAddressParams = {
+export type NexaGetAddressParams = {
   path: string | number[];
   prefix?: string;
   scheme?: string;
@@ -15,11 +15,11 @@ export type nexaGetAddressParams = {
 export declare function nexaGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & nexaGetAddressParams
-): Response<nexaAddress>;
+  params: CommonParams & NexaGetAddressParams
+): Response<NexaAddress>;
 
 export declare function nexaGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & { bundle?: nexaGetAddressParams[] }
-): Response<Array<nexaAddress>>;
+  params: CommonParams & { bundle?: NexaGetAddressParams[] }
+): Response<Array<NexaAddress>>;
