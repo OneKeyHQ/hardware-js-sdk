@@ -124,12 +124,6 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
 
   async run() {
     const { device, params } = this;
-    console.log('packages/core/src/api/nexa/NexaSignTransaction.ts', device, {
-      address_n: validatePath(params.inputPath, 3),
-      raw_message: params.message,
-      prefix: params.prefix,
-      input_count: params.inputCount,
-    });
     const response = await device.commands.typedCall(
       'NexaSignTx',
       ['NexaTxInputRequest', 'NexaSignedTx'],
@@ -140,6 +134,11 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
         input_count: params.inputCount,
       }
     );
-    return response;
+    const signature = [];
+    signature.push({
+      index: 0,
+      signature: response.message.signature,
+    });
+    return signature;
   }
 }
