@@ -7,6 +7,7 @@ import {
   getDeviceFirmwareVersion,
 } from '../../utils/deviceFeaturesUtils';
 import { DataManager } from '../../data-manager';
+import { shouldUpdateBootloaderForClassicAndMini } from './bootloaderHelper';
 
 export function checkNeedUpdateBootForTouch(features: Features) {
   const deviceType = getDeviceType(features);
@@ -44,14 +45,13 @@ export function checkNeedUpdateBootForClassicAndMini(
     DataManager.getBootloaderRelatedFirmwareVersion(features);
   if (!bootloaderRelatedFirmwareVersion) return false;
 
-  return (
-    // 1、The target version of the upgrade is lower or equal to relatedVersion
-    semver.lte(willUpdateFirmware, bootloaderRelatedFirmwareVersion.join('.')) ||
-    // 2、The current version is greater than the relatedVersion and the bootloader version is lower than the target bootloader version
-    (semver.gte(currentVersion, bootloaderRelatedFirmwareVersion.join('.')) &&
-      targetBootloaderVersion &&
-      semver.lt(bootloaderVersion, targetBootloaderVersion.join('.')))
-  );
+  return shouldUpdateBootloaderForClassicAndMini({
+    currentVersion,
+    bootloaderVersion,
+    willUpdateFirmware,
+    targetBootloaderVersion,
+    bootloaderRelatedFirmwareVersion,
+  });
 }
 
 const INIT_DATA_CHUNK_SIZE = 16 * 1024;

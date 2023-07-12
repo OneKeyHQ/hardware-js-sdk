@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-webusb",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
@@ -14,15 +14,14 @@
     "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
   },
   "scripts": {
-    "test": "echo \"Error: run tests from root\" && exit 1",
     "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^0.3.14",
-    "@onekeyfe/hd-transport": "^0.3.14"
+    "@onekeyfe/hd-shared": "^0.3.15",
+    "@onekeyfe/hd-transport": "^0.3.15"
   },
   "devDependencies": {
     "@types/w3c-web-usb": "^1.0.6"

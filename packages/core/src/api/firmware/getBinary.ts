@@ -84,7 +84,6 @@ export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) =
     }
   }
 
-  console.log('=====>>>getInfo: ', firmwareUpdateField);
   const releaseInfo = deviceMap?.[deviceType]?.[firmwareUpdateField] ?? [];
   return findLatestRelease(releaseInfo);
 };
