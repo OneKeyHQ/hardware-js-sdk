@@ -25,7 +25,7 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
   getVersionRange() {
     return {
       model_mini: {
-        min: '3.0.0',
+        min: '3.2.0',
       },
       model_touch: {
         min: '4.3.0',
