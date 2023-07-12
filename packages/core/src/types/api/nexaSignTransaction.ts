@@ -1,4 +1,3 @@
-import { SignatureType } from '../../api/nexa/helpers/SignatureType';
 import type { CommonParams, Response } from '../params';
 
 export type NexaSignature = {
@@ -25,15 +24,10 @@ export type NexaSignOutputParams = {
 };
 
 export type NexaSignTransactionParams = {
-  version: number;
-  inputs: NexaSignInputParams[];
-  outputs: NexaSignOutputParams[];
-  lockTime: number | string;
-  sigHashType?: SignatureType;
-  sigOpCount?: number;
-  subNetworkID?: string;
-  scheme?: string;
-  prefix?: string;
+  inputPath: string;
+  message: string;
+  prefix: string;
+  inputCount: number;
 };
 
 export declare function nexaSignTransaction(

@@ -62,10 +62,12 @@ export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]>
         ...param,
       });
 
+      console.log('packages/core/src/api/nexa/NexaGetAddress.ts', res.message);
       const { address } = res.message;
 
       const result = {
         path: serializedPath(param.address_n),
+        pub: res.message.public_key,
         address,
       };
       responses.push(result);
