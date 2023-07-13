@@ -108,9 +108,6 @@ import { polkadotSignTransaction } from './polkadotSignTransaction';
 import { kaspaGetAddress } from './kaspaGetAddress';
 import { kaspaSignTransaction } from './kaspaSignTransaction';
 
-import { nexaGetAddress } from './nexaGetAddress';
-import { nexaSignTransaction } from './nexaSignTransaction';
-
 export * from './export';
 
 export type CoreApi = {
@@ -293,10 +290,4 @@ export type CoreApi = {
    */
   kaspaGetAddress: typeof kaspaGetAddress;
   kaspaSignTransaction: typeof kaspaSignTransaction;
-
-  /**
-   * nexa function
-   */
-  nexaGetAddress: typeof nexaGetAddress;
-  nexaSignTransaction: typeof nexaSignTransaction;
 };
