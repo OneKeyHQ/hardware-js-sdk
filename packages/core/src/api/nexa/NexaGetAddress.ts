@@ -3,7 +3,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { NexaGetAddressParams, NexaAddress } from '../../types';
+import { NexaGetAddressParams } from '../../types';
 
 export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]> {
   hasBundle = false;
