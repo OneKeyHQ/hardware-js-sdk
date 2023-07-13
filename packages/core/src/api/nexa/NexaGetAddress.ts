@@ -3,7 +3,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { nexaGetAddressParams, nexaAddress } from '../../types';
+import { NexaGetAddressParams, NexaAddress } from '../../types';
 
 export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]> {
   hasBundle = false;
@@ -20,7 +20,7 @@ export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]>
 
     // init params
     this.params = [];
-    payload.bundle.forEach((batch: nexaGetAddressParams) => {
+    payload.bundle.forEach((batch: NexaGetAddressParams) => {
       const addressN = validatePath(batch.path, 3);
 
       validateParams(batch, [
@@ -53,7 +53,11 @@ export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]>
   }
 
   async run() {
-    const responses: nexaAddress[] = [];
+    const responses: {
+      path: string;
+      pub: string;
+      address: string;
+    }[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
