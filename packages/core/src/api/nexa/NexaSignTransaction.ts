@@ -1,4 +1,5 @@
 import { TypedCall } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { TypedResponseMessage } from '../../device/DeviceCommands';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -37,21 +38,28 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
     typedCall: TypedCall,
     res: TypedResponseMessage<'NexaTxInputRequest'> | TypedResponseMessage<'NexaSignedTx'>,
     index: number,
-    signature: NexaSignature[]
+    signatures: NexaSignature[]
   ): Promise<NexaSignature[]> {
+    const { signature } = res.message;
+    if (!signature) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.ResponseUnexpectTypeError,
+        'signature is not valid'
+      );
+    }
     if (res.type === 'NexaSignedTx') {
-      signature.push({
+      signatures.push({
         index,
-        signature: res.message.signature,
+        signature,
       });
 
-      return signature;
+      return signatures;
     }
 
     if (res.type === 'NexaTxInputRequest') {
-      signature.push({
+      signatures.push({
         index,
-        signature: res.message.signature ?? '',
+        signature,
       });
 
       const nextIndex = res.message.request_index;
@@ -66,10 +74,10 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
         }
       );
 
-      return this.processTxRequest(typedCall, response, nextIndex, signature);
+      return this.processTxRequest(typedCall, response, nextIndex, signatures);
     }
 
-    return signature;
+    return signatures;
   }
 
   async run() {
