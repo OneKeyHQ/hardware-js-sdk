@@ -261,4 +261,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'kaspaGetAddress' }),
   kaspaSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'kaspaSignTransaction' }),
+  nexaGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nexaGetAddress' }),
+  nexaSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nexaSignTransaction' }),
 });

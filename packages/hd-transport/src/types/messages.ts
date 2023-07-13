@@ -2730,6 +2730,44 @@ export type NEMDecryptedMessage = {
   payload: string;
 };
 
+// NexaGetAddress
+export type NexaGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+  prefix?: string;
+};
+
+// NexaAddress
+export type NexaAddress = {
+  address: string;
+  public_key: string;
+};
+
+// NexaSignTx
+export type NexaSignTx = {
+  address_n: number[];
+  raw_message: string;
+  prefix?: string;
+  input_count?: number;
+};
+
+// NexaTxInputRequest
+export type NexaTxInputRequest = {
+  request_index: number;
+  signature?: string;
+};
+
+// NexaTxInputAck
+export type NexaTxInputAck = {
+  address_n: number[];
+  raw_message: string;
+};
+
+// NexaSignedTx
+export type NexaSignedTx = {
+  signature: string;
+};
+
 // PolkadotGetAddress
 export type PolkadotGetAddress = {
   address_n: number[];
@@ -3667,6 +3705,12 @@ export type MessageType = {
   NEMSignedTx: NEMSignedTx;
   NEMDecryptMessage: NEMDecryptMessage;
   NEMDecryptedMessage: NEMDecryptedMessage;
+  NexaGetAddress: NexaGetAddress;
+  NexaAddress: NexaAddress;
+  NexaSignTx: NexaSignTx;
+  NexaTxInputRequest: NexaTxInputRequest;
+  NexaTxInputAck: NexaTxInputAck;
+  NexaSignedTx: NexaSignedTx;
   PolkadotGetAddress: PolkadotGetAddress;
   PolkadotAddress: PolkadotAddress;
   PolkadotSignTx: PolkadotSignTx;

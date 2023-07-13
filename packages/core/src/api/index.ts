@@ -103,3 +103,6 @@ export { default as polkadotSignTransaction } from './polkadot/PolkadotSignTrans
 
 export { default as kaspaGetAddress } from './kaspa/KaspaGetAddress';
 export { default as kaspaSignTransaction } from './kaspa/KaspaSignTransaction';
+
+export { default as nexaGetAddress } from './nexa/NexaGetAddress';
+export { default as nexaSignTransaction } from './nexa/NexaSignTransaction';
