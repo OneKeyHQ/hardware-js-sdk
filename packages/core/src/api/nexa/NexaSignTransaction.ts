@@ -28,7 +28,7 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
         min: '3.2.0',
       },
       model_touch: {
-        min: '4.3.0',
+        min: '4.4.0',
       },
     };
   }
