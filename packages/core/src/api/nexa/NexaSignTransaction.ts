@@ -56,10 +56,15 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
 
       const nextIndex = res.message.request_index;
       const input = this.params.inputs[nextIndex];
-      const response = await typedCall('NexaTxInputAck', ['NexaTxInputRequest', 'NexaSignedTx'], {
-        address_n: input.path,
-        raw_message: input.message,
-      });
+      const response = await typedCall(
+        'NexaTxInputAck',
+        // @ts-expect-error
+        ['NexaTxInputRequest', 'NexaSignedTx'],
+        {
+          address_n: input.path,
+          raw_message: input.message,
+        }
+      );
 
       return this.processTxRequest(typedCall, response, nextIndex, signature);
     }
