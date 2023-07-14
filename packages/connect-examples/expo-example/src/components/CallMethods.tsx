@@ -37,6 +37,7 @@ import { CallCardanoMethods } from './CallCardanoMethods';
 import { CallFilecoinMethods } from './CallFilecoinMethods';
 import { CallPolkadotMethods } from './CallPolkadotMethods';
 import { CallKaspaMethods } from './CallKaspaMethods';
+import { CallNexaMethods } from './CallNexa';
 
 let registerListener = false;
 
@@ -409,6 +410,7 @@ export function CallMethods({ HardwareLowLevelSDK, SDK, type }: ICallMethodProps
         commonParams={optionalParams}
       />
       <CallKaspaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
+      <CallNexaMethods SDK={SDK} selectedDevice={selectedDevice} commonParams={optionalParams} />
     </View>
   );
 }
