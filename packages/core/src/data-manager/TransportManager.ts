@@ -1,13 +1,16 @@
 import { Transport } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import DataManager from './DataManager';
+import DataManager, { MessageVersion } from './DataManager';
 import { getLogger, LoggerNames } from '../utils';
 // eslint-disable-next-line import/no-cycle
 import { DevicePool } from '../device/DevicePool';
+import { getSupportMessageVersion } from '../utils/deviceFeaturesUtils';
+import { Features } from '../types';
 
 const Log = getLogger(LoggerNames.Transport);
 const BleLogger = getLogger(LoggerNames.HdBleTransport);
 const HttpLogger = getLogger(LoggerNames.HdTransportHttp);
+
 /**
  * transport 在同一个环境中只会存在一个
  * 这里设计成单例获取
@@ -22,10 +25,13 @@ export default class TransportManager {
 
   static reactNativeInit = false;
 
+  static messageVersion: MessageVersion = 'latest';
+
   static load() {
     Log.debug('transport manager load');
     this.defaultMessages = DataManager.getProtobufMessages();
     this.currentMessages = this.defaultMessages;
+    this.messageVersion = 'latest';
   }
 
   static async configure() {
@@ -53,16 +59,20 @@ export default class TransportManager {
     }
   }
 
-  static async reconfigure(messages?: JSON | number[] | null) {
-    if (Array.isArray(messages)) {
-      messages = DataManager.getProtobufMessages();
-    }
+  static async reconfigure(features?: Features | undefined) {
+    Log.debug(`Begin reconfiguring transports`);
+    const { messageVersion, messages } = getSupportMessageVersion(features);
+
     if (this.currentMessages === messages || !messages) {
       return;
     }
+
+    Log.debug(`Reconfiguring transports version:${messageVersion}`);
+
     try {
       await this.transport.configure(JSON.stringify(messages));
       this.currentMessages = messages;
+      this.messageVersion = messageVersion;
     } catch (error) {
       throw ERRORS.TypedError(
         HardwareErrorCode.TransportInvalidProtobuf,
@@ -93,5 +103,9 @@ export default class TransportManager {
 
   static getCurrentMessages() {
     return this.currentMessages;
+  }
+
+  static getMessageVersion() {
+    return this.messageVersion;
   }
 }

@@ -4,11 +4,14 @@ import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
 import type {
   Features,
-  IVersionArray,
-  IDeviceType,
   IDeviceModel,
+  IDeviceType,
+  IVersionArray,
   SupportFeatureType,
 } from '../types';
+import { DeviceTypeToModels } from '../types';
+import DataManager, { MessageVersion } from '../data-manager/DataManager';
+import { PROTOBUF_MESSAGE_CONFIG } from '../data/messages-config';
 
 export const getDeviceModel = (features?: Features): IDeviceModel => {
   if (!features || typeof features !== 'object') {
@@ -120,14 +123,51 @@ export const supportTrezorMode = (features: Features | undefined): boolean => {
   const deviceType = getDeviceType(features);
 
   // Trezor mode is not supported on OneKey Mini
-  if ((deviceType === 'touch' || deviceType === 'pro') && semver.lt(currentVersion, '4.3.0')) {
+  if ((deviceType === 'touch' || deviceType === 'pro') && semver.lt(currentVersion, '4.4.0')) {
     return true;
   }
-  if ((deviceType === 'classic' || deviceType === 'mini') && semver.lt(currentVersion, '3.1.0')) {
+  if ((deviceType === 'classic' || deviceType === 'mini') && semver.lt(currentVersion, '3.2.0')) {
     return true;
   }
 
-  return features?.trezor_compat_mode ?? false;
+  return features?.vendor === 'trezor.io';
+};
+
+export const getSupportMessageVersion = (
+  features: Features | undefined
+): { messages: JSON; messageVersion: MessageVersion } => {
+  if (!features)
+    return {
+      messages: DataManager.messages.latest,
+      messageVersion: 'latest',
+    };
+
+  const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
+  const deviceType = getDeviceType(features);
+
+  const deviceVersionConfigs =
+    PROTOBUF_MESSAGE_CONFIG[deviceType] ||
+    (DeviceTypeToModels[deviceType] &&
+      DeviceTypeToModels[deviceType]
+        .map(model => PROTOBUF_MESSAGE_CONFIG[model])
+        .find(range => range !== undefined));
+
+  const sortedDeviceVersionConfigs =
+    deviceVersionConfigs?.sort((a, b) => semver.compare(b.minVersion, a.minVersion)) ?? [];
+
+  for (const { minVersion, messageVersion } of sortedDeviceVersionConfigs) {
+    if (semver.gte(currentDeviceVersion, minVersion)) {
+      return {
+        messages: DataManager.messages[messageVersion],
+        messageVersion,
+      };
+    }
+  }
+
+  return {
+    messages: DataManager.messages.latest,
+    messageVersion: 'latest',
+  };
 };
 
 export const supportInputPinOnSoftware = (features: Features): SupportFeatureType => {

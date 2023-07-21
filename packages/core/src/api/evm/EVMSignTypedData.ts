@@ -1,22 +1,18 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import type {
-  EthereumTypedDataSignature,
-  EthereumTypedDataStructAck,
-} from '@onekeyfe/hd-transport';
-import { EthereumTypedDataSignatureOneKey } from '@onekeyfe/hd-transport/src/types/messages';
+import { TypedCall } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { encodeData, getFieldType, parseArrayType } from '../helpers/typeNameUtils';
 import { getDeviceFirmwareVersion, getDeviceType } from '../../utils/deviceFeaturesUtils';
-import type {
-  EthereumSignTypedDataMessage,
-  EthereumSignTypedDataTypes,
-} from '../../types/api/evmSignTypedData';
-import { getEvmDefinitionParams } from './getEthereumDefinitions';
+import type { EthereumSignTypedDataMessage, EthereumSignTypedDataTypes } from '../../types';
+import TransportManager from '../../data-manager/TransportManager';
+import { signTypedHash as signTypedHashLegacyV1 } from './legacyV1/signTypedHash';
+import { signTypedHash } from './latest/signTypedHash';
+import { signTypedData as signTypedDataLegacyV1 } from './legacyV1/signTypedData';
+import { signTypedData } from './latest/signTypedData';
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -66,118 +62,71 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   }
 
   async signTypedData() {
-    const { commands } = this.device;
     const { addressN, data, metamaskV4Compat, chainId } = this.params;
 
-    const {
-      types,
-      primaryType,
-      domain,
-      message,
-    }: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> = data;
+    switch (TransportManager.getMessageVersion()) {
+      case 'v1':
+        return signTypedDataLegacyV1({
+          typedCall: this.device.commands.typedCall.bind(this.device.commands),
+          addressN,
+          data,
+          metamaskV4Compat,
+          chainId,
+        });
 
-    let response = await commands.typedCall(
-      'EthereumSignTypedData',
-      [
-        'EthereumTypedDataStructRequest',
-        'EthereumTypedDataValueRequest',
-        'EthereumTypedDataSignature',
-      ],
-      {
-        address_n: addressN,
-        primary_type: primaryType as string,
-        metamask_v4_compat: metamaskV4Compat,
-        chain_id: chainId,
-      }
-    );
-
-    while (response.type === 'EthereumTypedDataStructRequest') {
-      const { name: typeDefinitionName } = response.message;
-      const typeDefinition = types[typeDefinitionName];
-      if (typeDefinition === undefined) {
-        throw ERRORS.TypedError(
-          'Runtime',
-          `Type ${typeDefinitionName} was not defined in types object`
-        );
-      }
-
-      const dataStruckAck: EthereumTypedDataStructAck = {
-        members: typeDefinition.map(({ name, type: typeName }) => ({
-          name,
-          type: getFieldType(typeName, types),
-        })),
-      };
-
-      response = await commands.typedCall(
-        'EthereumTypedDataStructAck',
-        [
-          'EthereumTypedDataStructRequest',
-          'EthereumTypedDataValueRequest',
-          'EthereumTypedDataSignature',
-        ],
-        dataStruckAck
-      );
+      case 'latest':
+      default:
+        return signTypedData({
+          typedCall: this.device.commands.typedCall.bind(this.device.commands),
+          addressN,
+          data,
+          metamaskV4Compat,
+          chainId,
+          supportTrezor: this.supportTrezor,
+          device: this.device,
+        });
     }
+  }
 
-    while (response.type === 'EthereumTypedDataValueRequest') {
-      const { member_path } = response.message;
+  signTypedHash({
+    typedCall,
+    addressN,
+    chainId,
+    domainHash,
+    messageHash,
+  }: {
+    typedCall: TypedCall;
+    addressN: number[];
+    chainId: number | undefined;
+    domainHash: string | undefined;
+    messageHash: string | undefined;
+  }) {
+    if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
+    if (!chainId) throw ERRORS.TypedError('Runtime', 'chainId is required');
 
-      let memberData;
-      let memberTypeName: string;
+    switch (TransportManager.getMessageVersion()) {
+      case 'v1':
+        return signTypedHashLegacyV1({
+          typedCall,
+          addressN,
+          domainHash,
+          messageHash,
+          chainId,
+          device: this.device,
+        });
 
-      const [rootIndex, ...nestedMemberPath] = member_path;
-      switch (rootIndex) {
-        case 0:
-          memberData = domain;
-          memberTypeName = 'EIP712Domain';
-          break;
-        case 1:
-          memberData = message;
-          memberTypeName = primaryType as string;
-          break;
-        default:
-          throw ERRORS.TypedError('Runtime', 'Root index can only be 0 or 1');
-      }
-
-      for (const index of nestedMemberPath) {
-        if (Array.isArray(memberData)) {
-          memberTypeName = parseArrayType(memberTypeName).entryTypeName;
-          memberData = memberData[index];
-        } else if (typeof memberData === 'object' && memberData !== null) {
-          const memberTypeDefinition = types[memberTypeName][index];
-          memberTypeName = memberTypeDefinition.type;
-          memberData = memberData[memberTypeDefinition.name];
-        } else {
-          // TODO
-        }
-      }
-
-      let encodedData;
-      if (Array.isArray(memberData)) {
-        // Sending the length as uint16
-        encodedData = encodeData('uint16', memberData.length);
-      } else {
-        encodedData = encodeData(memberTypeName, memberData);
-      }
-
-      response = await commands.typedCall(
-        'EthereumTypedDataValueAck',
-        ['EthereumTypedDataValueRequest', 'EthereumTypedDataSignature'],
-        {
-          value: encodedData,
-        }
-      );
+      case 'latest':
+      default:
+        return signTypedHash({
+          typedCall,
+          addressN,
+          domainHash,
+          messageHash,
+          chainId,
+          device: this.device,
+          supportTrezor: this.supportTrezor,
+        });
     }
-
-    if (response.type !== 'EthereumTypedDataSignature') {
-      throw ERRORS.TypedError('Runtime', 'Unexpected response type');
-    }
-
-    const { address, signature }: EthereumTypedDataSignature = response.message;
-    return {
-      address,
-      signature,
-    };
   }
 
   getVersionRange() {
@@ -254,34 +203,13 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
       let response;
       if (this.supportSignTyped()) {
-        if (this.supportTrezor) {
-          const definitionParams = await getEvmDefinitionParams({
-            addressN: this.params.addressN,
-            chainId: this.params.chainId,
-            device: this.device,
-          });
-          response = await this.device.commands.typedCall(
-            'EthereumSignTypedHash',
-            'EthereumTypedDataSignature',
-            {
-              address_n: addressN,
-              domain_separator_hash: domainHash ?? '',
-              message_hash: messageHash,
-              ...definitionParams,
-            }
-          );
-        } else {
-          response = await this.device.commands.typedCall(
-            'EthereumSignTypedHashOneKey',
-            'EthereumTypedDataSignatureOneKey',
-            {
-              address_n: addressN,
-              domain_separator_hash: domainHash ?? '',
-              message_hash: messageHash,
-              chain_id: chainId,
-            }
-          );
-        }
+        response = await this.signTypedHash({
+          typedCall: this.device.commands.typedCall.bind(this.device.commands),
+          addressN,
+          domainHash,
+          messageHash,
+          chainId,
+        });
       } else {
         response = await this.device.commands.typedCall(
           'EthereumSignMessageEIP712',
@@ -298,57 +226,26 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     }
 
     // Touch Pro Sign NestedArrays
-    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
     if (this.hasNestedArrays(this.params.data)) {
-      const supportNestedArraysSignVersion = '4.2.0';
+      validateParams(this.params, [
+        { name: 'domainHash', type: 'hexString', required: true },
+        { name: 'messageHash', type: 'hexString', required: true },
+      ]);
 
-      // 4.2.0 is the first version that supports nested arrays in signTypedData
-      if (semver.gte(currentVersion, supportNestedArraysSignVersion)) {
-        validateParams(this.params, [
-          { name: 'domainHash', type: 'hexString', required: true },
-          { name: 'messageHash', type: 'hexString', required: true },
-        ]);
+      const { domainHash, messageHash } = this.params;
 
-        const { domainHash, messageHash } = this.params;
+      if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
+      if (!chainId) throw ERRORS.TypedError('Runtime', 'chainId is required');
 
-        let response;
-        if (this.supportTrezor) {
-          const definitionParams = await getEvmDefinitionParams({
-            addressN: this.params.addressN,
-            chainId: this.params.chainId,
-            device: this.device,
-          });
-          response = await this.device.commands.typedCall(
-            'EthereumSignMessage',
-            'EthereumMessageSignature',
-            {
-              address_n: addressN,
-              domain_separator_hash: domainHash ?? '',
-              message_hash: messageHash,
-              ...definitionParams,
-            }
-          );
-        } else {
-          response = await this.device.commands.typedCall(
-            'EthereumSignTypedHashOneKey',
-            'EthereumTypedDataSignatureOneKey   ',
-            {
-              address_n: addressN,
-              domain_separator_hash: domainHash ?? '',
-              message_hash: messageHash,
-              chain_id: chainId,
-            }
-          );
-        }
+      const response = await this.signTypedHash({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        addressN,
+        domainHash,
+        messageHash,
+        chainId,
+      });
 
-        return Promise.resolve(response.message);
-      }
-
-      throw ERRORS.TypedError(
-        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-        `Device firmware version is too low, please update to ${supportNestedArraysSignVersion}`,
-        { current: currentVersion, require: supportNestedArraysSignVersion }
-      );
+      return Promise.resolve(response.message);
     }
 
     // For Touch、Pro we use EthereumSignTypedData

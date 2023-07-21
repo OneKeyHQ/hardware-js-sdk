@@ -1,12 +1,12 @@
 import * as protobuf from 'protobufjs/light';
 import * as Long from 'long';
 import {
-  buildOne,
   buildBuffers,
   buildEncodeBuffers,
-  receiveOne,
-  parseConfigure,
+  buildOne,
   decodeProtocol,
+  parseConfigure,
+  receiveOne,
 } from './serialization';
 import * as check from './utils/highlevel-checks';
 

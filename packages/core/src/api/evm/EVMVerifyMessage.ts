@@ -1,10 +1,13 @@
-import { EthereumVerifyMessage } from '@onekeyfe/hd-transport';
+import { EthereumVerifyMessageOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
+import TransportManager from '../../data-manager/TransportManager';
+import verifyMessageLegacyV1 from './legacyV1/verifyMessage';
+import verifyMessage from './latest/verifyMessage';
 
-export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessage> {
+export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessageOneKey> {
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
@@ -27,17 +30,18 @@ export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessage> {
   }
 
   async run() {
-    let res;
-    if (this.supportTrezor) {
-      res = await this.device.commands.typedCall('EthereumVerifyMessage', 'Success', {
-        ...this.params,
-      });
-    } else {
-      res = await this.device.commands.typedCall('EthereumVerifyMessageOneKey', 'Success', {
-        ...this.params,
+    if (TransportManager.getMessageVersion() === 'v1') {
+      return verifyMessageLegacyV1({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        params: this.params,
       });
     }
 
-    return Promise.resolve(res.message);
+    return verifyMessage({
+      device: this.device,
+      typedCall: this.device.commands.typedCall.bind(this.device.commands),
+      params: this.params,
+      supportTrezor: this.supportTrezor,
+    });
   }
 }

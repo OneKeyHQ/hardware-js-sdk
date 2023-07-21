@@ -21,18 +21,18 @@ import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
 import { enableLog, getLogger, LoggerNames, setLoggerPostMessage, wait } from '../utils';
 import {
+  CORE_EVENT,
   CoreMessage,
+  createDeviceMessage,
   createResponseMessage,
+  createUiMessage,
   DEVICE,
   IFRAME,
   IFrameCallMessage,
-  CORE_EVENT,
   UI_REQUEST,
   UI_RESPONSE,
   UiPromise,
   UiPromiseResponse,
-  createUiMessage,
-  createDeviceMessage,
 } from '../events';
 import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, KnownDevice } from '../types';
@@ -234,7 +234,7 @@ export const callAPI = async (message: CoreMessage) => {
 
       // reconfigure messages
       if (_deviceList) {
-        await TransportManager.reconfigure(device.getFirmwareVersion());
+        await TransportManager.reconfigure(device.features);
       }
 
       // Check to see if it is safe to use Passphrase
@@ -411,6 +411,7 @@ function initDeviceForBle(method: BaseMethod) {
  * If the Bluetooth connection times out, retry 6 times
  */
 let bleTimeoutRetry = 0;
+
 async function connectDeviceForBle(method: BaseMethod, device: Device) {
   try {
     await device.acquire();

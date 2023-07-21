@@ -1,12 +1,14 @@
-import { EthereumSignMessage } from '@onekeyfe/hd-transport';
+import { EthereumSignMessageOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { getEvmDefinitionParams } from './getEthereumDefinitions';
+import TransportManager from '../../data-manager/TransportManager';
+import signMessage from './latest/signMessage';
+import signMessageLegacyV1 from './legacyV1/signMessage';
 
-export default class EVMSignMessage extends BaseMethod<EthereumSignMessage> {
+export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey> {
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
@@ -31,31 +33,18 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessage> {
   }
 
   async run() {
-    let res;
-    if (this.supportTrezor) {
-      const definitionParams = await getEvmDefinitionParams({
-        addressN: this.params.address_n,
-        chainId: this.params.chain_id,
-        device: this.device,
+    if (TransportManager.getMessageVersion() === 'v1') {
+      return signMessageLegacyV1({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        params: this.params,
       });
-      res = await this.device.commands.typedCall(
-        'EthereumSignMessage',
-        'EthereumMessageSignature',
-        {
-          ...this.params,
-          ...definitionParams,
-        }
-      );
-    } else {
-      res = await this.device.commands.typedCall(
-        'EthereumSignMessageOneKey',
-        'EthereumMessageSignatureOneKey',
-        {
-          ...this.params,
-        }
-      );
     }
 
-    return Promise.resolve(res.message);
+    return signMessage({
+      device: this.device,
+      typedCall: this.device.commands.typedCall.bind(this.device.commands),
+      params: this.params,
+      supportTrezor: this.supportTrezor,
+    });
   }
 }

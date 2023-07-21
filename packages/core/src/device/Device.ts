@@ -3,17 +3,17 @@ import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
   Deferred,
-  HardwareErrorCode,
   ERRORS,
   HardwareError,
+  HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
 import {
+  getDeviceBLEFirmwareVersion,
   getDeviceFirmwareVersion,
   getDeviceLabel,
   getDeviceType,
-  getDeviceUUID,
-  getDeviceBLEFirmwareVersion,
   getDeviceTypeOnBootloader,
+  getDeviceUUID,
   getPassphraseState,
 } from '../utils/deviceFeaturesUtils';
 
@@ -21,12 +21,13 @@ import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands, PassphrasePromptResponse } from './DeviceCommands';
 
-import type { Features, Device as DeviceTyped, UnavailableCapabilities } from '../types';
+import type { Device as DeviceTyped, Features, UnavailableCapabilities } from '../types';
 import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
 import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
+import TransportManager from '../data-manager/TransportManager';
 
 export type InitOptions = {
   initSession?: boolean;
@@ -355,6 +356,8 @@ export class Device extends EventEmitter {
 
     const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
     this._updateFeatures(message, options?.initSession);
+
+    await TransportManager.reconfigure(message);
   }
 
   async getFeatures() {

@@ -4161,201 +4161,6 @@
         }
       }
     },
-    "EthereumDefinitionType": {
-      "values": {
-        "NETWORK": 0,
-        "TOKEN": 1
-      }
-    },
-    "EthereumNetworkInfo": {
-      "fields": {
-        "chain_id": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 1
-        },
-        "symbol": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        },
-        "slip44": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 3
-        },
-        "name": {
-          "rule": "required",
-          "type": "string",
-          "id": 4
-        },
-        "icon": {
-          "type": "string",
-          "id": 101
-        },
-        "primary_color": {
-          "type": "uint64",
-          "id": 102
-        }
-      }
-    },
-    "EthereumTokenInfo": {
-      "fields": {
-        "address": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
-        "chain_id": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 2
-        },
-        "symbol": {
-          "rule": "required",
-          "type": "string",
-          "id": 3
-        },
-        "decimals": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 4
-        },
-        "name": {
-          "rule": "required",
-          "type": "string",
-          "id": 5
-        }
-      }
-    },
-    "EthereumDefinitions": {
-      "fields": {
-        "encoded_network": {
-          "type": "bytes",
-          "id": 1
-        },
-        "encoded_token": {
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "EthereumSignTypedDataOneKey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "primary_type": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        },
-        "metamask_v4_compat": {
-          "type": "bool",
-          "id": 3,
-          "options": {
-            "default": true
-          }
-        },
-        "chain_id": {
-          "type": "uint64",
-          "id": 4
-        }
-      }
-    },
-    "EthereumTypedDataStructRequestOneKey": {
-      "fields": {
-        "name": {
-          "rule": "required",
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
-    "EthereumTypedDataStructAckOneKey": {
-      "fields": {
-        "members": {
-          "rule": "repeated",
-          "type": "EthereumStructMemberOneKey",
-          "id": 1
-        }
-      },
-      "nested": {
-        "EthereumStructMemberOneKey": {
-          "fields": {
-            "type": {
-              "rule": "required",
-              "type": "EthereumFieldTypeOneKey",
-              "id": 1
-            },
-            "name": {
-              "rule": "required",
-              "type": "string",
-              "id": 2
-            }
-          }
-        },
-        "EthereumFieldTypeOneKey": {
-          "fields": {
-            "data_type": {
-              "rule": "required",
-              "type": "EthereumDataTypeOneKey",
-              "id": 1
-            },
-            "size": {
-              "type": "uint32",
-              "id": 2
-            },
-            "entry_type": {
-              "type": "EthereumFieldTypeOneKey",
-              "id": 3
-            },
-            "struct_name": {
-              "type": "string",
-              "id": 4
-            }
-          }
-        },
-        "EthereumDataTypeOneKey": {
-          "values": {
-            "UINT": 1,
-            "INT": 2,
-            "BYTES": 3,
-            "STRING": 4,
-            "BOOL": 5,
-            "ADDRESS": 6,
-            "ARRAY": 7,
-            "STRUCT": 8
-          }
-        }
-      }
-    },
-    "EthereumTypedDataValueRequestOneKey": {
-      "fields": {
-        "member_path": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        }
-      }
-    },
-    "EthereumTypedDataValueAckOneKey": {
-      "fields": {
-        "value": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
     "EthereumSignTypedData": {
       "fields": {
         "address_n": {
@@ -4378,8 +4183,8 @@
             "default": true
           }
         },
-        "definitions": {
-          "type": "EthereumDefinitions",
+        "chain_id": {
+          "type": "uint64",
           "id": 4
         }
       }
@@ -4472,369 +4277,6 @@
         }
       }
     },
-    "EthereumGetPublicKeyOneKey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 2
-        },
-        "chain_id": {
-          "type": "uint64",
-          "id": 3
-        }
-      }
-    },
-    "EthereumPublicKeyOneKey": {
-      "fields": {
-        "node": {
-          "rule": "required",
-          "type": "HDNodeType",
-          "id": 1
-        },
-        "xpub": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "EthereumGetAddressOneKey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 2
-        },
-        "chain_id": {
-          "type": "uint64",
-          "id": 3
-        }
-      }
-    },
-    "EthereumAddressOneKey": {
-      "fields": {
-        "_old_address": {
-          "type": "bytes",
-          "id": 1,
-          "options": {
-            "deprecated": true
-          }
-        },
-        "address": {
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "EthereumSignTxOneKey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "nonce": {
-          "type": "bytes",
-          "id": 2,
-          "options": {
-            "default": ""
-          }
-        },
-        "gas_price": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        },
-        "gas_limit": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 4
-        },
-        "to": {
-          "type": "string",
-          "id": 11,
-          "options": {
-            "default": ""
-          }
-        },
-        "value": {
-          "type": "bytes",
-          "id": 6,
-          "options": {
-            "default": ""
-          }
-        },
-        "data_initial_chunk": {
-          "type": "bytes",
-          "id": 7,
-          "options": {
-            "default": ""
-          }
-        },
-        "data_length": {
-          "type": "uint32",
-          "id": 8,
-          "options": {
-            "default": 0
-          }
-        },
-        "chain_id": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 9
-        },
-        "tx_type": {
-          "type": "uint32",
-          "id": 10
-        }
-      }
-    },
-    "EthereumSignTxEIP1559OneKey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "nonce": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "max_gas_fee": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        },
-        "max_priority_fee": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 4
-        },
-        "gas_limit": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 5
-        },
-        "to": {
-          "type": "string",
-          "id": 6,
-          "options": {
-            "default": ""
-          }
-        },
-        "value": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 7
-        },
-        "data_initial_chunk": {
-          "type": "bytes",
-          "id": 8,
-          "options": {
-            "default": ""
-          }
-        },
-        "data_length": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 9
-        },
-        "chain_id": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 10
-        },
-        "access_list": {
-          "rule": "repeated",
-          "type": "EthereumAccessListOneKey",
-          "id": 11
-        }
-      },
-      "nested": {
-        "EthereumAccessListOneKey": {
-          "fields": {
-            "address": {
-              "rule": "required",
-              "type": "string",
-              "id": 1
-            },
-            "storage_keys": {
-              "rule": "repeated",
-              "type": "bytes",
-              "id": 2
-            }
-          }
-        }
-      }
-    },
-    "EthereumTxRequestOneKey": {
-      "fields": {
-        "data_length": {
-          "type": "uint32",
-          "id": 1
-        },
-        "signature_v": {
-          "type": "uint32",
-          "id": 2
-        },
-        "signature_r": {
-          "type": "bytes",
-          "id": 3
-        },
-        "signature_s": {
-          "type": "bytes",
-          "id": 4
-        }
-      }
-    },
-    "EthereumTxAckOneKey": {
-      "fields": {
-        "data_chunk": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
-    "EthereumSignMessageOneKey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "message": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "chain_id": {
-          "type": "uint64",
-          "id": 3
-        }
-      }
-    },
-    "EthereumMessageSignatureOneKey": {
-      "fields": {
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 3
-        }
-      }
-    },
-    "EthereumVerifyMessageOneKey": {
-      "fields": {
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "message": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        },
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 4
-        },
-        "chain_id": {
-          "type": "uint64",
-          "id": 5
-        }
-      }
-    },
-    "EthereumSignTypedHashOneKey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "domain_separator_hash": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        },
-        "message_hash": {
-          "type": "bytes",
-          "id": 3
-        },
-        "chain_id": {
-          "type": "uint64",
-          "id": 4
-        }
-      }
-    },
-    "EthereumTypedDataSignatureOneKey": {
-      "fields": {
-        "signature": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        },
-        "address": {
-          "rule": "required",
-          "type": "string",
-          "id": 2
-        }
-      }
-    },
-    "EthereumSignMessageEIP712": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "domain_hash": {
-          "type": "bytes",
-          "id": 2
-        },
-        "message_hash": {
-          "type": "bytes",
-          "id": 3
-        }
-      }
-    },
     "EthereumGetPublicKey": {
       "fields": {
         "address_n": {
@@ -4848,6 +4290,10 @@
         "show_display": {
           "type": "bool",
           "id": 2
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 3
         }
       }
     },
@@ -4879,8 +4325,8 @@
           "type": "bool",
           "id": 2
         },
-        "encoded_network": {
-          "type": "bytes",
+        "chain_id": {
+          "type": "uint64",
           "id": 3
         }
       }
@@ -4963,10 +4409,6 @@
         "tx_type": {
           "type": "uint32",
           "id": 10
-        },
-        "definitions": {
-          "type": "EthereumDefinitions",
-          "id": 12
         }
       }
     },
@@ -5033,10 +4475,6 @@
           "rule": "repeated",
           "type": "EthereumAccessList",
           "id": 11
-        },
-        "definitions": {
-          "type": "EthereumDefinitions",
-          "id": 12
         }
       },
       "nested": {
@@ -5100,8 +4538,8 @@
           "type": "bytes",
           "id": 2
         },
-        "encoded_network": {
-          "type": "bytes",
+        "chain_id": {
+          "type": "uint64",
           "id": 3
         }
       }
@@ -5136,6 +4574,30 @@
           "rule": "required",
           "type": "string",
           "id": 4
+        },
+        "chain_id": {
+          "type": "uint64",
+          "id": 5
+        }
+      }
+    },
+    "EthereumSignMessageEIP712": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "domain_hash": {
+          "type": "bytes",
+          "id": 2
+        },
+        "message_hash": {
+          "type": "bytes",
+          "id": 3
         }
       }
     },
@@ -5158,8 +4620,8 @@
           "type": "bytes",
           "id": 3
         },
-        "encoded_network": {
-          "type": "bytes",
+        "chain_id": {
+          "type": "uint64",
           "id": 4
         }
       }
@@ -9887,24 +9349,6 @@
         "MessageType_EthereumTypedDataValueAck": 468,
         "MessageType_EthereumTypedDataSignature": 469,
         "MessageType_EthereumSignTypedHash": 470,
-        "MessageType_EthereumGetPublicKeyOneKey": 20100,
-        "MessageType_EthereumPublicKeyOneKey": 20101,
-        "MessageType_EthereumGetAddressOneKey": 20102,
-        "MessageType_EthereumAddressOneKey": 20103,
-        "MessageType_EthereumSignTxOneKey": 20104,
-        "MessageType_EthereumSignTxEIP1559OneKey": 20105,
-        "MessageType_EthereumTxRequestOneKey": 20106,
-        "MessageType_EthereumTxAckOneKey": 20107,
-        "MessageType_EthereumSignMessageOneKey": 20108,
-        "MessageType_EthereumVerifyMessageOneKey": 20109,
-        "MessageType_EthereumMessageSignatureOneKey": 20110,
-        "MessageType_EthereumSignTypedDataOneKey": 20111,
-        "MessageType_EthereumTypedDataStructRequestOneKey": 20112,
-        "MessageType_EthereumTypedDataStructAckOneKey": 20113,
-        "MessageType_EthereumTypedDataValueRequestOneKey": 20114,
-        "MessageType_EthereumTypedDataValueAckOneKey": 20115,
-        "MessageType_EthereumTypedDataSignatureOneKey": 20116,
-        "MessageType_EthereumSignTypedHashOneKey": 20117,
         "MessageType_NEMGetAddress": 67,
         "MessageType_NEMAddress": 68,
         "MessageType_NEMSignTx": 69,

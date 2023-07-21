@@ -1,28 +1,31 @@
 import axios from 'axios';
 import semver from 'semver';
 import MessagesJSON from '../data/messages/messages.json';
+import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
 import { getTimeStamp } from '../utils';
 import {
-  getDeviceType,
-  getDeviceFirmwareVersion,
   getDeviceBLEFirmwareVersion,
+  getDeviceFirmwareVersion,
+  getDeviceType,
   getFirmwareUpdateField,
 } from '../utils/deviceFeaturesUtils';
 
 import type {
+  AssetsMap,
   ConnectSettings,
   DeviceTypeMap,
-  AssetsMap,
-  RemoteConfigResponse,
   Features,
-  IDeviceFirmwareStatus,
   IDeviceBLEFirmwareStatus,
+  IDeviceFirmwareStatus,
   ITransportStatus,
   IVersionArray,
+  RemoteConfigResponse,
 } from '../types';
-import { getReleaseChangelog, getReleaseStatus, findLatestRelease } from '../utils/release';
+import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
 type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v3';
+
+export type MessageVersion = 'latest' | 'v1';
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap = {
@@ -48,8 +51,9 @@ export default class DataManager {
 
   static settings: ConnectSettings;
 
-  static messages: { default: JSON } = {
-    default: MessagesJSON as unknown as JSON,
+  static messages: { [version in MessageVersion]: JSON } = {
+    latest: MessagesJSON as unknown as JSON,
+    v1: MessagesLegacyV1JSON as unknown as JSON,
   };
 
   static lastCheckTimestamp = 0;
@@ -254,8 +258,8 @@ export default class DataManager {
     }
   }
 
-  static getProtobufMessages() {
-    return this.messages.default;
+  static getProtobufMessages(messageVersion: MessageVersion = 'latest'): JSON {
+    return this.messages[messageVersion];
   }
 
   static getSettings(key?: undefined): ConnectSettings;

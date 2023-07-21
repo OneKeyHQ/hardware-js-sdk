@@ -1,7 +1,6 @@
 import { EthereumDefinitions } from '@onekeyfe/hd-transport';
-import { bytesToHex } from '@noble/hashes/utils';
-import { getSlip44ByPath } from '../helpers/pathUtils';
-import { Device } from '../../device/Device';
+import { getSlip44ByPath } from '../../helpers/pathUtils';
+import { Device } from '../../../device/Device';
 
 /**
  * For given chainId and optionally contractAddress download ethereum definitions for transaction signing.
@@ -32,9 +31,7 @@ export const getEvmDefinitions = async ({
     }/${chainId ?? slip44}/network.dat`;
     const networkDefinition = await fetch(networkDefinitionUrl);
     if (networkDefinition.status === 200) {
-      definitions.encoded_network = bytesToHex(
-        new Uint8Array(await networkDefinition.arrayBuffer())
-      );
+      definitions.encoded_network = await networkDefinition.arrayBuffer();
     } else if (networkDefinition.status !== 404) {
       throw new Error(`unexpected status: $${networkDefinition.status}`);
     }
@@ -51,7 +48,7 @@ export const getEvmDefinitions = async ({
       }/${chainId ?? slip44}/token-${lowerCaseContractAddress}.dat`;
       const tokenDefinition = await fetch(tokenDefinitionUrl);
       if (tokenDefinition.status === 200) {
-        definitions.encoded_token = bytesToHex(new Uint8Array(await tokenDefinition.arrayBuffer()));
+        definitions.encoded_token = await tokenDefinition.arrayBuffer();
       } else if (tokenDefinition.status !== 404) {
         throw new Error(`unexpected status: $${tokenDefinition.status}`);
       }
@@ -68,19 +65,15 @@ export const getEvmDefinitions = async ({
 export const getEvmDefinitionParams = async (param: {
   addressN: number[];
   chainId?: number | undefined;
+  contractAddress?: string;
   device: Device;
-}) => {
+}): Promise<EthereumDefinitions | undefined> => {
   const slip44 = getSlip44ByPath(param.addressN);
   const definitions = await getEvmDefinitions({
     chainId: param.chainId,
     slip44,
+    contractAddress: param.contractAddress,
   });
 
-  const definitionParams = {
-    ...(definitions.encoded_network && {
-      encoded_network: definitions.encoded_network,
-    }),
-  };
-
-  return definitionParams;
+  return definitions;
 };
