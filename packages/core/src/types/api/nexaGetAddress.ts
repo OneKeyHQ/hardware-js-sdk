@@ -1,9 +1,10 @@
-import { NexaAddress as HardwareNexaAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type NexaAddress = {
   path: string;
-} & HardwareNexaAddress;
+  pub: string;
+  address: string;
+};
 
 export type NexaGetAddressParams = {
   path: string | number[];
