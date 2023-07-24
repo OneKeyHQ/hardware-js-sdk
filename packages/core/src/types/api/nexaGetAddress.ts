@@ -3,6 +3,7 @@ import type { CommonParams, Response } from '../params';
 export type NexaAddress = {
   path: string;
   pub: string;
+  address: string;
 };
 
 export type NexaGetAddressParams = {
