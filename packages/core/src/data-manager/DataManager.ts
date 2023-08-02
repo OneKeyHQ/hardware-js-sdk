@@ -23,7 +23,7 @@ import type {
 } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v3';
+type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v3' | 'firmware-v4';
 
 export type MessageVersion = 'latest' | 'v1';
 

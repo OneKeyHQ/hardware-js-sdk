@@ -242,7 +242,7 @@ export const supportModifyHomescreen = (features?: Features): SupportFeatureType
 export const getFirmwareUpdateField = (
   features: Features,
   updateType: 'firmware' | 'ble'
-): 'firmware' | 'ble' | 'firmware-v3' | 'firmware-v2' => {
+): 'firmware' | 'ble' | 'firmware-v4' => {
   const deviceType = getDeviceType(features);
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
   if (updateType === 'ble') {
@@ -250,12 +250,12 @@ export const getFirmwareUpdateField = (
   }
 
   if (deviceType === 'classic' || deviceType === 'mini') {
-    return 'firmware-v3';
+    return 'firmware-v4';
   }
 
   if (deviceType === 'touch') {
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
-    return 'firmware-v3';
+    return 'firmware-v4';
   }
   return 'firmware';
 };
