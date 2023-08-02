@@ -1,6 +1,7 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { TypedCall } from '@onekeyfe/hd-transport';
+import { get } from 'lodash';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -137,6 +138,21 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     };
   }
 
+  hasBiggerData(item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>) {
+    const data = get(item.message, 'data', undefined) as string | undefined;
+    if (!data) return false;
+
+    let biggerLimit = 1536; // 1.5k
+    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    const supportSignTypedVersion = '4.4.0';
+
+    if (semver.lt(currentVersion, supportSignTypedVersion)) {
+      biggerLimit = 1024; // 1k
+    }
+
+    return data.replace('0x', '').length > biggerLimit;
+  }
+
   hasNestedArrays(item: any): boolean {
     if (!item) return false;
 
@@ -226,7 +242,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     }
 
     // Touch Pro Sign NestedArrays
-    if (this.hasNestedArrays(this.params.data)) {
+    if (this.hasNestedArrays(this.params.data) || this.hasBiggerData(this.params.data)) {
       validateParams(this.params, [
         { name: 'domainHash', type: 'hexString', required: true },
         { name: 'messageHash', type: 'hexString', required: true },
