@@ -370,7 +370,7 @@ export class Device extends EventEmitter {
     if (this.features && this.features.device_id && feat.session_id) {
       this.setInternalState(feat.session_id, initSession);
     }
-    feat.unlocked = feat.unlocked || true;
+    feat.unlocked = feat.unlocked ?? true;
 
     this.features = feat;
     this.featuresNeedsReload = false;
