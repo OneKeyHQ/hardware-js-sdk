@@ -1,6 +1,12 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { TypedCall } from '@onekeyfe/hd-transport';
+import {
+  EthereumTypedDataSignature,
+  EthereumTypedDataStructAck,
+  MessageKey,
+  MessageResponse,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
 import { get } from 'lodash';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
@@ -14,6 +20,7 @@ import { signTypedHash as signTypedHashLegacyV1 } from './legacyV1/signTypedHash
 import { signTypedHash } from './latest/signTypedHash';
 import { signTypedData as signTypedDataLegacyV1 } from './legacyV1/signTypedData';
 import { signTypedData } from './latest/signTypedData';
+import { encodeData, getFieldType, parseArrayType } from '../helpers/typeNameUtils';
 
 export type EVMSignTypedDataParams = {
   addressN: number[];
@@ -62,22 +69,169 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     }
   }
 
+  async handleSignTypedData({
+    typedCall,
+    signData,
+    response,
+    supportTrezor,
+  }: {
+    typedCall: TypedCall;
+    signData: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+    response: MessageResponse<MessageKey>;
+    supportTrezor: boolean;
+  }) {
+    const {
+      types,
+      primaryType,
+      domain,
+      message,
+    }: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> = signData;
+
+    while (
+      response.type === 'EthereumTypedDataStructRequest' ||
+      response.type === 'EthereumTypedDataStructRequestOneKey'
+    ) {
+      // @ts-ignore
+      const { name: typeDefinitionName } = response.message;
+      const typeDefinition = types[typeDefinitionName];
+      if (typeDefinition === undefined) {
+        throw ERRORS.TypedError(
+          'Runtime',
+          `Type ${typeDefinitionName} was not defined in types object`
+        );
+      }
+
+      const dataStruckAck: EthereumTypedDataStructAck = {
+        members: typeDefinition.map(({ name, type: typeName }) => ({
+          name,
+          type: getFieldType(typeName, types),
+        })),
+      };
+
+      if (supportTrezor) {
+        response = await typedCall(
+          'EthereumTypedDataStructAck',
+          // @ts-ignore
+          [
+            'EthereumTypedDataStructRequest',
+            'EthereumTypedDataValueRequest',
+            'EthereumTypedDataSignature',
+          ],
+          dataStruckAck
+        );
+      } else {
+        response = await typedCall(
+          'EthereumTypedDataStructAckOneKey',
+          // @ts-ignore
+          [
+            'EthereumTypedDataStructRequestOneKey',
+            'EthereumTypedDataValueRequestOneKey',
+            'EthereumTypedDataSignatureOneKey',
+          ],
+          dataStruckAck
+        );
+      }
+    }
+
+    while (
+      response.type === 'EthereumTypedDataValueRequest' ||
+      response.type === 'EthereumTypedDataValueRequestOneKey'
+    ) {
+      // @ts-ignore
+      const { member_path } = response.message;
+
+      let memberData;
+      let memberTypeName: string;
+
+      const [rootIndex, ...nestedMemberPath] = member_path;
+      switch (rootIndex) {
+        case 0:
+          memberData = domain;
+          memberTypeName = 'EIP712Domain';
+          break;
+        case 1:
+          memberData = message;
+          memberTypeName = primaryType as string;
+          break;
+        default:
+          throw ERRORS.TypedError('Runtime', 'Root index can only be 0 or 1');
+      }
+
+      for (const index of nestedMemberPath) {
+        if (Array.isArray(memberData)) {
+          memberTypeName = parseArrayType(memberTypeName).entryTypeName;
+          memberData = memberData[index];
+        } else if (typeof memberData === 'object' && memberData !== null) {
+          const memberTypeDefinition = types[memberTypeName][index];
+          memberTypeName = memberTypeDefinition.type;
+          memberData = memberData[memberTypeDefinition.name];
+        } else {
+          // TODO
+        }
+      }
+
+      let encodedData;
+      if (Array.isArray(memberData)) {
+        // Sending the length as uint16
+        encodedData = encodeData('uint16', memberData.length);
+      } else {
+        encodedData = encodeData(memberTypeName, memberData);
+      }
+
+      if (supportTrezor) {
+        response = await typedCall(
+          'EthereumTypedDataValueAck',
+          // @ts-ignore
+          ['EthereumTypedDataValueRequest', 'EthereumTypedDataSignature'],
+          {
+            value: encodedData,
+          }
+        );
+      } else {
+        response = await typedCall(
+          'EthereumTypedDataValueAckOneKey',
+          // @ts-ignore
+          ['EthereumTypedDataValueRequestOneKey', 'EthereumTypedDataSignatureOneKey'],
+          {
+            value: encodedData,
+          }
+        );
+      }
+    }
+
+    if (
+      response.type !== 'EthereumTypedDataSignature' &&
+      response.type !== 'EthereumTypedDataSignatureOneKey'
+    ) {
+      throw ERRORS.TypedError('Runtime', 'Unexpected response type');
+    }
+
+    // @ts-ignore
+    const { address, signature }: EthereumTypedDataSignature = response.message;
+    return {
+      address,
+      signature,
+    };
+  }
+
   async signTypedData() {
     const { addressN, data, metamaskV4Compat, chainId } = this.params;
 
+    let response: MessageResponse<MessageKey>;
     switch (TransportManager.getMessageVersion()) {
       case 'v1':
-        return signTypedDataLegacyV1({
+        response = await signTypedDataLegacyV1({
           typedCall: this.device.commands.typedCall.bind(this.device.commands),
           addressN,
           data,
           metamaskV4Compat,
           chainId,
         });
+        break;
 
       case 'latest':
       default:
-        return signTypedData({
+        response = await signTypedData({
           typedCall: this.device.commands.typedCall.bind(this.device.commands),
           addressN,
           data,
@@ -86,7 +240,15 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
           supportTrezor: this.supportTrezor,
           device: this.device,
         });
+        break;
     }
+
+    return this.handleSignTypedData({
+      typedCall: this.device.commands.typedCall.bind(this.device.commands),
+      signData: data,
+      response,
+      supportTrezor: this.supportTrezor,
+    });
   }
 
   signTypedHash({
