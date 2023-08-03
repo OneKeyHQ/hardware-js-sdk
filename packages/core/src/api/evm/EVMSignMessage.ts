@@ -1,11 +1,14 @@
-import { EthereumSignMessage } from '@onekeyfe/hd-transport';
+import { EthereumSignMessageOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
+import TransportManager from '../../data-manager/TransportManager';
+import signMessage from './latest/signMessage';
+import signMessageLegacyV1 from './legacyV1/signMessage';
 
-export default class EVMSignMessage extends BaseMethod<EthereumSignMessage> {
+export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey> {
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
@@ -30,14 +33,16 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessage> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall(
-      'EthereumSignMessage',
-      'EthereumMessageSignature',
-      {
-        ...this.params,
-      }
-    );
+    if (TransportManager.getMessageVersion() === 'v1') {
+      return signMessageLegacyV1({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        params: this.params,
+      });
+    }
 
-    return Promise.resolve(res.message);
+    return signMessage({
+      typedCall: this.device.commands.typedCall.bind(this.device.commands),
+      params: this.params,
+    });
   }
 }

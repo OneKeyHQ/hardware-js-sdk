@@ -1,5 +1,5 @@
 import React, { FC, useState } from 'react';
-import { View, Button, StyleSheet, Text, TextInput, Switch } from 'react-native';
+import { Button, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 export type Option = {
   name: string;
@@ -80,7 +80,7 @@ const MethodInvoke: FC<MethodInvokeProps> = ({ title, options, onCall }) => {
           style={styles.input}
           value={item.value?.toString() ?? ''}
           onChangeText={v => {
-            const newText = v.replace(/[^\d]+/, '');
+            const newText = parseInt(v.replace(/[^\d]+/, ''));
             onChange({ name: item.name, value: newText });
           }}
         />

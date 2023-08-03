@@ -1,7 +1,7 @@
 import memoizee from 'memoizee';
 import { Platform } from 'react-native';
-import { ConnectSettings, CoreApi, HardwareTopLevelSdk, LowLevelCoreApi } from '@onekeyfe/hd-core';
-import { importLowLevelSDK, importTopLevelSdk, importSdk } from './importSdk';
+import { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
+import { importSdk } from './importSdk';
 
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;
@@ -34,7 +34,7 @@ export const getHardwareSDKInstance = memoizee(
         console.log(HardwareSDK);
 
         if (Platform.OS === 'web') {
-          settings.connectSrc = 'https://jssdk.onekey.so/0.3.18/';
+          settings.connectSrc = 'https://jssdk.onekey.so/0.3.19/';
           // settings.connectSrc = 'https://localhost:8087/';
           settings.env = 'web';
           settings.preRelease = false;

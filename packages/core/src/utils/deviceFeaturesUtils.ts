@@ -4,11 +4,14 @@ import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
 import type {
   Features,
-  IVersionArray,
-  IDeviceType,
   IDeviceModel,
+  IDeviceType,
+  IVersionArray,
   SupportFeatureType,
 } from '../types';
+import { DeviceTypeToModels } from '../types';
+import DataManager, { MessageVersion } from '../data-manager/DataManager';
+import { PROTOBUF_MESSAGE_CONFIG } from '../data/messages-config';
 
 export const getDeviceModel = (features?: Features): IDeviceModel => {
   if (!features || typeof features !== 'object') {
@@ -113,6 +116,43 @@ export const getDeviceBootloaderVersion = (features: Features): IVersionArray =>
   return [0, 0, 0];
 };
 
+export const getSupportMessageVersion = (
+  features: Features | undefined
+): { messages: JSON; messageVersion: MessageVersion } => {
+  if (!features)
+    return {
+      messages: DataManager.messages.latest,
+      messageVersion: 'latest',
+    };
+
+  const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
+  const deviceType = getDeviceType(features);
+
+  const deviceVersionConfigs =
+    PROTOBUF_MESSAGE_CONFIG[deviceType] ||
+    (DeviceTypeToModels[deviceType] &&
+      DeviceTypeToModels[deviceType]
+        .map(model => PROTOBUF_MESSAGE_CONFIG[model])
+        .find(range => range !== undefined));
+
+  const sortedDeviceVersionConfigs =
+    deviceVersionConfigs?.sort((a, b) => semver.compare(b.minVersion, a.minVersion)) ?? [];
+
+  for (const { minVersion, messageVersion } of sortedDeviceVersionConfigs) {
+    if (semver.gte(currentDeviceVersion, minVersion)) {
+      return {
+        messages: DataManager.messages[messageVersion],
+        messageVersion,
+      };
+    }
+  }
+
+  return {
+    messages: DataManager.messages.latest,
+    messageVersion: 'latest',
+  };
+};
+
 export const supportInputPinOnSoftware = (features: Features): SupportFeatureType => {
   if (!features) return { support: false };
 
@@ -185,7 +225,7 @@ export const supportModifyHomescreen = (features?: Features): SupportFeatureType
 export const getFirmwareUpdateField = (
   features: Features,
   updateType: 'firmware' | 'ble'
-): 'firmware' | 'ble' | 'firmware-v3' | 'firmware-v2' => {
+): 'firmware' | 'ble' | 'firmware-v4' => {
   const deviceType = getDeviceType(features);
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
   if (updateType === 'ble') {
@@ -193,12 +233,12 @@ export const getFirmwareUpdateField = (
   }
 
   if (deviceType === 'classic' || deviceType === 'mini') {
-    return 'firmware-v3';
+    return 'firmware-v4';
   }
 
   if (deviceType === 'touch') {
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
-    return 'firmware-v3';
+    return 'firmware-v4';
   }
   return 'firmware';
 };

@@ -1,11 +1,14 @@
-import { EthereumGetAddress } from '@onekeyfe/hd-transport';
+import { EthereumGetAddressOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { EVMAddress, EVMGetAddressParams } from '../../types/api/evmGetAddress';
+import { EVMAddress, EVMGetAddressParams } from '../../types';
+import TransportManager from '../../data-manager/TransportManager';
+import getAddressLegacyV1 from './legacyV1/getAddress';
+import getAddress from './latest/getAddress';
 
-export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
+export default class EvmGetAddress extends BaseMethod<EthereumGetAddressOneKey[]> {
   hasBundle = false;
 
   init() {
@@ -39,17 +42,33 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddress[]> {
     });
   }
 
+  async getEvmAddress(param: EthereumGetAddressOneKey) {
+    if (TransportManager.getMessageVersion() === 'v1') {
+      return getAddressLegacyV1({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        param,
+      });
+    }
+
+    return getAddress({
+      typedCall: this.device.commands.typedCall.bind(this.device.commands),
+      param,
+    });
+  }
+
   async run() {
     const responses: EVMAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall('EthereumGetAddress', 'EthereumAddress', {
-        ...param,
-      });
+      const res = await this.getEvmAddress(param);
 
       const { address } = res.message;
+
+      if (!address) {
+        throw new Error('EthereumGetAddressOneKey: address is undefined');
+      }
 
       const result = {
         path: serializedPath(param.address_n),

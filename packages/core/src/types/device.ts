@@ -77,6 +77,18 @@ export type IDeviceType = 'classic' | 'mini' | 'touch' | 'pro';
 // model_touch: 'touch' | 'pro'
 export type IDeviceModel = 'model_mini' | 'model_touch';
 
+export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] } = {
+  model_mini: ['classic', 'mini'],
+  model_touch: ['touch', 'pro'],
+};
+
+export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] } = {
+  classic: ['model_mini'],
+  mini: ['model_mini'],
+  touch: ['model_touch'],
+  pro: ['model_touch'],
+};
+
 export type IDeviceFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';
 
 export type IDeviceBLEFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';

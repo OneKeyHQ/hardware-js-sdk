@@ -795,7 +795,7 @@ export type CardanoSignTxInit = {
   collateral_inputs_count: number;
   required_signers_count: number;
   has_collateral_return?: boolean;
-  total_collateral?: number;
+  total_collateral?: UintType;
   reference_inputs_count?: number;
 };
 
@@ -1505,12 +1505,93 @@ export type EosSignedTx = {
   signature: string;
 };
 
+export enum EthereumDefinitionType {
+  NETWORK = 0,
+  TOKEN = 1,
+}
+
+// EthereumNetworkInfo
+export type EthereumNetworkInfo = {
+  chain_id: number;
+  symbol: string;
+  slip44: number;
+  name: string;
+  icon?: string;
+  primary_color?: number;
+};
+
+// EthereumTokenInfo
+export type EthereumTokenInfo = {
+  address: string;
+  chain_id: number;
+  symbol: string;
+  decimals: number;
+  name: string;
+};
+
+// EthereumDefinitions
+export type EthereumDefinitions = {
+  encoded_network?: ArrayBuffer;
+  encoded_token?: ArrayBuffer;
+};
+
+// EthereumSignTypedDataOneKey
+export type EthereumSignTypedDataOneKey = {
+  address_n: number[];
+  primary_type: string;
+  metamask_v4_compat?: boolean;
+  chain_id?: number;
+};
+
+// EthereumTypedDataStructRequestOneKey
+export type EthereumTypedDataStructRequestOneKey = {
+  name: string;
+};
+
+export type EthereumStructMemberOneKey = {
+  type: EthereumFieldTypeOneKey;
+  name: string;
+};
+
+export type EthereumFieldTypeOneKey = {
+  data_type: EthereumDataTypeOneKey;
+  size?: number;
+  entry_type?: EthereumFieldTypeOneKey;
+  struct_name?: string;
+};
+
+export enum EthereumDataTypeOneKey {
+  UINT = 1,
+  INT = 2,
+  BYTES = 3,
+  STRING = 4,
+  BOOL = 5,
+  ADDRESS = 6,
+  ARRAY = 7,
+  STRUCT = 8,
+}
+
+// EthereumTypedDataStructAckOneKey
+export type EthereumTypedDataStructAckOneKey = {
+  members: EthereumStructMemberOneKey[];
+};
+
+// EthereumTypedDataValueRequestOneKey
+export type EthereumTypedDataValueRequestOneKey = {
+  member_path: number[];
+};
+
+// EthereumTypedDataValueAckOneKey
+export type EthereumTypedDataValueAckOneKey = {
+  value: string;
+};
+
 // EthereumSignTypedData
 export type EthereumSignTypedData = {
   address_n: number[];
   primary_type: string;
   metamask_v4_compat?: boolean;
-  chain_id?: number;
+  definitions?: EthereumDefinitions;
 };
 
 // EthereumTypedDataStructRequest
@@ -1556,11 +1637,125 @@ export type EthereumTypedDataValueAck = {
   value: string;
 };
 
+// EthereumGetPublicKeyOneKey
+export type EthereumGetPublicKeyOneKey = {
+  address_n: number[];
+  show_display?: boolean;
+  chain_id?: number;
+};
+
+// EthereumPublicKeyOneKey
+export type EthereumPublicKeyOneKey = {
+  node: HDNodeType;
+  xpub: string;
+};
+
+// EthereumGetAddressOneKey
+export type EthereumGetAddressOneKey = {
+  address_n: number[];
+  show_display?: boolean;
+  chain_id?: number;
+};
+
+// EthereumAddressOneKey
+export type EthereumAddressOneKey = {
+  _old_address?: string;
+  address?: string;
+};
+
+// EthereumSignTxOneKey
+export type EthereumSignTxOneKey = {
+  address_n: number[];
+  nonce?: string;
+  gas_price: string;
+  gas_limit: string;
+  to?: string;
+  value?: string;
+  data_initial_chunk?: string;
+  data_length?: number;
+  chain_id: number;
+  tx_type?: number;
+};
+
+export type EthereumAccessListOneKey = {
+  address: string;
+  storage_keys: string[];
+};
+
+// EthereumSignTxEIP1559OneKey
+export type EthereumSignTxEIP1559OneKey = {
+  address_n: number[];
+  nonce: string;
+  max_gas_fee: string;
+  max_priority_fee: string;
+  gas_limit: string;
+  to?: string;
+  value: string;
+  data_initial_chunk?: string;
+  data_length: number;
+  chain_id: number;
+  access_list: EthereumAccessListOneKey[];
+};
+
+// EthereumTxRequestOneKey
+export type EthereumTxRequestOneKey = {
+  data_length?: number;
+  signature_v?: number;
+  signature_r?: string;
+  signature_s?: string;
+};
+
+// EthereumTxAckOneKey
+export type EthereumTxAckOneKey = {
+  data_chunk: string;
+};
+
+// EthereumSignMessageOneKey
+export type EthereumSignMessageOneKey = {
+  address_n: number[];
+  message: string;
+  chain_id?: number;
+};
+
+// EthereumMessageSignatureOneKey
+export type EthereumMessageSignatureOneKey = {
+  signature: string;
+  address: string;
+};
+
+// EthereumVerifyMessageOneKey
+export type EthereumVerifyMessageOneKey = {
+  signature: string;
+  message: string;
+  address: string;
+  chain_id?: number;
+};
+
+// EthereumSignTypedHashOneKey
+export type EthereumSignTypedHashOneKey = {
+  address_n: number[];
+  domain_separator_hash: string;
+  message_hash?: string;
+  chain_id?: number;
+};
+
+// EthereumTypedDataSignatureOneKey
+export type EthereumTypedDataSignatureOneKey = {
+  signature: string;
+  address: string;
+};
+
+// EthereumSignMessageEIP712
+export type EthereumSignMessageEIP712 = {
+  address_n: number[];
+  domain_hash?: string;
+  message_hash?: string;
+};
+
 // EthereumGetPublicKey
 export type EthereumGetPublicKey = {
   address_n: number[];
   show_display?: boolean;
-  chain_id?: number;
 };
 
 // EthereumPublicKey
@@ -1573,7 +1768,7 @@ export type EthereumPublicKey = {
 export type EthereumGetAddress = {
   address_n: number[];
   show_display?: boolean;
-  chain_id?: number;
+  encoded_network?: ArrayBuffer;
 };
 
 // EthereumAddress
@@ -1594,6 +1789,7 @@ export type EthereumSignTx = {
   data_length?: number;
   chain_id: number;
   tx_type?: number;
+  definitions?: EthereumDefinitions;
 };
 
 export type EthereumAccessList = {
@@ -1614,6 +1810,7 @@ export type EthereumSignTxEIP1559 = {
   data_length: number;
   chain_id: number;
   access_list: EthereumAccessList[];
+  definitions?: EthereumDefinitions;
 };
 
 // EthereumTxRequest
@@ -1633,7 +1830,7 @@ export type EthereumTxAck = {
 export type EthereumSignMessage = {
   address_n: number[];
   message: string;
-  chain_id?: number;
+  encoded_network?: ArrayBuffer;
 };
 
 // EthereumMessageSignature
@@ -1647,14 +1844,6 @@ export type EthereumVerifyMessage = {
   signature: string;
   message: string;
   address: string;
-  chain_id?: number;
-};
-
-// EthereumSignMessageEIP712
-export type EthereumSignMessageEIP712 = {
-  address_n: number[];
-  domain_hash?: string;
-  message_hash?: string;
 };
 
 // EthereumSignTypedHash
@@ -1662,7 +1851,7 @@ export type EthereumSignTypedHash = {
   address_n: number[];
   domain_separator_hash: string;
   message_hash?: string;
-  chain_id?: number;
+  encoded_network?: ArrayBuffer;
 };
 
 // EthereumTypedDataSignature
@@ -3536,6 +3725,16 @@ export type MessageType = {
   EosActionUnknown: EosActionUnknown;
   EosTxActionAck: EosTxActionAck;
   EosSignedTx: EosSignedTx;
+  EthereumNetworkInfo: EthereumNetworkInfo;
+  EthereumTokenInfo: EthereumTokenInfo;
+  EthereumDefinitions: EthereumDefinitions;
+  EthereumSignTypedDataOneKey: EthereumSignTypedDataOneKey;
+  EthereumTypedDataStructRequestOneKey: EthereumTypedDataStructRequestOneKey;
+  EthereumStructMemberOneKey: EthereumStructMemberOneKey;
+  EthereumFieldTypeOneKey: EthereumFieldTypeOneKey;
+  EthereumTypedDataStructAckOneKey: EthereumTypedDataStructAckOneKey;
+  EthereumTypedDataValueRequestOneKey: EthereumTypedDataValueRequestOneKey;
+  EthereumTypedDataValueAckOneKey: EthereumTypedDataValueAckOneKey;
   EthereumSignTypedData: EthereumSignTypedData;
   EthereumTypedDataStructRequest: EthereumTypedDataStructRequest;
   EthereumFieldType: EthereumFieldType;
@@ -3543,6 +3742,21 @@ export type MessageType = {
   EthereumTypedDataStructAck: EthereumTypedDataStructAck;
   EthereumTypedDataValueRequest: EthereumTypedDataValueRequest;
   EthereumTypedDataValueAck: EthereumTypedDataValueAck;
+  EthereumGetPublicKeyOneKey: EthereumGetPublicKeyOneKey;
+  EthereumPublicKeyOneKey: EthereumPublicKeyOneKey;
+  EthereumGetAddressOneKey: EthereumGetAddressOneKey;
+  EthereumAddressOneKey: EthereumAddressOneKey;
+  EthereumSignTxOneKey: EthereumSignTxOneKey;
+  EthereumAccessListOneKey: EthereumAccessListOneKey;
+  EthereumSignTxEIP1559OneKey: EthereumSignTxEIP1559OneKey;
+  EthereumTxRequestOneKey: EthereumTxRequestOneKey;
+  EthereumTxAckOneKey: EthereumTxAckOneKey;
+  EthereumSignMessageOneKey: EthereumSignMessageOneKey;
+  EthereumMessageSignatureOneKey: EthereumMessageSignatureOneKey;
+  EthereumVerifyMessageOneKey: EthereumVerifyMessageOneKey;
+  EthereumSignTypedHashOneKey: EthereumSignTypedHashOneKey;
+  EthereumTypedDataSignatureOneKey: EthereumTypedDataSignatureOneKey;
+  EthereumSignMessageEIP712: EthereumSignMessageEIP712;
   EthereumGetPublicKey: EthereumGetPublicKey;
   EthereumPublicKey: EthereumPublicKey;
   EthereumGetAddress: EthereumGetAddress;
@@ -3555,7 +3769,6 @@ export type MessageType = {
   EthereumSignMessage: EthereumSignMessage;
   EthereumMessageSignature: EthereumMessageSignature;
   EthereumVerifyMessage: EthereumVerifyMessage;
-  EthereumSignMessageEIP712: EthereumSignMessageEIP712;
   EthereumSignTypedHash: EthereumSignTypedHash;
   EthereumTypedDataSignature: EthereumTypedDataSignature;
   FilecoinGetAddress: FilecoinGetAddress;

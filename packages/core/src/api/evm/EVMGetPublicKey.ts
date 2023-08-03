@@ -1,12 +1,15 @@
-import { EthereumGetPublicKey } from '@onekeyfe/hd-transport';
+import { EthereumGetPublicKey, EthereumGetPublicKeyOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { EVMGetPublicKeyParams, EVMPublicKey } from '../../types/api/evmGetPublicKey';
+import { EVMGetPublicKeyParams, EVMPublicKey } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
+import TransportManager from '../../data-manager/TransportManager';
+import getPublicKey from './latest/getPublicKey';
+import getPublicKeyLegacyV1 from './legacyV1/getPublicKey';
 
-export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> {
+export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneKey[]> {
   hasBundle = false;
 
   useBatch = false;
@@ -43,6 +46,20 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
     });
   }
 
+  getEvmPublicKey(param: EthereumGetPublicKey) {
+    if (TransportManager.getMessageVersion() === 'v1') {
+      return getPublicKeyLegacyV1({
+        typedCall: this.device.commands.typedCall.bind(this.device.commands),
+        param,
+      });
+    }
+
+    return getPublicKey({
+      typedCall: this.device.commands.typedCall.bind(this.device.commands),
+      param,
+    });
+  }
+
   async run() {
     const responses: EVMPublicKey[] = [];
 
@@ -61,13 +78,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKey[]> 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall(
-        'EthereumGetPublicKey',
-        'EthereumPublicKey',
-        {
-          ...param,
-        }
-      );
+      const res = await this.getEvmPublicKey(param);
 
       responses.push({
         path: serializedPath(param.address_n),

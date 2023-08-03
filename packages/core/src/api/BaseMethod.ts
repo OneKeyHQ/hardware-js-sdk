@@ -4,7 +4,7 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange, KnownDevice } from '../types';
-import { CoreMessage, createFirmwareMessage, DEVICE, FIRMWARE, createUiMessage } from '../events';
+import { CoreMessage, createFirmwareMessage, createUiMessage, DEVICE, FIRMWARE } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
 import { getLogger, LoggerNames } from '../utils';
 

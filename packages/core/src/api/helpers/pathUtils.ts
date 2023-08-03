@@ -6,6 +6,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 const HD_HARDENED = 0x80000000;
 export const toHardened = (n: number): number => (n | HD_HARDENED) >>> 0;
 export const fromHardened = (n: number): number => (n & ~HD_HARDENED) >>> 0;
+export const getSlip44ByPath = (path: number[]) => fromHardened(path[1]);
 
 const PATH_NOT_VALID = ERRORS.TypedError(
   HardwareErrorCode.CallMethodInvalidParameter,
