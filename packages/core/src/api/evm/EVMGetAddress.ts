@@ -51,10 +51,8 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddressOneKey[]
     }
 
     return getAddress({
-      device: this.device,
       typedCall: this.device.commands.typedCall.bind(this.device.commands),
       param,
-      supportTrezor: this.supportTrezor,
     });
   }
 

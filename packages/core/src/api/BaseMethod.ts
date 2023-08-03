@@ -1,14 +1,10 @@
-import {
-  supportInputPinOnSoftware,
-  supportModifyHomescreen,
-  supportTrezorMode,
-} from '../utils/deviceFeaturesUtils';
+import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
 import { Device } from '../device/Device';
 import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange, KnownDevice } from '../types';
-import { CoreMessage, createFirmwareMessage, DEVICE, FIRMWARE, createUiMessage } from '../events';
+import { CoreMessage, createFirmwareMessage, createUiMessage, DEVICE, FIRMWARE } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
 import { getLogger, LoggerNames } from '../utils';
 
@@ -85,8 +81,6 @@ export abstract class BaseMethod<Params = undefined> {
    */
   skipForceUpdateCheck = false;
 
-  supportTrezor = false;
-
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 
@@ -144,11 +138,6 @@ export abstract class BaseMethod<Params = undefined> {
         device: this.device.toMessageObject(),
       })
     );
-  }
-
-  initDeviceState() {
-    if (!this.device || !this.device.features) return;
-    this.supportTrezor = supportTrezorMode(this.device.features);
   }
 
   /**

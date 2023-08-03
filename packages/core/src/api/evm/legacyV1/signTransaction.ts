@@ -38,7 +38,7 @@ const evmSignTx = async (typedCall: TypedCall, addressN: number[], tx: EVMTransa
 
   const response = await typedCall('EthereumSignTx', 'EthereumTxRequest', message);
 
-  return processTxRequest(typedCall, response.message, true, rest, chainId);
+  return processTxRequest({ typedCall, request: response.message, data: rest, chainId });
 };
 
 const evmSignTxEip1559 = async (
@@ -81,7 +81,7 @@ const evmSignTxEip1559 = async (
 
   const response = await typedCall('EthereumSignTxEIP1559', 'EthereumTxRequest', message);
 
-  return processTxRequest(typedCall, response.message, true, rest);
+  return processTxRequest({ typedCall, request: response.message, data: rest });
 };
 export const signTransaction = async ({
   typedCall,

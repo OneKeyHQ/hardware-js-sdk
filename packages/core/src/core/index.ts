@@ -220,8 +220,6 @@ export const callAPI = async (message: CoreMessage) => {
         }
       }
 
-      method.initDeviceState();
-
       /**
        * check firmware release info
        */

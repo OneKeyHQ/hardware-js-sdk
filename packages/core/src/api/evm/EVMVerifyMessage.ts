@@ -38,10 +38,8 @@ export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessageOneK
     }
 
     return verifyMessage({
-      device: this.device,
       typedCall: this.device.commands.typedCall.bind(this.device.commands),
       params: this.params,
-      supportTrezor: this.supportTrezor,
     });
   }
 }

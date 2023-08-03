@@ -3,19 +3,10 @@ import { EthereumGetPublicKeyOneKey, MessageResponse, TypedCall } from '@onekeyf
 export default async function ({
   typedCall,
   param,
-  supportTrezor,
 }: {
   typedCall: TypedCall;
   param: EthereumGetPublicKeyOneKey;
-  supportTrezor: boolean;
-}): Promise<MessageResponse<'EthereumPublicKey'> | MessageResponse<'EthereumPublicKeyOneKey'>> {
-  if (supportTrezor) {
-    return typedCall('EthereumGetPublicKey', 'EthereumPublicKey', {
-      address_n: param.address_n,
-      show_display: param.show_display,
-    });
-  }
-
+}): Promise<MessageResponse<'EthereumPublicKeyOneKey'>> {
   return typedCall('EthereumGetPublicKeyOneKey', 'EthereumPublicKeyOneKey', {
     ...param,
   });

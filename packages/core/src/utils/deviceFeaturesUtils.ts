@@ -116,22 +116,6 @@ export const getDeviceBootloaderVersion = (features: Features): IVersionArray =>
   return [0, 0, 0];
 };
 
-export const supportTrezorMode = (features: Features | undefined): boolean => {
-  if (!features) return false;
-
-  const currentVersion = getDeviceFirmwareVersion(features).join('.');
-  const deviceType = getDeviceType(features);
-
-  if ((deviceType === 'touch' || deviceType === 'pro') && semver.lt(currentVersion, '4.4.0')) {
-    return true;
-  }
-  if ((deviceType === 'classic' || deviceType === 'mini') && semver.lt(currentVersion, '3.2.0')) {
-    return true;
-  }
-
-  return features?.vendor === 'trezor.io';
-};
-
 export const getSupportMessageVersion = (
   features: Features | undefined
 ): { messages: JSON; messageVersion: MessageVersion } => {

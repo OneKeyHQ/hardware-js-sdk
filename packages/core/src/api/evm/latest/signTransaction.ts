@@ -1,8 +1,6 @@
 import {
-  EthereumDefinitions,
   EthereumSignTx,
   EthereumSignTxEIP1559,
-  EthereumTxRequest,
   EthereumTxRequestOneKey,
   MessageResponse,
   TypedCall,
@@ -11,16 +9,20 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { EVMSignedTx, EVMTransaction, EVMTransactionEIP1559 } from '../../../types';
 import { cutString } from '../../helpers/stringUtils';
 import { stripHexStartZeroes } from '../../helpers/hexUtils';
-import { Device } from '../../../device/Device';
-import { getEvmDefinitionParams } from './getEthereumDefinitions';
 
-export const processTxRequest = async (
-  typedCall: TypedCall,
-  request: EthereumTxRequest | EthereumTxRequestOneKey,
-  supportTrezor: boolean,
-  data: string,
-  chain_id?: number | undefined
-): Promise<EVMSignedTx> => {
+export const processTxRequest = async ({
+  typedCall,
+  request,
+  data,
+  chainId,
+  supportTrezor,
+}: {
+  typedCall: TypedCall;
+  request: EthereumTxRequestOneKey;
+  data: string;
+  chainId?: number | undefined;
+  supportTrezor?: boolean;
+}): Promise<EVMSignedTx> => {
   if (!request.data_length) {
     let v = request.signature_v;
     const r = request.signature_r;
@@ -34,8 +36,8 @@ export const processTxRequest = async (
     }
 
     // if v is not 27 or 28, it is a legacy transaction
-    if (chain_id && v <= 1) {
-      v += 2 * chain_id + 35;
+    if (chainId && v <= 1) {
+      v += 2 * chainId + 35;
     }
 
     return Promise.resolve({
@@ -58,16 +60,26 @@ export const processTxRequest = async (
     });
   }
 
-  return processTxRequest(typedCall, response.message, supportTrezor, rest, chain_id);
+  return processTxRequest({
+    typedCall,
+    request: response.message,
+    data: rest,
+    chainId,
+    supportTrezor,
+  });
 };
 
-const evmSignTx = async (
-  typedCall: TypedCall,
-  addressN: number[],
-  tx: EVMTransaction,
-  definitions: EthereumDefinitions | undefined,
-  supportTrezor: boolean
-) => {
+const evmSignTx = async ({
+  typedCall,
+  addressN,
+  tx,
+  supportTrezor,
+}: {
+  typedCall: TypedCall;
+  addressN: number[];
+  tx: EVMTransaction;
+  supportTrezor?: boolean;
+}) => {
   const { to, value, gasPrice, gasLimit, nonce, data, chainId, txType } = tx;
 
   const length = data == null ? 0 : data.length / 2;
@@ -82,7 +94,6 @@ const evmSignTx = async (
     to,
     value: stripHexStartZeroes(value),
     chain_id: chainId,
-    definitions,
   };
 
   if (length !== 0) {
@@ -102,25 +113,31 @@ const evmSignTx = async (
 
   let response;
   if (supportTrezor) {
-    message = {
-      ...message,
-      definitions,
-    };
     response = await typedCall('EthereumSignTx', 'EthereumTxRequest', message);
   } else {
     response = await typedCall('EthereumSignTxOneKey', 'EthereumTxRequestOneKey', message);
   }
 
-  return processTxRequest(typedCall, response.message, supportTrezor, rest, chainId);
+  return processTxRequest({
+    typedCall,
+    request: response.message,
+    data: rest,
+    chainId,
+    supportTrezor,
+  });
 };
 
-const evmSignTxEip1559 = async (
-  typedCall: TypedCall,
-  addressN: number[],
-  tx: EVMTransactionEIP1559,
-  definitions: EthereumDefinitions | undefined,
-  supportTrezor: boolean
-) => {
+const evmSignTxEip1559 = async ({
+  typedCall,
+  addressN,
+  tx,
+  supportTrezor,
+}: {
+  typedCall: TypedCall;
+  addressN: number[];
+  tx: EVMTransactionEIP1559;
+  supportTrezor?: boolean;
+}) => {
   const {
     to,
     value,
@@ -137,7 +154,7 @@ const evmSignTxEip1559 = async (
 
   const [first, rest] = cutString(data, 1024 * 2);
 
-  let message: EthereumSignTxEIP1559 = {
+  const message: EthereumSignTxEIP1559 = {
     address_n: addressN,
     nonce: stripHexStartZeroes(nonce),
     max_gas_fee: stripHexStartZeroes(maxFeePerGas),
@@ -152,51 +169,28 @@ const evmSignTxEip1559 = async (
       address: a.address,
       storage_keys: a.storageKeys,
     })),
-    definitions,
   };
 
   let response;
   if (supportTrezor) {
-    message = {
-      ...message,
-      definitions,
-    };
     response = await typedCall('EthereumSignTxEIP1559', 'EthereumTxRequest', message);
   } else {
     response = await typedCall('EthereumSignTxEIP1559OneKey', 'EthereumTxRequestOneKey', message);
   }
 
-  return processTxRequest(typedCall, response.message, supportTrezor, rest);
+  return processTxRequest({ typedCall, request: response.message, data: rest, supportTrezor });
 };
 export const signTransaction = async ({
   typedCall,
   isEIP1559,
-  device,
   addressN,
   tx,
-  supportTrezor,
 }: {
   addressN: number[];
   tx: EVMTransaction | EVMTransactionEIP1559;
   isEIP1559: boolean;
-  supportTrezor: boolean;
   typedCall: TypedCall;
-  device: Device;
-}) => {
-  const definitionParams = await getEvmDefinitionParams({
-    addressN,
-    chainId: tx.chainId,
-    contractAddress: tx.data ? tx.to : undefined,
-    device,
-  });
-
-  return isEIP1559
-    ? evmSignTxEip1559(
-        typedCall,
-        addressN,
-        tx as EVMTransactionEIP1559,
-        definitionParams,
-        supportTrezor
-      )
-    : evmSignTx(typedCall, addressN, tx as EVMTransaction, definitionParams, supportTrezor);
-};
+}) =>
+  isEIP1559
+    ? evmSignTxEip1559({ typedCall, addressN, tx: tx as EVMTransactionEIP1559 })
+    : evmSignTx({ typedCall, addressN, tx: tx as EVMTransaction });

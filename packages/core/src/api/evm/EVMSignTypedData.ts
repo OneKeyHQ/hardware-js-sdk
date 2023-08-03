@@ -217,9 +217,11 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
   async signTypedData() {
     const { addressN, data, metamaskV4Compat, chainId } = this.params;
 
+    let supportTrezor = false;
     let response: MessageResponse<MessageKey>;
     switch (TransportManager.getMessageVersion()) {
       case 'v1':
+        supportTrezor = true;
         response = await signTypedDataLegacyV1({
           typedCall: this.device.commands.typedCall.bind(this.device.commands),
           addressN,
@@ -231,14 +233,13 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
       case 'latest':
       default:
+        supportTrezor = false;
         response = await signTypedData({
           typedCall: this.device.commands.typedCall.bind(this.device.commands),
           addressN,
           data,
           metamaskV4Compat,
           chainId,
-          supportTrezor: this.supportTrezor,
-          device: this.device,
         });
         break;
     }
@@ -247,7 +248,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       typedCall: this.device.commands.typedCall.bind(this.device.commands),
       signData: data,
       response,
-      supportTrezor: this.supportTrezor,
+      supportTrezor,
     });
   }
 
@@ -287,7 +288,6 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
           messageHash,
           chainId,
           device: this.device,
-          supportTrezor: this.supportTrezor,
         });
     }
   }

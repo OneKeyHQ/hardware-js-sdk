@@ -57,7 +57,6 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
     return getPublicKey({
       typedCall: this.device.commands.typedCall.bind(this.device.commands),
       param,
-      supportTrezor: this.supportTrezor,
     });
   }
 

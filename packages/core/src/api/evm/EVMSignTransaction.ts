@@ -86,8 +86,6 @@ export default class EVMSignTransaction extends BaseMethod {
       addressN,
       tx: formattedTx,
       isEIP1559,
-      supportTrezor: this.supportTrezor,
-      device: this.device,
     });
   }
 }

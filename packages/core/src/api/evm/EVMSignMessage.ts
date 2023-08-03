@@ -41,10 +41,8 @@ export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey
     }
 
     return signMessage({
-      device: this.device,
       typedCall: this.device.commands.typedCall.bind(this.device.commands),
       params: this.params,
-      supportTrezor: this.supportTrezor,
     });
   }
 }
