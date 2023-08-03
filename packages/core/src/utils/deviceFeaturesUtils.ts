@@ -122,7 +122,6 @@ export const supportTrezorMode = (features: Features | undefined): boolean => {
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const deviceType = getDeviceType(features);
 
-  // Trezor mode is not supported on OneKey Mini
   if ((deviceType === 'touch' || deviceType === 'pro') && semver.lt(currentVersion, '4.4.0')) {
     return true;
   }
