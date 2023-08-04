@@ -10,11 +10,11 @@ type DeviceVersionConfig = {
 
 export const PROTOBUF_MESSAGE_CONFIG: DeviceVersionConfig = {
   model_mini: [
-    { minVersion: '3.2.0', messageVersion: 'latest' },
+    { minVersion: '3.3.0', messageVersion: 'latest' },
     { minVersion: '0.0.0', messageVersion: 'v1' },
   ],
   model_touch: [
-    { minVersion: '4.4.0', messageVersion: 'latest' },
+    { minVersion: '4.5.0', messageVersion: 'latest' },
     { minVersion: '0.0.0', messageVersion: 'v1' },
   ],
 };
