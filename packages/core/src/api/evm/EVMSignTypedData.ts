@@ -304,15 +304,17 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     const data = get(item.message, 'data', undefined) as string | undefined;
     if (!data) return false;
 
-    let biggerLimit = 1536; // 1.5k
-    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
-    const supportSignTypedVersion = '4.4.0';
+    let biggerLimit = 1024; // 1k
 
-    if (semver.lt(currentVersion, supportSignTypedVersion)) {
-      biggerLimit = 1024; // 1k
+    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    const supportBiggerDataVersion = '4.4.0';
+
+    if (semver.gte(currentVersion, supportBiggerDataVersion)) {
+      biggerLimit = 1536; // 1.5k
     }
 
-    return data.replace('0x', '').length > biggerLimit;
+    const startIndex = data.startsWith('0x') ? 2 : 0;
+    return (data.length - startIndex) / 2 > biggerLimit;
   }
 
   hasNestedArrays(item: any): boolean {
