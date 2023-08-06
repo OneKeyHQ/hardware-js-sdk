@@ -507,7 +507,7 @@ export default class ReactNativeBleTransport {
         if (chunk.offset === packetCapacity || index >= buffers.length) {
           chunk.reset();
           // Upgrading Packet Logs, Too much content to ignore
-          // this.Log.debug('send more packet hex strting: ', chunk.toString('hex'));
+          this.Log.debug('send more packet hex strting: ', chunk.toString('hex'));
           try {
             await transport.writeCharacteristic.writeWithoutResponse(chunk.toString('base64'));
             chunk = ByteBuffer.allocate(packetCapacity);
