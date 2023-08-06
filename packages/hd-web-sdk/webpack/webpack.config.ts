@@ -10,6 +10,10 @@ export default {
     libraryExport: 'default',
   },
   resolve: {
+    alias: {
+      // fix the issue where webpack 5 does not recognize jszip after keeping the 'require' field.
+      jszip: path.resolve(__dirname, '../../../node_modules/jszip/lib/index.js'),
+    },
     modules: ['node_modules'],
     mainFields: ['browser', 'module', 'main'],
     extensions: ['.ts', '.js'],
