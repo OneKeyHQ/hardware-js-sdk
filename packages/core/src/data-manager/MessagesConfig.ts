@@ -1,5 +1,5 @@
-import { IDeviceModel, IDeviceType } from '../../types';
-import { MessageVersion } from '../../data-manager/DataManager';
+import { IDeviceModel, IDeviceType } from '../types';
+import { MessageVersion } from './DataManager';
 
 type DeviceVersionConfig = {
   [deviceType in IDeviceType | IDeviceModel]?: {
