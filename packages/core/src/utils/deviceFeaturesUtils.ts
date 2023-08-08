@@ -11,7 +11,7 @@ import type {
 } from '../types';
 import { DeviceTypeToModels } from '../types';
 import DataManager, { MessageVersion } from '../data-manager/DataManager';
-import { PROTOBUF_MESSAGE_CONFIG } from '../data/messages-config';
+import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 
 export const getDeviceModel = (features?: Features): IDeviceModel => {
   if (!features || typeof features !== 'object') {
