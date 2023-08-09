@@ -69,7 +69,7 @@ export const processTxRequest = async ({
   });
 };
 
-const evmSignTx = async ({
+export const evmSignTx = async ({
   typedCall,
   addressN,
   tx,
@@ -127,7 +127,7 @@ const evmSignTx = async ({
   });
 };
 
-const evmSignTxEip1559 = async ({
+export const evmSignTxEip1559 = async ({
   typedCall,
   addressN,
   tx,

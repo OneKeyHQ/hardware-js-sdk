@@ -129,7 +129,7 @@ export function CallEVMMethods({
             },
             {
               name: 'transaction.data',
-              value: '0x01',
+              value: `0x${'01'.repeat(3072)}`,
               type: 'string',
             },
             {
@@ -182,7 +182,7 @@ export function CallEVMMethods({
             },
             {
               name: 'transaction.data',
-              value: '0x01',
+              value: `0x${'01'.repeat(3072)}`,
               type: 'string',
             },
             {
