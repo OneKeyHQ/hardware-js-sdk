@@ -29,6 +29,7 @@
     "dev:transport": "cd ./packages/hd-transport && yarn dev",
     "dev:transport-http": "cd ./packages/hd-transport-web && yarn dev",
     "dev:transport-rn": "cd ./packages/hd-transport-react-native && yarn dev",
+    "dev:transport-lowlevel": "cd ./packages/hd-transport-lowlevel && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
     "publish:yalc": "yarn setup && node ./scripts/publish-yalc.js"
   },
