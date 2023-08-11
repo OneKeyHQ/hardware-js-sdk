@@ -14,7 +14,7 @@ export type ConnectSettings = {
   priority: number;
   trustedHost: boolean;
   supportedBrowser?: boolean;
-  env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native' | 'webusb';
+  env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native' | 'webusb' | 'lowlevel';
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;

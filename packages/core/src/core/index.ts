@@ -1,6 +1,6 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { Features, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
   Deferred,
@@ -765,15 +765,19 @@ export const initConnector = () => {
   return _connector;
 };
 
-const initTransport = (Transport: any) => {
-  TransportManager.setTransport(Transport);
+const initTransport = (Transport: any, plugin?: LowlevelTransportSharedPlugin) => {
+  TransportManager.setTransport(Transport, plugin);
 };
 
-export const init = async (settings: ConnectSettings, Transport: any) => {
+export const init = async (
+  settings: ConnectSettings,
+  Transport: any,
+  plugin?: LowlevelTransportSharedPlugin
+) => {
   try {
     try {
       await DataManager.load(settings);
-      initTransport(Transport);
+      initTransport(Transport, plugin);
     } catch {
       Log.error('DataManager.load error');
     }

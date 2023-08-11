@@ -1,5 +1,5 @@
 {
-  "name": "hd-transport-lowlevel",
+  "name": "@onekeyfe/hd-transport-lowlevel",
   "version": "0.3.22",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",

@@ -23,6 +23,7 @@
     "@onekeyfe/hd-core": "^0.3.22",
     "@onekeyfe/hd-shared": "^0.3.22",
     "@onekeyfe/hd-transport-http": "^0.3.22",
-    "@onekeyfe/hd-transport-webusb": "^0.3.22"
+    "@onekeyfe/hd-transport-webusb": "^0.3.22",
+    "@onekeyfe/hd-transport-lowlevel": "^0.3.22"
   }
 }

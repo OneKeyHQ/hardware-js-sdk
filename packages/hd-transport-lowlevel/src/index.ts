@@ -1,6 +1,8 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import transport from '@onekeyfe/hd-transport';
-import type { LowlevelTransportSharedPlugin, LowLevelAcquireInput } from './types';
+import type EventEmitter from 'events';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
+import type { LowLevelAcquireInput } from './types';
 
 const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 
@@ -11,10 +13,13 @@ export default class LowlevelTransport {
 
   Log?: any;
 
+  emitter?: EventEmitter;
+
   plugin: LowlevelTransportSharedPlugin = {} as LowlevelTransportSharedPlugin;
 
-  init(logger: any, plugin: LowlevelTransportSharedPlugin) {
+  init(logger: any, emitter: EventEmitter, plugin: LowlevelTransportSharedPlugin) {
     this.Log = logger;
+    this.emitter = emitter;
     this.plugin = plugin;
     this.plugin.init();
   }
@@ -29,7 +34,7 @@ export default class LowlevelTransport {
     // empty
   }
 
-  async enumerate() {
+  enumerate() {
     return this.plugin.enumerate();
   }
 

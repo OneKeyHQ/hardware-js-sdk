@@ -1,4 +1,4 @@
-import { Transport } from '@onekeyfe/hd-transport';
+import { LowlevelTransportSharedPlugin, Transport } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import DataManager, { MessageVersion } from './DataManager';
 import { getLogger, LoggerNames } from '../utils';
@@ -10,6 +10,7 @@ import { Features } from '../types';
 const Log = getLogger(LoggerNames.Transport);
 const BleLogger = getLogger(LoggerNames.HdBleTransport);
 const HttpLogger = getLogger(LoggerNames.HdTransportHttp);
+const LowLevelLogger = getLogger(LoggerNames.HdTransportLowLevel);
 
 /**
  * transport 在同一个环境中只会存在一个
@@ -26,6 +27,8 @@ export default class TransportManager {
   static reactNativeInit = false;
 
   static messageVersion: MessageVersion = 'latest';
+
+  static plugin: LowlevelTransportSharedPlugin | null = null;
 
   static load() {
     Log.debug('transport manager load');
@@ -45,6 +48,14 @@ export default class TransportManager {
         } else {
           Log.debug('React Native Do Not Initializing transports');
         }
+      } else if (env === 'lowlevel') {
+        if (!this.plugin) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.TransportNotConfigured,
+            'Lowlevel transport mast have plugin'
+          );
+        }
+        await this.transport.init(LowLevelLogger, DevicePool.emitter, this.plugin);
       } else {
         await this.transport.init(HttpLogger);
       }
@@ -81,7 +92,7 @@ export default class TransportManager {
     }
   }
 
-  static setTransport(TransportConstructor: any) {
+  static setTransport(TransportConstructor: any, plugin?: LowlevelTransportSharedPlugin) {
     const env = DataManager.getSettings('env');
     if (env === 'react-native') {
       /** Actually initializes the ReactNativeTransport */
@@ -89,6 +100,10 @@ export default class TransportManager {
     } else {
       /** Actually initializes the HttpTransport */
       this.transport = new TransportConstructor() as unknown as Transport;
+    }
+    if (plugin) {
+      this.plugin = plugin;
+      Log.debug('set transport plugin: ', this.plugin);
     }
     Log.debug('set transport: ', this.transport);
   }
