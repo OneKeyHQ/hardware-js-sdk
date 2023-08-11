@@ -1,4 +1,4 @@
-# `@onekeyfe/hd-transport-http`
+# `@onekeyfe/hd-transport-lowlevel`
 
 `@onekeyfe/hd-transport-http` is a library that implements transport communication using http.
 
@@ -22,7 +22,7 @@ In order to be able to use new features of onekey-firmware you need to update pr
 
 git submodule update --init --recursive to initialize firmware submodule
 yarn update-submodules to update firmware submodule
-yar update:protobuf to generate new ./messages.json and ./src/types/messages.ts
+yarn update:protobuf to generate new ./messages.json and ./src/types/messages.ts
 
 ## Docs
 

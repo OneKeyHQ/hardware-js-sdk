@@ -17,12 +17,12 @@
 In order to be able to use new features of onekey-firmware you need to update protobuf definitions.
 
 1. `git submodule update --init --recursive` to initialize git submodules.
-1. `yarn update-submodules` to update trezor-common submodule
-1. `yarn workspace @onekeyfe/transport update:protobuf` to generate new `./messages.json` and `./src/types/messages.ts`
+1. `yarn update-submodules` to update firmware submodule
+1. `yarn update:protobuf` to generate new `./messages.json` and `./src/types/messages.ts`
 
-git submodule update --init --recursive to initialize trezor-common submodule
-yarn update-submodules to update trezor-common submodule
-yarn workspace @trezor/transport update:protobuf to generate new ./messages.json and ./src/types/messages.ts
+git submodule update --init --recursive to initialize firmware submodule
+yarn update-submodules to update firmware submodule
+yarn update:protobuf to generate new ./messages.json and ./src/types/messages.ts
 
 ## Docs
 

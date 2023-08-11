@@ -1,0 +1,25 @@
+{
+  "name": "hd-transport-lowlevel",
+  "version": "0.3.22",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-shared": "^0.3.22",
+    "@onekeyfe/hd-transport": "^0.3.22"
+  }
+}
