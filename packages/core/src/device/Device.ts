@@ -572,7 +572,7 @@ export class Device extends EventEmitter {
   hasUsePassphrase() {
     const isModeT =
       getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
-    const preCheckTouch = isModeT && this.features?.unlocked === true;
+    const preCheckTouch = isModeT && this.features?.unlocked === false;
 
     return this.features && (!!this.features.passphrase_protection || preCheckTouch);
   }
@@ -586,7 +586,7 @@ export class Device extends EventEmitter {
 
   async checkPassphraseState() {
     if (!this.features) return false;
-    const locked = this.features?.unlocked === true;
+    const locked = this.features?.unlocked === false;
     const isModeT =
       getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
 
