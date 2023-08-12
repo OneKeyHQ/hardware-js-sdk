@@ -70,9 +70,9 @@ export default class LowlevelTransport {
 
     const buffers = buildBuffers(messages, name, data);
     for (const o of buffers) {
-      const outData = o.toString('base64');
+      const outData = o.toString('hex');
       // Upload resources on low-end phones may OOM
-      this.Log.debug('send hex strting: ', o.toString('hex'));
+      this.Log.debug('send hex strting: ', outData);
       try {
         await this.plugin.send(uuid, outData);
       } catch (e) {
