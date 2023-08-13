@@ -12,6 +12,7 @@ import type {
 import { DeviceTypeToModels } from '../types';
 import DataManager, { MessageVersion } from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
+import { Device } from '../device/Device';
 
 export const getDeviceModel = (features?: Features): IDeviceModel => {
   if (!features || typeof features !== 'object') {
@@ -178,7 +179,24 @@ export const supportNewPassphrase = (features?: Features): SupportFeatureType =>
   return { support: semver.gte(currentVersion, '2.4.0'), require: '2.4.0' };
 };
 
-export const getPassphraseState = async (features: Features, commands: DeviceCommands) => {
+export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) => {
+  const { features, commands } = device;
+  const locked = features?.unlocked === false;
+  const passphraseState = await getPassphraseState(features, commands);
+  const isModeT = getDeviceType(features) === 'touch' || getDeviceType(features) === 'pro';
+
+  // if Touch/Pro was locked before, refresh the device state
+  if (isModeT && locked) {
+    await device.getFeatures();
+  }
+
+  return passphraseState;
+};
+
+export const getPassphraseState = async (
+  features: Features | undefined,
+  commands: DeviceCommands
+) => {
   if (!features) return false;
   const { message, type } = await commands.typedCall('GetAddress', 'Address', {
     address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
