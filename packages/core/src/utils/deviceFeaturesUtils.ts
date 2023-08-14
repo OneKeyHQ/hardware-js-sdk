@@ -10,7 +10,7 @@ import type {
   SupportFeatureType,
 } from '../types';
 import { DeviceTypeToModels } from '../types';
-import DataManager, { MessageVersion } from '../data-manager/DataManager';
+import DataManager, { FirmwareField, MessageVersion } from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 
@@ -240,10 +240,15 @@ export const supportModifyHomescreen = (features?: Features): SupportFeatureType
 /**
  *  Since 3.5.0, Touch uses the firmware-v3 field to get firmware release info
  */
-export const getFirmwareUpdateField = (
-  features: Features,
-  updateType: 'firmware' | 'ble'
-): 'firmware' | 'ble' | 'firmware-v4' => {
+export const getFirmwareUpdateField = ({
+  features,
+  updateType,
+  targetVersion,
+}: {
+  features: Features;
+  updateType: 'firmware' | 'ble';
+  targetVersion?: string;
+}): 'ble' | FirmwareField => {
   const deviceType = getDeviceType(features);
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
   if (updateType === 'ble') {
@@ -255,7 +260,13 @@ export const getFirmwareUpdateField = (
   }
 
   if (deviceType === 'touch') {
+    if (targetVersion) {
+      if (semver.eq(targetVersion, '4.0.0')) return 'firmware-v2';
+      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v4';
+    }
+
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
+
     return 'firmware-v4';
   }
   return 'firmware';
