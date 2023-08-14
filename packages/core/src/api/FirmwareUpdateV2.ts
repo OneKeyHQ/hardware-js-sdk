@@ -88,7 +88,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkDeviceToBootloader(connectId: string | undefined) {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
-    const isBleReconnect = connectId && env === 'react-native';
+    const isBleReconnect = connectId && DataManager.isBleConnect(env);
 
     Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
 

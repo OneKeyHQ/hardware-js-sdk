@@ -25,7 +25,7 @@ export default class SearchDevices extends BaseMethod {
      * No need to call features during Bluetooth scaning
      * to avoid device pairing
      */
-    if (env === 'react-native') {
+    if (DataManager.isBleConnect(env)) {
       return devicesDescriptor.map(device => ({
         ...device,
         connectId: device.id,
