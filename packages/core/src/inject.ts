@@ -77,7 +77,7 @@ export const createCoreApi = (
   /**
    * 获取设备信息
    */
-  getFeatures: connectId => call({ connectId, method: 'getFeatures' }),
+  getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
 
   /**
    * 检查固件版本
