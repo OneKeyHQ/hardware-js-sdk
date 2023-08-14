@@ -41,6 +41,7 @@ export default class LowlevelTransport {
   async acquire(input: LowLevelAcquireInput) {
     try {
       await this.plugin.connect(input.uuid);
+      return { uuid: input.uuid };
     } catch (error) {
       this.Log.debug('lowlelvel transport connect error: ', error);
       throw ERRORS.TypedError(
