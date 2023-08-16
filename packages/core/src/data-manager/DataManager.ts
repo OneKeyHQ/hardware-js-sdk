@@ -23,7 +23,7 @@ import type {
 } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v3' | 'firmware-v4';
+export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v4';
 
 export type MessageVersion = 'latest' | 'v1';
 
@@ -69,7 +69,7 @@ export default class DataManager {
       return 'unknown';
     }
 
-    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware');
+    const firmwareUpdateField = getFirmwareUpdateField({ features, updateType: 'firmware' });
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
     return getReleaseStatus(targetDeviceConfigList, currentVersion);
@@ -85,7 +85,10 @@ export default class DataManager {
 
     if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
 
-    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const firmwareUpdateField = getFirmwareUpdateField({
+      features,
+      updateType: 'firmware',
+    }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
     const targetDeviceConfig = targetDeviceConfigList.filter(item =>
@@ -106,7 +109,10 @@ export default class DataManager {
 
     if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
 
-    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const firmwareUpdateField = getFirmwareUpdateField({
+      features,
+      updateType: 'firmware',
+    }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.fullResource);
 
@@ -117,7 +123,10 @@ export default class DataManager {
     const deviceType = getDeviceType(features);
 
     if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
-    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const firmwareUpdateField = getFirmwareUpdateField({
+      features,
+      updateType: 'firmware',
+    }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
@@ -127,7 +136,10 @@ export default class DataManager {
   static getBootloaderTargetVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
 
-    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const firmwareUpdateField = getFirmwareUpdateField({
+      features,
+      updateType: 'firmware',
+    }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
@@ -138,7 +150,10 @@ export default class DataManager {
     const deviceType = getDeviceType(features);
 
     if (!(deviceType === 'classic' || deviceType === 'mini')) return undefined;
-    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const firmwareUpdateField = getFirmwareUpdateField({
+      features,
+      updateType: 'firmware',
+    }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(
       item => !!item.bootloaderRelatedFirmwareVersion
@@ -158,7 +173,10 @@ export default class DataManager {
       return [];
     }
 
-    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const firmwareUpdateField = getFirmwareUpdateField({
+      features,
+      updateType: 'firmware',
+    }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
     return getReleaseChangelog(targetDeviceConfigList, currentVersion);
@@ -166,7 +184,10 @@ export default class DataManager {
 
   static getFirmwareLatestRelease = (features: Features) => {
     const deviceType = getDeviceType(features);
-    const firmwareUpdateField = getFirmwareUpdateField(features, 'firmware') as FirmwareField;
+    const firmwareUpdateField = getFirmwareUpdateField({
+      features,
+      updateType: 'firmware',
+    }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     const target = findLatestRelease(targetDeviceConfigList);
