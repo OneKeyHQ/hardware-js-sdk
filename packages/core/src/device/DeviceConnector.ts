@@ -78,7 +78,7 @@ export default class DeviceConnector {
     const env = DataManager.getSettings('env');
     try {
       let res;
-      if (env === 'react-native') {
+      if (DataManager.isBleConnect(env)) {
         res = await this.transport.acquire({ uuid: path, forceCleanRunPromise });
       } else {
         res = await this.transport.acquire({ path, previous: session ?? null });

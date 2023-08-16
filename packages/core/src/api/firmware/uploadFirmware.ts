@@ -146,7 +146,7 @@ const newTouchUpdateProcess = async (
   // Write File
   const filePath = `0:${updateType === 'ble' ? 'ble-' : ''}firmware.bin`;
   const env = DataManager.getSettings('env');
-  const perPackageSize = env === 'react-native' ? 16 : 128;
+  const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;
   const chunkSize = 1024 * perPackageSize;
   const totalChunks = Math.ceil(payload.byteLength / chunkSize);
   let offset = 0;
@@ -230,7 +230,7 @@ const emmcFileWriteWithRetry = async (
         throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
       }
       const env = DataManager.getSettings('env');
-      if (env === 'react-native') {
+      if (DataManager.isBleConnect(env)) {
         await wait(3000);
         await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
         await device.initialize();

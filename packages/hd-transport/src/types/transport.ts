@@ -26,7 +26,11 @@ export type AcquireInput = {
 
 export type MessageFromOneKey = { type: string; message: Record<string, any> };
 
-type ITransportInitFn = (logger?: any, emitter?: EventEmitter) => Promise<string>;
+type ITransportInitFn = (
+  logger?: any,
+  emitter?: EventEmitter,
+  plugin?: LowlevelTransportSharedPlugin
+) => Promise<string>;
 
 export type Transport = {
   enumerate(): Promise<Array<OneKeyDeviceInfo>>;
@@ -54,4 +58,16 @@ export type Transport = {
   requestNeeded: boolean;
 
   isOutdated: boolean;
+};
+
+export type LowLevelDevice = { id: string; name: string };
+export type LowlevelTransportSharedPlugin = {
+  enumerate: () => Promise<LowLevelDevice[]>;
+  send: (uuid: string, data: string) => Promise<void>;
+  receive: () => Promise<string>;
+  connect: (uuid: string) => Promise<void>;
+  disconnect: (uuid: string) => Promise<void>;
+
+  init: () => Promise<void>;
+  version: string;
 };

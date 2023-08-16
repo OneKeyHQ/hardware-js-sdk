@@ -1,6 +1,6 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { Features, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
+import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
   Deferred,
@@ -341,7 +341,7 @@ export const callAPI = async (message: CoreMessage) => {
 
 async function initDeviceList(method: BaseMethod) {
   const env = DataManager.getSettings('env');
-  if (env === 'react-native' && method.connectId) {
+  if (DataManager.isBleConnect(env) && method.connectId) {
     await TransportManager.configure();
     return;
   }
@@ -479,7 +479,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
       const env = DataManager.getSettings('env');
       let device: Device;
       try {
-        if (env === 'react-native') {
+        if (DataManager.isBleConnect(env)) {
           device = initDeviceForBle(method);
         } else {
           device = initDevice(method);
@@ -493,7 +493,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
           /**
            * Bluetooth should call initialize here
            */
-          if (env === 'react-native') {
+          if (DataManager.isBleConnect(env)) {
             bleTimeoutRetry = 0;
             await connectDeviceForBle(method, device);
           }
@@ -541,7 +541,7 @@ export const cancel = (connectId?: string) => {
   try {
     if (connectId) {
       let device;
-      if (env === 'react-native') {
+      if (DataManager.isBleConnect(env)) {
         device = initDeviceForBle({ connectId } as BaseMethod);
       } else {
         device = initDevice({ connectId } as BaseMethod);
@@ -594,13 +594,13 @@ const closePopup = () => {
 
 const onDeviceConnectHandler = (device: Device) => {
   const env = DataManager.getSettings('env');
-  const deviceObject = env === 'react-native' ? device : device.toMessageObject();
+  const deviceObject = DataManager.isBleConnect(env) ? device : device.toMessageObject();
   postMessage(createDeviceMessage(DEVICE.CONNECT, { device: deviceObject as KnownDevice }));
 };
 
 const onDeviceDisconnectHandler = (device: Device) => {
   const env = DataManager.getSettings('env');
-  const deviceObject = env === 'react-native' ? device : device.toMessageObject();
+  const deviceObject = DataManager.isBleConnect(env) ? device : device.toMessageObject();
   postMessage(createDeviceMessage(DEVICE.DISCONNECT, { device: deviceObject as KnownDevice }));
 };
 
@@ -765,15 +765,19 @@ export const initConnector = () => {
   return _connector;
 };
 
-const initTransport = (Transport: any) => {
-  TransportManager.setTransport(Transport);
+const initTransport = (Transport: any, plugin?: LowlevelTransportSharedPlugin) => {
+  TransportManager.setTransport(Transport, plugin);
 };
 
-export const init = async (settings: ConnectSettings, Transport: any) => {
+export const init = async (
+  settings: ConnectSettings,
+  Transport: any,
+  plugin?: LowlevelTransportSharedPlugin
+) => {
   try {
     try {
       await DataManager.load(settings);
-      initTransport(Transport);
+      initTransport(Transport, plugin);
     } catch {
       Log.error('DataManager.load error');
     }

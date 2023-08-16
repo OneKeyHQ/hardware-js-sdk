@@ -31,7 +31,7 @@ fi
 
 
 # BUILD combined messages.proto file from protobuf files
-# this code was copied from ./submodules/trezor-common/protob Makekile
+# this code was copied from ./submodules/firmware/protob Makekile
 # clear protobuf syntax and remove unknown values to be able to work with proto2js
 echo 'syntax = "proto2";' > $DIST/messages.proto
 echo 'import "google/protobuf/descriptor.proto";' >> $DIST/messages.proto

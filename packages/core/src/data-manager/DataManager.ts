@@ -294,4 +294,7 @@ export default class DataManager {
     }
     return this.settings;
   }
+
+  static isBleConnect = (env: ConnectSettings['env']) =>
+    env === 'react-native' || env === 'lowlevel';
 }

@@ -1,7 +1,6 @@
 {
-  "name": "@onekeyfe/hd-transport-webusb",
+  "name": "@onekeyfe/hd-transport-lowlevel",
   "version": "0.3.25",
-  "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
   "main": "dist/index.js",
@@ -22,8 +21,5 @@
   "dependencies": {
     "@onekeyfe/hd-shared": "^0.3.25",
     "@onekeyfe/hd-transport": "^0.3.25"
-  },
-  "devDependencies": {
-    "@types/w3c-web-usb": "^1.0.6"
   }
 }

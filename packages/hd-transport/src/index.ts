@@ -20,6 +20,8 @@ export type {
   OneKeyMobileDeviceInfo,
   OneKeyDeviceInfoWithSession,
   MessageFromOneKey,
+  LowlevelTransportSharedPlugin,
+  LowLevelDevice,
 } from './types';
 
 export { Messages } from './types';

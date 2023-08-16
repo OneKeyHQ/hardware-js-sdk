@@ -136,7 +136,7 @@ export class Device extends EventEmitter {
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
-      connectId: env === 'react-native' ? this.mainId || null : getDeviceUUID(this.features),
+      connectId: DataManager.isBleConnect(env) ? this.mainId || null : getDeviceUUID(this.features),
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
       deviceType: this.features.bootloader_mode
@@ -166,7 +166,7 @@ export class Device extends EventEmitter {
     const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<boolean>(async resolve => {
-      if (env === 'react-native') {
+      if (DataManager.isBleConnect(env)) {
         try {
           await this.acquire();
           resolve(true);
@@ -195,9 +195,9 @@ export class Device extends EventEmitter {
 
   async acquire() {
     const env = DataManager.getSettings('env');
-    const mainIdKey = env === 'react-native' ? 'id' : 'session';
+    const mainIdKey = DataManager.isBleConnect(env) ? 'id' : 'session';
     try {
-      if (env === 'react-native') {
+      if (DataManager.isBleConnect(env)) {
         const res = await this.deviceConnector?.acquire(this.originalDescriptor.id);
         this.mainId = (res as unknown as any).uuid ?? '';
         Log.debug('Expected uuid:', this.mainId);
@@ -228,7 +228,7 @@ export class Device extends EventEmitter {
     const env = DataManager.getSettings('env');
     if (
       (this.isUsedHere() && !this.keepSession && this.mainId) ||
-      (this.mainId && env === 'react-native')
+      (this.mainId && DataManager.isBleConnect(env))
     ) {
       if (this.commands) {
         this.commands.dispose(false);
@@ -389,7 +389,7 @@ export class Device extends EventEmitter {
    */
   updateDescriptor(descriptor: DeviceDescriptor, forceUpdate = false) {
     const env = DataManager.getSettings('env');
-    if (env === 'react-native') {
+    if (DataManager.isBleConnect(env)) {
       return;
     }
     const originalSession = this.originalDescriptor.session;
@@ -523,7 +523,7 @@ export class Device extends EventEmitter {
 
   isUsedHere() {
     const env = DataManager.getSettings('env');
-    if (env === 'react-native') {
+    if (DataManager.isBleConnect(env)) {
       return false;
     }
     return this.isUsed() && this.originalDescriptor.session === this.mainId;
