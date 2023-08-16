@@ -5,6 +5,7 @@ import { getDeviceType, httpRequest } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { findLatestRelease } from '../../utils/release';
 import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
+import { FirmwareField } from '../../data-manager/DataManager';
 
 export interface GetInfoProps {
   features: Features;
@@ -74,15 +75,11 @@ export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) =
   const deviceType = getDeviceType(features);
   const { deviceMap } = DataManager;
 
-  let firmwareUpdateField: 'firmware' | 'ble' | 'firmware-v2' | 'firmware-v3' =
-    getFirmwareUpdateField(features, updateType);
-  if (deviceType === 'touch' && targetVersion) {
-    if (semver.eq(targetVersion, '4.0.0')) {
-      firmwareUpdateField = 'firmware-v2';
-    } else if (semver.gt(targetVersion, '4.0.0')) {
-      firmwareUpdateField = 'firmware-v3';
-    }
-  }
+  const firmwareUpdateField: 'ble' | FirmwareField = getFirmwareUpdateField({
+    features,
+    updateType,
+    targetVersion,
+  });
 
   const releaseInfo = deviceMap?.[deviceType]?.[firmwareUpdateField] ?? [];
   return findLatestRelease(releaseInfo);

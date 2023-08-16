@@ -14,7 +14,7 @@ import {
   getDeviceType,
   getDeviceTypeOnBootloader,
   getDeviceUUID,
-  getPassphraseState,
+  getPassphraseStateWithRefreshDeviceInfo,
 } from '../utils/deviceFeaturesUtils';
 
 import type DeviceConnector from './DeviceConnector';
@@ -57,7 +57,9 @@ export interface DeviceEvents {
 
 export interface Device {
   on<K extends keyof DeviceEvents>(type: K, listener: (...event: DeviceEvents[K]) => void): this;
+
   off<K extends keyof DeviceEvents>(type: K, listener: (...event: DeviceEvents[K]) => void): this;
+
   emit<K extends keyof DeviceEvents>(type: K, ...args: DeviceEvents[K]): boolean;
 }
 
@@ -572,7 +574,7 @@ export class Device extends EventEmitter {
   hasUsePassphrase() {
     const isModeT =
       getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
-    const preCheckTouch = isModeT && this.features?.unlocked === true;
+    const preCheckTouch = isModeT && this.features?.unlocked === false;
 
     return this.features && (!!this.features.passphrase_protection || preCheckTouch);
   }
@@ -586,16 +588,7 @@ export class Device extends EventEmitter {
 
   async checkPassphraseState() {
     if (!this.features) return false;
-    const locked = this.features?.unlocked === true;
-    const isModeT =
-      getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
-
-    const newState = await getPassphraseState(this.features, this.commands);
-
-    // if Touch/Pro was locked before, refresh the passphrase state
-    if (isModeT && locked) {
-      await this.getFeatures();
-    }
+    const newState = await getPassphraseStateWithRefreshDeviceInfo(this);
 
     // When exists passphraseState, check passphraseState
     if (this.passphraseState && this.passphraseState !== newState) {
