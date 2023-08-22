@@ -63,6 +63,7 @@ export function CallBTCMethods({
               value: '6578616d706c65206d657373616765', // 'example message'
               type: 'string',
             },
+            { name: 'noScriptType', value: false, type: 'boolean' },
           ]}
           onCall={data =>
             SDK.btcSignMessage(connectId, deviceId, { ...commonParams, ...data } as any)
