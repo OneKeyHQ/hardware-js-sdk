@@ -5,10 +5,11 @@ export type BTCSignMessageParams = {
   path: string | number[];
   messageHex: string;
   coin?: string;
+  noScriptType?: boolean;
 };
 
 export declare function btcSignMessage(
   connectId: string,
   deviceId: string,
-  params: CommonParams & BTCSignMessageParams
+  params: CommonParams & BTCSignMessageParams,
 ): Response<MessageSignature>;

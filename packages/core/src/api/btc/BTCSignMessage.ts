@@ -15,9 +15,10 @@ export default class BTCSignMessage extends BaseMethod<SignMessage> {
       { name: 'path', required: true },
       { name: 'messageHex', type: 'hexString', required: true },
       { name: 'coin', type: 'string' },
+      { name: 'noScriptType', type: 'boolean' },
     ]);
 
-    const { path, messageHex, coin } = this.payload;
+    const { path, messageHex, coin, noScriptType } = this.payload;
 
     const addressN = validatePath(path);
 
@@ -27,7 +28,8 @@ export default class BTCSignMessage extends BaseMethod<SignMessage> {
       address_n: addressN,
       message: formatAnyHex(messageHex),
       coin_name: coinName,
-      script_type: scriptType,
+      script_type: noScriptType ? undefined : scriptType,
+      no_script_type: noScriptType,
     };
   }
 
