@@ -3,5 +3,5 @@
   "compilerOptions": {
     "outDir": "./dist",
   },
-  "include": ["./src", "../hd-transport/src/utils/logBlockCommand.ts"]
+  "include": ["./src",]
 }
