@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-import transport, { AcquireInput } from '@onekeyfe/hd-transport';
+import transport, { AcquireInput, LogBlockCommand } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
@@ -141,7 +141,11 @@ export default class WebUsbTransport {
     }
 
     const messages = this._messages;
-    this.Log.debug('call-', ' name: ', name, ' data: ', data);
+    if (LogBlockCommand.has(name)) {
+      this.Log.debug('call-', ' name: ', name);
+    } else {
+      this.Log.debug('call-', ' name: ', name, ' data: ', data);
+    }
     const encodeBuffers = buildEncodeBuffers(messages, name, data);
 
     for (const buffer of encodeBuffers) {

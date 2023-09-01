@@ -1,4 +1,4 @@
-import transport from '@onekeyfe/hd-transport';
+import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 import { request as http } from './http';
@@ -105,7 +105,12 @@ export default class HttpTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const messages = this._messages;
-    this.Log.debug('call-', ' name: ', name, ' data: ', data);
+    if (LogBlockCommand.has(name)) {
+      this.Log.debug('call-', ' name: ', name);
+    } else {
+      this.Log.debug('call-', ' name: ', name, ' data: ', data);
+    }
+
     const o = buildOne(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({

@@ -26,6 +26,7 @@ export type {
 
 export { Messages } from './types';
 export * from './types/messages';
+export * from './utils/logBlockCommand';
 
 export * from './constants';
 

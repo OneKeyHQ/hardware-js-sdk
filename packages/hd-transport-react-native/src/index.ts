@@ -8,7 +8,7 @@ import {
   ScanMode,
 } from '@onekeyfe/react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
-import transport, { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
+import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type EventEmitter from 'events';
 import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
@@ -490,6 +490,8 @@ export default class ReactNativeBleTransport {
         file_name: data?.file_name,
         hash: data?.hash,
       });
+    } else if (LogBlockCommand.has(name)) {
+      this.Log.debug('transport-react-native', 'call-', ' name: ', name);
     } else {
       this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
     }
