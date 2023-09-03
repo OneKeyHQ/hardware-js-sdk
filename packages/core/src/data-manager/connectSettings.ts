@@ -109,6 +109,10 @@ export const parseConnectSettings = (input: Partial<ConnectSettings> = {}) => {
     settings.preRelease = input.preRelease;
   }
 
+  if (input.fetchConfig) {
+    settings.fetchConfig = input.fetchConfig;
+  }
+
   return settings;
 };
 

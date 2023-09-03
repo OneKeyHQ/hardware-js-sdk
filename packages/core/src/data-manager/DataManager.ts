@@ -245,6 +245,9 @@ export default class DataManager {
 
   static async load(settings: ConnectSettings) {
     this.settings = settings;
+    if (!settings.fetchConfig) {
+      return;
+    }
     try {
       const url = settings.preRelease
         ? 'https://data.onekey.so/pre-config.json'
