@@ -11,5 +11,5 @@ export type BTCSignMessageParams = {
 export declare function btcSignMessage(
   connectId: string,
   deviceId: string,
-  params: CommonParams & BTCSignMessageParams,
+  params: CommonParams & BTCSignMessageParams
 ): Response<MessageSignature>;
