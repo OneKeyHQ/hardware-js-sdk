@@ -18,6 +18,7 @@ export type ConnectSettings = {
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;
+  fetchConfig?: boolean;
 };
 
 export type IVersionArray = [number, number, number];

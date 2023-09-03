@@ -74,6 +74,7 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
         }
       );
 
+      // @ts-expect-error
       return this.processTxRequest(typedCall, response, nextIndex, signatures);
     }
 

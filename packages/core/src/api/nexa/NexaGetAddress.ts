@@ -36,6 +36,7 @@ export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]>
         address_n: addressN,
         show_display: showOnOneKey,
         prefix: batch.prefix,
+        // @ts-expect-error
         scheme: batch.scheme,
       });
     });
