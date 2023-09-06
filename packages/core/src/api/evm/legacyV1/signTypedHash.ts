@@ -15,7 +15,7 @@ export const signTypedHash = async ({
   typedCall: TypedCall;
   addressN: number[];
   device: Device;
-  chainId: number;
+  chainId: number | undefined;
   domainHash: string;
   messageHash: string | undefined;
 }): Promise<

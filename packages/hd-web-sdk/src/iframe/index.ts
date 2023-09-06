@@ -14,7 +14,9 @@ import {
   CORE_EVENT,
   getLogger,
   LoggerNames,
+  LogBlockEvent,
 } from '@onekeyfe/hd-core';
+import { get } from 'lodash';
 import { getOrigin } from '../utils/urlUtils';
 import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
 
@@ -62,10 +64,19 @@ export async function init(payload: IFrameInit['payload']) {
     targetOrigin: getOrigin(settings.parentOrigin as string),
     receiveHandler: async messageEvent => {
       const message = parseMessage(messageEvent);
-      Log.debug('Frame Bridge Receive message: ', message);
+      const blockLog = LogBlockEvent.has(get(message, 'type')) ? message.type : undefined;
+      if (blockLog) {
+        Log.debug('Frame Bridge Receive message: ', blockLog);
+      } else {
+        Log.debug('Frame Bridge Receive message: ', message);
+      }
 
       const response = await _core?.handleMessage(message);
-      Log.debug('Frame Bridge response data: ', response);
+      if (blockLog) {
+        Log.debug('Frame Bridge response message: ', blockLog);
+      } else {
+        Log.debug('Frame Bridge response message: ', message);
+      }
       return response;
     },
   });

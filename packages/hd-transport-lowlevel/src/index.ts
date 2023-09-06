@@ -1,5 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import transport from '@onekeyfe/hd-transport';
+import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
 import type EventEmitter from 'events';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 import type { LowLevelAcquireInput } from './types';
@@ -67,7 +67,11 @@ export default class LowlevelTransport {
     }
 
     const messages = this._messages;
-    this.Log.debug('lowlevel-transport', 'call-', ' name: ', name, ' data: ', data);
+    if (LogBlockCommand.has(name)) {
+      this.Log.debug('lowlevel-transport', 'call-', ' name: ', name);
+    } else {
+      this.Log.debug('lowlevel-transport', 'call-', ' name: ', name, ' data: ', data);
+    }
 
     const buffers = buildBuffers(messages, name, data);
     for (const o of buffers) {

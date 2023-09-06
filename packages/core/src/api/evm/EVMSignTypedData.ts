@@ -266,7 +266,6 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     messageHash: string | undefined;
   }) {
     if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
-    if (!chainId) throw ERRORS.TypedError('Runtime', 'chainId is required');
 
     switch (TransportManager.getMessageVersion()) {
       case 'v1':
@@ -415,7 +414,6 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       const { domainHash, messageHash } = this.params;
 
       if (!domainHash) throw ERRORS.TypedError('Runtime', 'domainHash is required');
-      if (!chainId) throw ERRORS.TypedError('Runtime', 'chainId is required');
 
       const response = await this.signTypedHash({
         typedCall: this.device.commands.typedCall.bind(this.device.commands),
