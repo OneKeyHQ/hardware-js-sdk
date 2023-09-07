@@ -1,5 +1,5 @@
 import { CommonParams, CoreApi } from '@onekeyfe/hd-core';
-import React, { View, StyleSheet, Text } from 'react-native';
+import React, { StyleSheet, Text, View } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
 
@@ -18,7 +18,7 @@ export function CallKaspaMethods({
   const deviceId = currentDevice?.features?.deviceId ?? '';
   return (
     <View>
-      <Text style={{ textAlign: 'center', fontSize: 24 }}>Sui Method Test</Text>
+      <Text style={{ textAlign: 'center', fontSize: 24 }}>Kaspa Method Test</Text>
       <View style={styles.buttonContainer}>
         <MethodInvoke
           title="kaspaGetAddress"

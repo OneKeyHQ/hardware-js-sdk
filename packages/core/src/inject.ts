@@ -235,6 +235,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'suiGetAddress' }),
   suiGetPublicKey: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'suiGetPublicKey' }),
+  suiSignMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'suiSignMessage' }),
   suiSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'suiSignTransaction' }),
 
