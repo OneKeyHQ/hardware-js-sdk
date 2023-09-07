@@ -1,5 +1,5 @@
 import { CommonParams, CoreApi } from '@onekeyfe/hd-core';
-import React, { View, StyleSheet, Text } from 'react-native';
+import React, { StyleSheet, Text, View } from 'react-native';
 import type { Device } from './DeviceList';
 import MethodInvoke from './MethodInvoke';
 
@@ -58,6 +58,24 @@ export function CallSuiMethods({
             { name: 'showOnOneKey', value: false, type: 'boolean' },
           ]}
           onCall={data => SDK.suiGetPublicKey(connectId, deviceId, { ...commonParams, ...data })}
+        />
+
+        <MethodInvoke
+          title="suiSignMessage"
+          options={[
+            { name: 'path', value: "m/44'/784'/0'/0'/0'", type: 'string' },
+            {
+              name: 'messageHex',
+              value: '010203',
+              type: 'string',
+            },
+          ]}
+          onCall={data =>
+            SDK.suiSignMessage(connectId, deviceId, {
+              ...commonParams,
+              ...data,
+            } as unknown as any)
+          }
         />
 
         <MethodInvoke

@@ -1,4 +1,4 @@
-import { on, off, removeAllListeners } from './event';
+import { off, on, removeAllListeners } from './event';
 import { uiResponse } from './uiResponse';
 import { init, updateSettings } from './init';
 
@@ -92,6 +92,7 @@ import { xrpSignTransaction } from './xrpSignTransaction';
 
 import { suiGetAddress } from './suiGetAddress';
 import { suiGetPublicKey } from './suiGetPublicKey';
+import { suiSignMessage } from './suiSignMessage';
 import { suiSignTransaction } from './suiSignTransaction';
 
 import { cardanoGetAddress } from './cardanoGetAddress';
@@ -266,6 +267,7 @@ export type CoreApi = {
    */
   suiGetAddress: typeof suiGetAddress;
   suiGetPublicKey: typeof suiGetPublicKey;
+  suiSignMessage: typeof suiSignMessage;
   suiSignTransaction: typeof suiSignTransaction;
 
   /**

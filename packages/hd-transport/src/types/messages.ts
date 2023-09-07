@@ -3297,6 +3297,18 @@ export type SuiSignedTx = {
   signature: string;
 };
 
+// SuiSignMessage
+export type SuiSignMessage = {
+  address_n: number[];
+  message: string;
+};
+
+// SuiMessageSignature
+export type SuiMessageSignature = {
+  signature: string;
+  address: string;
+};
+
 // TezosGetAddress
 export type TezosGetAddress = {
   address_n: number[];
@@ -3969,6 +3981,8 @@ export type MessageType = {
   SuiAddress: SuiAddress;
   SuiSignTx: SuiSignTx;
   SuiSignedTx: SuiSignedTx;
+  SuiSignMessage: SuiSignMessage;
+  SuiMessageSignature: SuiMessageSignature;
   TezosGetAddress: TezosGetAddress;
   TezosAddress: TezosAddress;
   TezosGetPublicKey: TezosGetPublicKey;

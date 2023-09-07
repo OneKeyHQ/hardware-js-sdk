@@ -8919,6 +8919,37 @@
         }
       }
     },
+    "SuiSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "SuiMessageSignature": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
     "TezosGetAddress": {
       "fields": {
         "address_n": {
@@ -10099,6 +10130,8 @@
         "MessageType_SuiAddress": 11101,
         "MessageType_SuiSignTx": 11102,
         "MessageType_SuiSignedTx": 11103,
+        "MessageType_SuiSignMessage": 11104,
+        "MessageType_SuiMessageSignature": 11105,
         "MessageType_FilecoinGetAddress": 11200,
         "MessageType_FilecoinAddress": 11201,
         "MessageType_FilecoinSignTx": 11202,
