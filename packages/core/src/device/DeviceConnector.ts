@@ -1,8 +1,8 @@
-import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { OneKeyDeviceInfo as DeviceDescriptor, Transport } from '@onekeyfe/hd-transport';
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
-import { DevicePool, DeviceDescriptorDiff } from './DevicePool';
+import { DeviceDescriptorDiff, DevicePool } from './DevicePool';
 import { resolveAfter } from '../utils/promiseUtils';
 import { getLogger, LoggerNames } from '../utils';
 

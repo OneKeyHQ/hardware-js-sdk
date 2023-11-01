@@ -1,0 +1,27 @@
+{
+  "name": "@onekeyfe/hd-react-native-udp-sdk",
+  "version": "0.3.30",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-core": "^0.3.30",
+    "@onekeyfe/hd-shared": "^0.3.30",
+    "@onekeyfe/hd-transport-lowlevel": "^0.3.30",
+    "react-native-udp": "^4.1.7"
+  }
+}

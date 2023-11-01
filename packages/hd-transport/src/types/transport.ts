@@ -61,7 +61,7 @@ export type Transport = {
 };
 
 export type LowLevelDevice = { id: string; name: string };
-export type LowlevelTransportSharedPlugin = {
+export interface LowlevelTransportSharedPlugin {
   enumerate: () => Promise<LowLevelDevice[]>;
   send: (uuid: string, data: string) => Promise<void>;
   receive: () => Promise<string>;
@@ -70,4 +70,4 @@ export type LowlevelTransportSharedPlugin = {
 
   init: () => Promise<void>;
   version: string;
-};
+}

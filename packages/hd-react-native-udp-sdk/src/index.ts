@@ -21,10 +21,9 @@ import HardwareSdk, {
   UiResponseEvent,
 } from '@onekeyfe/hd-core';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
-import HttpTransport from '@onekeyfe/hd-transport-http';
-import WebusbTransport from '@onekeyfe/hd-transport-webusb';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
+import { UsbTransportPlugin } from '@onekeyfe/hd-transport-lowlevel/dist/plugins/udp';
+import { UdpInterface } from './UdpInterface';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
@@ -103,32 +102,22 @@ async function postMessage(message: CoreMessage, usePromise = true) {
   _core.handleMessage(message);
 }
 
-const init = async (
-  settings: Partial<ConnectSettings>,
-  _?: LowLevelCoreApi,
-  plugin?: LowlevelTransportSharedPlugin
-) => {
+const init = async (settings: Partial<ConnectSettings>, _?: LowLevelCoreApi) => {
   _settings = { ..._settings, ...settings, env: settings.env ?? 'node' };
 
   enableLog(!!settings.debug);
 
   Log.debug('init');
 
+  // @ts-expect-error
+  const { deviceList }: { deviceList: string[] } = settings;
+  const plugin = new UsbTransportPlugin({
+    transportInterface: new UdpInterface(deviceList),
+    version: 'UDP-1.0.0',
+  });
+
   try {
-    console.log(_settings.env);
-    // const Transport = _settings.env === 'webusb' ? WebusbTransport : HttpTransport;
-    let Transport: any;
-    switch (_settings.env) {
-      case 'webusb':
-        Transport = WebusbTransport;
-        break;
-      case 'lowlevel':
-        Transport = LowlevelTransport;
-        break;
-      default:
-        Transport = HttpTransport;
-    }
-    _core = await initCore(_settings, Transport, plugin);
+    _core = await initCore(_settings, LowlevelTransport, plugin);
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);
 
@@ -160,7 +149,7 @@ const call = async (params: any) => {
 
 const updateSettings = () => Promise.resolve(true);
 
-const HardwareCommonConnectSdk = HardwareSdk({
+const HardwareReactNativeUdpConnectSdk = HardwareSdk({
   eventEmitter,
   init,
   call,
@@ -170,4 +159,4 @@ const HardwareCommonConnectSdk = HardwareSdk({
   updateSettings,
 });
 
-export default HardwareCommonConnectSdk;
+export default HardwareReactNativeUdpConnectSdk;
