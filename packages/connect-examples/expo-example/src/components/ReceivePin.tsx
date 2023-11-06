@@ -5,9 +5,10 @@ type IReceivePinProps = {
   value: string;
   onChange: (value: string) => void;
   onConfirm: (value: string) => void;
+  onCancel: () => void;
 };
 
-export function ReceivePin({ value, onChange, onConfirm }: IReceivePinProps) {
+export function ReceivePin({ value, onChange, onConfirm, onCancel }: IReceivePinProps) {
   return (
     <View style={{ maxWidth: 300 }}>
       <Text style={{ fontSize: 24 }}>Input Pin</Text>
@@ -23,6 +24,7 @@ export function ReceivePin({ value, onChange, onConfirm }: IReceivePinProps) {
         value={value}
       />
       <Button title="confirm" onPress={() => onConfirm(value)} />
+      <Button title="cancel" onPress={onCancel} />
     </View>
   );
 }

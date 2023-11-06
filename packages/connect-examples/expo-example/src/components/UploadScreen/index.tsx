@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Platform, Button, View, Text, StyleSheet, TextInput, Image } from 'react-native';
 import { bytesToHex } from '@noble/hashes/utils';
 import { Picker } from '@react-native-picker/picker';
@@ -9,13 +9,9 @@ import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { DeviceUploadResourceParams, CoreApi, CommonParams, KnownDevice } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
 import { getImageSize, imageToBase64, formatBytes, generateUploadNFTParams } from './nftUtils';
-
-interface Props {
-  SDK: CoreApi;
-  type: 'Bluetooth' | 'USB';
-  commonParams?: CommonParams;
-  selectedDevice: KnownDevice;
-}
+import HardwareSDKContext from '../../provider/HardwareSDKContext';
+import { useCommonParams } from '../../provider/CommonParamsProvider';
+import { useDevice } from '../../provider/DeviceProvider';
 
 interface UploadResourceParams {
   suffix?: string;
@@ -115,7 +111,11 @@ export const compressHomescreen = async (
   };
 };
 
-function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Props) {
+function UploadScreenComponent() {
+  const { sdk: SDK, type } = useContext(HardwareSDKContext);
+  const { selectedDevice } = useDevice();
+  const { commonParams } = useCommonParams();
+
   const [uploadScreenParams, setUploadScreenParams] = useState<UploadResourceParams>({
     resType: 0,
   });
@@ -146,7 +146,7 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
         }
 
         if (uploadResParams) {
-          const response = await SDK.deviceUploadResource(
+          const response = await SDK?.deviceUploadResource(
             type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
             {
               ...commonParams,
@@ -179,7 +179,7 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
     }
 
     if (uploadResParams) {
-      const response = await SDK.deviceUploadResource(
+      const response = await SDK?.deviceUploadResource(
         type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
         {
           ...commonParams,
@@ -199,11 +199,13 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
 
     console.log(result);
 
-    if (!result.cancelled) {
-      setImage(result);
+    if (!result.canceled) {
+      const assetImage = result.assets[0];
+
+      setImage(assetImage);
       setUploadScreenParams({
         ...uploadScreenParams,
-        suffix: getUrlExtension(result.uri),
+        suffix: getUrlExtension(assetImage.uri),
       });
     }
   };
@@ -211,7 +213,7 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
   return (
     <View style={styles.container}>
       <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Upload Screen Image & Video</Text>
-      <View style={{ flexDirection: Platform.OS === 'web' ? 'row' : 'column' }}>
+      <View style={{ flexDirection: Platform.OS === 'web' ? 'row' : 'column', flexWrap: 'wrap' }}>
         <View style={{ flexDirection: 'column' }}>
           <View style={styles.item}>
             <Text>支持 PNG & MP4</Text>
@@ -231,16 +233,13 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
         </View>
         <View style={styles.item}>
           <Text>资源类型</Text>
-          {/* @ts-expect-error */}
           <Picker
             selectedValue={uploadScreenParams?.resType}
             onValueChange={itemValue =>
               setUploadScreenParams({ ...uploadScreenParams, resType: itemValue })
             }
           >
-            {/* @ts-expect-error */}
             <Picker.Item label="WallPaper" value="0" />
-            {/* @ts-expect-error */}
             <Picker.Item label="NFT" value="1" />
           </Picker>
         </View>
@@ -269,7 +268,7 @@ function UploadScreenComponent({ SDK, type, commonParams, selectedDevice }: Prop
           <View style={styles.item}>
             <Button
               title="全量覆盖 RES"
-              onPress={() => SDK.deviceFullyUploadResource(selectedDevice?.connectId ?? '', {})}
+              onPress={() => SDK?.deviceFullyUploadResource(selectedDevice?.connectId ?? '', {})}
             />
           </View>
         )}
@@ -303,7 +302,7 @@ const styles = StyleSheet.create({
     borderColor: '#cccccc',
     borderWidth: 1,
     overflow: 'hidden',
-    margin: 12,
+    marginTop: 12,
     padding: 12,
     height: 'auto',
   },
