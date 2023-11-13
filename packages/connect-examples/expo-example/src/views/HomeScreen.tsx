@@ -1,9 +1,7 @@
-import React, { Suspense } from 'react';
-import { StyleSheet, Platform, View, Text, Button } from 'react-native';
+import React from 'react';
+import { Button, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-
-const USB = React.lazy(() => import('../env/USB'));
-const Bluetooth = React.lazy(() => import('../env/Bluetooth'));
+import SDKProvider from '../provider/SDKProvider';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -11,9 +9,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* @ts-expect-error */}
       <Button title="Mock Screen" onPress={() => navigation.push('Mock')} />
-      <Suspense fallback={<Text>Loading...</Text>}>
-        {Platform.OS === 'web' ? <USB /> : <Bluetooth />}
-      </Suspense>
+      <SDKProvider />
     </View>
   );
 }

@@ -27,3 +27,4 @@ project.xcworkspace
 
 # CocoaPods
 /Pods/
+.xcode.env.local

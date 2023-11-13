@@ -1,15 +1,7 @@
-import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  SafeAreaView,
-  StyleSheet,
-  StatusBar,
-  TouchableOpacity,
-  Button,
-} from 'react-native';
+import { useCallback, useContext, useEffect, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import HardwareSDKContext from '../provider/HardwareSDKContext';
 
 export type Device = {
   connectId: string;
@@ -59,12 +51,13 @@ const Item = ({ item, onPress, backgroundColor, textColor }: ItemProps) => (
 );
 
 type IDeviceListProps = {
-  data: Device[];
   onSelected: (device: Device) => void;
 };
 
-export function DeviceList({ data, onSelected }: IDeviceListProps) {
+export function DeviceList({ onSelected }: IDeviceListProps) {
+  const { sdk } = useContext(HardwareSDKContext);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [devices, setDevices] = useState<Device[]>([]);
 
   useEffect(() => {
     getSelectedId().then(value => {
@@ -74,6 +67,19 @@ export function DeviceList({ data, onSelected }: IDeviceListProps) {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const searchDevices = useCallback(async () => {
+    if (!sdk) return console.log('sdk is not ready');
+
+    const response = await sdk.searchDevices();
+    console.log('example searchDevices response: ', response);
+    setDevices((response.payload as unknown as Device[]) ?? []);
+  }, [sdk]);
+
+  const handleRemoveSelected = useCallback(() => {
+    removeSelectedId();
+    setSelectedId(null);
   }, []);
 
   const renderItem = ({ item }: { item: Device }) => {
@@ -95,25 +101,29 @@ export function DeviceList({ data, onSelected }: IDeviceListProps) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.seleteWrap}>
-        <Text>当前选择设备：{selectedId}</Text>
-        <Button title="清除" onPress={() => removeSelectedId()} />
+    <View style={styles.container}>
+      <Button title="Search Devices" onPress={searchDevices} />
+      <View style={styles.selectWrap}>
+        <Text>当前选择设备：{selectedId || '无'}</Text>
+        <Button title="清除" onPress={handleRemoveSelected} />
       </View>
       <FlatList
-        data={data}
+        data={devices}
         renderItem={renderItem}
         keyExtractor={item => item.connectId}
         extraData={selectedId}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    marginTop: StatusBar.currentHeight || 0,
+    width: '100%',
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 10,
   },
   item: {
     backgroundColor: '#f9c2ff',
@@ -124,9 +134,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
   },
-  seleteWrap: {
-    display: 'flex',
+  selectWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
   },
 });

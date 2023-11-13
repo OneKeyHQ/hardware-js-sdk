@@ -19,14 +19,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.onekey.hardwareexample"
+      "bundleIdentifier": "com.onekey.hardware.expoexample"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.onekey.hardwareexample"
+      "package": "com.onekey.hardware.expoexample"
     },
     "web": {
       "favicon": "./assets/favicon.png"
