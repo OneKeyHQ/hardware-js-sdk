@@ -12,17 +12,17 @@ jobs:
       - name: Setup Environment
         uses: actions/setup-node@v2
         with:
-          node-version: '16.x'
+          node-version: '18.x'
           registry-url: 'https://registry.npmjs.org'
       - name: Install Package
         run: |
-          npm i -g expo-cli@6.0.5 && yarn
+          yarn
           yarn bootstrap
       - name: Build Target
         run: |
           yarn build
           cd packages/connect-examples/expo-example
-          npx expo build:web
+          npx expo export:web
 
       - name: Deploy Github Pages
         uses: peaceiris/actions-gh-pages@v3
