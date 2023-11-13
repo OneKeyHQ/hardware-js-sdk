@@ -3,6 +3,7 @@ lib/
 dist/
 example/
 packages/**/dist/
+packages/**/web-build/
 submodules/
 packages/**/coverage/
 packages/hd-transport/scripts/protobuf-patches/
