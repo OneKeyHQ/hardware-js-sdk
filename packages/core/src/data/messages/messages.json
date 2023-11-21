@@ -5631,6 +5631,58 @@
         "battery_level": {
           "type": "uint32",
           "id": 520
+        },
+        "onekey_device_type": {
+          "type": "OneKeyDeviceType",
+          "id": 600
+        },
+        "onekey_se_type": {
+          "type": "OneKeySeType",
+          "id": 601
+        },
+        "onekey_board_version": {
+          "type": "string",
+          "id": 602
+        },
+        "onekey_board_hash": {
+          "type": "bytes",
+          "id": 603
+        },
+        "onekey_boot_version": {
+          "type": "string",
+          "id": 604
+        },
+        "onekey_boot_hash": {
+          "type": "bytes",
+          "id": 605
+        },
+        "onekey_se_version": {
+          "type": "string",
+          "id": 606
+        },
+        "onekey_se_hash": {
+          "type": "bytes",
+          "id": 607
+        },
+        "onekey_se_build_id": {
+          "type": "string",
+          "id": 608
+        },
+        "onekey_firmware_version": {
+          "type": "string",
+          "id": 609
+        },
+        "onekey_firmware_hash": {
+          "type": "bytes",
+          "id": 610
+        },
+        "onekey_firmware_build_id": {
+          "type": "string",
+          "id": 611
+        },
+        "onekey_serial_no": {
+          "type": "string",
+          "id": 612
         }
       },
       "nested": {
@@ -5656,6 +5708,21 @@
             "Capability_Shamir": 15,
             "Capability_ShamirGroups": 16,
             "Capability_PassphraseEntry": 17
+          }
+        },
+        "OneKeyDeviceType": {
+          "values": {
+            "CLASSIC": 0,
+            "CLASSIC1S": 1,
+            "MINI": 2,
+            "TOUCH": 3,
+            "TOUCH_PRO": 4
+          }
+        },
+        "OneKeySeType": {
+          "values": {
+            "THD89": 0,
+            "SE608A": 1
           }
         }
       }

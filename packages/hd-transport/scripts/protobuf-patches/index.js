@@ -109,6 +109,8 @@ const TYPE_PATCH = {
   'Features.auto_lock_delay_ms': 'number | null',
   'Features.display_rotation': 'number | null',
   'Features.experimental_features': 'boolean | null',
+  'Features.onekey_device_type': 'string | null',
+  'Features.onekey_se_type': 'string | null',
   'HDNodePathType.node': 'HDNodeType | string',
   'FirmwareUpload.payload': 'Buffer | ArrayBuffer',
   'EthereumGetAddress.encoded_network': 'ArrayBuffer',

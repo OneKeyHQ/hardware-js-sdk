@@ -1968,6 +1968,19 @@ export enum Enum_Capability {
 }
 export type Capability = keyof typeof Enum_Capability;
 
+export enum OneKeyDeviceType {
+  CLASSIC = 0,
+  CLASSIC1S = 1,
+  MINI = 2,
+  TOUCH = 3,
+  TOUCH_PRO = 4,
+}
+
+export enum OneKeySeType {
+  THD89 = 0,
+  SE608A = 1,
+}
+
 // Features
 export type Features = {
   vendor: string;
@@ -2028,6 +2041,19 @@ export type Features = {
   coin_switch?: number;
   build_id?: string;
   battery_level?: number;
+  onekey_device_type?: string | null;
+  onekey_se_type?: string | null;
+  onekey_board_version?: string;
+  onekey_board_hash?: string;
+  onekey_boot_version?: string;
+  onekey_boot_hash?: string;
+  onekey_se_version?: string;
+  onekey_se_hash?: string;
+  onekey_se_build_id?: string;
+  onekey_firmware_version?: string;
+  onekey_firmware_hash?: string;
+  onekey_firmware_build_id?: string;
+  onekey_serial_no?: string;
 };
 
 // LockDevice
