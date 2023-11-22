@@ -1,22 +1,16 @@
 import React from 'react';
 import { Button, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import PlaygroundManager from '../components/PlaygroundManager';
+import PassphraseTestView from '../components/PassphraseTest';
 
-export default function HomeScreen() {
+export default function PassphraseTestScreen() {
   const navigation = useNavigation();
   return (
     <ScrollView>
       <View style={styles.container}>
         {/* @ts-expect-error */}
-        <Button title="Mock Screen" onPress={() => navigation.push('Mock')} />
-        <Button
-          title="Passphrase Test Screen"
-          // @ts-expect-error
-          onPress={() => navigation.navigate('PassphraseTest')}
-        />
-
-        <PlaygroundManager />
+        <Button title="Go Back Home" onPress={() => navigation.replace('Home')} />
+        <PassphraseTestView />
       </View>
     </ScrollView>
   );

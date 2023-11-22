@@ -34,7 +34,7 @@ const requestBluetoothScanPermission = async () => {
   return granted;
 };
 
-export default function Bluetooth() {
+export default function Bluetooth({ children }: { children: React.ReactNode }) {
   const [sdk, createSDK] = React.useState<CoreApi>();
   const sdkInit = () => {
     getHardwareSDKInstance().then(res => {
@@ -79,15 +79,14 @@ export default function Bluetooth() {
   );
 
   return (
-    <ScrollView>
-      <HardwareSDKContext.Provider value={contextValue}>
-        <View style={styles.container}>
-          <Text>This is Bluetooth example page, will run on iOS / Android device. </Text>
-          {/* {!!sdk && <CallMethods />} */}
-          {!!sdk && <PlaygroundManager />}
-        </View>
-      </HardwareSDKContext.Provider>
-    </ScrollView>
+    <HardwareSDKContext.Provider value={contextValue}>
+      <>
+        <Text>This is Bluetooth example page, will run on iOS / Android device. </Text>
+        <Text>{sdk ? 'SDK loading complete' : 'SDK loading...'}</Text>
+        {/* {!!sdk && <CallMethods />} */}
+        {children}
+      </>
+    </HardwareSDKContext.Provider>
   );
 }
 

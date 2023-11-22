@@ -1,35 +1,7 @@
-import { useContext } from 'react';
-import { StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Switch, Text, View } from 'react-native';
 import { useCommonParams } from '../provider/CommonParamsProvider';
-
-type SwitchInputProps = {
-  value: boolean;
-  onToggle: (value: boolean) => void;
-  label: string;
-};
-const SwitchInput = ({ value, onToggle, label }: SwitchInputProps) => (
-  <View style={styles.commonParamItem}>
-    <Text style={styles.label}>{label}</Text>
-    <Switch value={value} onValueChange={onToggle} />
-  </View>
-);
-
-type NumberInputProps = {
-  value: string;
-  onChange: (value: string) => void;
-  label: string;
-};
-const NumberInput = ({ value, onChange, label }: NumberInputProps) => (
-  <View style={styles.commonParamItem}>
-    <Text style={styles.label}>{label}</Text>
-    <TextInput
-      style={styles.input}
-      keyboardType="numeric"
-      value={value}
-      onChangeText={text => onChange(text.replace(/[^\d]+/, ''))}
-    />
-  </View>
-);
+import { CommonInput } from './CommonInput';
+import { SwitchInput } from './SwitchInput';
 
 export default function CommonParamsView() {
   const { commonParams, setCommonParams: setOptionalParams } = useCommonParams();
@@ -47,23 +19,27 @@ export default function CommonParamsView() {
           value={!!commonParams.keepSession}
           onToggle={value => handleSetParam('keepSession', value)}
         />
-        <NumberInput
+        <CommonInput
           label="重试次数"
+          type="number"
           value={commonParams.retryCount?.toString() ?? ''}
           onChange={value => handleSetParam('retryCount', parseInt(value))}
         />
-        <NumberInput
+        <CommonInput
           label="重试间隔时长"
+          type="number"
           value={commonParams.pollIntervalTime?.toString() ?? ''}
           onChange={value => handleSetParam('pollIntervalTime', parseInt(value))}
         />
-        <NumberInput
+        <CommonInput
           label="连接超时事件"
+          type="number"
           value={commonParams.timeout?.toString() ?? ''}
           onChange={value => handleSetParam('timeout', parseInt(value))}
         />
-        <NumberInput
+        <CommonInput
           label="passphrase State"
+          type="text"
           value={commonParams.passphraseState ?? ''}
           onChange={value => handleSetParam('passphraseState', value)}
         />

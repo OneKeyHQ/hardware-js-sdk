@@ -127,8 +127,7 @@ const PlaygroundManager = () => (
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    gap: 24,
+    width: '100%',
   },
   flatListContainer: {
     marginTop: 12,

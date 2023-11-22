@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   CoreMessage,
   DEVICE,
@@ -8,6 +8,7 @@ import {
   UI_RESPONSE,
 } from '@onekeyfe/hd-core';
 import { View } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { ReceivePin } from './ReceivePin';
 
@@ -17,6 +18,13 @@ export default function HandleSDKEvents() {
   const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK, type } = useContext(HardwareSDKContext);
   const [showPinInput, setShowPinInput] = useState(false);
   const [pinValue, setPinValue] = useState('');
+
+  const focus = useIsFocused();
+  const focusRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    focusRef.current = focus;
+  }, [focus]);
 
   useEffect(() => {
     // 监听 SDK 事件
@@ -30,6 +38,7 @@ export default function HandleSDKEvents() {
     });
 
     SDK.on(UI_EVENT, (message: CoreMessage) => {
+      if (!focusRef.current) return;
       console.log('TopLEVEL EVENT ===>>>>: ', message);
       if (message.type === UI_REQUEST.REQUEST_PIN) {
         // setShowPinInput(true);
@@ -75,7 +84,12 @@ export default function HandleSDKEvents() {
       console.log('example get disconnect event: ', message);
     });
     registerListener = true;
-  }, [SDK, HardwareLowLevelSDK]);
+
+    return () => {
+      registerListener = false;
+      SDK.removeAllListeners();
+    };
+  }, [SDK, HardwareLowLevelSDK, focus]);
 
   // 输入 pin 码的确认回调
   const onConfirmPin = useCallback(

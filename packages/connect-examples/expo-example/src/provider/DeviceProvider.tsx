@@ -29,10 +29,10 @@ export const DeviceProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <DeviceContext.Provider value={providerValue}>
-      <View>
+      <>
         <DeviceList onSelected={setSelectedDevice} />
         {childMemo}
-      </View>
+      </>
     </DeviceContext.Provider>
   );
 };
