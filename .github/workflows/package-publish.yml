@@ -22,4 +22,4 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          yarn publish-packages -y
+          yarn publish-packages -y --no-verify-access
