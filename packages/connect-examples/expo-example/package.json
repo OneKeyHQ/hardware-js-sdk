@@ -45,7 +45,8 @@
     "react-native-screens": "~3.22.0",
     "react-native-web": "~0.19.6",
     "ripple-keypairs": "^1.1.4",
-    "stream-browserify": "^3.0.0"
+    "stream-browserify": "^3.0.0",
+    "use-context-selector": "^1.4.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

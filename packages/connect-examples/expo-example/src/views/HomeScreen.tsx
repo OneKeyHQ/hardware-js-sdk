@@ -15,6 +15,11 @@ export default function HomeScreen() {
           // @ts-expect-error
           onPress={() => navigation.navigate('PassphraseTest')}
         />
+        <Button
+          title="AddressTest Test Screen"
+          // @ts-expect-error
+          onPress={() => navigation.navigate('AddressTest')}
+        />
 
         <PlaygroundManager />
       </View>
@@ -29,6 +34,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: 16,
+    gap: 8,
   },
 });

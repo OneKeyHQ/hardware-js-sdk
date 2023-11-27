@@ -201,7 +201,9 @@ export default function TestMultiWalletChangeView() {
     });
 
     const connectId = selectedDevice?.connectId ?? '';
-    const deviceId = selectedDevice?.features?.device_id ?? '';
+    // refresh device
+    const featuresRes = await SDK.getFeatures(connectId);
+    const deviceId = featuresRes.payload?.device_id ?? '';
 
     SDK.on(UI_EVENT, (message: CoreMessage) => {
       console.log('TopLEVEL EVENT ===>>>>: ', message);
@@ -364,13 +366,7 @@ export default function TestMultiWalletChangeView() {
       done: true,
       payload: '测试结果正确',
     });
-  }, [
-    SDK,
-    changeWalletCount,
-    selectedDevice?.connectId,
-    selectedDevice?.features?.device_id,
-    walletParams,
-  ]);
+  }, [SDK, changeWalletCount, selectedDevice?.connectId, walletParams]);
 
   const ContentView = useMemo(() => {
     console.log();

@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 
@@ -69,13 +69,27 @@ export function DeviceList({ onSelected }: IDeviceListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const selectDevice = useCallback(
+    (device: Device) => {
+      setSelectedId(device.connectId);
+      storeSelectedId(device.connectId);
+      onSelected(device);
+    },
+    [onSelected]
+  );
+
   const searchDevices = useCallback(async () => {
     if (!sdk) return console.log('sdk is not ready');
 
     const response = await sdk.searchDevices();
     console.log('example searchDevices response: ', response);
-    setDevices((response.payload as unknown as Device[]) ?? []);
-  }, [sdk]);
+    const foundDevices = (response.payload as unknown as Device[]) ?? [];
+    setDevices(foundDevices);
+    if (Platform.OS === 'web' && foundDevices?.length) {
+      const device = foundDevices[0];
+      selectDevice(device);
+    }
+  }, [sdk, selectDevice]);
 
   const handleRemoveSelected = useCallback(() => {
     removeSelectedId();
@@ -90,9 +104,7 @@ export function DeviceList({ onSelected }: IDeviceListProps) {
       <Item
         item={item}
         onPress={() => {
-          setSelectedId(item.connectId);
-          storeSelectedId(item.connectId);
-          onSelected(item);
+          selectDevice(item);
         }}
         backgroundColor={{ backgroundColor }}
         textColor={{ color }}

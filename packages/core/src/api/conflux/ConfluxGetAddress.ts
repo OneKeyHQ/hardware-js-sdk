@@ -32,7 +32,7 @@ export default class ConfluxGetAddress extends BaseMethod<HardwareConfluxGetAddr
 
       this.params.push({
         address_n: addressN,
-        chain_id: batch.chainId,
+        chain_id: batch.chainId ?? 1029,
         show_display: showOnOneKey,
       });
     });

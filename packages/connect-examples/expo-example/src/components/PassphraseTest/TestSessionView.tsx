@@ -34,11 +34,15 @@ export default function TestSessionView() {
 
   const testSessionCount = useCallback(async () => {
     const connectId = selectedDevice?.connectId ?? '';
-    const deviceId = selectedDevice?.features?.device_id ?? '';
 
     if (!SDK) return;
 
     SDK.removeAllListeners(UI_EVENT);
+
+    // refresh device
+    const featuresRes = await SDK.getFeatures(connectId);
+    const deviceId = featuresRes.payload?.device_id ?? '';
+
     passphraseStateList.current = [];
     setTestSessionCountResult({
       done: false,
@@ -78,7 +82,9 @@ export default function TestSessionView() {
     hasContinue.current = true;
     while (hasContinue.current) {
       allowInputPassphrase.current = true;
-      const passphraseStateRes = await SDK.getPassphraseState(connectId);
+      const passphraseStateRes = await SDK.getPassphraseState(connectId, {
+        initSession: true,
+      });
       if (!passphraseStateRes.success) {
         hasContinue.current = false;
         setTestSessionCountResult({
@@ -152,7 +158,7 @@ export default function TestSessionView() {
         address: addressRes.payload.address ?? '',
       });
     }
-  }, [SDK, selectedDevice?.connectId, selectedDevice?.features?.device_id, testChain]);
+  }, [SDK, selectedDevice?.connectId, testChain]);
 
   const ContentView = useMemo(() => {
     let result;

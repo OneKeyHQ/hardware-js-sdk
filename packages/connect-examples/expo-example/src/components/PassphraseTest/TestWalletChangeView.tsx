@@ -68,7 +68,11 @@ export default function TestWalletChangeView() {
     });
 
     const connectId = selectedDevice?.connectId ?? '';
-    const deviceId = selectedDevice?.features?.device_id ?? '';
+
+    // refresh device
+    const featuresRes = await SDK.getFeatures(connectId);
+    // @ts-expect-error
+    const deviceId = featuresRes.payload?.device_id ?? '';
 
     SDK.on(UI_EVENT, (message: CoreMessage) => {
       console.log('TopLEVEL EVENT ===>>>>: ', message);
@@ -98,27 +102,30 @@ export default function TestWalletChangeView() {
       }
     >();
     for (const item of passphraseStateList.current ?? []) {
-      let passphraseState: string | undefined;
+      //   let passphraseState: string | undefined;
       currentPassphrase.current = item.passphrase;
-      if (!item.emptyPassphraseState) {
-        const passphraseStateRes = await SDK.getPassphraseState(connectId, {});
-        if (!passphraseStateRes.success) {
-          setTestResult({
-            done: true,
-            payload: `getPassphraseState failed ${passphraseStateRes?.payload?.error}`,
-          });
-          return;
-        }
-        if (!passphraseStateRes.payload) {
-          setTestResult({
-            done: true,
-            payload: 'passphrase is not enabled on the device.',
-          });
-          return;
-        }
-
-        passphraseState = passphraseStateRes.payload;
+      //   if (!item.emptyPassphraseState) {
+      const passphraseStateRes = await SDK.getPassphraseState(connectId, {
+        initSession: true,
+        useEmptyPassphrase: item.emptyPassphraseState,
+      });
+      if (!passphraseStateRes.success) {
+        setTestResult({
+          done: true,
+          payload: `getPassphraseState failed ${passphraseStateRes?.payload?.error}`,
+        });
+        return;
       }
+      if (!item.emptyPassphraseState && !passphraseStateRes.payload) {
+        setTestResult({
+          done: true,
+          payload: 'passphrase is not enabled on the device.',
+        });
+        return;
+      }
+
+      const passphraseState = passphraseStateRes.payload;
+      //   }
 
       const addressRes = await requestAddress({
         sdk: SDK,
@@ -198,14 +205,7 @@ export default function TestWalletChangeView() {
       done: true,
       payload: '测试结果正确',
     });
-  }, [
-    SDK,
-    changeWalletCount,
-    selectedDevice?.connectId,
-    selectedDevice?.features?.device_id,
-    testChain,
-    testWalletCount,
-  ]);
+  }, [SDK, changeWalletCount, selectedDevice?.connectId, testChain, testWalletCount]);
 
   const ContentView = useMemo(() => {
     console.log();
