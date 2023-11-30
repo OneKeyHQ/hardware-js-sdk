@@ -7,7 +7,7 @@ import HardwareSDKContext from '../HardwareSDKContext';
 import PlaygroundManager from '../../components/PlaygroundManager';
 
 let isSdkInit = false;
-export default function USB() {
+export default function USB({ children }: { children: React.ReactNode }) {
   const [sdk, createSDK] = useState<CoreApi>();
   const [lowLevelSDK, createLowLevelSDK] = useState<LowLevelCoreApi>();
   const [useLowLevelApi, setUseLowLevelApi] = useState<boolean>(false);
@@ -46,7 +46,8 @@ export default function USB() {
     <HardwareSDKContext.Provider value={contextValue}>
       <View style={styles.container}>
         <Text>This is USB example page, will run on desktop browser. </Text>
-        {showContent && <PlaygroundManager />}
+        <Text>{showContent ? 'SDK loading complete' : 'SDK loading...'}</Text>
+        {children}
         {/* {showContent && <CallMethods />} */}
       </View>
     </HardwareSDKContext.Provider>

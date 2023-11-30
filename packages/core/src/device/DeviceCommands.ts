@@ -87,17 +87,23 @@ export class DeviceCommands {
           },
         } as any;
       }
-      if (error.response?.data) {
-        Log.debug('error response', error?.response.data);
+
+      const responseData = error?.response?.data;
+      const responseError = responseData?.error;
+
+      if (responseData) {
+        Log.debug('error response', responseData);
       }
-      if (error?.response?.data?.error === 'device disconnected during action') {
+      if (responseError === 'device disconnected during action') {
         return { type: 'BridgeNetworkError', message: {} } as any;
       }
-      if (error?.response?.data?.error?.indexOf('Request failed with status code') !== -1) {
+
+      // undefined.indexOf('...') !== -1 Always true
+      if (responseError && responseError.indexOf('Request failed with status code') !== -1) {
         return {
           type: 'CallMethodError',
           message: {
-            error: error?.response.data ?? '',
+            error: responseData ?? '',
           },
         } as any;
       }
