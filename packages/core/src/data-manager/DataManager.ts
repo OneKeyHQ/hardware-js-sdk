@@ -33,6 +33,10 @@ export default class DataManager {
       firmware: [],
       ble: [],
     },
+    classic1s: {
+      firmware: [],
+      ble: [],
+    },
     mini: {
       firmware: [],
       ble: [],
@@ -262,6 +266,7 @@ export default class DataManager {
       );
       this.deviceMap = {
         classic: data.classic,
+        classic1s: data.classic1s,
         mini: data.mini,
         touch: data.touch,
         pro: data.pro,

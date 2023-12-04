@@ -31,10 +31,26 @@ export const getDeviceModel = (features?: Features): IDeviceModel => {
 };
 
 export const getDeviceType = (features?: Features): IDeviceType => {
-  if (!features || typeof features !== 'object' || !features.serial_no) {
+  if (!features || typeof features !== 'object') {
     return 'classic';
   }
 
+  // classic1s 3.5.0
+  switch (features.onekey_device_type) {
+    case 'CLASSIC':
+      return 'classic';
+    case 'CLASSIC1S':
+      return 'classic1s';
+    case 'MINI':
+      return 'mini';
+    case 'TOUCH_PRO':
+      return 'pro';
+    default:
+    // other
+  }
+
+  // low version hardware
+  if (!features.serial_no) return 'classic';
   const serialNo = features.serial_no;
   const miniFlag = serialNo.slice(0, 2);
   if (miniFlag.toLowerCase() === 'mi') return 'mini';
@@ -64,6 +80,9 @@ export const getDeviceTypeByDeviceId = (deviceId?: string): IDeviceType => {
 
 export const getDeviceUUID = (features: Features) => {
   const deviceType = getDeviceType(features);
+
+  if (features.onekey_serial_no) return features.onekey_serial_no;
+
   if (deviceType === 'classic') {
     return features.onekey_serial ?? '';
   }
@@ -162,7 +181,7 @@ export const supportInputPinOnSoftware = (features: Features): SupportFeatureTyp
   if (!features) return { support: false };
 
   const deviceType = getDeviceType(features);
-  if (deviceType === 'touch') {
+  if (deviceType === 'touch' || deviceType === 'pro') {
     return { support: false };
   }
 
