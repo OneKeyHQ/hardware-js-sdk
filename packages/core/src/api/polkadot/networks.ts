@@ -1,3 +1,5 @@
+import type { DeviceFirmwareRange } from '../../types';
+
 // 100% sure which networks are supported
 enum Networks {
   Polkadot = 'polkadot',
@@ -7,16 +9,17 @@ enum Networks {
   JoyStream = 'joystream',
 }
 
-const networkVersionRange = {
-  // All polkadot networks are included in no special case
-  [Networks.Polkadot]: {
-    model_mini: {
-      min: '3.0.0',
-    },
-    model_touch: {
-      min: '4.3.0',
-    },
+// All polkadot networks are included in no special case
+const baseVersionRange = {
+  model_mini: {
+    min: '3.0.0',
   },
+  model_touch: {
+    min: '4.3.0',
+  },
+};
+
+const specialVersionRange: Record<string, DeviceFirmwareRange> = {
   [Networks.JoyStream]: {
     model_mini: {
       min: '3.6.0',
@@ -28,4 +31,14 @@ const networkVersionRange = {
 };
 
 export default Networks;
-export const PolkadotVersionRange = networkVersionRange;
+
+export function getPolkadotVersionRange(network: string) {
+  return specialVersionRange[network] ?? baseVersionRange;
+}
+
+export function getPolkadotVersionRangeWithBundle(networks: string[]) {
+  if (networks.includes(Networks.JoyStream)) {
+    return specialVersionRange[Networks.JoyStream];
+  }
+  return baseVersionRange;
+}

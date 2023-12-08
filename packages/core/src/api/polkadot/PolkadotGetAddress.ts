@@ -4,7 +4,7 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
-import Networks, { PolkadotVersionRange } from './networks';
+import { getPolkadotVersionRangeWithBundle } from './networks';
 
 export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAddress[]> {
   hasBundle = false;
@@ -45,10 +45,7 @@ export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAd
 
   getVersionRange() {
     const networks = this.params.map(param => param.network);
-    if (networks.includes(Networks.JoyStream)) {
-      return PolkadotVersionRange[Networks.JoyStream];
-    }
-    return PolkadotVersionRange[Networks.Polkadot];
+    return getPolkadotVersionRangeWithBundle(networks);
   }
 
   async run() {
