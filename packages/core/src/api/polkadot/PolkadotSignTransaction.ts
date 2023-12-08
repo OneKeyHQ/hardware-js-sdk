@@ -4,6 +4,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { PolkadotSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
+import { getPolkadotVersionRange } from './networks';
 
 export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadotSignTx> {
   hasBundle = false;
@@ -31,14 +32,7 @@ export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadot
   }
 
   getVersionRange() {
-    return {
-      model_mini: {
-        min: '3.0.0',
-      },
-      model_touch: {
-        min: '4.3.0',
-      },
-    };
+    return getPolkadotVersionRange(this.params.network);
   }
 
   async run() {

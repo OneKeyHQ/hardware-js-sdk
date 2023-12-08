@@ -4,6 +4,7 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
+import { getPolkadotVersionRangeWithBundle } from './networks';
 
 export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAddress[]> {
   hasBundle = false;
@@ -43,14 +44,8 @@ export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAd
   }
 
   getVersionRange() {
-    return {
-      model_mini: {
-        min: '3.0.0',
-      },
-      model_touch: {
-        min: '4.3.0',
-      },
-    };
+    const networks = this.params.map(param => param.network);
+    return getPolkadotVersionRangeWithBundle(networks);
   }
 
   async run() {
