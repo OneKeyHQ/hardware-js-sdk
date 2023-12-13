@@ -1245,6 +1245,106 @@ export type EcdsaPublicKeys = {
   public_keys: string[];
 };
 
+export enum DebugSwipeDirection {
+  UP = 0,
+  DOWN = 1,
+  LEFT = 2,
+  RIGHT = 3,
+}
+
+// DebugLinkDecision
+export type DebugLinkDecision = {
+  yes_no?: boolean;
+  swipe?: DebugSwipeDirection;
+  input?: string;
+  x?: number;
+  y?: number;
+  wait?: boolean;
+  hold_ms?: number;
+};
+
+// DebugLinkLayout
+export type DebugLinkLayout = {
+  lines: string[];
+};
+
+// DebugLinkReseedRandom
+export type DebugLinkReseedRandom = {
+  value?: number;
+};
+
+// DebugLinkRecordScreen
+export type DebugLinkRecordScreen = {
+  target_directory?: string;
+};
+
+// DebugLinkGetState
+export type DebugLinkGetState = {
+  wait_word_list?: boolean;
+  wait_word_pos?: boolean;
+  wait_layout?: boolean;
+};
+
+// DebugLinkState
+export type DebugLinkState = {
+  layout?: string;
+  pin?: string;
+  matrix?: string;
+  mnemonic_secret?: string;
+  node?: HDNodeType;
+  passphrase_protection?: boolean;
+  reset_word?: string;
+  reset_entropy?: string;
+  recovery_fake_word?: string;
+  recovery_word_pos?: number;
+  reset_word_pos?: number;
+  mnemonic_type?: BackupType;
+  layout_lines: string[];
+};
+
+// DebugLinkStop
+export type DebugLinkStop = {};
+
+// DebugLinkLog
+export type DebugLinkLog = {
+  level?: number;
+  bucket?: string;
+  text?: string;
+};
+
+// DebugLinkMemoryRead
+export type DebugLinkMemoryRead = {
+  address?: number;
+  length?: number;
+};
+
+// DebugLinkMemory
+export type DebugLinkMemory = {
+  memory?: string;
+};
+
+// DebugLinkMemoryWrite
+export type DebugLinkMemoryWrite = {
+  address?: number;
+  memory?: string;
+  flash?: boolean;
+};
+
+// DebugLinkFlashErase
+export type DebugLinkFlashErase = {
+  sector?: number;
+};
+
+// DebugLinkEraseSdCard
+export type DebugLinkEraseSdCard = {
+  format?: boolean;
+};
+
+// DebugLinkWatchLayout
+export type DebugLinkWatchLayout = {
+  watch?: boolean;
+};
+
 // EmmcFixPermission
 export type EmmcFixPermission = {};
 
@@ -3811,6 +3911,20 @@ export type MessageType = {
   Path: Path;
   BatchGetPublickeys: BatchGetPublickeys;
   EcdsaPublicKeys: EcdsaPublicKeys;
+  DebugLinkDecision: DebugLinkDecision;
+  DebugLinkLayout: DebugLinkLayout;
+  DebugLinkReseedRandom: DebugLinkReseedRandom;
+  DebugLinkRecordScreen: DebugLinkRecordScreen;
+  DebugLinkGetState: DebugLinkGetState;
+  DebugLinkState: DebugLinkState;
+  DebugLinkStop: DebugLinkStop;
+  DebugLinkLog: DebugLinkLog;
+  DebugLinkMemoryRead: DebugLinkMemoryRead;
+  DebugLinkMemory: DebugLinkMemory;
+  DebugLinkMemoryWrite: DebugLinkMemoryWrite;
+  DebugLinkFlashErase: DebugLinkFlashErase;
+  DebugLinkEraseSdCard: DebugLinkEraseSdCard;
+  DebugLinkWatchLayout: DebugLinkWatchLayout;
   EmmcFixPermission: EmmcFixPermission;
   EmmcPath: EmmcPath;
   EmmcPathInfo: EmmcPathInfo;

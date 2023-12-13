@@ -280,4 +280,64 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nostrSignSchnorr' }),
   lnurlAuth: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'lnurlAuth' }),
+
+  deviceSpiFlashWrite: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSpiFlashWrite' }),
+  deviceSpiFlashRead: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSpiFlashRead' }),
+  deviceInfoSettings: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceInfoSettings' }),
+  deviceGetInfo: (connectId, params) => call({ ...params, connectId, method: 'deviceGetInfo' }),
+  deviceReadSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadSEPublicCert' }),
+  deviceWriteSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteSEPublicCert' }),
+  deviceSESignMessage: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSESignMessage' }),
+  devicePing: (connectId, params) => call({ ...params, connectId, method: 'devicePing' }),
+  deviceGetEntropy: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetEntropy' }),
+  deviceSdProtect: (connectId, params) => call({ ...params, connectId, method: 'deviceSdProtect' }),
+  deviceChangeWipeCode: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceChangeWipeCode' }),
+  deviceEndSession: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceEndSession' }),
+  deviceLock: (connectId, params) => call({ ...params, connectId, method: 'deviceLock' }),
+  deviceDoPreauthorized: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceDoPreauthorized' }),
+  deviceCancelAuthorization: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceCancelAuthorization' }),
+  setU2FCounter: (connectId, params) => call({ ...params, connectId, method: 'setU2FCounter' }),
+  getNextU2FCounter: (connectId, params) =>
+    call({ ...params, connectId, method: 'getNextU2FCounter' }),
+
+  emmcDirList: (connectId, params) => call({ ...params, connectId, method: 'emmcDirList' }),
+  emmcDirMake: (connectId, params) => call({ ...params, connectId, method: 'emmcDirMake' }),
+  emmcDirRemove: (connectId, params) => call({ ...params, connectId, method: 'emmcDirRemove' }),
+  emmcFileDelete: (connectId, params) => call({ ...params, connectId, method: 'emmcFileDelete' }),
+  emmcFileRead: (connectId, params) => call({ ...params, connectId, method: 'emmcFileRead' }),
+  emmcFileWrite: (connectId, params) => call({ ...params, connectId, method: 'emmcFileWrite' }),
+  emmcFixPermission: (connectId, params) =>
+    call({ ...params, connectId, method: 'emmcFixPermission' }),
+  emmcPathInfo: (connectId, params) => call({ ...params, connectId, method: 'emmcPathInfo' }),
+
+  debugLinkDecision: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkDecision' }),
+  debugLinkEraseSdCard: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkEraseSdCard' }),
+  debugLinkFlashErase: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkFlashErase' }),
+  debugLinkGetState: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkGetState' }),
+  debugLinkMemoryRead: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkMemoryRead' }),
+  debugLinkMemoryWrite: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkMemoryWrite' }),
+  debugLinkRecordScreen: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkRecordScreen' }),
+  debugLinkReseedRandom: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkReseedRandom' }),
+  debugLinkStop: (connectId, params) => call({ ...params, connectId, method: 'debugLinkStop' }),
+  debugLinkWatchLayout: (connectId, params) =>
+    call({ ...params, connectId, method: 'debugLinkWatchLayout' }),
 });

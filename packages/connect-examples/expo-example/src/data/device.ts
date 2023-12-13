@@ -108,6 +108,11 @@ const api: PlaygroundProps[] = [
     description: 'Wipe a device',
     noDeviceIdReq: true,
   },
+  {
+    method: 'deviceBackup',
+    description: 'Backup a device',
+    noDeviceIdReq: true,
+  },
 ];
 
 export default api;

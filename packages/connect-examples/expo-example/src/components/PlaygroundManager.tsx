@@ -104,6 +104,18 @@ const playgroundConfig = [
     title: 'Nostr API',
     data: require('../data/nostr').default,
   },
+  {
+    title: 'Manager API',
+    data: require('../data/manager').default,
+  },
+  {
+    title: 'Emmc API',
+    data: require('../data/emmc').default,
+  },
+  {
+    title: 'Debug API',
+    data: require('../data/debug').default,
+  },
 ];
 
 const PlaygroundManager = () => (

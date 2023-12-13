@@ -119,6 +119,41 @@ import { nostrDecryptMessage } from './nostrDecryptMessage';
 import { nostrSignSchnorr } from './nostrSignSchnorr';
 
 import { lnurlAuth } from './lnurlAuth';
+import { deviceSpiFlashWrite } from './deviceSpiFlashWrite';
+import { deviceSpiFlashRead } from './deviceSpiFlashRead';
+import { deviceInfoSettings } from './deviceInfoSettings';
+import { deviceGetInfo } from './deviceGetInfo';
+import { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
+import { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
+import { deviceSESignMessage } from './deviceSESignMessage';
+import { devicePing } from './devicePing';
+import { deviceGetEntropy } from './deviceGetEntropy';
+import { deviceSdProtect } from './deviceSdProtect';
+import { deviceChangeWipeCode } from './deviceChangeWipeCode';
+import { deviceEndSession } from './deviceEndSession';
+import { deviceLock } from './deviceLock';
+import { deviceDoPreauthorized } from './deviceDoPreauthorized';
+import { deviceCancelAuthorization } from './deviceCancelAuthorization';
+import { setU2FCounter } from './setU2FCounter';
+import { getNextU2FCounter } from './getNextU2FCounter';
+import { emmcDirList } from './emmcDirList';
+import { emmcDirMake } from './emmcDirMake';
+import { emmcDirRemove } from './emmcDirRemove';
+import { emmcFileDelete } from './emmcFileDelete';
+import { emmcFileRead } from './emmcFileRead';
+import { emmcFileWrite } from './emmcFileWrite';
+import { emmcFixPermission } from './emmcFixPermission';
+import { emmcPathInfo } from './emmcPathInfo';
+import { debugLinkDecision } from './debugLinkDecision';
+import { debugLinkEraseSdCard } from './debugLinkEraseSdCard';
+import { debugLinkFlashErase } from './debugLinkFlashErase';
+import { debugLinkGetState } from './debugLinkGetState';
+import { debugLinkMemoryRead } from './debugLinkMemoryRead';
+import { debugLinkMemoryWrite } from './debugLinkMemoryWrite';
+import { debugLinkRecordScreen } from './debugLinkRecordScreen';
+import { debugLinkReseedRandom } from './debugLinkReseedRandom';
+import { debugLinkStop } from './debugLinkStop';
+import { debugLinkWatchLayout } from './debugLinkWatchLayout';
 
 export * from './export';
 
@@ -323,4 +358,42 @@ export type CoreApi = {
    * Lightning Network
    */
   lnurlAuth: typeof lnurlAuth;
+  deviceSpiFlashWrite: typeof deviceSpiFlashWrite;
+  deviceSpiFlashRead: typeof deviceSpiFlashRead;
+  deviceInfoSettings: typeof deviceInfoSettings;
+  deviceGetInfo: typeof deviceGetInfo;
+  deviceReadSEPublicCert: typeof deviceReadSEPublicCert;
+  deviceWriteSEPublicCert: typeof deviceWriteSEPublicCert;
+  deviceSESignMessage: typeof deviceSESignMessage;
+  devicePing: typeof devicePing;
+  deviceGetEntropy: typeof deviceGetEntropy;
+  deviceSdProtect: typeof deviceSdProtect;
+  deviceChangeWipeCode: typeof deviceChangeWipeCode;
+  deviceEndSession: typeof deviceEndSession;
+  deviceLock: typeof deviceLock;
+  deviceDoPreauthorized: typeof deviceDoPreauthorized;
+  deviceCancelAuthorization: typeof deviceCancelAuthorization;
+
+  setU2FCounter: typeof setU2FCounter;
+  getNextU2FCounter: typeof getNextU2FCounter;
+
+  emmcDirList: typeof emmcDirList;
+  emmcDirMake: typeof emmcDirMake;
+  emmcDirRemove: typeof emmcDirRemove;
+  emmcFileDelete: typeof emmcFileDelete;
+  emmcFileRead: typeof emmcFileRead;
+  emmcFileWrite: typeof emmcFileWrite;
+  emmcFixPermission: typeof emmcFixPermission;
+  emmcPathInfo: typeof emmcPathInfo;
+
+  debugLinkDecision: typeof debugLinkDecision;
+  debugLinkEraseSdCard: typeof debugLinkEraseSdCard;
+  debugLinkFlashErase: typeof debugLinkFlashErase;
+  debugLinkGetState: typeof debugLinkGetState;
+  debugLinkMemoryRead: typeof debugLinkMemoryRead;
+  debugLinkMemoryWrite: typeof debugLinkMemoryWrite;
+  debugLinkRecordScreen: typeof debugLinkRecordScreen;
+  debugLinkReseedRandom: typeof debugLinkReseedRandom;
+  debugLinkStop: typeof debugLinkStop;
+  debugLinkWatchLayout: typeof debugLinkWatchLayout;
 };
