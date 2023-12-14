@@ -107,3 +107,8 @@ export { default as kaspaSignTransaction } from './kaspa/KaspaSignTransaction';
 
 export { default as nexaGetAddress } from './nexa/NexaGetAddress';
 export { default as nexaSignTransaction } from './nexa/NexaSignTransaction';
+
+export { default as nostrGetPublicKey } from './nostr/NostrGetPublicKey';
+export { default as nostrSignEvent } from './nostr/NostrSignEvent';
+export { default as nostrEncryptMessage } from './nostr/NostrEncryptMessage';
+export { default as nostrDecryptMessage } from './nostr/NostrDecryptMessage';

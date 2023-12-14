@@ -112,6 +112,11 @@ import { kaspaSignTransaction } from './kaspaSignTransaction';
 import { nexaGetAddress } from './nexaGetAddress';
 import { nexaSignTransaction } from './nexaSignTransaction';
 
+import { nostrGetPublicKey } from './nostrGetPublicKey';
+import { nostrSignEvent } from './nostrSignEvent';
+import { nostrEncryptMessage } from './nostrEncryptMessage';
+import { nostrDecryptMessage } from './nostrDecryptMessage';
+
 export * from './export';
 
 export type CoreApi = {
@@ -301,4 +306,12 @@ export type CoreApi = {
    */
   nexaGetAddress: typeof nexaGetAddress;
   nexaSignTransaction: typeof nexaSignTransaction;
+
+  /**
+   * Nostr function
+   */
+  nostrGetPublicKey: typeof nostrGetPublicKey;
+  nostrSignEvent: typeof nostrSignEvent;
+  nostrEncryptMessage: typeof nostrEncryptMessage;
+  nostrDecryptMessage: typeof nostrDecryptMessage;
 };
