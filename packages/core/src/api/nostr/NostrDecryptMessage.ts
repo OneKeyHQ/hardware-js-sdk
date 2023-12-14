@@ -14,12 +14,6 @@ export default class NostrDecryptMessage extends BaseMethod<DecryptMessage> {
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     const { payload } = this;
-    if (!validateEvent(payload.event)) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.CallMethodInvalidParameter,
-        `Can't serialize event with wrong or missing properties`
-      );
-    }
     validateParams(payload, [
       { name: 'path', required: true },
       { name: 'pubkey', required: true, type: 'string' },

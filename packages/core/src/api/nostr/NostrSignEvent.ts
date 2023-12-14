@@ -5,6 +5,7 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { validateEvent } from './helper';
+import { bytesToHex, hexToBytes } from '../helpers/hexUtils';
 
 export default class NostrSignEvent extends BaseMethod<SignEvent> {
   hasBundle = false;
@@ -25,7 +26,7 @@ export default class NostrSignEvent extends BaseMethod<SignEvent> {
 
     this.params = {
       address_n: addressN,
-      event: payload.event,
+      event: bytesToHex(Buffer.from(JSON.stringify(payload.event, null, 0), 'utf-8')),
     };
   }
 
@@ -44,9 +45,16 @@ export default class NostrSignEvent extends BaseMethod<SignEvent> {
       this.params
     );
 
-    return {
-      path: serializedPath(this.params.address_n),
-      signature: message.event,
-    };
+    try {
+      const signedEvent = Buffer.from(hexToBytes(message.event)).toString('utf-8');
+      const event = JSON.parse(signedEvent);
+      return {
+        path: serializedPath(this.params.address_n),
+        rawTx: message.event,
+        event,
+      };
+    } catch (e) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallMethodError, 'Failed to parse signed event', e);
+    }
   }
 }

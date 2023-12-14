@@ -36,6 +36,7 @@ export type NostrEvent = {
 };
 
 export type NostrSignedEvent = {
+  path: string;
   event: NostrEvent;
 };
 
