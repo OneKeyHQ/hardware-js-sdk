@@ -1,10 +1,8 @@
 import { NostrEncryptMessage as EncryptMessage } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { validateEvent } from './helper';
 
 export default class NostrEncryptMessage extends BaseMethod<EncryptMessage> {
   hasBundle = false;

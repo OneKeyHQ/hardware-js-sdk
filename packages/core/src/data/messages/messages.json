@@ -8081,6 +8081,122 @@
         }
       }
     },
+    "NostrGetPublicKey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "NostrPublicKey": {
+      "fields": {
+        "publickey": {
+          "type": "string",
+          "id": 1
+        },
+        "npub": {
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "NostrSignEvent": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "event": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "NostrSignedEvent": {
+      "fields": {
+        "event": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "NostrEncryptMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "pubkey": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "msg": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "NostrEncryptedMessage": {
+      "fields": {
+        "msg": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "NostrDecryptMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "pubkey": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "msg": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "NostrDecryptedMessage": {
+      "fields": {
+        "msg": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
     "PolkadotGetAddress": {
       "fields": {
         "address_n": {
@@ -10215,6 +10331,14 @@
         "MessageType_NexaSignedTx": 11403,
         "MessageType_NexaTxInputRequest": 11404,
         "MessageType_NexaTxInputAck": 11405,
+        "MessageType_NostrGetPublicKey": 11500,
+        "MessageType_NostrPublicKey": 11501,
+        "MessageType_NostrSignEvent": 11502,
+        "MessageType_NostrSignedEvent": 11503,
+        "MessageType_NostrEncryptMessage": 11504,
+        "MessageType_NostrEncryptedMessage": 11505,
+        "MessageType_NostrDecryptMessage": 11506,
+        "MessageType_NostrDecryptedMessage": 11507,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
