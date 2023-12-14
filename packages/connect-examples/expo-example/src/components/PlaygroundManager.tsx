@@ -13,10 +13,6 @@ import UpdateFirmware from './UpdateFirmware';
 
 const playgroundConfig = [
   {
-    title: 'Nostr API',
-    data: require('../data/nostr').default,
-  },
-  {
     title: 'Basic API',
     data: require('../data/basic').default,
   },
@@ -99,6 +95,10 @@ const playgroundConfig = [
   {
     title: 'TRON API',
     data: require('../data/tron').default,
+  },
+  {
+    title: 'Nostr API',
+    data: require('../data/nostr').default,
   },
 ];
 
