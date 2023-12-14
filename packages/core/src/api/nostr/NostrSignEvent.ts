@@ -33,7 +33,10 @@ export default class NostrSignEvent extends BaseMethod<SignEvent> {
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.9.0',
+        min: '3.6.0',
+      },
+      model_touch: {
+        min: '4.6.0',
       },
     };
   }

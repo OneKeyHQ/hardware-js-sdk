@@ -3,6 +3,7 @@ import type { CommonParams, Response } from '../params';
 export type NostrPublicKey = {
   npub?: string;
   publickey?: string;
+  path: string;
 };
 
 export interface NostrPublicKeyParams {
