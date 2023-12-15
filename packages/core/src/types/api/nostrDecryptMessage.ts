@@ -8,6 +8,7 @@ export interface NostrDecryptMessageParams {
   path: string | number[];
   pubkey: string;
   ciphertext: string;
+  showOnOneKey?: boolean;
 }
 
 export type NostrDecryptedMessageResponse = {

@@ -8135,6 +8135,32 @@
         }
       }
     },
+    "NostrSignSchnorr": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "hash": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "NostrSignedSchnorr": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "NostrEncryptMessage": {
       "fields": {
         "address_n": {
@@ -8154,6 +8180,10 @@
           "rule": "required",
           "type": "string",
           "id": 3
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 4
         }
       }
     },
@@ -8185,6 +8215,10 @@
           "rule": "required",
           "type": "string",
           "id": 3
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 4
         }
       }
     },
@@ -10339,6 +10373,8 @@
         "MessageType_NostrEncryptedMessage": 11505,
         "MessageType_NostrDecryptMessage": 11506,
         "MessageType_NostrDecryptedMessage": 11507,
+        "MessageType_NostrSignSchnorr": 11508,
+        "MessageType_NostrSignedSchnorr": 11509,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,

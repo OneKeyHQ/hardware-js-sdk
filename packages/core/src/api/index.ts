@@ -112,3 +112,4 @@ export { default as nostrGetPublicKey } from './nostr/NostrGetPublicKey';
 export { default as nostrSignEvent } from './nostr/NostrSignEvent';
 export { default as nostrEncryptMessage } from './nostr/NostrEncryptMessage';
 export { default as nostrDecryptMessage } from './nostr/NostrDecryptMessage';
+export { default as nostrSignSchnorr } from './nostr/NostrSignSchnorr';

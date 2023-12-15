@@ -276,4 +276,6 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nostrEncryptMessage' }),
   nostrDecryptMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'nostrDecryptMessage' }),
+  nostrSignSchnorr: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nostrSignSchnorr' }),
 });

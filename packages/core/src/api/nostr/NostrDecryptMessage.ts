@@ -16,6 +16,7 @@ export default class NostrDecryptMessage extends BaseMethod<DecryptMessage> {
       { name: 'path', required: true },
       { name: 'pubkey', required: true, type: 'string' },
       { name: 'ciphertext', required: true, type: 'string' },
+      { name: 'showOnOneKey', type: 'boolean' },
     ]);
     const addressN = validatePath(payload.path, 5);
 
@@ -23,6 +24,7 @@ export default class NostrDecryptMessage extends BaseMethod<DecryptMessage> {
       address_n: addressN,
       pubkey: payload.pubkey,
       msg: payload.ciphertext,
+      show_display: payload.showOnOneKey ?? true,
     };
   }
 

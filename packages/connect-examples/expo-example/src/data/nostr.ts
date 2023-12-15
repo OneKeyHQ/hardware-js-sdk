@@ -82,6 +82,7 @@ const api: PlaygroundProps[] = [
           path: "m/44'/1237'/0'/0/0",
           pubkey: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
           plaintext: 'Hello world',
+          showOnOneKey: false,
         },
       },
     ],
@@ -96,6 +97,20 @@ const api: PlaygroundProps[] = [
           path: "m/44'/1237'/0'/0/0",
           pubkey: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
           ciphertext: 'VpWFJ7JDFv16jL7pBZ1shw==?iv=$1tPpwGD3Ic1RTVXJx1ZG7Q==',
+          showOnOneKey: false,
+        },
+      },
+    ],
+  },
+  {
+    method: 'nostrSignSchnorr',
+    description: 'Sign schnorr',
+    presupposes: [
+      {
+        title: 'Sign schnorr',
+        value: {
+          path: "m/44'/1237'/0'/0/0",
+          hash: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
         },
       },
     ],

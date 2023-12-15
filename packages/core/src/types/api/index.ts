@@ -116,6 +116,7 @@ import { nostrGetPublicKey } from './nostrGetPublicKey';
 import { nostrSignEvent } from './nostrSignEvent';
 import { nostrEncryptMessage } from './nostrEncryptMessage';
 import { nostrDecryptMessage } from './nostrDecryptMessage';
+import { nostrSignSchnorr } from './nostrSignSchnorr';
 
 export * from './export';
 
@@ -314,4 +315,5 @@ export type CoreApi = {
   nostrSignEvent: typeof nostrSignEvent;
   nostrEncryptMessage: typeof nostrEncryptMessage;
   nostrDecryptMessage: typeof nostrDecryptMessage;
+  nostrSignSchnorr: typeof nostrSignSchnorr;
 };

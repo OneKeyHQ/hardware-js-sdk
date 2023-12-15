@@ -3006,11 +3006,23 @@ export type NostrSignedEvent = {
   event: string;
 };
 
+// NostrSignSchnorr
+export type NostrSignSchnorr = {
+  address_n: number[];
+  hash: string;
+};
+
+// NostrSignedSchnorr
+export type NostrSignedSchnorr = {
+  signature: string;
+};
+
 // NostrEncryptMessage
 export type NostrEncryptMessage = {
   address_n: number[];
   pubkey: string;
   msg: string;
+  show_display?: boolean;
 };
 
 // NostrEncryptedMessage
@@ -3023,6 +3035,7 @@ export type NostrDecryptMessage = {
   address_n: number[];
   pubkey: string;
   msg: string;
+  show_display?: boolean;
 };
 
 // NostrDecryptedMessage
@@ -4013,6 +4026,8 @@ export type MessageType = {
   NostrPublicKey: NostrPublicKey;
   NostrSignEvent: NostrSignEvent;
   NostrSignedEvent: NostrSignedEvent;
+  NostrSignSchnorr: NostrSignSchnorr;
+  NostrSignedSchnorr: NostrSignedSchnorr;
   NostrEncryptMessage: NostrEncryptMessage;
   NostrEncryptedMessage: NostrEncryptedMessage;
   NostrDecryptMessage: NostrDecryptMessage;

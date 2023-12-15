@@ -1,10 +1,10 @@
-import { NostrEncryptMessage as EncryptMessage } from '@onekeyfe/hd-transport';
+import { NostrSignSchnorr as SignSchnorr } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 
-export default class NostrEncryptMessage extends BaseMethod<EncryptMessage> {
+export default class NostrSignSchnorr extends BaseMethod<SignSchnorr> {
   hasBundle = false;
 
   init() {
@@ -14,17 +14,13 @@ export default class NostrEncryptMessage extends BaseMethod<EncryptMessage> {
     const { payload } = this;
     validateParams(payload, [
       { name: 'path', required: true },
-      { name: 'pubkey', required: true, type: 'string' },
-      { name: 'plaintext', required: true, type: 'string' },
-      { name: 'showOnOneKey', type: 'boolean' },
+      { name: 'hash', required: true, type: 'string' },
     ]);
     const addressN = validatePath(payload.path, 5);
 
     this.params = {
       address_n: addressN,
-      pubkey: payload.pubkey,
-      msg: payload.plaintext,
-      show_display: payload.showOnOneKey ?? true,
+      hash: payload.hash,
     };
   }
 
@@ -41,16 +37,15 @@ export default class NostrEncryptMessage extends BaseMethod<EncryptMessage> {
 
   async run() {
     const { message } = await this.device.commands.typedCall(
-      'NostrEncryptMessage',
-      'NostrEncryptedMessage',
+      'NostrSignSchnorr',
+      'NostrSignedSchnorr',
       this.params
     );
 
     return {
       path: serializedPath(this.params.address_n),
-      pubkey: this.params.pubkey,
-      plaintext: this.params.msg,
-      encryptedMessage: message.msg,
+      rawHash: this.params.hash,
+      signature: message.signature,
     };
   }
 }
