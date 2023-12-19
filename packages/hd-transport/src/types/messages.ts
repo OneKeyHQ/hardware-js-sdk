@@ -2983,6 +2983,66 @@ export type NexaSignedTx = {
   signature: string;
 };
 
+// NostrGetPublicKey
+export type NostrGetPublicKey = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// NostrPublicKey
+export type NostrPublicKey = {
+  publickey?: string;
+  npub?: string;
+};
+
+// NostrSignEvent
+export type NostrSignEvent = {
+  address_n: number[];
+  event: string;
+};
+
+// NostrSignedEvent
+export type NostrSignedEvent = {
+  event: string;
+};
+
+// NostrSignSchnorr
+export type NostrSignSchnorr = {
+  address_n: number[];
+  hash: string;
+};
+
+// NostrSignedSchnorr
+export type NostrSignedSchnorr = {
+  signature: string;
+};
+
+// NostrEncryptMessage
+export type NostrEncryptMessage = {
+  address_n: number[];
+  pubkey: string;
+  msg: string;
+  show_display?: boolean;
+};
+
+// NostrEncryptedMessage
+export type NostrEncryptedMessage = {
+  msg: string;
+};
+
+// NostrDecryptMessage
+export type NostrDecryptMessage = {
+  address_n: number[];
+  pubkey: string;
+  msg: string;
+  show_display?: boolean;
+};
+
+// NostrDecryptedMessage
+export type NostrDecryptedMessage = {
+  msg: string;
+};
+
 // PolkadotGetAddress
 export type PolkadotGetAddress = {
   address_n: number[];
@@ -3962,6 +4022,16 @@ export type MessageType = {
   NexaTxInputRequest: NexaTxInputRequest;
   NexaTxInputAck: NexaTxInputAck;
   NexaSignedTx: NexaSignedTx;
+  NostrGetPublicKey: NostrGetPublicKey;
+  NostrPublicKey: NostrPublicKey;
+  NostrSignEvent: NostrSignEvent;
+  NostrSignedEvent: NostrSignedEvent;
+  NostrSignSchnorr: NostrSignSchnorr;
+  NostrSignedSchnorr: NostrSignedSchnorr;
+  NostrEncryptMessage: NostrEncryptMessage;
+  NostrEncryptedMessage: NostrEncryptedMessage;
+  NostrDecryptMessage: NostrDecryptMessage;
+  NostrDecryptedMessage: NostrDecryptedMessage;
   PolkadotGetAddress: PolkadotGetAddress;
   PolkadotAddress: PolkadotAddress;
   PolkadotSignTx: PolkadotSignTx;

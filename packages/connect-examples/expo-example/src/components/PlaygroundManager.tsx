@@ -96,6 +96,10 @@ const playgroundConfig = [
     title: 'TRON API',
     data: require('../data/tron').default,
   },
+  {
+    title: 'Nostr API',
+    data: require('../data/nostr').default,
+  },
 ];
 
 const PlaygroundManager = () => (
