@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-http",
-  "version": "0.3.34-alpha.0",
+  "version": "0.3.34",
   "description": "hardware http transport",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -24,8 +24,8 @@
     "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^0.3.34-alpha.0",
-    "@onekeyfe/hd-transport": "^0.3.34-alpha.0",
+    "@onekeyfe/hd-shared": "^0.3.34",
+    "@onekeyfe/hd-transport": "^0.3.34",
     "axios": "^0.27.2"
   }
 }
