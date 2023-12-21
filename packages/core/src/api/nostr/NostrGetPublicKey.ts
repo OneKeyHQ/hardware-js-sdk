@@ -43,7 +43,7 @@ export default class NostrGetPublicKey extends BaseMethod<GetPublicKey[]> {
         min: '3.6.0',
       },
       model_touch: {
-        min: '4.6.0',
+        min: '4.7.0',
       },
     };
   }
