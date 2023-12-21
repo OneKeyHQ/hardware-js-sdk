@@ -9,7 +9,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'ListEmmcDir',
         value: {
-          path: '/',
+          path: '/res',
         },
       },
     ],
@@ -21,7 +21,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'CreateEmmcDir',
         value: {
-          path: '/abc',
+          path: '/res/abc',
         },
       },
     ],
@@ -33,7 +33,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'RemoveEmmcDir',
         value: {
-          path: '/abc',
+          path: '/res/abc',
         },
       },
     ],
@@ -45,7 +45,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'RemoveEmmcFile',
         value: {
-          path: '/abc/a.txt',
+          path: '/res/abc/a.txt',
         },
       },
     ],
@@ -58,7 +58,7 @@ const api: PlaygroundProps[] = [
         title: 'ReadEmmcFile',
         value: {
           file: {
-            path: '/abc/a.txt',
+            path: '/res/abc/a.txt',
             offset: 0,
             length: 100,
           },
@@ -74,7 +74,7 @@ const api: PlaygroundProps[] = [
         title: 'WriteEmmcFile',
         value: {
           file: {
-            path: '/abc/a.txt',
+            path: '/res/abc/a.txt',
             offset: 0,
             length: 100,
           },
@@ -95,7 +95,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'emmcPathInfo',
         value: {
-          path: '/abc/a.txt',
+          path: '/res/abc/a.txt',
         },
       },
     ],
