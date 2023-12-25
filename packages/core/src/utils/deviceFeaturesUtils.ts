@@ -9,7 +9,7 @@ import type {
   IVersionArray,
   SupportFeatureType,
 } from '../types';
-import { DeviceTypeToModels } from '../types';
+import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
 import DataManager, { FirmwareField, MessageVersion } from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
@@ -68,6 +68,7 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType | null => {
   return 'classic';
 };
 
+// @deprecated
 export const getDeviceTypeByDeviceId = (deviceId?: string): IDeviceType => {
   if (!deviceId) {
     return 'classic';
@@ -253,7 +254,7 @@ export const supportModifyHomescreen = (features?: Features): SupportFeatureType
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
 
   const deviceType = getDeviceType(features);
-  if (deviceType === 'classic' || deviceType === 'mini') {
+  if (DeviceModelToTypes.model_mini.includes(deviceType)) {
     return { support: true };
   }
 
@@ -278,7 +279,7 @@ export const getFirmwareUpdateField = ({
     return 'ble';
   }
 
-  if (deviceType === 'classic' || deviceType === 'mini') {
+  if (DeviceModelToTypes.model_mini.includes(deviceType)) {
     return 'firmware-v4';
   }
 

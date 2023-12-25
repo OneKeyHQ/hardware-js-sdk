@@ -7,6 +7,7 @@ import {
 } from './firmware/updateBootloader';
 import { DataManager } from '../data-manager';
 import { getDeviceType } from '../utils';
+import { DeviceModelToTypes } from '../types';
 
 export default class CheckBootloaderRelease extends BaseMethod {
   init() {
@@ -22,7 +23,8 @@ export default class CheckBootloaderRelease extends BaseMethod {
     const { features } = this.device;
     const deviceType = getDeviceType(features);
     let shouldUpdate = false;
-    if (deviceType === 'classic' || deviceType === 'mini') {
+    // classic mini classic1s
+    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
       shouldUpdate = !!checkNeedUpdateBootForClassicAndMini(
         features,
         this.payload.willUpdateFirmwareVersion

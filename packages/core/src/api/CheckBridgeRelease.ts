@@ -5,6 +5,7 @@ import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 import { getDeviceType } from '../utils';
 import { getDeviceFirmwareVersion } from '../utils/deviceFeaturesUtils';
+import { DeviceModelToTypes } from '../types';
 
 const BridgeVersion = '2.2.0';
 const TouchNeedUpdateVersion = '4.3.0';
@@ -45,7 +46,8 @@ export default class CheckBridgeRelease extends BaseMethod {
           shouldUpdate = true;
         }
       }
-      if (deviceType === 'classic' || deviceType === 'mini') {
+      // classic mini classic1s
+      if (DeviceModelToTypes.model_mini.includes(deviceType)) {
         if (
           semver.gte(willUpdateFirmwareVersion, ClassicAndMiniNeedUpdateVersion) &&
           isOldVersionBridge

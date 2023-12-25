@@ -14,7 +14,11 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { getDeviceFirmwareVersion, getDeviceType } from '../../utils/deviceFeaturesUtils';
-import type { EthereumSignTypedDataMessage, EthereumSignTypedDataTypes } from '../../types';
+import {
+  DeviceModelToTypes,
+  type EthereumSignTypedDataMessage,
+  type EthereumSignTypedDataTypes,
+} from '../../types';
 import TransportManager from '../../data-manager/TransportManager';
 import { signTypedHash as signTypedHashLegacyV1 } from './legacyV1/signTypedHash';
 import { signTypedHash } from './latest/signTypedHash';
@@ -348,7 +352,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
   supportSignTyped() {
     const deviceType = getDeviceType(this.device.features);
-    if (deviceType === 'classic' || deviceType === 'mini') {
+    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
       const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
       const supportSignTypedVersion = '2.2.0';
 
@@ -372,7 +376,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     // For Classic、Mini device we use EthereumSignTypedData
     const deviceType = getDeviceType(this.device.features);
-    if (deviceType === 'classic' || deviceType === 'mini') {
+    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
       validateParams(this.params, [
         { name: 'domainHash', type: 'hexString', required: true },
         { name: 'messageHash', type: 'hexString', required: true },

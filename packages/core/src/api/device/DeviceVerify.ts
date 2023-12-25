@@ -6,6 +6,7 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { getDeviceType } from '../../utils';
+import { DeviceModelToTypes } from '../../types';
 import type { DeviceVerifySignature } from '../../types';
 
 export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
@@ -26,7 +27,7 @@ export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
     const deviceType = getDeviceType(this.device.features);
     let response: DeviceVerifySignature | undefined;
 
-    if (deviceType === 'classic') {
+    if (DeviceModelToTypes.model_classic.includes(deviceType)) {
       const res = await this.device.commands.typedCall(
         'BixinVerifyDeviceRequest',
         'BixinVerifyDeviceAck',

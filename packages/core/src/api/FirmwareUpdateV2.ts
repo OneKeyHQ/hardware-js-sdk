@@ -14,9 +14,11 @@ import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
 import { getDeviceType, getDeviceUUID, wait, getLogger, LoggerNames } from '../utils';
 import { createUiMessage } from '../events/ui-request';
-import type { KnownDevice, Features } from '../types';
+import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
 import { getDeviceFirmwareVersion } from '../utils/deviceFeaturesUtils';
+
+import type { KnownDevice, Features } from '../types';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -235,7 +237,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         this.checkDeviceToBootloader(this.payload.connectId);
 
         // force clean classic device cache so that the device can initialize again
-        if (deviceType === 'classic') {
+        if (DeviceModelToTypes.model_classic.includes(deviceType)) {
           DevicePool.clearDeviceCache(uuid);
         }
         delete DevicePool.devicesCache[''];
