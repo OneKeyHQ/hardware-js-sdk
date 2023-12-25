@@ -73,18 +73,22 @@ export type Features = PROTO.Features;
 
 export type IDeviceType = 'classic' | 'classic1s' | 'mini' | 'touch' | 'pro';
 
-// model_mini: 'classic' | 'mini'
-// model_touch: 'touch' | 'pro'
-export type IDeviceModel = 'model_mini' | 'model_touch';
+/**
+ * model_classic: 'classic' | 'classic1s'
+ * model_mini: 'classic' | 'mini'
+ * model_touch: 'touch' | 'pro'
+ */
+export type IDeviceModel = 'model_classic' | 'model_mini' | 'model_touch';
 
 export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] } = {
   model_mini: ['classic', 'classic1s', 'mini'],
   model_touch: ['touch', 'pro'],
+  model_classic: ['classic', 'classic1s'],
 };
 
 export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] } = {
-  classic: ['model_mini'],
-  classic1s: ['model_mini'],
+  classic: ['model_classic', 'model_mini'],
+  classic1s: ['model_classic', 'model_mini'],
   mini: ['model_mini'],
   touch: ['model_touch'],
   pro: ['model_touch'],

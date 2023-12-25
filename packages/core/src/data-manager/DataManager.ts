@@ -21,6 +21,7 @@ import type {
   IVersionArray,
   RemoteConfigResponse,
 } from '../types';
+import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
 export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v4';
@@ -69,7 +70,7 @@ export default class DataManager {
       return 'none';
     }
 
-    if (deviceType === 'classic' && features.bootloader_mode) {
+    if (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloader_mode) {
       return 'unknown';
     }
 
@@ -153,7 +154,7 @@ export default class DataManager {
   static getBootloaderRelatedFirmwareVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
 
-    if (!(deviceType === 'classic' || deviceType === 'mini')) return undefined;
+    if (!DeviceModelToTypes.model_mini.includes(deviceType)) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
@@ -172,7 +173,7 @@ export default class DataManager {
 
     if (
       features.firmware_present === false ||
-      (deviceType === 'classic' && features.bootloader_mode)
+      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloader_mode)
     ) {
       return [];
     }

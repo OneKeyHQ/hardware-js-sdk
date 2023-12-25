@@ -1,6 +1,6 @@
 import ByteBuffer from 'bytebuffer';
 import semver from 'semver';
-import { Features } from '../../types';
+import { DeviceModelToTypes, Features } from '../../types';
 import { getDeviceType } from '../../utils';
 import {
   getDeviceBootloaderVersion,
@@ -32,7 +32,7 @@ export function checkNeedUpdateBootForClassicAndMini(
   willUpdateFirmware: string
 ) {
   const deviceType = getDeviceType(features);
-  if (deviceType !== 'classic' && deviceType !== 'mini') return false;
+  if (!DeviceModelToTypes.model_mini.includes(deviceType)) return false;
   if (!willUpdateFirmware) return false;
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
