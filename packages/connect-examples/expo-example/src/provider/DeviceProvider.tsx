@@ -6,13 +6,14 @@ import { DeviceList } from '../components/DeviceList';
 
 interface DeviceContextState {
   selectedDevice: Device | null;
+  setSelectedDevice?: (device: Device | null) => void;
 }
 
 const defaultState: DeviceContextState = {
   selectedDevice: null,
 };
 
-const DeviceContext = createContext<DeviceContextState>(defaultState);
+export const DeviceContext = createContext<DeviceContextState>(defaultState);
 
 export const useDevice = () => useContext(DeviceContext);
 
@@ -22,8 +23,9 @@ function DeviceProviderContent({ children }: { children: React.ReactNode }) {
   const providerValue = useMemo(
     () => ({
       selectedDevice,
+      setSelectedDevice,
     }),
-    [selectedDevice]
+    [selectedDevice, setSelectedDevice]
   );
 
   const childMemo = useMemo(() => children, [children]);

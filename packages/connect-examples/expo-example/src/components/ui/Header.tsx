@@ -65,6 +65,14 @@ const HeaderView = () => {
             {intl.formatMessage({ id: 'tab__address_test' })}
           </Button>
         </Group.Item>
+        <Group.Item>
+          <Button
+            variant={route.name === Routes.ApiExportTest ? 'primary' : 'secondary'}
+            onPress={() => navigate(Routes.ApiExportTest)}
+          >
+            {intl.formatMessage({ id: 'tab__api_export_test' })}
+          </Button>
+        </Group.Item>
       </Group>
     ),
     [intl, navigate, route.name]
@@ -109,6 +117,11 @@ const HeaderView = () => {
             <ListItem
               title={intl.formatMessage({ id: 'tab__address_test' })}
               onPress={() => navigate(Routes.AddressTest)}
+            />
+
+            <ListItem
+              title={intl.formatMessage({ id: 'tab__api_export_test' })}
+              onPress={() => navigate(Routes.ApiExportTest)}
             />
           </YGroup>
         </Sheet.Frame>

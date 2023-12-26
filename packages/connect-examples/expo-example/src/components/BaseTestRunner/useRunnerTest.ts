@@ -14,7 +14,10 @@ import {
 } from './Context/TestRunnerVerifyProvider';
 
 type RunnerConfig<T> = {
-  initTestCase: () => Promise<
+  initTestCase: (
+    sdk: CoreApi,
+    connectId: string
+  ) => Promise<
     | {
         title: string;
         data: TestCaseDataWithKey<T>[];
@@ -45,7 +48,10 @@ type RunnerConfig<T> = {
     deviceId: string,
     requestParams: any,
     item: TestCaseDataWithKey<T>
-  ) => Promise<Unsuccessful | Success<any>>;
+  ) => Promise<{
+    payload: Unsuccessful | Success<any>;
+    skipVerify?: boolean;
+  }>;
   processResponse: (
     response: any,
     item: TestCaseDataWithKey<T>,
@@ -110,10 +116,9 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
 
   const beginTest = useCallback(async () => {
     if (!SDK) return;
-    SDK.removeAllListeners(UI_EVENT);
 
     // init test cases
-    const initTestCaseRes = await initTestCase();
+    const initTestCaseRes = await initTestCase(SDK, selectedDevice?.connectId ?? '');
     if (!initTestCaseRes) return;
 
     const { title, data: currentTestCases } = initTestCaseRes;

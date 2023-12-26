@@ -253,9 +253,9 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
 }
 
 export function TestSingleAddress({
-  title,
-  testCases,
-}: {
+                                    title,
+                                    testCases,
+                                  }: {
   title: string;
   testCases: AddressTestCase[];
 }) {

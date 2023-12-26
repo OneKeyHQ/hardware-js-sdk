@@ -74,8 +74,7 @@ export default class SuiSignTransaction extends BaseMethod<HardwareSuiSignTx> {
     const { data_length } = res.message;
 
     if (!data_length) {
-      // sign Done
-      return res.message;
+      throw new Error('Sign transaction failed');
     }
 
     const payload = data.slice(offset, offset + data_length * 2);
@@ -84,6 +83,7 @@ export default class SuiSignTransaction extends BaseMethod<HardwareSuiSignTx> {
       data_chunk: payload,
     };
 
+    // @ts-expect-error
     const response = await typedCall('SuiTxAck', ['SuiSignedTx', 'SuiTxRequest'], {
       ...resourceAckParams,
     });
@@ -112,7 +112,6 @@ export default class SuiSignTransaction extends BaseMethod<HardwareSuiSignTx> {
       ...this.params,
     });
 
-    // @ts-expect-error
     return this.processTxRequest(typedCall, res, data, offset);
   }
 }

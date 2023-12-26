@@ -32,7 +32,7 @@ export default class TransportManager {
 
   static load() {
     Log.debug('transport manager load');
-    this.defaultMessages = DataManager.getProtobufMessages();
+    this.defaultMessages = DataManager.getCommonMessages();
     this.currentMessages = this.defaultMessages;
     this.messageVersion = 'latest';
   }
@@ -82,6 +82,7 @@ export default class TransportManager {
 
     try {
       await this.transport.configure(JSON.stringify(messages));
+      this.defaultMessages = messages;
       this.currentMessages = messages;
       this.messageVersion = messageVersion;
     } catch (error) {
