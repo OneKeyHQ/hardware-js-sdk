@@ -105,7 +105,10 @@ export const getDeviceLabel = (features: Features) => {
 export const getDeviceFirmwareVersion = (features: Features | undefined): IVersionArray => {
   if (!features) return [0, 0, 0];
 
-  if (features.onekey_version) {
+  if (semver.valid(features.onekey_firmware_version)) {
+    return features.onekey_firmware_version.split('.') as unknown as IVersionArray;
+  }
+  if (semver.valid(features.onekey_version)) {
     return features.onekey_version.split('.') as unknown as IVersionArray;
   }
   return [
@@ -129,6 +132,10 @@ export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray |
 };
 
 export const getDeviceBootloaderVersion = (features: Features): IVersionArray => {
+  // classic1s 3.5.0 pro 4.6.0
+  if (semver.valid(features.onekey_boot_version)) {
+    return features.onekey_boot_version.split('.') as unknown as IVersionArray;
+  }
   if (!features.bootloader_version) {
     if (features.bootloader_mode) {
       return [features.major_version, features.minor_version, features.patch_version];
