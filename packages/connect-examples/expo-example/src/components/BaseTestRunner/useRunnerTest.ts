@@ -55,7 +55,10 @@ type RunnerConfig<T> = {
     deviceId: string,
     requestParams: any,
     item: TestCaseDataWithKey<T>
-  ) => Promise<Unsuccessful | Success<any>>;
+  ) => Promise<{
+    payload: Unsuccessful | Success<any>;
+    skipVerify?: boolean;
+  }>;
   processResponse: (
     response: any,
     item: TestCaseDataWithKey<T>,

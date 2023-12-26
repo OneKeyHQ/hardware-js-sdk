@@ -1,5 +1,5 @@
 import React from 'react';
-import { Separator, Stack } from 'tamagui';
+import { Stack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { TestSingleAddress } from '../testTools/addressTest/TestSingleAddress';

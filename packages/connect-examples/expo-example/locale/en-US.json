@@ -3,6 +3,7 @@
   "tab__firmware_update": "Firmware Update",
   "tab__passphrase_test": "Passphrase Test",
   "tab__address_test": "Address Test",
+  "tab__api_export_test": "ApiExport Test",
 
   "action__search_device": "Search Device",
   "action__clean_device": "Disconnect Device",

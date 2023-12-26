@@ -3,6 +3,7 @@
   "tab__firmware_update": "固件更新",
   "tab__passphrase_test": "Passphrase 测试",
   "tab__address_test": "地址测试",
+  "tab__api_export_test": "API 范围测试",
 
   "action__search_device": "搜索设备",
   "action__clean_device": "断开连接",
@@ -37,7 +38,7 @@
   "tip__no_select_file": "未选择文件",
   "tip__update_success": "更新成功",
 
-  "title__common_parameters": "常用参数",
+  "title__common_parameters": "通用参数 (每次请求都会使用)",
   "title__hardware_api_test": "硬件 API 测试",
   "title__updating": "正在更新",
   "title__input_pin": "输入 PIN",

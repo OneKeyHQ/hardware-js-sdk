@@ -347,9 +347,9 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
 }
 
 export function TestBatchPubkey({
-  title,
-  testCases,
-}: {
+                                  title,
+                                  testCases,
+                                }: {
   title: string;
   testCases: PubkeyBatchTestCase[];
 }) {
