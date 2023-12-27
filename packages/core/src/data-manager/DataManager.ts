@@ -1,4 +1,3 @@
-import axios from 'axios';
 import semver from 'semver';
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
@@ -20,7 +19,6 @@ import type {
   IDeviceFirmwareStatus,
   ITransportStatus,
   IVersionArray,
-  RemoteConfigResponse,
 } from '../types';
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
