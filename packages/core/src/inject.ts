@@ -303,6 +303,8 @@ export const createCoreApi = (
   deviceEndSession: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceEndSession' }),
   deviceLock: (connectId, params) => call({ ...params, connectId, method: 'deviceLock' }),
+  deviceLoad: (connectId, params) => call({ ...params, connectId, method: 'deviceLoad' }),
+  deviceCancel: (connectId, params) => call({ ...params, connectId, method: 'deviceCancel' }),
   deviceDoPreauthorized: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceDoPreauthorized' }),
   deviceCancelAuthorization: (connectId, params) =>

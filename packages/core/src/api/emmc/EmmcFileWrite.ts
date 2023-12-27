@@ -15,7 +15,7 @@ export default class EmmcFileWrite extends BaseMethod<HardwareEmmcFileWrite> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('EmmcFileWrite', 'Success', this.params);
+    const res = await this.device.commands.typedCall('EmmcFileWrite', 'EmmcFile', this.params);
 
     return Promise.resolve(res.message);
   }

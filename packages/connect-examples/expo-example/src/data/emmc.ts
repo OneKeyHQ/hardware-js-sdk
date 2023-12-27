@@ -3,8 +3,8 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'emmcDirList',
-    description: 'emmcDirList',
     noDeviceIdReq: true,
+    description: 'emmcDirList',
     presupposes: [
       {
         title: 'ListEmmcDir',
@@ -16,6 +16,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'emmcDirMake',
+    noDeviceIdReq: true,
     description: 'create emmc dir',
     presupposes: [
       {
@@ -28,6 +29,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'emmcDirRemove',
+    noDeviceIdReq: true,
     description: 'remove emmc dir',
     presupposes: [
       {
@@ -40,6 +42,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'emmcFileDelete',
+    noDeviceIdReq: true,
     description: 'remove emmc file',
     presupposes: [
       {
@@ -52,15 +55,16 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'emmcFileRead',
+    noDeviceIdReq: true,
     description: 'read emmc file',
     presupposes: [
       {
         title: 'ReadEmmcFile',
         value: {
           file: {
-            path: '/res/abc/a.txt',
+            path: '0:firmware.txt',
             offset: 0,
-            length: 100,
+            len: 100,
           },
         },
       },
@@ -68,15 +72,17 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'emmcFileWrite',
+    noDeviceIdReq: true,
     description: 'Write emmc file',
     presupposes: [
       {
         title: 'WriteEmmcFile',
         value: {
           file: {
-            path: '/res/abc/a.txt',
+            path: '0:firmware.txt',
             offset: 0,
-            length: 100,
+            len: 100,
+            data: '1234567890',
           },
           overwrite: true,
           append: true,
@@ -86,10 +92,12 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'emmcFixPermission',
+    noDeviceIdReq: true,
     description: 'Fix emmc permission',
   },
   {
     method: 'emmcPathInfo',
+    noDeviceIdReq: true,
     description: 'emmcPathInfo',
     presupposes: [
       {

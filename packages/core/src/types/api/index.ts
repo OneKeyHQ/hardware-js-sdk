@@ -132,6 +132,7 @@ import { deviceSdProtect } from './deviceSdProtect';
 import { deviceChangeWipeCode } from './deviceChangeWipeCode';
 import { deviceEndSession } from './deviceEndSession';
 import { deviceLock } from './deviceLock';
+import { deviceLoad } from './deviceLoad';
 import { deviceDoPreauthorized } from './deviceDoPreauthorized';
 import { deviceCancelAuthorization } from './deviceCancelAuthorization';
 import { setU2FCounter } from './setU2FCounter';
@@ -154,6 +155,7 @@ import { debugLinkRecordScreen } from './debugLinkRecordScreen';
 import { debugLinkReseedRandom } from './debugLinkReseedRandom';
 import { debugLinkStop } from './debugLinkStop';
 import { debugLinkWatchLayout } from './debugLinkWatchLayout';
+import { deviceCancel } from './deviceCancel';
 
 export * from './export';
 
@@ -371,6 +373,8 @@ export type CoreApi = {
   deviceChangeWipeCode: typeof deviceChangeWipeCode;
   deviceEndSession: typeof deviceEndSession;
   deviceLock: typeof deviceLock;
+  deviceLoad: typeof deviceLoad;
+  deviceCancel: typeof deviceCancel;
   deviceDoPreauthorized: typeof deviceDoPreauthorized;
   deviceCancelAuthorization: typeof deviceCancelAuthorization;
 

@@ -198,20 +198,20 @@ export const callAPI = async (message: CoreMessage) => {
       }
 
       // check call method mode
-      const unexpectedMode = device.hasUnexpectedMode(
-        method.notAllowDeviceMode,
-        method.requireDeviceMode
-      );
-      if (unexpectedMode) {
-        if (unexpectedMode === UI_REQUEST.NOT_IN_BOOTLOADER) {
-          return Promise.reject(
-            ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedBootloaderMode)
-          );
-        }
-        return Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
-        );
-      }
+      // const unexpectedMode = device.hasUnexpectedMode(
+      //   method.notAllowDeviceMode,
+      //   method.requireDeviceMode
+      // );
+      // if (unexpectedMode) {
+      //   if (unexpectedMode === UI_REQUEST.NOT_IN_BOOTLOADER) {
+      //     return Promise.reject(
+      //       ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedBootloaderMode)
+      //     );
+      //   }
+      //   return Promise.reject(
+      //     ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
+      //   );
+      // }
 
       if (method.deviceId && method.checkDeviceId) {
         const isSameDeviceID = device.checkDeviceId(method.deviceId);

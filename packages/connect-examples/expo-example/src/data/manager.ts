@@ -17,6 +17,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'deviceSpiFlashRead',
+    noDeviceIdReq: true,
     description: 'read from spi flash',
     presupposes: [
       {
@@ -30,6 +31,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'deviceInfoSettings',
+    noDeviceIdReq: true,
     description: 'get device info settings',
     presupposes: [
       {
@@ -50,6 +52,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'deviceWriteSEPublicCert',
+    noDeviceIdReq: true,
     description: 'write se public cert',
     presupposes: [
       {
@@ -62,6 +65,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'deviceSESignMessage',
+    noDeviceIdReq: true,
     description: 'se sign message',
     presupposes: [
       {
@@ -74,6 +78,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'devicePing',
+    noDeviceIdReq: true,
     description: 'ping device',
     presupposes: [
       {
@@ -86,7 +91,65 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'deviceLoad',
+    noDeviceIdReq: true,
+    description: 'load device',
+    presupposes: [
+      {
+        title: 'load',
+        value: {
+          mnemonics: 'all all all all all all all all all all all all',
+          pin: '1111',
+        },
+      },
+    ],
+  },
+  {
+    method: 'deviceCancel',
+    description: 'cancel device',
+  },
+  {
+    method: 'deviceLock',
+    description: 'lock device',
+  },
+  {
+    method: 'deviceFlags',
+    noDeviceIdReq: true,
+    description: 'device set flags',
+    presupposes: [
+      {
+        title: 'set flags',
+        value: {
+          flags: 1,
+        },
+      },
+    ],
+  },
+  {
+    method: 'deviceRecovery',
+    noDeviceIdReq: true,
+    description: 'device recovery',
+    presupposes: [
+      {
+        title: 'set flags',
+        value: {
+          word_count: 12,
+          pin_protection: true,
+        },
+      },
+    ],
+  },
+  {
+    method: 'deviceEndSession',
+    description: 'end session',
+  },
+  {
+    method: 'deviceRebootToBootloader',
+    description: 'reboot to bootloader',
+  },
+  {
     method: 'deviceGetEntropy',
+    noDeviceIdReq: true,
     description: 'device get entropy',
     presupposes: [
       {
@@ -99,6 +162,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'deviceSdProtect',
+    noDeviceIdReq: true,
     description: 'set sd protect',
     presupposes: [
       {
@@ -111,6 +175,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'deviceChangeWipeCode',
+    noDeviceIdReq: true,
     description: 'Change Wipe Code',
     presupposes: [
       {
