@@ -2,7 +2,8 @@ import axios from 'axios';
 import semver from 'semver';
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
-import { getTimeStamp } from '../utils';
+import ReleaseConfigJSON from './config.json';
+import { getTimeStamp, wait } from '../utils';
 import {
   getDeviceBLEFirmwareVersion,
   getDeviceFirmwareVersion,
@@ -254,17 +255,20 @@ export default class DataManager {
       return;
     }
     try {
-      const url = settings.preRelease
-        ? 'https://data.onekey.so/pre-config.json'
-        : 'https://data.onekey.so/config.json';
+      // const url = settings.preRelease
+      //   ? 'https://data.onekey.so/pre-config.json'
+      //   : 'https://data.onekey.so/config.json';
 
-      const { data } = await axios.get<RemoteConfigResponse>(
-        `${url}?noCache=${getTimeStamp()}`,
-        // because of iframe timeout is 10000
-        {
-          timeout: 7000,
-        }
-      );
+      // const { data } = await axios.get<RemoteConfigResponse>(
+      //   `${url}?noCache=${getTimeStamp()}`,
+      //   // because of iframe timeout is 10000
+      //   {
+      //     timeout: 7000,
+      //   }
+      // );
+      await wait(0);
+      const data = ReleaseConfigJSON as any;
+      console.log('======>!!!@@###->>>RELEASE_DATA: ', data);
       this.deviceMap = {
         classic: data.classic,
         classic1s: data.classic1s,
