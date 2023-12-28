@@ -212,18 +212,7 @@ const SKIP = [
   'TxInput', // declared in TxInputType patch
   'TxOutput', // declared in TxOutputType patch
   // not implemented
-  'CosiCommit',
-  'CosiCommitment',
-  'CosiSign',
-  'CosiSignature',
   'LoadDevice',
-  'DebugMoneroDiagRequest',
-  'DebugMoneroDiagAck',
-  'WebAuthnListResidentCredentials',
-  'WebAuthnAddResidentCredential',
-  'WebAuthnRemoveResidentCredential',
-  'WebAuthnCredential',
-  'WebAuthnCredentials',
   'wire_in',
   'wire_out',
   'wire_debug_in',

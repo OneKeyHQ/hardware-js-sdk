@@ -39,6 +39,13 @@ export { default as btcGetOwnershipId } from './btc/BTCGetOwnershipId';
 export { default as btcGetOwnershipProof } from './btc/BTCGetOwnershipProof';
 export { default as btcAuthorizeCoinJoin } from './btc/BTCAuthorizeCoinJoin';
 
+export { default as cryptoBatchGetPublickeys } from './crypto/CryptoBatchGetPublickeys';
+export { default as cryptoCipherKeyValue } from './crypto/CryptoCipherKeyValue';
+export { default as cryptoCosiCommit } from './crypto/CryptoCosiCommit';
+export { default as cryptoCosiSign } from './crypto/CryptoCosiSign';
+export { default as cryptoGetECDHSessionKey } from './crypto/CryptoGetECDHSessionKey';
+export { default as cryptoSignIdentity } from './crypto/CryptoSignIdentity';
+
 export { default as confluxGetAddress } from './conflux/ConfluxGetAddress';
 export { default as confluxSignMessage } from './conflux/ConfluxSignMessage';
 export { default as confluxSignMessageCIP23 } from './conflux/ConfluxSignMessageCIP23';

@@ -1230,6 +1230,31 @@ export type ECDHSessionKey = {
   public_key?: string;
 };
 
+// CosiCommit
+export type CosiCommit = {
+  address_n: number[];
+  data?: string;
+};
+
+// CosiCommitment
+export type CosiCommitment = {
+  commitment?: string;
+  pubkey?: string;
+};
+
+// CosiSign
+export type CosiSign = {
+  address_n: number[];
+  data?: string;
+  global_commitment?: string;
+  global_pubkey?: string;
+};
+
+// CosiSignature
+export type CosiSignature = {
+  signature: string;
+};
+
 export type Path = {
   address_n: number[];
 };
@@ -2917,6 +2942,26 @@ export type MoneroLiveRefreshFinalRequest = {};
 // MoneroLiveRefreshFinalAck
 export type MoneroLiveRefreshFinalAck = {};
 
+// DebugMoneroDiagRequest
+export type DebugMoneroDiagRequest = {
+  ins?: number;
+  p1?: number;
+  p2?: number;
+  pd: number[];
+  data1?: string;
+  data2?: string;
+};
+
+// DebugMoneroDiagAck
+export type DebugMoneroDiagAck = {
+  ins?: number;
+  p1?: number;
+  p2?: number;
+  pd: number[];
+  data1?: string;
+  data2?: string;
+};
+
 // NearGetAddress
 export type NearGetAddress = {
   address_n: number[];
@@ -3126,7 +3171,6 @@ export type NostrGetPublicKey = {
 // NostrPublicKey
 export type NostrPublicKey = {
   publickey?: string;
-  npub?: string;
 };
 
 // NostrSignEvent
@@ -3140,23 +3184,11 @@ export type NostrSignedEvent = {
   event: string;
 };
 
-// NostrSignSchnorr
-export type NostrSignSchnorr = {
-  address_n: number[];
-  hash: string;
-};
-
-// NostrSignedSchnorr
-export type NostrSignedSchnorr = {
-  signature: string;
-};
-
 // NostrEncryptMessage
 export type NostrEncryptMessage = {
   address_n: number[];
   pubkey: string;
   msg: string;
-  show_display?: boolean;
 };
 
 // NostrEncryptedMessage
@@ -3169,7 +3201,6 @@ export type NostrDecryptMessage = {
   address_n: number[];
   pubkey: string;
   msg: string;
-  show_display?: boolean;
 };
 
 // NostrDecryptedMessage
@@ -3781,6 +3812,39 @@ export type TronMessageSignature = {
   signature: string;
 };
 
+// WebAuthnListResidentCredentials
+export type WebAuthnListResidentCredentials = {};
+
+// WebAuthnAddResidentCredential
+export type WebAuthnAddResidentCredential = {
+  credential_id?: string;
+};
+
+// WebAuthnRemoveResidentCredential
+export type WebAuthnRemoveResidentCredential = {
+  index?: number;
+};
+
+export type WebAuthnCredential = {
+  index?: number;
+  id?: string;
+  rp_id?: string;
+  rp_name?: string;
+  user_id?: string;
+  user_name?: string;
+  user_display_name?: string;
+  creation_time?: number;
+  hmac_secret?: boolean;
+  use_sign_count?: boolean;
+  algorithm?: number;
+  curve?: number;
+};
+
+// WebAuthnCredentials
+export type WebAuthnCredentials = {
+  credentials: WebAuthnCredential[];
+};
+
 // facotry
 export type facotry = {};
 
@@ -3929,6 +3993,10 @@ export type MessageType = {
   SignedIdentity: SignedIdentity;
   GetECDHSessionKey: GetECDHSessionKey;
   ECDHSessionKey: ECDHSessionKey;
+  CosiCommit: CosiCommit;
+  CosiCommitment: CosiCommitment;
+  CosiSign: CosiSign;
+  CosiSignature: CosiSignature;
   Path: Path;
   BatchGetPublickeys: BatchGetPublickeys;
   EcdsaPublicKeys: EcdsaPublicKeys;
@@ -4164,6 +4232,8 @@ export type MessageType = {
   MoneroLiveRefreshStepAck: MoneroLiveRefreshStepAck;
   MoneroLiveRefreshFinalRequest: MoneroLiveRefreshFinalRequest;
   MoneroLiveRefreshFinalAck: MoneroLiveRefreshFinalAck;
+  DebugMoneroDiagRequest: DebugMoneroDiagRequest;
+  DebugMoneroDiagAck: DebugMoneroDiagAck;
   NearGetAddress: NearGetAddress;
   NearAddress: NearAddress;
   NearSignTx: NearSignTx;
@@ -4194,8 +4264,6 @@ export type MessageType = {
   NostrPublicKey: NostrPublicKey;
   NostrSignEvent: NostrSignEvent;
   NostrSignedEvent: NostrSignedEvent;
-  NostrSignSchnorr: NostrSignSchnorr;
-  NostrSignedSchnorr: NostrSignedSchnorr;
   NostrEncryptMessage: NostrEncryptMessage;
   NostrEncryptedMessage: NostrEncryptedMessage;
   NostrDecryptMessage: NostrDecryptMessage;
@@ -4281,6 +4349,11 @@ export type MessageType = {
   TronSignedTx: TronSignedTx;
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
+  WebAuthnListResidentCredentials: WebAuthnListResidentCredentials;
+  WebAuthnAddResidentCredential: WebAuthnAddResidentCredential;
+  WebAuthnRemoveResidentCredential: WebAuthnRemoveResidentCredential;
+  WebAuthnCredential: WebAuthnCredential;
+  WebAuthnCredentials: WebAuthnCredentials;
   facotry: facotry;
 };
 
@@ -4294,5 +4367,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;

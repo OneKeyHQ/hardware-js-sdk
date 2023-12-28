@@ -159,6 +159,19 @@ export const createCoreApi = (
   btcAuthorizeCoinJoin: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcAuthorizeCoinJoin' }),
 
+  cryptoBatchGetPublickeys: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoBatchGetPublickeys' }),
+  cryptoCipherKeyValue: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoCipherKeyValue' }),
+  cryptoCosiCommit: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoCosiCommit' }),
+  cryptoCosiSign: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoCosiSign' }),
+  cryptoGetECDHSessionKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoGetECDHSessionKey' }),
+  cryptoSignIdentity: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cryptoSignIdentity' }),
+
   starcoinGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'starcoinGetAddress' }),
   starcoinGetPublicKey: (connectId, deviceId, params) =>

@@ -168,6 +168,16 @@ import { btcGetOwnershipId } from './btcGetOwnershipId';
 import { btcGetOwnershipProof } from './btcGetOwnershipProof';
 import { btcAuthorizeCoinJoin } from './btcAuthorizeCoinJoin';
 
+/**
+ * Crypto function
+ */
+import { cryptoBatchGetPublickeys } from './cryptoBatchGetPublickeys';
+import { cryptoCipherKeyValue } from './cryptoCipherKeyValue';
+import { cryptoCosiCommit } from './cryptoCosiCommit';
+import { cryptoCosiSign } from './cryptoCosiSign';
+import { cryptoGetECDHSessionKey } from './cryptoGetECDHSessionKey';
+import { cryptoSignIdentity } from './cryptoSignIdentity';
+
 export * from './export';
 
 export type CoreApi = {
@@ -245,6 +255,16 @@ export type CoreApi = {
   btcGetOwnershipId: typeof btcGetOwnershipId;
   btcGetOwnershipProof: typeof btcGetOwnershipProof;
   btcAuthorizeCoinJoin: typeof btcAuthorizeCoinJoin;
+
+  /**
+   * Crypto function
+   */
+  cryptoBatchGetPublickeys: typeof cryptoBatchGetPublickeys;
+  cryptoCipherKeyValue: typeof cryptoCipherKeyValue;
+  cryptoCosiCommit: typeof cryptoCosiCommit;
+  cryptoCosiSign: typeof cryptoCosiSign;
+  cryptoGetECDHSessionKey: typeof cryptoGetECDHSessionKey;
+  cryptoSignIdentity: typeof cryptoSignIdentity;
 
   /**
    * Starcoin function
