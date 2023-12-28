@@ -142,6 +142,19 @@ export const createCoreApi = (
   evmVerifyMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'evmVerifyMessage' }),
 
+  evmGetAddressTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmGetAddressTrezor' }),
+  evmGetPublicKeyTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmGetPublicKeyTrezor' }),
+  evmSignMessageTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmSignMessageTrezor' }),
+  evmSignTransactionTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmSignTransactionTrezor' }),
+  evmSignTypedDataTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmSignTypedDataTrezor' }),
+  evmVerifyMessageTrezor: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmVerifyMessageTrezor' }),
+
   btcGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcGetAddress' }),
   btcGetPublicKey: (connectId, deviceId, params) =>

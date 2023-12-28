@@ -42,6 +42,13 @@ import { evmSignTransaction } from './evmSignTransaction';
 import { evmSignTypedData } from './evmSignTypedData';
 import { evmVerifyMessage } from './evmVerifyMessage';
 
+import { evmGetAddressTrezor } from './evmGetAddressTrezor';
+import { evmGetPublicKeyTrezor } from './evmGetPublicKeyTrezor';
+import { evmSignMessageTrezor } from './evmSignMessageTrezor';
+import { evmSignTransactionTrezor } from './evmSignTransactionTrezor';
+import { evmSignTypedDataTrezor } from './evmSignTypedDataTrezor';
+import { evmVerifyMessageTrezor } from './evmVerifyMessageTrezor';
+
 import { btcGetAddress } from './btcGetAddress';
 import { btcGetPublicKey } from './btcGetPublicKey';
 import { btcSignMessage } from './btcSignMessage';
@@ -243,6 +250,16 @@ export type CoreApi = {
   evmSignTransaction: typeof evmSignTransaction;
   evmSignTypedData: typeof evmSignTypedData;
   evmVerifyMessage: typeof evmVerifyMessage;
+
+  /**
+   * EVM function
+   */
+  evmGetAddressTrezor: typeof evmGetAddressTrezor;
+  evmGetPublicKeyTrezor: typeof evmGetPublicKeyTrezor;
+  evmSignMessageTrezor: typeof evmSignMessageTrezor;
+  evmSignTransactionTrezor: typeof evmSignTransactionTrezor;
+  evmSignTypedDataTrezor: typeof evmSignTypedDataTrezor;
+  evmVerifyMessageTrezor: typeof evmVerifyMessageTrezor;
 
   /**
    * BTC function

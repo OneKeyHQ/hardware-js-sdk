@@ -59,6 +59,13 @@ export { default as evmSignTransaction } from './evm/EVMSignTransaction';
 export { default as evmSignTypedData } from './evm/EVMSignTypedData';
 export { default as evmVerifyMessage } from './evm/EVMVerifyMessage';
 
+export { default as evmGetAddresTrezor } from './evmTrezor/EVMGetAddress';
+export { default as evmGetPublicKeyTrezor } from './evmTrezor/EVMGetPublicKey';
+export { default as evmSignMessageTrezor } from './evmTrezor/EVMSignMessage';
+export { default as evmSignTransactionTrezor } from './evmTrezor/EVMSignTransaction';
+export { default as evmSignTypedDataTrezor } from './evmTrezor/EVMSignTypedData';
+export { default as evmVerifyMessageTrezor } from './evmTrezor/EVMVerifyMessage';
+
 export { default as starcoinGetAddress } from './starcoin/StarcoinGetAddress';
 export { default as starcoinGetPublicKey } from './starcoin/StarcoinGetPublicKey';
 export { default as starcoinSignMessage } from './starcoin/StarcoinSignMessage';

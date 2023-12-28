@@ -105,6 +105,10 @@ const playgroundConfig = [
     data: require('../data/nostr').default,
   },
   {
+    title: 'Ethereum Trezor API',
+    data: require('../data/ethereumTrezor').default,
+  },
+  {
     title: 'Crypto API',
     data: require('../data/crypto').default,
   },
