@@ -156,6 +156,17 @@ import { debugLinkReseedRandom } from './debugLinkReseedRandom';
 import { debugLinkStop } from './debugLinkStop';
 import { debugLinkWatchLayout } from './debugLinkWatchLayout';
 import { deviceCancel } from './deviceCancel';
+import { deviceGetFirmwareHash } from './deviceGetFirmwareHash';
+import { deviceUnlockPath } from './deviceUnlockPath';
+import { firmwareEraseEx } from './firmwareEraseEx';
+import { firmwareErase } from './firmwareErase';
+import { firmwareUpdateEmmcTest } from './firmwareUpdateEmmcTest';
+import { firmwareUploadTest } from './firmwareUploadTest';
+import { reboot } from './reboot';
+import { selfTest } from './selfTest';
+import { btcGetOwnershipId } from './btcGetOwnershipId';
+import { btcGetOwnershipProof } from './btcGetOwnershipProof';
+import { btcAuthorizeCoinJoin } from './btcAuthorizeCoinJoin';
 
 export * from './export';
 
@@ -231,6 +242,9 @@ export type CoreApi = {
   btcSignMessage: typeof btcSignMessage;
   btcSignTransaction: typeof btcSignTransaction;
   btcVerifyMessage: typeof btcVerifyMessage;
+  btcGetOwnershipId: typeof btcGetOwnershipId;
+  btcGetOwnershipProof: typeof btcGetOwnershipProof;
+  btcAuthorizeCoinJoin: typeof btcAuthorizeCoinJoin;
 
   /**
    * Starcoin function
@@ -369,6 +383,8 @@ export type CoreApi = {
   deviceSESignMessage: typeof deviceSESignMessage;
   devicePing: typeof devicePing;
   deviceGetEntropy: typeof deviceGetEntropy;
+  deviceGetFirmwareHash: typeof deviceGetFirmwareHash;
+  deviceUnlockPath: typeof deviceUnlockPath;
   deviceSdProtect: typeof deviceSdProtect;
   deviceChangeWipeCode: typeof deviceChangeWipeCode;
   deviceEndSession: typeof deviceEndSession;
@@ -400,4 +416,11 @@ export type CoreApi = {
   debugLinkReseedRandom: typeof debugLinkReseedRandom;
   debugLinkStop: typeof debugLinkStop;
   debugLinkWatchLayout: typeof debugLinkWatchLayout;
+
+  firmwareEraseEx: typeof firmwareEraseEx;
+  firmwareErase: typeof firmwareErase;
+  firmwareUpdateEmmcTest: typeof firmwareUpdateEmmcTest;
+  firmwareUploadTest: typeof firmwareUploadTest;
+  reboot: typeof reboot;
+  selfTest: typeof selfTest;
 };

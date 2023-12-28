@@ -170,6 +170,47 @@ const api: PlaygroundProps[] = [
       },
     ],
   },
+  {
+    method: 'btcGetOwnershipId',
+    description: 'btcGetOwnershipId',
+    presupposes: [
+      {
+        title: 'btcGetOwnershipId',
+        value: {
+          path: "m/44'/0'/0'/0/0",
+          coin: 'btc',
+        },
+      },
+    ],
+  },
+  {
+    method: 'btcGetOwnershipProof',
+    description: 'btcGetOwnershipProof',
+    presupposes: [
+      {
+        title: 'btcGetOwnershipProof',
+        value: {
+          path: "m/44'/0'/0'/0/0",
+          coin: 'btc',
+        },
+      },
+    ],
+  },
+  {
+    method: 'btcAuthorizeCoinJoin',
+    description: 'btcAuthorizeCoinJoin',
+    presupposes: [
+      {
+        title: 'btcAuthorizeCoinJoin',
+        value: {
+          path: "m/44'/0'/0'/0/0",
+          coin: 'btc',
+          coordinator: '0x123456',
+          max_total_fee: 1000,
+        },
+      },
+    ],
+  },
 ];
 
 export default api;

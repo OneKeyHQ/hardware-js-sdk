@@ -197,6 +197,7 @@ const api: PlaygroundProps[] = [
   {
     method: 'setU2FCounter',
     description: 'setU2FCounter',
+    noDeviceIdReq: true,
     presupposes: [
       {
         title: 'setU2FCounter',
@@ -209,6 +210,87 @@ const api: PlaygroundProps[] = [
   {
     method: 'getNextU2FCounter',
     description: 'getNextU2FCounter',
+  },
+  {
+    method: 'deviceUnlockPath',
+    description: 'UnlockPath',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'UnlockPath',
+        value: {
+          address_n: "m/44'/60'/0'/0/0",
+          mac: '0x1234567',
+        },
+      },
+    ],
+  },
+  {
+    method: 'firmwareEraseEx',
+    description: 'firmwareEraseEx',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'firmwareErase',
+    description: 'firmwareErase',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'firmwareUpdateEmmcTest',
+    description: 'firmwareUpdateEmmcTest',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'firmwareUpdateEmmcTest',
+        value: {
+          path: '0:firmware.bin',
+          reboot_on_success: false,
+        },
+      },
+    ],
+  },
+  {
+    method: 'firmwareUploadTest',
+    description: 'firmwareUploadTest',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'reboot',
+    description: 'reboot',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Normal',
+        value: {
+          reboot_type: 0,
+        },
+      },
+      {
+        title: 'Boardloader',
+        value: {
+          reboot_type: 1,
+        },
+      },
+      {
+        title: 'BootLoader',
+        value: {
+          reboot_type: 2,
+        },
+      },
+    ],
+  },
+  {
+    method: 'selfTest',
+    description: 'selfTest',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'firmwareUpdateEmmcTest',
+        value: {
+          payload: '0x12346',
+        },
+      },
+    ],
   },
 ];
 

@@ -2247,6 +2247,16 @@ export type Entropy = {
   entropy: string;
 };
 
+// GetFirmwareHash
+export type GetFirmwareHash = {
+  challenge?: string;
+};
+
+// FirmwareHash
+export type FirmwareHash = {
+  hash: string;
+};
+
 // WipeDevice
 export type WipeDevice = {};
 
@@ -2571,6 +2581,17 @@ export type FileInfoList = {
 // DeviceEraseSector
 export type DeviceEraseSector = {
   sector: number;
+};
+
+// UnlockPath
+export type UnlockPath = {
+  address_n: number[];
+  mac?: string;
+};
+
+// UnlockedPathRequest
+export type UnlockedPathRequest = {
+  mac?: string;
 };
 
 export type MoneroRctKeyPublic = {
@@ -4036,6 +4057,8 @@ export type MessageType = {
   Cancel: Cancel;
   GetEntropy: GetEntropy;
   Entropy: Entropy;
+  GetFirmwareHash: GetFirmwareHash;
+  FirmwareHash: FirmwareHash;
   WipeDevice: WipeDevice;
   ResetDevice: ResetDevice;
   BackupDevice: BackupDevice;
@@ -4091,6 +4114,8 @@ export type MessageType = {
   FileInfo: FileInfo;
   FileInfoList: FileInfoList;
   DeviceEraseSector: DeviceEraseSector;
+  UnlockPath: UnlockPath;
+  UnlockedPathRequest: UnlockedPathRequest;
   MoneroRctKeyPublic: MoneroRctKeyPublic;
   MoneroOutputEntry: MoneroOutputEntry;
   MoneroMultisigKLRki: MoneroMultisigKLRki;

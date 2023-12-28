@@ -35,6 +35,9 @@ export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
 export { default as btcSignMessage } from './btc/BTCSignMessage';
 export { default as btcSignTransaction } from './btc/BTCSignTransaction';
 export { default as btcVerifyMessage } from './btc/BTCVerifyMessage';
+export { default as btcGetOwnershipId } from './btc/BTCGetOwnershipId';
+export { default as btcGetOwnershipProof } from './btc/BTCGetOwnershipProof';
+export { default as btcAuthorizeCoinJoin } from './btc/BTCAuthorizeCoinJoin';
 
 export { default as confluxGetAddress } from './conflux/ConfluxGetAddress';
 export { default as confluxSignMessage } from './conflux/ConfluxSignMessage';
@@ -124,6 +127,8 @@ export { default as deviceWriteSEPublicCert } from './manager/DeviceWriteSEPubli
 export { default as deviceSESignMessage } from './manager/DeviceSESignMessage';
 export { default as devicePing } from './manager/DevicePing';
 export { default as deviceGetEntropy } from './manager/DeviceGetEntropy';
+export { default as deviceGetFirmwareHash } from './manager/DeviceGetFirmwareHash';
+export { default as deviceUnlockPath } from './manager/DeviceUnlockPath';
 export { default as deviceSdProtect } from './manager/DeviceSdProtect';
 export { default as deviceChangeWipeCode } from './manager/DeviceChangeWipeCode';
 export { default as deviceEndSession } from './manager/DeviceEndSession';
@@ -152,3 +157,10 @@ export { default as debugLinkRecordScreen } from './debug/DebugLinkRecordScreen'
 export { default as debugLinkReseedRandom } from './debug/DebugLinkReseedRandom';
 export { default as debugLinkStop } from './debug/DebugLinkStop';
 export { default as debugLinkWatchLayout } from './debug/DebugLinkWatchLayout';
+
+export { default as firmwareErase } from './firmware/FirmwareErase';
+export { default as firmwareEraseEx } from './firmware/FirmwareEraseEx';
+export { default as firmwareUpdateEmmcTest } from './firmware/FirmwareUpdateEmmcTest';
+export { default as firmwareUploadTest } from './firmware/FirmwareUploadTest';
+export { default as reboot } from './firmware/Reboot';
+export { default as selfTest } from './firmware/SelfTest';

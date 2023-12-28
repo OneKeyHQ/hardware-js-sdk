@@ -113,6 +113,19 @@ const api: PlaygroundProps[] = [
     description: 'Backup a device',
     noDeviceIdReq: true,
   },
+  {
+    method: 'deviceGetFirmwareHash',
+    description: 'Get Firmware Hash',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'GetFirmwareHash',
+        value: {
+          challenge: '0x12345',
+        },
+      },
+    ],
+  },
 ];
 
 export default api;

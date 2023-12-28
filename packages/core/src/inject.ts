@@ -152,6 +152,12 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'btcSignTransaction' }),
   btcVerifyMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcVerifyMessage' }),
+  btcGetOwnershipId: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'btcGetOwnershipId' }),
+  btcGetOwnershipProof: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'btcGetOwnershipProof' }),
+  btcAuthorizeCoinJoin: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'btcAuthorizeCoinJoin' }),
 
   starcoinGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'starcoinGetAddress' }),
@@ -294,6 +300,10 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceWriteSEPublicCert' }),
   deviceSESignMessage: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceSESignMessage' }),
+  deviceGetFirmwareHash: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceGetFirmwareHash' }),
+  deviceUnlockPath: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceUnlockPath' }),
   devicePing: (connectId, params) => call({ ...params, connectId, method: 'devicePing' }),
   deviceGetEntropy: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceGetEntropy' }),
@@ -342,4 +352,13 @@ export const createCoreApi = (
   debugLinkStop: (connectId, params) => call({ ...params, connectId, method: 'debugLinkStop' }),
   debugLinkWatchLayout: (connectId, params) =>
     call({ ...params, connectId, method: 'debugLinkWatchLayout' }),
+
+  firmwareEraseEx: (connectId, params) => call({ ...params, connectId, method: 'firmwareEraseEx' }),
+  firmwareErase: (connectId, params) => call({ ...params, connectId, method: 'firmwareErase' }),
+  firmwareUpdateEmmcTest: (connectId, params) =>
+    call({ ...params, connectId, method: 'firmwareUpdateEmmcTest' }),
+  firmwareUploadTest: (connectId, params) =>
+    call({ ...params, connectId, method: 'firmwareUploadTest' }),
+  reboot: (connectId, params) => call({ ...params, connectId, method: 'reboot' }),
+  selfTest: (connectId, params) => call({ ...params, connectId, method: 'selfTest' }),
 });

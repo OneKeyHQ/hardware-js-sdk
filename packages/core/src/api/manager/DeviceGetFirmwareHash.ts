@@ -1,17 +1,21 @@
-import { GetEntropy } from '@onekeyfe/hd-transport';
+import { GetFirmwareHash } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 
-export default class DeviceGetEntropy extends BaseMethod<GetEntropy> {
+export default class DeviceGetFirmwareHash extends BaseMethod<GetFirmwareHash> {
   init() {
     this.useDevicePassphraseState = false;
 
     this.params = {
-      size: this.payload.size,
+      challenge: this.payload.challenge,
     };
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('GetEntropy', 'Entropy', this.params);
+    const res = await this.device.commands.typedCall(
+      'GetFirmwareHash',
+      'FirmwareHash',
+      this.params
+    );
 
     return Promise.resolve(res.message);
   }
