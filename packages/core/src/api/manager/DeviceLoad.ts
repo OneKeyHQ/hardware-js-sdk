@@ -1,12 +1,12 @@
+import { LoadDevice } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 
-export default class DeviceLoad extends BaseMethod {
+export default class DeviceLoad extends BaseMethod<LoadDevice> {
   init() {
     this.useDevicePassphraseState = false;
 
-    // @ts-expect-error
     this.params = {
-      mnemonics: this.payload.mnemonics,
+      mnemonics: this.payload.mnemonics.split(' '),
       pin: this.payload.pin,
       passphrase_protection: this.payload.passphrase_protection,
       language: this.payload.language,

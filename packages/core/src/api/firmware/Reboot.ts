@@ -7,7 +7,7 @@ export default class Reboot extends BaseMethod<HardwareReboot> {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
     this.params = {
-      reboot_type: this.params.reboot_type,
+      reboot_type: this.payload.reboot_type,
     };
   }
 

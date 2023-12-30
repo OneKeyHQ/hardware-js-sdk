@@ -7,9 +7,31 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
+    method: 'deviceLoad',
+    noDeviceIdReq: true,
+    description: 'load device',
+    presupposes: [
+      {
+        title: 'load',
+        value: {
+          mnemonics: 'all all all all all all all all all all all all',
+          pin: '1111',
+        },
+      },
+    ],
+  },
+  {
     method: 'deviceReset',
     description: 'Reset a device',
     noDeviceIdReq: true,
+  },
+  {
+    method: 'deviceCancel',
+    description: 'cancel device',
+  },
+  {
+    method: 'deviceLock',
+    description: 'lock device',
   },
   {
     method: 'deviceSettings',
@@ -59,6 +81,37 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+  },
+  {
+    method: 'deviceFlags',
+    noDeviceIdReq: true,
+    description: 'device set flags',
+    presupposes: [
+      {
+        title: 'set flags',
+        value: {
+          flags: 1,
+        },
+      },
+    ],
+  },
+  {
+    method: 'deviceRecovery',
+    noDeviceIdReq: true,
+    description: 'device recovery',
+    presupposes: [
+      {
+        title: 'set flags',
+        value: {
+          word_count: 12,
+          pin_protection: true,
+        },
+      },
+    ],
+  },
+  {
+    method: 'deviceEndSession',
+    description: 'end session',
   },
   {
     method: 'deviceSupportFeatures',
@@ -125,6 +178,28 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+  },
+  {
+    method: 'deviceUploadResource',
+    description: 'deviceUploadResource',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'GetFirmwareHash',
+        value: {
+          suffix: 'png',
+          dataHex: '010203',
+          thumbnailDataHex: '010203',
+          resType: 0,
+          nftMetaData: '010203',
+        },
+      },
+    ],
+  },
+  {
+    method: 'deviceRebootToBoardloader',
+    description: 'DeviceRebootToBoardloader',
+    noDeviceIdReq: true,
   },
 ];
 

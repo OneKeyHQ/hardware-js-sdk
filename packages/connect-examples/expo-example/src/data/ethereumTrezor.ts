@@ -2,7 +2,7 @@ import { type PlaygroundProps } from '../components/Playground';
 
 const api: PlaygroundProps[] = [
   {
-    method: 'evmGetAddress',
+    method: 'evmGetAddressTrezor',
     description: 'Get a EVM address for your account.',
     presupposes: [
       {
@@ -42,7 +42,7 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'evmGetPublicKey',
+    method: 'evmGetPublicKeyTrezor',
     description: 'Get a EVM public key for your account.',
     presupposes: [
       {
@@ -74,7 +74,7 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'evmSignMessage',
+    method: 'evmSignMessageTrezor',
     description: 'Sign a message with your EVM account.',
     presupposes: [
       {
@@ -89,23 +89,7 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'evmSignMessageEIP712',
-    description:
-      'Sign a message with your EVM account. \nClassic and Mini firmware versions greater than 2.1.8 and less than 2.2.0 are available',
-    presupposes: [
-      {
-        title: 'Sign Message',
-        value: {
-          path: "m/44'/60'/0'/0/0",
-          domainHash: '7c872d109a4e735dc1886c72af47e9b4888a1507557e0f49c85b570019163373',
-          messageHash: '07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c644',
-        },
-      },
-    ],
-    deprecated: true,
-  },
-  {
-    method: 'evmSignTransaction',
+    method: 'evmSignTransactionTrezor',
     description: 'Sign a transaction with your EVM account.',
     presupposes: [
       {
@@ -173,7 +157,7 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'evmSignTypedData',
+    method: 'evmSignTypedDataTrezor',
     description: 'Sign a typed data with your EVM account.',
     presupposes: [
       {
@@ -321,7 +305,7 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'evmVerifyMessage',
+    method: 'evmVerifyMessageTrezor',
     description: 'Verify a message with your EVM account.',
     presupposes: [
       {

@@ -1,4 +1,3 @@
-import semver from 'semver';
 import EventEmitter from 'events';
 import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
@@ -8,12 +7,7 @@ import {
   HardwareError,
   HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
-import {
-  getDeviceFirmwareVersion,
-  getDeviceModel,
-  getDeviceType,
-  supportNewPassphrase,
-} from '../utils/deviceFeaturesUtils';
+import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
@@ -143,13 +137,13 @@ export const callAPI = async (message: CoreMessage) => {
   try {
     const inner = async (): Promise<void> => {
       // check firmware version
-      const deviceType = getDeviceType(device.features);
-      const deviceModel = getDeviceModel(device.features);
-      const versionRangeType = method.getVersionRange()[deviceType];
-      const versionRangeModel = method.getVersionRange()[deviceModel];
+      // const deviceType = getDeviceType(device.features);
+      // const deviceModel = getDeviceModel(device.features);
+      // const versionRangeType = method.getVersionRange()[deviceType];
+      // const versionRangeModel = method.getVersionRange()[deviceModel];
 
-      // Type has a higher priority than Model
-      const versionRange = versionRangeType ?? versionRangeModel;
+      // // Type has a higher priority than Model
+      // const versionRange = versionRangeType ?? versionRangeModel;
 
       if (device.features) {
         await DataManager.checkAndReloadData();
@@ -166,35 +160,35 @@ export const callAPI = async (message: CoreMessage) => {
           );
         }
 
-        if (versionRange) {
-          const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
-          if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
-            if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
-            }
+        // if (versionRange) {
+        //   const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+        //   if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
+        //     if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
+        //       throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
+        //     }
 
-            return Promise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-                `Device firmware version is too low, please update to ${versionRange.min}`,
-                { current: currentVersion, require: versionRange.min }
-              )
-            );
-          }
-          if (
-            versionRange.max &&
-            semver.valid(versionRange.max) &&
-            semver.gte(currentVersion, versionRange.max)
-          ) {
-            return Promise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.CallMethodDeprecated,
-                `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
-                { current: currentVersion, deprecated: versionRange.max }
-              )
-            );
-          }
-        }
+        //     return Promise.reject(
+        //       ERRORS.TypedError(
+        //         HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+        //         `Device firmware version is too low, please update to ${versionRange.min}`,
+        //         { current: currentVersion, require: versionRange.min }
+        //       )
+        //     );
+        //   }
+        //   if (
+        //     versionRange.max &&
+        //     semver.valid(versionRange.max) &&
+        //     semver.gte(currentVersion, versionRange.max)
+        //   ) {
+        //     return Promise.reject(
+        //       ERRORS.TypedError(
+        //         HardwareErrorCode.CallMethodDeprecated,
+        //         `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
+        //         { current: currentVersion, deprecated: versionRange.max }
+        //       )
+        //     );
+        //   }
+        // }
       }
 
       // check call method mode

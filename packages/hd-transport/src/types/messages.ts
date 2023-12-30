@@ -2285,6 +2285,19 @@ export type FirmwareHash = {
 // WipeDevice
 export type WipeDevice = {};
 
+// LoadDevice
+export type LoadDevice = {
+  mnemonics: string[];
+  pin?: string;
+  passphrase_protection?: boolean;
+  language?: string;
+  label?: string;
+  skip_checksum?: boolean;
+  u2f_counter?: number;
+  needs_backup?: boolean;
+  no_backup?: boolean;
+};
+
 // ResetDevice
 export type ResetDevice = {
   display_random?: boolean;
@@ -4128,6 +4141,7 @@ export type MessageType = {
   GetFirmwareHash: GetFirmwareHash;
   FirmwareHash: FirmwareHash;
   WipeDevice: WipeDevice;
+  LoadDevice: LoadDevice;
   ResetDevice: ResetDevice;
   BackupDevice: BackupDevice;
   EntropyRequest: EntropyRequest;

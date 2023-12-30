@@ -1,6 +1,5 @@
 import { GetECDHSessionKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 
 export default class CryptoGetECDHSessionKey extends BaseMethod<GetECDHSessionKey> {
@@ -9,7 +8,7 @@ export default class CryptoGetECDHSessionKey extends BaseMethod<GetECDHSessionKe
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
-    const addressN = validatePath(this.payload.path);
+
     // init params
     this.params = {
       identity: this.payload.identity,

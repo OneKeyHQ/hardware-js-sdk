@@ -9,7 +9,7 @@ export default class CryptoSignIdentity extends BaseMethod<SignIdentity> {
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
-    const addressN = validatePath(this.payload.path);
+
     // init params
     this.params = {
       identity: this.payload.identity,

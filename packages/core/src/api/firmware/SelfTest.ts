@@ -7,7 +7,7 @@ export default class SelfTest extends BaseMethod<HardwareSelfTest> {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
     this.params = {
-      payload: this.params.payload,
+      payload: this.payload.payload,
     };
   }
 

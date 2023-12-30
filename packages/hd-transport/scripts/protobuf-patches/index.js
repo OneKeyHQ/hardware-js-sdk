@@ -212,7 +212,6 @@ const SKIP = [
   'TxInput', // declared in TxInputType patch
   'TxOutput', // declared in TxOutputType patch
   // not implemented
-  'LoadDevice',
   'wire_in',
   'wire_out',
   'wire_debug_in',

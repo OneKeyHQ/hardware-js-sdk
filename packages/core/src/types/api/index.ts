@@ -184,6 +184,30 @@ import { cryptoCosiCommit } from './cryptoCosiCommit';
 import { cryptoCosiSign } from './cryptoCosiSign';
 import { cryptoGetECDHSessionKey } from './cryptoGetECDHSessionKey';
 import { cryptoSignIdentity } from './cryptoSignIdentity';
+import { nemDecryptMessage } from './nemDecryptMessage';
+import { tezosGetAddress } from './tezosGetAddress';
+import { tezosGetPublicKey } from './tezosGetPublicKey';
+import { tezosSignTx } from './tezosSignTx';
+import { moneroGetWatchKey } from './moneroGetWatchKey';
+import { moneroGetAddress } from './moneroGetAddress';
+import { eosGetPublicKey } from './eosGetPublicKey';
+import { eosSignTx } from './eosSignTx';
+import { binanceGetAddress } from './binanceGetAddress';
+import { binanceGetPublicKey } from './binanceGetPublicKey';
+import { binanceSignTx } from './binanceSignTx';
+import { webAuthnAddResidentCredential } from './webAuthnAddResidentCredential';
+import { webAuthnListResidentCredentials } from './webAuthnListResidentCredentials';
+import { webAuthnRemoveResidentCredential } from './webAuthnRemoveResidentCredential';
+import { getPublicKeyMultiple } from './getPublicKeyMultiple';
+import { listResDir } from './listResDir';
+import { nftWriteData } from './nftWriteData';
+import { nftWriteInfo } from './nftWriteInfo';
+import { readSEPublicKey } from './readSEPublicKey';
+import { resourceUpdate } from './resourceUpdate';
+import { bixinBackupDevice } from './bixinBackupDevice';
+import { bixinLoadDevice } from './bixinLoadDevice';
+import { bixinMessageSE } from './bixinMessageSE';
+import { bixinVerifyDeviceRequest } from './bixinVerifyDeviceRequest';
 
 export * from './export';
 
@@ -297,6 +321,7 @@ export type CoreApi = {
    */
   nemGetAddress: typeof nemGetAddress;
   nemSignTransaction: typeof nemSignTransaction;
+  nemDecryptMessage: typeof nemDecryptMessage;
 
   /**
    * Solana function
@@ -460,4 +485,34 @@ export type CoreApi = {
   firmwareUploadTest: typeof firmwareUploadTest;
   reboot: typeof reboot;
   selfTest: typeof selfTest;
+
+  tezosGetAddress: typeof tezosGetAddress;
+  tezosGetPublicKey: typeof tezosGetPublicKey;
+  tezosSignTx: typeof tezosSignTx;
+
+  binanceGetAddress: typeof binanceGetAddress;
+  binanceGetPublicKey: typeof binanceGetPublicKey;
+  binanceSignTx: typeof binanceSignTx;
+
+  moneroGetWatchKey: typeof moneroGetWatchKey;
+  moneroGetAddress: typeof moneroGetAddress;
+
+  eosGetPublicKey: typeof eosGetPublicKey;
+  eosSignTx: typeof eosSignTx;
+
+  webAuthnAddResidentCredential: typeof webAuthnAddResidentCredential;
+  webAuthnListResidentCredentials: typeof webAuthnListResidentCredentials;
+  webAuthnRemoveResidentCredential: typeof webAuthnRemoveResidentCredential;
+
+  getPublicKeyMultiple: typeof getPublicKeyMultiple;
+  listResDir: typeof listResDir;
+  nftWriteData: typeof nftWriteData;
+  nftWriteInfo: typeof nftWriteInfo;
+  readSEPublicKey: typeof readSEPublicKey;
+  resourceUpdate: typeof resourceUpdate;
+
+  bixinBackupDevice: typeof bixinBackupDevice;
+  bixinLoadDevice: typeof bixinLoadDevice;
+  bixinMessageSE: typeof bixinMessageSE;
+  bixinVerifyDeviceRequest: typeof bixinVerifyDeviceRequest;
 };

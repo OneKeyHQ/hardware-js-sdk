@@ -9,12 +9,7 @@ const api: PlaygroundProps[] = [
         title: 'cryptoBatchGetPublickeys',
         value: {
           ecdsa_curve_name: 'secp256k1',
-          paths: [
-            {
-              path: "m/44'/60'/0'/0/0",
-              show_display: false,
-            },
-          ],
+          paths: ["m/44'/60'/0'/0/0", "m/44'/60'/0'/0/1", "m/44'/60'/0'/0/2"],
         },
       },
     ],
@@ -100,3 +95,4 @@ const api: PlaygroundProps[] = [
     ],
   },
 ];
+export default api;

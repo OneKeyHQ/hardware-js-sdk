@@ -113,6 +113,10 @@ const playgroundConfig = [
     data: require('../data/crypto').default,
   },
   {
+    title: 'Other API',
+    data: require('../data/other').default,
+  },
+  {
     title: 'Manager API',
     data: require('../data/manager').default,
   },

@@ -200,6 +200,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nemGetAddress' }),
   nemSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'nemSignTransaction' }),
+  nemDecryptMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nemDecryptMessage' }),
 
   solGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'solGetAddress' }),
@@ -312,6 +314,59 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nostrSignSchnorr' }),
   lnurlAuth: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'lnurlAuth' }),
+
+  tezosGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tezosGetAddress' }),
+  tezosGetPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tezosGetPublicKey' }),
+  tezosSignTx: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tezosSignTx' }),
+
+  binanceGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'binanceGetAddress' }),
+  binanceGetPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'binanceGetPublicKey' }),
+  binanceSignTx: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'binanceSignTx' }),
+
+  moneroGetWatchKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroGetWatchKey' }),
+  moneroGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'moneroGetAddress' }),
+
+  eosGetPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'eosGetPublicKey' }),
+  eosSignTx: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'eosSignTx' }),
+
+  webAuthnAddResidentCredential: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'webAuthnAddResidentCredential' }),
+  webAuthnListResidentCredentials: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'webAuthnListResidentCredentials' }),
+  webAuthnRemoveResidentCredential: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'webAuthnRemoveResidentCredential' }),
+
+  getPublicKeyMultiple: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'getPublicKeyMultiple' }),
+  listResDir: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'listResDir' }),
+  nftWriteData: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nftWriteData' }),
+  nftWriteInfo: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nftWriteInfo' }),
+  readSEPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'readSEPublicKey' }),
+  resourceUpdate: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'resourceUpdate' }),
+
+  bixinBackupDevice: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'bixinBackupDevice' }),
+  bixinLoadDevice: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'bixinLoadDevice' }),
+  bixinMessageSE: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'bixinMessageSE' }),
+  bixinVerifyDeviceRequest: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'bixinVerifyDeviceRequest' }),
 
   deviceSpiFlashWrite: (connectId, params) =>
     call({ ...params, connectId, method: 'deviceSpiFlashWrite' }),

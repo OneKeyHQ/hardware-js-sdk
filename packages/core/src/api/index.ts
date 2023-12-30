@@ -59,7 +59,7 @@ export { default as evmSignTransaction } from './evm/EVMSignTransaction';
 export { default as evmSignTypedData } from './evm/EVMSignTypedData';
 export { default as evmVerifyMessage } from './evm/EVMVerifyMessage';
 
-export { default as evmGetAddresTrezor } from './evmTrezor/EVMGetAddress';
+export { default as evmGetAddressTrezor } from './evmTrezor/EVMGetAddress';
 export { default as evmGetPublicKeyTrezor } from './evmTrezor/EVMGetPublicKey';
 export { default as evmSignMessageTrezor } from './evmTrezor/EVMSignMessage';
 export { default as evmSignTransactionTrezor } from './evmTrezor/EVMSignTransaction';
@@ -74,6 +74,7 @@ export { default as starcoinVerifyMessage } from './starcoin/StarcoinVerifyMessa
 
 export { default as nemGetAddress } from './nem/NEMGetAddress';
 export { default as nemSignTransaction } from './nem/NEMSignTransaction';
+export { default as nemDecryptMessage } from './nem/NEMDecryptMessage';
 
 export { default as solGetAddress } from './solana/SolGetAddress';
 export { default as solSignTransaction } from './solana/SolSignTransaction';
@@ -178,3 +179,33 @@ export { default as firmwareUpdateEmmcTest } from './firmware/FirmwareUpdateEmmc
 export { default as firmwareUploadTest } from './firmware/FirmwareUploadTest';
 export { default as reboot } from './firmware/Reboot';
 export { default as selfTest } from './firmware/SelfTest';
+
+export { default as tezosGetAddress } from './tezos/TezosGetAddress';
+export { default as tezosGetPublicKey } from './tezos/TezosGetPublicKey';
+export { default as tezosSignTx } from './tezos/TezosSignTx';
+
+export { default as moneroGetAddress } from './monero/MoneroGetAddress';
+export { default as moneroGetWatchKey } from './monero/MoneroGetWatchKey';
+
+export { default as eosGetPublicKey } from './eos/EosGetPublicKey';
+export { default as eosSignTx } from './eos/EosSignTx';
+
+export { default as binanceGetAddress } from './binance/BinanceGetAddress';
+export { default as binanceGetPublicKey } from './binance/BinanceGetPublicKey';
+export { default as binanceSignTx } from './binance/BinanceSignTx';
+
+export { default as webAuthnAddResidentCredential } from './WebAuthnAddResidentCredential';
+export { default as webAuthnListResidentCredentials } from './WebAuthnListResidentCredentials';
+export { default as webAuthnRemoveResidentCredential } from './WebAuthnRemoveResidentCredential';
+
+export { default as getPublicKeyMultiple } from './manager/GetPublicKeyMultiple';
+export { default as listResDir } from './manager/ListResDir';
+export { default as nftWriteData } from './manager/NFTWriteData';
+export { default as nftWriteInfo } from './manager/NFTWriteInfo';
+export { default as readSEPublicKey } from './manager/ReadSEPublicKey';
+export { default as resourceUpdate } from './manager/ResourceUpdate';
+
+export { default as bixinBackupDevice } from './BixinBackupDevice';
+export { default as bixinLoadDevice } from './BixinLoadDevice';
+export { default as bixinMessageSE } from './BixinMessageSE';
+export { default as bixinVerifyDeviceRequest } from './BixinVerifyDeviceRequest';

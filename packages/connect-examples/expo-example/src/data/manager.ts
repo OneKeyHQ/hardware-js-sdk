@@ -47,6 +47,10 @@ const api: PlaygroundProps[] = [
     description: 'get device info',
   },
   {
+    method: 'readSEPublicKey',
+    description: 'readSEPublicKey',
+  },
+  {
     method: 'deviceReadSEPublicCert',
     description: 'read se public cert',
   },
@@ -89,59 +93,6 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
-  },
-  {
-    method: 'deviceLoad',
-    noDeviceIdReq: true,
-    description: 'load device',
-    presupposes: [
-      {
-        title: 'load',
-        value: {
-          mnemonics: 'all all all all all all all all all all all all',
-          pin: '1111',
-        },
-      },
-    ],
-  },
-  {
-    method: 'deviceCancel',
-    description: 'cancel device',
-  },
-  {
-    method: 'deviceLock',
-    description: 'lock device',
-  },
-  {
-    method: 'deviceFlags',
-    noDeviceIdReq: true,
-    description: 'device set flags',
-    presupposes: [
-      {
-        title: 'set flags',
-        value: {
-          flags: 1,
-        },
-      },
-    ],
-  },
-  {
-    method: 'deviceRecovery',
-    noDeviceIdReq: true,
-    description: 'device recovery',
-    presupposes: [
-      {
-        title: 'set flags',
-        value: {
-          word_count: 12,
-          pin_protection: true,
-        },
-      },
-    ],
-  },
-  {
-    method: 'deviceEndSession',
-    description: 'end session',
   },
   {
     method: 'deviceRebootToBootloader',
