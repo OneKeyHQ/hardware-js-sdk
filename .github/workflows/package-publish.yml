@@ -15,11 +15,8 @@ jobs:
         run: |
           yarn
           yarn bootstrap
-      - name: Build Target
-        run: |
-          yarn build
-      - name: Publish
+      - name: WhoAmI
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          yarn publish-packages -y --no-verify-access
+          npm whoami
