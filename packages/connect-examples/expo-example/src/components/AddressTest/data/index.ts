@@ -13,6 +13,9 @@ import passphrase241 from './passphrase24_1';
 import passphrase242 from './passphrase24_2';
 import passphrase243 from './passphrase24_3';
 import passphrase244 from './passphrase24_4';
+import unsafeNormal12 from './unsafe_normal12';
+import unsafePassphrase12 from './unsafe_passphrase12';
+import unsafePassphrase12Empty from './unsafe_passphrase12_empty';
 import type { TestCase } from './types';
 
 export const baseChainParams = {
@@ -113,6 +116,10 @@ export const baseChainParams = {
     path: "m/44'/195'/0'/0/0",
     showOnOneKey: false,
   },
+  nostrGetPublicKey: {
+    path: "m/44'/1237'/0'/0/0",
+    showOnOneKey: false,
+  },
 };
 
 export const testCases: TestCase[] = [
@@ -131,4 +138,7 @@ export const testCases: TestCase[] = [
   passphrase242,
   passphrase243,
   passphrase244,
+  unsafeNormal12,
+  unsafePassphrase12,
+  unsafePassphrase12Empty,
 ];

@@ -35,7 +35,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
     return 'classic';
   }
 
-  // classic1s 3.5.0
+  // classic1s 3.5.0 pro 4.6.0
   switch (features.onekey_device_type) {
     case 'CLASSIC':
       return 'classic';
@@ -43,6 +43,8 @@ export const getDeviceType = (features?: Features): IDeviceType => {
       return 'classic1s';
     case 'MINI':
       return 'mini';
+    case 'TOUCH':
+      return 'touch';
     case 'TOUCH_PRO':
       return 'pro';
     default:

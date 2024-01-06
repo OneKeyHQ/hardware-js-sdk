@@ -248,6 +248,10 @@ function OptionsView() {
 
     for (const item of currentTestCases) {
       try {
+        // await 300
+        await new Promise(resolve => {
+          setTimeout(() => resolve(true), 300);
+        });
         if (isNil(item.expectedAddress) || isEmpty(item.expectedAddress)) {
           setItemVerifyState?.(item.$key, {
             verify: 'skip',
@@ -261,6 +265,7 @@ function OptionsView() {
             ...params,
             passphraseState,
             useEmptyPassphrase: !passphraseState,
+            retryCount: 1,
           };
           setItemVerifyState?.(item.$key, {
             verify: 'pending',
