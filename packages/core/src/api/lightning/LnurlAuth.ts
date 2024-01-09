@@ -2,6 +2,7 @@ import { LnurlAuth as ILnurlAuth } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
+import { bytesToHex } from '../helpers/hexUtils';
 
 export default class LnurlAuth1 extends BaseMethod<ILnurlAuth> {
   hasBundle = false;
@@ -17,8 +18,8 @@ export default class LnurlAuth1 extends BaseMethod<ILnurlAuth> {
     ]);
 
     this.params = {
-      domain: payload.domain,
-      data: payload.k1,
+      domain: bytesToHex(Buffer.from(payload.domain, 'utf-8')),
+      data: bytesToHex(Buffer.from(payload.k1, 'hex')),
     };
   }
 

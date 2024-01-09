@@ -8,8 +8,8 @@ const api: PlaygroundProps[] = [
       {
         title: 'LNURL Auth',
         value: {
-          domain: 'https://google.com',
-          k1: 'k1',
+          domain: 'site.com',
+          k1: 'e2af6254a8df433264fa23f67eb8188635d15ce883e8fc020989d5f82ae6f11e',
         },
       },
     ],
