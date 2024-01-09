@@ -26,10 +26,10 @@ export default class LnurlAuth1 extends BaseMethod<ILnurlAuth> {
   getVersionRange() {
     return {
       model_mini: {
-        min: '3.6.0',
+        min: '3.7.0',
       },
       model_touch: {
-        min: '4.7.0',
+        min: '4.8.0',
       },
     };
   }
