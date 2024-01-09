@@ -1923,6 +1923,19 @@ export type KaspaSignedTx = {
   signature: string;
 };
 
+// LnurlAuth
+export type LnurlAuth = {
+  domain: string;
+  data: string;
+};
+
+// LnurlAuthResp
+export type LnurlAuthResp = {
+  publickey?: string;
+  path?: string;
+  signature?: string;
+};
+
 export enum Enum_BackupType {
   Bip39 = 0,
   Slip39_Basic = 1,
@@ -3879,6 +3892,8 @@ export type MessageType = {
   KaspaTxInputRequest: KaspaTxInputRequest;
   KaspaTxInputAck: KaspaTxInputAck;
   KaspaSignedTx: KaspaSignedTx;
+  LnurlAuth: LnurlAuth;
+  LnurlAuthResp: LnurlAuthResp;
   Initialize: Initialize;
   GetFeatures: GetFeatures;
   Features: Features;

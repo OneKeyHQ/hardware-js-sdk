@@ -118,6 +118,8 @@ import { nostrEncryptMessage } from './nostrEncryptMessage';
 import { nostrDecryptMessage } from './nostrDecryptMessage';
 import { nostrSignSchnorr } from './nostrSignSchnorr';
 
+import { lnurlAuth } from './lnurlAuth';
+
 export * from './export';
 
 export type CoreApi = {
@@ -316,4 +318,9 @@ export type CoreApi = {
   nostrEncryptMessage: typeof nostrEncryptMessage;
   nostrDecryptMessage: typeof nostrDecryptMessage;
   nostrSignSchnorr: typeof nostrSignSchnorr;
+
+  /**
+   * Lightning Network
+   */
+  lnurlAuth: typeof lnurlAuth;
 };

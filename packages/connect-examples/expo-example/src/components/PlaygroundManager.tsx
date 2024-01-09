@@ -13,6 +13,10 @@ import UpdateFirmware from './UpdateFirmware';
 
 const playgroundConfig = [
   {
+    title: 'Lightning Network API',
+    data: require('../data/lightning').default,
+  },
+  {
     title: 'Basic API',
     data: require('../data/basic').default,
   },

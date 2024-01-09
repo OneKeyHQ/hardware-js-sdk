@@ -5352,6 +5352,36 @@
         }
       }
     },
+    "LnurlAuth": {
+      "fields": {
+        "domain": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "LnurlAuthResp": {
+      "fields": {
+        "publickey": {
+          "type": "string",
+          "id": 1
+        },
+        "path": {
+          "type": "string",
+          "id": 2
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
     "BackupType": {
       "values": {
         "Bip39": 0,
@@ -10375,6 +10405,8 @@
         "MessageType_NostrDecryptedMessage": 11507,
         "MessageType_NostrSignSchnorr": 11508,
         "MessageType_NostrSignedSchnorr": 11509,
+        "MessageType_LnurlAuth": 11600,
+        "MessageType_LnurlAuthResp": 11601,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
