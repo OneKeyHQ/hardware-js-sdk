@@ -115,6 +115,28 @@ const TestItemView = ({ item }: { item: TestCaseDataWithKey }) => {
     );
   }, [verifyState]);
 
+  const subChain = useMemo(() => {
+    // @ts-expect-error
+    const commonParams = baseChainParams[item.method];
+    const requestParams = {
+      ...commonParams,
+      ...item.params,
+    };
+
+    return requestParams?.coin || requestParams?.hrp || requestParams?.network;
+  }, [item.method, item.params]);
+
+  const addressPath = useMemo(() => {
+    // @ts-expect-error
+    const commonParams = baseChainParams[item.method];
+    const requestParams = {
+      ...commonParams,
+      ...item.params,
+    };
+
+    return requestParams?.path;
+  }, [item.method, item.params]);
+
   return (
     <View
       style={{
@@ -129,7 +151,12 @@ const TestItemView = ({ item }: { item: TestCaseDataWithKey }) => {
     >
       {verifyStateViewMemo}
       <View>
-        <Text>{item.method}</Text>
+        <View style={{ flexDirection: 'row' }}>
+          <Text>{item.method}</Text>
+          {!!subChain && <Text>--{subChain}</Text>}
+          {!!addressPath && <Text>--{addressPath}</Text>}
+        </View>
+
         <Text>Expected:{item.expectedAddress}</Text>
         {errorStateViewMemo}
       </View>

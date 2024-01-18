@@ -1,0 +1,101 @@
+export const INDEX_MARK = '$$INDEX$$';
+
+export const baseParams = {
+  cardanoGetAddress: {
+    addressParameters: {
+      addressType: 0,
+      path: `m/1852'/1815'/${INDEX_MARK}'/0/0`,
+      stakingPath: `m/1852'/1815'/${INDEX_MARK}'/2/0`,
+      stakingKeyHash: undefined,
+      paymentScriptHash: undefined,
+      stakingScriptHash: undefined,
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+    derivationType: 1,
+    address: '',
+    showOnOneKey: false,
+    isCheck: false,
+  },
+  algoGetAddress: {
+    path: `m/44'/283'/0'/0'/${INDEX_MARK}'`,
+    showOnOneKey: false,
+  },
+  aptosGetAddress: {
+    path: `m/44'/637'/${INDEX_MARK}'/0'/0'`,
+    showOnOneKey: false,
+  },
+  btcGetAddress: {
+    path: `m/44'/0'/${INDEX_MARK}'/0/0`,
+    coin: 'btc',
+    showOnOneKey: false,
+  },
+  confluxGetAddress: {
+    path: `m/44'/503'/0'/0/${INDEX_MARK}`,
+    chainId: 1029,
+    showOnOneKey: false,
+  },
+  cosmosGetAddress: {
+    path: `m/44'/118'/0'/0/${INDEX_MARK}`,
+    showOnOneKey: false,
+    hrp: 'cosmos',
+  },
+  evmGetAddress: {
+    path: `m/44'/60'/0'/0/${INDEX_MARK}`,
+    showOnOneKey: false,
+  },
+  filecoinGetAddress: {
+    path: `m/44'/461'/0'/0/${INDEX_MARK}`,
+    showOnOneKey: false,
+  },
+  kaspaGetAddress: {
+    path: `m/44'/111111'/0'/0/${INDEX_MARK}`,
+    showOnOneKey: false,
+    prefix: 'kaspa',
+    scheme: 'schnorr',
+  },
+  nearGetAddress: {
+    path: `m/44'/397'/${INDEX_MARK}'`,
+    showOnOneKey: false,
+  },
+  nemGetAddress: {
+    path: `m/44'/43'/${INDEX_MARK}'`,
+    showOnOneKey: false,
+  },
+  nexaGetAddress: {
+    path: `m/44'/29223'/${INDEX_MARK}'/0/0`,
+    showOnOneKey: false,
+    prefix: 'nexa',
+    scheme: 'schnorr',
+  },
+  polkadotGetAddress: {
+    path: `m/44'/354'/${INDEX_MARK}'/0'/0'`,
+    prefix: '0',
+    network: 'polkadot',
+    showOnOneKey: false,
+  },
+  xrpGetAddress: {
+    path: `m/44'/144'/${INDEX_MARK}'/0/0`,
+    showOnOneKey: false,
+  },
+  solGetAddress: {
+    path: `m/44'/501'/${INDEX_MARK}'/0'`,
+    showOnOneKey: false,
+  },
+  starcoinGetAddress: {
+    path: `m/44'/101010'/0'/0'/${INDEX_MARK}'`,
+    showOnOneKey: false,
+  },
+  stellarGetAddress: {
+    path: `m/44'/148'/${INDEX_MARK}'`,
+    showOnOneKey: false,
+  },
+  suiGetAddress: {
+    path: `m/44'/784'/${INDEX_MARK}'/0'/0'`,
+    showOnOneKey: false,
+  },
+  tronGetAddress: {
+    path: `m/44'/195'/0'/0/${INDEX_MARK}`,
+    showOnOneKey: false,
+  },
+};
