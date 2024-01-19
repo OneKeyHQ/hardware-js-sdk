@@ -51,7 +51,7 @@ export function convertTestSingleData(
           ...item.params,
           path,
         },
-        result: Object.values(item.result)[index],
+        result: item.result[index],
       });
     }
   }
@@ -86,7 +86,8 @@ export function convertTestBatchData(data: PubkeyTestCaseData): PubkeyTestCase {
         ...item.params,
         path,
       });
-      results[path] = Object.values(item.result)[index];
+
+      results[path] = item.result[index];
     }
     dataList.push({
       ...item,

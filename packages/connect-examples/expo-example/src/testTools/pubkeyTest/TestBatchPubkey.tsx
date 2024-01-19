@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'r
 import { Button, Text, View } from 'react-native';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-import { isEmpty, isNil } from 'lodash';
+import { isEmpty } from 'lodash';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
 import { useRunnerState } from '../../components/BaseTestRunner/useRunnerState';
@@ -11,6 +11,8 @@ import { batchTestCases } from './data';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { PubkeyBatchTestCase } from './types';
 import { TestCaseDataWithKey, VerifyState } from '../../components/BaseTestRunner/types';
+import passphraseTestCase from './data/count24_two/passphrase_empty';
+import { fullPath } from './data/utils';
 
 type ResultViewProps = { item: TestCaseDataWithKey<PubkeyBatchTestCase['data'][0]> };
 
@@ -45,6 +47,58 @@ function ResultView({ item }: ResultViewProps) {
   );
 }
 
+function setTestData(
+  originData: any,
+  fullOriginData: any,
+  dataIndex: number,
+  payload: any,
+  result: any,
+  key: string
+) {
+  const resultData = {};
+  for (const fieldKey of Object.keys(result)) {
+    if (result[fieldKey] === undefined) break;
+    if (typeof result[fieldKey] === 'string') {
+      // @ts-expect-error
+      resultData[fieldKey] = payload[fieldKey];
+    } else {
+      // @ts-expect-error
+      if (!resultData[fieldKey]) {
+        // @ts-expect-error
+        resultData[fieldKey] = {};
+      }
+      for (const subFieldKey of Object.keys(result[fieldKey])) {
+        // @ts-expect-error
+        resultData[fieldKey][subFieldKey] = payload[fieldKey][subFieldKey];
+      }
+    }
+  }
+  return {
+    ...originData,
+    data: [
+      // @ts-expect-error
+      ...originData.data.map((item, index) => {
+        if (index === dataIndex) {
+          const path = fullOriginData.data[index].params?.path;
+          let indexKey = key;
+          if (path) {
+            indexKey = extractIndex(path, key);
+          }
+
+          return {
+            ...item,
+            result: {
+              ...item.result,
+              [indexKey]: resultData,
+            },
+          };
+        }
+        return item;
+      }),
+    ],
+  };
+}
+
 function validateFields(payload: any, result: any, prefix = '') {
   let error = '';
   for (const fieldKey of Object.keys(result)) {
@@ -60,6 +114,20 @@ function validateFields(payload: any, result: any, prefix = '') {
     }
   }
   return error;
+}
+
+function extractIndex(template: string, actual: string) {
+  const escapedTemplate = template.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  const regexPattern = escapedTemplate.replace('\\$\\$INDEX\\$\\$', '(\\d+)');
+
+  const regex = new RegExp(regexPattern);
+  const match = actual.match(regex);
+
+  if (match && match.length > 1) {
+    return match[1];
+  }
+
+  return actual;
 }
 
 function ExecuteView() {
@@ -161,7 +229,11 @@ function ExecuteView() {
     currentPassphrase.current = testCase.extra?.passphrase;
     const passphraseState = testCase.extra?.passphraseState;
 
-    for (const item of currentTestCases) {
+    const fullOriginData = fullPath(passphraseTestCase);
+    let originData = passphraseTestCase;
+
+    for (let dataIndex = 0; dataIndex < currentTestCases.length; dataIndex++) {
+      const item = currentTestCases[dataIndex];
       try {
         // await 300
         await new Promise(resolve => {
@@ -201,6 +273,15 @@ function ExecuteView() {
               item => item.path === key || item.serializedPath === key
             );
 
+            originData = setTestData(
+              originData,
+              fullOriginData,
+              dataIndex,
+              address,
+              item.result[key],
+              key
+            );
+
             error += validateFields(address, item.result[key]);
           }
 
@@ -223,7 +304,7 @@ function ExecuteView() {
         });
       }
     }
-
+    console.log('=====>>>', JSON.stringify(originData, null, 2));
     SDK.removeAllListeners(UI_EVENT);
   }, [
     SDK,

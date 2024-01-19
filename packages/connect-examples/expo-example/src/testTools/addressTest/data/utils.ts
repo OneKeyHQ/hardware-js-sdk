@@ -65,8 +65,9 @@ export function convertTestSingleData(
               stakingPath,
             },
           },
+          template: path,
           result: {
-            address: Object.values(item.expectedAddress)[index],
+            address: item.expectedAddress[index],
           },
         });
       } else {
@@ -82,8 +83,9 @@ export function convertTestSingleData(
             ...item.params,
             path,
           },
+          template: path,
           result: {
-            address: Object.values(item.expectedAddress)[index],
+            address: item.expectedAddress[index],
           },
         });
       }
@@ -131,7 +133,7 @@ export function convertTestBatchData(data: AddressTestCaseData): AddressBatchTes
           },
         });
         results[path] = {
-          address: Object.values(item.expectedAddress)[index],
+          address: item.expectedAddress[index],
         };
       }
 
@@ -159,7 +161,7 @@ export function convertTestBatchData(data: AddressTestCaseData): AddressBatchTes
           path,
         });
         results[path] = {
-          address: Object.values(item.expectedAddress)[index],
+          address: item.expectedAddress[index],
         };
       }
       dataList.push({
