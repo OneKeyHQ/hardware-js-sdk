@@ -1,19 +1,21 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Text, View } from 'react-native';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-import { isEmpty, isNil } from 'lodash';
-import HardwareSDKContext from '../../provider/HardwareSDKContext';
-import { useDevice } from '../../provider/DeviceProvider';
-import { useRunnerState } from '../../components/BaseTestRunner/useRunnerState';
+import { useContextSelector } from 'use-context-selector';
 
 import { testCases } from './data';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { AddressCaseData, AddressTestCase } from './types';
-import { TestCaseDataWithKey, VerifyState } from '../../components/BaseTestRunner/types';
+import { AddressTestCase } from './types';
+import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
+import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
+import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
+import { TestRunnerVerifyContext } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
+import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 
-type ResultViewProps = { item: TestCaseDataWithKey<AddressCaseData> };
+type TestCaseDataType = AddressTestCase['data'][0];
+type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
 
 function ResultView({ item }: ResultViewProps) {
   const title = item?.title || item?.method;
@@ -29,15 +31,101 @@ function ResultView({ item }: ResultViewProps) {
   );
 }
 
-function ExecuteView() {
-  const { sdk: SDK } = useContext(HardwareSDKContext);
-  const { selectedDevice } = useDevice();
+function ExportReportView() {
+  const runnerInfo = useContextSelector(TestRunnerContext, v => v);
+  const runnerVerify = useContextSelector(TestRunnerVerifyContext, v => v);
 
+  const exportReport = () => {
+    const {
+      runnerTestCaseTitle,
+      timestampBeginTest,
+      timestampEndTest,
+      itemValues,
+      runningDeviceFeatures,
+    } = runnerInfo;
+
+    const { itemVerifyState } = runnerVerify;
+
+    if (!itemVerifyState) return;
+    if (!timestampBeginTest) return;
+    if (!timestampEndTest) return;
+    if (!runningDeviceFeatures) return;
+
+    const beginTime = new Date(timestampBeginTest).toLocaleString();
+    const endTime = new Date(timestampEndTest).toLocaleString();
+
+    const allSuccess = itemValues.every(item => {
+      const caseItem = item as TestCaseDataWithKey<TestCaseDataType>;
+      const { $key } = caseItem;
+      const state = itemVerifyState?.[$key].verify;
+      return state === 'success';
+    });
+
+    const markdown = [];
+    markdown.push(`# Single Address Test Report (${runnerTestCaseTitle})`);
+    markdown.push(`Status: ${allSuccess ? 'Success' : 'Fail'}\n`);
+    markdown.push(`Begin Time: ${beginTime}\n`);
+    markdown.push(`End Time: ${endTime}\n`);
+    markdown.push(``);
+
+    markdown.push(`## Device Info`);
+    const deviceInfo = getDeviceInfo(runningDeviceFeatures);
+    markdown.push(`| Key | Value |`);
+    markdown.push(`| --- | --- |`);
+    Object.keys(deviceInfo).forEach(key => {
+      // @ts-expect-error
+      const value = deviceInfo[key];
+      if (value) {
+        markdown.push(`| ${key} | ${value} |`);
+      }
+    });
+    markdown.push(``);
+
+    markdown.push(`## Test Case`);
+    markdown.push(`| State | Title | Path | Address |`);
+    markdown.push(`| --- | --- | --- | --- |`);
+    itemValues.forEach(item => {
+      const caseItem = item as TestCaseDataWithKey<TestCaseDataType>;
+      const { result, $key } = caseItem;
+      const title = caseItem?.name || caseItem?.title || caseItem?.method;
+      const state = itemVerifyState?.[$key].verify;
+      const path = caseItem?.params?.addressParameters?.path || caseItem?.params?.path;
+
+      const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : result.address;
+      markdown.push(`| ${state} | ${title} | ${path} | ${runnerResult} |`);
+    });
+
+    const testCaseTitle = runnerTestCaseTitle?.replace(/-/g, '_');
+    const formatTime = new Date(timestampBeginTest).toLocaleString().replace(/[-: ]/g, '_');
+    const fileName = `SingleAddressTestReport(${testCaseTitle})${formatTime}.md`;
+
+    const element = document.createElement('a');
+    const file = new Blob([markdown.join('\n').toString()], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = fileName;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  if (runnerInfo.runnerDone) {
+    return <Button title="Export Report" onPress={exportReport} />;
+  }
+
+  return null;
+}
+
+function ExecuteView() {
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
-  const [currentTestCase, setCurrentTestCase] = useState<string>();
+  const [currentTestCase, setCurrentTestCase] = useState<AddressTestCase>();
   const [testDescription, setTestDescription] = useState<string>();
   const [passphrase, setPassphrase] = useState<string>();
+
+  function findTestCase(name: string) {
+    const testCase = testCases.find(testCase => testCase.name === name);
+    return testCase;
+  }
 
   useEffect(() => {
     const testCaseList: string[] = [];
@@ -45,163 +133,105 @@ function ExecuteView() {
       testCaseList.push(testCase.name);
     });
     setTestCaseList(testCaseList);
-    setCurrentTestCase(testCaseList[0]);
+    setCurrentTestCase(findTestCase(testCaseList[0]));
   }, []);
 
   useEffect(() => {
-    const testCase = testCases.find(testCase => testCase.name === currentTestCase);
+    const testCase = currentTestCase;
     if (!testCase) return;
 
     setTestDescription(testCase.description);
     setPassphrase(testCase.extra?.passphrase);
   }, [currentTestCase]);
 
-  const { setItemValues, setItemVerifyState, clearItemVerifyState } = useRunnerState();
-
-  const running = useRef<boolean>(false);
-
   const currentPassphrase = useRef<string | undefined>('');
 
-  const stopTest = useCallback(() => {
-    running.current = false;
-    setItemValues?.([]);
-    clearItemVerifyState?.();
-    if (SDK) {
-      SDK.cancel();
-      SDK.removeAllListeners(UI_EVENT);
-    }
-  }, [SDK, setItemValues, clearItemVerifyState]);
+  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+    initTestCase: () => {
+      const testCase = currentTestCase;
+      const currentTestCases = testCase?.data?.map((item, index) => {
+        const key = `${item.method}-${index}`;
 
-  const beginTest = useCallback(async () => {
-    if (!SDK) return;
-    SDK.removeAllListeners(UI_EVENT);
-
-    const testCase = testCases.find(testCase => testCase.name === currentTestCase);
-    if (!testCase) return;
-
-    SDK.on(UI_EVENT, (message: CoreMessage) => {
-      console.log('TopLEVEL EVENT ===>>>>: ', message);
-      if (message.type === UI_REQUEST.REQUEST_PIN) {
-        SDK.uiResponse({
-          type: UI_RESPONSE.RECEIVE_PIN,
-          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+        return {
+          ...item,
+          $key: key,
+        } as unknown as TestCaseDataWithKey<TestCaseDataType>;
+      });
+      if (testCase && currentTestCases) {
+        return Promise.resolve({
+          title: testCase.name,
+          data: currentTestCases,
         });
       }
-      if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
-        setTimeout(() => {
-          SDK.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-            payload: {
-              value: currentPassphrase.current ?? '',
-            },
-          });
-        }, 200);
-      }
-    });
-
-    const currentTestCases = testCase?.data?.map((item, index) => {
-      const key = `${item.method}-${index}`;
-
-      return {
-        ...item,
-        $key: key,
-      } as unknown as TestCaseDataWithKey<AddressCaseData>;
-    });
-    setItemValues?.(currentTestCases);
-    clearItemVerifyState?.();
-    running.current = true;
-
-    const connectId = selectedDevice?.connectId ?? '';
-    const featuresRes = await SDK.getFeatures(connectId);
-    const deviceId = featuresRes.payload?.device_id ?? '';
-
-    if (featuresRes.payload?.passphrase_protection === true && testCase.extra?.passphrase == null) {
-      await SDK.deviceSettings(connectId, {
-        usePassphrase: false,
-      });
-    }
-    if (!featuresRes.payload?.passphrase_protection && testCase.extra?.passphrase != null) {
-      await SDK.deviceSettings(connectId, {
-        usePassphrase: true,
-      });
-    }
-
-    currentPassphrase.current = testCase.extra?.passphrase;
-    const passphraseState = testCase.extra?.passphraseState;
-
-    for (const item of currentTestCases) {
-      try {
-        // await 300
-        await new Promise(resolve => {
-          setTimeout(() => resolve(true), 300);
-        });
-        if (isNil(item.result.address) || isEmpty(item.result.address)) {
-          setItemVerifyState?.(item.$key, {
-            verify: 'skip',
-          });
-        } else {
-          const { method, params } = item;
-
-          const requestParams = {
-            ...params,
-            passphraseState,
-            useEmptyPassphrase: !passphraseState,
-            retryCount: 1,
-            showOnOneKey,
-          };
-          setItemVerifyState?.(item.$key, {
-            verify: 'pending',
-          });
-
-          // @ts-expect-error
-          const res = await SDK[`${method}` as keyof typeof sdk](
-            connectId,
-            deviceId,
-            requestParams
-          );
-
-          if (!running.current) return;
-          let verifyState: VerifyState = 'none';
-          let error: string | undefined;
-
-          if (!res.success) {
-            if (res.payload?.code === 802 || res.payload?.code === 803) {
-              verifyState = 'skip';
-            } else {
-              verifyState = 'fail';
-              error = res.payload?.error;
-            }
-          } else if (res.payload?.address === item.result.address) {
-            verifyState = 'success';
-          } else {
-            verifyState = 'fail';
-            error = `actual: ${res.payload?.address}, expected: ${item.result.address}`;
-          }
-
-          setItemVerifyState?.(item.$key, {
-            verify: verifyState,
-            error,
+      return Promise.resolve(undefined);
+    },
+    initHardwareListener: sdk => {
+      sdk.on(UI_EVENT, (message: CoreMessage) => {
+        console.log('TopLEVEL EVENT ===>>>>: ', message);
+        if (message.type === UI_REQUEST.REQUEST_PIN) {
+          sdk.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PIN,
+            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
           });
         }
-      } catch (e) {
-        setItemVerifyState?.(item.$key, {
-          verify: 'fail',
-          // @ts-expect-error
-          error: e?.message ?? '',
+        if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+          setTimeout(() => {
+            sdk.uiResponse({
+              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+              payload: {
+                value: currentPassphrase.current ?? '',
+              },
+            });
+          }, 200);
+        }
+      });
+      return Promise.resolve();
+    },
+    prepareRunner: async (connectId, deviceId, features, sdk) => {
+      const testCase = currentTestCase;
+
+      if (features?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
+        await sdk.deviceSettings(connectId, {
+          usePassphrase: false,
         });
       }
-    }
+      if (!features?.passphrase_protection && testCase?.extra?.passphrase != null) {
+        await sdk.deviceSettings(connectId, {
+          usePassphrase: true,
+        });
+      }
 
-    SDK.removeAllListeners(UI_EVENT);
-  }, [
-    SDK,
-    clearItemVerifyState,
-    currentTestCase,
-    selectedDevice?.connectId,
-    setItemValues,
-    setItemVerifyState,
-    showOnOneKey,
-  ]);
+      currentPassphrase.current = testCase?.extra?.passphrase;
+    },
+    generateRequestParams: item => {
+      const { params } = item;
+      const requestParams = {
+        ...params,
+        passphraseState: currentPassphrase.current,
+        useEmptyPassphrase: !params.passphraseState,
+      };
+      return Promise.resolve({
+        method: item.method,
+        params: requestParams,
+      });
+    },
+    processResponse: (res, item, itemIndex) => {
+      const response = res as {
+        path: string;
+        address: string;
+      };
+
+      let error = '';
+
+      if (response.address !== item.result.address) {
+        error = `actual: ${response.address}, expected: ${item.result.address}`;
+      }
+
+      return Promise.resolve({
+        error,
+      });
+    },
+  });
 
   const contentMemo = useMemo(
     () => (
@@ -214,8 +244,8 @@ function ExecuteView() {
         )}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <Picker
-            selectedValue={currentTestCase}
-            onValueChange={itemValue => setCurrentTestCase(itemValue)}
+            selectedValue={currentTestCase?.name}
+            onValueChange={itemValue => setCurrentTestCase(findTestCase(itemValue))}
           >
             {testCaseList.map((testCase, index) => (
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
@@ -224,6 +254,7 @@ function ExecuteView() {
           <SwitchInput label="Show on OneKey" value={showOnOneKey} onToggle={setShowOnOneKey} />
           <Button title="Start Test" onPress={beginTest} />
           <Button title="Stop Test" onPress={stopTest} />
+          <ExportReportView />
         </View>
       </>
     ),

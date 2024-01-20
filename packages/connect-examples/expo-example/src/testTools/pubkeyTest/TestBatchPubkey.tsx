@@ -1,20 +1,106 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Text, View } from 'react-native';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-import { isEmpty } from 'lodash';
-import HardwareSDKContext from '../../provider/HardwareSDKContext';
-import { useDevice } from '../../provider/DeviceProvider';
-import { useRunnerState } from '../../components/BaseTestRunner/useRunnerState';
 
+import { useContextSelector } from 'use-context-selector';
 import { batchTestCases } from './data';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { PubkeyBatchTestCase } from './types';
-import { TestCaseDataWithKey, VerifyState } from '../../components/BaseTestRunner/types';
+import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath } from './data/utils';
+import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
+import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
+import { TestRunnerVerifyContext } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
+import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
 
-type ResultViewProps = { item: TestCaseDataWithKey<PubkeyBatchTestCase['data'][0]> };
+type TestCaseDataType = PubkeyBatchTestCase['data'][0];
+type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
+
+function ExportReportView() {
+  const runnerInfo = useContextSelector(TestRunnerContext, v => v);
+  const runnerVerify = useContextSelector(TestRunnerVerifyContext, v => v);
+
+  const exportReport = () => {
+    const {
+      runnerTestCaseTitle,
+      timestampBeginTest,
+      timestampEndTest,
+      itemValues,
+      runningDeviceFeatures,
+    } = runnerInfo;
+
+    const { itemVerifyState } = runnerVerify;
+
+    if (!itemVerifyState) return;
+    if (!timestampBeginTest) return;
+    if (!timestampEndTest) return;
+    if (!runningDeviceFeatures) return;
+
+    const beginTime = new Date(timestampBeginTest).toLocaleString();
+    const endTime = new Date(timestampEndTest).toLocaleString();
+
+    const allSuccess = itemValues.every(item => {
+      const caseItem = item as TestCaseDataWithKey<TestCaseDataType>;
+      const { $key } = caseItem;
+      const state = itemVerifyState?.[$key].verify;
+      return state === 'success';
+    });
+
+    const markdown = [];
+    markdown.push(`# Batch Pubkey Test Report (${runnerTestCaseTitle})`);
+    markdown.push(`Status: ${allSuccess ? 'Success' : 'Fail'}\n`);
+    markdown.push(`Begin Time: ${beginTime}\n`);
+    markdown.push(`End Time: ${endTime}\n`);
+    markdown.push(``);
+
+    markdown.push(`## Device Info`);
+    const deviceInfo = getDeviceInfo(runningDeviceFeatures);
+    markdown.push(`| Key | Value |`);
+    markdown.push(`| --- | --- |`);
+    Object.keys(deviceInfo).forEach(key => {
+      // @ts-expect-error
+      const value = deviceInfo[key];
+      if (value) {
+        markdown.push(`| ${key} | ${value} |`);
+      }
+    });
+    markdown.push(``);
+
+    markdown.push(`## Test Case`);
+    markdown.push(`| Status | Title | Pubkey |`);
+    markdown.push(`| --- | --- | --- |`);
+    itemValues.forEach(item => {
+      const caseItem = item as TestCaseDataWithKey<TestCaseDataType>;
+      const { result, $key } = caseItem;
+      const title = caseItem?.name || caseItem?.title || caseItem?.method;
+      const state = itemVerifyState?.[$key].verify;
+
+      const runnerResult =
+        state === 'fail' ? itemVerifyState?.[$key].error : JSON.stringify(result);
+      markdown.push(`| ${state} | ${title} | ${runnerResult} |`);
+    });
+
+    const testCaseTitle = runnerTestCaseTitle?.replace(/-/g, '_');
+    const formatTime = new Date(timestampBeginTest).toLocaleString().replace(/[-: ]/g, '_');
+    const fileName = `BatchPubkeyTestReport(${testCaseTitle})${formatTime}.md`;
+
+    const element = document.createElement('a');
+    const file = new Blob([markdown.join('\n').toString()], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = fileName;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  if (runnerInfo.runnerDone) {
+    return <Button title="Export Report" onPress={exportReport} />;
+  }
+
+  return null;
+}
 
 const RenderNestedObject = ({ obj, parentKey = '' }: { obj: any; parentKey?: string }) => (
   <>
@@ -131,13 +217,15 @@ function extractIndex(template: string, actual: string) {
 }
 
 function ExecuteView() {
-  const { sdk: SDK } = useContext(HardwareSDKContext);
-  const { selectedDevice } = useDevice();
-
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
-  const [currentTestCase, setCurrentTestCase] = useState<string>();
+  const [currentTestCase, setCurrentTestCase] = useState<PubkeyBatchTestCase>();
   const [testDescription, setTestDescription] = useState<string>();
   const [passphrase, setPassphrase] = useState<string>();
+
+  function findTestCase(name: string) {
+    const testCase = batchTestCases.find(testCase => testCase.name === name);
+    return testCase;
+  }
 
   useEffect(() => {
     const testCaseList: string[] = [];
@@ -145,175 +233,129 @@ function ExecuteView() {
       testCaseList.push(testCase.name);
     });
     setTestCaseList(testCaseList);
-    setCurrentTestCase(testCaseList[0]);
+    setCurrentTestCase(findTestCase(testCaseList[0]));
   }, []);
 
   useEffect(() => {
-    const testCase = batchTestCases.find(testCase => testCase.name === currentTestCase);
+    const testCase = currentTestCase;
     if (!testCase) return;
 
     setTestDescription(testCase.description);
     setPassphrase(testCase.extra?.passphrase);
   }, [currentTestCase]);
 
-  const { setItemValues, setItemVerifyState, clearItemVerifyState } = useRunnerState();
-
-  const running = useRef<boolean>(false);
-
   const currentPassphrase = useRef<string | undefined>('');
+  const fullOriginDataRef = useRef(passphraseTestCase);
+  const originDataRef = useRef(passphraseTestCase);
 
-  const stopTest = useCallback(() => {
-    running.current = false;
-    setItemValues?.([]);
-    clearItemVerifyState?.();
-    if (SDK) {
-      SDK.cancel();
-      SDK.removeAllListeners(UI_EVENT);
-    }
-  }, [SDK, setItemValues, clearItemVerifyState]);
+  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+    initTestCase: () => {
+      const testCase = currentTestCase;
+      const currentTestCases = testCase?.data?.map((item, index) => {
+        const key = `${item.method}-${index}`;
 
-  const beginTest = useCallback(async () => {
-    if (!SDK) return;
-    SDK.removeAllListeners(UI_EVENT);
-
-    const testCase = batchTestCases.find(testCase => testCase.name === currentTestCase);
-    if (!testCase) return;
-
-    SDK.on(UI_EVENT, (message: CoreMessage) => {
-      console.log('TopLEVEL EVENT ===>>>>: ', message);
-      if (message.type === UI_REQUEST.REQUEST_PIN) {
-        SDK.uiResponse({
-          type: UI_RESPONSE.RECEIVE_PIN,
-          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+        return {
+          ...item,
+          $key: key,
+        } as unknown as TestCaseDataWithKey<TestCaseDataType>;
+      });
+      if (testCase && currentTestCases) {
+        return Promise.resolve({
+          title: testCase.name,
+          data: currentTestCases,
         });
       }
-      if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
-        setTimeout(() => {
-          SDK.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-            payload: {
-              value: currentPassphrase.current ?? '',
-            },
+      return Promise.resolve(undefined);
+    },
+    initHardwareListener: sdk => {
+      sdk.on(UI_EVENT, (message: CoreMessage) => {
+        console.log('TopLEVEL EVENT ===>>>>: ', message);
+        if (message.type === UI_REQUEST.REQUEST_PIN) {
+          sdk.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PIN,
+            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
           });
-        }, 200);
-      }
-    });
-
-    const currentTestCases = testCase?.data?.map((item, index) => {
-      const key = `${item.method}-${index}`;
-
-      return {
-        ...item,
-        $key: key,
-      } as unknown as TestCaseDataWithKey<PubkeyBatchTestCase['data'][0]>;
-    });
-    setItemValues?.(currentTestCases);
-    clearItemVerifyState?.();
-    running.current = true;
-
-    const connectId = selectedDevice?.connectId ?? '';
-    const featuresRes = await SDK.getFeatures(connectId);
-    const deviceId = featuresRes.payload?.device_id ?? '';
-
-    if (featuresRes.payload?.passphrase_protection === true && testCase.extra?.passphrase == null) {
-      await SDK.deviceSettings(connectId, {
-        usePassphrase: false,
-      });
-    }
-    if (!featuresRes.payload?.passphrase_protection && testCase.extra?.passphrase != null) {
-      await SDK.deviceSettings(connectId, {
-        usePassphrase: true,
-      });
-    }
-
-    currentPassphrase.current = testCase.extra?.passphrase;
-    const passphraseState = testCase.extra?.passphraseState;
-
-    const fullOriginData = fullPath(passphraseTestCase);
-    let originData = passphraseTestCase;
-
-    for (let dataIndex = 0; dataIndex < currentTestCases.length; dataIndex++) {
-      const item = currentTestCases[dataIndex];
-      try {
-        // await 300
-        await new Promise(resolve => {
-          setTimeout(() => resolve(true), 300);
-        });
-
-        const { method, params } = item;
-
-        const requestParams = {
-          ...params,
-          passphraseState,
-          useEmptyPassphrase: !passphraseState,
-          retryCount: 1,
-        };
-        setItemVerifyState?.(item.$key, {
-          verify: 'pending',
-        });
-
-        // @ts-expect-error
-        const res = await SDK[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
-
-        if (!running.current) return;
-        let verifyState: VerifyState = 'none';
-        let error: string | undefined = '';
-
-        if (!res.success) {
-          if (res.payload?.code === 802 || res.payload?.code === 803) {
-            verifyState = 'skip';
-          } else {
-            verifyState = 'fail';
-            error = res.payload?.error;
-          }
-        } else {
-          for (const key of Object.keys(item.result)) {
-            const address = res.payload?.find(
-              // @ts-expect-error
-              item => item.path === key || item.serializedPath === key
-            );
-
-            originData = setTestData(
-              originData,
-              fullOriginData,
-              dataIndex,
-              address,
-              item.result[key],
-              key
-            );
-
-            error += validateFields(address, item.result[key]);
-          }
-
-          if (isEmpty(error)) {
-            verifyState = 'success';
-          } else {
-            verifyState = 'fail';
-          }
         }
+        if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+          setTimeout(() => {
+            sdk.uiResponse({
+              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+              payload: {
+                value: currentPassphrase.current ?? '',
+              },
+            });
+          }, 200);
+        }
+      });
+      return Promise.resolve();
+    },
+    prepareRunner: async (connectId, deviceId, features, sdk) => {
+      const testCase = currentTestCase;
 
-        setItemVerifyState?.(item.$key, {
-          verify: verifyState,
-          error,
-        });
-      } catch (e) {
-        setItemVerifyState?.(item.$key, {
-          verify: 'fail',
-          // @ts-expect-error
-          error: e?.message ?? '',
+      if (features?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
+        await sdk.deviceSettings(connectId, {
+          usePassphrase: false,
         });
       }
-    }
-    console.log('=====>>>', JSON.stringify(originData, null, 2));
-    SDK.removeAllListeners(UI_EVENT);
-  }, [
-    SDK,
-    clearItemVerifyState,
-    currentTestCase,
-    selectedDevice?.connectId,
-    setItemValues,
-    setItemVerifyState,
-  ]);
+      if (!features?.passphrase_protection && testCase?.extra?.passphrase != null) {
+        await sdk.deviceSettings(connectId, {
+          usePassphrase: true,
+        });
+      }
+
+      currentPassphrase.current = testCase?.extra?.passphrase;
+
+      fullOriginDataRef.current = fullPath(passphraseTestCase);
+      originDataRef.current = passphraseTestCase;
+    },
+    generateRequestParams: item => {
+      const { params } = item;
+      const requestParams = {
+        ...params,
+        passphraseState: currentPassphrase.current,
+        useEmptyPassphrase: !params.passphraseState,
+      };
+      return Promise.resolve({
+        method: item.method,
+        params: requestParams,
+      });
+    },
+    processResponse: (res, item, itemIndex) => {
+      const response = res as {
+        path: string;
+        address: string;
+        // ada
+        serializedPath: string;
+      }[];
+
+      let error = '';
+
+      for (const key of Object.keys(item.result)) {
+        const address = response?.find(
+          account => account.path === key || account.serializedPath === key
+        );
+
+        // 测试数据
+        originDataRef.current = setTestData(
+          originDataRef.current,
+          fullOriginDataRef.current,
+          itemIndex,
+          address,
+          item.result[key],
+          key
+        );
+
+        error += validateFields(address, item.result[key]);
+      }
+
+      return Promise.resolve({
+        error,
+      });
+    },
+    processRunnerDone: () => {
+      console.log('=====>>> Success Data:\n', JSON.stringify(originDataRef.current, null, 2));
+    },
+  });
 
   const contentMemo = useMemo(
     () => (
@@ -326,8 +368,8 @@ function ExecuteView() {
         )}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <Picker
-            selectedValue={currentTestCase}
-            onValueChange={itemValue => setCurrentTestCase(itemValue)}
+            selectedValue={currentTestCase?.name}
+            onValueChange={itemValue => setCurrentTestCase(findTestCase(itemValue))}
           >
             {testCaseList.map((testCase, index) => (
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
@@ -335,6 +377,7 @@ function ExecuteView() {
           </Picker>
           <Button title="Start Test" onPress={beginTest} />
           <Button title="Stop Test" onPress={stopTest} />
+          <ExportReportView />
         </View>
       </>
     ),
@@ -347,7 +390,7 @@ function ExecuteView() {
 export function TestBatchPubkey() {
   return (
     <TestRunnerView<PubkeyBatchTestCase['data']>
-      title="Pubkey Test"
+      title="Batch Pubkey Test"
       renderExecuteView={() => <ExecuteView />}
       renderResultView={item => <ResultView item={item} />}
     />

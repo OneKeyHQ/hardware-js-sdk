@@ -1,10 +1,24 @@
 import { useMemo, useState } from 'react';
 import { createContext } from 'use-context-selector';
+import type { Features } from '@onekeyfe/hd-transport';
 import type { TestCase, TestCaseDataWithKey } from '../types';
 
-type TestCaseInfo = Omit<TestCase<any>, 'data'>;
-
 export const TestRunnerContext = createContext<{
+  runnerTestCaseTitle?: string;
+  setRunnerTestCaseTitle?: React.Dispatch<React.SetStateAction<string>>;
+
+  runnerDone?: boolean;
+  setRunnerDone?: React.Dispatch<React.SetStateAction<boolean>>;
+
+  runningDeviceFeatures?: Features;
+  setRunningDeviceFeatures?: React.Dispatch<React.SetStateAction<Features>>;
+
+  timestampBeginTest?: number;
+  setTimestampBeginTest?: React.Dispatch<React.SetStateAction<number>>;
+
+  timestampEndTest?: number;
+  setTimestampEndTest?: React.Dispatch<React.SetStateAction<number>>;
+
   itemValues: TestCaseDataWithKey[];
   setItemValues?: React.Dispatch<React.SetStateAction<TestCaseDataWithKey[]>>;
 }>({
@@ -13,16 +27,35 @@ export const TestRunnerContext = createContext<{
 
 export function TestRunnerProvider({ children }: { children: React.ReactNode }) {
   const [itemValues, setItemValues] = useState<TestCaseDataWithKey[]>([]);
-  const [caseInfo, setCaseInfo] = useState<TestCaseInfo>();
+  const [runnerTestCaseTitle, setRunnerTestCaseTitle] = useState<string>();
+  const [runnerDone, setRunnerDone] = useState<boolean>();
+  const [runningDeviceFeatures, setRunningDeviceFeatures] = useState<Features>();
+  const [timestampBeginTest, setTimestampBeginTest] = useState<number>();
+  const [timestampEndTest, setTimestampEndTest] = useState<number>();
 
   const value = useMemo(
     () => ({
       itemValues,
       setItemValues,
-      caseInfo,
-      setCaseInfo,
+      runnerTestCaseTitle,
+      setRunnerTestCaseTitle,
+      runnerDone,
+      setRunnerDone,
+      runningDeviceFeatures,
+      setRunningDeviceFeatures,
+      timestampBeginTest,
+      setTimestampBeginTest,
+      timestampEndTest,
+      setTimestampEndTest,
     }),
-    [caseInfo, itemValues]
+    [
+      itemValues,
+      runnerDone,
+      runnerTestCaseTitle,
+      runningDeviceFeatures,
+      timestampBeginTest,
+      timestampEndTest,
+    ]
   );
 
   return <TestRunnerContext.Provider value={value}>{children}</TestRunnerContext.Provider>;
