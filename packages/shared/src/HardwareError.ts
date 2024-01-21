@@ -338,6 +338,11 @@ export const HardwareErrorCode = {
   NotInSigningMode: 815,
 
   /**
+   * not in signing mode
+   */
+  DataOverload: 816,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -449,6 +454,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FileAlreadyExists]: 'File already exists',
   [HardwareErrorCode.CheckDownloadFileError]: 'Check download file error',
   [HardwareErrorCode.NotInSigningMode]: 'not in signing mode',
+  [HardwareErrorCode.DataOverload]: 'Params data overload',
 
   /**
    * Lowlevel transport

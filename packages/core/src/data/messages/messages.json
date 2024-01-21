@@ -9149,6 +9149,17 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "data_initial_chunk": {
+          "type": "bytes",
+          "id": 3,
+          "options": {
+            "default": ""
+          }
+        },
+        "data_length": {
+          "type": "uint32",
+          "id": 4
         }
       }
     },
@@ -9163,6 +9174,31 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        }
+      }
+    },
+    "SuiTxRequest": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "SuiTxAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -10379,6 +10415,8 @@
         "MessageType_SuiSignedTx": 11103,
         "MessageType_SuiSignMessage": 11104,
         "MessageType_SuiMessageSignature": 11105,
+        "MessageType_SuiTxRequest": 11106,
+        "MessageType_SuiTxAck": 11107,
         "MessageType_FilecoinGetAddress": 11200,
         "MessageType_FilecoinAddress": 11201,
         "MessageType_FilecoinSignTx": 11202,

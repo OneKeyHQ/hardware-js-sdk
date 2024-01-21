@@ -216,6 +216,9 @@ export class DeviceCommands {
         if (message === 'File already exists') {
           error = ERRORS.TypedError(HardwareErrorCode.FileAlreadyExists);
         }
+        if (message?.includes('bytes overflow')) {
+          error = ERRORS.TypedError(HardwareErrorCode.DataOverload);
+        }
       }
 
       if (code === 'Failure_UnexpectedMessage') {
