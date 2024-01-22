@@ -91,7 +91,7 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Sign Transaction(7K)',
+        title: 'Sign Transaction(Big 7K)',
         value: {
           path: "m/44'/784'/0'/0'/0'",
           rawTx:
