@@ -3388,12 +3388,26 @@ export type SuiAddress = {
 export type SuiSignTx = {
   address_n: number[];
   raw_tx: string;
+  data_initial_chunk?: string;
+  data_length?: number;
 };
 
 // SuiSignedTx
 export type SuiSignedTx = {
   public_key: string;
   signature: string;
+};
+
+// SuiTxRequest
+export type SuiTxRequest = {
+  data_length?: number;
+  public_key?: string;
+  signature?: string;
+};
+
+// SuiTxAck
+export type SuiTxAck = {
+  data_chunk: string;
 };
 
 // SuiSignMessage
@@ -4092,6 +4106,8 @@ export type MessageType = {
   SuiAddress: SuiAddress;
   SuiSignTx: SuiSignTx;
   SuiSignedTx: SuiSignedTx;
+  SuiTxRequest: SuiTxRequest;
+  SuiTxAck: SuiTxAck;
   SuiSignMessage: SuiSignMessage;
   SuiMessageSignature: SuiMessageSignature;
   TezosGetAddress: TezosGetAddress;
@@ -4139,5 +4155,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;
