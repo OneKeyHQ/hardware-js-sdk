@@ -89,11 +89,12 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     running.current = false;
     setItemValues?.([]);
     clearItemVerifyState?.();
+    setRunnerDone?.(false);
     if (SDK) {
       SDK.cancel();
       SDK.removeAllListeners(UI_EVENT);
     }
-  }, [SDK, setItemValues, clearItemVerifyState]);
+  }, [setItemValues, clearItemVerifyState, setRunnerDone, SDK]);
 
   const endTestRunner = useCallback(() => {
     if (SDK) {

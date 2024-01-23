@@ -207,8 +207,8 @@ function ExecuteView() {
       const { params } = item;
       const requestParams = {
         ...params,
-        passphraseState: currentPassphrase.current,
-        useEmptyPassphrase: !params.passphraseState,
+        passphraseState: currentTestCase?.extra?.passphraseState,
+        useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
       };
       return Promise.resolve({
         method: item.method,

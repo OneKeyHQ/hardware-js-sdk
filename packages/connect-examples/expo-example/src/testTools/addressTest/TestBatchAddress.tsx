@@ -120,7 +120,7 @@ function ExportReportView() {
 }
 
 function extractIndex(template: string, actual: string) {
-  const escapedTemplate = template.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  const escapedTemplate = template.replace(/[-\\/\\^$*+?.()|[\]{}]/g, '\\$&');
   const regexPattern = escapedTemplate.replace('\\$\\$INDEX\\$\\$', '(\\d+)');
   const regex = new RegExp(regexPattern);
   const match = actual.match(regex);
@@ -229,8 +229,8 @@ function ExecuteView() {
       const { params } = item;
       const requestParams = {
         ...params,
-        passphraseState: currentPassphrase.current,
-        useEmptyPassphrase: !params.passphraseState,
+        passphraseState: currentTestCase?.extra?.passphraseState,
+        useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
       };
       return Promise.resolve({
         method: item.method,
