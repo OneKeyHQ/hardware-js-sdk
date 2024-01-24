@@ -2402,6 +2402,14 @@ export type BixinOutMessageSE = {
   outmessage?: string;
 };
 
+// GetNonce
+export type GetNonce = {};
+
+// Nonce
+export type Nonce = {
+  nonce: string;
+};
+
 // DeviceBackToBoot
 export type DeviceBackToBoot = {};
 
@@ -3184,6 +3192,7 @@ export type NostrGetPublicKey = {
 // NostrPublicKey
 export type NostrPublicKey = {
   publickey?: string;
+  npub?: string;
 };
 
 // NostrSignEvent
@@ -3197,11 +3206,23 @@ export type NostrSignedEvent = {
   event: string;
 };
 
+// NostrSignSchnorr
+export type NostrSignSchnorr = {
+  address_n: number[];
+  hash: string;
+};
+
+// NostrSignedSchnorr
+export type NostrSignedSchnorr = {
+  signature: string;
+};
+
 // NostrEncryptMessage
 export type NostrEncryptMessage = {
   address_n: number[];
   pubkey: string;
   msg: string;
+  show_display?: boolean;
 };
 
 // NostrEncryptedMessage
@@ -3214,6 +3235,7 @@ export type NostrDecryptMessage = {
   address_n: number[];
   pubkey: string;
   msg: string;
+  show_display?: boolean;
 };
 
 // NostrDecryptedMessage
@@ -4158,6 +4180,8 @@ export type MessageType = {
   BixinSeedOperate: BixinSeedOperate;
   BixinMessageSE: BixinMessageSE;
   BixinOutMessageSE: BixinOutMessageSE;
+  GetNonce: GetNonce;
+  Nonce: Nonce;
   DeviceBackToBoot: DeviceBackToBoot;
   BixinBackupRequest: BixinBackupRequest;
   BixinBackupAck: BixinBackupAck;
@@ -4278,6 +4302,8 @@ export type MessageType = {
   NostrPublicKey: NostrPublicKey;
   NostrSignEvent: NostrSignEvent;
   NostrSignedEvent: NostrSignedEvent;
+  NostrSignSchnorr: NostrSignSchnorr;
+  NostrSignedSchnorr: NostrSignedSchnorr;
   NostrEncryptMessage: NostrEncryptMessage;
   NostrEncryptedMessage: NostrEncryptedMessage;
   NostrDecryptMessage: NostrDecryptMessage;

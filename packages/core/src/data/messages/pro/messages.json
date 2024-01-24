@@ -6595,28 +6595,12 @@
         }
       }
     },
-    "UnlockPath": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "mac": {
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "UnlockedPathRequest": {
-      "fields": {
-        "mac": {
-          "type": "bytes",
-          "id": 1
-        }
+    "MoneroNetworkType": {
+      "values": {
+        "MAINNET": 0,
+        "TESTNET": 1,
+        "STAGENET": 2,
+        "FAKECHAIN": 3
       }
     },
     "MoneroTransactionSourceEntry": {

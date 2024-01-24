@@ -3,28 +3,35 @@ import { MessageVersion } from './DataManager';
 import CommonMessageJSON from '../data/messages/messages_common.json';
 import { IDeviceType } from '../types';
 
+import LegacyMessageJSON from '../data/messages/messages_legacy_v1.json';
+import ClassicMessageJSON from '../data/messages/classic/messages.json';
+import Classic1sMessageJSON from '../data/messages/classic1s/messages.json';
+import MiniMessageJSON from '../data/messages/mini/messages.json';
+import TouchMessageJSON from '../data/messages/touch/messages.json';
+import ProMessageJSON from '../data/messages/pro/messages.json';
+
 const messages: {
-  [deviceType in IDeviceType]: { [version in MessageVersion]: string };
+  [deviceType in IDeviceType]: { [version in MessageVersion]: JSON };
 } = {
   classic: {
-    latest: '../data/messages/classic/messages.json',
-    v1: '../data/messages/messages_legacy_v1.json',
+    latest: ClassicMessageJSON as unknown as JSON,
+    v1: LegacyMessageJSON as unknown as JSON,
   },
   classic1s: {
-    latest: '../data/messages/classic1s/messages.json',
-    v1: '../data/messages/messages_legacy_v1.json',
+    latest: Classic1sMessageJSON as unknown as JSON,
+    v1: LegacyMessageJSON as unknown as JSON,
   },
   mini: {
-    latest: '../data/messages/mini/messages.json',
-    v1: '../data/messages/messages_legacy_v1.json',
+    latest: MiniMessageJSON as unknown as JSON,
+    v1: LegacyMessageJSON as unknown as JSON,
   },
   touch: {
-    latest: '../data/messages/touch/messages.json',
-    v1: '../data/messages/messages_legacy_v1.json',
+    latest: TouchMessageJSON as unknown as JSON,
+    v1: LegacyMessageJSON as unknown as JSON,
   },
   pro: {
-    latest: '../data/messages/pro/messages.json',
-    v1: '../data/messages/messages_legacy_v1.json',
+    latest: ProMessageJSON as unknown as JSON,
+    v1: LegacyMessageJSON as unknown as JSON,
   },
 };
 
@@ -34,5 +41,6 @@ export function getCommonMessages() {
 
 export function getMessages(device: IDeviceType, version: MessageVersion) {
   // eslint-disable-next-line import/no-dynamic-require
-  return require(messages[device][version]) as unknown as JSON;
+  // return require(messages[device][version]) as unknown as JSON;
+  return messages[device][version];
 }
