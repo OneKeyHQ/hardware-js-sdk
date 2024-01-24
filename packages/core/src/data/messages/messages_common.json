@@ -1,0 +1,2322 @@
+{
+  "nested": {
+    "FirmwareErase": {
+      "fields": {
+        "length": {
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "FirmwareRequest": {
+      "fields": {
+        "offset": {
+          "type": "uint32",
+          "id": 1
+        },
+        "length": {
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "FirmwareUpload": {
+      "fields": {
+        "payload": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "hash": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "SelfTest": {
+      "fields": {
+        "payload": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "FirmwareErase_ex": {
+      "fields": {
+        "length": {
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "RebootType": {
+      "values": {
+        "Normal": 0,
+        "Boardloader": 1,
+        "BootLoader": 2
+      }
+    },
+    "Reboot": {
+      "fields": {
+        "reboot_type": {
+          "rule": "required",
+          "type": "RebootType",
+          "id": 1
+        }
+      }
+    },
+    "FirmwareUpdateEmmc": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "reboot_on_success": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "Success": {
+      "fields": {
+        "message": {
+          "type": "string",
+          "id": 1,
+          "options": {
+            "default": ""
+          }
+        }
+      }
+    },
+    "Failure": {
+      "fields": {
+        "code": {
+          "type": "FailureType",
+          "id": 1
+        },
+        "message": {
+          "type": "string",
+          "id": 2
+        }
+      },
+      "nested": {
+        "FailureType": {
+          "values": {
+            "Failure_UnexpectedMessage": 1,
+            "Failure_ButtonExpected": 2,
+            "Failure_DataError": 3,
+            "Failure_ActionCancelled": 4,
+            "Failure_PinExpected": 5,
+            "Failure_PinCancelled": 6,
+            "Failure_PinInvalid": 7,
+            "Failure_InvalidSignature": 8,
+            "Failure_ProcessError": 9,
+            "Failure_NotEnoughFunds": 10,
+            "Failure_NotInitialized": 11,
+            "Failure_PinMismatch": 12,
+            "Failure_WipeCodeMismatch": 13,
+            "Failure_InvalidSession": 14,
+            "Failure_FirmwareError": 99
+          }
+        }
+      }
+    },
+    "ButtonRequest": {
+      "fields": {
+        "code": {
+          "type": "ButtonRequestType",
+          "id": 1
+        },
+        "pages": {
+          "type": "uint32",
+          "id": 2
+        }
+      },
+      "nested": {
+        "ButtonRequestType": {
+          "values": {
+            "ButtonRequest_Other": 1,
+            "ButtonRequest_FeeOverThreshold": 2,
+            "ButtonRequest_ConfirmOutput": 3,
+            "ButtonRequest_ResetDevice": 4,
+            "ButtonRequest_ConfirmWord": 5,
+            "ButtonRequest_WipeDevice": 6,
+            "ButtonRequest_ProtectCall": 7,
+            "ButtonRequest_SignTx": 8,
+            "ButtonRequest_FirmwareCheck": 9,
+            "ButtonRequest_Address": 10,
+            "ButtonRequest_PublicKey": 11,
+            "ButtonRequest_MnemonicWordCount": 12,
+            "ButtonRequest_MnemonicInput": 13,
+            "_Deprecated_ButtonRequest_PassphraseType": 14,
+            "ButtonRequest_UnknownDerivationPath": 15,
+            "ButtonRequest_RecoveryHomepage": 16,
+            "ButtonRequest_Success": 17,
+            "ButtonRequest_Warning": 18,
+            "ButtonRequest_PassphraseEntry": 19,
+            "ButtonRequest_PinEntry": 20
+          }
+        }
+      }
+    },
+    "ButtonAck": {
+      "fields": {}
+    },
+    "PinMatrixRequest": {
+      "fields": {
+        "type": {
+          "type": "PinMatrixRequestType",
+          "id": 1
+        }
+      },
+      "nested": {
+        "PinMatrixRequestType": {
+          "values": {
+            "PinMatrixRequestType_Current": 1,
+            "PinMatrixRequestType_NewFirst": 2,
+            "PinMatrixRequestType_NewSecond": 3,
+            "PinMatrixRequestType_WipeCodeFirst": 4,
+            "PinMatrixRequestType_WipeCodeSecond": 5,
+            "PinMatrixRequestType_BackupFirst": 6,
+            "PinMatrixRequestType_BackupSecond": 7
+          }
+        }
+      }
+    },
+    "PinMatrixAck": {
+      "fields": {
+        "pin": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "new_pin": {
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "PassphraseRequest": {
+      "fields": {
+        "_on_device": {
+          "type": "bool",
+          "id": 1,
+          "options": {
+            "deprecated": true
+          }
+        }
+      }
+    },
+    "PassphraseAck": {
+      "fields": {
+        "passphrase": {
+          "type": "string",
+          "id": 1
+        },
+        "_state": {
+          "type": "bytes",
+          "id": 2,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "on_device": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "Deprecated_PassphraseStateRequest": {
+      "options": {
+        "deprecated": true
+      },
+      "fields": {
+        "state": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "Deprecated_PassphraseStateAck": {
+      "options": {
+        "deprecated": true
+      },
+      "fields": {}
+    },
+    "HDNodeType": {
+      "fields": {
+        "depth": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "fingerprint": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "child_num": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "chain_code": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "private_key": {
+          "type": "bytes",
+          "id": 5
+        },
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 6
+        }
+      }
+    },
+    "BixinPinInputOnDevice": {
+      "fields": {}
+    },
+    "BackupType": {
+      "values": {
+        "Bip39": 0,
+        "Slip39_Basic": 1,
+        "Slip39_Advanced": 2
+      }
+    },
+    "SafetyCheckLevel": {
+      "values": {
+        "Strict": 0,
+        "PromptAlways": 1,
+        "PromptTemporarily": 2
+      }
+    },
+    "Initialize": {
+      "fields": {
+        "session_id": {
+          "type": "bytes",
+          "id": 1
+        },
+        "_skip_passphrase": {
+          "type": "bool",
+          "id": 2,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "derive_cardano": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "GetFeatures": {
+      "fields": {}
+    },
+    "Features": {
+      "fields": {
+        "vendor": {
+          "type": "string",
+          "id": 1
+        },
+        "major_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "minor_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "patch_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "bootloader_mode": {
+          "type": "bool",
+          "id": 5
+        },
+        "device_id": {
+          "type": "string",
+          "id": 6
+        },
+        "pin_protection": {
+          "type": "bool",
+          "id": 7
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 8
+        },
+        "language": {
+          "type": "string",
+          "id": 9
+        },
+        "label": {
+          "type": "string",
+          "id": 10
+        },
+        "initialized": {
+          "type": "bool",
+          "id": 12
+        },
+        "revision": {
+          "type": "bytes",
+          "id": 13
+        },
+        "bootloader_hash": {
+          "type": "bytes",
+          "id": 14
+        },
+        "imported": {
+          "type": "bool",
+          "id": 15
+        },
+        "unlocked": {
+          "type": "bool",
+          "id": 16
+        },
+        "_passphrase_cached": {
+          "type": "bool",
+          "id": 17,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "firmware_present": {
+          "type": "bool",
+          "id": 18
+        },
+        "needs_backup": {
+          "type": "bool",
+          "id": 19
+        },
+        "flags": {
+          "type": "uint32",
+          "id": 20
+        },
+        "model": {
+          "type": "string",
+          "id": 21
+        },
+        "fw_major": {
+          "type": "uint32",
+          "id": 22
+        },
+        "fw_minor": {
+          "type": "uint32",
+          "id": 23
+        },
+        "fw_patch": {
+          "type": "uint32",
+          "id": 24
+        },
+        "fw_vendor": {
+          "type": "string",
+          "id": 25
+        },
+        "fw_vendor_keys": {
+          "type": "bytes",
+          "id": 26
+        },
+        "unfinished_backup": {
+          "type": "bool",
+          "id": 27
+        },
+        "no_backup": {
+          "type": "bool",
+          "id": 28
+        },
+        "recovery_mode": {
+          "type": "bool",
+          "id": 29
+        },
+        "capabilities": {
+          "rule": "repeated",
+          "type": "Capability",
+          "id": 30,
+          "options": {
+            "packed": false
+          }
+        },
+        "backup_type": {
+          "type": "BackupType",
+          "id": 31
+        },
+        "sd_card_present": {
+          "type": "bool",
+          "id": 32
+        },
+        "sd_protection": {
+          "type": "bool",
+          "id": 33
+        },
+        "wipe_code_protection": {
+          "type": "bool",
+          "id": 34
+        },
+        "session_id": {
+          "type": "bytes",
+          "id": 35
+        },
+        "passphrase_always_on_device": {
+          "type": "bool",
+          "id": 36
+        },
+        "safety_checks": {
+          "type": "SafetyCheckLevel",
+          "id": 37
+        },
+        "auto_lock_delay_ms": {
+          "type": "uint32",
+          "id": 38
+        },
+        "display_rotation": {
+          "type": "uint32",
+          "id": 39
+        },
+        "experimental_features": {
+          "type": "bool",
+          "id": 40
+        },
+        "offset": {
+          "type": "uint32",
+          "id": 500
+        },
+        "ble_name": {
+          "type": "string",
+          "id": 501
+        },
+        "ble_ver": {
+          "type": "string",
+          "id": 502
+        },
+        "ble_enable": {
+          "type": "bool",
+          "id": 503
+        },
+        "se_enable": {
+          "type": "bool",
+          "id": 504
+        },
+        "se_ver": {
+          "type": "string",
+          "id": 506
+        },
+        "backup_only": {
+          "type": "bool",
+          "id": 507
+        },
+        "onekey_version": {
+          "type": "string",
+          "id": 508
+        },
+        "onekey_serial": {
+          "type": "string",
+          "id": 509
+        },
+        "bootloader_version": {
+          "type": "string",
+          "id": 510
+        },
+        "serial_no": {
+          "type": "string",
+          "id": 511
+        },
+        "spi_flash": {
+          "type": "string",
+          "id": 512
+        },
+        "initstates": {
+          "type": "uint32",
+          "id": 513
+        },
+        "NFT_voucher": {
+          "type": "bytes",
+          "id": 514
+        },
+        "cpu_info": {
+          "type": "string",
+          "id": 515
+        },
+        "pre_firmware": {
+          "type": "string",
+          "id": 516
+        },
+        "coin_switch": {
+          "type": "uint32",
+          "id": 517
+        },
+        "build_id": {
+          "type": "string",
+          "id": 518
+        },
+        "battery_level": {
+          "type": "uint32",
+          "id": 520
+        }
+      },
+      "nested": {
+        "Capability": {
+          "options": {
+            "(has_bitcoin_only_values)": true
+          },
+          "values": {
+            "Capability_Bitcoin": 1,
+            "Capability_Bitcoin_like": 2,
+            "Capability_Binance": 3,
+            "Capability_Cardano": 4,
+            "Capability_Crypto": 5,
+            "Capability_EOS": 6,
+            "Capability_Ethereum": 7,
+            "Capability_Lisk": 8,
+            "Capability_Monero": 9,
+            "Capability_NEM": 10,
+            "Capability_Ripple": 11,
+            "Capability_Stellar": 12,
+            "Capability_Tezos": 13,
+            "Capability_U2F": 14,
+            "Capability_Shamir": 15,
+            "Capability_ShamirGroups": 16,
+            "Capability_PassphraseEntry": 17
+          }
+        }
+      }
+    },
+    "LockDevice": {
+      "fields": {}
+    },
+    "EndSession": {
+      "fields": {}
+    },
+    "ApplySettings": {
+      "fields": {
+        "language": {
+          "type": "string",
+          "id": 1
+        },
+        "label": {
+          "type": "string",
+          "id": 2
+        },
+        "use_passphrase": {
+          "type": "bool",
+          "id": 3
+        },
+        "homescreen": {
+          "type": "bytes",
+          "id": 4
+        },
+        "_passphrase_source": {
+          "type": "uint32",
+          "id": 5,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "auto_lock_delay_ms": {
+          "type": "uint32",
+          "id": 6
+        },
+        "display_rotation": {
+          "type": "uint32",
+          "id": 7
+        },
+        "passphrase_always_on_device": {
+          "type": "bool",
+          "id": 8
+        },
+        "safety_checks": {
+          "type": "SafetyCheckLevel",
+          "id": 9
+        },
+        "experimental_features": {
+          "type": "bool",
+          "id": 10
+        },
+        "use_ble": {
+          "type": "bool",
+          "id": 100
+        },
+        "use_se": {
+          "type": "bool",
+          "id": 101
+        },
+        "is_bixinapp": {
+          "type": "bool",
+          "id": 102
+        },
+        "fastpay_pin": {
+          "type": "bool",
+          "id": 103
+        },
+        "fastpay_confirm": {
+          "type": "bool",
+          "id": 104
+        },
+        "fastpay_money_limit": {
+          "type": "uint64",
+          "id": 105
+        },
+        "fastpay_times": {
+          "type": "uint32",
+          "id": 106
+        }
+      },
+      "nested": {
+        "ExportType": {
+          "values": {
+            "SeedEncExportType_NO": 0,
+            "SeedEncExportType_YES": 1,
+            "MnemonicPlainExportType_YES": 2
+          }
+        }
+      }
+    },
+    "ApplyFlags": {
+      "fields": {
+        "flags": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "ChangePin": {
+      "fields": {
+        "remove": {
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
+    "ChangeWipeCode": {
+      "fields": {
+        "remove": {
+          "type": "bool",
+          "id": 1
+        }
+      }
+    },
+    "SdProtect": {
+      "fields": {
+        "operation": {
+          "rule": "required",
+          "type": "SdProtectOperationType",
+          "id": 1
+        }
+      },
+      "nested": {
+        "SdProtectOperationType": {
+          "values": {
+            "DISABLE": 0,
+            "ENABLE": 1,
+            "REFRESH": 2
+          }
+        }
+      }
+    },
+    "Ping": {
+      "fields": {
+        "message": {
+          "type": "string",
+          "id": 1,
+          "options": {
+            "default": ""
+          }
+        },
+        "button_protection": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "Cancel": {
+      "fields": {}
+    },
+    "GetEntropy": {
+      "fields": {
+        "size": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "Entropy": {
+      "fields": {
+        "entropy": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "WipeDevice": {
+      "fields": {}
+    },
+    "LoadDevice": {
+      "fields": {
+        "mnemonics": {
+          "rule": "repeated",
+          "type": "string",
+          "id": 1
+        },
+        "pin": {
+          "type": "string",
+          "id": 3
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 4
+        },
+        "language": {
+          "type": "string",
+          "id": 5,
+          "options": {
+            "default": "en-US"
+          }
+        },
+        "label": {
+          "type": "string",
+          "id": 6
+        },
+        "skip_checksum": {
+          "type": "bool",
+          "id": 7
+        },
+        "u2f_counter": {
+          "type": "uint32",
+          "id": 8
+        },
+        "needs_backup": {
+          "type": "bool",
+          "id": 9
+        },
+        "no_backup": {
+          "type": "bool",
+          "id": 10
+        }
+      }
+    },
+    "ResetDevice": {
+      "fields": {
+        "display_random": {
+          "type": "bool",
+          "id": 1
+        },
+        "strength": {
+          "type": "uint32",
+          "id": 2,
+          "options": {
+            "default": 256
+          }
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 3
+        },
+        "pin_protection": {
+          "type": "bool",
+          "id": 4
+        },
+        "language": {
+          "type": "string",
+          "id": 5,
+          "options": {
+            "default": "en-US"
+          }
+        },
+        "label": {
+          "type": "string",
+          "id": 6
+        },
+        "u2f_counter": {
+          "type": "uint32",
+          "id": 7
+        },
+        "skip_backup": {
+          "type": "bool",
+          "id": 8
+        },
+        "no_backup": {
+          "type": "bool",
+          "id": 9
+        },
+        "backup_type": {
+          "type": "BackupType",
+          "id": 10,
+          "options": {
+            "default": "Bip39"
+          }
+        }
+      }
+    },
+    "BackupDevice": {
+      "fields": {}
+    },
+    "EntropyRequest": {
+      "fields": {}
+    },
+    "EntropyAck": {
+      "fields": {
+        "entropy": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "RecoveryDevice": {
+      "fields": {
+        "word_count": {
+          "type": "uint32",
+          "id": 1
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 2
+        },
+        "pin_protection": {
+          "type": "bool",
+          "id": 3
+        },
+        "language": {
+          "type": "string",
+          "id": 4
+        },
+        "label": {
+          "type": "string",
+          "id": 5
+        },
+        "enforce_wordlist": {
+          "type": "bool",
+          "id": 6
+        },
+        "type": {
+          "type": "RecoveryDeviceType",
+          "id": 8
+        },
+        "u2f_counter": {
+          "type": "uint32",
+          "id": 9
+        },
+        "dry_run": {
+          "type": "bool",
+          "id": 10
+        }
+      },
+      "nested": {
+        "RecoveryDeviceType": {
+          "values": {
+            "RecoveryDeviceType_ScrambledWords": 0,
+            "RecoveryDeviceType_Matrix": 1
+          }
+        }
+      }
+    },
+    "WordRequest": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "WordRequestType",
+          "id": 1
+        }
+      },
+      "nested": {
+        "WordRequestType": {
+          "values": {
+            "WordRequestType_Plain": 0,
+            "WordRequestType_Matrix9": 1,
+            "WordRequestType_Matrix6": 2
+          }
+        }
+      }
+    },
+    "WordAck": {
+      "fields": {
+        "word": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "SetU2FCounter": {
+      "fields": {
+        "u2f_counter": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "GetNextU2FCounter": {
+      "fields": {}
+    },
+    "NextU2FCounter": {
+      "fields": {
+        "u2f_counter": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "DoPreauthorized": {
+      "fields": {}
+    },
+    "PreauthorizedRequest": {
+      "fields": {}
+    },
+    "CancelAuthorization": {
+      "fields": {}
+    },
+    "BixinSeedOperate": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "SeedRequestType",
+          "id": 1
+        },
+        "seed_importData": {
+          "type": "bytes",
+          "id": 2
+        }
+      },
+      "nested": {
+        "SeedRequestType": {
+          "values": {
+            "SeedRequestType_Gen": 0,
+            "SeedRequestType_EncExport": 1,
+            "SeedRequestType_EncImport": 2
+          }
+        }
+      }
+    },
+    "BixinMessageSE": {
+      "fields": {
+        "inputmessage": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "BixinOutMessageSE": {
+      "fields": {
+        "outmessage": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "DeviceBackToBoot": {
+      "fields": {}
+    },
+    "BixinBackupRequest": {
+      "fields": {}
+    },
+    "BixinBackupAck": {
+      "fields": {
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "BixinRestoreRequest": {
+      "fields": {
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "language": {
+          "type": "string",
+          "id": 2
+        },
+        "label": {
+          "type": "string",
+          "id": 3
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 4
+        }
+      }
+    },
+    "BixinRestoreAck": {
+      "fields": {
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "BixinVerifyDeviceRequest": {
+      "fields": {
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "BixinVerifyDeviceAck": {
+      "fields": {
+        "cert": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "BixinWhiteListRequest": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "WL_OperationType",
+          "id": 1
+        },
+        "addr_in": {
+          "type": "string",
+          "id": 2
+        }
+      },
+      "nested": {
+        "WL_OperationType": {
+          "values": {
+            "WL_OperationType_Add": 0,
+            "WL_OperationType_Delete": 1,
+            "WL_OperationType_Inquire": 2
+          }
+        }
+      }
+    },
+    "BixinWhiteListAck": {
+      "fields": {
+        "address": {
+          "rule": "repeated",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "BixinLoadDevice": {
+      "fields": {
+        "mnemonics": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "language": {
+          "type": "string",
+          "id": 5,
+          "options": {
+            "default": "en-US"
+          }
+        },
+        "label": {
+          "type": "string",
+          "id": 6
+        },
+        "skip_checksum": {
+          "type": "bool",
+          "id": 7
+        }
+      }
+    },
+    "BixinBackupDevice": {
+      "fields": {}
+    },
+    "BixinBackupDeviceAck": {
+      "fields": {
+        "mnemonics": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DeviceInfoSettings": {
+      "fields": {
+        "serial_no": {
+          "type": "string",
+          "id": 1
+        },
+        "cpu_info": {
+          "type": "string",
+          "id": 2
+        },
+        "pre_firmware": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "GetDeviceInfo": {
+      "fields": {}
+    },
+    "DeviceInfo": {
+      "fields": {
+        "serial_no": {
+          "type": "string",
+          "id": 1
+        },
+        "spiFlash_info": {
+          "type": "string",
+          "id": 2
+        },
+        "SE_info": {
+          "type": "string",
+          "id": 3
+        },
+        "NFT_voucher": {
+          "type": "bytes",
+          "id": 4
+        },
+        "cpu_info": {
+          "type": "string",
+          "id": 5
+        },
+        "pre_firmware": {
+          "type": "string",
+          "id": 6
+        }
+      }
+    },
+    "ReadSEPublicKey": {
+      "fields": {}
+    },
+    "SEPublicKey": {
+      "fields": {
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "WriteSEPublicCert": {
+      "fields": {
+        "public_cert": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "ReadSEPublicCert": {
+      "fields": {}
+    },
+    "SEPublicCert": {
+      "fields": {
+        "public_cert": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "SpiFlashWrite": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "SpiFlashRead": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "len": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "SpiFlashData": {
+      "fields": {
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "SESignMessage": {
+      "fields": {
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "SEMessageSignature": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "ResourceUpload": {
+      "fields": {
+        "extension": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "res_type": {
+          "rule": "required",
+          "type": "ResourceType",
+          "id": 3
+        },
+        "nft_meta_data": {
+          "type": "bytes",
+          "id": 4
+        },
+        "zoom_data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 5
+        },
+        "file_name_no_ext": {
+          "type": "string",
+          "id": 6
+        }
+      },
+      "nested": {
+        "ResourceType": {
+          "values": {
+            "WallPaper": 0,
+            "Nft": 1
+          }
+        }
+      }
+    },
+    "ZoomRequest": {
+      "fields": {
+        "offset": {
+          "type": "uint32",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "ResourceRequest": {
+      "fields": {
+        "offset": {
+          "type": "uint32",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "ResourceAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "hash": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ResourceUpdate": {
+      "fields": {
+        "file_name": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "initial_data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "hash": {
+          "type": "bytes",
+          "id": 4
+        }
+      }
+    },
+    "NFTWriteInfo": {
+      "fields": {
+        "index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "width": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "height": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "name_zh": {
+          "type": "string",
+          "id": 4
+        },
+        "name_en": {
+          "type": "string",
+          "id": 5
+        }
+      }
+    },
+    "NFTWriteData": {
+      "fields": {
+        "index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "offset": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        }
+      }
+    },
+    "RebootToBootloader": {
+      "fields": {}
+    },
+    "RebootToBoardloader": {
+      "fields": {}
+    },
+    "ListResDir": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "FileInfoList": {
+      "fields": {
+        "files": {
+          "rule": "repeated",
+          "type": "FileInfo",
+          "id": 1
+        }
+      },
+      "nested": {
+        "FileInfo": {
+          "fields": {
+            "name": {
+              "rule": "required",
+              "type": "string",
+              "id": 1
+            },
+            "size": {
+              "rule": "required",
+              "type": "uint64",
+              "id": 2
+            }
+          }
+        }
+      }
+    },
+    "DeviceEraseSector": {
+      "fields": {
+        "sector": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "wire_in": {
+      "type": "bool",
+      "id": 50002,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_out": {
+      "type": "bool",
+      "id": 50003,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_debug_in": {
+      "type": "bool",
+      "id": 50004,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_debug_out": {
+      "type": "bool",
+      "id": 50005,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_tiny": {
+      "type": "bool",
+      "id": 50006,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_bootloader": {
+      "type": "bool",
+      "id": 50007,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_no_fsm": {
+      "type": "bool",
+      "id": 50008,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "facotry": {
+      "type": "bool",
+      "id": 50501,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "bitcoin_only": {
+      "type": "bool",
+      "id": 60000,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "has_bitcoin_only_values": {
+      "type": "bool",
+      "id": 51001,
+      "extend": "google.protobuf.EnumOptions"
+    },
+    "unstable": {
+      "type": "bool",
+      "id": 52001,
+      "extend": "google.protobuf.MessageOptions"
+    },
+    "wire_type": {
+      "type": "uint32",
+      "id": 52002,
+      "extend": "google.protobuf.MessageOptions"
+    },
+    "experimental": {
+      "type": "bool",
+      "id": 53001,
+      "extend": "google.protobuf.FieldOptions"
+    },
+    "include_in_bitcoin_only": {
+      "type": "bool",
+      "id": 60000,
+      "extend": "google.protobuf.FileOptions"
+    },
+    "CommandFlags": {
+      "values": {
+        "Default": 0,
+        "Factory_Only": 1
+      }
+    },
+    "MessageType": {
+      "options": {
+        "(has_bitcoin_only_values)": true
+      },
+      "values": {
+        "MessageType_Initialize": 0,
+        "MessageType_Ping": 1,
+        "MessageType_Success": 2,
+        "MessageType_Failure": 3,
+        "MessageType_ChangePin": 4,
+        "MessageType_WipeDevice": 5,
+        "MessageType_GetEntropy": 9,
+        "MessageType_Entropy": 10,
+        "MessageType_LoadDevice": 13,
+        "MessageType_ResetDevice": 14,
+        "MessageType_Features": 17,
+        "MessageType_PinMatrixRequest": 18,
+        "MessageType_PinMatrixAck": 19,
+        "MessageType_Cancel": 20,
+        "MessageType_LockDevice": 24,
+        "MessageType_ApplySettings": 25,
+        "MessageType_ButtonRequest": 26,
+        "MessageType_ButtonAck": 27,
+        "MessageType_ApplyFlags": 28,
+        "MessageType_BackupDevice": 34,
+        "MessageType_EntropyRequest": 35,
+        "MessageType_EntropyAck": 36,
+        "MessageType_PassphraseRequest": 41,
+        "MessageType_PassphraseAck": 42,
+        "MessageType_RecoveryDevice": 45,
+        "MessageType_WordRequest": 46,
+        "MessageType_WordAck": 47,
+        "MessageType_GetFeatures": 55,
+        "MessageType_SdProtect": 79,
+        "MessageType_ChangeWipeCode": 82,
+        "MessageType_EndSession": 83,
+        "MessageType_DoPreauthorized": 84,
+        "MessageType_PreauthorizedRequest": 85,
+        "MessageType_CancelAuthorization": 86,
+        "MessageType_RebootToBootloader": 87,
+        "MessageType_SetU2FCounter": 63,
+        "MessageType_GetNextU2FCounter": 80,
+        "MessageType_NextU2FCounter": 81,
+        "MessageType_Deprecated_PassphraseStateRequest": 77,
+        "MessageType_Deprecated_PassphraseStateAck": 78,
+        "MessageType_FirmwareErase": 6,
+        "MessageType_FirmwareErase_ex": 16,
+        "MessageType_FirmwareUpload": 7,
+        "MessageType_FirmwareRequest": 8,
+        "MessageType_SelfTest": 32,
+        "MessageType_Reboot": 30000,
+        "MessageType_FirmwareUpdateEmmc": 30001,
+        "MessageType_DeviceBackToBoot": 903,
+        "MessageType_DeviceInfoSettings": 10001,
+        "MessageType_GetDeviceInfo": 10002,
+        "MessageType_DeviceInfo": 10003,
+        "MessageType_ReadSEPublicKey": 10004,
+        "MessageType_SEPublicKey": 10005,
+        "MessageType_WriteSEPublicCert": 10006,
+        "MessageType_ReadSEPublicCert": 10007,
+        "MessageType_SEPublicCert": 10008,
+        "MessageType_SpiFlashWrite": 10009,
+        "MessageType_SpiFlashRead": 10010,
+        "MessageType_SpiFlashData": 10011,
+        "MessageType_SESignMessage": 10012,
+        "MessageType_SEMessageSignature": 10013,
+        "MessageType_NFTWriteInfo": 10014,
+        "MessageType_NFTWriteData": 10015,
+        "MessageType_ResourceUpload": 10018,
+        "MessageType_ZoomRequest": 10019,
+        "MessageType_ResourceRequest": 10020,
+        "MessageType_ResourceAck": 10021,
+        "MessageType_ResourceUpdate": 10022,
+        "MessageType_ListResDir": 10023,
+        "MessageType_FileInfoList": 10024,
+        "MessageType_RebootToBoardloader": 10025,
+        "MessageType_DeviceEraseSector": 10026
+      }
+    },
+    "google": {
+      "nested": {
+        "protobuf": {
+          "nested": {
+            "FileDescriptorSet": {
+              "fields": {
+                "file": {
+                  "rule": "repeated",
+                  "type": "FileDescriptorProto",
+                  "id": 1
+                }
+              }
+            },
+            "FileDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "package": {
+                  "type": "string",
+                  "id": 2
+                },
+                "dependency": {
+                  "rule": "repeated",
+                  "type": "string",
+                  "id": 3
+                },
+                "public_dependency": {
+                  "rule": "repeated",
+                  "type": "int32",
+                  "id": 10,
+                  "options": {
+                    "packed": false
+                  }
+                },
+                "weak_dependency": {
+                  "rule": "repeated",
+                  "type": "int32",
+                  "id": 11,
+                  "options": {
+                    "packed": false
+                  }
+                },
+                "message_type": {
+                  "rule": "repeated",
+                  "type": "DescriptorProto",
+                  "id": 4
+                },
+                "enum_type": {
+                  "rule": "repeated",
+                  "type": "EnumDescriptorProto",
+                  "id": 5
+                },
+                "service": {
+                  "rule": "repeated",
+                  "type": "ServiceDescriptorProto",
+                  "id": 6
+                },
+                "extension": {
+                  "rule": "repeated",
+                  "type": "FieldDescriptorProto",
+                  "id": 7
+                },
+                "options": {
+                  "type": "FileOptions",
+                  "id": 8
+                },
+                "source_code_info": {
+                  "type": "SourceCodeInfo",
+                  "id": 9
+                },
+                "syntax": {
+                  "type": "string",
+                  "id": 12
+                }
+              }
+            },
+            "DescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "field": {
+                  "rule": "repeated",
+                  "type": "FieldDescriptorProto",
+                  "id": 2
+                },
+                "extension": {
+                  "rule": "repeated",
+                  "type": "FieldDescriptorProto",
+                  "id": 6
+                },
+                "nested_type": {
+                  "rule": "repeated",
+                  "type": "DescriptorProto",
+                  "id": 3
+                },
+                "enum_type": {
+                  "rule": "repeated",
+                  "type": "EnumDescriptorProto",
+                  "id": 4
+                },
+                "extension_range": {
+                  "rule": "repeated",
+                  "type": "ExtensionRange",
+                  "id": 5
+                },
+                "oneof_decl": {
+                  "rule": "repeated",
+                  "type": "OneofDescriptorProto",
+                  "id": 8
+                },
+                "options": {
+                  "type": "MessageOptions",
+                  "id": 7
+                },
+                "reserved_range": {
+                  "rule": "repeated",
+                  "type": "ReservedRange",
+                  "id": 9
+                },
+                "reserved_name": {
+                  "rule": "repeated",
+                  "type": "string",
+                  "id": 10
+                }
+              },
+              "nested": {
+                "ExtensionRange": {
+                  "fields": {
+                    "start": {
+                      "type": "int32",
+                      "id": 1
+                    },
+                    "end": {
+                      "type": "int32",
+                      "id": 2
+                    }
+                  }
+                },
+                "ReservedRange": {
+                  "fields": {
+                    "start": {
+                      "type": "int32",
+                      "id": 1
+                    },
+                    "end": {
+                      "type": "int32",
+                      "id": 2
+                    }
+                  }
+                }
+              }
+            },
+            "FieldDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "number": {
+                  "type": "int32",
+                  "id": 3
+                },
+                "label": {
+                  "type": "Label",
+                  "id": 4
+                },
+                "type": {
+                  "type": "Type",
+                  "id": 5
+                },
+                "type_name": {
+                  "type": "string",
+                  "id": 6
+                },
+                "extendee": {
+                  "type": "string",
+                  "id": 2
+                },
+                "default_value": {
+                  "type": "string",
+                  "id": 7
+                },
+                "oneof_index": {
+                  "type": "int32",
+                  "id": 9
+                },
+                "json_name": {
+                  "type": "string",
+                  "id": 10
+                },
+                "options": {
+                  "type": "FieldOptions",
+                  "id": 8
+                }
+              },
+              "nested": {
+                "Type": {
+                  "values": {
+                    "TYPE_DOUBLE": 1,
+                    "TYPE_FLOAT": 2,
+                    "TYPE_INT64": 3,
+                    "TYPE_UINT64": 4,
+                    "TYPE_INT32": 5,
+                    "TYPE_FIXED64": 6,
+                    "TYPE_FIXED32": 7,
+                    "TYPE_BOOL": 8,
+                    "TYPE_STRING": 9,
+                    "TYPE_GROUP": 10,
+                    "TYPE_MESSAGE": 11,
+                    "TYPE_BYTES": 12,
+                    "TYPE_UINT32": 13,
+                    "TYPE_ENUM": 14,
+                    "TYPE_SFIXED32": 15,
+                    "TYPE_SFIXED64": 16,
+                    "TYPE_SINT32": 17,
+                    "TYPE_SINT64": 18
+                  }
+                },
+                "Label": {
+                  "values": {
+                    "LABEL_OPTIONAL": 1,
+                    "LABEL_REQUIRED": 2,
+                    "LABEL_REPEATED": 3
+                  }
+                }
+              }
+            },
+            "OneofDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "options": {
+                  "type": "OneofOptions",
+                  "id": 2
+                }
+              }
+            },
+            "EnumDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "value": {
+                  "rule": "repeated",
+                  "type": "EnumValueDescriptorProto",
+                  "id": 2
+                },
+                "options": {
+                  "type": "EnumOptions",
+                  "id": 3
+                }
+              }
+            },
+            "EnumValueDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "number": {
+                  "type": "int32",
+                  "id": 2
+                },
+                "options": {
+                  "type": "EnumValueOptions",
+                  "id": 3
+                }
+              }
+            },
+            "ServiceDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "method": {
+                  "rule": "repeated",
+                  "type": "MethodDescriptorProto",
+                  "id": 2
+                },
+                "options": {
+                  "type": "ServiceOptions",
+                  "id": 3
+                }
+              }
+            },
+            "MethodDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "input_type": {
+                  "type": "string",
+                  "id": 2
+                },
+                "output_type": {
+                  "type": "string",
+                  "id": 3
+                },
+                "options": {
+                  "type": "MethodOptions",
+                  "id": 4
+                },
+                "client_streaming": {
+                  "type": "bool",
+                  "id": 5
+                },
+                "server_streaming": {
+                  "type": "bool",
+                  "id": 6
+                }
+              }
+            },
+            "FileOptions": {
+              "fields": {
+                "java_package": {
+                  "type": "string",
+                  "id": 1
+                },
+                "java_outer_classname": {
+                  "type": "string",
+                  "id": 8
+                },
+                "java_multiple_files": {
+                  "type": "bool",
+                  "id": 10
+                },
+                "java_generate_equals_and_hash": {
+                  "type": "bool",
+                  "id": 20,
+                  "options": {
+                    "deprecated": true
+                  }
+                },
+                "java_string_check_utf8": {
+                  "type": "bool",
+                  "id": 27
+                },
+                "optimize_for": {
+                  "type": "OptimizeMode",
+                  "id": 9,
+                  "options": {
+                    "default": "SPEED"
+                  }
+                },
+                "go_package": {
+                  "type": "string",
+                  "id": 11
+                },
+                "cc_generic_services": {
+                  "type": "bool",
+                  "id": 16
+                },
+                "java_generic_services": {
+                  "type": "bool",
+                  "id": 17
+                },
+                "py_generic_services": {
+                  "type": "bool",
+                  "id": 18
+                },
+                "deprecated": {
+                  "type": "bool",
+                  "id": 23
+                },
+                "cc_enable_arenas": {
+                  "type": "bool",
+                  "id": 31
+                },
+                "objc_class_prefix": {
+                  "type": "string",
+                  "id": 36
+                },
+                "csharp_namespace": {
+                  "type": "string",
+                  "id": 37
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [[1000, 536870911]],
+              "reserved": [[38, 38]],
+              "nested": {
+                "OptimizeMode": {
+                  "values": {
+                    "SPEED": 1,
+                    "CODE_SIZE": 2,
+                    "LITE_RUNTIME": 3
+                  }
+                }
+              }
+            },
+            "MessageOptions": {
+              "fields": {
+                "message_set_wire_format": {
+                  "type": "bool",
+                  "id": 1
+                },
+                "no_standard_descriptor_accessor": {
+                  "type": "bool",
+                  "id": 2
+                },
+                "deprecated": {
+                  "type": "bool",
+                  "id": 3
+                },
+                "map_entry": {
+                  "type": "bool",
+                  "id": 7
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [[1000, 536870911]],
+              "reserved": [[8, 8]]
+            },
+            "FieldOptions": {
+              "fields": {
+                "ctype": {
+                  "type": "CType",
+                  "id": 1,
+                  "options": {
+                    "default": "STRING"
+                  }
+                },
+                "packed": {
+                  "type": "bool",
+                  "id": 2
+                },
+                "jstype": {
+                  "type": "JSType",
+                  "id": 6,
+                  "options": {
+                    "default": "JS_NORMAL"
+                  }
+                },
+                "lazy": {
+                  "type": "bool",
+                  "id": 5
+                },
+                "deprecated": {
+                  "type": "bool",
+                  "id": 3
+                },
+                "weak": {
+                  "type": "bool",
+                  "id": 10
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [[1000, 536870911]],
+              "reserved": [[4, 4]],
+              "nested": {
+                "CType": {
+                  "values": {
+                    "STRING": 0,
+                    "CORD": 1,
+                    "STRING_PIECE": 2
+                  }
+                },
+                "JSType": {
+                  "values": {
+                    "JS_NORMAL": 0,
+                    "JS_STRING": 1,
+                    "JS_NUMBER": 2
+                  }
+                }
+              }
+            },
+            "OneofOptions": {
+              "fields": {
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [[1000, 536870911]]
+            },
+            "EnumOptions": {
+              "fields": {
+                "allow_alias": {
+                  "type": "bool",
+                  "id": 2
+                },
+                "deprecated": {
+                  "type": "bool",
+                  "id": 3
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [[1000, 536870911]]
+            },
+            "EnumValueOptions": {
+              "fields": {
+                "deprecated": {
+                  "type": "bool",
+                  "id": 1
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [[1000, 536870911]]
+            },
+            "ServiceOptions": {
+              "fields": {
+                "deprecated": {
+                  "type": "bool",
+                  "id": 33
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [[1000, 536870911]]
+            },
+            "MethodOptions": {
+              "fields": {
+                "deprecated": {
+                  "type": "bool",
+                  "id": 33
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [[1000, 536870911]]
+            },
+            "UninterpretedOption": {
+              "fields": {
+                "name": {
+                  "rule": "repeated",
+                  "type": "NamePart",
+                  "id": 2
+                },
+                "identifier_value": {
+                  "type": "string",
+                  "id": 3
+                },
+                "positive_int_value": {
+                  "type": "uint64",
+                  "id": 4
+                },
+                "negative_int_value": {
+                  "type": "int64",
+                  "id": 5
+                },
+                "double_value": {
+                  "type": "double",
+                  "id": 6
+                },
+                "string_value": {
+                  "type": "bytes",
+                  "id": 7
+                },
+                "aggregate_value": {
+                  "type": "string",
+                  "id": 8
+                }
+              },
+              "nested": {
+                "NamePart": {
+                  "fields": {
+                    "name_part": {
+                      "rule": "required",
+                      "type": "string",
+                      "id": 1
+                    },
+                    "is_extension": {
+                      "rule": "required",
+                      "type": "bool",
+                      "id": 2
+                    }
+                  }
+                }
+              }
+            },
+            "SourceCodeInfo": {
+              "fields": {
+                "location": {
+                  "rule": "repeated",
+                  "type": "Location",
+                  "id": 1
+                }
+              },
+              "nested": {
+                "Location": {
+                  "fields": {
+                    "path": {
+                      "rule": "repeated",
+                      "type": "int32",
+                      "id": 1
+                    },
+                    "span": {
+                      "rule": "repeated",
+                      "type": "int32",
+                      "id": 2
+                    },
+                    "leading_comments": {
+                      "type": "string",
+                      "id": 3
+                    },
+                    "trailing_comments": {
+                      "type": "string",
+                      "id": 4
+                    },
+                    "leading_detached_comments": {
+                      "rule": "repeated",
+                      "type": "string",
+                      "id": 6
+                    }
+                  }
+                }
+              }
+            },
+            "GeneratedCodeInfo": {
+              "fields": {
+                "annotation": {
+                  "rule": "repeated",
+                  "type": "Annotation",
+                  "id": 1
+                }
+              },
+              "nested": {
+                "Annotation": {
+                  "fields": {
+                    "path": {
+                      "rule": "repeated",
+                      "type": "int32",
+                      "id": 1
+                    },
+                    "source_file": {
+                      "type": "string",
+                      "id": 2
+                    },
+                    "begin": {
+                      "type": "int32",
+                      "id": 3
+                    },
+                    "end": {
+                      "type": "int32",
+                      "id": 4
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
