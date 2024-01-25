@@ -13,6 +13,7 @@ import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
 import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
 import { TestRunnerVerifyContext } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
+import { downloadFile } from '../../utils/downloadUtils';
 
 type TestCaseDataType = AddressTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -99,13 +100,7 @@ function ExportReportView() {
     const formatTime = new Date(timestampBeginTest).toLocaleString().replace(/[-: ]/g, '_');
     const fileName = `SingleAddressTestReport(${testCaseTitle})${formatTime}.md`;
 
-    const element = document.createElement('a');
-    const file = new Blob([markdown.join('\n').toString()], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = fileName;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    downloadFile(fileName, markdown.join('\n').toString());
   };
 
   if (runnerInfo.runnerDone) {

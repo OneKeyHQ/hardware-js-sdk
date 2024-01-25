@@ -1,4 +1,6 @@
 export const INDEX_MARK = '$$INDEX$$';
+export const CHANGE_MARK = '$$CHANGE$$';
+export const ADDRESS_INDEX_MARK = '$$ADDRESS_INDEX$$';
 
 export const baseParams = {
   cardanoGetPublicKey: {

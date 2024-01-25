@@ -9,11 +9,12 @@ import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { AddressBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import passphraseTestCase from './data/count24_two/passphrase_empty';
-import { fullPath } from './data/utils';
+import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
 import { TestRunnerVerifyContext } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
+import { downloadFile } from '../../utils/downloadUtils';
 
 type TestCaseDataType = AddressBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -103,13 +104,7 @@ function ExportReportView() {
     const formatTime = new Date(timestampBeginTest).toLocaleString().replace(/[-: ]/g, '_');
     const fileName = `BatchAddressTestReport(${testCaseTitle})${formatTime}.md`;
 
-    const element = document.createElement('a');
-    const file = new Blob([markdown.join('\n').toString()], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = fileName;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    downloadFile(fileName, markdown.join('\n').toString());
   };
 
   if (runnerInfo.runnerDone) {
@@ -117,19 +112,6 @@ function ExportReportView() {
   }
 
   return null;
-}
-
-function extractIndex(template: string, actual: string) {
-  const escapedTemplate = template.replace(/[-\\/\\^$*+?.()|[\]{}]/g, '\\$&');
-  const regexPattern = escapedTemplate.replace('\\$\\$INDEX\\$\\$', '(\\d+)');
-  const regex = new RegExp(regexPattern);
-  const match = actual.match(regex);
-
-  if (match && match.length > 1) {
-    return match[1];
-  }
-
-  return actual;
 }
 
 function ExecuteView() {
@@ -258,12 +240,19 @@ function ExecuteView() {
           data: [
             ...originDataRef.current.data.map((item, index) => {
               if (index === itemIndex) {
-                const path = fullOriginDataRef.current.data[index].params?.path;
-                let indexKey = key;
-                if (path) {
-                  indexKey = extractIndex(path, key);
-                }
+                const originParams = fullOriginDataRef.current.data[index].params;
+                const template = originParams?.addressParameters?.path || originParams?.path;
 
+                const originKey = Object.keys(item.expectedAddress).find(key => {
+                  const path = replaceTemplate(key, template);
+                  const resultPath = address?.serializedPath || address?.path;
+                  if (path === resultPath) {
+                    return key;
+                  }
+                  return false;
+                });
+
+                const indexKey = originKey || key;
                 return {
                   ...item,
                   expectedAddress: {

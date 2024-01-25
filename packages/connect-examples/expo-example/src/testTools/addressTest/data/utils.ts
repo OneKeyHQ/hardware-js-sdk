@@ -1,4 +1,4 @@
-import { INDEX_MARK, baseParams } from '../baseParams';
+import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from '../baseParams';
 import {
   AddressBatchCaseData,
   AddressBatchTestCase,
@@ -26,6 +26,40 @@ export function fullPath(data: AddressTestCaseData): AddressTestCaseData {
   };
 }
 
+export function replaceTemplate(key: string, template: string) {
+  let path = template;
+
+  let index = 0;
+  let change = 0;
+  let addressIndex = 0;
+  if (key.indexOf('/') !== -1) {
+    const keys = key.split('/');
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i].startsWith('C')) {
+        change = parseInt(keys[i].slice(1));
+      } else if (keys[i].startsWith('A')) {
+        addressIndex = parseInt(keys[i].slice(1));
+      } else {
+        index = parseInt(keys[i]);
+      }
+    }
+  } else {
+    index = parseInt(key);
+  }
+
+  if (path.indexOf(INDEX_MARK) !== -1) {
+    path = template.replace(INDEX_MARK, index.toString());
+  }
+  if (path.indexOf(CHANGE_MARK) !== -1) {
+    path = path.replace(CHANGE_MARK, change.toString());
+  }
+  if (path.indexOf(ADDRESS_INDEX_MARK) !== -1) {
+    path = path.replace(ADDRESS_INDEX_MARK, addressIndex.toString());
+  }
+
+  return path;
+}
+
 export function convertTestSingleData(
   data: AddressTestCaseData,
   options?: {
@@ -37,22 +71,19 @@ export function convertTestSingleData(
   const dataList: AddressCaseData[] = [];
   for (const item of testCase.data) {
     const keys = Object.keys(item.expectedAddress);
+    let count = 0;
     for (let i = 0; i < keys.length; i++) {
-      const index = parseInt(keys[i]);
-
-      if (options?.getOnlyOne && index > 0) {
+      if (options?.getOnlyOne && count > 0) {
         break;
       }
+      count += 1;
+
+      const key = keys[i];
 
       if (item.params?.addressParameters?.path) {
         // ada case
-        let { path, stakingPath } = item.params.addressParameters;
-        if (path && path.indexOf(INDEX_MARK) !== -1) {
-          path = path.replace(INDEX_MARK, index);
-        }
-        if (stakingPath && stakingPath.indexOf(INDEX_MARK) !== -1) {
-          stakingPath = stakingPath.replace(INDEX_MARK, index);
-        }
+        const path = replaceTemplate(key, item.params.addressParameters.path);
+        const stakingPath = replaceTemplate(key, item.params.addressParameters.stakingPath);
 
         dataList.push({
           ...item,
@@ -65,27 +96,22 @@ export function convertTestSingleData(
               stakingPath,
             },
           },
-          template: path,
           result: {
-            address: item.expectedAddress[index],
+            address: item.expectedAddress[key],
           },
         });
       } else {
-        let { path } = item.params;
-        if (path && path.indexOf(INDEX_MARK) !== -1) {
-          path = path.replace(INDEX_MARK, index);
-        }
+        const path = replaceTemplate(key, item.params.path);
 
         dataList.push({
           ...item,
-          title: `${item.name || item.method} -- ${index} -- ${path}`,
+          title: `${item.name || item.method} -- ${key} -- ${path}`,
           params: {
             ...item.params,
             path,
           },
-          template: path,
           result: {
-            address: item.expectedAddress[index],
+            address: item.expectedAddress[key],
           },
         });
       }
@@ -114,15 +140,10 @@ export function convertTestBatchData(data: AddressTestCaseData): AddressBatchTes
       const results: Record<string, { address: string }> = {};
       const keys = Object.keys(item.expectedAddress);
       for (let i = 0; i < keys.length; i++) {
-        const index = parseInt(keys[i]);
+        const key = keys[i];
 
-        let { path, stakingPath } = item.params.addressParameters;
-        if (path && path.indexOf(INDEX_MARK) !== -1) {
-          path = path.replace(INDEX_MARK, index);
-        }
-        if (stakingPath && stakingPath.indexOf(INDEX_MARK) !== -1) {
-          stakingPath = stakingPath.replace(INDEX_MARK, index);
-        }
+        const path = replaceTemplate(key, item.params.addressParameters.path);
+        const stakingPath = replaceTemplate(key, item.params.addressParameters.stakingPath);
 
         bundle.push({
           ...item.params,
@@ -133,7 +154,7 @@ export function convertTestBatchData(data: AddressTestCaseData): AddressBatchTes
           },
         });
         results[path] = {
-          address: item.expectedAddress[index],
+          address: item.expectedAddress[key],
         };
       }
 
@@ -150,18 +171,15 @@ export function convertTestBatchData(data: AddressTestCaseData): AddressBatchTes
       const results: Record<string, { address: string }> = {};
       const keys = Object.keys(item.expectedAddress);
       for (let i = 0; i < keys.length; i++) {
-        const index = parseInt(keys[i]);
+        const key = keys[i];
 
-        let { path } = item.params;
-        if (path && path.indexOf(INDEX_MARK) !== -1) {
-          path = path.replace(INDEX_MARK, index);
-        }
+        const path = replaceTemplate(key, item.params.path);
         bundle.push({
           ...item.params,
           path,
         });
         results[path] = {
-          address: item.expectedAddress[index],
+          address: item.expectedAddress[key],
         };
       }
       dataList.push({

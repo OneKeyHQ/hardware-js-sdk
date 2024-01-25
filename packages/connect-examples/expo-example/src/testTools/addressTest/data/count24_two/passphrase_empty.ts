@@ -35,11 +35,12 @@ export default {
       method: 'btcGetAddress',
       name: 'btcGetAddress-Legacy',
       params: {
-        path: "m/44'/0'/$$INDEX$$'/0/0",
+        path: "m/44'/0'/$$INDEX$$'/$$CHANGE$$/$$ADDRESS_INDEX$$",
       },
       expectedAddress: {
         '0': '13WmVBjPamTJQfuGrjk7ffypXoXodorYke',
         '30': '1Mrf9HG1UA8bc6PHeGsXgyLcb98EuJR7Z',
+        '20/C1/A2': '1Cc9TYjGwWL2iuvZyZmpoE7o1R4JC5qouB',
         '2147483647': '1DddyJeeJvHbDfPPLNHEggfbdAf7wDX53L',
       },
     },

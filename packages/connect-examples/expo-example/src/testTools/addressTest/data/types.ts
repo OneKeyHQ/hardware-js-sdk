@@ -5,7 +5,7 @@ export type AddressTestCaseData = {
   passphrase?: string;
   data: {
     method: string;
-    expectedAddress: Record<number, string>;
+    expectedAddress: Record<string, string>;
     name?: string;
     params?: any;
   }[];

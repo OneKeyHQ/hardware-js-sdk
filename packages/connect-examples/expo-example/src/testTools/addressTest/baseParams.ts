@@ -1,4 +1,6 @@
 export const INDEX_MARK = '$$INDEX$$';
+export const CHANGE_MARK = '$$CHANGE$$';
+export const ADDRESS_INDEX_MARK = '$$ADDRESS_INDEX$$';
 
 export const baseParams = {
   cardanoGetAddress: {
@@ -26,7 +28,7 @@ export const baseParams = {
     showOnOneKey: false,
   },
   btcGetAddress: {
-    path: `m/44'/0'/${INDEX_MARK}'/0/0`,
+    path: `m/44'/0'/${INDEX_MARK}'/${CHANGE_MARK}/${ADDRESS_INDEX_MARK}`,
     coin: 'btc',
     showOnOneKey: false,
   },
