@@ -38,7 +38,7 @@ export const getHardwareSDKInstance = memoizee(
           // settings.connectSrc = 'https://jssdk.onekeytest.com/';
           settings.connectSrc = 'https://localhost:8087/';
           settings.env = 'web';
-          settings.preRelease = false;
+          settings.preRelease = true;
           // HardwareLowLevelSDK = await importLowLevelSDK();
         }
 

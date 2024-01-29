@@ -11,6 +11,18 @@ const api: PlaygroundProps[] = [
           path: "m/44'/784'/0'/0'/0'",
           showOnOneKey: false,
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
       {
         title: 'Batch Get Address',
@@ -30,6 +42,18 @@ const api: PlaygroundProps[] = [
             },
           ],
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -42,6 +66,18 @@ const api: PlaygroundProps[] = [
         value: {
           path: "m/44'/784'/0'/0'/0'",
           showOnOneKey: false,
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
       {
@@ -62,6 +98,18 @@ const api: PlaygroundProps[] = [
             },
           ],
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -75,6 +123,18 @@ const api: PlaygroundProps[] = [
           path: "m/44'/784'/0'/0'/0'",
           branch: new Uint8Array(),
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -86,6 +146,18 @@ const api: PlaygroundProps[] = [
         title: 'Get address',
         value: {
           path: "m/44'/784'/0'/0'/0'",
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
       {
@@ -102,6 +174,18 @@ const api: PlaygroundProps[] = [
               path: "m/44'/784'/2'/0'/0'",
             },
           ],
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
     ],
@@ -116,6 +200,18 @@ const api: PlaygroundProps[] = [
           path: "m/44'/784'/0'/0'/0'",
           showOnOneKey: false,
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
       {
         title: 'Batch Get Address',
@@ -135,6 +231,18 @@ const api: PlaygroundProps[] = [
             },
           ],
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -148,6 +256,18 @@ const api: PlaygroundProps[] = [
           path: "m/44'/784'/0'/0'/0'",
           showOnOneKey: false,
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -159,6 +279,31 @@ const api: PlaygroundProps[] = [
         title: 'eosSignTx',
         value: {
           path: "m/44'/784'/0'/0'/0'",
+          chain_id: '1',
+          header: {
+            expiration: 0,
+            ref_block_num: 0,
+            ref_block_prefix: 0,
+            max_net_usage_words: 0,
+            max_cpu_usage_ms: 0,
+            delay_sec: 0,
+          },
+          num_actions: 0,
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+            bootloader: {
+              error: true,
+            },
+          },
         },
       },
     ],
@@ -173,6 +318,18 @@ const api: PlaygroundProps[] = [
           path: "m/44'/784'/0'/0'/0'",
           showOnOneKey: false,
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -185,6 +342,18 @@ const api: PlaygroundProps[] = [
         value: {
           path: "m/44'/784'/0'/0'/0'",
           showOnOneKey: false,
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
     ],
@@ -200,12 +369,36 @@ const api: PlaygroundProps[] = [
           msg_count: 1,
           account_number: 0,
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
   {
     method: 'webAuthnListResidentCredentials',
     description: 'webAuthnListResidentCredentials',
+    expect: {
+      common: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+      touch: {
+        normal: {
+          requestPin: true,
+        },
+      },
+    },
   },
   {
     method: 'webAuthnAddResidentCredential',
@@ -215,6 +408,18 @@ const api: PlaygroundProps[] = [
         title: 'webAuthnAddResidentCredential',
         value: {
           credential_id: '0',
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
     ],
@@ -227,6 +432,18 @@ const api: PlaygroundProps[] = [
         title: 'webAuthnRemoveResidentCredential',
         value: {
           index: 0,
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
     ],
@@ -244,6 +461,13 @@ const api: PlaygroundProps[] = [
             },
           ],
         },
+        expect: {
+          touch: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -255,6 +479,18 @@ const api: PlaygroundProps[] = [
         title: 'listResDir',
         value: {
           path: '/res',
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
     ],
@@ -270,6 +506,18 @@ const api: PlaygroundProps[] = [
           data: '0x123456',
           offset: 0,
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          mini: {
+            normal: {
+              error: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -284,6 +532,18 @@ const api: PlaygroundProps[] = [
           width: 768,
           height: 768,
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          mini: {
+            normal: {
+              success: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -297,12 +557,31 @@ const api: PlaygroundProps[] = [
           name: 'a123.png',
           data: '0x123456',
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
   {
     method: 'bixinBackupDevice',
     description: 'bixinBackupDevice',
+    expect: {
+      common: {
+        normal: {
+          skip: true,
+        },
+      },
+    },
   },
   {
     method: 'bixinLoadDevice',
@@ -312,6 +591,23 @@ const api: PlaygroundProps[] = [
         title: 'resourceUpdate',
         value: {
           mnemonics: 'all all all all all all all all all all all all',
+        },
+        expect: {
+          common: {
+            normal: {
+              skip: true,
+            },
+          },
+          mini: {
+            normal: {
+              error: true,
+            },
+          },
+          classic: {
+            normal: {
+              error: true,
+            },
+          },
         },
       },
     ],
@@ -325,6 +621,18 @@ const api: PlaygroundProps[] = [
         value: {
           inputmessage: '0x1234567',
         },
+        expect: {
+          common: {
+            normal: {
+              skip: true,
+            },
+          },
+          touch: {
+            normal: {
+              skip: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -336,6 +644,13 @@ const api: PlaygroundProps[] = [
         title: 'bixinVerifyDeviceRequest',
         value: {
           data: '0x1234567',
+        },
+        expect: {
+          mini: {
+            normal: {
+              skip: true,
+            },
+          },
         },
       },
     ],

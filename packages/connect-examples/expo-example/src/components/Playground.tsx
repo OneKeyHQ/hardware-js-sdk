@@ -1,18 +1,42 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { IDeviceType } from '@onekeyfe/hd-core';
 import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
+
+export type TestDeviceType = IDeviceType | 'common';
+
+export interface TestExpect {
+  skip?: boolean;
+  success?: boolean;
+  requestPin?: boolean;
+  requestButton?: boolean;
+  unknownMessage?: boolean;
+  error?: boolean;
+}
+
+export interface TestModalExpect {
+  normal?: TestExpect;
+  bootloader?: TestExpect;
+}
+
+export type TestDeviceExpect = {
+  [key in TestDeviceType]?: TestModalExpect;
+};
 
 export interface PresupposeProps {
   title: string;
   value: any; // JSON object
+
+  expect?: TestDeviceExpect;
 }
 
 export type PlaygroundProps = {
   description: string;
   presupposes?: PresupposeProps[];
   deprecated?: boolean;
+  expect?: TestDeviceExpect;
 } & MethodPayload;
 
 const Playground = ({

@@ -11,6 +11,18 @@ const api: PlaygroundProps[] = [
         value: {
           path: '/res',
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            bootloader: {
+              error: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -23,6 +35,19 @@ const api: PlaygroundProps[] = [
         title: 'CreateEmmcDir',
         value: {
           path: '/res/abc',
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            bootloader: {
+              erro: true,
+              success: true,
+            },
+          },
         },
       },
     ],
@@ -37,6 +62,19 @@ const api: PlaygroundProps[] = [
         value: {
           path: '/res/abc',
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            bootloader: {
+              success: true,
+              error: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -49,6 +87,18 @@ const api: PlaygroundProps[] = [
         title: 'RemoveEmmcFile',
         value: {
           path: '/res/abc/a.txt',
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            bootloader: {
+              error: true,
+            },
+          },
         },
       },
     ],
@@ -65,6 +115,19 @@ const api: PlaygroundProps[] = [
             path: '0:firmware.txt',
             offset: 0,
             len: 100,
+          },
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            bootloader: {
+              error: true,
+              success: true,
+            },
           },
         },
       },
@@ -87,6 +150,18 @@ const api: PlaygroundProps[] = [
           overwrite: true,
           append: true,
         },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            bootloader: {
+              error: true,
+            },
+          },
+        },
       },
     ],
   },
@@ -94,6 +169,18 @@ const api: PlaygroundProps[] = [
     method: 'emmcFixPermission',
     noDeviceIdReq: true,
     description: 'Fix emmc permission',
+    expect: {
+      common: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+      touch: {
+        bootloader: {
+          success: true,
+        },
+      },
+    },
   },
   {
     method: 'emmcPathInfo',
@@ -104,6 +191,18 @@ const api: PlaygroundProps[] = [
         title: 'emmcPathInfo',
         value: {
           path: '/res/abc/a.txt',
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            bootloader: {
+              error: true,
+            },
+          },
         },
       },
     ],

@@ -7,6 +7,7 @@ import { getHardwareSDKInstance } from './src/utils/hardwareInstance';
 import PassphraseTestScreen from './src/views/PassphraseTestScreen';
 import SDKProvider from './src/provider/SDKProvider';
 import AddressTestScreen from './src/views/AddressTestScreen';
+import ApiExportTestScreen from './src/views/ApiExportTestScreen';
 
 getHardwareSDKInstance();
 
@@ -19,6 +20,7 @@ export default function App() {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="PassphraseTest" component={PassphraseTestScreen} />
           <Stack.Screen name="AddressTest" component={AddressTestScreen} />
+          <Stack.Screen name="ApiExportTest" component={ApiExportTestScreen} />
           <Stack.Screen name="Mock" component={MockScreen} />
         </Stack.Navigator>
       </SDKProvider>

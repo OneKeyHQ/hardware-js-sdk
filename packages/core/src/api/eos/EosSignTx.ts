@@ -16,8 +16,8 @@ export default class EosSignTx extends BaseMethod<HardwareEosSignTx> {
     this.params = {
       address_n: addressN,
       chain_id: this.payload.chain_id,
-      header: this.payload.chain_id,
-      num_actions: this.payload.chain_id,
+      header: this.payload.header,
+      num_actions: this.payload.num_actions,
     };
   }
 

@@ -82,6 +82,7 @@ export default class TransportManager {
 
     try {
       await this.transport.configure(JSON.stringify(messages));
+      this.defaultMessages = messages;
       this.currentMessages = messages;
       this.messageVersion = messageVersion;
     } catch (error) {

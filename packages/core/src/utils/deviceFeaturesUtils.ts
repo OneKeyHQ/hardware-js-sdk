@@ -165,11 +165,14 @@ export const getSupportMessageVersion = (
 
   const deviceVersionConfigs = PROTOBUF_MESSAGE_CONFIG[deviceType];
 
+  console.log('=====>>>>> deviceVersionConfigs', deviceType, deviceVersionConfigs);
+
   const sortedDeviceVersionConfigs =
     deviceVersionConfigs?.sort((a, b) => semver.compare(b.minVersion, a.minVersion)) ?? [];
 
   for (const { minVersion, messageVersion } of sortedDeviceVersionConfigs) {
     if (semver.gte(currentDeviceVersion, minVersion)) {
+      console.log('=====>>>>> deviceVersionConfigs deviceType', deviceType, messageVersion);
       return {
         messages: getMessages(deviceType, messageVersion),
         messageVersion,
@@ -177,6 +180,7 @@ export const getSupportMessageVersion = (
     }
   }
 
+  console.log('=====>>>>> deviceVersionConfigs deviceType latest', deviceType);
   return {
     messages: getMessages(deviceType, 'latest'),
     messageVersion: 'latest',

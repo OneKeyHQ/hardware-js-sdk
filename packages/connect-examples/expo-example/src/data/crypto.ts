@@ -51,6 +51,13 @@ const api: PlaygroundProps[] = [
           path: "m/44'/60'/0'/0/0",
           data: '7c872d109a4e735dc1886c72af47e9b4888a1507557e0f49c85b570019163373',
         },
+        expect: {
+          common: {
+            normal: {
+              error: true,
+            },
+          },
+        },
       },
     ],
     deprecated: true,

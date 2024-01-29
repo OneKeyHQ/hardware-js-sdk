@@ -11,7 +11,10 @@ import { TestRunnerVerifyContext } from './Context/TestRunnerVerifyProvider';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
 
 type RunnerConfig<T> = {
-  initTestCase: () => Promise<
+  initTestCase: (
+    sdk: CoreApi,
+    connectId: string
+  ) => Promise<
     | {
         title: string;
         data: TestCaseDataWithKey<T>[];
@@ -25,7 +28,11 @@ type RunnerConfig<T> = {
     features: Features,
     sdk: CoreApi
   ) => Promise<void>;
-  prepareRunnerTestCase?: (item: TestCaseDataWithKey<T>) => Promise<void>;
+  prepareRunnerTestCase?: (
+    sdk: CoreApi,
+    connectId: string,
+    item: TestCaseDataWithKey<T>
+  ) => Promise<void>;
   generateRequestParams: (item: TestCaseDataWithKey<T>) => Promise<{
     method: string;
     params: any;
@@ -37,13 +44,18 @@ type RunnerConfig<T> = {
     deviceId: string,
     requestParams: any,
     item: TestCaseDataWithKey<T>
-  ) => Promise<Unsuccessful | Success<any>>;
+  ) => Promise<{
+    payload: Unsuccessful | Success<any>;
+    skipVerify?: boolean;
+  }>;
   processResponse: (
     response: any,
     item: TestCaseDataWithKey<T>,
-    itemIndex: number
+    itemIndex: number,
+    res: Unsuccessful | Success<any>
   ) => Promise<{
     error: string | undefined;
+    verifyState?: VerifyState;
   }>;
   processRunnerDone?: () => void;
 };
@@ -111,7 +123,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     SDK.removeAllListeners(UI_EVENT);
 
     // init test cases
-    const initTestCaseRes = await initTestCase();
+    const initTestCaseRes = await initTestCase(SDK, selectedDevice?.connectId ?? '');
     if (!initTestCaseRes) return;
 
     const { title, data: currentTestCases } = initTestCaseRes;
@@ -141,7 +153,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     for (let itemIndex = 0; itemIndex < currentTestCases.length; itemIndex++) {
       const item = currentTestCases[itemIndex];
 
-      prepareRunnerTestCase?.(item);
+      await prepareRunnerTestCase?.(SDK, connectId, item);
 
       try {
         await new Promise(resolve => {
@@ -159,8 +171,18 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
         });
 
         let res: Unsuccessful | Success<any>;
+        let skipVerify = false;
         if (processRequest) {
-          res = await processRequest(SDK, method, connectId, deviceId, requestParams, item);
+          const result = await processRequest(
+            SDK,
+            method,
+            connectId,
+            deviceId,
+            requestParams,
+            item
+          );
+          res = result.payload;
+          skipVerify = result.skipVerify ?? false;
         } else {
           // @ts-expect-error
           res = await SDK[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
@@ -170,7 +192,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
         let verifyState: VerifyState = 'none';
         let error: string | undefined = '';
 
-        if (!res.success) {
+        if (!res.success && !skipVerify) {
           if (res.payload?.code === 802 || res.payload?.code === 803) {
             verifyState = 'skip';
           } else {
@@ -178,10 +200,11 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
             error = res.payload?.error;
           }
         } else {
-          const result = await processResponse(res.payload, item, itemIndex);
+          const result = await processResponse(res.payload, item, itemIndex, res);
           error = result.error;
-
-          if (isEmpty(error)) {
+          if (result.verifyState) {
+            verifyState = result.verifyState;
+          } else if (isEmpty(error)) {
             verifyState = 'success';
           } else {
             verifyState = 'fail';
@@ -202,8 +225,8 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     endTestRunner();
   }, [
     SDK,
-    setRunnerTestCaseTitle,
     initTestCase,
+    setRunnerTestCaseTitle,
     setItemValues,
     clearItemVerifyState,
     initHardwareListener,

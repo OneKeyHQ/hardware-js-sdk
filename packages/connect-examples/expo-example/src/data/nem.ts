@@ -69,6 +69,18 @@ const api: PlaygroundProps[] = [
           public_key: '0x04e1a0a9',
           payload: '746573745f6e656d5f7472616e73616374696f6e5f7472616e73666572',
         },
+        expect: {
+          common: {
+            normal: {
+              error: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },

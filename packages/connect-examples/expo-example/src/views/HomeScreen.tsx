@@ -20,6 +20,11 @@ export default function HomeScreen() {
           // @ts-expect-error
           onPress={() => navigation.navigate('AddressTest')}
         />
+        <Button
+          title="ApiExport Test Screen"
+          // @ts-expect-error
+          onPress={() => navigation.navigate('ApiExportTest')}
+        />
 
         <PlaygroundManager />
       </View>

@@ -167,6 +167,18 @@ const api: PlaygroundProps[] = [
           signature:
             '0x1fdef26d2134034ec4c00874597be03591a2b16bc3e2cc86f06e4c4dc4df1f00a22eea8efca6446f145e12c5a8064b4f46be57e7ddb42759550eefe4f5d3c7c487',
         },
+        expect: {
+          common: {
+            normal: {
+              requestButton: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
       },
     ],
   },
