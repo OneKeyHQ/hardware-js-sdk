@@ -7,6 +7,7 @@ enum Networks {
   Kusama = 'kusama',
   Astar = 'astar',
   JoyStream = 'joystream',
+  Manta = 'manta',
 }
 
 // All polkadot networks are included in no special case
@@ -28,6 +29,14 @@ const specialVersionRange: Record<string, DeviceFirmwareRange> = {
       min: '4.7.0',
     },
   },
+  [Networks.Manta]: {
+    model_mini: {
+      min: '3.7.0',
+    },
+    model_touch: {
+      min: '4.9.0',
+    },
+  },
 };
 
 export default Networks;
@@ -39,6 +48,9 @@ export function getPolkadotVersionRange(network: string) {
 export function getPolkadotVersionRangeWithBundle(networks: string[]) {
   if (networks.includes(Networks.JoyStream)) {
     return specialVersionRange[Networks.JoyStream];
+  }
+  if (networks.includes(Networks.Manta)) {
+    return specialVersionRange[Networks.Manta];
   }
   return baseVersionRange;
 }
