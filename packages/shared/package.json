@@ -1,6 +1,10 @@
 {
   "name": "@onekeyfe/hd-shared",
+<<<<<<< HEAD
   "version": "0.3.40-alpha.2",
+=======
+  "version": "0.3.40-alpha.0",
+>>>>>>> 1682b66 (fix: change pro to touch)
   "description": "Hardware SDK's shared tool library",
   "keywords": [
     "Hardware-SDK",

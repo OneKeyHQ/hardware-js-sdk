@@ -46,7 +46,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
     case 'TOUCH':
       return 'touch';
     case 'TOUCH_PRO':
-      return 'pro';
+      return 'touch';
     default:
     // other
   }
@@ -67,6 +67,7 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType | null => {
   if (!name) return 'classic';
   if (name.startsWith('MI')) return 'mini';
   if (name.startsWith('T')) return 'touch';
+  if (name.startsWith('P')) return 'touch';
   return 'classic';
 };
 
