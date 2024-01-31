@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Text, View } from 'react-native';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 
-import { testCases } from './data';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { PubkeyTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
@@ -95,17 +94,20 @@ function validateFields(payload: any, result: any, prefix = '') {
   return error;
 }
 
-function ExecuteView() {
+function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PubkeyTestCase>();
   const [testDescription, setTestDescription] = useState<string>();
   const [passphrase, setPassphrase] = useState<string>();
 
-  function findTestCase(name: string) {
-    const testCase = testCases.find(testCase => testCase.name === name);
-    return testCase;
-  }
+  const findTestCase = useCallback(
+    (name: string) => {
+      const testCase = testCases.find(testCase => testCase.name === name);
+      return testCase;
+    },
+    [testCases]
+  );
 
   useEffect(() => {
     const testCaseList: string[] = [];
@@ -114,7 +116,7 @@ function ExecuteView() {
     });
     setTestCaseList(testCaseList);
     setCurrentTestCase(findTestCase(testCaseList[0]));
-  }, []);
+  }, [findTestCase, testCases]);
 
   useEffect(() => {
     const testCase = currentTestCase;
@@ -229,17 +231,32 @@ function ExecuteView() {
         </View>
       </>
     ),
-    [beginTest, currentTestCase, passphrase, showOnOneKey, stopTest, testCaseList, testDescription]
+    [
+      beginTest,
+      currentTestCase?.name,
+      findTestCase,
+      passphrase,
+      showOnOneKey,
+      stopTest,
+      testCaseList,
+      testDescription,
+    ]
   );
 
   return contentMemo;
 }
 
-export function TestSinglePubkey() {
+export function TestSinglePubkey({
+  title,
+  testCases,
+}: {
+  title: string;
+  testCases: PubkeyTestCase[];
+}) {
   return (
     <TestRunnerView<PubkeyTestCase['data']>
-      title="Pubkey Test"
-      renderExecuteView={() => <ExecuteView />}
+      title={title}
+      renderExecuteView={() => <ExecuteView testCases={testCases} />}
       renderResultView={item => <ResultView item={item} />}
     />
   );

@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Text, View } from 'react-native';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 
-import { batchTestCases } from './data';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { PubkeyBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import passphraseTestCase from './data/count24_two/passphrase_empty';
-import { fullPath } from './data/utils';
+import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 
@@ -110,11 +109,18 @@ function setTestData(
       // @ts-expect-error
       ...originData.data.map((item, index) => {
         if (index === dataIndex) {
-          const path = fullOriginData.data[index].params?.path;
-          let indexKey = key;
-          if (path) {
-            indexKey = extractIndex(path, key);
-          }
+          const template = fullOriginData.data[index].params?.path;
+
+          const originKey = Object.keys(item.result).find(key => {
+            const path = replaceTemplate(key, template);
+            const resultPath = payload?.serializedPath || payload?.path;
+            if (path === resultPath) {
+              return key;
+            }
+            return false;
+          });
+
+          const indexKey = originKey || key;
 
           return {
             ...item,
@@ -130,7 +136,7 @@ function setTestData(
   };
 }
 
-function validateFields(payload: any, result: any, prefix = '') {
+function validateFields(key: string, payload: any, result: any, prefix = '') {
   let error = '';
   for (const fieldKey of Object.keys(result)) {
     const fullPath = prefix ? `${prefix}.${fieldKey}` : fieldKey;
@@ -138,10 +144,10 @@ function validateFields(payload: any, result: any, prefix = '') {
     if (result[fieldKey] === undefined) break;
     if (typeof result[fieldKey] === 'string') {
       if (fieldKey && payload?.[fieldKey] !== result[fieldKey]) {
-        error += `${fullPath}: actual: ${payload?.[fieldKey]}, expected: ${result[fieldKey]}\n`;
+        error += `(${key}) ${fullPath}: actual: ${payload?.[fieldKey]}, expected: ${result[fieldKey]}\n`;
       }
     } else {
-      error += validateFields(payload[fieldKey], result[fieldKey], fullPath);
+      error += validateFields(key, payload[fieldKey], result[fieldKey], fullPath);
     }
   }
   return error;
@@ -161,25 +167,28 @@ function extractIndex(template: string, actual: string) {
   return actual;
 }
 
-function ExecuteView() {
+function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PubkeyBatchTestCase>();
   const [testDescription, setTestDescription] = useState<string>();
   const [passphrase, setPassphrase] = useState<string>();
 
-  function findTestCase(name: string) {
-    const testCase = batchTestCases.find(testCase => testCase.name === name);
-    return testCase;
-  }
+  const findTestCase = useCallback(
+    (name: string) => {
+      const testCase = testCases.find(testCase => testCase.name === name);
+      return testCase;
+    },
+    [testCases]
+  );
 
   useEffect(() => {
     const testCaseList: string[] = [];
-    batchTestCases.forEach(testCase => {
+    testCases.forEach(testCase => {
       testCaseList.push(testCase.name);
     });
     setTestCaseList(testCaseList);
     setCurrentTestCase(findTestCase(testCaseList[0]));
-  }, []);
+  }, [findTestCase, testCases]);
 
   useEffect(() => {
     const testCase = currentTestCase;
@@ -290,7 +299,7 @@ function ExecuteView() {
           key
         );
 
-        error += validateFields(address, item.result[key]);
+        error += validateFields(key, address, item.result[key]);
       }
 
       return Promise.resolve({
@@ -326,17 +335,31 @@ function ExecuteView() {
         </View>
       </>
     ),
-    [beginTest, currentTestCase, passphrase, stopTest, testCaseList, testDescription]
+    [
+      beginTest,
+      currentTestCase?.name,
+      findTestCase,
+      passphrase,
+      stopTest,
+      testCaseList,
+      testDescription,
+    ]
   );
 
   return contentMemo;
 }
 
-export function TestBatchPubkey() {
+export function TestBatchPubkey({
+  title,
+  testCases,
+}: {
+  title: string;
+  testCases: PubkeyBatchTestCase[];
+}) {
   return (
     <TestRunnerView<PubkeyBatchTestCase['data']>
-      title="Batch Pubkey Test"
-      renderExecuteView={() => <ExecuteView />}
+      title={title}
+      renderExecuteView={() => <ExecuteView testCases={testCases} />}
       renderResultView={item => <ResultView item={item} />}
     />
   );

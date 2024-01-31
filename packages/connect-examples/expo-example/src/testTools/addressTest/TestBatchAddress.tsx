@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Text, View } from 'react-native';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 
-import { batchTestCases } from './data';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { AddressBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
+
 import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
@@ -64,17 +64,20 @@ function ExportReportView() {
   return null;
 }
 
-function ExecuteView() {
+function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[] }) {
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressBatchTestCase>();
 
   const [testDescription, setTestDescription] = useState<string>();
   const [passphrase, setPassphrase] = useState<string>();
 
-  function findTestCase(name: string) {
-    const testCase = batchTestCases.find(testCase => testCase.name === name);
-    return testCase;
-  }
+  const findTestCase = useCallback(
+    (name: string) => {
+      const testCase = batchTestCases.find(testCase => testCase.name === name);
+      return testCase;
+    },
+    [batchTestCases]
+  );
 
   useEffect(() => {
     const testCaseList: string[] = [];
@@ -83,7 +86,7 @@ function ExecuteView() {
     });
     setTestCaseList(testCaseList);
     setCurrentTestCase(findTestCase(testCaseList[0]));
-  }, []);
+  }, [batchTestCases, findTestCase]);
 
   useEffect(() => {
     const testCase = currentTestCase;
@@ -222,7 +225,7 @@ function ExecuteView() {
             address[verifyField] !== item.result[key][verifyField]
           ) {
             // @ts-expect-error
-            error += `actual: ${address[verifyField]}, expected: ${item.result[key][verifyField]}\n`;
+            error += `(${key}) actual: ${address[verifyField]}, expected: ${item.result[key][verifyField]}\n`;
           }
         }
       }
@@ -262,17 +265,31 @@ function ExecuteView() {
         </View>
       </>
     ),
-    [beginTest, currentTestCase, passphrase, stopTest, testCaseList, testDescription]
+    [
+      beginTest,
+      currentTestCase?.name,
+      findTestCase,
+      passphrase,
+      stopTest,
+      testCaseList,
+      testDescription,
+    ]
   );
 
   return contentMemo;
 }
 
-export function TestBatchAddress() {
+export function TestBatchAddress({
+  title,
+  testCases,
+}: {
+  title: string;
+  testCases: AddressBatchTestCase[];
+}) {
   return (
     <TestRunnerView<AddressBatchTestCase['data']>
-      title="Batch Address Test"
-      renderExecuteView={() => <ExecuteView />}
+      title={title}
+      renderExecuteView={() => <ExecuteView batchTestCases={testCases} />}
       renderResultView={item => <ResultView item={item} />}
     />
   );
