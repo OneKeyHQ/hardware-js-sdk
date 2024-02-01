@@ -3,7 +3,7 @@ import normal12 from './normal12';
 import passphrase12Empty from './passphrase12_empty';
 import passphrase121 from './passphrase12_1';
 import passphrase122 from './passphrase12_2';
-import passphrase123 from './passphrase12_3';
+import passphrase123 from './passphrase12_2';
 
 export const singleAddressTestCount12Three = [
   convertTestSingleData(normal12),

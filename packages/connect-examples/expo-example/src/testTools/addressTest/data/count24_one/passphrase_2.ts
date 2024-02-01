@@ -4,411 +4,504 @@ import type { AddressTestCaseData } from '../types';
 export default {
   name: 'one-passphrase24-密语2',
   passphrase: '$`%@@`&^~$',
-  passphraseState: 'mw38WWF5QNSdvWKiZmHQVrPrada3ARc8f8',
+  passphraseState: 'moP2GcZKGrjTk35r8BSRD4JTeQagvuKzzS',
   description: '助记词详见 https://onekeyhq.atlassian.net/wiki/spaces/ONEKEY/pages/429392156',
   data: [
     {
-      method: 'cardanoGetAddress',
-      expectedAddress: {
-        '0': 'addr1q9aey6k522e4dtexcz7dcjqrpzvn5raaru4hjw9ufeh2ksm05ehyv20jl3h73r8c8hn2l2yh4c42uvzwj82f5z853rpqclg0f6',
-        '10': 'addr1q8ft3jr8g7plkzv58pxtum8z3qlp0r522zccfzzk83q9aggjdme24z3w4u2f0p2cmg435gy7punc89w2xdrz5n4rxkgspxjwvp',
-        '2147483647':
-          'addr1q9a2mscr3fcewt5q933gred23ujxwmur7l6gqf55a6mal47hle5epglq8gjl50vq5lmlylag37gcarq3rcq6qznflwdsfca3je',
-      },
+      "method": "cardanoGetAddress",
+      "expectedAddress": {
+        "0": "addr1q8k2kehf7wk7w2udayleh3mrr2eqzt4dspyn5c5jwhe4xzyg07tlzg2kgdn8yyh5gd9dgve8fx6aw8eqrawqu5j83yqs2mw8qt",
+        "1": "addr1qy6avvjtp3gghptrlh3w48vhm8nvrl7qmsalgeuecws22pmyv5j6zjywr7uws28w39lm7v6hm4srwha43dwwyzwd9y4qjay442",
+        "10": "addr1qyq2tgtf8ss4rxjgkc3t7agwftlv62zu3yrjz506u2m9gzsdux5k0vksz9dz0aa0jncyhw6m2lyfdvaf8eque552lwps37sgms",
+        "2147483646": "addr1qx6g5qetfn3pntn37vd3rpe5am0ne4tymyq8ldejn7lhmtf5tt2plluztf4hfwhjd0shhm39r9gjwqn2l3sd28m0ce4sahdzrr",
+        "2147483647": "addr1q9k9p40cg8zt8wdzzkhenek90zqcnk67h4yazxp5p6rthx9dvfw70p8curtqlvp56xv8p7a0nhhyfwxrkv4rr0cczknq8fzsd7"
+      }
     },
     {
-      method: 'algoGetAddress',
-      expectedAddress: {
-        '0': 'VMY74NJPN2TBPGFAEZN3UDQ47ALTRGBWVIFENRYHFX7PR4TIESAO7XIOXA',
-        '10': 'CWR44VUIY2RKXMK22T5T53JZLLCZ7WKT5D3ZTHZJWZLRBCGEFZSXGZHXUI',
-        '2147483647': 'CUTLYLG7K5B2CU4SLW2K4FRVUDW7LY3BPLRZ53MRCYGPIXBXU5UK4TDLYA',
-      },
+      "method": "algoGetAddress",
+      "expectedAddress": {
+        "0": "VPUH3KS4VZEZK6D4HAPNDHWQZ7OTW46S6SLQ5EJOC4R7FZDDJ2EYK7HNDI",
+        "1": "AKSCO3QITLILBQULR3FOG4Y2SMAPCKLZ7AQORZ4WGGQICWKRLAQCQK5RPI",
+        "10": "QPXQRPEPDJOMSIVZIPAUHH5VOKUIMWOD6N5H7UUPTD7YND4B22UWIEICU4",
+        "2147483646": "FBLV6L37NQJM4JQMRE5NEUY6R26OH5V4IXQJDLJZHM6M4GIS4DUOV2A4HA",
+        "2147483647": "FHBPQ5Z3RDGX4I6SEPW2BVPODZWDV5WTSPJ4EZZDKMZPGG3I7MMCSPY5FA"
+      }
     },
     {
-      method: 'aptosGetAddress',
-      expectedAddress: {
-        '0': '0xabccbf709a1912356205b73cb24dcaa6b7d95acf1d0088453919d4e13d8e249a',
-        '10': '0xc1bda126db8be77ac4474ee9f8e3f534f4f0908f3e362c3bb89c341029d02579',
-        '2147483647': '0xaeba2a4e606fd2fba11d2de261aa74d565c5522e8ebf4e711f3a6369e1076d6d',
-      },
+      "method": "aptosGetAddress",
+      "expectedAddress": {
+        "0": "0x5f9f7e0d87b800f0b66088c4256d32493c788dbc339bc4556016f9924764a689",
+        "1": "0xeaa71acc6a0ff1f5e43753e7efc18a4cecde48b15421da76d9293bec32816234",
+        "10": "0xb5b37ae106a2dfefefcc774ac96c82b6f990cb3e089002fdb9dd10a1be458592",
+        "2147483646": "0x00591401ce3292d1eed532667a68ce2697e7bccf14477cb560fe8587a407620e",
+        "2147483647": "0xe5a6712f55d8a74893905b4bb423efb0cc0f14596314791c9d25495c90fd9cb2"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-Legacy',
-      params: {
-        path: "m/44'/0'/$$INDEX$$'/0/0",
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-Legacy",
+      "params": {
+        "path": "m/44'/0'/$$INDEX$$'/0/0"
       },
-      expectedAddress: {
-        '0': '1FL5fGuZxGTmgigtk1CocX6gpUuZjouNFw',
-        '10': '1CbTaPzmYfrid2e48x9NvnBKCy2znhwTFf',
-        '2147483647': '1JcGHj5fRRiaWqFN5Z62gsbqy1omedFktP',
-      },
+      "expectedAddress": {
+        "0": "1NyQmfY5ZgAXTLA5VgQCPfPgpt5v4KMWrZ",
+        "1": "14a9D4m5kYFcXhSUqfqqB3UM11cKXHGXWT",
+        "10": "1Jt4m8LjjYNJ5A6YR4UEhwb2SzALgSx3xM",
+        "2147483646": "1F4DP9MSTKDDkR1QTgr3XpqcQPt9xTPtTj",
+        "2147483647": "1DFkgDTbRTKxLgCKiUraxqweDhznufqK2e"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-Nested SegWit',
-      params: {
-        path: "m/49'/0'/$$INDEX$$'/0/0",
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-Nested SegWit",
+      "params": {
+        "path": "m/49'/0'/$$INDEX$$'/0/0"
       },
-      expectedAddress: {
-        '0': '3H5Zn2Z8D4uWeQGSouMKPJzmQPo95RBgD5',
-        '10': '3CAFAiQ4tdgCAUXcVdX525LE96uWnuEyKG',
-        '2147483647': '3LFPY6ZW5B27BYPMKsAB65bnEB4EDqMcBM',
-      },
+      "expectedAddress": {
+        "0": "3MqNybhh5TGkamqecb3uYHqvxXdoRYeUze",
+        "1": "3JnC5AVFuqtGyUTsPtUYV9F4cQT9nVMXCF",
+        "10": "34X8ELjSvidTJeTWb7Ax6Ekk25vQ7ktfuu",
+        "2147483646": "3LTQ9qNWQ8Bk62X14Ndw2K8Sno4fLAqEE9",
+        "2147483647": "33g1BfSGhuRKexSC71JaoVQ66DioftzvWU"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-Native SegWit',
-      params: {
-        path: "m/84'/0'/$$INDEX$$'/0/0",
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-Native SegWit",
+      "params": {
+        "path": "m/84'/0'/$$INDEX$$'/0/0"
       },
-      expectedAddress: {
-        '0': 'bc1qyxp2gl36vvwlfm2mp0etxmvchpfmt8lv8suyg7',
-        '10': 'bc1qd0zclae7jvd3c5sq3xkjdffyjj74rz9ah6y5jh',
-        '2147483647': 'bc1qjg50cw203ehppv7x3tyhlynnfwqq4gnh2v6gdr',
-      },
+      "expectedAddress": {
+        "0": "bc1qd69qp5qc4m06xry23smh7ndhj6n54s3cwjr0uq",
+        "1": "bc1qxsufrp3cnhelz8k7r7a8zdgskpcfhvrz4jl79f",
+        "10": "bc1qy7274jufqvjl0zlealllwl7ctsg3xfynd9g0uc",
+        "2147483646": "bc1q4qnzxqhjqe0a30f64n3qghqvf8zphak4mf7ew7",
+        "2147483647": "bc1qqq4jzf8dgef2tkk32wr2gpnsgktmedudanvxfz"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-Taproot',
-      params: {
-        path: "m/86'/0'/$$INDEX$$'/0/0",
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-Taproot",
+      "params": {
+        "path": "m/86'/0'/$$INDEX$$'/0/0"
       },
-      expectedAddress: {
-        '0': 'bc1pntzy8kpw030uz7thy4xgy9dv04xyme5d2jq2qqghc6x7e8c544dsmxamwj',
-        '10': 'bc1pl2gkyfg8u8kxrpcvvjlx0xk7x2kta43cvpqd5zl4slfvk3qxjh8qq90svd',
-        '2147483647': 'bc1ptlm944ewddlpdfstqfqcrd2cqrwmghugrg8wsk9pdakwrun5hmcq8njd7q',
-      },
+      "expectedAddress": {
+        "0": "bc1prwd704fqm0jrj0lepnsc0u3plrme6y4hd6c2xwk9dy0cm2y3rugszgap4w",
+        "1": "bc1pgs9clnn36g8ll6wf8v04djnxgcdrnrwty7z05v6c8nw6d4xxe26qvgrq5d",
+        "10": "bc1pyqgwtlurpcrc9p2m34le03l980muqehf5eral496pd8jyl2vy75sjv2yl5",
+        "2147483646": "bc1pdz4xld06wepvr5glkvhhk3yp9jnjvulg8wu7gma38nx3graehrws2w5ar3",
+        "2147483647": "bc1pn9jhkme06j2snwrf7w6uc2qmcjkkdqwrftgd7c255mxc5pfcs0nsmwxrqq"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-Doge',
-      params: {
-        path: "m/44'/3'/$$INDEX$$'/0/0",
-        coin: 'doge',
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-Doge",
+      "params": {
+        "path": "m/44'/3'/$$INDEX$$'/0/0",
+        "coin": "doge"
       },
-      expectedAddress: {
-        '0': 'DNbeqxpqCPfVxwGX6cAgX7m31n4RamX8zh',
-        '10': 'DLruL4sNVTGzGTixB796ZG7Upbai9u3rWK',
-        '2147483647': 'DDn5UsYeR269pSUMxK1ccuGgXoWpXyyGzw',
-      },
+      "expectedAddress": {
+        "0": "D82bFxiE6UcnCCBBSn6JmLU8xNsC32cci3",
+        "1": "D8CZYhDK8v8CA1LLvLQddVegibEtkqoEhH",
+        "10": "DP9H4zS87C9Xb83TxB8hwvbztMhBUsK8G7",
+        "2147483646": "DPgZ8AitDMjUwcqmTsP3ExRSeAxTk3ng65",
+        "2147483647": "DUCKGv1i5oUxpbekXfZ4B77G741rsiNN83"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-BCH',
-      params: {
-        path: "m/44'/145'/$$INDEX$$'/0/0",
-        coin: 'bch',
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-BCH",
+      "params": {
+        "path": "m/44'/145'/$$INDEX$$'/0/0",
+        "coin": "bch"
       },
-      expectedAddress: {
-        '0': 'bitcoincash:qqphalgwy8c2nja30plluszanv2qmmzj8sxuxpl6jw',
-        '10': 'bitcoincash:qpyx6qqwxythwd8swvre9a8d9jp6z453tsuyqsdgyq',
-        '2147483647': 'bitcoincash:qzl3rhpwmnpjfpendsx3aa5432qv0u2mjqule8h957',
-      },
+      "expectedAddress": {
+        "0": "bitcoincash:qpe86ut8pm0lfxaqx936yfkj4w0s4salw523h3fpe0",
+        "1": "bitcoincash:qrcn0dd0gnfhu6t37uuy88sh3qfdnjwk3uhzltces5",
+        "10": "bitcoincash:qqedruznk725la0nuzvv4sh6v7x5q7t43ghy4gs5pm",
+        "2147483646": "bitcoincash:qph0fz68q3j4v6cd3tx6p7xag3kj87976y88dr3xdh",
+        "2147483647": "bitcoincash:qq60jgfdq2d9sf9e4vupvqc6devdegcj2qfahjc7ju"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-LTC Legacy',
-      params: {
-        path: "m/44'/2'/$$INDEX$$'/0/0",
-        coin: 'ltc',
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-LTC Legacy",
+      "params": {
+        "path": "m/44'/2'/$$INDEX$$'/0/0",
+        "coin": "ltc"
       },
-      expectedAddress: {
-        '0': 'Le9R2uUi2wtQJDQwmRkNwTjUMBBrrnzcHy',
-        '10': 'LVkUDSLorBxCepNbfRVYH6RYD5QXPn5nkS',
-        '2147483647': 'LSu2QP5KiN3s4TM3QVtCLroJzFA97nJ1kv',
-      },
+      "expectedAddress": {
+        "0": "LX5CjVw27sBMYg3LewxkLf3juJUbq6JKG4",
+        "1": "LVpVyhVJHcnUTVhSeFn1GvZuyiMKVsn54W",
+        "10": "LKnHYM7x4BRyWJUogkqTYT6ETi9SYz1L1z",
+        "2147483646": "Leg6yKhXsiUC8SicD3mj4Y1PUuyZs8zgd4",
+        "2147483647": "LSEtDgCdEHM75ZSvjniSWA6e9nyvVFyASj"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-LTC Nested SegWit',
-      params: {
-        path: "m/49'/2'/$$INDEX$$'/0/0",
-        coin: 'ltc',
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-LTC Nested SegWit",
+      "params": {
+        "path": "m/49'/2'/$$INDEX$$'/0/0",
+        "coin": "ltc"
       },
-      expectedAddress: {
-        '0': 'MUq481EcDVx6BzGRYB1RoPtHfitorZdExY',
-        '10': 'M9UiXzbdTD98Ju2UqEtSy4H9iCNmEh7NZv',
-        '2147483647': 'MFg55uVdJuhCogxv1GzM2u944KSAc7xN2R',
-      },
+      "expectedAddress": {
+        "0": "MPRS3Xy8UwWSZ56HAk2nSC7bwRqmbvRxj1",
+        "1": "MPNTKEps85FSzyymujTNTCjGWZVHmtzkPC",
+        "10": "MVweke8pgN21Ya4PdKvtg7FZPauDECe2vJ",
+        "2147483646": "MJAnPVmw5ZgopooV26mkDjsU7maXTYCzZX",
+        "2147483647": "MWhoyRhPgZroC7Xm7c2tARsHmGwP8G1rXc"
+      }
     },
     {
-      method: 'btcGetAddress',
-      name: 'btcGetAddress-LTC Native SegWit',
-      params: {
-        path: "m/84'/2'/$$INDEX$$'/0/0",
-        coin: 'ltc',
+      "method": "btcGetAddress",
+      "name": "btcGetAddress-LTC Native SegWit",
+      "params": {
+        "path": "m/84'/2'/$$INDEX$$'/0/0",
+        "coin": "ltc"
       },
-      expectedAddress: {
-        '0': 'ltc1qsc5rx6fh4a45zz3e0twsulkp7s58g7y6y0jnq9',
-        '10': 'ltc1qvhahvgx2d6sp4hzcnf78yg8jsczn4k0pfzdkk3',
-        '2147483647': 'ltc1q2s5fwqsan5m9ewan27738nwy6su3s32a97ku7u',
-      },
+      "expectedAddress": {
+        "0": "ltc1qt24w55rvn0sfnm48ws3u2fc6kg2vk7eqhqgwll",
+        "1": "ltc1qqk5yp3vget3h8f3w5uey7xtdnkylqv72kqk4xr",
+        "10": "ltc1qqffumg2u5vrseez8auf08lr3p34e5lcrek0a09",
+        "2147483646": "ltc1qczagekctd2jxsgvpu48k3aja60j9qdnstvrdfn",
+        "2147483647": "ltc1qgucvn982ceqd2dxzw4e75a3waw9g7sl036ja5p"
+      }
     },
     {
-      method: 'confluxGetAddress',
-      expectedAddress: {
-        '0': 'cfx:aatxj7p4274trveb6bcjfu5u3n6c1p3b829sp4kvk6',
-        '10': 'cfx:aarn7vz9by2xwu3ezw66vgjubjacxev3jj6t7tyuyf',
-        '2147483647': 'cfx:aaj4p64x7vgcs22xnfryea1f9zuvs7v8s2px73x21x',
-      },
+      "method": "confluxGetAddress",
+      "expectedAddress": {
+        "0": "cfx:aaj639f78tbtr787d88sb4yn2m4rytt33248t84pjk",
+        "1": "cfx:aamer49haw4a03m38fz9uryasgu9vafyveeah1ncn9",
+        "10": "cfx:aak45e0ydv3s244y3d27r8tt3731uj3tj2ybmh82yd",
+        "2147483646": "cfx:aajsnrjs42kwcfgn6m35t7wkupkmh8d6kjybs4svry",
+        "2147483647": "cfx:aas6bwm3kczutcs1kk0tfdmdcy7cf4s0ea5yfhp93w"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      expectedAddress: {
-        '0': 'cosmos1ur74cpxk6x0pwn88xag95qrah6h0mvs080xrky',
-        '10': 'cosmos1shxlmq9zgtk3llhj336nf6kfk5r3e0rhgtr03p',
-        '2147483647': 'cosmos1el9j2p34n6vlrv4ezhcz5js9mxftyr5245gtta',
-      },
+      "method": "cosmosGetAddress",
+      "expectedAddress": {
+        "0": "cosmos1fuejvffey6skhwutm50h6zaecmlu3hpj2hyhkg",
+        "1": "cosmos1tyr37l05xmtm53qnfzr87z4y9yzk4gftxemrvp",
+        "10": "cosmos1qgl7vp5ncg4v9jsc2uvd9htxycene24r8sgd0j",
+        "2147483646": "cosmos1x757ac688rxl7zw94jdmll5r0pqwshf30xz9gk",
+        "2147483647": "cosmos1h3uzndzgwhf44swvmare9d3ughrpj804scx85g"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      name: 'cosmosGetAddress-akash',
-      params: {
-        hrp: 'akash',
+      "method": "cosmosGetAddress",
+      "name": "cosmosGetAddress-akash",
+      "params": {
+        "hrp": "akash"
       },
-      expectedAddress: {
-        '0': 'akash1ur74cpxk6x0pwn88xag95qrah6h0mvs025ty07',
-        '10': 'akash1shxlmq9zgtk3llhj336nf6kfk5r3e0rh9swggm',
-      },
+      "expectedAddress": {
+        "0": "akash1fuejvffey6skhwutm50h6zaecmlu3hpj8vfs0j",
+        "1": "akash1tyr37l05xmtm53qnfzr87z4y9yzk4gfttzky4m",
+        "10": "akash1qgl7vp5ncg4v9jsc2uvd9htxycene24r2t92kg",
+        "2147483646": "akash1x757ac688rxl7zw94jdmll5r0pqwshf3za0z3v",
+        "2147483647": "akash1h3uzndzgwhf44swvmare9d3ughrpj804artqdj"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      name: 'cosmosGetAddress-crypto',
-      params: {
-        hrp: 'cro',
+      "method": "cosmosGetAddress",
+      "name": "cosmosGetAddress-crypto",
+      "params": {
+        "hrp": "cro"
       },
-      expectedAddress: {
-        '0': 'cro1ur74cpxk6x0pwn88xag95qrah6h0mvs0l5w624',
-        '10': 'cro1shxlmq9zgtk3llhj336nf6kfk5r3e0rhsstkds',
-      },
+      "expectedAddress": {
+        "0": "cro1fuejvffey6skhwutm50h6zaecmlu3hpjjvvw2e",
+        "1": "cro1tyr37l05xmtm53qnfzr87z4y9yzk4gft7zn6ss",
+        "10": "cro1qgl7vp5ncg4v9jsc2uvd9htxycene24rltq5nr",
+        "2147483646": "cro1x757ac688rxl7zw94jdmll5r0pqwshf3ha2u58",
+        "2147483647": "cro1h3uzndzgwhf44swvmare9d3ughrpj804grw7ge"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      name: 'cosmosGetAddress-fetch',
-      params: {
-        hrp: 'fetch',
+      "method": "cosmosGetAddress",
+      "name": "cosmosGetAddress-fetch",
+      "params": {
+        "hrp": "fetch"
       },
-      expectedAddress: {
-        '0': 'fetch1ur74cpxk6x0pwn88xag95qrah6h0mvs05j085n',
-        '10': 'fetch1shxlmq9zgtk3llhj336nf6kfk5r3e0rhmk2tnk',
-      },
+      "expectedAddress": {
+        "0": "fetch1fuejvffey6skhwutm50h6zaecmlu3hpje2dn5l",
+        "1": "fetch1tyr37l05xmtm53qnfzr87z4y9yzk4gft4yj8wk",
+        "10": "fetch1qgl7vp5ncg4v9jsc2uvd9htxycene24r5dpfd9",
+        "2147483646": "fetch1x757ac688rxl7zw94jdmll5r0pqwshf3umtp2p",
+        "2147483647": "fetch1h3uzndzgwhf44swvmare9d3ughrpj804r90rkl"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      name: 'cosmosGetAddress-osmo',
-      params: {
-        hrp: 'osmo',
+      "method": "cosmosGetAddress",
+      "name": "cosmosGetAddress-osmo",
+      "params": {
+        "hrp": "osmo"
       },
-      expectedAddress: {
-        '0': 'osmo1ur74cpxk6x0pwn88xag95qrah6h0mvs0054nqk',
-        '10': 'osmo1shxlmq9zgtk3llhj336nf6kfk5r3e0rhqssl8n',
-      },
+      "expectedAddress": {
+        "0": "osmo1fuejvffey6skhwutm50h6zaecmlu3hpjzvh8q6",
+        "1": "osmo1tyr37l05xmtm53qnfzr87z4y9yzk4gftwzgn6n",
+        "10": "osmo1qgl7vp5ncg4v9jsc2uvd9htxycene24r0tmaeq",
+        "2147483646": "osmo1x757ac688rxl7zw94jdmll5r0pqwshf38a347y",
+        "2147483647": "osmo1h3uzndzgwhf44swvmare9d3ughrpj804cr4hz6"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      name: 'cosmosGetAddress-juno',
-      params: {
-        hrp: 'juno',
+      "method": "cosmosGetAddress",
+      "name": "cosmosGetAddress-juno",
+      "params": {
+        "hrp": "juno"
       },
-      expectedAddress: {
-        '0': 'juno1ur74cpxk6x0pwn88xag95qrah6h0mvs03a9c3c',
-        '10': 'juno1shxlmq9zgtk3llhj336nf6kfk5r3e0rh7eq5ka',
-      },
+      "expectedAddress": {
+        "0": "juno1fuejvffey6skhwutm50h6zaecmlu3hpju98v35",
+        "1": "juno1tyr37l05xmtm53qnfzr87z4y9yzk4gftstccta",
+        "10": "juno1qgl7vp5ncg4v9jsc2uvd9htxycene24r3ztkgw",
+        "2147483646": "juno1x757ac688rxl7zw94jdmll5r0pqwshf3e5p702",
+        "2147483647": "juno1h3uzndzgwhf44swvmare9d3ughrpj804x29un5"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      name: 'cosmosGetAddress-terra',
-      params: {
-        hrp: 'terra',
+      "method": "cosmosGetAddress",
+      "name": "cosmosGetAddress-terra",
+      "params": {
+        "hrp": "terra"
       },
-      expectedAddress: {
-        '0': 'terra1ur74cpxk6x0pwn88xag95qrah6h0mvs0ptur5y',
-        '10': 'terra1shxlmq9zgtk3llhj336nf6kfk5r3e0rhw0e0np',
-      },
+      "expectedAddress": {
+        "0": "terra1fuejvffey6skhwutm50h6zaecmlu3hpjvn7h5g",
+        "1": "terra1tyr37l05xmtm53qnfzr87z4y9yzk4gftqaprwp",
+        "10": "terra1qgl7vp5ncg4v9jsc2uvd9htxycene24rp5jddj",
+        "2147483646": "terra1x757ac688rxl7zw94jdmll5r0pqwshf3fzc92k",
+        "2147483647": "terra1h3uzndzgwhf44swvmare9d3ughrpj804kuu8kg"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      name: 'cosmosGetAddress-secret',
-      params: {
-        hrp: 'secret',
+      "method": "cosmosGetAddress",
+      "name": "cosmosGetAddress-secret",
+      "params": {
+        "hrp": "secret"
       },
-      expectedAddress: {
-        '0': 'secret1ur74cpxk6x0pwn88xag95qrah6h0mvs092j2tc',
-        '10': 'secret1shxlmq9zgtk3llhj336nf6kfk5r3e0rh2whxva',
-      },
+      "expectedAddress": {
+        "0": "secret1fuejvffey6skhwutm50h6zaecmlu3hpjgjs7t5",
+        "1": "secret1tyr37l05xmtm53qnfzr87z4y9yzk4gftyu023a",
+        "10": "secret1qgl7vp5ncg4v9jsc2uvd9htxycene24r94uyjw",
+        "2147483646": "secret1x757ac688rxl7zw94jdmll5r0pqwshf3drkv42",
+        "2147483647": "secret1h3uzndzgwhf44swvmare9d3ughrpj804jajwf5"
+      }
     },
     {
-      method: 'cosmosGetAddress',
-      name: 'cosmosGetAddress-celestia',
-      params: {
-        hrp: 'celestia',
+      "method": "cosmosGetAddress",
+      "name": "cosmosGetAddress-celestia",
+      "params": {
+        "hrp": "celestia"
       },
-      expectedAddress: {
-        '0': 'celestia1ur74cpxk6x0pwn88xag95qrah6h0mvs0k9hnvf',
-        '10': 'celestia1shxlmq9zgtk3llhj336nf6kfk5r3e0rhepjltv',
-      },
+      "expectedAddress": {
+        "0": "celestia1fuejvffey6skhwutm50h6zaecmlu3hpjma48v9",
+        "1": "celestia1tyr37l05xmtm53qnfzr87z4y9yzk4gfthn2nkv",
+        "10": "celestia1qgl7vp5ncg4v9jsc2uvd9htxycene24rk6ea4l",
+        "2147483646": "celestia1x757ac688rxl7zw94jdmll5r0pqwshf37vn4jm",
+        "2147483647": "celestia1h3uzndzgwhf44swvmare9d3ughrpj804pjhhw9"
+      }
     },
     {
-      method: 'evmGetAddress',
-      expectedAddress: {
-        '0': '0x573461C4307e83896944eC69CF4389529D068D93',
-        '10': '0x6e06251D66a6CFE4e14A0008486a8839Ca759c28',
-        '2147483647': '0xcC15E44B2d25F1EcA5a02eCA3bfaffd43f6DB59E',
-      },
+      "method": "evmGetAddress",
+      "expectedAddress": {
+        "0": "0x2079f77Bb051E7608fa5541ABCc313E2C4c99fD9",
+        "1": "0x9B15E50b2c35B4343bc1741d91704f0B90FDDBA0",
+        "10": "0x2dBe941102C076DA417408FEf96E570136061A22",
+        "2147483646": "0x68AF8A72A816256f011a24E26664da164F720D0F",
+        "2147483647": "0x2989930b46E7F5Ebf9FEddE2169579c72311aac1"
+      }
     },
     {
-      method: 'evmGetAddress',
-      name: 'evmGetAddress-Ledger Live',
-      params: {
-        path: "m/44'/61'/$$INDEX$$'/0/0",
+      "method": "evmGetAddress",
+      "name": "evmGetAddress-Ledger Live",
+      "params": {
+        "path": "m/44'/61'/$$INDEX$$'/0/0"
       },
-      expectedAddress: {
-        '0': '0x9968ec0f6BB17EDdCc9fC2fDD8FaB1e7fC03f623',
-        '2147483647': '0x3386D5bD51D7Dc8ee1eA4ce393fbb157C4eCc60D',
-      },
+      "expectedAddress": {
+        "0": "0xf0F56C62EBec6eD5AC23A38dA0B2cAe9CA518D4c",
+        "1": "0xcf58fEE71eD5A6c5A2C56775c511FcC37c874c9D",
+        "10": "0xC54C688F1dbDB703B875fc6083502eBB112edB4A",
+        "2147483646": "0x27c9102B179e1EBF01D180dD9a1dB76D343bB333",
+        "2147483647": "0x75c83beDd22FC1cF64AD7910844c6A7640BD93e0"
+      }
     },
     {
-      method: 'evmGetAddress',
-      name: 'evmGetAddress-ETC',
-      params: {
-        path: "m/44'/61'/0'/0/$$INDEX$$",
+      "method": "evmGetAddress",
+      "name": "evmGetAddress-ETC",
+      "params": {
+        "path": "m/44'/61'/0'/0/$$INDEX$$"
       },
-      expectedAddress: {
-        '0': '0x9968ec0f6BB17EDdCc9fC2fDD8FaB1e7fC03f623',
-        '2147483647': '0x30816CC2bAF40f98523c9191ECA9B35E3d9A698e',
-      },
+      "expectedAddress": {
+        "0": "0xf0F56C62EBec6eD5AC23A38dA0B2cAe9CA518D4c",
+        "1": "0x0FB97b178DD51c38bd9aF0d66bda125254194518",
+        "10": "0xe3849b272D986BF27228384BCb7401Dc534f413f",
+        "2147483646": "0xd8f59fCD20c8A0A5B8123a7ac4EfA3e66b0c0A3e",
+        "2147483647": "0xee36f0F2018dC56DcE68F64fbd0C40a15ed70954"
+      }
     },
     {
-      method: 'filecoinGetAddress',
-      expectedAddress: {
-        '0': 'f1yfboy53ay7fegyjl3bdzg6yu6ozonhsot7zs3ha',
-        '10': 'f1yyuxbrgqht2bmg6vt26echzvqdopkqze4lha33q',
-        '2147483647': 'f1grw63vniwengemlctxmsfsoxsc65p2qhqz7i4la',
-      },
+      "method": "filecoinGetAddress",
+      "expectedAddress": {
+        "0": "f1tpanxxjngzxjhcgfno7y2sgj7klzj2exmgl7iha",
+        "1": "f1nb6jypcps27chah6ypy3ps5sbp6drvqpbkih2lq",
+        "10": "f145ix4h33eicxjf6qztix4hp2lalimvkiycw2ydi",
+        "2147483646": "f1ibdrjruqsdgxbrq6vmvdznq5tc7al2h7k3zzvyy",
+        "2147483647": "f1fv4bm5g4rgvkpa6pc7pbbgewarvbu5szc6dsxvi"
+      }
     },
     {
-      method: 'kaspaGetAddress',
-      expectedAddress: {
-        '0': 'kaspa:qrgcxrktrlu50dren50rqnlpzw0z58ukrsazmf826hxq794wgc5x7ul9qskv4',
-        '10': 'kaspa:qzydksj8jakyyk68v0gkh26qycmy9dxv99e9gnrjvw4cgfwwvnrp7pz3zc3ys',
-        '2147483647': 'kaspa:qrs33pk9lxqyk0qnqmpf6hr92333jm5ukrxc5j9zqvzjfdx53wvcz0yxtznm3',
-      },
+      "method": "kaspaGetAddress",
+      "expectedAddress": {
+        "0": "kaspa:qryltk6t6pl2agy0v7lwezlyv8egz7sxmtftfwlwphe0y7095t34wtz6pwygc",
+        "1": "kaspa:qzwf5zddnl64g8aah706j4q7pks2g9t797anx8mstp2latjuc92s2779zh8ms",
+        "10": "kaspa:qzfmv76xdn9an9j6an3yljv63lhc0vgu8ecrhjv3vm254p4za27ssavtavzke",
+        "2147483646": "kaspa:qzt7f67w4z3mwt8wmgdn7ndhjkcyl34zk884sezzt6lmes4sxj0h5ejk9zwss",
+        "2147483647": "kaspa:qzf362e66ruxwy77hknyfqr7jq6nwrll3rx9x4wnp5pz8qkc34ysu87rtlrdv"
+      }
     },
     {
-      method: 'nearGetAddress',
-      expectedAddress: {
-        '0': '4bf980d957577ff45d7537b284bc8669ef034a6aae7304503886b856507868df',
-        '10': 'c054ad6ffe015add5f68531a840b0ab458a0773b0424cb4df8b6d3528dce18ae',
-        '2147483647': 'b2959c3c1cc6647d3ac4f41d4e2e39553b9d7ffd4359302e0ed72d1bbe2b611b',
-      },
+      "method": "nearGetAddress",
+      "expectedAddress": {
+        "0": "05f4a4c3ade3cd83edc216572386cd43cfdfbaeb1fcecd951559efd15930553c",
+        "1": "c4d4eba446566bf489f8cc7f05f351af00dc65ea6efbc5b622cb284e6870268a",
+        "10": "0f262a79e8358f54b12521c64424056991f279e02f3002ce8792939b7bb5f85a",
+        "2147483646": "0612b8f5f22c39befe2090bdcd70f9cc2439d41e4e192f7046f28d49f5944b65",
+        "2147483647": "6bb5cc2198202ac3825ab7da0f444a5f17348b3366b69daad8d014db423704bc"
+      }
     },
     {
-      method: 'nemGetAddress',
-      expectedAddress: {
-        '0': 'NCMJ56AUPNK4DHYJOOGLXSPAG6QUOGWOG4PLJXJH',
-        '10': 'NCHWKXWZWMP4GOZESHH34KZOIHMK7GCPHJO7SVPC',
-        '2147483647': 'NDU45KE4GQCZU6S5HMO5XQQ4IOUZJYAZIOFYONXD',
-      },
+      "method": "nemGetAddress",
+      "expectedAddress": {
+        "0": "NDYQPQTYL2T7MY3VQDELJDPJZV4OAHQICCKP2F6B",
+        "1": "NDU2ICPL47A4BDNXMWWT2L5V3CTWK2SO67P2WSNT",
+        "10": "NBGK63TXIEAJ6JUJEJFSCII5JH5XH5XGH44MCCDB",
+        "2147483646": "NDV25VZLOQXFBBUAVPKLKRVX2FWGKPL25V6KAOCT",
+        "2147483647": "NBOY4RZRYOQBUA3NQ6BF7C7XZ6BMD3RJD5MTL4BL"
+      }
     },
     {
-      method: 'nexaGetAddress',
-      expectedAddress: {
-        '0': 'nexa:nqtsq5g530ayu6nwet0njgmmgp4l7jd03xf8vt3pvnl0fze4',
-        '10': 'nexa:nqtsq5g50hs36xk5h6pzwg69muhxvaewzyh3nsys5xk4hndh',
-        '2147483647': 'nexa:nqtsq5g5qnwn40p39hsk37vf3q0p6feffhp5sp243m364rzq',
-      },
+      "method": "nexaGetAddress",
+      "expectedAddress": {
+        "0": "nexa:nqtsq5g530c25apqwtna23ay2hwkg3pljwayrahjlre4w7j2",
+        "1": "nexa:nqtsq5g5ddxgge76jczsve4mjkhpwwr49w47qpxgl48vtlma",
+        "10": "nexa:nqtsq5g5p40x3y30mct494hfwrr4kehnrqsk05tcp56c6ryg",
+        "2147483646": "nexa:nqtsq5g5xa2gwg3tp689v872sawtez3fmxvmfcwgfhx3ln80",
+        "2147483647": "nexa:nqtsq5g5jykp2mfsc2448e2z6dpufpxfxtxw6nqsvfet8yzp"
+      }
     },
     {
-      method: 'polkadotGetAddress',
-      expectedAddress: {
-        '0': '1zxDKrQHVwoMrKzC7eLrvBwhxSsgfsiHoEhup1LVirC1fZw',
-        '10': '14c4jLvtMy1E1GjpfA2wVsKVYHV9eD21GZMDs58EnqUXcWtM',
-        '2147483647': '14iVYehkTHu83J1zWDmuhHwfqV2atXWxDzmgC4jM1PWdz9JG',
-      },
+      "method": "polkadotGetAddress",
+      "expectedAddress": {
+        "0": "16d2cjEEQqGhH2iNJAZdeUVkV6KgUW6c1G5e5LzEATa7s94w",
+        "1": "12x9ZuHZHDFGcWA7YpwBfwNWqByJXsxB3K2Y9dCcqNJdxFX8",
+        "10": "14DLQRC3YTmdcfUt8Z8qjJuHgYVhgVuhNwWVMzYutfZLgs3c",
+        "2147483646": "16QPRGpQXmGB4aFDHFbuZyDVuY6iFnZwzNNVqDrG9dYcSByB",
+        "2147483647": "14oXctMz1AB7nanvLeKWiBFvgtbpJQQfKdYY8TQM9dDTmqNu"
+      }
     },
     {
-      method: 'polkadotGetAddress',
-      name: 'polkadotGetAddress-astar',
-      params: {
-        prefix: '5',
-        network: 'astar',
+      "method": "polkadotGetAddress",
+      "name": "polkadotGetAddress-astar",
+      "params": {
+        "prefix": "5",
+        "network": "astar"
       },
-      expectedAddress: {
-        '0': 'WwFWHZRCxKS99MJin3TkRX4wPALxb2KEW1MzEDqozpdR6X7',
-        '2147483647': 'ZenqcQmNkGkpb3K2tB2aoGo4uk4ASfZAhYLGUwrKfV5PvEx',
-      },
+      "expectedAddress": {
+        "0": "bZKugwFLHeL4KjgppxkXypsiX39kRFCwxrJ9mCjUjYZGXdg",
+        "1": "XtSrrzaCfcuPoBS5VLJZShe4cgmoo6mz1oCE3R89eH5MzJU",
+        "10": "Z9dhNu4Tv9GPxWCfDXxcpEQuyDAxR4JKeH9SQmRCwXn6HMy",
+        "2147483646": "bLgiEXRTDdoqsGXov12TUYd8xpBXhiYw599ue4mTuX3qxDd",
+        "2147483647": "Zjpur4zvcYkZspEsJidbgb3vKKHaKZGGLKCCscrTuBuBPat"
+      }
     },
     {
-      method: 'polkadotGetAddress',
-      name: 'polkadotGetAddress-kusama',
-      params: {
-        prefix: '2',
-        network: 'kusama',
+      "method": "polkadotGetAddress",
+      "name": "polkadotGetAddress-kusama",
+      "params": {
+        "prefix": "2",
+        "network": "kusama"
       },
-      expectedAddress: {
-        '0': 'DaGjJwD45hFfy8v1BQPciinzvjTo38kfgLy9BHwRS3Aa5aJ',
-        '2147483647': 'GHp4dnZDseaMQpvKHXxT6UX8TKAztmzbsswRS1ww6hcYnfH',
-      },
+      "expectedAddress": {
+        "0": "JCM8iK3BR29b9XJ7EKgQH2bn4cGasMeP9BuJiGq6Am6RhGm",
+        "1": "EXU5tNN3nzivcy3MthERjuN8AFteFDDRC8oNzVDm5VcX49X",
+        "10": "FnevQGrK3X5vnHowcttV7S8yWnHnsAjkpckbMqWpNkKFKkC",
+        "2147483646": "HyhwFuDJM1dNh496KMxKmkMCWPJN9pzNFUm4b8s5LjazznU",
+        "2147483647": "GNr8sSnmjva6hbr9i5ZTynmyrtQQmfhhWeoMpgx5LQSLE6X"
+      }
     },
     {
-      method: 'polkadotGetAddress',
-      name: 'polkadotGetAddress-joystream',
-      params: {
-        prefix: '126',
-        network: 'joystream',
+      "method": "polkadotGetAddress",
+      "name": "polkadotGetAddress-joystream",
+      "params": {
+        "prefix": "126",
+        "network": "joystream"
       },
-      expectedAddress: {
-        '0': 'j4SKZe2qJJSBMkvmDWT32Zv4nNiXoVFtjwF8f854JNhyJUgWy',
-        '2147483647': 'j4V36yMgeUE8gSNTDpZAbQHpWWF7Wh7XysSfdQKnJtNdkTMhZ',
-      },
+      "expectedAddress": {
+        "0": "j4Wwe3SD8RmWFg79bcVxKMUNb9rQcH67dehybHc3C3ShEL5Az",
+        "1": "j4TGkzcGTJ9Uq1abLsAKsNwFMVx4ELTyCgkvVMtFaiMRkRZCq",
+        "10": "j4UXwq8AwZQ1C1jv7StXXSJn8MJadV5vj2PQSaFbsmegT9jNR",
+        "2147483646": "j4WizqyoJYhVjTegSbazbGy6LaJBe4NaydpGT3UuE2cfiuHBW",
+        "2147483647": "j4V893bLt26QgBfE9eyiCRB8mMegk6zRgy5SVLiTK2cLaEdss"
+      }
     },
     {
-      method: 'xrpGetAddress',
-      expectedAddress: {
-        '0': 'rMQsKUP9xz3xGJGs4fynnURqW38ba8J4pg',
-        '2147483647': 'rLxhs9Xjk9GzSZELHF2UvdrVCPGzLWZTP1',
-      },
+      "method": "xrpGetAddress",
+      "expectedAddress": {
+        "0": "rLZEodVdLKRvUmG7MEFFiqoVR8mGeJQSDx",
+        "1": "rnuLjkjSGZyGEogDq1vW84HCgZKTAiL95h",
+        "10": "rL4wcnVjGY8CAzMZdHDZKSCiQ3qcnoMFkR",
+        "2147483646": "rH7E7m7nREwxgXg3sK9CHnmivVC9fJi6Sp",
+        "2147483647": "r3NkQNBUPYLWEzUHeR7tQVdzwY6k4VPBaW"
+      }
     },
     {
-      method: 'solGetAddress',
-      expectedAddress: {
-        '0': 'FSDCL9XcNN1YXFnwmTSt1N2HRefETePVHXhQTAJH6Wyo',
-        '10': 'Hsn9UoR4EQ8e5Htmcb83VVz8aqkXzGrMu1YWJsufTKQ2',
-        '2147483647': 'E8Lfh64r5AY33Q7BVKvFE5ELSr8m5KnQC5g2EW6xGMr2',
-      },
+      "method": "solGetAddress",
+      "expectedAddress": {
+        "0": "69XRUrgavi7huZbdzJFwHbH2kAz6qgozU2LzQRP5sM47",
+        "1": "Gveh9t6vydu32F1A76kNZm3bCgeeMffNfbqpRqRECcEt",
+        "10": "5YMr7JFPD4FMp3wBYoMJi2Uw5ALu7DxYJMv65SMDfBpP",
+        "2147483646": "mWBbVvKXe5U7spC1HfLh6qyCJDFkaSvGzGFLwxyeBWC",
+        "2147483647": "54Dn9mBGJKcZ4kBS15cuNgK7cGAX4B4PNAaq8bAZwBeu"
+      }
     },
     {
-      method: 'starcoinGetAddress',
-      expectedAddress: {
-        '0': '0x026d4c7c9e4204821b39001ef6126c12',
-        '10': '0x5be3e01813b7dae807c8812efa31eb9c',
-        '2147483647': '0x0d774a840b4617734298c0bd57e46277',
-      },
+      "method": "starcoinGetAddress",
+      "expectedAddress": {
+        "0": "0xda5fe1d6154543d2e4d68a07163e95b8",
+        "1": "0x5d470545b09774c91468ecde12d1e01c",
+        "10": "0x9f3192b2ea88fd26f7bc4d2afbc7cf4a",
+        "2147483646": "0x1a07ffe1b5838028476d06903f54f402",
+        "2147483647": "0x869a721ef49fb83f4f6ec8bd71aa8bcc"
+      }
     },
     {
-      method: 'stellarGetAddress',
-      expectedAddress: {
-        '0': 'GCGZB5OO6CADJ66UH337CJQMU2AWJ7UHQBGO3UMI2YMQMG7H56G5XU72',
-        '10': 'GDU3E67N4OWZ7E55YMKATWWMU6XH42U5HFX3QHCM2FNHOHKRJIQ5Y5QW',
-        '2147483647': 'GD4E2FGX7KY3KZ2BTBALPUIUPC7N6VUIXBY2VV2LSS2HQU2S4FK23KLB',
-      },
+      "method": "stellarGetAddress",
+      "expectedAddress": {
+        "0": "GDK3LVBYSABWONCBARK6SDMCBETSIIILFQZAQTUEJEL7Y3MVASBQ7V5U",
+        "1": "GAD7MKWZGWTXP5F6GI3SBDQWDAB6FBOP2NNBKKBWL2I7BY6CLVU6VWHC",
+        "10": "GCMKI56XNYQP7RZ4PCHTF7VDMDAFTUXZEOKE4EGI5U2E454MU7DPORYA",
+        "2147483646": "GCDEHDAWTILOFYMACBHKVPOTOQH7Y2IKO6K7MPFPKOGNZKDBDSKALIXY",
+        "2147483647": "GCLM57SFODVQ46BPCBNG2RSW5TIEBFFDESOSD6XEL2CQ2XYDP4YJZRJL"
+      }
     },
     {
-      method: 'suiGetAddress',
-      expectedAddress: {
-        '0': '0x8855ed0e14b98d09668fe43012fd180fa598452ed9fea6174b15ef25e007af73',
-        '10': '0x2a300a7bd1ee51bdae03e9fc9240afc255ca4fc215e6ea0878968bac7657e9ef',
-        '2147483647': '0xdbcd51475aedc4150b43053ee201c7be9bee16e47d2d95d669e61889a7d23404',
-      },
+      "method": "suiGetAddress",
+      "expectedAddress": {
+        "0": "0x795d640b8e8f775178c5e342f57bf6446c7412ad849b44663bc047d22103cab3",
+        "1": "0xa51edfc64e22847cf238026d480ec4544439b4963024bcf031af535f7fd44e0f",
+        "10": "0x71b616f4c8f9f0ed1ccf6f6ee9e9525e8f3c2bb1515284b515d14b9019797d0d",
+        "2147483646": "0x67ecbdeaf0c149da6bc06e8d3b717966ebb114dfa44835f0738df7979eebdc70",
+        "2147483647": "0x7b251448e1d628206ffa40d415a12d0c35b2b000ca488521ef31367b7b89b0ff"
+      }
     },
     {
-      method: 'tronGetAddress',
-      expectedAddress: {
-        '0': 'TNg97CAHbLsFLWL82Pf5korUJdZnjfmSsA',
-        '10': 'TA6Sd7JCzmqu6rS3UKaxbg8iVEq9sziJ2b',
-        '2147483647': 'TEPPVPzcQJQEXgxt2Lnv9fXyXb8JXQUeYh',
-      },
-    },
+      "method": "tronGetAddress",
+      "expectedAddress": {
+        "0": "TSdDKfQXUMd48h1TkwfYJRR6rXrRTzN9Gq",
+        "1": "TT5eRhYioxFZLG1DxgR9ZYMqLmhXCU4RhM",
+        "10": "TQKwSjNPb44pEeEbZf5SKmunU1YwrAoxxd",
+        "2147483646": "TJzKKuSVGSx4DYBpuNs9YZDf28ELAu8bG8",
+        "2147483647": "TS9XAR3tKoiGMdDJm6ijVCgdvt6SmTLbJY"
+      }
+    }
   ],
 } as AddressTestCaseData;
