@@ -5,7 +5,7 @@ export type PubkeyTestCaseData = {
   passphrase?: string;
   data: {
     method: string;
-    result: Record<number, any>;
+    result: Record<string, any>;
     name?: string;
     params?: any;
   }[];

@@ -1,20 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Text, View } from 'react-native';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 
-import { useContextSelector } from 'use-context-selector';
-import { batchTestCases } from './data';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { AddressBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
+
 import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
-import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
-import { TestRunnerVerifyContext } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
-import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
-import { downloadFile } from '../../utils/downloadUtils';
+import useExportReport from '../../components/BaseTestRunner/useExportReport';
 
 type TestCaseDataType = AddressBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -37,94 +33,51 @@ function ResultView({ item }: ResultViewProps) {
 }
 
 function ExportReportView() {
-  const runnerInfo = useContextSelector(TestRunnerContext, v => v);
-  const runnerVerify = useContextSelector(TestRunnerVerifyContext, v => v);
+  const { showExportReport, exportReport } = useExportReport<TestCaseDataType>({
+    fileName: 'BatchAddressTestReport',
+    reportTitle: 'Batch Address Test Report',
+    customReport: (items, itemVerifyState) => {
+      const markdown: string[] = [];
 
-  const exportReport = () => {
-    const {
-      runnerTestCaseTitle,
-      timestampBeginTest,
-      timestampEndTest,
-      itemValues,
-      runningDeviceFeatures,
-    } = runnerInfo;
+      markdown.push(`## Test Case`);
+      markdown.push(`| State | Title | Address |`);
+      markdown.push(`| --- | --- | --- |`);
+      items.forEach(item => {
+        const caseItem = item;
+        const { result, $key } = caseItem;
+        const title = caseItem?.name || caseItem?.title || caseItem?.method;
+        const state = itemVerifyState?.[$key].verify;
 
-    const { itemVerifyState } = runnerVerify;
+        const runnerResult =
+          state === 'fail' ? itemVerifyState?.[$key].error : JSON.stringify(result);
+        markdown.push(`| ${state} | ${title} | ${runnerResult} |`);
+      });
 
-    if (!itemVerifyState) return;
-    if (!timestampBeginTest) return;
-    if (!timestampEndTest) return;
-    if (!runningDeviceFeatures) return;
+      return Promise.resolve(markdown);
+    },
+  });
 
-    const beginTime = new Date(timestampBeginTest).toLocaleString();
-    const endTime = new Date(timestampEndTest).toLocaleString();
-
-    const allSuccess = itemValues.every(item => {
-      const caseItem = item as TestCaseDataWithKey<TestCaseDataType>;
-      const { $key } = caseItem;
-      const state = itemVerifyState?.[$key].verify;
-      return state === 'success';
-    });
-
-    const markdown = [];
-    markdown.push(`# Batch Address Test Report (${runnerTestCaseTitle})`);
-    markdown.push(`Status: ${allSuccess ? 'Success' : 'Fail'}\n`);
-    markdown.push(`Begin Time: ${beginTime}\n`);
-    markdown.push(`End Time: ${endTime}\n`);
-    markdown.push(``);
-
-    markdown.push(`## Device Info`);
-    const deviceInfo = getDeviceInfo(runningDeviceFeatures);
-    markdown.push(`| Key | Value |`);
-    markdown.push(`| --- | --- |`);
-    Object.keys(deviceInfo).forEach(key => {
-      // @ts-expect-error
-      const value = deviceInfo[key];
-      if (value) {
-        markdown.push(`| ${key} | ${value} |`);
-      }
-    });
-    markdown.push(``);
-
-    markdown.push(`## Test Case`);
-    markdown.push(`| State | Title | Address |`);
-    markdown.push(`| --- | --- | --- |`);
-    itemValues.forEach(item => {
-      const caseItem = item as TestCaseDataWithKey<TestCaseDataType>;
-      const { result, $key } = caseItem;
-      const title = caseItem?.name || caseItem?.title || caseItem?.method;
-      const state = itemVerifyState?.[$key].verify;
-
-      const runnerResult =
-        state === 'fail' ? itemVerifyState?.[$key].error : JSON.stringify(result);
-      markdown.push(`| ${state} | ${title} | ${runnerResult} |`);
-    });
-
-    const testCaseTitle = runnerTestCaseTitle?.replace(/-/g, '_');
-    const formatTime = new Date(timestampBeginTest).toLocaleString().replace(/[-: ]/g, '_');
-    const fileName = `BatchAddressTestReport(${testCaseTitle})${formatTime}.md`;
-
-    downloadFile(fileName, markdown.join('\n').toString());
-  };
-
-  if (runnerInfo.runnerDone) {
+  if (showExportReport) {
     return <Button title="Export Report" onPress={exportReport} />;
   }
 
   return null;
 }
 
-function ExecuteView() {
+function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[] }) {
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressBatchTestCase>();
 
   const [testDescription, setTestDescription] = useState<string>();
   const [passphrase, setPassphrase] = useState<string>();
 
-  function findTestCase(name: string) {
-    const testCase = batchTestCases.find(testCase => testCase.name === name);
-    return testCase;
-  }
+  const findTestCase = useCallback(
+    (name: string) => {
+      const testCase = batchTestCases.find(testCase => testCase.name === name);
+      return testCase;
+    },
+    [batchTestCases]
+  );
 
   useEffect(() => {
     const testCaseList: string[] = [];
@@ -133,7 +86,7 @@ function ExecuteView() {
     });
     setTestCaseList(testCaseList);
     setCurrentTestCase(findTestCase(testCaseList[0]));
-  }, []);
+  }, [batchTestCases, findTestCase]);
 
   useEffect(() => {
     const testCase = currentTestCase;
@@ -272,7 +225,7 @@ function ExecuteView() {
             address[verifyField] !== item.result[key][verifyField]
           ) {
             // @ts-expect-error
-            error += `actual: ${address[verifyField]}, expected: ${item.result[key][verifyField]}\n`;
+            error += `(${key}) actual: ${address[verifyField]}, expected: ${item.result[key][verifyField]}\n`;
           }
         }
       }
@@ -312,17 +265,31 @@ function ExecuteView() {
         </View>
       </>
     ),
-    [beginTest, currentTestCase, passphrase, stopTest, testCaseList, testDescription]
+    [
+      beginTest,
+      currentTestCase?.name,
+      findTestCase,
+      passphrase,
+      stopTest,
+      testCaseList,
+      testDescription,
+    ]
   );
 
   return contentMemo;
 }
 
-export function TestBatchAddress() {
+export function TestBatchAddress({
+  title,
+  testCases,
+}: {
+  title: string;
+  testCases: AddressBatchTestCase[];
+}) {
   return (
     <TestRunnerView<AddressBatchTestCase['data']>
-      title="Batch Address Test"
-      renderExecuteView={() => <ExecuteView />}
+      title={title}
+      renderExecuteView={() => <ExecuteView batchTestCases={testCases} />}
       renderResultView={item => <ResultView item={item} />}
     />
   );

@@ -1,4 +1,4 @@
-import { INDEX_MARK, baseParams } from '../baseParams';
+import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from '../baseParams';
 import { PubkeyTestCase } from '../types';
 import { PubkeyTestCaseData } from './types';
 
@@ -21,6 +21,40 @@ export function fullPath(data: PubkeyTestCaseData): PubkeyTestCaseData {
   };
 }
 
+export function replaceTemplate(key: string, template: string) {
+  let path = template;
+
+  let index = 0;
+  let change = 0;
+  let addressIndex = 0;
+  if (key.indexOf('/') !== -1) {
+    const keys = key.split('/');
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i].startsWith('C')) {
+        change = parseInt(keys[i].slice(1));
+      } else if (keys[i].startsWith('A')) {
+        addressIndex = parseInt(keys[i].slice(1));
+      } else {
+        index = parseInt(keys[i]);
+      }
+    }
+  } else {
+    index = parseInt(key);
+  }
+
+  if (path.indexOf(INDEX_MARK) !== -1) {
+    path = template.replace(INDEX_MARK, index.toString());
+  }
+  if (path.indexOf(CHANGE_MARK) !== -1) {
+    path = path.replace(CHANGE_MARK, change.toString());
+  }
+  if (path.indexOf(ADDRESS_INDEX_MARK) !== -1) {
+    path = path.replace(ADDRESS_INDEX_MARK, addressIndex.toString());
+  }
+
+  return path;
+}
+
 export function convertTestSingleData(
   data: PubkeyTestCaseData,
   options?: {
@@ -32,26 +66,24 @@ export function convertTestSingleData(
   const dataList: PubkeyTestCase['data'] = [];
   for (const item of testCase.data) {
     const keys = Object.keys(item.result);
+    let count = 0;
     for (let i = 0; i < keys.length; i++) {
-      const index = parseInt(keys[i]);
-
-      if (options?.getOnlyOne && index > 0) {
+      if (options?.getOnlyOne && count > 0) {
         break;
       }
+      count += 1;
 
-      let { path } = item.params;
-      if (path && path.indexOf(INDEX_MARK) !== -1) {
-        path = path.replace(INDEX_MARK, index);
-      }
+      const key = keys[i];
+      const path = replaceTemplate(key, item.params.path);
 
       dataList.push({
         ...item,
-        title: `${item.name || item.method} -- ${index} -- ${path}`,
+        title: `${item.name || item.method} -- ${key} -- ${path}`,
         params: {
           ...item.params,
           path,
         },
-        result: item.result[index],
+        result: item.result[key],
       });
     }
   }
@@ -76,18 +108,15 @@ export function convertTestBatchData(data: PubkeyTestCaseData): PubkeyTestCase {
     const results: Record<string, { address: string }> = {};
     const keys = Object.keys(item.result);
     for (let i = 0; i < keys.length; i++) {
-      const index = parseInt(keys[i]);
+      const key = keys[i];
+      const path = replaceTemplate(key, item.params.path);
 
-      let { path } = item.params;
-      if (path && path.indexOf(INDEX_MARK) !== -1) {
-        path = path.replace(INDEX_MARK, index);
-      }
       bundle.push({
         ...item.params,
         path,
       });
 
-      results[path] = item.result[index];
+      results[path] = item.result[key];
     }
     dataList.push({
       ...item,

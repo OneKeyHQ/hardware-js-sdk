@@ -1,19 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Text, View } from 'react-native';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-import { useContextSelector } from 'use-context-selector';
 
-import { testCases } from './data';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { AddressTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
-import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
-import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
-import { TestRunnerVerifyContext } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
-import { downloadFile } from '../../utils/downloadUtils';
+import useExportReport from '../../components/BaseTestRunner/useExportReport';
 
 type TestCaseDataType = AddressTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -33,94 +28,51 @@ function ResultView({ item }: ResultViewProps) {
 }
 
 function ExportReportView() {
-  const runnerInfo = useContextSelector(TestRunnerContext, v => v);
-  const runnerVerify = useContextSelector(TestRunnerVerifyContext, v => v);
+  const { showExportReport, exportReport } = useExportReport<TestCaseDataType>({
+    fileName: 'SingleAddressTestReport',
+    reportTitle: 'Single Address Test Report',
+    customReport: (items, itemVerifyState) => {
+      const markdown: string[] = [];
 
-  const exportReport = () => {
-    const {
-      runnerTestCaseTitle,
-      timestampBeginTest,
-      timestampEndTest,
-      itemValues,
-      runningDeviceFeatures,
-    } = runnerInfo;
+      markdown.push(`## Test Case`);
+      markdown.push(`| State | Title | Path | Address |`);
+      markdown.push(`| --- | --- | --- | --- |`);
+      items.forEach(item => {
+        const caseItem = item;
+        const { result, $key } = caseItem;
+        const title = caseItem?.name || caseItem?.title || caseItem?.method;
+        const state = itemVerifyState?.[$key].verify;
+        const path = caseItem?.params?.addressParameters?.path || caseItem?.params?.path;
 
-    const { itemVerifyState } = runnerVerify;
+        const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : result.address;
+        markdown.push(`| ${state} | ${title} | ${path} | ${runnerResult} |`);
+      });
 
-    if (!itemVerifyState) return;
-    if (!timestampBeginTest) return;
-    if (!timestampEndTest) return;
-    if (!runningDeviceFeatures) return;
+      return Promise.resolve(markdown);
+    },
+  });
 
-    const beginTime = new Date(timestampBeginTest).toLocaleString();
-    const endTime = new Date(timestampEndTest).toLocaleString();
-
-    const allSuccess = itemValues.every(item => {
-      const caseItem = item as TestCaseDataWithKey<TestCaseDataType>;
-      const { $key } = caseItem;
-      const state = itemVerifyState?.[$key].verify;
-      return state === 'success';
-    });
-
-    const markdown = [];
-    markdown.push(`# Single Address Test Report (${runnerTestCaseTitle})`);
-    markdown.push(`Status: ${allSuccess ? 'Success' : 'Fail'}\n`);
-    markdown.push(`Begin Time: ${beginTime}\n`);
-    markdown.push(`End Time: ${endTime}\n`);
-    markdown.push(``);
-
-    markdown.push(`## Device Info`);
-    const deviceInfo = getDeviceInfo(runningDeviceFeatures);
-    markdown.push(`| Key | Value |`);
-    markdown.push(`| --- | --- |`);
-    Object.keys(deviceInfo).forEach(key => {
-      // @ts-expect-error
-      const value = deviceInfo[key];
-      if (value) {
-        markdown.push(`| ${key} | ${value} |`);
-      }
-    });
-    markdown.push(``);
-
-    markdown.push(`## Test Case`);
-    markdown.push(`| State | Title | Path | Address |`);
-    markdown.push(`| --- | --- | --- | --- |`);
-    itemValues.forEach(item => {
-      const caseItem = item as TestCaseDataWithKey<TestCaseDataType>;
-      const { result, $key } = caseItem;
-      const title = caseItem?.name || caseItem?.title || caseItem?.method;
-      const state = itemVerifyState?.[$key].verify;
-      const path = caseItem?.params?.addressParameters?.path || caseItem?.params?.path;
-
-      const runnerResult = state === 'fail' ? itemVerifyState?.[$key].error : result.address;
-      markdown.push(`| ${state} | ${title} | ${path} | ${runnerResult} |`);
-    });
-
-    const testCaseTitle = runnerTestCaseTitle?.replace(/-/g, '_');
-    const formatTime = new Date(timestampBeginTest).toLocaleString().replace(/[-: ]/g, '_');
-    const fileName = `SingleAddressTestReport(${testCaseTitle})${formatTime}.md`;
-
-    downloadFile(fileName, markdown.join('\n').toString());
-  };
-
-  if (runnerInfo.runnerDone) {
+  if (showExportReport) {
     return <Button title="Export Report" onPress={exportReport} />;
   }
 
   return null;
 }
 
-function ExecuteView() {
+function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressTestCase>();
   const [testDescription, setTestDescription] = useState<string>();
   const [passphrase, setPassphrase] = useState<string>();
 
-  function findTestCase(name: string) {
-    const testCase = testCases.find(testCase => testCase.name === name);
-    return testCase;
-  }
+  const findTestCase = useCallback(
+    (name: string) => {
+      const testCase = testCases.find(testCase => testCase.name === name);
+      return testCase;
+    },
+    [testCases]
+  );
 
   useEffect(() => {
     const testCaseList: string[] = [];
@@ -129,7 +81,7 @@ function ExecuteView() {
     });
     setTestCaseList(testCaseList);
     setCurrentTestCase(findTestCase(testCaseList[0]));
-  }, []);
+  }, [findTestCase, testCases]);
 
   useEffect(() => {
     const testCase = currentTestCase;
@@ -253,17 +205,32 @@ function ExecuteView() {
         </View>
       </>
     ),
-    [beginTest, currentTestCase, passphrase, showOnOneKey, stopTest, testCaseList, testDescription]
+    [
+      beginTest,
+      currentTestCase?.name,
+      findTestCase,
+      passphrase,
+      showOnOneKey,
+      stopTest,
+      testCaseList,
+      testDescription,
+    ]
   );
 
   return contentMemo;
 }
 
-export function TestSingleAddress() {
+export function TestSingleAddress({
+  title,
+  testCases,
+}: {
+  title: string;
+  testCases: AddressTestCase[];
+}) {
   return (
     <TestRunnerView<AddressTestCase['data']>
-      title="Address Test"
-      renderExecuteView={() => <ExecuteView />}
+      title={title}
+      renderExecuteView={() => <ExecuteView testCases={testCases} />}
       renderResultView={item => <ResultView item={item} />}
     />
   );
