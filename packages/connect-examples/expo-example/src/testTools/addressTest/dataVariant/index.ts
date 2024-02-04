@@ -33,6 +33,3 @@ export const batchTestCases: AddressBatchTestCase[] = [
     ...batchAddressTestCount18Three,
     ...batchAddressTestCount24Three,
 ];
-
-
-

@@ -14,6 +14,6 @@ export const singleAddressTestCount18Two = [
 export const batchAddressTestCount18Two = [
   convertTestBatchData(normal),
   convertTestBatchData(passphraseEmpty),
-  convertTestSingleData(passphrase1),
-  convertTestSingleData(passphrase2),
+  convertTestBatchData(passphrase1),
+  convertTestBatchData(passphrase2),
 ];

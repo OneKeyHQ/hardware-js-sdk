@@ -3,7 +3,7 @@ import type { AddressTestCaseData } from '../types';
 
 export default {
   name: 'one-passphrase12-密语1',
-  passphrase: '12345',
+  passphrase: '12345',  
   passphraseState: 'mwfiTkMnz8ed9txm7yybKCqRr4bndeTohm',
   description: '助记词详见 https://onekeyhq.atlassian.net/wiki/spaces/ONEKEY/pages/429162680',
   data: [

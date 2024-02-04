@@ -503,6 +503,5 @@ export default {
         "2147483647": "TUKjDFGmLHw6NLbYuy4bpt2d6MBpKYtiYR"
       }
     }
-
   ],
 } as AddressTestCaseData;

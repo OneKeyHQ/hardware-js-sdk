@@ -6,19 +6,6 @@ export default {
   passphraseState: 'n2XDwPTRoTrLUxu25L6XDnyDBuDeXhjmoz',
   description: '助记词详见 https://onekeyhq.atlassian.net/wiki/spaces/ONEKEY/pages/432046239',
   data: [
-    // {
-    //   method: 'btcGetAddress',
-    //   name: 'btcGetAddress-Legacy',
-    //   params: {
-    //     path: "m/44'/0'/$$INDEX$$'/$$CHANGE$$/$$ADDRESS_INDEX$$",
-    //   },
-    //   expectedAddress: {
-    //     '0/C1/A200': '1G4suo2srsQArAeangYCU31cWtb8qTH5ZY',
-    //     '30/C0/A2': '19Pu9isUTWaFqA2JY3Mu1Lb85RjSw7xusz',
-    //     '20/C1/A2': '1Cc9TYjGwWL2iuvZyZmpoE7o1R4JC5qouB',
-    //     '2147483646/C1/A2': '1MnbeVTHPfv2Uuo6RA7SXfLDEQzzoWExE2',
-    //   },
-    // },
     {
       "method": "btcGetAddress",
       "name": "btcGetAddress-Legacy",
@@ -84,7 +71,7 @@ export default {
         "8974594/A2147483647": "3JL6TP3aq25PZkbK5Qo7Zto928EJsCuMKu",
         "8974594/A1": "3PdRi6nTB3kFnkhHk6rgtiLrBkZVkUqD4L",
         "8974594/A2147483646": "3HvWrnSWcTdJ99b6XT974F7eGctaYA5ufz",
-        "8974594/A45656668": "399qjtGfdqZwJeeghHF1v6oinVELeR9Yrp" 
+        "8974594/A45656668": "399qjtGfdqZwJeeghHF1v6oinVELeR9Yrp"
       }
     },
     {
@@ -152,7 +139,7 @@ export default {
         "8974594/A2147483647": "bc1pmznm78fjl86f3c8a483zft9ch83re7a5v0umpdx0rl8lxwakuz3qa0w2vh",
         "8974594/A1": "bc1p0lc3cnv935yey5t4ld5lkmkv3v8zzn754dfya844qd3ntgdm4huq7rme3w",
         "8974594/A2147483646": "bc1pkt95j5xj78f8hsr5yjkrfkp6njk9nmyxcf72t0gp8j50m04qwrrs7zsp8y",
-        "8974594/A45656668": "bc1pqs5v64slrp0xr73nfltxskj0txfgr73e5k5nlg7de48t6f3zy79sr0eyd3" 
+        "8974594/A45656668": "bc1pqs5v64slrp0xr73nfltxskj0txfgr73e5k5nlg7de48t6f3zy79sr0eyd3"
       }
     }
   ],
