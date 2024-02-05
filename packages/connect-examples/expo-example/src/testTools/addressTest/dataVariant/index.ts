@@ -11,25 +11,25 @@ import { AddressBatchTestCase, AddressTestCase } from '../types';
 // import { singleAddressTestCount12Two } from './count12_two';
 
 export const testCases: AddressTestCase[] = [
-    ...singleAddressTestCount12One,
-    ...singleAddressTestCount18One,
-    ...singleAddressTestCount24One,
-    ...singleAddressTestCount12Two,
-    ...singleAddressTestCount18Two,
-    ...singleAddressTestCount24Two,
-    ...singleAddressTestCount12Three,
-    ...singleAddressTestCount18Three,
-    ...singleAddressTestCount24Three,
+  ...singleAddressTestCount12One,
+  ...singleAddressTestCount18One,
+  ...singleAddressTestCount24One,
+  ...singleAddressTestCount12Two,
+  ...singleAddressTestCount18Two,
+  ...singleAddressTestCount24Two,
+  ...singleAddressTestCount12Three,
+  ...singleAddressTestCount18Three,
+  ...singleAddressTestCount24Three,
 ];
 
 export const batchTestCases: AddressBatchTestCase[] = [
-    ...batchAddressTestCount12One,
-    ...batchAddressTestCount18One,
-    ...batchAddressTestCount24One,
-    ...batchAddressTestCount12Two,
-    ...batchAddressTestCount18Two,
-    ...batchAddressTestCount24Two,
-    ...batchAddressTestCount12Three,
-    ...batchAddressTestCount18Three,
-    ...batchAddressTestCount24Three,
+  ...batchAddressTestCount12One,
+  ...batchAddressTestCount18One,
+  ...batchAddressTestCount24One,
+  ...batchAddressTestCount12Two,
+  ...batchAddressTestCount18Two,
+  ...batchAddressTestCount24Two,
+  ...batchAddressTestCount12Three,
+  ...batchAddressTestCount18Three,
+  ...batchAddressTestCount24Three,
 ];

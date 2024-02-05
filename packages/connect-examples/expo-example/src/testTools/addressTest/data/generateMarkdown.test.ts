@@ -1,4 +1,4 @@
-import { singleAddressTestCount24Two } from './count24_two';
+import { singleAddressTestCount24Two as AddressTestData } from './count24_two';
 
 function getTestChainName(chain?: string, name?: string) {
   if (chain) {
@@ -27,7 +27,7 @@ function getTestChainName(chain?: string, name?: string) {
 
 describe('generate markdown', () => {
   it('run', () => {
-    const testDataList = singleAddressTestCount24Two.splice(1);
+    const testDataList = AddressTestData.splice(1);
 
     const data = testDataList[0];
     const caseSize = testDataList.length;
