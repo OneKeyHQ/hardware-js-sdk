@@ -58,18 +58,6 @@ export default function AddressTestScreen() {
               testCases={batchVariantAddressTestCases}
             />
           </View>
-          <View style={styles.container}>
-            <TestSinglePubkey
-              title="Single Variant Pubkey Test"
-              testCases={pubkeyVariantTestCases}
-            />
-          </View>
-          <View style={styles.container}>
-            <TestBatchPubkey
-              title="Batch Variant Pubkey Test"
-              testCases={batchVariantPubkeyTestCases}
-            />
-          </View>
         </DeviceProvider>
       </View>
       {/* </View> */}
