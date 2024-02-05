@@ -6,7 +6,7 @@ import { Picker } from '@react-native-picker/picker';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { PubkeyBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
-import passphraseTestCase from './data/count24_two/passphrase_empty';
+import passphraseTestCase from './data/count12_three/passphrase12_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';

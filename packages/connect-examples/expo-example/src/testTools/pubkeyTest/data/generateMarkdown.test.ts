@@ -1,4 +1,4 @@
-import { singlePubkeyTestCount24Two } from './count24_two';
+import { singlePubkeyTestCount12Three as testData } from './count12_three';
 
 function getTestChainName(chain?: string, name?: string) {
   if (chain) {
@@ -26,7 +26,7 @@ function getTestChainName(chain?: string, name?: string) {
 }
 
 function getFields(result: any, prefix = '') {
-  if (!result) return '';
+  if (result == null || !result) return '';
   let error = '';
   for (const fieldKey of Object.keys(result)) {
     const fullPath = prefix ? `${prefix}.${fieldKey}` : fieldKey;
@@ -43,7 +43,7 @@ function getFields(result: any, prefix = '') {
 
 describe('generate markdown', () => {
   it('run', () => {
-    const testDataList = singlePubkeyTestCount24Two.splice(1);
+    const testDataList = testData.splice(1);
 
     const data = testDataList[0];
     const caseSize = testDataList.length;
@@ -72,7 +72,7 @@ describe('generate markdown', () => {
       let row = `| ${title} | ${path} |`;
 
       testDataList.forEach(item => {
-        const other = getFields(item.data[index].result);
+        const other = getFields(item?.data[index]?.result);
         row += ` ${other} |`;
       });
 
