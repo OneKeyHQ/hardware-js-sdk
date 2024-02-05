@@ -22,7 +22,7 @@ jobs:
         run: |
           yarn build
           cd packages/connect-examples/expo-example
-          npx expo export:web
+          yarn expo export:web
 
       - name: Deploy Github Pages
         uses: peaceiris/actions-gh-pages@v3
