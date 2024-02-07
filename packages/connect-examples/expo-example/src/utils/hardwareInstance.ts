@@ -34,12 +34,21 @@ export const getHardwareSDKInstance = memoizee(
         // HardwareSDK = await importTopLevelSdk();
         console.log(HardwareSDK);
 
+        console.log('=====>>>>> current dir:', __dirname);
         if (Platform.OS === 'web') {
           settings.connectSrc = 'https://jssdk.onekey.so/0.3.39/';
           // settings.connectSrc = 'https://localhost:8087/';
           settings.env = 'web';
           settings.preRelease = false;
           // HardwareLowLevelSDK = await importLowLevelSDK();
+
+          // Override Connect src
+          const { sdkConnectSrc } = window.ONEKEY_DESKTOP_GLOBALS ?? {};
+          if (sdkConnectSrc) {
+            settings.connectSrc = sdkConnectSrc;
+          }
+
+          console.log('======>>>>> Hardware SDK Init ConnectSrc:', settings.connectSrc);
         }
 
         try {
