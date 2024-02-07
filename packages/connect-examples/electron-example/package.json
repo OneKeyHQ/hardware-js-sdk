@@ -5,33 +5,35 @@
   "version": "0.0.1",
   "description": "End-to-end encrypted workspaces for teams",
   "main": "dist/index.js",
-  "license":"GPL-3.0-only",
+  "license": "GPL-3.0-only",
   "scripts": {
     "build-electron-web": "yarn build:main && cd ../expo-example && yarn build:electron-web && cd -",
     "dev-electron-web": "yarn && yarn build:main && cd ../expo-example && yarn dev:electron-web && cd -",
-    "dev": "yarn && npx concurrently \"NODE_ENV=development electron-forge start\" \"yarn dev-electron-web\"",
+    "dev": "yarn && npx concurrently \"NODE_ENV=development yarn dev:electron-forge\" \"yarn dev-electron-web\"",
+    "dev:electron": "electron --inspect=5858 dist/index.js",
+    "dev:electron-forge": "electron-forge start",
     "build:package": "yarn build-electron-web && electron-forge package",
-    "build:package:only": "electron-forge package",
+    "build:electron": "yarn build-electron-web && electron-builder build -mwl --config electron-builder.config.js",
     "build:main": "rm -rf ./dist && cross-env NODE_ENV=production node scripts/build.js",
     "make": "electron-forge make",
-    "publish": "electron-forge publish",
     "lint": "eslint --ext .tsx --ext .ts ./",
     "test": "echo 'Nothing to test'",
     "ts:check": "yarn tsc --noEmit"
   },
   "dependencies": {
+    "debug": "4.3.4",
     "electron-squirrel-startup": "^1.0.0",
-    "node-fetch": "^2.6.7",
-    "debug": "4.3.4"
+    "node-fetch": "^2.6.7"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
-    "esbuild": "^0.15.11",
     "@electron-forge/cli": "^6.0.4",
     "@electron-forge/maker-deb": "^6.0.4",
     "@electron-forge/maker-rpm": "^6.0.4",
     "@electron-forge/maker-squirrel": "^6.0.4",
     "@electron-forge/maker-zip": "^6.0.4",
-    "electron": "^22.0.0"
+    "cross-env": "^7.0.3",
+    "electron": "^22.0.0",
+    "electron-builder": "^24.9.1",
+    "esbuild": "^0.15.11"
   }
 }
