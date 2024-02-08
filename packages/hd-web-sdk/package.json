@@ -11,10 +11,10 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/dev.webpack.config.ts",
+    "dev": "rimraf build && cross-env TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/dev.webpack.config.ts",
     "build:lib": "rimraf ./dist && tsc --build tsconfig.json",
-    "build:iframe": "TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/iframe.webpack.config.ts",
-    "build:sdk": "rimraf build && TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
+    "build:iframe": "cross-env TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/iframe.webpack.config.ts",
+    "build:sdk": "rimraf build && cross-env TS_NODE_PROJECT=\"../../tsconfig.webpack.json\" webpack --config ./webpack/prod.webpack.config.ts",
     "build": "yarn build:sdk && yarn build:iframe && yarn build:lib",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
