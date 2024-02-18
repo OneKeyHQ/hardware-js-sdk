@@ -21,6 +21,7 @@ jobs:
         yarn
         yarn bootstrap
         yarn build
+        cd packages/connect-examples/electron-example && yarn
 
     - name: Build Application
       run: yarn build:desktop

@@ -9,8 +9,7 @@ module.exports = {
   packagerConfig: {
     name: 'HardwareExample',
     appBundleId: 'so.onekey.example.hardware-desktop',
-    executableName:
-      process.platform === 'linux' ? 'onekey-hardware-example' : 'onekeyHardwareExample',
+    executableName: process.platform === 'linux' ? 'onekey-hardware-example' : 'HardwareExample',
     appCategoryType: 'public.app-category.developer-tools',
     appCopyright: 'Copyright 2024 OneKey Ltd',
     icon: path.resolve(__dirname, 'public', 'icons', 'icon'),
@@ -30,6 +29,10 @@ module.exports = {
         case 'win32':
           originDir = path.resolve(buildPath, 'public', 'bin', 'bridge', 'win-x64');
           binName = 'onekeyd.exe';
+          break;
+        case 'linux':
+          originDir = path.resolve(buildPath, 'public', 'bin', 'bridge', `linux-${arch}`);
+          binName = 'onekeyd';
           break;
         default:
           originDir = '';
@@ -54,12 +57,8 @@ module.exports = {
   },
   makers: [
     {
-      name: '@electron-forge/maker-squirrel',
-      config: {},
-    },
-    {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
+      platforms: ['darwin', 'win32'],
     },
     {
       name: '@electron-forge/maker-deb',

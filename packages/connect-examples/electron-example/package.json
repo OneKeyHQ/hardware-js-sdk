@@ -14,9 +14,8 @@
     "dev:electron": "electron --inspect=5858 dist/index.js",
     "dev:electron-forge": "electron-forge start",
     "build:package": "yarn build-electron-web && electron-forge package",
-    "build:electron": "yarn build-electron-web && electron-builder build -mwl --config electron-builder.config.js",
     "build:main": "rimraf ./dist && cross-env NODE_ENV=production node scripts/buildMain.js",
-    "make": "electron-forge make",
+    "make": "yarn build-electron-web && electron-forge make",
     "lint": "eslint --ext .tsx --ext .ts ./",
     "test": "echo 'Nothing to test'",
     "ts:check": "yarn tsc --noEmit"
@@ -34,7 +33,6 @@
     "@electron-forge/maker-zip": "^6.0.4",
     "cross-env": "^7.0.3",
     "electron": "^22.0.0",
-    "electron-builder": "^24.9.1",
     "esbuild": "^0.15.11"
   }
 }
