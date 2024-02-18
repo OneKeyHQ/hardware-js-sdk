@@ -33,7 +33,7 @@
     "copy:inject": "node scripts/copy-injected.js",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
     "example:desktop": "yarn copy:inject && cd ./packages/connect-examples/electron-example && yarn dev",
-    "build:desktop": "yarn copy:inject && cd ./packages/connect-examples/electron-example && yarn build:package",
+    "build:desktop": "yarn copy:inject && cd ./packages/connect-examples/electron-example && yarn make",
     "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
     "dev:ble": "cd ./packages/hd-ble-sdk && yarn dev",
     "dev:core": "cd ./packages/core && yarn dev",
