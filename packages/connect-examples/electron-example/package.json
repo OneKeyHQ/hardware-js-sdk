@@ -8,9 +8,9 @@
   "main": "dist/index.js",
   "license": "GPL-3.0-only",
   "scripts": {
-    "build-electron-web": "yarn && node scripts/buildElectronWeb.js build",
-    "dev-electron-web": "yarn && node scripts/buildElectronWeb.js dev",
-    "dev": "yarn && npx concurrently \"cross-env NODE_ENV=development yarn dev:electron-forge\" \"yarn dev-electron-web\"",
+    "build-electron-web": "node scripts/buildElectronWeb.js build",
+    "dev-electron-web": "node scripts/buildElectronWeb.js dev",
+    "dev": "npx concurrently \"cross-env NODE_ENV=development yarn dev:electron-forge\" \"yarn dev-electron-web\"",
     "dev:electron": "electron --inspect=5858 dist/index.js",
     "dev:electron-forge": "electron-forge start",
     "build:package": "yarn build-electron-web && electron-forge package",
@@ -22,17 +22,15 @@
   },
   "dependencies": {
     "debug": "4.3.4",
-    "electron-squirrel-startup": "^1.0.0",
     "node-fetch": "^2.6.7"
   },
   "devDependencies": {
-    "@electron-forge/cli": "^6.0.4",
-    "@electron-forge/maker-deb": "^6.0.4",
-    "@electron-forge/maker-rpm": "^6.0.4",
-    "@electron-forge/maker-squirrel": "^6.0.4",
-    "@electron-forge/maker-zip": "^6.0.4",
+    "@electron-forge/cli": "^7.2.0",
+    "@electron-forge/maker-deb": "^7.2.0",
+    "@electron-forge/maker-rpm": "^7.2.0",
+    "@electron-forge/maker-zip": "^7.2.0",
     "cross-env": "^7.0.3",
-    "electron": "^22.0.0",
+    "electron": "^28.0.0",
     "esbuild": "^0.15.11"
   }
 }

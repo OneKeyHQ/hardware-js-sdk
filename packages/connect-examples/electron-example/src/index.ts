@@ -92,11 +92,6 @@ if (!isDevelopment) {
   serve(path.join('web-build'));
 }
 
-// handle creating/removing shortcuts on Windows when installing/uninstalling
-// if (require('electron-squirrel-startup')) {
-//   app.quit();
-// }
-
 const createWindow = () => {
   const display = screen.getPrimaryDisplay();
   const dimensions = display.workAreaSize;
@@ -148,63 +143,14 @@ const createWindow = () => {
 
       callback({ cancel: false, requestHeaders: details.requestHeaders });
     });
-
-    // const webviewSession = session.fromPartition('webview');
-
-    // webviewSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    //   const permissionBlackList = ['media', 'geolocation'];
-    //   if (permissionBlackList.includes(permission)) {
-    //     callback(false);
-    //   } else {
-    //     callback(true);
-    //   }
-    // });
-
-    // if (!isDevelopment) {
-    //   const PROTOCOL = 'file';
-    //   session.defaultSession.protocol.interceptFileProtocol(PROTOCOL, (request, callback) => {
-    //     const isJsSdkFile = request.url.indexOf('/public/js-sdk') > -1;
-    //     const isIFrameHtml = request.url.indexOf('/public/js-sdk/iframe.html') > -1;
-
-    //     // resolve iframe path
-    //     if (isJsSdkFile && isIFrameHtml) {
-    //       callback({
-    //         path: path.join(__dirname, '..', 'public', 'js-sdk', 'iframe.html'),
-    //       });
-    //       return;
-    //     }
-
-    //     // move to parent folder
-    //     let url = request.url.substr(PROTOCOL.length + 1);
-    //     url = path.join(__dirname, '..', 'build', url);
-    //     callback(url);
-    //   });
-    //   mainWindow.webContents.on('did-fail-load', (_, __, ___, validatedURL) => {
-    //     const redirectPath = validatedURL.replace(`${PROTOCOL}://`, '');
-    //     if (validatedURL.startsWith(PROTOCOL) && !redirectPath.includes('.')) {
-    //       // mainWindow.loadURL(src);
-    //     }
-    //   });
-    // }
   }
 
   mainWindow.show();
-
-  console.log('=====>>>>> loading web-build', __dirname);
 
   if (isDevelopment) {
     mainWindow.loadURL(`http://localhost:19006`);
     mainWindow.webContents.openDevTools();
   } else {
-    // mainWindow.loadURL(
-    //   url.format({
-    //     // pathname: path.join(__dirname, 'public/static/web-build/index.html'),
-    //     pathname: path.join(__dirname, 'index.html'),
-    //     protocol: 'file:',
-    //     slashes: true,
-    //   })
-    // );
-    // mainWindow.loadFile('web-build/index.html');
     mainWindow.loadURL(`${scheme}://${root}`);
   }
 };

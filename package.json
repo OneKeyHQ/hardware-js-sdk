@@ -7,18 +7,21 @@
     "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
   },
   "author": "OneKey",
-  "workspaces": [
-    "packages/*",
-    "packages/connect-examples/expo-example"
-  ],
-  "nohoist": [
-    "**/electron",
-    "**/electron/**",
-    "**/electron-squirrel-startup",
-    "**/electron-squirrel-startup/**",
-    "**/@electron-forge",
-    "**/@electron-forge/**"
-  ],
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "packages/connect-examples/expo-example",
+      "packages/connect-examples/electron-example"
+    ],
+    "nohoist": [
+      "**/electron",
+      "**/electron/**",
+      "**/@electron",
+      "**/@electron/**",
+      "**/@electron-forge",
+      "**/@electron-forge/**"
+    ]
+  },
   "scripts": {
     "bootstrap": "lerna bootstrap",
     "build": "lerna run build",
@@ -33,7 +36,7 @@
     "copy:inject": "node scripts/copy-injected.js",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
     "example:desktop": "yarn copy:inject && cd ./packages/connect-examples/electron-example && yarn dev",
-    "build:desktop": "yarn copy:inject && cd ./packages/connect-examples/electron-example && yarn make",
+    "build:example:desktop": "yarn copy:inject && cd ./packages/connect-examples/electron-example && yarn make",
     "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
     "dev:ble": "cd ./packages/hd-ble-sdk && yarn dev",
     "dev:core": "cd ./packages/core && yarn dev",

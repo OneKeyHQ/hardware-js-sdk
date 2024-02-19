@@ -12,9 +12,8 @@ const commands = {
   dev: {
     main: 'yarn build:main',
     electronWeb: 'yarn dev:electron-web',
-  }
+  },
 };
-
 
 const rootDir = process.cwd();
 const expoExampleDir = path.join(rootDir, '../expo-example');
@@ -28,7 +27,6 @@ function runCommand(command, cwd) {
     process.exit(1);
   }
 }
-
 
 if (commands[commandToRun]) {
   runCommand(commands[commandToRun].main, rootDir);

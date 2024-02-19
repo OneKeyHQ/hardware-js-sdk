@@ -18,13 +18,10 @@ jobs:
 
     - name: Install dependencies
       run: |
-        yarn
-        yarn bootstrap
-        yarn build
-        cd packages/connect-examples/electron-example && yarn
+        yarn setup
 
     - name: Build Application
-      run: yarn build:desktop
+      run: yarn build:example:desktop
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
