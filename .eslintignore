@@ -3,7 +3,9 @@ lib/
 dist/
 example/
 packages/**/dist/
+packages/**/out/
 packages/**/web-build/
 submodules/
 packages/**/coverage/
 packages/hd-transport/scripts/protobuf-patches/
+packages/connect-examples/electron-example/public/

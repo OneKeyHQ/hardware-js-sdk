@@ -92,6 +92,18 @@ if (!isDevelopment) {
   serve(path.join('web-build'));
 }
 
+function showMainWindow() {
+  if (!mainWindow) {
+    return;
+  }
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function quitOrMinimizeApp(event?: Event) {
+  app.quit();
+}
+
 const createWindow = () => {
   const display = screen.getPrimaryDisplay();
   const dimensions = display.workAreaSize;
@@ -127,11 +139,7 @@ const createWindow = () => {
     });
 
     const filter = {
-      urls: [
-        'http://127.0.0.1:21320/*',
-        'http://localhost:21320/*',
-        'https://mainnet.optimism.io/*',
-      ],
+      urls: ['http://127.0.0.1:21320/*', 'http://localhost:21320/*'],
     };
 
     session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
@@ -166,16 +174,13 @@ app.on('ready', () => {
 // wuit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+app.on('window-all-closed', (event: Event) => {
+  quitOrMinimizeApp(event);
 });
 
 app.on('activate', () => {
-  // on OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open
-  if (BrowserWindow.getAllWindows().length === 0) {
+  if (!mainWindow) {
     createWindow();
   }
+  showMainWindow();
 });
