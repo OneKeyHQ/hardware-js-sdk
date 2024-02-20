@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Text, View } from 'react-native';
+
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 
+import { Stack, Text, View } from 'tamagui';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { AddressBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
@@ -11,6 +12,7 @@ import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import { Button } from '../../components/ui/Button';
 
 type TestCaseDataType = AddressBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -20,11 +22,11 @@ function ResultView({ item }: ResultViewProps) {
 
   return (
     <>
-      <View style={{ flexDirection: 'row' }}>
-        <Text>{title}</Text>
+      <View flexDirection="row">
+        <Text fontSize={14}>{title}</Text>
       </View>
       {Object.keys(item?.result).map(key => (
-        <Text key={key}>
+        <Text fontSize={14} key={key}>
           {key}: {item?.result[key].address}
         </Text>
       ))}
@@ -58,7 +60,9 @@ function ExportReportView() {
   });
 
   if (showExportReport) {
-    return <Button title="Export Report" onPress={exportReport} />;
+    <Button variant="primary" onPress={exportReport}>
+      Export Report
+    </Button>;
   }
 
   return null;
@@ -242,13 +246,9 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
   const contentMemo = useMemo(
     () => (
       <>
-        <Text style={{ fontSize: 14, paddingTop: 8, paddingBottom: 8 }}>{testDescription}</Text>
-        {!!passphrase && (
-          <Text style={{ fontSize: 14, paddingTop: 8, paddingBottom: 8 }}>
-            Passphrase:「{passphrase}」
-          </Text>
-        )}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <Text paddingVertical="$2">{testDescription}</Text>
+        {!!passphrase && <Text paddingVertical="$2">Passphrase:「{passphrase}」</Text>}
+        <Stack flexDirection="row" flexWrap="wrap" gap="$2">
           <Picker
             selectedValue={currentTestCase?.name}
             onValueChange={itemValue => {
@@ -259,10 +259,14 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
-          <Button title="Start Test" onPress={beginTest} />
-          <Button title="Stop Test" onPress={stopTest} />
+          <Button variant="primary" onPress={beginTest}>
+            Start Test
+          </Button>
+          <Button variant="destructive" onPress={stopTest}>
+            Stop Test
+          </Button>
           <ExportReportView />
-        </View>
+        </Stack>
       </>
     ),
     [

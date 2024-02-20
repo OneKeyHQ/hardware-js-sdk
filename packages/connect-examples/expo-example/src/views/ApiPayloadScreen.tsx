@@ -1,21 +1,21 @@
-/* eslint-disable global-require, @typescript-eslint/no-var-requires */
-import React from 'react';
-import { View, StyleSheet, FlatList, Text } from 'react-native';
-import HandleSDKEvents from './HandleSDKEvents';
-import Playground, { PlaygroundProps } from './Playground';
+import React, { useEffect, useState } from 'react';
+import { FlatList } from 'react-native';
+import { Stack, XStack, YStack, useMedia } from 'tamagui';
+
+import PageView from '../components/ui/Page';
+import HandleSDKEvents from '../components/HandleSDKEvents';
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { CommonParamsProvider } from '../provider/CommonParamsProvider';
-import CommonParamsView from './CommonParamsView';
-import { CollapsibleSection } from './CollapsibleSection';
+import CommonParamsView from '../components/CommonParamsView';
+import UpdateFirmware from '../components/UpdateFirmware';
+import { UploadScreen } from '../components/UploadScreen';
 import { ExpandModeProvider } from '../provider/ExpandModeProvider';
-import { UploadScreen } from './UploadScreen';
-import UpdateFirmware from './UpdateFirmware';
+import { CollapsibleSection } from '../components/CollapsibleSection';
+import Playground, { PlaygroundProps as ApiPayloadProps } from '../components/Playground';
+import PanelView from '../components/ui/Panel';
 
+/* eslint-disable global-require, @typescript-eslint/no-var-requires */
 const playgroundConfig = [
-  {
-    title: 'Lightning Network API',
-    data: require('../data/lightning').default,
-  },
   {
     title: 'Basic API',
     data: require('../data/basic').default,
@@ -55,6 +55,10 @@ const playgroundConfig = [
   {
     title: 'Filecoin API',
     data: require('../data/filecoin').default,
+  },
+  {
+    title: 'Lightning Network API',
+    data: require('../data/lightning').default,
   },
   {
     title: 'Kaspa API',
@@ -106,8 +110,23 @@ const playgroundConfig = [
   },
 ];
 
-const PlaygroundManager = () => (
-  <View style={styles.container}>
+function renderItem({ item }: { item: { title: string; data: any } }) {
+  console.log();
+  return (
+    <CollapsibleSection title={item.title}>
+      <YStack flexDirection="column" $gtSm={{ flexDirection: 'row' }} flexWrap="wrap" gap="$2">
+        {item.data.map((data: React.JSX.IntrinsicAttributes & ApiPayloadProps) => (
+          <Stack key={data.method} width="100%" $gtSm={{ width: '50%' }} $gtLg={{ width: '33%' }}>
+            <Playground key={`payload-${data.method}`} {...data} />
+          </Stack>
+        ))}
+      </YStack>
+    </CollapsibleSection>
+  );
+}
+
+const ApiPayload = () => (
+  <Stack>
     <HandleSDKEvents />
     <DeviceProvider>
       <CommonParamsProvider>
@@ -115,37 +134,23 @@ const PlaygroundManager = () => (
         <UpdateFirmware />
         <UploadScreen />
         <ExpandModeProvider>
-          <FlatList
-            contentContainerStyle={styles.flatListContainer}
-            data={playgroundConfig}
-            keyExtractor={item => `playground-${item.title}`}
-            renderItem={({ item }) => (
-              <CollapsibleSection title={item.title}>
-                {item.data.map((data: React.JSX.IntrinsicAttributes & PlaygroundProps) => (
-                  <Playground key={data.method} {...data} />
-                ))}
-              </CollapsibleSection>
-            )}
-          />
+          <PanelView title="Hardware Api Test">
+            <FlatList
+              data={playgroundConfig}
+              keyExtractor={item => `playground-${item.title}`}
+              renderItem={renderItem}
+            />
+          </PanelView>
         </ExpandModeProvider>
       </CommonParamsProvider>
     </DeviceProvider>
-  </View>
+  </Stack>
 );
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-  flatListContainer: {
-    marginTop: 12,
-    marginBottom: 24,
-  },
-  header: {
-    fontWeight: 'bold',
-    fontSize: 24,
-    paddingVertical: 10,
-  },
-});
-
-export default PlaygroundManager;
+export default function ApiPayloadScreen() {
+  return (
+    <PageView>
+      <ApiPayload />
+    </PageView>
+  );
+}

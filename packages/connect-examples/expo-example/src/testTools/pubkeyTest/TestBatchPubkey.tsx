@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Text, View } from 'react-native';
+
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 
+import { Text, XStack } from 'tamagui';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { PubkeyBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
@@ -10,6 +11,7 @@ import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import { Button } from '../../components/ui/Button';
 
 type TestCaseDataType = PubkeyBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -40,7 +42,11 @@ function ExportReportView() {
   });
 
   if (showExportReport) {
-    return <Button title="Export Report" onPress={exportReport} />;
+    return (
+      <Button variant="primary" onPress={exportReport}>
+        Export Report
+      </Button>
+    );
   }
 
   return null;
@@ -56,7 +62,7 @@ const RenderNestedObject = ({ obj, parentKey = '' }: { obj: any; parentKey?: str
       }
 
       return (
-        <Text key={currentKey}>
+        <Text fontSize={14} key={currentKey}>
           {currentKey}: {value?.toString()}
         </Text>
       );
@@ -69,9 +75,9 @@ function ResultView({ item }: ResultViewProps) {
 
   return (
     <>
-      <View style={{ flexDirection: 'row' }}>
+      <XStack>
         <Text>{title}</Text>
-      </View>
+      </XStack>
       <RenderNestedObject obj={item.result} />
     </>
   );
@@ -314,13 +320,9 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
   const contentMemo = useMemo(
     () => (
       <>
-        <Text style={{ fontSize: 14, paddingTop: 8, paddingBottom: 8 }}>{testDescription}</Text>
-        {!!passphrase && (
-          <Text style={{ fontSize: 14, paddingTop: 8, paddingBottom: 8 }}>
-            Passphrase:「{passphrase}」
-          </Text>
-        )}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <Text paddingVertical="$2">{testDescription}</Text>
+        {!!passphrase && <Text paddingVertical="$2">Passphrase:「{passphrase}」</Text>}
+        <XStack flexWrap="wrap" gap="$2">
           <Picker
             selectedValue={currentTestCase?.name}
             onValueChange={itemValue => setCurrentTestCase(findTestCase(itemValue))}
@@ -329,10 +331,14 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
-          <Button title="Start Test" onPress={beginTest} />
-          <Button title="Stop Test" onPress={stopTest} />
+          <Button variant="primary" onPress={beginTest}>
+            Start Test
+          </Button>
+          <Button variant="destructive" onPress={stopTest}>
+            Stop Test
+          </Button>
           <ExportReportView />
-        </View>
+        </XStack>
       </>
     ),
     [

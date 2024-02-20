@@ -1,10 +1,10 @@
 import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Usb } from '@tamagui/lucide-icons';
 import { LowLevelCoreApi } from '@onekeyfe/hd-core/dist/lowLevelInject';
+import { Stack, Text } from 'tamagui';
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
-import PlaygroundManager from '../../components/PlaygroundManager';
 
 let isSdkInit = false;
 export default function USB({ children }: { children: React.ReactNode }) {
@@ -44,18 +44,13 @@ export default function USB({ children }: { children: React.ReactNode }) {
 
   return (
     <HardwareSDKContext.Provider value={contextValue}>
-      <View style={styles.container}>
-        <Text>This is USB example page, will run on desktop browser. </Text>
-        <Text>{showContent ? 'SDK loading complete' : 'SDK loading...'}</Text>
+      <Stack flex={1}>
+        <Stack flexDirection="row" gap="$2" paddingHorizontal="$2">
+          <Usb />
+          <Text>SDK {showContent ? 'Loading complete' : 'Loading...'}</Text>
+        </Stack>
         {children}
-        {/* {showContent && <CallMethods />} */}
-      </View>
+      </Stack>
     </HardwareSDKContext.Provider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-});

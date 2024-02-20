@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { createContext } from 'use-context-selector';
+import { createContext, useMemo, useState } from 'react';
+
 import type { Features } from '@onekeyfe/hd-transport';
 import type { TestCase, TestCaseDataWithKey } from '../types';
 

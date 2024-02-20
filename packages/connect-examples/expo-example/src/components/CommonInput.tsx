@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+
+import { Input, Label, Stack } from 'tamagui';
 
 export type CommonInputProps = {
   value: string;
@@ -18,31 +19,21 @@ export const CommonInput = ({ value, onChange, label, type }: CommonInputProps) 
     },
     [onChange, type]
   );
+  const id = `switch-${label ?? ''}}`;
 
   return (
-    <View>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
+    <Stack width={160} minHeight={45}>
+      <Label paddingRight="$0" justifyContent="center" htmlFor={id}>
+        {label}
+      </Label>
+      <Input
+        id={id}
+        size="$4"
+        height={34}
         keyboardType="numeric"
         value={value}
         onChangeText={onChangeCallback}
       />
-    </View>
+    </Stack>
   );
 };
-const styles = StyleSheet.create({
-  input: {
-    borderColor: '#E0E0E0',
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 6,
-    margin: 2,
-    fontSize: 16,
-  },
-  label: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-    fontSize: 14,
-  },
-});

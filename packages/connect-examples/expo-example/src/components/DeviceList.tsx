@@ -1,12 +1,18 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button, Platform } from 'react-native';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { H5, ListItem, Text, View } from 'tamagui';
+import { FlatList, Platform } from 'react-native';
+import { Check } from '@tamagui/lucide-icons';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
+import { Button } from './ui/Button';
+import PanelView from './ui/Panel';
 
 export type Device = {
   connectId: string;
   name: string;
   features?: any;
+  deviceType?: string;
 };
 
 const STORE_KEY = '@onekey/selectedId';
@@ -40,14 +46,21 @@ const removeSelectedId = async () => {
 type ItemProps = {
   item: Device;
   onPress: () => void;
-  backgroundColor: { backgroundColor: string };
-  textColor: { color: string };
+  connected: boolean;
 };
 
-const Item = ({ item, onPress, backgroundColor, textColor }: ItemProps) => (
-  <TouchableOpacity onPress={onPress} style={[styles.item, backgroundColor]}>
-    <Text style={[styles.title, textColor]}>{item.name}</Text>
-  </TouchableOpacity>
+const Item = ({ item, onPress, connected }: ItemProps) => (
+  <ListItem
+    onPress={onPress}
+    backgroundColor={connected ? '$bgInfo' : '$bgHover'}
+    icon={connected ? Check : undefined}
+    flexWrap="wrap"
+  >
+    <ListItem.Text>{item.name}</ListItem.Text>
+    <ListItem.Text>{item.deviceType}</ListItem.Text>
+    <ListItem.Text>{item.connectId}</ListItem.Text>
+    <Button onPress={onPress}>Connect</Button>
+  </ListItem>
 );
 
 type IDeviceListProps = {
@@ -97,8 +110,7 @@ export function DeviceList({ onSelected }: IDeviceListProps) {
   }, []);
 
   const renderItem = ({ item }: { item: Device }) => {
-    const backgroundColor = item.connectId === selectedId ? '#6e3b6e' : '#f9c2ff';
-    const color = item.connectId === selectedId ? 'white' : 'black';
+    const connected = item.connectId === selectedId;
 
     return (
       <Item
@@ -106,50 +118,26 @@ export function DeviceList({ onSelected }: IDeviceListProps) {
         onPress={() => {
           selectDevice(item);
         }}
-        backgroundColor={{ backgroundColor }}
-        textColor={{ color }}
+        connected={connected}
       />
     );
   };
 
   return (
-    <View style={styles.container}>
-      <Button title="Search Devices" onPress={searchDevices} />
-      <View style={styles.selectWrap}>
-        <Text>当前选择设备：{selectedId || '无'}</Text>
-        <Button title="清除" onPress={handleRemoveSelected} />
+    <PanelView>
+      <View flexDirection="row" justifyContent="space-between" flexWrap="wrap">
+        <Text fontSize={15}>当前选择设备：{selectedId || '无'}</Text>
+        <Button onPress={handleRemoveSelected}>清除</Button>
       </View>
+      <Button onPress={searchDevices}>
+        <H5>Search Devices</H5>
+      </Button>
       <FlatList
         data={devices}
         renderItem={renderItem}
         keyExtractor={item => item.connectId}
         extraData={selectedId}
       />
-    </View>
+    </PanelView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-  },
-  item: {
-    backgroundColor: '#f9c2ff',
-    padding: 20,
-    marginVertical: 8,
-    marginHorizontal: 16,
-  },
-  title: {
-    fontSize: 16,
-  },
-  selectWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10,
-  },
-});

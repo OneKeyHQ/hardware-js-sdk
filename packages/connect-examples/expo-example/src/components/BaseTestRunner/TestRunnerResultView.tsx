@@ -1,9 +1,11 @@
-import { useContextSelector } from 'use-context-selector';
-import { memo, useMemo } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
-import { TestRunnerContext } from './Context/TestRunnerProvider';
+import { memo, useContext, useEffect, useMemo } from 'react';
+
+import { Stack, Text, XStack } from 'tamagui';
+import { useAtomValue } from 'jotai';
+
 import { TestCaseDataWithKey } from './types';
-import { TestRunnerVerifyContext } from './Context/TestRunnerVerifyProvider';
+import { selectedItemVerifyStateAtom as createSelectedItemVerifyStateAtom } from './Context/TestRunnerVerifyProvider';
+import { TestRunnerContext } from './Context/TestRunnerProvider';
 
 export type TestItemViewProps = {
   item: TestCaseDataWithKey;
@@ -11,17 +13,22 @@ export type TestItemViewProps = {
 };
 
 const TestItemView = ({ item, renderResultView }: TestItemViewProps) => {
-  const itemVerifyState = useContextSelector(
-    TestRunnerVerifyContext,
-    v => v.itemVerifyState?.[item.$key]
+  const selectedItemVerifyStateAtom = useMemo(
+    () => createSelectedItemVerifyStateAtom(item.$key),
+    [item.$key]
   );
+  const itemVerifyState = useAtomValue(selectedItemVerifyStateAtom);
 
   const verifyState = useMemo(() => itemVerifyState?.verify ?? 'none', [itemVerifyState]);
   const errorState = useMemo(() => itemVerifyState?.error ?? '', [itemVerifyState]);
 
   const errorStateViewMemo = useMemo(() => {
     if (!errorState) return null;
-    return <Text style={{ color: 'red' }}>error: {errorState}</Text>;
+    return (
+      <Text fontSize={14} color="red">
+        error: {errorState}
+      </Text>
+    );
   }, [errorState]);
 
   const verifyStateViewMemo = useMemo(() => {
@@ -37,36 +44,26 @@ const TestItemView = ({ item, renderResultView }: TestItemViewProps) => {
     }
 
     return (
-      <Text
-        style={{
-          width: 80,
-          color,
-          fontWeight: 'bold',
-        }}
-      >
+      <Text width={80} color={color} fontWeight="bold">
         {verifyState}
       </Text>
     );
   }, [verifyState]);
 
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 8,
-        paddingBottom: 8,
-        gap: 8,
-        borderColor: '#E0E0E0',
-        borderWidth: 1,
-      }}
+    <XStack
+      alignItems="center"
+      paddingVertical="$2"
+      gap="$2"
+      borderColor="$border"
+      borderWidth="$px"
     >
       {verifyStateViewMemo}
-      <View>
+      <Stack flex={1}>
         {renderResultView(item)}
         {errorStateViewMemo}
-      </View>
-    </View>
+      </Stack>
+    </XStack>
   );
 };
 
@@ -75,36 +72,18 @@ const TestItemViewMemo = memo(TestItemView);
 export type TestRunnerResultViewProps = Omit<TestItemViewProps, 'item'>;
 
 export function TestRunnerResultView({ renderResultView }: TestRunnerResultViewProps) {
-  const itemValues = useContextSelector(TestRunnerContext, v => v.itemValues);
+  const { itemValues } = useContext(TestRunnerContext);
 
   const resultViewMemo = useMemo(
     () => (
-      <View style={styles.fullItem}>
+      <Stack width="100%">
         {itemValues.map(item => (
           <TestItemViewMemo renderResultView={renderResultView} key={item.$key} item={item} />
         ))}
-      </View>
+      </Stack>
     ),
     [itemValues, renderResultView]
   );
 
   return resultViewMemo;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-  subContainer: {
-    width: '100%',
-    marginTop: 16,
-    padding: 10,
-    backgroundColor: '#FFF',
-    borderColor: '#E0E0E0',
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  fullItem: {
-    width: '100%',
-  },
-});

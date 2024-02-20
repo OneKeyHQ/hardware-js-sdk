@@ -2,9 +2,10 @@ import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect } from 'react';
 import { PermissionsAndroid, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Stack } from 'tamagui';
+import { BluetoothSearching } from '@tamagui/lucide-icons';
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
-import PlaygroundManager from '../../components/PlaygroundManager';
 
 let isSdkInit = false;
 
@@ -80,12 +81,13 @@ export default function Bluetooth({ children }: { children: React.ReactNode }) {
 
   return (
     <HardwareSDKContext.Provider value={contextValue}>
-      <>
-        <Text>This is Bluetooth example page, will run on iOS / Android device. </Text>
-        <Text>{sdk ? 'SDK loading complete' : 'SDK loading...'}</Text>
-        {/* {!!sdk && <CallMethods />} */}
+      <Stack flex={1}>
+        <Stack flexDirection="row" gap="$2" paddingHorizontal="$2">
+          <BluetoothSearching />
+          <Text>{sdk ? 'SDK loading complete' : 'SDK loading...'}</Text>
+        </Stack>
         {children}
-      </>
+      </Stack>
     </HardwareSDKContext.Provider>
   );
 }

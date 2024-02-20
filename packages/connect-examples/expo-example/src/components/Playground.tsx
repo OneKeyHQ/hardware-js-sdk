@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { Group, H4, Stack, Text } from 'tamagui';
 import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
+import { Button } from './ui/Button';
+import AutoExpandingTextArea from './ui/AutoExpandingTextArea';
 
 export interface PresupposeProps {
   title: string;
@@ -50,12 +52,19 @@ const Playground = ({
 
   const HeaderView = useMemo(
     () => (
-      <Text
+      <Stack
+        padding="$2"
+        height="$14"
+        borderColor="$border"
+        backgroundColor="$bgInfo"
+        flexDirection="row"
+        alignItems="center"
         onPress={() => setIsExpanded(!isExpanded)}
-        style={deprecated ? styles.deprecatedHeader : styles.header}
       >
-        {` ${!!isExpanded || !!isExpandMode ? '-' : '+'} ${method}`}
-      </Text>
+        <H4 fontWeight="bold" textDecorationLine={deprecated ? 'line-through' : 'none'}>
+          {` ${!!isExpanded || !!isExpandMode ? '-' : '+'} ${method}`}
+        </H4>
+      </Stack>
     ),
     [deprecated, isExpandMode, isExpanded, method]
   );
@@ -64,16 +73,18 @@ const Playground = ({
     if (presupposes && presupposes.length > 0) {
       return (
         <>
-          <Text style={styles.subheader}>Default parameters</Text>
-          <View style={styles.features}>
+          <Text fontSize={16} fontWeight="bold">
+            Default parameters
+          </Text>
+          <Group orientation="horizontal" paddingHorizontal="$2" flexWrap="wrap">
             {presupposes.map((presuppose, index) => (
-              <Button
-                key={presuppose.title}
-                title={presuppose.title}
-                onPress={fillParameterCallback(index)}
-              />
+              <Group.Item>
+                <Button key={presuppose.title} onPress={fillParameterCallback(index)}>
+                  {presuppose.title}
+                </Button>
+              </Group.Item>
             ))}
-          </View>
+          </Group>
         </>
       );
     }
@@ -83,13 +94,17 @@ const Playground = ({
   const RequestParamsView = useMemo(
     () => (
       <>
-        <Text style={styles.subheader}>Parameters</Text>
-        <TextInput
-          style={presupposes && presupposes.length > 0 ? styles.input : styles.emptyInput}
+        <Text fontSize={16} fontWeight="bold">
+          Parameters
+        </Text>
+        <AutoExpandingTextArea
+          marginHorizontal="$2"
+          lineHeight={1}
+          fontSize={14}
+          minHeight={presupposes && presupposes.length > 0 ? 140 : 40}
           onChangeText={setParams}
           value={params}
           placeholder="Enter your parameters here..."
-          multiline
         />
       </>
     ),
@@ -102,22 +117,27 @@ const Playground = ({
 
   const ResponseView = useMemo(
     () => (
-      <>
-        <View style={styles.subheader}>
-          <Text style={styles.subheaderText}>Response</Text>
-          <TouchableOpacity onPress={copyResponse}>
-            <Text style={styles.copyButton}>Copy</Text>
-          </TouchableOpacity>
-        </View>
-        <TextInput
-          style={[styles.input, styles.responseInput]}
+      <Stack>
+        <Stack flexDirection="row" justifyContent="space-between">
+          <Text fontSize={16} fontWeight="bold" marginTop="$1">
+            Response
+          </Text>
+          <Button onPress={copyResponse}>
+            <Text color="$textInfo">Copy</Text>
+          </Button>
+        </Stack>
+        <AutoExpandingTextArea
+          marginHorizontal="$2"
+          marginBottom="$2"
+          lineHeight={1}
+          fontSize={13}
+          minHeight={350}
           onChangeText={setResponse}
           value={response}
           placeholder="Response will be shown here."
-          multiline
           editable={false}
         />
-      </>
+      </Stack>
     ),
     [copyResponse, response]
   );
@@ -149,89 +169,21 @@ const Playground = ({
   );
 
   return (
-    <View style={styles.container}>
+    <Stack borderWidth="$px" borderColor="$border" borderRadius="$2">
       {HeaderView}
       {(!!isExpanded || !!isExpandMode) && (
-        <>
-          <Text style={styles.description}>{description}</Text>
+        <Stack gap="$2" paddingHorizontal="$2">
+          <Text fontSize={14} paddingHorizontal="$2">
+            {description}
+          </Text>
           {PresupposeView}
           {RequestParamsView}
           {PlaygroundExecutorView}
           {ResponseView}
-        </>
+        </Stack>
       )}
-    </View>
+    </Stack>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-  },
-  header: {
-    fontWeight: 'bold',
-    paddingVertical: 4,
-    fontSize: 22,
-  },
-  deprecatedHeader: {
-    fontWeight: 'bold',
-    paddingVertical: 4,
-    fontSize: 22,
-    textDecorationLine: 'line-through',
-  },
-  description: {
-    padding: 8,
-    fontSize: 12,
-  },
-  subheader: {
-    paddingTop: 10,
-    fontWeight: 'bold',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  subheaderText: {
-    fontWeight: 'bold',
-  },
-  copyButton: {
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  features: {
-    flexDirection: 'row',
-    flex: 1,
-    flexWrap: 'wrap',
-    gap: 8,
-    padding: 8,
-  },
-  emptyInput: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    padding: 8,
-    marginTop: 10,
-    marginBottom: 10,
-    fontSize: 14,
-    borderRadius: 4,
-    minHeight: 40,
-    textAlignVertical: 'top',
-  },
-  input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    padding: 8,
-    marginTop: 10,
-    marginBottom: 10,
-    fontSize: 14,
-    borderRadius: 4,
-    minHeight: 120,
-    textAlignVertical: 'top',
-  },
-  responseInput: {
-    backgroundColor: '#f7f7f7',
-  },
-});
 
 export default Playground;

@@ -1,8 +1,9 @@
 import { useCallback, useContext } from 'react';
-import { Button } from 'react-native';
+
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { useDevice } from '../provider/DeviceProvider';
 import { useCommonParams } from '../provider/CommonParamsProvider';
+import { Button } from './ui/Button';
 
 export type MethodPayload = {
   method: string;
@@ -68,7 +69,11 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
     }
   }, [sdk, selectedDevice, methodPayload, onExecute, commonParams, onAcquireParams]);
 
-  return <Button title="Try it out" onPress={executeMethod} />;
+  return (
+    <Button variant="primary" onPress={executeMethod}>
+      Try it out
+    </Button>
+  );
 };
 
 export default PlaygroundExecutor;

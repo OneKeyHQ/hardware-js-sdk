@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
-import { Button, Platform, Switch, Text, View } from 'react-native';
+import { Platform } from 'react-native';
+import { Stack } from 'tamagui';
+import { Button } from '../components/ui/Button';
 
 const ExpandModeContext = createContext<boolean>(false);
 
@@ -16,15 +18,16 @@ export const ExpandModeProvider: React.FC<{ children: ReactNode }> = ({ children
   return (
     <ExpandModeContext.Provider value={providerValue}>
       <>
-        <View
-          style={{
-            flexDirection: Platform.OS === 'web' ? 'row' : 'column',
-            flexWrap: 'wrap',
-            marginTop: 12,
-          }}
+        <Stack
+          gap="$2"
+          flexDirection={Platform.OS === 'web' ? 'row' : 'column'}
+          flexWrap="wrap"
+          marginTop="$2"
         >
-          <Button title="Change ExpandMode" onPress={toggleExpandMode} />
-        </View>
+          <Button size="large" onPress={toggleExpandMode}>
+            Change ExpandMode
+          </Button>
+        </Stack>
         {contentContainer}
       </>
     </ExpandModeContext.Provider>
