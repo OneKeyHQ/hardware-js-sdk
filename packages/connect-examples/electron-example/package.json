@@ -8,8 +8,8 @@
   "main": "dist/index.js",
   "license": "GPL-3.0-only",
   "scripts": {
-    "build-electron-web": "node scripts/buildElectronWeb.js build",
-    "dev-electron-web": "node scripts/buildElectronWeb.js dev",
+    "build-electron-web": "yarn build:main && cd ../expo-example && yarn build:electron-web",
+    "dev-electron-web": "yarn build:main && cd ../expo-example && yarn dev:electron-web",
     "dev": "npx concurrently \"cross-env NODE_ENV=development yarn dev:electron-forge\" \"yarn dev-electron-web\"",
     "dev:electron": "electron --inspect=5858 dist/index.js",
     "dev:electron-forge": "electron-forge start",

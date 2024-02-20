@@ -6,8 +6,8 @@
     "android": "yarn expo run:android",
     "ios": "yarn expo run:ios",
     "web": "yarn expo start --web",
-    "dev:electron-web": "yarn && cross-env NODE_OPTIONS=--openssl-legacy-provider cross-env EXPO_ELECTRON_MODE=true yarn web",
-    "build:electron-web": "yarn && cross-env NODE_OPTIONS=--openssl-legacy-provider cross-env EXPO_ELECTRON_MODE=true yarn expo export:web && node scripts/moveWebBuild.js",
+    "dev:electron-web": "cross-env NODE_OPTIONS=--openssl-legacy-provider cross-env EXPO_ELECTRON_MODE=true yarn web",
+    "build:electron-web": "cross-env NODE_OPTIONS=--openssl-legacy-provider cross-env EXPO_ELECTRON_MODE=true yarn expo export:web && node scripts/moveWebBuild.js",
     "eject": "yarn expo eject"
   },
   "dependencies": {
