@@ -7,10 +7,21 @@
     "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
   },
   "author": "OneKey",
-  "workspaces": [
-    "packages/*",
-    "packages/connect-examples/expo-example"
-  ],
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "packages/connect-examples/expo-example",
+      "packages/connect-examples/electron-example"
+    ],
+    "nohoist": [
+      "**/electron",
+      "**/electron/**",
+      "**/@electron",
+      "**/@electron/**",
+      "**/@electron-forge",
+      "**/@electron-forge/**"
+    ]
+  },
   "scripts": {
     "bootstrap": "lerna bootstrap",
     "build": "lerna run build",
@@ -22,7 +33,10 @@
     "publish-packages": "lerna publish from-package",
     "update-protobuf": "lerna run update:protobuf --scope=@onekeyfe/hd-transport",
     "update-version": "lerna version --no-git-tag-version",
+    "copy:inject": "node scripts/copy-injected.js",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
+    "example:desktop": "yarn copy:inject && cd ./packages/connect-examples/electron-example && yarn dev",
+    "build:example:desktop": "yarn copy:inject && cd ./packages/connect-examples/electron-example && yarn make",
     "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
     "dev:ble": "cd ./packages/hd-ble-sdk && yarn dev",
     "dev:core": "cd ./packages/core && yarn dev",
@@ -48,6 +62,7 @@
     "@types/shelljs": "^0.8.11",
     "babel-jest": "^28.1.3",
     "babel-loader": "^8.2.5",
+    "cross-env": "^7.0.3",
     "eslint": "^8.4.1",
     "eslint-config-wesbos": "3.2.3",
     "eslint-plugin-jest": "^26.6.0",

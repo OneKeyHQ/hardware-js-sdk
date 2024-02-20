@@ -1,0 +1,31 @@
+name: build-example-desktop
+
+on: workflow_dispatch
+
+jobs:
+  build-and-upload:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+        node-version: [18]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Install dependencies
+      run: |
+        yarn setup
+
+    - name: Build Application
+      run: yarn build:example:desktop
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: example-${{ matrix.os }}
+        path: |
+          out/make/**/*.zip

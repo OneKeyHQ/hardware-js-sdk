@@ -8,7 +8,7 @@ import PassphraseTestScreen from './src/views/PassphraseTestScreen';
 import SDKProvider from './src/provider/SDKProvider';
 import AddressTestScreen from './src/views/AddressTestScreen';
 
-getHardwareSDKInstance();
+// getHardwareSDKInstance();
 
 const Stack = createNativeStackNavigator();
 export default function App() {

@@ -1,0 +1,40 @@
+{
+  "name": "hardware-example",
+  "productName": "HardwareExample",
+  "executableName": "onekey-hardware-example",
+  "version": "0.0.1",
+  "author": "OneKey",
+  "description": "End-to-end encrypted workspaces for teams",
+  "main": "dist/index.js",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "build-electron-web": "yarn build:main && cd ../expo-example && yarn build:electron-web",
+    "dev-electron-web": "yarn build:main && cd ../expo-example && yarn dev:electron-web",
+    "dev": "npx concurrently \"cross-env NODE_ENV=development yarn dev:electron-forge\" \"yarn dev-electron-web\"",
+    "dev:electron": "electron --inspect=5858 dist/index.js",
+    "dev:electron-forge": "electron-forge start",
+    "build:package": "yarn build-electron-web && electron-forge package",
+    "build:main": "webpack --config webpack.config.ts",
+    "make": "yarn build-electron-web && electron-forge make",
+    "lint": "eslint --ext .tsx --ext .ts ./",
+    "test": "echo 'Nothing to test'",
+    "ts:check": "yarn tsc --noEmit"
+  },
+  "dependencies": {
+    "debug": "4.3.4",
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.2.0",
+    "@electron-forge/maker-deb": "^7.2.0",
+    "@electron-forge/maker-rpm": "^7.2.0",
+    "@electron-forge/maker-zip": "^7.2.0",
+    "@types/webpack": "^5.28.5",
+    "@types/webpack-node-externals": "^3.0.4",
+    "clean-webpack-plugin": "^4.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^28.0.0",
+    "webpack": "^5.90.2",
+    "webpack-node-externals": "^3.0.0"
+  }
+}

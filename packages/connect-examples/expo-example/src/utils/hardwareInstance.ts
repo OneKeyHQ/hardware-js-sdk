@@ -40,6 +40,14 @@ export const getHardwareSDKInstance = memoizee(
           settings.env = 'web';
           settings.preRelease = false;
           // HardwareLowLevelSDK = await importLowLevelSDK();
+
+          // Override Connect src
+          const { sdkConnectSrc } = window.ONEKEY_DESKTOP_GLOBALS ?? {};
+          if (sdkConnectSrc) {
+            settings.connectSrc = sdkConnectSrc;
+          }
+
+          console.log('======>>>>> Hardware SDK Init ConnectSrc:', settings.connectSrc);
         }
 
         try {

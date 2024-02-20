@@ -1,0 +1,7 @@
+# Electron-Forge
+out/
+
+# Generated build
+web-build/
+public/js-sdk/
+dist/
