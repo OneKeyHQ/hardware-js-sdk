@@ -3,12 +3,13 @@ import HeaderView from './Header';
 
 export interface PageViewProps {
   children?: React.ReactNode;
+  scrollable?: boolean;
 }
 
-const PageView = ({ children }: PageViewProps) => (
+const PageView = ({ children, scrollable = true }: PageViewProps) => (
   <View flex={1} backgroundColor="bgApp">
     <HeaderView />
-    <ScrollView flex={1}>{children}</ScrollView>
+    {scrollable ? <ScrollView flex={1}>{children}</ScrollView> : <View>{children}</View>}
   </View>
 );
 

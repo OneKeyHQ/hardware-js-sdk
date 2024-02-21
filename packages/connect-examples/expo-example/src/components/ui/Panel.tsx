@@ -6,7 +6,7 @@ export interface PanelViewProps {
 }
 
 const PanelView = ({ title, children }: PanelViewProps) => (
-  <Card elevate size="$4" bordered padding="$2" marginTop="$2" backgroundColor="$bgApp">
+  <Card flex={1} elevate size="$4" bordered padding="$2" marginTop="$2" backgroundColor="$bgApp">
     {!!title && (
       <Card.Header padded>
         <Text fontWeight="bold">{title}</Text>

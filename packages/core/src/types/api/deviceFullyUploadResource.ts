@@ -3,5 +3,7 @@ import type { CommonParams, Response } from '../params';
 
 export declare function deviceFullyUploadResource(
   connectId: string,
-  params: CommonParams
+  params: CommonParams & {
+    binary?: ArrayBuffer;
+  }
 ): Response<Success>;

@@ -55,6 +55,9 @@ const Item = ({ item, onPress, connected }: ItemProps) => (
     backgroundColor={connected ? '$bgInfo' : '$bgHover'}
     icon={connected ? Check : undefined}
     flexWrap="wrap"
+    borderWidth="$px"
+    borderColor="$border"
+    gap="$4"
   >
     <ListItem.Text>{item.name}</ListItem.Text>
     <ListItem.Text>{item.deviceType}</ListItem.Text>
@@ -65,14 +68,16 @@ const Item = ({ item, onPress, connected }: ItemProps) => (
 
 type IDeviceListProps = {
   onSelected: (device: Device) => void;
+  disableSaveDevice?: boolean;
 };
 
-export function DeviceList({ onSelected }: IDeviceListProps) {
+export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceListProps) {
   const { sdk } = useContext(HardwareSDKContext);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
 
   useEffect(() => {
+    if (disableSaveDevice) return;
     getSelectedId().then(value => {
       if (value) {
         setSelectedId(value);
@@ -125,12 +130,19 @@ export function DeviceList({ onSelected }: IDeviceListProps) {
 
   return (
     <PanelView>
-      <View flexDirection="row" justifyContent="space-between" flexWrap="wrap">
-        <Text fontSize={15}>当前选择设备：{selectedId || '无'}</Text>
-        <Button onPress={handleRemoveSelected}>清除</Button>
-      </View>
-      <Button onPress={searchDevices}>
-        <H5>Search Devices</H5>
+      {disableSaveDevice ? (
+        <Text fontSize={16} fontWeight="bold">
+          搜索并连接设备
+        </Text>
+      ) : (
+        <View flexDirection="row" justifyContent="space-between" flexWrap="wrap">
+          <Text fontSize={15}>当前选择设备：{selectedId || '无'}</Text>
+          <Button onPress={handleRemoveSelected}>清除</Button>
+        </View>
+      )}
+
+      <Button variant="primary" size="large" onPress={searchDevices}>
+        Search Devices
       </Button>
       <FlatList
         data={devices}

@@ -82,8 +82,8 @@ export default function Bluetooth({ children }: { children: React.ReactNode }) {
   return (
     <HardwareSDKContext.Provider value={contextValue}>
       <Stack flex={1}>
-        <Stack flexDirection="row" gap="$2" paddingHorizontal="$2">
-          <BluetoothSearching />
+        <Stack flexDirection="row" backgroundColor="$bgApp" gap="$2" paddingHorizontal="$2">
+          <BluetoothSearching size={20} />
           <Text>{sdk ? 'SDK loading complete' : 'SDK loading...'}</Text>
         </Stack>
         {children}
@@ -91,9 +91,3 @@ export default function Bluetooth({ children }: { children: React.ReactNode }) {
     </HardwareSDKContext.Provider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-});

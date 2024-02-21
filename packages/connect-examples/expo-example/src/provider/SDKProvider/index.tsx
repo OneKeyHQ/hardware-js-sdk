@@ -45,8 +45,8 @@ export default function USB({ children }: { children: React.ReactNode }) {
   return (
     <HardwareSDKContext.Provider value={contextValue}>
       <Stack flex={1}>
-        <Stack flexDirection="row" gap="$2" paddingHorizontal="$2">
-          <Usb />
+        <Stack flexDirection="row" backgroundColor="$bgApp" gap="$2" paddingHorizontal="$2">
+          <Usb size={20} />
           <Text>SDK {showContent ? 'Loading complete' : 'Loading...'}</Text>
         </Stack>
         {children}

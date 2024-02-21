@@ -65,7 +65,7 @@ function ExportReportView() {
   return null;
 }
 
-function ExecuteView({ title, testCases }: { title: string; testCases: AddressTestCase[] }) {
+function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressTestCase>();
@@ -189,10 +189,13 @@ function ExecuteView({ title, testCases }: { title: string; testCases: AddressTe
   const contentMemo = useMemo(
     () => (
       <>
-        <Text paddingVertical="$2">{testDescription}</Text>
+        <Text fontSize={13} paddingVertical="$2">
+          {testDescription}
+        </Text>
         {!!passphrase && <Text paddingVertical="$2">Passphrase:「{passphrase}」</Text>}
         <Stack flexDirection="row" flexWrap="wrap" gap="$2">
           <Picker
+            style={{ width: 200 }}
             selectedValue={currentTestCase?.name}
             onValueChange={itemValue => setCurrentTestCase(findTestCase(itemValue))}
           >
@@ -204,7 +207,6 @@ function ExecuteView({ title, testCases }: { title: string; testCases: AddressTe
             label="Show on OneKey"
             value={showOnOneKey}
             onToggle={setShowOnOneKey}
-            id={title}
             vertical
           />
           <Button variant="primary" onPress={beginTest}>
@@ -226,7 +228,6 @@ function ExecuteView({ title, testCases }: { title: string; testCases: AddressTe
       stopTest,
       testCaseList,
       testDescription,
-      title,
     ]
   );
 
@@ -243,7 +244,7 @@ export function TestSingleAddress({
   return (
     <TestRunnerView<AddressTestCase['data']>
       title={title}
-      renderExecuteView={() => <ExecuteView title={title} testCases={testCases} />}
+      renderExecuteView={() => <ExecuteView testCases={testCases} />}
       renderResultView={item => <ResultView item={item} />}
     />
   );

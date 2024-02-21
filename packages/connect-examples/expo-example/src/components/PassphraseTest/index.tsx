@@ -1,20 +1,20 @@
-import { View } from 'react-native';
+import { Stack } from 'tamagui';
 import { DeviceProvider } from '../../provider/DeviceProvider';
-import { styles } from './utils';
+
 import TestSessionView from './TestSessionView';
 import TestWalletChangeView from './TestWalletChangeView';
 import TestMultiWalletChangeView from './TestMultiWalletChangeView';
 
 export default function PassphraseTestScreen() {
   return (
-    <View style={styles.container}>
+    <Stack>
       <DeviceProvider>
-        <View style={styles.container}>
+        <Stack>
           <TestSessionView />
           <TestWalletChangeView />
           <TestMultiWalletChangeView />
-        </View>
+        </Stack>
       </DeviceProvider>
-    </View>
+    </Stack>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Separator } from 'tamagui';
+import { Separator, Stack } from 'tamagui';
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { TestSingleAddress } from '../testTools/addressTest/TestSingleAddress';
 import { TestBatchAddress } from '../testTools/addressTest/TestBatchAddress';
@@ -28,33 +28,35 @@ export default function AddressTestScreen() {
   return (
     <PageView>
       <DeviceProvider>
-        <PanelView>
-          <TestSingleAddress title="Single Address Test" testCases={addressTestCases} />
-        </PanelView>
-        <PanelView>
-          <TestBatchAddress title="Batch Address Test" testCases={batchAddressTestCases} />
-        </PanelView>
-        <PanelView>
-          <TestSinglePubkey title="Single Pubkey Test" testCases={pubkeyTestCases} />
-        </PanelView>
-        <PanelView>
-          <TestBatchPubkey title="Batch Pubkey Test" testCases={batchPubkeyTestCases} />
-        </PanelView>
+        <Stack>
+          <PanelView>
+            <TestSingleAddress title="Single Address Test" testCases={addressTestCases} />
+          </PanelView>
+          <PanelView>
+            <TestBatchAddress title="Batch Address Test" testCases={batchAddressTestCases} />
+          </PanelView>
+          <PanelView>
+            <TestSinglePubkey title="Single Pubkey Test" testCases={pubkeyTestCases} />
+          </PanelView>
+          <PanelView>
+            <TestBatchPubkey title="Batch Pubkey Test" testCases={batchPubkeyTestCases} />
+          </PanelView>
 
-        <Separator width="100%" minHeight={60} vertical={false} />
+          <Stack marginTop="$8" />
 
-        <PanelView>
-          <TestSingleAddress
-            title="Single Variant Address Test"
-            testCases={addressVariantTestCases}
-          />
-        </PanelView>
-        <PanelView>
-          <TestBatchAddress
-            title="Batch Variant Address Test"
-            testCases={batchVariantAddressTestCases}
-          />
-        </PanelView>
+          <PanelView>
+            <TestSingleAddress
+              title="Single Variant Address Test"
+              testCases={addressVariantTestCases}
+            />
+          </PanelView>
+          <PanelView>
+            <TestBatchAddress
+              title="Batch Variant Address Test"
+              testCases={batchVariantAddressTestCases}
+            />
+          </PanelView>
+        </Stack>
       </DeviceProvider>
     </PageView>
   );

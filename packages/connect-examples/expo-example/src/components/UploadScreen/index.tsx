@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 import React, { useState, useEffect, useContext } from 'react';
-import { Platform, Button, View, Text, StyleSheet, TextInput, Image } from 'react-native';
+
 import { bytesToHex } from '@noble/hashes/utils';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -8,10 +8,15 @@ import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 import { DeviceUploadResourceParams, CoreApi, CommonParams, KnownDevice } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
+import { Image, Label, Stack, View, XStack } from 'tamagui';
+import { Platform } from 'react-native';
 import { getImageSize, imageToBase64, formatBytes, generateUploadNFTParams } from './nftUtils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useCommonParams } from '../../provider/CommonParamsProvider';
 import { useDevice } from '../../provider/DeviceProvider';
+import PanelView from '../ui/Panel';
+import { Button } from '../ui/Button';
+import { CommonInput } from '../CommonInput';
 
 interface UploadResourceParams {
   suffix?: string;
@@ -211,28 +216,26 @@ function UploadScreenComponent() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Upload Screen Image & Video</Text>
-      <View style={{ flexDirection: Platform.OS === 'web' ? 'row' : 'column', flexWrap: 'wrap' }}>
-        <View style={{ flexDirection: 'column' }}>
-          <View style={styles.item}>
-            <Text>支持 PNG & MP4</Text>
-            {/* {image && <Text>{image}</Text>} */}
-            <Button title="Pick image" onPress={pickImage} />
-          </View>
-        </View>
-        <View style={styles.item}>
-          <Text>文件后缀</Text>
-          <TextInput
-            style={styles.input}
-            value={uploadScreenParams?.suffix ?? ''}
-            onChangeText={v => {
-              setUploadScreenParams({ ...uploadScreenParams, suffix: v });
-            }}
-          />
-        </View>
-        <View style={styles.item}>
-          <Text>资源类型</Text>
+    <PanelView title="Upload Screen Image & Video">
+      <XStack flexWrap="wrap" gap="$4">
+        <Stack width={160} minHeight={45}>
+          <Label paddingRight="$0" justifyContent="center">
+            支持 PNG & MP4
+          </Label>
+          <Button onPress={pickImage}>Pick image</Button>
+        </Stack>
+        <CommonInput
+          type="text"
+          label="文件后缀"
+          value={uploadScreenParams?.suffix ?? ''}
+          onChange={v => {
+            setUploadScreenParams({ ...uploadScreenParams, suffix: v });
+          }}
+        />
+        <Stack width={160} minHeight={45}>
+          <Label paddingRight="$0" justifyContent="center">
+            资源类型
+          </Label>
           <Picker
             selectedValue={uploadScreenParams?.resType}
             onValueChange={itemValue =>
@@ -242,42 +245,39 @@ function UploadScreenComponent() {
             <Picker.Item label="WallPaper" value="0" />
             <Picker.Item label="NFT" value="1" />
           </Picker>
-        </View>
-        <View style={styles.item}>
-          <Text>NFT 数据</Text>
-          <TextInput
-            style={styles.input}
-            value={uploadScreenParams?.nftMetaData ?? ''}
-            onChangeText={v => {
-              setUploadScreenParams({ ...uploadScreenParams, nftMetaData: v });
-            }}
-          />
-        </View>
-        <View style={styles.item}>
-          <Text>NFT URL</Text>
-          <TextInput
-            style={styles.input}
-            value={nftUrl}
-            onChangeText={v => {
-              setNftUrl(v);
-            }}
-          />
-        </View>
-        <Button title="Upload File" onPress={() => handleScreenUpdate()} />
+        </Stack>
+        <CommonInput
+          type="text"
+          label="NFT 数据"
+          value={uploadScreenParams?.nftMetaData ?? ''}
+          onChange={v => {
+            setUploadScreenParams({ ...uploadScreenParams, nftMetaData: v });
+          }}
+        />
+        <CommonInput
+          type="text"
+          label="NFT URL"
+          value={nftUrl ?? ''}
+          onChange={v => {
+            setNftUrl(v);
+          }}
+        />
+        <Button onPress={() => handleScreenUpdate()}>Upload File</Button>
         {Platform.OS === 'web' && (
-          <View style={styles.item}>
-            <Button
-              title="全量覆盖 RES"
-              onPress={() => SDK?.deviceFullyUploadResource(selectedDevice?.connectId ?? '', {})}
-            />
-          </View>
+          <Button
+            onPress={() => SDK?.deviceFullyUploadResource(selectedDevice?.connectId ?? '', {})}
+          >
+            全量覆盖 RES
+          </Button>
         )}
-      </View>
+      </XStack>
+
       {Platform.OS === 'web' && (
-        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+        <View flexDirection="row" alignItems="center">
           {image && (
             <Image
-              style={{ height: 800, width: 480 }}
+              height={800}
+              width={480}
               source={{ uri: image.uri }}
               // this resize mode for nft
               resizeMode="contain"
@@ -285,39 +285,15 @@ function UploadScreenComponent() {
           )}
           {previewData && (
             // NFT
-            <Image style={{ height: 238, width: 238 }} source={{ uri: previewData }} />
+            <Image height={238} width={238} source={{ uri: previewData }} />
             // HOME SCREEN
             // <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />
           )}
         </View>
       )}
-    </View>
+    </PanelView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'column',
-    borderRadius: 12,
-    borderColor: '#cccccc',
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginTop: 12,
-    padding: 12,
-    height: 'auto',
-  },
-  item: {
-    flexDirection: 'column',
-    paddingStart: 12,
-    paddingEnd: 12,
-    paddingVertical: 8,
-  },
-  input: {
-    height: 35,
-    borderWidth: 1,
-    padding: 4,
-  },
-});
 
 const UploadScreen = React.memo(UploadScreenComponent);
 export { UploadScreen };

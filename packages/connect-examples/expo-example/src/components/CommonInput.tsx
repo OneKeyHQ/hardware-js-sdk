@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { random } from 'lodash';
+import { useCallback, useRef } from 'react';
 
 import { Input, Label, Stack } from 'tamagui';
 
@@ -19,15 +20,16 @@ export const CommonInput = ({ value, onChange, label, type }: CommonInputProps) 
     },
     [onChange, type]
   );
-  const id = `switch-${label ?? ''}}`;
+
+  const idRef = useRef(`input-${random(1000, 10000)}`);
 
   return (
     <Stack width={160} minHeight={45}>
-      <Label paddingRight="$0" justifyContent="center" htmlFor={id}>
+      <Label paddingRight="$0" justifyContent="center" htmlFor={idRef.current}>
         {label}
       </Label>
       <Input
-        id={id}
+        id={idRef.current}
         size="$4"
         height={34}
         keyboardType="numeric"

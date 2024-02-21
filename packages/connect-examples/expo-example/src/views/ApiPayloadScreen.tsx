@@ -7,7 +7,6 @@ import HandleSDKEvents from '../components/HandleSDKEvents';
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { CommonParamsProvider } from '../provider/CommonParamsProvider';
 import CommonParamsView from '../components/CommonParamsView';
-import UpdateFirmware from '../components/UpdateFirmware';
 import { UploadScreen } from '../components/UploadScreen';
 import { ExpandModeProvider } from '../provider/ExpandModeProvider';
 import { CollapsibleSection } from '../components/CollapsibleSection';
@@ -116,7 +115,13 @@ function renderItem({ item }: { item: { title: string; data: any } }) {
     <CollapsibleSection title={item.title}>
       <YStack flexDirection="column" $gtSm={{ flexDirection: 'row' }} flexWrap="wrap" gap="$2">
         {item.data.map((data: React.JSX.IntrinsicAttributes & ApiPayloadProps) => (
-          <Stack key={data.method} width="100%" $gtSm={{ width: '50%' }} $gtLg={{ width: '33%' }}>
+          <Stack
+            flex={1}
+            key={data.method}
+            width="100%"
+            $gtSm={{ width: '48%' }}
+            $gtLg={{ width: '30%' }}
+          >
             <Playground key={`payload-${data.method}`} {...data} />
           </Stack>
         ))}
@@ -131,8 +136,6 @@ const ApiPayload = () => (
     <DeviceProvider>
       <CommonParamsProvider>
         <CommonParamsView />
-        <UpdateFirmware />
-        <UploadScreen />
         <ExpandModeProvider>
           <PanelView title="Hardware Api Test">
             <FlatList
@@ -142,6 +145,7 @@ const ApiPayload = () => (
             />
           </PanelView>
         </ExpandModeProvider>
+        <UploadScreen />
       </CommonParamsProvider>
     </DeviceProvider>
   </Stack>

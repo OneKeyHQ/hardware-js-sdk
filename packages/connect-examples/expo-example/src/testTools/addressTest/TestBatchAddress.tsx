@@ -246,10 +246,13 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
   const contentMemo = useMemo(
     () => (
       <>
-        <Text paddingVertical="$2">{testDescription}</Text>
+        <Text fontSize={13} paddingVertical="$2">
+          {testDescription}
+        </Text>
         {!!passphrase && <Text paddingVertical="$2">Passphrase:「{passphrase}」</Text>}
-        <Stack flexDirection="row" flexWrap="wrap" gap="$2">
+        <Stack flex={1} flexDirection="row" flexWrap="wrap" gap="$2">
           <Picker
+            style={{ width: 200 }}
             selectedValue={currentTestCase?.name}
             onValueChange={itemValue => {
               setCurrentTestCase(findTestCase(itemValue));
@@ -259,6 +262,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
+
           <Button variant="primary" onPress={beginTest}>
             Start Test
           </Button>

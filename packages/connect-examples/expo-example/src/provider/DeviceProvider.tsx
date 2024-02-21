@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useMemo, memo } from 'react';
+import React, { createContext, useState, useContext, useMemo, memo, useEffect } from 'react';
 
 import { Stack } from 'tamagui';
 import type { Device } from '../components/DeviceList';
@@ -30,7 +30,7 @@ function DeviceProviderContent({ children }: { children: React.ReactNode }) {
 
   return (
     <DeviceContext.Provider value={providerValue}>
-      <Stack flex={1} padding="$2">
+      <Stack padding="$2">
         <DeviceList onSelected={setSelectedDevice} />
         {childMemo}
       </Stack>

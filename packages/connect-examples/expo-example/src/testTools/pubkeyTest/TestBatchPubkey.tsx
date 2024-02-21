@@ -320,10 +320,13 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
   const contentMemo = useMemo(
     () => (
       <>
-        <Text paddingVertical="$2">{testDescription}</Text>
+        <Text fontSize={13} paddingVertical="$2">
+          {testDescription}
+        </Text>
         {!!passphrase && <Text paddingVertical="$2">Passphrase:「{passphrase}」</Text>}
         <XStack flexWrap="wrap" gap="$2">
           <Picker
+            style={{ width: 200 }}
             selectedValue={currentTestCase?.name}
             onValueChange={itemValue => setCurrentTestCase(findTestCase(itemValue))}
           >
