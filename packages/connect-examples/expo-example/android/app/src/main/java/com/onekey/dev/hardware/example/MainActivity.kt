@@ -1,4 +1,4 @@
-package com.onekey.hardware.expoexample
+package com.onekey.dev.hardware.example
 
 import android.os.Build
 import android.os.Bundle

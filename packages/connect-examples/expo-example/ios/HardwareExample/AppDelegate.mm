@@ -20,7 +20,7 @@
 {
   return [self getBundleURL];
 }
- 
+
 - (NSURL *)getBundleURL
 {
 #if DEBUG

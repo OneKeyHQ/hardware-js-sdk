@@ -83,9 +83,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.onekey.hardware.expoexample'
+    namespace 'com.onekey.dev.hardware.example'
     defaultConfig {
-        applicationId 'com.onekey.hardware.expoexample'
+        applicationId 'com.onekey.dev.hardware.example'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

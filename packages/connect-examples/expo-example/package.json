@@ -45,6 +45,7 @@
     "path-browserify": "0.0.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "react-intl": "^6.6.2",
     "react-native": "0.73.4",
     "react-native-ble-manager": "^8.3.0",
     "react-native-crypto": "^2.2.0",

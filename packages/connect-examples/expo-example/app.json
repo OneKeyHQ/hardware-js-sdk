@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "expo-example",
-    "slug": "expo-example",
+    "name": "HardwareExample",
+    "slug": "hardware-example",
     "scheme": "hardware-example",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,14 +18,14 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.onekey.hardware.expoexample"
+      "bundleIdentifier": "com.onekey.dev.hardware.example"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.onekey.hardware.expoexample"
+      "package": "com.onekey.dev.hardware.example"
     },
     "web": {
       "favicon": "./assets/favicon.png"
