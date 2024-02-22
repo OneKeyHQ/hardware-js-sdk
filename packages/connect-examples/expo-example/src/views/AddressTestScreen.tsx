@@ -1,5 +1,6 @@
 import React from 'react';
 import { Separator, Stack } from 'tamagui';
+import { useIntl } from 'react-intl';
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { TestSingleAddress } from '../testTools/addressTest/TestSingleAddress';
 import { TestBatchAddress } from '../testTools/addressTest/TestBatchAddress';
@@ -25,34 +26,47 @@ import PageView from '../components/ui/Page';
 import PanelView from '../components/ui/Panel';
 
 export default function AddressTestScreen() {
+  const intl = useIntl();
   return (
     <PageView>
       <DeviceProvider>
         <Stack>
           <PanelView>
-            <TestSingleAddress title="Single Address Test" testCases={addressTestCases} />
+            <TestSingleAddress
+              title={intl.formatMessage({ id: 'title__address_test_single' })}
+              testCases={addressTestCases}
+            />
           </PanelView>
           <PanelView>
-            <TestBatchAddress title="Batch Address Test" testCases={batchAddressTestCases} />
+            <TestBatchAddress
+              title={intl.formatMessage({ id: 'title__address_test_batch' })}
+              testCases={batchAddressTestCases}
+            />
           </PanelView>
           <PanelView>
-            <TestSinglePubkey title="Single Pubkey Test" testCases={pubkeyTestCases} />
+            <TestSinglePubkey
+              title={intl.formatMessage({ id: 'title__publickey_test_single' })}
+              testCases={pubkeyTestCases}
+            />
           </PanelView>
           <PanelView>
-            <TestBatchPubkey title="Batch Pubkey Test" testCases={batchPubkeyTestCases} />
+            <TestBatchPubkey
+              title={intl.formatMessage({ id: 'title__publickey_test_batch' })}
+              testCases={batchPubkeyTestCases}
+            />
           </PanelView>
 
           <Stack marginTop="$8" />
 
           <PanelView>
             <TestSingleAddress
-              title="Single Variant Address Test"
+              title={intl.formatMessage({ id: 'title__address_variant_test_single' })}
               testCases={addressVariantTestCases}
             />
           </PanelView>
           <PanelView>
             <TestBatchAddress
-              title="Batch Variant Address Test"
+              title={intl.formatMessage({ id: 'title__address_variant_test_batch' })}
               testCases={batchVariantAddressTestCases}
             />
           </PanelView>

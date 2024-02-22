@@ -15,7 +15,9 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.onekey.dev.hardware.example"
@@ -30,6 +32,10 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-image-picker", "expo-document-picker"]
+    "plugins": [
+      "expo-image-picker",
+      "expo-document-picker",
+      "expo-localization"
+    ]
   }
 }

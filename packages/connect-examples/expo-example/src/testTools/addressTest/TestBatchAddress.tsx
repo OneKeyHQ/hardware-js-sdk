@@ -4,6 +4,7 @@ import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-cor
 import { Picker } from '@react-native-picker/picker';
 
 import { Stack, Text, View } from 'tamagui';
+import { useIntl } from 'react-intl';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { AddressBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
@@ -35,6 +36,7 @@ function ResultView({ item }: ResultViewProps) {
 }
 
 function ExportReportView() {
+  const intl = useIntl();
   const { showExportReport, exportReport } = useExportReport<TestCaseDataType>({
     fileName: 'BatchAddressTestReport',
     reportTitle: 'Batch Address Test Report',
@@ -61,7 +63,7 @@ function ExportReportView() {
 
   if (showExportReport) {
     <Button variant="primary" onPress={exportReport}>
-      Export Report
+      {intl.formatMessage({ id: 'action__export_report' })}
     </Button>;
   }
 
@@ -69,6 +71,7 @@ function ExportReportView() {
 }
 
 function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[] }) {
+  const intl = useIntl();
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressBatchTestCase>();
 
@@ -264,10 +267,10 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
           </Picker>
 
           <Button variant="primary" onPress={beginTest}>
-            Start Test
+            {intl.formatMessage({ id: 'action__start_test' })}
           </Button>
           <Button variant="destructive" onPress={stopTest}>
-            Stop Test
+            {intl.formatMessage({ id: 'action__stop_test' })}
           </Button>
           <ExportReportView />
         </Stack>
@@ -277,6 +280,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       beginTest,
       currentTestCase?.name,
       findTestCase,
+      intl,
       passphrase,
       stopTest,
       testCaseList,

@@ -4,6 +4,7 @@ import { PermissionsAndroid, Platform, ScrollView, StyleSheet, Text, View } from
 
 import { Stack } from 'tamagui';
 import { BluetoothSearching } from '@tamagui/lucide-icons';
+import { useIntl } from 'react-intl';
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
 
@@ -36,6 +37,7 @@ const requestBluetoothScanPermission = async () => {
 };
 
 export default function Bluetooth({ children }: { children: React.ReactNode }) {
+  const intl = useIntl();
   const [sdk, createSDK] = React.useState<CoreApi>();
   const sdkInit = () => {
     getHardwareSDKInstance().then(res => {
@@ -84,7 +86,11 @@ export default function Bluetooth({ children }: { children: React.ReactNode }) {
       <Stack flex={1}>
         <Stack flexDirection="row" backgroundColor="$bgApp" gap="$2" paddingHorizontal="$2">
           <BluetoothSearching size={20} />
-          <Text>{sdk ? 'SDK loading complete' : 'SDK loading...'}</Text>
+          <Text>
+            {sdk
+              ? intl.formatMessage({ id: 'tip__sdk_load_complete' })
+              : intl.formatMessage({ id: 'tip__sdk_loading' })}
+          </Text>
         </Stack>
         {children}
       </Stack>

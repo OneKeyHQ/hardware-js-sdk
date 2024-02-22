@@ -1,4 +1,4 @@
-import { Card, H2, H3, Stack, Text } from 'tamagui';
+import { Card, Text } from 'tamagui';
 
 export interface PanelViewProps {
   title?: string;

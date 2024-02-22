@@ -1,12 +1,13 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { H5, ListItem, Text, View } from 'tamagui';
+import { ListItem, Text, View } from 'tamagui';
 import { FlatList, Platform } from 'react-native';
 import { Check } from '@tamagui/lucide-icons';
+import { useIntl } from 'react-intl';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
+import { getItem, removeItem, setItem } from '../utils/store';
 
 export type Device = {
   connectId: string;
@@ -18,7 +19,7 @@ export type Device = {
 const STORE_KEY = '@onekey/selectedId';
 const storeSelectedId = async (value: string) => {
   try {
-    await AsyncStorage.setItem(STORE_KEY, value);
+    await setItem(STORE_KEY, value);
   } catch (error) {
     console.log(error);
   }
@@ -26,7 +27,7 @@ const storeSelectedId = async (value: string) => {
 
 const getSelectedId = async () => {
   try {
-    const value = await AsyncStorage.getItem(STORE_KEY);
+    const value = await getItem(STORE_KEY);
     if (value !== null) {
       return value;
     }
@@ -37,7 +38,7 @@ const getSelectedId = async () => {
 
 const removeSelectedId = async () => {
   try {
-    await AsyncStorage.removeItem(STORE_KEY);
+    await removeItem(STORE_KEY);
   } catch (e) {
     // remove error
   }
@@ -49,22 +50,26 @@ type ItemProps = {
   connected: boolean;
 };
 
-const Item = ({ item, onPress, connected }: ItemProps) => (
-  <ListItem
-    onPress={onPress}
-    backgroundColor={connected ? '$bgInfo' : '$bgHover'}
-    icon={connected ? Check : undefined}
-    flexWrap="wrap"
-    borderWidth="$px"
-    borderColor="$border"
-    gap="$4"
-  >
-    <ListItem.Text>{item.name}</ListItem.Text>
-    <ListItem.Text>{item.deviceType}</ListItem.Text>
-    <ListItem.Text>{item.connectId}</ListItem.Text>
-    <Button onPress={onPress}>Connect</Button>
-  </ListItem>
-);
+const Item = ({ item, onPress, connected }: ItemProps) => {
+  const intl = useIntl();
+
+  return (
+    <ListItem
+      onPress={onPress}
+      backgroundColor={connected ? '$bgInfo' : '$bgHover'}
+      icon={connected ? Check : undefined}
+      flexWrap="wrap"
+      borderWidth="$px"
+      borderColor="$border"
+      gap="$4"
+    >
+      <ListItem.Text>{item.name}</ListItem.Text>
+      <ListItem.Text>{item.deviceType}</ListItem.Text>
+      <ListItem.Text>{item.connectId}</ListItem.Text>
+      <Button onPress={onPress}>{intl.formatMessage({ id: 'action__connect_device' })}</Button>
+    </ListItem>
+  );
+};
 
 type IDeviceListProps = {
   onSelected: (device: Device) => void;
@@ -72,6 +77,7 @@ type IDeviceListProps = {
 };
 
 export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceListProps) {
+  const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -97,17 +103,16 @@ export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceLis
   );
 
   const searchDevices = useCallback(async () => {
-    if (!sdk) return console.log('sdk is not ready');
+    if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
     const response = await sdk.searchDevices();
-    console.log('example searchDevices response: ', response);
     const foundDevices = (response.payload as unknown as Device[]) ?? [];
     setDevices(foundDevices);
     if (Platform.OS === 'web' && foundDevices?.length) {
       const device = foundDevices[0];
       selectDevice(device);
     }
-  }, [sdk, selectDevice]);
+  }, [intl, sdk, selectDevice]);
 
   const handleRemoveSelected = useCallback(() => {
     removeSelectedId();
@@ -132,17 +137,22 @@ export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceLis
     <PanelView>
       {disableSaveDevice ? (
         <Text fontSize={16} fontWeight="bold">
-          搜索并连接设备
+          {intl.formatMessage({ id: 'message__search_device_and_connect_device' })}
         </Text>
       ) : (
         <View flexDirection="row" justifyContent="space-between" flexWrap="wrap">
-          <Text fontSize={15}>当前选择设备：{selectedId || '无'}</Text>
-          <Button onPress={handleRemoveSelected}>清除</Button>
+          <Text fontSize={15}>
+            {intl.formatMessage({ id: 'message__current_selector_device' })}
+            {selectedId || intl.formatMessage({ id: 'message__no_device' })}
+          </Text>
+          <Button onPress={handleRemoveSelected}>
+            {intl.formatMessage({ id: 'action__clean_device' })}
+          </Button>
         </View>
       )}
 
       <Button variant="primary" size="large" onPress={searchDevices}>
-        Search Devices
+        {intl.formatMessage({ id: 'action__search_device' })}
       </Button>
       <FlatList
         data={devices}

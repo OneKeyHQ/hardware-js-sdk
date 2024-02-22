@@ -1,0 +1,108 @@
+{
+  "tab__api_payload": "API 测试",
+  "tab__firmware_update": "固件更新",
+  "tab__passphrase_test": "Passphrase 测试",
+  "tab__address_test": "地址测试",
+
+  "action__search_device": "搜索设备",
+  "action__clean_device": "断开连接",
+  "action__connect_device": "连接设备",
+  "action__confirm": "确认",
+  "action__cancel": "取消",
+  "action__close": "关闭",
+  "action__copy": "复制",
+  "action__upload": "上传",
+  "action__update": "更新",
+  "action__try_it": "尝试执行",
+  "action__change_expand_mode": "切换展开模式",
+  "action__pick_image": "选择图片",
+  "action__full_coverage_res": "上传完整资源",
+  "action__pick_file": "选择文件",
+  "action__export_report": "导出报告",
+
+  "action__start_test": "开始测试",
+  "action__stop_test": "停止测试",
+
+  "tip__sdk_not_ready": "SDK 未就绪",
+  "tip__sdk_loading": "SDK 加载中...",
+  "tip__sdk_load_complete": "SDK 准备就绪",
+  "tip__need_connect_device_first": "首先需要连接设备",
+  "tip__need_pick_file": "需要选择文件",
+
+  "tip__connecting_device": "正在连接设备...",
+  "tip__need_connect_and_search_device_first": "需要搜索并连接设备",
+
+  "tip__no_select_file_tip": "未选择任何文件",
+  "tip__no_select_file": "未选择文件",
+  "tip__update_success": "更新成功",
+
+  "title__common_parameters": "常用参数",
+  "title__hardware_api_test": "硬件 API 测试",
+  "title__updating": "正在更新",
+
+  "title__device_info": "设备信息",
+  "title__device_firmware_update": "设备固件更新",
+  "title__device_advanced_info": "设备高级信息",
+
+  "title__address_test_single": "单个地址测试",
+  "title__address_test_batch": "批量地址测试",
+  "title__publickey_test_single": "单个公钥测试",
+  "title__publickey_test_batch": "批量公钥测试",
+  "title__address_variant_test_single": "单个变种地址测试",
+  "title__address_variant_test_batch": "批量变种地址测试",
+
+  "label__keep_session": "保持 Session",
+  "label__retry_count": "重试次数",
+  "label__retry_interval_time": "重试间隔时间",
+  "label__connection_timeout": "连接超时时间",
+  "label__init_session": "初始化 Session",
+  "label__default_parameters": "预设参数",
+  "label__parameters": "参数",
+  "label__enter_parameters_tip": "在此输入您的参数...",
+  "label__response": "响应",
+  "label__will_response_tip": "响应将在此显示",
+
+  "label__upload_image_res_type": "支持 PNG 和 MP4",
+  "label__image_res_type": "资源类型",
+  "label__res_file_suffix": "文件后缀",
+  "label__res_type_wall_paper": "壁纸",
+  "label__res_type_nft": "NFT",
+  "label__nft_data": "NFT 数据",
+  "label__nft_url": "NFT URL",
+
+  "label__progress": "进度",
+  "label__expected": "预期：",
+
+  "label__show_on_onekey": "在硬件上确认",
+
+  "label__device_type_sdk": "设备类型（SDK）",
+  "label__device_uuid": "设备 UUID",
+  "label__device_firmware_version": "固件版本",
+  "label__device_bootloader_version": "Bootloader 版本",
+  "label__device_bluetooth_version": "蓝牙版本",
+
+  "label__device_update_firmware": "更新固件",
+  "label__device_update_ble_firmware": "更新蓝牙固件",
+  "label__device_update_bootloader": "更新 Bootloader",
+  "label__device_update_sys_resource": "更新系统资源",
+
+  "message__no_device": "未连接设备",
+  "message__current_selector_device": "当前选择的设备：",
+  "message__search_device_and_connect_device": "搜索设备并连接设备",
+
+  "message__check_latest_ui_resource": "检查最新 UI 资源...",
+  "message__download_latest_ui_resource": "下载最新 UI 资源中...",
+  "message__download_latest_ui_resource_success": "下载最新 UI 资源成功",
+  "message__reboot_to_bootloader": "重启到 Bootloader...",
+  "message__wait_begin_update": "等待开始更新中...",
+  "message__confirm_on_device": "在设备上确认...",
+  "message__firmware_erase_success": "固件擦除成功",
+  "message__firmware_start_transfer": "固件开始传输中...",
+  "message__firmware_installing": "固件安装中...",
+  "message__bootloader_update": "Bootloader 更新中...",
+  "message__bootloader_update_success": "Bootloader 更新成功",
+  "message__sys_resource_update": "系统资源更新中...",
+  "message__sys_resource_update_success": "系统资源更新成功",
+
+  "ignore": "忽略"
+}

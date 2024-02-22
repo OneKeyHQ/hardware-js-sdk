@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FlatList } from 'react-native';
 import { Stack, XStack, YStack, useMedia } from 'tamagui';
 
+import { useIntl } from 'react-intl';
 import PageView from '../components/ui/Page';
 import HandleSDKEvents from '../components/HandleSDKEvents';
 import { DeviceProvider } from '../provider/DeviceProvider';
@@ -130,26 +131,30 @@ function renderItem({ item }: { item: { title: string; data: any } }) {
   );
 }
 
-const ApiPayload = () => (
-  <Stack>
-    <HandleSDKEvents />
-    <DeviceProvider>
-      <CommonParamsProvider>
-        <CommonParamsView />
-        <ExpandModeProvider>
-          <PanelView title="Hardware Api Test">
-            <FlatList
-              data={playgroundConfig}
-              keyExtractor={item => `playground-${item.title}`}
-              renderItem={renderItem}
-            />
-          </PanelView>
-        </ExpandModeProvider>
-        <UploadScreen />
-      </CommonParamsProvider>
-    </DeviceProvider>
-  </Stack>
-);
+const ApiPayload = () => {
+  const intl = useIntl();
+
+  return (
+    <Stack>
+      <HandleSDKEvents />
+      <DeviceProvider>
+        <CommonParamsProvider>
+          <CommonParamsView />
+          <ExpandModeProvider>
+            <PanelView title={intl.formatMessage({ id: 'title__hardware_api_test' })}>
+              <FlatList
+                data={playgroundConfig}
+                keyExtractor={item => `playground-${item.title}`}
+                renderItem={renderItem}
+              />
+            </PanelView>
+          </ExpandModeProvider>
+          <UploadScreen />
+        </CommonParamsProvider>
+      </DeviceProvider>
+    </Stack>
+  );
+};
 
 export default function ApiPayloadScreen() {
   return (

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { Group, H4, Stack, Text } from 'tamagui';
+import { useIntl } from 'react-intl';
 import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
 import { Button } from './ui/Button';
@@ -25,6 +26,7 @@ const Playground = ({
   noConnIdReq,
   noDeviceIdReq,
 }: PlaygroundProps) => {
+  const intl = useIntl();
   const [isExpanded, setIsExpanded] = useState(false);
   const [params, setParams] = useState('');
   const [response, setResponse] = useState('');
@@ -74,7 +76,7 @@ const Playground = ({
       return (
         <>
           <Text fontSize={16} fontWeight="bold">
-            Default parameters
+            {intl.formatMessage({ id: 'label__default_parameters' })}
           </Text>
           <Group orientation="horizontal" paddingHorizontal="$2" flexWrap="wrap">
             {presupposes.map((presuppose, index) => (
@@ -89,13 +91,13 @@ const Playground = ({
       );
     }
     return null;
-  }, [fillParameterCallback, presupposes]);
+  }, [fillParameterCallback, intl, presupposes]);
 
   const RequestParamsView = useMemo(
     () => (
       <>
         <Text fontSize={16} fontWeight="bold">
-          Parameters
+          {intl.formatMessage({ id: 'label__parameters' })}
         </Text>
         <AutoExpandingTextArea
           marginHorizontal="$2"
@@ -104,11 +106,11 @@ const Playground = ({
           minHeight={presupposes && presupposes.length > 0 ? 140 : 40}
           onChangeText={setParams}
           value={params}
-          placeholder="Enter your parameters here..."
+          placeholder={intl.formatMessage({ id: 'label__enter_parameters_tip' })}
         />
       </>
     ),
-    [params, presupposes]
+    [intl, params, presupposes]
   );
 
   const copyResponse = useCallback(() => {
@@ -120,13 +122,14 @@ const Playground = ({
       <Stack>
         <Stack flexDirection="row" justifyContent="space-between">
           <Text fontSize={16} fontWeight="bold" marginTop="$1">
-            Response
+            {intl.formatMessage({ id: 'label__response' })}
           </Text>
           <Button onPress={copyResponse}>
-            <Text color="$textInfo">Copy</Text>
+            <Text color="$textInfo"> {intl.formatMessage({ id: 'action__copy' })}</Text>
           </Button>
         </Stack>
         <AutoExpandingTextArea
+          marginTop="$2"
           marginHorizontal="$2"
           marginBottom="$2"
           lineHeight={1}
@@ -134,12 +137,12 @@ const Playground = ({
           minHeight={350}
           onChangeText={setResponse}
           value={response}
-          placeholder="Response will be shown here."
+          placeholder={intl.formatMessage({ id: 'label__will_response_tip' })}
           editable={false}
         />
       </Stack>
     ),
-    [copyResponse, response]
+    [copyResponse, intl, response]
   );
 
   const onAcquireParams = useCallback(

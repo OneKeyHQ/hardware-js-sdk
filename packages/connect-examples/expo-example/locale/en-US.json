@@ -1,0 +1,108 @@
+{
+  "tab__api_payload": "Api Payload",
+  "tab__firmware_update": "Firmware Update",
+  "tab__passphrase_test": "Passphrase Test",
+  "tab__address_test": "Address Test",
+
+  "action__search_device": "Search Device",
+  "action__clean_device": "Disconnect Device",
+  "action__connect_device": "Connect Device",
+  "action__confirm": "Confirm",
+  "action__cancel": "Cancel",
+  "action__close": "Close",
+  "action__copy": "Copy",
+  "action__upload": "Upload",
+  "action__update": "Update",
+  "action__try_it": "Try it out",
+  "action__change_expand_mode": "Change ExpandMode",
+  "action__pick_image": "Pick image",
+  "action__full_coverage_res": "Upload Full Resource",
+  "action__pick_file": "Pick File",
+  "action__export_report": "Export Report",
+
+  "action__start_test": "Start Test",
+  "action__stop_test": "Stop Test",
+
+  "tip__sdk_not_ready": "SDK not ready",
+  "tip__sdk_loading": "SDK loading...",
+  "tip__sdk_load_complete": "SDK Ready",
+  "tip__need_connect_device_first": "You need to connect the device first",
+  "tip__need_pick_file": "You need to pick a file",
+
+  "tip__connecting_device": "Connecting device...",
+  "tip__need_connect_and_search_device_first": "You need to search and connect the device first",
+
+  "tip__no_select_file_tip": "No file has been selected",
+  "tip__no_select_file": "No selection file",
+  "tip__update_success": "Update success",
+
+  "title__common_parameters": "Common Parameters",
+  "title__hardware_api_test": "Hardware Api Test",
+  "title__updating": "Updating",
+
+  "title__device_info": "Device Information",
+  "title__device_firmware_update": "Device Firmware Update",
+  "title__device_advanced_info": "Device Advanced Information",
+
+  "title__address_test_single": "Single Address Test",
+  "title__address_test_batch": "Batch Address Test",
+  "title__publickey_test_single": "Single Pubkey Test",
+  "title__publickey_test_batch": "Batch Pubkey Test",
+  "title__address_variant_test_single": "Single Variant Address Test",
+  "title__address_variant_test_batch": "Batch Variant Address Test",
+
+  "label__keep_session": "Keep Session",
+  "label__retry_count": "Retry Count",
+  "label__retry_interval_time": "Retry Interval Time",
+  "label__connection_timeout": "Connection Timeout Time",
+  "label__init_session": "Init Session",
+  "label__default_parameters": "Default Parameters",
+  "label__parameters": "Parameters",
+  "label__enter_parameters_tip": "Enter your parameters here...",
+  "label__response": "Response",
+  "label__will_response_tip": "Response will be shown here.",
+
+  "label__upload_image_res_type": "Support PNG & MP4",
+  "label__image_res_type": "Resource type",
+  "label__res_file_suffix": "File Suffix",
+  "label__res_type_wall_paper": "WallPaper",
+  "label__res_type_nft": "NFT",
+  "label__nft_data": "NFT Data",
+  "label__nft_url": "NFT URL",
+
+  "label__progress": "Progress",
+  "label__expected": "Expected:",
+
+  "label__show_on_onekey": "Show on OneKey",
+
+  "label__device_type_sdk": "Device Type (SDK)",
+  "label__device_uuid": "Device UUID",
+  "label__device_firmware_version": "Firmware Version",
+  "label__device_bootloader_version": "Bootloader Version",
+  "label__device_bluetooth_version": "Bluetooth Version",
+
+  "label__device_update_firmware": "Update Firmware",
+  "label__device_update_ble_firmware": "Update Bluetooth Firmware",
+  "label__device_update_bootloader": "Update Bootloader",
+  "label__device_update_sys_resource": "Update Sys Resource",
+
+  "message__no_device": "No device",
+  "message__current_selector_device": "Current selector device: ",
+  "message__search_device_and_connect_device": "Search device and connect device",
+
+  "message__check_latest_ui_resource": "Check latest Ui resource...",
+  "message__download_latest_ui_resource": "Download latest Ui resource...",
+  "message__download_latest_ui_resource_success": "Download latest Ui resource success",
+  "message__reboot_to_bootloader": "Reboot to bootloader...",
+  "message__wait_begin_update": "Wait begin update...",
+  "message__confirm_on_device": "Confirm on device...",
+  "message__firmware_erase_success": "Firmware erase success",
+  "message__firmware_start_transfer": "Firmware start transfer...",
+  "message__firmware_installing": "Firmware installing...",
+  "message__bootloader_update": "Bootloader update...",
+  "message__bootloader_update_success": "Bootloader update success",
+  "message__sys_resource_update": "Sys resource update...",
+  "message__sys_resource_update_success": "Sys resource update success",
+
+  "ignore": "ignore"
+}

@@ -1,12 +1,15 @@
-import { Stack, Group, H3, YGroup, ListItem, useMedia, Sheet } from 'tamagui';
+import { Stack, Group, H3, YGroup, ListItem, useMedia, Sheet, XStack } from 'tamagui';
 import { useNavigation, useRoute } from '@react-navigation/core';
 import { Menu } from '@tamagui/lucide-icons';
 
 import { useCallback, useMemo, useState } from 'react';
+import { useIntl } from 'react-intl';
 import { Routes } from '../../route';
 import { Button } from './Button';
+import LocaleToggleButton from './LocaleToggleButton';
 
 const HeaderView = () => {
+  const intl = useIntl();
   const media = useMedia();
   const route = useRoute();
   const navigation = useNavigation();
@@ -35,7 +38,7 @@ const HeaderView = () => {
             variant={route.name === Routes.Payload ? 'primary' : 'secondary'}
             onPress={() => navigate(Routes.Payload)}
           >
-            Api Payload
+            {intl.formatMessage({ id: 'tab__api_payload' })}
           </Button>
         </Group.Item>
         <Group.Item>
@@ -43,7 +46,7 @@ const HeaderView = () => {
             variant={route.name === Routes.FirmwareUpdateTest ? 'primary' : 'secondary'}
             onPress={() => navigate(Routes.FirmwareUpdateTest)}
           >
-            Firmware Update
+            {intl.formatMessage({ id: 'tab__firmware_update' })}
           </Button>
         </Group.Item>
         <Group.Item>
@@ -51,7 +54,7 @@ const HeaderView = () => {
             variant={route.name === Routes.PassphraseTest ? 'primary' : 'secondary'}
             onPress={() => navigate(Routes.PassphraseTest)}
           >
-            Passphrase Test
+            {intl.formatMessage({ id: 'tab__passphrase_test' })}
           </Button>
         </Group.Item>
         <Group.Item>
@@ -59,12 +62,12 @@ const HeaderView = () => {
             variant={route.name === Routes.AddressTest ? 'primary' : 'secondary'}
             onPress={() => navigate(Routes.AddressTest)}
           >
-            Address Test
+            {intl.formatMessage({ id: 'tab__address_test' })}
           </Button>
         </Group.Item>
       </Group>
     ),
-    [navigate, route.name]
+    [intl, navigate, route.name]
   );
 
   const smallGroupItemMemo = useMemo(
@@ -88,18 +91,30 @@ const HeaderView = () => {
         <Sheet.Handle />
         <Sheet.Frame padding="$4" justifyContent="center" alignItems="center" space="$5">
           <YGroup alignSelf="center" width={240}>
-            <ListItem title="Api Payload" onPress={() => navigate(Routes.Payload)} />
+            <ListItem
+              title={intl.formatMessage({ id: 'tab__api_payload' })}
+              onPress={() => navigate(Routes.Payload)}
+            />
 
-            <ListItem title="Firmware Update" onPress={() => navigate(Routes.FirmwareUpdateTest)} />
+            <ListItem
+              title={intl.formatMessage({ id: 'tab__firmware_update' })}
+              onPress={() => navigate(Routes.FirmwareUpdateTest)}
+            />
 
-            <ListItem title="Passphrase Test" onPress={() => navigate(Routes.PassphraseTest)} />
+            <ListItem
+              title={intl.formatMessage({ id: 'tab__passphrase_test' })}
+              onPress={() => navigate(Routes.PassphraseTest)}
+            />
 
-            <ListItem title="Address Test" onPress={() => navigate(Routes.AddressTest)} />
+            <ListItem
+              title={intl.formatMessage({ id: 'tab__address_test' })}
+              onPress={() => navigate(Routes.AddressTest)}
+            />
           </YGroup>
         </Sheet.Frame>
       </Sheet>
     ),
-    [navigate, open]
+    [intl, navigate, open]
   );
 
   return (
@@ -112,16 +127,19 @@ const HeaderView = () => {
     >
       <H3>Hardware Example</H3>
 
-      {media.gtSm ? (
-        groupItemMemo
-      ) : (
-        <>
-          <Button onPress={() => setOpen(!open)}>
-            <Menu size="$4" />
-          </Button>
-          {smallGroupItemMemo}
-        </>
-      )}
+      <XStack minHeight={40} gap="$2">
+        {media.gtSm ? (
+          groupItemMemo
+        ) : (
+          <>
+            <Button onPress={() => setOpen(!open)}>
+              <Menu size="$4" />
+            </Button>
+            {smallGroupItemMemo}
+          </>
+        )}
+        <LocaleToggleButton />
+      </XStack>
     </Stack>
   );
 };

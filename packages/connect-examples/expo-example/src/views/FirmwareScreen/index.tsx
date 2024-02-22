@@ -10,6 +10,7 @@ import {
   getDeviceBootloaderVersion,
 } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
+import { useIntl } from 'react-intl';
 import type { Device } from '../../components/DeviceList';
 import PageView from '../../components/ui/Page';
 import PanelView from '../../components/ui/Panel';
@@ -35,6 +36,7 @@ interface FirmwareLocalFileProps {
 }
 
 function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
+  const intl = useIntl();
   const [fileAsset, setFileAsset] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState | undefined>();
 
@@ -47,7 +49,7 @@ function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
     }).then(res => {
       if (res.canceled) return;
       if (res.assets.length === 0) {
-        alert('未选择文件');
+        alert(intl.formatMessage({ id: 'tip__no_select_file_tip' }));
       } else {
         setFileAsset(res.assets[0]);
       }
@@ -62,6 +64,7 @@ function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
       borderWidth="$px"
       borderRadius="$3"
       width="100%"
+      flex={1}
       $gtSm={{ width: '48%' }}
       $gtLg={{ width: '30%' }}
     >
@@ -77,8 +80,10 @@ function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
         alignItems="center"
         justifyContent="space-between"
       >
-        <Text>{fileAsset?.name ? fileAsset?.name : '未选择'}</Text>
-        <Button onPress={selectFile}>选择文件</Button>
+        <Text>
+          {fileAsset?.name ? fileAsset?.name : intl.formatMessage({ id: 'tip__no_select_file' })}
+        </Text>
+        <Button onPress={selectFile}>{intl.formatMessage({ id: 'action__pick_file' })}</Button>
       </Stack>
       <Button
         variant="primary"
@@ -94,11 +99,13 @@ function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
           setUpdateState(res);
         }}
       >
-        Update
+        {intl.formatMessage({ id: 'action__update' })}
       </Button>
       {updateState && (
         <Text color={updateState?.success ? '$text' : '$textCritical'}>
-          {updateState?.success ? '升级成功' : updateState?.payload}
+          {updateState?.success
+            ? intl.formatMessage({ id: 'tip__update_success' })
+            : updateState?.payload}
         </Text>
       )}
     </Stack>
@@ -107,8 +114,10 @@ function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
 
 interface FirmwareUpdateProps {
   selectDevice: Device | null;
+  onDisconnectDevice: () => void;
 }
-function FirmwareUpdate({ selectDevice }: FirmwareUpdateProps) {
+function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProps) {
+  const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
   const [features, setFeatures] = useState<Features | undefined>(undefined);
   const [connecting, setConnecting] = useState<boolean>(false);
@@ -119,7 +128,7 @@ function FirmwareUpdate({ selectDevice }: FirmwareUpdateProps) {
 
   useEffect(() => {
     if (!sdk) return;
-    if (!selectDevice?.connectId) return;
+    if (selectDevice?.connectId == null && selectDevice?.features == null) return;
     setConnecting(true);
     setFeatures(undefined);
     sdk
@@ -137,13 +146,23 @@ function FirmwareUpdate({ selectDevice }: FirmwareUpdateProps) {
       .finally(() => {
         setConnecting(false);
       });
-  }, [sdk, selectDevice?.connectId]);
+  }, [sdk, selectDevice?.connectId, selectDevice?.features]);
+
+  const disconnectDevice = useCallback(() => {
+    setFeatures(undefined);
+    onDisconnectDevice?.();
+  }, [onDisconnectDevice]);
 
   const updateFirmware = useCallback(
     async ({ type, file }: { type: UpdateType; file: DocumentPicker.DocumentPickerAsset }) => {
-      if (!sdk) return { payload: 'sdk is not ready', success: false };
+      if (!sdk)
+        return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
       if (!features) return { payload: 'features is not ready', success: false };
-      if (!selectDevice) return { payload: 'selectDevice is not ready', success: false };
+      if (!selectDevice)
+        return {
+          payload: intl.formatMessage({ id: 'tip__need_connect_device_first' }),
+          success: false,
+        };
 
       let fileData: ArrayBuffer | undefined;
       if (Platform.OS === 'web') {
@@ -155,7 +174,8 @@ function FirmwareUpdate({ selectDevice }: FirmwareUpdateProps) {
         fileData = new Uint8Array(Buffer.from(base64Data, 'base64')).buffer;
       }
 
-      if (!fileData) return { payload: 'fileData is not ready', success: false };
+      if (!fileData)
+        return { payload: intl.formatMessage({ id: 'tip__need_pick_file' }), success: false };
 
       if (type === 'bootloader' && (deviceType === 'touch' || deviceType === 'pro')) {
         setShowUpdateDialog(true);
@@ -178,11 +198,14 @@ function FirmwareUpdate({ selectDevice }: FirmwareUpdateProps) {
       if (type === 'ble' || type === 'firmware' || type === 'bootloader') {
         setShowUpdateDialog(true);
         // @ts-expect-error
-        const res = await sdk.firmwareUpdateV2(selectDevice.connectId, {
-          updateType: type === 'bootloader' ? 'firmware' : type,
-          binary: fileData,
-          platform: Platform.OS === 'web' ? 'web' : 'native',
-        });
+        const res = await sdk.firmwareUpdate(
+          Platform.OS === 'web' ? undefined : selectDevice.connectId,
+          {
+            updateType: type === 'bootloader' ? 'firmware' : type,
+            binary: fileData,
+            platform: Platform.OS === 'web' ? 'web' : 'native',
+          }
+        );
 
         setShowUpdateDialog(false);
         if (!res.success) {
@@ -214,7 +237,7 @@ function FirmwareUpdate({ selectDevice }: FirmwareUpdateProps) {
         };
       }
     },
-    [deviceType, features, sdk, selectDevice]
+    [deviceType, features, intl, sdk, selectDevice]
   );
 
   return (
@@ -222,14 +245,23 @@ function FirmwareUpdate({ selectDevice }: FirmwareUpdateProps) {
       <FirmwareUpdateEvent open={showUpdateDialog} onOpenChange={setShowUpdateDialog} />
 
       <Stack marginTop="$2">
-        {connecting && <MessageBox message="Connecting..." />}
-        {!selectDevice && <MessageBox message="请先搜索并连接设备" />}
+        {connecting && (
+          <MessageBox message={intl.formatMessage({ id: 'tip__connecting_device' })} />
+        )}
+        {!selectDevice && (
+          <MessageBox
+            message={intl.formatMessage({ id: 'tip__need_connect_and_search_device_first' })}
+          />
+        )}
         {!!error && <MessageBox message={error} />}
       </Stack>
 
       {features && (
         <Stack>
-          <PanelView title="Device Information">
+          <PanelView title={intl.formatMessage({ id: 'title__device_info' })}>
+            <Button size="large" onPress={disconnectDevice}>
+              {intl.formatMessage({ id: 'action__clean_device' })}
+            </Button>
             <Stack
               flex={1}
               padding="$2"
@@ -239,43 +271,60 @@ function FirmwareUpdate({ selectDevice }: FirmwareUpdateProps) {
               flexWrap="wrap"
               borderRadius="$2"
             >
-              <DeviceField field="DeviceType (SDK)" value={getDeviceType(features)} />
-              <DeviceField field="DeviceUUID" value={getDeviceUUID(features)} />
               <DeviceField
-                field="FirmwareVersion"
+                field={intl.formatMessage({ id: 'label__device_type_sdk' })}
+                value={getDeviceType(features)}
+              />
+              <DeviceField
+                field={intl.formatMessage({ id: 'label__device_uuid' })}
+                value={getDeviceUUID(features)}
+              />
+              <DeviceField
+                field={intl.formatMessage({ id: 'label__device_firmware_version' })}
                 value={getDeviceFirmwareVersion(features).join('.')}
               />
               <DeviceField
-                field="BootloaderVersion"
+                field={intl.formatMessage({ id: 'label__device_bootloader_version' })}
                 value={getDeviceBootloaderVersion(features).join('.')}
               />
-              <DeviceField field="BleVersion" value={features.ble_ver} />
+              <DeviceField
+                field={intl.formatMessage({ id: 'label__device_bluetooth_version' })}
+                value={features.ble_ver}
+              />
             </Stack>
           </PanelView>
 
-          <PanelView title="Firmware Update">
+          <PanelView title={intl.formatMessage({ id: 'title__device_firmware_update' })}>
             <XStack flexWrap="wrap" gap="$2">
-              <FirmwareLocalFile title="升级固件" type="firmware" onUpdate={updateFirmware} />
+              <FirmwareLocalFile
+                title={intl.formatMessage({ id: 'label__device_update_firmware' })}
+                type="firmware"
+                onUpdate={updateFirmware}
+              />
               {deviceType !== 'mini' && (
                 <FirmwareLocalFile
-                  title="升级 BLE 固件"
+                  title={intl.formatMessage({ id: 'label__device_update_ble_firmware' })}
                   type="firmware"
                   onUpdate={updateFirmware}
                 />
               )}
               <FirmwareLocalFile
-                title="升级 Bootloader"
+                title={intl.formatMessage({ id: 'label__device_update_bootloader' })}
                 type="bootloader"
                 onUpdate={updateFirmware}
               />
               {deviceType === 'pro' ||
                 (deviceType === 'touch' && (
-                  <FirmwareLocalFile title="升级系统资源" type="source" onUpdate={updateFirmware} />
+                  <FirmwareLocalFile
+                    title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
+                    type="source"
+                    onUpdate={updateFirmware}
+                  />
                 ))}
             </XStack>
           </PanelView>
 
-          <PanelView title="Device Advanced Information">
+          <PanelView title={intl.formatMessage({ id: 'title__device_advanced_info' })}>
             <Stack
               flex={1}
               padding="$2"
@@ -330,7 +379,10 @@ export default function FirmwareScreen() {
     <PageView>
       <Stack padding="$2">
         <DeviceList onSelected={setSelectedDevice} disableSaveDevice />
-        <FirmwareUpdate selectDevice={selectedDevice} />
+        <FirmwareUpdate
+          selectDevice={selectedDevice}
+          onDisconnectDevice={() => setSelectedDevice(null)}
+        />
       </Stack>
     </PageView>
   );

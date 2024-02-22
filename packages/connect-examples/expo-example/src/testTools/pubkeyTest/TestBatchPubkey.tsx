@@ -4,6 +4,7 @@ import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-cor
 import { Picker } from '@react-native-picker/picker';
 
 import { Text, XStack } from 'tamagui';
+import { useIntl } from 'react-intl';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { PubkeyBatchTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
@@ -17,6 +18,7 @@ type TestCaseDataType = PubkeyBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
 
 function ExportReportView() {
+  const intl = useIntl();
   const { showExportReport, exportReport } = useExportReport<TestCaseDataType>({
     fileName: 'BatchPubkeyTestReport',
     reportTitle: 'Batch Pubkey Test Report',
@@ -44,7 +46,7 @@ function ExportReportView() {
   if (showExportReport) {
     return (
       <Button variant="primary" onPress={exportReport}>
-        Export Report
+        {intl.formatMessage({ id: 'action__export_report' })}
       </Button>
     );
   }
@@ -159,21 +161,8 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
   return error;
 }
 
-function extractIndex(template: string, actual: string) {
-  const escapedTemplate = template.replace(/[-\\/\\^$*+?.()|[\]{}]/g, '\\$&');
-  const regexPattern = escapedTemplate.replace('\\$\\$INDEX\\$\\$', '(\\d+)');
-
-  const regex = new RegExp(regexPattern);
-  const match = actual.match(regex);
-
-  if (match && match.length > 1) {
-    return match[1];
-  }
-
-  return actual;
-}
-
 function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
+  const intl = useIntl();
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PubkeyBatchTestCase>();
   const [testDescription, setTestDescription] = useState<string>();
@@ -335,10 +324,10 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
             ))}
           </Picker>
           <Button variant="primary" onPress={beginTest}>
-            Start Test
+            {intl.formatMessage({ id: 'action__start_test' })}
           </Button>
           <Button variant="destructive" onPress={stopTest}>
-            Stop Test
+            {intl.formatMessage({ id: 'action__stop_test' })}
           </Button>
           <ExportReportView />
         </XStack>
@@ -348,6 +337,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
       beginTest,
       currentTestCase?.name,
       findTestCase,
+      intl,
       passphrase,
       stopTest,
       testCaseList,

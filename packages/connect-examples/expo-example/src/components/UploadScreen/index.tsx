@@ -10,6 +10,7 @@ import { DeviceUploadResourceParams, CoreApi, CommonParams, KnownDevice } from '
 import { ResourceType } from '@onekeyfe/hd-transport';
 import { Image, Label, Stack, View, XStack } from 'tamagui';
 import { Platform } from 'react-native';
+import { useIntl } from 'react-intl';
 import { getImageSize, imageToBase64, formatBytes, generateUploadNFTParams } from './nftUtils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useCommonParams } from '../../provider/CommonParamsProvider';
@@ -117,6 +118,7 @@ export const compressHomescreen = async (
 };
 
 function UploadScreenComponent() {
+  const intl = useIntl();
   const { sdk: SDK, type } = useContext(HardwareSDKContext);
   const { selectedDevice } = useDevice();
   const { commonParams } = useCommonParams();
@@ -220,13 +222,13 @@ function UploadScreenComponent() {
       <XStack flexWrap="wrap" gap="$4">
         <Stack width={160} minHeight={45}>
           <Label paddingRight="$0" justifyContent="center">
-            支持 PNG & MP4
+            {intl.formatMessage({ id: 'label__upload_image_res_type' })}
           </Label>
-          <Button onPress={pickImage}>Pick image</Button>
+          <Button onPress={pickImage}>{intl.formatMessage({ id: 'action__pick_image' })}</Button>
         </Stack>
         <CommonInput
           type="text"
-          label="文件后缀"
+          label={intl.formatMessage({ id: 'label__res_file_suffix' })}
           value={uploadScreenParams?.suffix ?? ''}
           onChange={v => {
             setUploadScreenParams({ ...uploadScreenParams, suffix: v });
@@ -234,7 +236,7 @@ function UploadScreenComponent() {
         />
         <Stack width={160} minHeight={45}>
           <Label paddingRight="$0" justifyContent="center">
-            资源类型
+            {intl.formatMessage({ id: 'label__image_res_type' })}
           </Label>
           <Picker
             selectedValue={uploadScreenParams?.resType}
@@ -242,13 +244,16 @@ function UploadScreenComponent() {
               setUploadScreenParams({ ...uploadScreenParams, resType: itemValue })
             }
           >
-            <Picker.Item label="WallPaper" value="0" />
-            <Picker.Item label="NFT" value="1" />
+            <Picker.Item
+              label={intl.formatMessage({ id: 'label__res_type_wall_paper' })}
+              value="0"
+            />
+            <Picker.Item label={intl.formatMessage({ id: 'label__res_type_nft' })} value="1" />
           </Picker>
         </Stack>
         <CommonInput
           type="text"
-          label="NFT 数据"
+          label={intl.formatMessage({ id: 'label__nft_data' })}
           value={uploadScreenParams?.nftMetaData ?? ''}
           onChange={v => {
             setUploadScreenParams({ ...uploadScreenParams, nftMetaData: v });
@@ -256,18 +261,20 @@ function UploadScreenComponent() {
         />
         <CommonInput
           type="text"
-          label="NFT URL"
+          label={intl.formatMessage({ id: 'label__nft_url' })}
           value={nftUrl ?? ''}
           onChange={v => {
             setNftUrl(v);
           }}
         />
-        <Button onPress={() => handleScreenUpdate()}>Upload File</Button>
+        <Button onPress={() => handleScreenUpdate()}>
+          {intl.formatMessage({ id: 'action__upload' })}
+        </Button>
         {Platform.OS === 'web' && (
           <Button
             onPress={() => SDK?.deviceFullyUploadResource(selectedDevice?.connectId ?? '', {})}
           >
-            全量覆盖 RES
+            {intl.formatMessage({ id: 'action__full_coverage_res' })}
           </Button>
         )}
       </XStack>

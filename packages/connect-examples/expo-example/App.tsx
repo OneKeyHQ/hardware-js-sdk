@@ -4,8 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TamaguiProvider } from '@tamagui/core';
 import { PortalProvider, Text, Stack } from 'tamagui';
 import * as ExpoLinking from 'expo-linking';
-import { IntlProvider } from 'react-intl';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import ApiPayloadScreen from './src/views/ApiPayloadScreen';
 import PassphraseTestScreen from './src/views/PassphraseTestScreen';
 import SDKProvider from './src/provider/SDKProvider';
@@ -14,6 +14,7 @@ import AddressTestScreen from './src/views/AddressTestScreen';
 
 import config from './tamagui.config';
 import { Routes } from './src/route';
+import AppIntlProvider from './src/provider/AppIntlProvider';
 
 const prefix = ExpoLinking.createURL('/');
 
@@ -68,22 +69,15 @@ function TamaguiProviderWrapper({ children }: { children: React.ReactNode }) {
 const TamaguiProviderWrapperMemo = React.memo(TamaguiProviderWrapper);
 TamaguiProviderWrapperMemo.displayName = 'TamaguiProviderWrapper';
 
-// Wrap the app with the IntlProvider
-function AppIntlProvider({ children }: { children: React.ReactNode }) {
-  return <IntlProvider locale="en">{children}</IntlProvider>;
-}
-const AppIntlProviderMemo = React.memo(AppIntlProvider);
-AppIntlProviderMemo.displayName = 'AppIntlProvider';
-
 // Main App
 export default function App() {
   return (
-    <AppIntlProviderMemo>
+    <AppIntlProvider>
       <SafeAreaProvider>
         <TamaguiProviderWrapperMemo>
           <NavigationContentMemo />
         </TamaguiProviderWrapperMemo>
       </SafeAreaProvider>
-    </AppIntlProviderMemo>
+    </AppIntlProvider>
   );
 }

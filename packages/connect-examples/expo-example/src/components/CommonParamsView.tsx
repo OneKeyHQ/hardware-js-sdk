@@ -1,10 +1,12 @@
 import { Stack } from 'tamagui';
+import { useIntl } from 'react-intl';
 import { useCommonParams } from '../provider/CommonParamsProvider';
 import { CommonInput } from './CommonInput';
 import { SwitchInput } from './SwitchInput';
 import PanelView from './ui/Panel';
 
 export default function CommonParamsView() {
+  const intl = useIntl();
   const { commonParams, setCommonParams: setOptionalParams } = useCommonParams();
 
   const handleSetParam = (param: string, value: any) => {
@@ -12,27 +14,27 @@ export default function CommonParamsView() {
   };
 
   return (
-    <PanelView title="Common Parameters">
+    <PanelView title={intl.formatMessage({ id: 'title__common_parameters' })}>
       <Stack gap="$4" flexDirection="row" flexWrap="wrap">
         <SwitchInput
-          label="保持 Session"
+          label={intl.formatMessage({ id: 'label__keep_session' })}
           value={!!commonParams.keepSession}
           onToggle={value => handleSetParam('keepSession', value)}
         />
         <CommonInput
-          label="重试次数"
+          label={intl.formatMessage({ id: 'label__retry_count' })}
           type="number"
           value={commonParams.retryCount?.toString() ?? ''}
           onChange={value => handleSetParam('retryCount', parseInt(value))}
         />
         <CommonInput
-          label="重试间隔时长"
+          label={intl.formatMessage({ id: 'label__retry_interval_time' })}
           type="number"
           value={commonParams.pollIntervalTime?.toString() ?? ''}
           onChange={value => handleSetParam('pollIntervalTime', parseInt(value))}
         />
         <CommonInput
-          label="连接超时事件"
+          label={intl.formatMessage({ id: 'label__connection_timeout' })}
           type="number"
           value={commonParams.timeout?.toString() ?? ''}
           onChange={value => handleSetParam('timeout', parseInt(value))}
@@ -44,7 +46,7 @@ export default function CommonParamsView() {
           onChange={value => handleSetParam('passphraseState', value)}
         />
         <SwitchInput
-          label="Init Session"
+          label={intl.formatMessage({ id: 'label__init_session' })}
           value={!!commonParams.initSession}
           onToggle={value => handleSetParam('initSession', value)}
         />

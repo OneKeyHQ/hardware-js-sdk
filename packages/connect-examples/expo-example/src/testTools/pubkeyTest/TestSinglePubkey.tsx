@@ -4,6 +4,7 @@ import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-cor
 import { Picker } from '@react-native-picker/picker';
 
 import { Stack, Text, XStack } from 'tamagui';
+import { useIntl } from 'react-intl';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { PubkeyTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
@@ -16,6 +17,8 @@ type TestCaseDataType = PubkeyTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<PubkeyTestCase['data'][0]> };
 
 function ExportReportView() {
+  const intl = useIntl();
+
   const { showExportReport, exportReport } = useExportReport<TestCaseDataType>({
     fileName: 'SinglePubkeyTestReport',
     reportTitle: 'Single Pubkey Test Report',
@@ -44,7 +47,7 @@ function ExportReportView() {
   if (showExportReport) {
     return (
       <Button variant="primary" onPress={exportReport}>
-        Export Report
+        {intl.formatMessage({ id: 'action__export_report' })}
       </Button>
     );
   }
@@ -101,6 +104,7 @@ function validateFields(payload: any, result: any, prefix = '') {
 }
 
 function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
+  const intl = useIntl();
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PubkeyTestCase>();
@@ -230,16 +234,16 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
             ))}
           </Picker>
           <SwitchInput
-            label="Show on OneKey"
+            label={intl.formatMessage({ id: 'label__show_on_onekey' })}
             value={showOnOneKey}
             onToggle={setShowOnOneKey}
             vertical
           />
           <Button variant="primary" onPress={beginTest}>
-            Start Test
+            {intl.formatMessage({ id: 'action__start_test' })}
           </Button>
           <Button variant="destructive" onPress={stopTest}>
-            Stop Test
+            {intl.formatMessage({ id: 'action__stop_test' })}
           </Button>
           <ExportReportView />
         </Stack>
@@ -249,6 +253,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       beginTest,
       currentTestCase?.name,
       findTestCase,
+      intl,
       passphrase,
       showOnOneKey,
       stopTest,

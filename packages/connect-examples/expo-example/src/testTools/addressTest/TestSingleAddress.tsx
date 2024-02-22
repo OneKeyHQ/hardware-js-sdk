@@ -4,6 +4,7 @@ import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-cor
 import { Picker } from '@react-native-picker/picker';
 
 import { Stack, Text } from 'tamagui';
+import { useIntl } from 'react-intl';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { AddressTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
@@ -16,6 +17,7 @@ type TestCaseDataType = AddressTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
 
 function ResultView({ item }: ResultViewProps) {
+  const intl = useIntl();
   const title = item?.title || item?.method;
 
   return (
@@ -24,12 +26,15 @@ function ResultView({ item }: ResultViewProps) {
         <Text fontSize={14}>{title}</Text>
       </Stack>
 
-      <Text fontSize={14}>Expected: {item?.result.address}</Text>
+      <Text fontSize={14}>
+        {intl.formatMessage({ id: 'label__expected' })} {item?.result.address}
+      </Text>
     </>
   );
 }
 
 function ExportReportView() {
+  const intl = useIntl();
   const { showExportReport, exportReport } = useExportReport<TestCaseDataType>({
     fileName: 'SingleAddressTestReport',
     reportTitle: 'Single Address Test Report',
@@ -57,7 +62,7 @@ function ExportReportView() {
   if (showExportReport) {
     return (
       <Button variant="primary" onPress={exportReport}>
-        Export Report
+        {intl.formatMessage({ id: 'action__export_report' })}
       </Button>
     );
   }
@@ -66,6 +71,7 @@ function ExportReportView() {
 }
 
 function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
+  const intl = useIntl();
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressTestCase>();
@@ -204,16 +210,16 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
             ))}
           </Picker>
           <SwitchInput
-            label="Show on OneKey"
+            label={intl.formatMessage({ id: 'label__show_on_onekey' })}
             value={showOnOneKey}
             onToggle={setShowOnOneKey}
             vertical
           />
           <Button variant="primary" onPress={beginTest}>
-            Start Test
+            {intl.formatMessage({ id: 'action__start_test' })}
           </Button>
           <Button variant="destructive" onPress={stopTest}>
-            Stop Test
+            {intl.formatMessage({ id: 'action__stop_test' })}
           </Button>
           <ExportReportView />
         </Stack>
@@ -223,6 +229,7 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
       beginTest,
       currentTestCase?.name,
       findTestCase,
+      intl,
       passphrase,
       showOnOneKey,
       stopTest,
