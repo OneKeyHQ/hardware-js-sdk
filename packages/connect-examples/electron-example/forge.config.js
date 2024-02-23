@@ -12,6 +12,7 @@ module.exports = {
     executableName: process.platform === 'linux' ? 'onekey-hardware-example' : 'HardwareExample',
     appCategoryType: 'public.app-category.developer-tools',
     appCopyright: 'Copyright 2024 OneKey Ltd',
+    asar: true,
     icon: path.resolve(__dirname, 'public', 'icons', 'icon'),
   },
   rebuildConfig: {},
@@ -19,7 +20,7 @@ module.exports = {
     packageAfterCopy: async (forgeConfig, buildPath, electronVersion, platform, arch) => {
       let originDir;
       let binName;
-      const destDir = path.resolve(buildPath, 'bin', 'bridge');
+      const destDir = path.resolve(buildPath, '../', 'bin', 'bridge');
 
       switch (platform) {
         case 'darwin':

@@ -82,9 +82,9 @@ function AppIntlProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppLocaleContext.Provider value={providerValue}>
-      <Suspense fallback={<div>Loading...</div>}>
-        <IntlContentMemo locale={locale}>{children}</IntlContentMemo>
-      </Suspense>
+      {/* <Suspense fallback={<div>Loading...</div>}> */}
+      <IntlContentMemo locale={locale}>{children}</IntlContentMemo>
+      {/* </Suspense> */}
     </AppLocaleContext.Provider>
   );
 }

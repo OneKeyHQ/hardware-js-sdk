@@ -5,7 +5,7 @@ import { useIntl } from 'react-intl';
 import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
 import { Button } from './ui/Button';
-import AutoExpandingTextArea from './ui/AutoExpandingTextArea';
+import AutoWrapperTextArea from './ui/AutoWrapperTextArea';
 
 export interface PresupposeProps {
   title: string;
@@ -80,10 +80,8 @@ const Playground = ({
           </Text>
           <Group orientation="horizontal" paddingHorizontal="$2" flexWrap="wrap">
             {presupposes.map((presuppose, index) => (
-              <Group.Item>
-                <Button key={presuppose.title} onPress={fillParameterCallback(index)}>
-                  {presuppose.title}
-                </Button>
+              <Group.Item key={presuppose.title}>
+                <Button onPress={fillParameterCallback(index)}>{presuppose.title}</Button>
               </Group.Item>
             ))}
           </Group>
@@ -99,13 +97,12 @@ const Playground = ({
         <Text fontSize={16} fontWeight="bold">
           {intl.formatMessage({ id: 'label__parameters' })}
         </Text>
-        <AutoExpandingTextArea
+        <AutoWrapperTextArea
           marginHorizontal="$2"
-          lineHeight={1}
-          fontSize={14}
           minHeight={presupposes && presupposes.length > 0 ? 140 : 40}
-          onChangeText={setParams}
+          maxHeight={320}
           value={params}
+          onChangeText={setParams}
           placeholder={intl.formatMessage({ id: 'label__enter_parameters_tip' })}
         />
       </>
@@ -128,15 +125,12 @@ const Playground = ({
             <Text color="$textInfo"> {intl.formatMessage({ id: 'action__copy' })}</Text>
           </Button>
         </Stack>
-        <AutoExpandingTextArea
+        <AutoWrapperTextArea
           marginTop="$2"
           marginHorizontal="$2"
           marginBottom="$2"
-          lineHeight={1}
-          fontSize={13}
-          minHeight={350}
-          onChangeText={setResponse}
           value={response}
+          onChangeText={setResponse}
           placeholder={intl.formatMessage({ id: 'label__will_response_tip' })}
           editable={false}
         />

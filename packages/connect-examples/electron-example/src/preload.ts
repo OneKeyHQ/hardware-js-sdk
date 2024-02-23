@@ -13,7 +13,9 @@ declare global {
 }
 
 ipcRenderer.on('SET_ONEKEY_DESKTOP_GLOBALS', (_, globals) => {
-  contextBridge.exposeInMainWorld('ONEKEY_DESKTOP_GLOBALS', globals);
+  // @ts-expect-error
+  window.ONEKEY_DESKTOP_GLOBALS = globals;
+  // contextBridge.exposeInMainWorld('ONEKEY_DESKTOP_GLOBALS', globals);
 });
 
 const desktopApi = {

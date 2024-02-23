@@ -18,14 +18,20 @@ export const ExpandModeProvider: React.FC<{ children: ReactNode }> = ({ children
 
   return (
     <ExpandModeContext.Provider value={providerValue}>
-      <>
-        <Stack gap="$2" alignItems="flex-end" marginTop="$2">
-          <Button size="large" variant="primary" onPress={toggleExpandMode}>
-            {intl.formatMessage({ id: 'action__change_expand_mode' })}
-          </Button>
-        </Stack>
+      <Stack>
+        <Button
+          id="expand-mode-button"
+          zIndex={100}
+          position="absolute"
+          top="$5"
+          right="$3"
+          variant="primary"
+          onPress={toggleExpandMode}
+        >
+          {intl.formatMessage({ id: 'action__change_expand_mode' })}
+        </Button>
         {contentContainer}
-      </>
+      </Stack>
     </ExpandModeContext.Provider>
   );
 };

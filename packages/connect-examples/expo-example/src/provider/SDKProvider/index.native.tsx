@@ -1,10 +1,9 @@
 import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect } from 'react';
-import { PermissionsAndroid, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PermissionsAndroid, Platform, Text } from 'react-native';
 
 import { Stack } from 'tamagui';
 import { BluetoothSearching } from '@tamagui/lucide-icons';
-import { useIntl } from 'react-intl';
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
 
@@ -37,7 +36,6 @@ const requestBluetoothScanPermission = async () => {
 };
 
 export default function Bluetooth({ children }: { children: React.ReactNode }) {
-  const intl = useIntl();
   const [sdk, createSDK] = React.useState<CoreApi>();
   const sdkInit = () => {
     getHardwareSDKInstance().then(res => {
@@ -84,13 +82,14 @@ export default function Bluetooth({ children }: { children: React.ReactNode }) {
   return (
     <HardwareSDKContext.Provider value={contextValue}>
       <Stack flex={1}>
-        <Stack flexDirection="row" backgroundColor="$bgApp" gap="$2" paddingHorizontal="$2">
+        <Stack
+          flexDirection="row"
+          backgroundColor={sdk ? '$bgApp' : '$bgCritical'}
+          gap="$2"
+          padding="$2"
+        >
           <BluetoothSearching size={20} />
-          <Text>
-            {sdk
-              ? intl.formatMessage({ id: 'tip__sdk_load_complete' })
-              : intl.formatMessage({ id: 'tip__sdk_loading' })}
-          </Text>
+          <Text>{sdk ? 'SDK Ready' : 'SDK Loading...'}</Text>
         </Stack>
         {children}
       </Stack>

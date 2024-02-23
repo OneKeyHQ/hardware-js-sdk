@@ -7,6 +7,7 @@ import { useIntl } from 'react-intl';
 import { Routes } from '../../route';
 import { Button } from './Button';
 import LocaleToggleButton from './LocaleToggleButton';
+import { DesktopDragZoneBox } from './DesktopDragZoneBox';
 
 const HeaderView = () => {
   const intl = useIntl();
@@ -18,7 +19,7 @@ const HeaderView = () => {
   const navigate = useCallback(
     (routeName: string) => {
       // @ts-expect-error
-      navigation.navigate(routeName);
+      navigation.replace(routeName);
       setOpen(false);
     },
     [navigation]

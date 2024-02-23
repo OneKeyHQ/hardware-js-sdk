@@ -118,7 +118,7 @@ function renderItem({ item }: { item: { title: string; data: any } }) {
         {item.data.map((data: React.JSX.IntrinsicAttributes & ApiPayloadProps) => (
           <Stack
             flex={1}
-            key={data.method}
+            key={`stack-${data.method}`}
             width="100%"
             $gtSm={{ width: '48%' }}
             $gtLg={{ width: '30%' }}

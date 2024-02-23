@@ -8,7 +8,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
-        node-version: [18]
+        node-version: [20]
     steps:
     - uses: actions/checkout@v3
     - name: Use Node.js ${{ matrix.node-version }}
@@ -28,4 +28,4 @@ jobs:
       with:
         name: example-${{ matrix.os }}
         path: |
-          out/make/**/*.zip
+          packages/connect-examples/electron-example/out/make/**/*.zip

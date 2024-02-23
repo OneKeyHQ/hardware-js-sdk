@@ -25,7 +25,7 @@ function FirmwareUpdateEventView({
     progress: number;
     message: string;
   }>({
-    progress: 1,
+    progress: 0,
     message: '',
   });
 
@@ -36,7 +36,7 @@ function FirmwareUpdateEventView({
   useEffect(() => {
     setUpdateState(pre => ({
       ...pre,
-      progress: 1,
+      progress: 0,
     }));
   }, [open]);
 

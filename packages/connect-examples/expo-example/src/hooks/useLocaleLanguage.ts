@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ILocaleSymbol } from '../../locale';
 import { getDefaultLocale } from '../provider/AppIntlProvider/getDefaultLocale';
-import { getItem, setItem } from '../utils/store';
+import { getItem, setItem } from '../utils/storeUtil';
 
 const STORE_LOCALES_KEYS = '@onekey/locale';
 

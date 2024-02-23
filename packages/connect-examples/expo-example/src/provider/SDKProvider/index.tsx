@@ -1,15 +1,13 @@
 import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Usb } from '@tamagui/lucide-icons';
+import { FolderSync, RefreshCw, Usb } from '@tamagui/lucide-icons';
 import { LowLevelCoreApi } from '@onekeyfe/hd-core/dist/lowLevelInject';
-import { Stack, Text } from 'tamagui';
-import { useIntl } from 'react-intl';
+import { Button, Stack, Text } from 'tamagui';
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
 
 let isSdkInit = false;
 export default function USB({ children }: { children: React.ReactNode }) {
-  const intl = useIntl();
   const [sdk, createSDK] = useState<CoreApi>();
   const [lowLevelSDK, createLowLevelSDK] = useState<LowLevelCoreApi>();
   const [useLowLevelApi, setUseLowLevelApi] = useState<boolean>(false);
@@ -47,13 +45,22 @@ export default function USB({ children }: { children: React.ReactNode }) {
   return (
     <HardwareSDKContext.Provider value={contextValue}>
       <Stack flex={1}>
-        <Stack flexDirection="row" backgroundColor="$bgApp" gap="$2" paddingHorizontal="$2">
+        <Stack
+          flexDirection="row"
+          alignItems="center"
+          justifyContent="flex-end"
+          backgroundColor={showContent ? '$bgApp' : '$bgCritical'}
+          gap="$2"
+          padding="$2"
+          style={{
+            // @ts-expect-error
+            WebkitAppRegion: 'drag',
+            WebkitUserSelect: 'none',
+            cursor: 'default',
+          }}
+        >
           <Usb size={20} />
-          <Text>
-            {showContent
-              ? intl.formatMessage({ id: 'tip__sdk_load_complete' })
-              : intl.formatMessage({ id: 'tip__sdk_loading' })}
-          </Text>
+          <Text>{showContent ? 'SDK Ready' : 'SDK Loading...'}</Text>
         </Stack>
         {children}
       </Stack>

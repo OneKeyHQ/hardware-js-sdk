@@ -7,7 +7,7 @@ import { useIntl } from 'react-intl';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
-import { getItem, removeItem, setItem } from '../utils/store';
+import { getItem, removeItem, setItem } from '../utils/storeUtil';
 
 export type Device = {
   connectId: string;
