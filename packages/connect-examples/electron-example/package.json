@@ -2,7 +2,7 @@
   "name": "hardware-example",
   "productName": "HardwareExample",
   "executableName": "onekey-hardware-example",
-  "version": "0.0.1",
+  "version": "0.3.39",
   "author": "OneKey",
   "description": "End-to-end encrypted workspaces for teams",
   "main": "dist/index.js",
@@ -27,8 +27,6 @@
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.2.0",
-    "@electron-forge/maker-deb": "^7.2.0",
-    "@electron-forge/maker-rpm": "^7.2.0",
     "@electron-forge/maker-zip": "^7.2.0",
     "@types/webpack": "^5.28.5",
     "@types/webpack-node-externals": "^3.0.4",

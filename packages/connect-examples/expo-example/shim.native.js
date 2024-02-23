@@ -29,7 +29,7 @@ if (typeof localStorage !== 'undefined') {
 // crypto is loaded first, so it can populate global.crypto
 if (typeof crypto === 'undefined') {
   try {
-    shimsLog('crypto');
+    // shimsLog('crypto');
     // eslint-disable-next-line no-const-assign
     global.crypto = require('crypto');
   } catch (error) {

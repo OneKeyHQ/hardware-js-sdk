@@ -4,15 +4,14 @@ import React, {
   useContext,
   useEffect,
   useState,
-  useCallback,
   useMemo,
   memo,
   Suspense,
 } from 'react';
 import { isFunction } from 'lodash';
+import { Text } from 'tamagui';
 import { appLocale } from './AppLocale';
 import { ILocaleSymbol, LOCALES } from '../../../locale';
-import { getDefaultLocale } from './getDefaultLocale';
 
 import { useLocaleLanguage } from '../../hooks/useLocaleLanguage';
 
@@ -82,9 +81,9 @@ function AppIntlProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppLocaleContext.Provider value={providerValue}>
-      {/* <Suspense fallback={<div>Loading...</div>}> */}
-      <IntlContentMemo locale={locale}>{children}</IntlContentMemo>
-      {/* </Suspense> */}
+      <Suspense fallback={<Text>Loading...</Text>}>
+        <IntlContentMemo locale={locale}>{children}</IntlContentMemo>
+      </Suspense>
     </AppLocaleContext.Provider>
   );
 }

@@ -41,7 +41,7 @@ module.exports = {
           break;
       }
 
-      debug(`=====>>>>> copy bin: originDir:${originDir}, platform:${platform}, arch:${arch}`);
+      debug(`Copy bridge bin: originDir:${originDir}, platform:${platform}, arch:${arch}`);
       await fs.ensureDir(destDir);
       await fs.copy(path.resolve(originDir, binName), path.resolve(destDir, binName));
     },
@@ -60,14 +60,6 @@ module.exports = {
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin', 'win32'],
-    },
-    {
-      name: '@electron-forge/maker-deb',
-      config: {},
-    },
-    {
-      name: '@electron-forge/maker-rpm',
-      config: {},
     },
   ],
 };

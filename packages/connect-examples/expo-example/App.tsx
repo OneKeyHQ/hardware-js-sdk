@@ -1,4 +1,4 @@
-import React, { lazy } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TamaguiProvider } from '@tamagui/core';
@@ -12,7 +12,8 @@ import config from './tamagui.config';
 import { Routes } from './src/route';
 import AppIntlProvider from './src/provider/AppIntlProvider';
 
-const ApiPayloadScreen = lazy(() => import('./src/views/ApiPayloadScreen'));
+import ApiPayloadScreen from './src/views/ApiPayloadScreen';
+
 const PassphraseTestScreen = lazy(() => import('./src/views/PassphraseTestScreen'));
 const FirmwareScreen = lazy(() => import('./src/views/FirmwareScreen'));
 const AddressTestScreen = lazy(() => import('./src/views/AddressTestScreen'));

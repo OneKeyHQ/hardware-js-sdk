@@ -313,14 +313,13 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
                 type="bootloader"
                 onUpdate={updateFirmware}
               />
-              {deviceType === 'pro' ||
-                (deviceType === 'touch' && (
-                  <FirmwareLocalFile
-                    title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
-                    type="source"
-                    onUpdate={updateFirmware}
-                  />
-                ))}
+              {(deviceType === 'pro' || deviceType === 'touch') && (
+                <FirmwareLocalFile
+                  title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
+                  type="source"
+                  onUpdate={updateFirmware}
+                />
+              )}
             </XStack>
           </PanelView>
 

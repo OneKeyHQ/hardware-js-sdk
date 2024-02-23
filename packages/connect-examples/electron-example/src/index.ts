@@ -163,6 +163,7 @@ function createMainWindow() {
       callback(url);
     });
 
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     browserWindow.webContents.on('did-fail-load', (_, __, ___, validatedURL) => {
       const redirectPath = validatedURL.replace(`${PROTOCOL}://`, '');
       if (validatedURL.startsWith(PROTOCOL) && !redirectPath.includes('.')) {
@@ -200,7 +201,7 @@ if (!singleInstance && !process.mas) {
   });
 
   app.name = APP_NAME;
-  app.on('ready', async () => {
+  app.on('ready', () => {
     if (!mainWindow) {
       mainWindow = createMainWindow();
     }

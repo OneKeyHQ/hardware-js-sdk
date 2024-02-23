@@ -7,7 +7,6 @@ import { useIntl } from 'react-intl';
 import { Routes } from '../../route';
 import { Button } from './Button';
 import LocaleToggleButton from './LocaleToggleButton';
-import { DesktopDragZoneBox } from './DesktopDragZoneBox';
 
 const HeaderView = () => {
   const intl = useIntl();
