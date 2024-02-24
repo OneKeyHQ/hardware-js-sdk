@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          yarn
+          yarn setup
 
       - name: Cache Gradle packages
         uses: actions/cache@v2
