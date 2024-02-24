@@ -122,8 +122,10 @@ export const createCoreApi = (
   deviceSupportFeatures: connectId => call({ connectId, method: 'deviceSupportFeatures' }),
   deviceVerify: (connectId, params) => call({ ...params, connectId, method: 'deviceVerify' }),
   deviceWipe: connectId => call({ connectId, method: 'deviceWipe' }),
-  deviceFullyUploadResource: connectId => call({ connectId, method: 'deviceFullyUploadResource' }),
-  deviceUpdateBootloader: connectId => call({ connectId, method: 'deviceUpdateBootloader' }),
+  deviceFullyUploadResource: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceFullyUploadResource' }),
+  deviceUpdateBootloader: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceUpdateBootloader' }),
   getPassphraseState: (connectId, params) =>
     call({ ...params, connectId, method: 'getPassphraseState' }),
 

@@ -1,33 +1,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Text, View } from 'react-native';
+
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 
+import { Stack, Text } from 'tamagui';
+import { useIntl } from 'react-intl';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { AddressTestCase } from './types';
 import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import { Button } from '../../components/ui/Button';
 
 type TestCaseDataType = AddressTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
 
 function ResultView({ item }: ResultViewProps) {
+  const intl = useIntl();
   const title = item?.title || item?.method;
 
   return (
     <>
-      <View style={{ flexDirection: 'row' }}>
-        <Text>{title}</Text>
-      </View>
+      <Stack flexDirection="row">
+        <Text fontSize={14}>{title}</Text>
+      </Stack>
 
-      <Text>Expected: {item?.result.address}</Text>
+      <Text fontSize={14}>
+        {intl.formatMessage({ id: 'label__expected' })} {item?.result.address}
+      </Text>
     </>
   );
 }
 
 function ExportReportView() {
+  const intl = useIntl();
   const { showExportReport, exportReport } = useExportReport<TestCaseDataType>({
     fileName: 'SingleAddressTestReport',
     reportTitle: 'Single Address Test Report',
@@ -53,13 +60,18 @@ function ExportReportView() {
   });
 
   if (showExportReport) {
-    return <Button title="Export Report" onPress={exportReport} />;
+    return (
+      <Button variant="primary" onPress={exportReport}>
+        {intl.formatMessage({ id: 'action__export_report' })}
+      </Button>
+    );
   }
 
   return null;
 }
 
 function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
+  const intl = useIntl();
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressTestCase>();
@@ -183,14 +195,13 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
   const contentMemo = useMemo(
     () => (
       <>
-        <Text style={{ fontSize: 14, paddingTop: 8, paddingBottom: 8 }}>{testDescription}</Text>
-        {!!passphrase && (
-          <Text style={{ fontSize: 14, paddingTop: 8, paddingBottom: 8 }}>
-            Passphrase:「{passphrase}」
-          </Text>
-        )}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <Text fontSize={13} paddingVertical="$2">
+          {testDescription}
+        </Text>
+        {!!passphrase && <Text paddingVertical="$2">Passphrase:「{passphrase}」</Text>}
+        <Stack flexDirection="row" flexWrap="wrap" gap="$2">
           <Picker
+            style={{ width: 200 }}
             selectedValue={currentTestCase?.name}
             onValueChange={itemValue => setCurrentTestCase(findTestCase(itemValue))}
           >
@@ -198,17 +209,27 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
-          <SwitchInput label="Show on OneKey" value={showOnOneKey} onToggle={setShowOnOneKey} />
-          <Button title="Start Test" onPress={beginTest} />
-          <Button title="Stop Test" onPress={stopTest} />
+          <SwitchInput
+            label={intl.formatMessage({ id: 'label__show_on_onekey' })}
+            value={showOnOneKey}
+            onToggle={setShowOnOneKey}
+            vertical
+          />
+          <Button variant="primary" onPress={beginTest}>
+            {intl.formatMessage({ id: 'action__start_test' })}
+          </Button>
+          <Button variant="destructive" onPress={stopTest}>
+            {intl.formatMessage({ id: 'action__stop_test' })}
+          </Button>
           <ExportReportView />
-        </View>
+        </Stack>
       </>
     ),
     [
       beginTest,
       currentTestCase?.name,
       findTestCase,
+      intl,
       passphrase,
       showOnOneKey,
       stopTest,

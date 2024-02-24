@@ -1,4 +1,5 @@
 import React from 'react';
+import { useIntl } from 'react-intl';
 import { View, TextInput, Text, Button, Platform } from 'react-native';
 
 type IReceivePinProps = {
@@ -9,6 +10,8 @@ type IReceivePinProps = {
 };
 
 export function ReceivePin({ value, onChange, onConfirm, onCancel }: IReceivePinProps) {
+  const intl = useIntl();
+
   return (
     <View style={{ maxWidth: 300 }}>
       <Text style={{ fontSize: 24 }}>Input Pin</Text>
@@ -23,8 +26,11 @@ export function ReceivePin({ value, onChange, onConfirm, onCancel }: IReceivePin
         onChangeText={text => onChange(text)}
         value={value}
       />
-      <Button title="confirm" onPress={() => onConfirm(value)} />
-      <Button title="cancel" onPress={onCancel} />
+      <Button
+        title={intl.formatMessage({ id: 'button__confirm' })}
+        onPress={() => onConfirm(value)}
+      />
+      <Button title={intl.formatMessage({ id: 'action__cancel' })} onPress={onCancel} />
     </View>
   );
 }

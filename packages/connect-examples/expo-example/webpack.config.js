@@ -20,5 +20,10 @@ module.exports = async function (env, argv) {
     };
   }
 
+  // disable devtool in production
+  if (process.env.NODE_ENV === 'production') {
+    config.devtool = false;
+  }
+
   return config;
 };

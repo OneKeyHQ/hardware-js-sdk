@@ -14,7 +14,6 @@ export default class DeviceFullyUploadResource extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
 
   init() {
-    this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
@@ -48,21 +47,25 @@ export default class DeviceFullyUploadResource extends BaseMethod {
     if (!features?.bootloader_mode && features) {
       // check & upgrade firmware resource
       if (features) {
-        this.postTipMessage('CheckLatestUiResource');
-        const resourceUrl = DataManager.getSysFullResource(features);
-        if (resourceUrl) {
-          this.postTipMessage('DownloadLatestUiResource');
-          const resource = await getSysResourceBinary(resourceUrl);
-          this.postTipMessage('DownloadLatestUiResourceSuccess');
-          if (resource) {
-            await updateResources(
-              this.device.getCommands().typedCall.bind(this.device.getCommands()),
-              this.postMessage,
-              device,
-              resource.binary
-            );
+        let { binary } = this.payload;
+        if (!binary) {
+          this.postTipMessage('CheckLatestUiResource');
+          const resourceUrl = DataManager.getSysFullResource(features);
+          if (resourceUrl) {
+            this.postTipMessage('DownloadLatestUiResource');
+            const resource = await getSysResourceBinary(resourceUrl);
+            this.postTipMessage('DownloadLatestUiResourceSuccess');
+            if (resource) {
+              binary = resource.binary;
+            }
           }
         }
+        await updateResources(
+          this.device.getCommands().typedCall.bind(this.device.getCommands()),
+          this.postMessage,
+          device,
+          binary
+        );
       }
     }
   }

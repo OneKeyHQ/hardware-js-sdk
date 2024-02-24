@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
-import { Button, Platform, Switch, Text, View } from 'react-native';
+import { Stack } from 'tamagui';
+import { useIntl } from 'react-intl';
+import { Button } from '../components/ui/Button';
 
 const ExpandModeContext = createContext<boolean>(false);
 
 export const useExpandMode = () => useContext(ExpandModeContext);
 
 export const ExpandModeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const intl = useIntl();
   const [isExpandMode, setIsExpandMode] = useState(false);
   const toggleExpandMode = useCallback(() => setIsExpandMode(pre => !pre), []);
 
@@ -15,18 +18,20 @@ export const ExpandModeProvider: React.FC<{ children: ReactNode }> = ({ children
 
   return (
     <ExpandModeContext.Provider value={providerValue}>
-      <>
-        <View
-          style={{
-            flexDirection: Platform.OS === 'web' ? 'row' : 'column',
-            flexWrap: 'wrap',
-            marginTop: 12,
-          }}
+      <Stack>
+        <Button
+          id="expand-mode-button"
+          zIndex={100}
+          position="absolute"
+          top="$5"
+          right="$3"
+          variant="primary"
+          onPress={toggleExpandMode}
         >
-          <Button title="Change ExpandMode" onPress={toggleExpandMode} />
-        </View>
+          {intl.formatMessage({ id: 'action__change_expand_mode' })}
+        </Button>
         {contentContainer}
-      </>
+      </Stack>
     </ExpandModeContext.Provider>
   );
 };

@@ -34,26 +34,35 @@ export default class DeviceUpdateBootloader extends BaseMethod {
   async updateTouchBootloader(device: Device, features?: Features) {
     if (features && !features.bootloader_mode) {
       // check & upgrade firmware resource
-      if (features && checkNeedUpdateBootForTouch(features)) {
-        this.postTipMessage('CheckLatestUiResource');
-        const resourceUrl = DataManager.getBootloaderResource(features);
-        if (resourceUrl) {
-          this.postTipMessage('DownloadLatestBootloaderResource');
-          const resource = await getSysResourceBinary(resourceUrl);
-          this.postTipMessage('DownloadLatestBootloaderResourceSuccess');
-          if (resource) {
-            if (!checkBootloaderLength(resource.binary)) {
-              throw ERRORS.TypedError(HardwareErrorCode.CheckDownloadFileError);
+      const needUpdateBoot = checkNeedUpdateBootForTouch(features);
+      const existsBootRes = this.payload?.binary != null;
+
+      const hasUpdateBootloader = needUpdateBoot || existsBootRes;
+      if (features && hasUpdateBootloader) {
+        let { binary } = this.payload;
+        if (!binary) {
+          this.postTipMessage('CheckLatestUiResource');
+          const resourceUrl = DataManager.getBootloaderResource(features);
+          if (resourceUrl) {
+            this.postTipMessage('DownloadLatestBootloaderResource');
+            const resource = await getSysResourceBinary(resourceUrl);
+            this.postTipMessage('DownloadLatestBootloaderResourceSuccess');
+            if (resource) {
+              binary = resource.binary;
             }
-            await updateBootloader(
-              this.device.getCommands().typedCall.bind(this.device.getCommands()),
-              this.postMessage,
-              device,
-              resource.binary
-            );
-            return Promise.resolve(true);
           }
         }
+
+        if (!checkBootloaderLength(binary)) {
+          throw ERRORS.TypedError(HardwareErrorCode.CheckDownloadFileError);
+        }
+        await updateBootloader(
+          this.device.getCommands().typedCall.bind(this.device.getCommands()),
+          this.postMessage,
+          device,
+          binary
+        );
+        return Promise.resolve(true);
       }
     }
 

@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { Group, H4, Stack, Text } from 'tamagui';
+import { useIntl } from 'react-intl';
 import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
+import { Button } from './ui/Button';
+import AutoWrapperTextArea from './ui/AutoWrapperTextArea';
 
 export interface PresupposeProps {
   title: string;
@@ -23,6 +26,7 @@ const Playground = ({
   noConnIdReq,
   noDeviceIdReq,
 }: PlaygroundProps) => {
+  const intl = useIntl();
   const [isExpanded, setIsExpanded] = useState(false);
   const [params, setParams] = useState('');
   const [response, setResponse] = useState('');
@@ -50,12 +54,19 @@ const Playground = ({
 
   const HeaderView = useMemo(
     () => (
-      <Text
+      <Stack
+        padding="$2"
+        height="$14"
+        borderColor="$border"
+        backgroundColor="$bgInfo"
+        flexDirection="row"
+        alignItems="center"
         onPress={() => setIsExpanded(!isExpanded)}
-        style={deprecated ? styles.deprecatedHeader : styles.header}
       >
-        {` ${!!isExpanded || !!isExpandMode ? '-' : '+'} ${method}`}
-      </Text>
+        <H4 fontWeight="bold" textDecorationLine={deprecated ? 'line-through' : 'none'}>
+          {` ${!!isExpanded || !!isExpandMode ? '-' : '+'} ${method}`}
+        </H4>
+      </Stack>
     ),
     [deprecated, isExpandMode, isExpanded, method]
   );
@@ -64,36 +75,39 @@ const Playground = ({
     if (presupposes && presupposes.length > 0) {
       return (
         <>
-          <Text style={styles.subheader}>Default parameters</Text>
-          <View style={styles.features}>
+          <Text fontSize={16} fontWeight="bold">
+            {intl.formatMessage({ id: 'label__default_parameters' })}
+          </Text>
+          <Group orientation="horizontal" paddingHorizontal="$2" flexWrap="wrap">
             {presupposes.map((presuppose, index) => (
-              <Button
-                key={presuppose.title}
-                title={presuppose.title}
-                onPress={fillParameterCallback(index)}
-              />
+              <Group.Item key={presuppose.title}>
+                <Button onPress={fillParameterCallback(index)}>{presuppose.title}</Button>
+              </Group.Item>
             ))}
-          </View>
+          </Group>
         </>
       );
     }
     return null;
-  }, [fillParameterCallback, presupposes]);
+  }, [fillParameterCallback, intl, presupposes]);
 
   const RequestParamsView = useMemo(
     () => (
       <>
-        <Text style={styles.subheader}>Parameters</Text>
-        <TextInput
-          style={presupposes && presupposes.length > 0 ? styles.input : styles.emptyInput}
-          onChangeText={setParams}
+        <Text fontSize={16} fontWeight="bold">
+          {intl.formatMessage({ id: 'label__parameters' })}
+        </Text>
+        <AutoWrapperTextArea
+          marginHorizontal="$2"
+          minHeight={presupposes && presupposes.length > 0 ? 140 : 40}
+          maxHeight={320}
           value={params}
-          placeholder="Enter your parameters here..."
-          multiline
+          onChangeText={setParams}
+          placeholder={intl.formatMessage({ id: 'label__enter_parameters_tip' })}
         />
       </>
     ),
-    [params, presupposes]
+    [intl, params, presupposes]
   );
 
   const copyResponse = useCallback(() => {
@@ -102,24 +116,27 @@ const Playground = ({
 
   const ResponseView = useMemo(
     () => (
-      <>
-        <View style={styles.subheader}>
-          <Text style={styles.subheaderText}>Response</Text>
-          <TouchableOpacity onPress={copyResponse}>
-            <Text style={styles.copyButton}>Copy</Text>
-          </TouchableOpacity>
-        </View>
-        <TextInput
-          style={[styles.input, styles.responseInput]}
-          onChangeText={setResponse}
+      <Stack>
+        <Stack flexDirection="row" justifyContent="space-between">
+          <Text fontSize={16} fontWeight="bold" marginTop="$1">
+            {intl.formatMessage({ id: 'label__response' })}
+          </Text>
+          <Button onPress={copyResponse}>
+            <Text color="$textInfo"> {intl.formatMessage({ id: 'action__copy' })}</Text>
+          </Button>
+        </Stack>
+        <AutoWrapperTextArea
+          marginTop="$2"
+          marginHorizontal="$2"
+          marginBottom="$2"
           value={response}
-          placeholder="Response will be shown here."
-          multiline
+          onChangeText={setResponse}
+          placeholder={intl.formatMessage({ id: 'label__will_response_tip' })}
           editable={false}
         />
-      </>
+      </Stack>
     ),
-    [copyResponse, response]
+    [copyResponse, intl, response]
   );
 
   const onAcquireParams = useCallback(
@@ -149,89 +166,21 @@ const Playground = ({
   );
 
   return (
-    <View style={styles.container}>
+    <Stack borderWidth="$px" borderColor="$border" borderRadius="$2">
       {HeaderView}
       {(!!isExpanded || !!isExpandMode) && (
-        <>
-          <Text style={styles.description}>{description}</Text>
+        <Stack gap="$2" paddingHorizontal="$2">
+          <Text fontSize={14} paddingHorizontal="$2">
+            {description}
+          </Text>
           {PresupposeView}
           {RequestParamsView}
           {PlaygroundExecutorView}
           {ResponseView}
-        </>
+        </Stack>
       )}
-    </View>
+    </Stack>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-  },
-  header: {
-    fontWeight: 'bold',
-    paddingVertical: 4,
-    fontSize: 22,
-  },
-  deprecatedHeader: {
-    fontWeight: 'bold',
-    paddingVertical: 4,
-    fontSize: 22,
-    textDecorationLine: 'line-through',
-  },
-  description: {
-    padding: 8,
-    fontSize: 12,
-  },
-  subheader: {
-    paddingTop: 10,
-    fontWeight: 'bold',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  subheaderText: {
-    fontWeight: 'bold',
-  },
-  copyButton: {
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  features: {
-    flexDirection: 'row',
-    flex: 1,
-    flexWrap: 'wrap',
-    gap: 8,
-    padding: 8,
-  },
-  emptyInput: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    padding: 8,
-    marginTop: 10,
-    marginBottom: 10,
-    fontSize: 14,
-    borderRadius: 4,
-    minHeight: 40,
-    textAlignVertical: 'top',
-  },
-  input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    padding: 8,
-    marginTop: 10,
-    marginBottom: 10,
-    fontSize: 14,
-    borderRadius: 4,
-    minHeight: 120,
-    textAlignVertical: 'top',
-  },
-  responseInput: {
-    backgroundColor: '#f7f7f7',
-  },
-});
 
 export default Playground;

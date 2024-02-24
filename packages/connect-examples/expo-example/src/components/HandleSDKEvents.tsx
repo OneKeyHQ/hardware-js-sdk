@@ -7,8 +7,9 @@ import {
   UI_REQUEST,
   UI_RESPONSE,
 } from '@onekeyfe/hd-core';
-import { View } from 'react-native';
+
 import { useIsFocused } from '@react-navigation/native';
+import { View } from 'tamagui';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { ReceivePin } from './ReceivePin';
 

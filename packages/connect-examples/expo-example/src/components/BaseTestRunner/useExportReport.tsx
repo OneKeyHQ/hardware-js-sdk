@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { useContextSelector } from 'use-context-selector';
-import { TestRunnerContext } from './Context/TestRunnerProvider';
-import { ItemVerifyState, TestRunnerVerifyContext } from './Context/TestRunnerVerifyProvider';
+import { useContext, useEffect, useState } from 'react';
+import { useAtomValue } from 'jotai';
+
 import { TestCaseDataWithKey } from './types';
 import { getDeviceInfo } from './utils';
 import { downloadFile } from '../../utils/downloadUtils';
+import { TestRunnerContext } from './Context/TestRunnerProvider';
+import { ItemVerifyState, itemVerifyStateAtom } from './Context/TestRunnerVerifyProvider';
 
 export default function useExportReport<T>({
   fileName = 'TestReport',
@@ -18,8 +19,8 @@ export default function useExportReport<T>({
     itemVerifyState: { [key: string]: ItemVerifyState }
   ) => Promise<string[]>;
 }) {
-  const runnerInfo = useContextSelector(TestRunnerContext, v => v);
-  const runnerVerify = useContextSelector(TestRunnerVerifyContext, v => v);
+  const runnerInfo = useContext(TestRunnerContext);
+  const itemVerifyState = useAtomValue(itemVerifyStateAtom);
 
   const [showExportReport, setShowExportReport] = useState(false);
 
@@ -35,8 +36,6 @@ export default function useExportReport<T>({
       itemValues,
       runningDeviceFeatures,
     } = runnerInfo;
-
-    const { itemVerifyState } = runnerVerify;
 
     if (!itemVerifyState) return;
     if (!timestampBeginTest) return;

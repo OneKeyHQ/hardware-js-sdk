@@ -3,12 +3,15 @@ import { UI_EVENT } from '@onekeyfe/hd-core';
 import { isEmpty } from 'lodash';
 import type { CoreApi, Features, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
-import { useContextSelector } from 'use-context-selector';
+import { useSetAtom } from 'jotai';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
 import type { TestCaseDataWithKey, VerifyState } from './types';
-import { TestRunnerVerifyContext } from './Context/TestRunnerVerifyProvider';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
+import {
+  clearItemVerifyStateAtom,
+  setItemVerifyStateAtom,
+} from './Context/TestRunnerVerifyProvider';
 
 type RunnerConfig<T> = {
   initTestCase: () => Promise<
@@ -63,25 +66,17 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
   const { sdk: SDK } = useContext(HardwareSDKContext);
   const { selectedDevice } = useDevice();
 
-  const setRunnerTestCaseTitle = useContextSelector(
-    TestRunnerContext,
-    v => v.setRunnerTestCaseTitle
-  );
-  const setTimestampBeginTest = useContextSelector(TestRunnerContext, v => v.setTimestampBeginTest);
-  const setTimestampEndTest = useContextSelector(TestRunnerContext, v => v.setTimestampEndTest);
-  const setRunnerDone = useContextSelector(TestRunnerContext, v => v.setRunnerDone);
-  const setRunningDeviceFeatures = useContextSelector(
-    TestRunnerContext,
-    v => v.setRunningDeviceFeatures
-  );
+  const {
+    setRunnerTestCaseTitle,
+    setTimestampBeginTest,
+    setTimestampEndTest,
+    setRunnerDone,
+    setRunningDeviceFeatures,
+    setItemValues,
+  } = useContext(TestRunnerContext);
 
-  const setItemValues = useContextSelector(TestRunnerContext, v => v.setItemValues);
-
-  const setItemVerifyState = useContextSelector(TestRunnerVerifyContext, v => v.setItemVerifyState);
-  const clearItemVerifyState = useContextSelector(
-    TestRunnerVerifyContext,
-    v => v.clearItemVerifyState
-  );
+  const setItemVerifyState = useSetAtom(setItemVerifyStateAtom);
+  const clearItemVerifyState = useSetAtom(clearItemVerifyStateAtom);
 
   const running = useRef<boolean>(false);
 
@@ -154,8 +149,11 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
           ...params,
         };
 
-        setItemVerifyState?.(item.$key, {
-          verify: 'pending',
+        setItemVerifyState?.({
+          key: item.$key,
+          newState: {
+            verify: 'pending',
+          },
         });
 
         let res: Unsuccessful | Success<any>;
@@ -187,15 +185,21 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
             verifyState = 'fail';
           }
         }
-        setItemVerifyState?.(item.$key, {
-          verify: verifyState,
-          error,
+        setItemVerifyState?.({
+          key: item.$key,
+          newState: {
+            verify: verifyState,
+            error,
+          },
         });
       } catch (e) {
-        setItemVerifyState?.(item.$key, {
-          verify: 'fail',
-          // @ts-expect-error
-          error: e?.message ?? '',
+        setItemVerifyState?.({
+          key: item.$key,
+          newState: {
+            verify: 'fail',
+            // @ts-expect-error
+            error: e?.message ?? '',
+          },
         });
       }
     }

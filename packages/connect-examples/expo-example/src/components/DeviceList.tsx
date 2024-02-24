@@ -1,18 +1,25 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Button, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { ListItem, Text, View } from 'tamagui';
+import { FlatList, Platform } from 'react-native';
+import { Check } from '@tamagui/lucide-icons';
+import { useIntl } from 'react-intl';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
+import { Button } from './ui/Button';
+import PanelView from './ui/Panel';
+import { getItem, removeItem, setItem } from '../utils/storeUtil';
 
 export type Device = {
   connectId: string;
   name: string;
   features?: any;
+  deviceType?: string;
 };
 
 const STORE_KEY = '@onekey/selectedId';
 const storeSelectedId = async (value: string) => {
   try {
-    await AsyncStorage.setItem(STORE_KEY, value);
+    await setItem(STORE_KEY, value);
   } catch (error) {
     console.log(error);
   }
@@ -20,7 +27,7 @@ const storeSelectedId = async (value: string) => {
 
 const getSelectedId = async () => {
   try {
-    const value = await AsyncStorage.getItem(STORE_KEY);
+    const value = await getItem(STORE_KEY);
     if (value !== null) {
       return value;
     }
@@ -31,7 +38,7 @@ const getSelectedId = async () => {
 
 const removeSelectedId = async () => {
   try {
-    await AsyncStorage.removeItem(STORE_KEY);
+    await removeItem(STORE_KEY);
   } catch (e) {
     // remove error
   }
@@ -40,26 +47,43 @@ const removeSelectedId = async () => {
 type ItemProps = {
   item: Device;
   onPress: () => void;
-  backgroundColor: { backgroundColor: string };
-  textColor: { color: string };
+  connected: boolean;
 };
 
-const Item = ({ item, onPress, backgroundColor, textColor }: ItemProps) => (
-  <TouchableOpacity onPress={onPress} style={[styles.item, backgroundColor]}>
-    <Text style={[styles.title, textColor]}>{item.name}</Text>
-  </TouchableOpacity>
-);
+const Item = ({ item, onPress, connected }: ItemProps) => {
+  const intl = useIntl();
+
+  return (
+    <ListItem
+      onPress={onPress}
+      backgroundColor={connected ? '$bgInfo' : '$bgHover'}
+      icon={connected ? Check : undefined}
+      flexWrap="wrap"
+      borderWidth="$px"
+      borderColor="$border"
+      gap="$4"
+    >
+      <ListItem.Text>{item.name}</ListItem.Text>
+      <ListItem.Text>{item.deviceType}</ListItem.Text>
+      <ListItem.Text>{item.connectId}</ListItem.Text>
+      <Button onPress={onPress}>{intl.formatMessage({ id: 'action__connect_device' })}</Button>
+    </ListItem>
+  );
+};
 
 type IDeviceListProps = {
   onSelected: (device: Device) => void;
+  disableSaveDevice?: boolean;
 };
 
-export function DeviceList({ onSelected }: IDeviceListProps) {
+export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceListProps) {
+  const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
 
   useEffect(() => {
+    if (disableSaveDevice) return;
     getSelectedId().then(value => {
       if (value) {
         setSelectedId(value);
@@ -79,17 +103,16 @@ export function DeviceList({ onSelected }: IDeviceListProps) {
   );
 
   const searchDevices = useCallback(async () => {
-    if (!sdk) return console.log('sdk is not ready');
+    if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
     const response = await sdk.searchDevices();
-    console.log('example searchDevices response: ', response);
     const foundDevices = (response.payload as unknown as Device[]) ?? [];
     setDevices(foundDevices);
     if (Platform.OS === 'web' && foundDevices?.length) {
       const device = foundDevices[0];
       selectDevice(device);
     }
-  }, [sdk, selectDevice]);
+  }, [intl, sdk, selectDevice]);
 
   const handleRemoveSelected = useCallback(() => {
     removeSelectedId();
@@ -97,8 +120,7 @@ export function DeviceList({ onSelected }: IDeviceListProps) {
   }, []);
 
   const renderItem = ({ item }: { item: Device }) => {
-    const backgroundColor = item.connectId === selectedId ? '#6e3b6e' : '#f9c2ff';
-    const color = item.connectId === selectedId ? 'white' : 'black';
+    const connected = item.connectId === selectedId;
 
     return (
       <Item
@@ -106,50 +128,38 @@ export function DeviceList({ onSelected }: IDeviceListProps) {
         onPress={() => {
           selectDevice(item);
         }}
-        backgroundColor={{ backgroundColor }}
-        textColor={{ color }}
+        connected={connected}
       />
     );
   };
 
   return (
-    <View style={styles.container}>
-      <Button title="Search Devices" onPress={searchDevices} />
-      <View style={styles.selectWrap}>
-        <Text>当前选择设备：{selectedId || '无'}</Text>
-        <Button title="清除" onPress={handleRemoveSelected} />
-      </View>
+    <PanelView>
+      {disableSaveDevice ? (
+        <Text fontSize={16} fontWeight="bold">
+          {intl.formatMessage({ id: 'message__search_device_and_connect_device' })}
+        </Text>
+      ) : (
+        <View flexDirection="row" justifyContent="space-between" flexWrap="wrap">
+          <Text fontSize={15}>
+            {intl.formatMessage({ id: 'message__current_selector_device' })}
+            {selectedId || intl.formatMessage({ id: 'message__no_device' })}
+          </Text>
+          <Button onPress={handleRemoveSelected}>
+            {intl.formatMessage({ id: 'action__clean_device' })}
+          </Button>
+        </View>
+      )}
+
+      <Button variant="primary" size="large" onPress={searchDevices}>
+        {intl.formatMessage({ id: 'action__search_device' })}
+      </Button>
       <FlatList
         data={devices}
         renderItem={renderItem}
         keyExtractor={item => item.connectId}
         extraData={selectedId}
       />
-    </View>
+    </PanelView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-  },
-  item: {
-    backgroundColor: '#f9c2ff',
-    padding: 20,
-    marginVertical: 8,
-    marginHorizontal: 16,
-  },
-  title: {
-    fontSize: 16,
-  },
-  selectWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10,
-  },
-});

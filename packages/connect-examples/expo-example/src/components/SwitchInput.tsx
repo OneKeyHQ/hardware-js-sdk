@@ -1,23 +1,37 @@
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { Checkbox, Label, Stack } from 'tamagui';
+import { Check as CheckIcon } from '@tamagui/lucide-icons';
+import { random } from 'lodash';
+import { useRef } from 'react';
 
 export type SwitchInputProps = {
   value: boolean;
   onToggle: (value: boolean) => void;
   label: string;
+  vertical?: boolean;
 };
-export const SwitchInput = ({ value, onToggle, label }: SwitchInputProps) => (
-  <View style={styles.commonParamItem}>
-    <Text style={styles.label}>{label}</Text>
-    <Switch value={value} onValueChange={onToggle} />
-  </View>
-);
-const styles = StyleSheet.create({
-  commonParamItem: {
-    marginBottom: 16,
-  },
-  label: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-    fontSize: 14,
-  },
-});
+export const SwitchInput = ({ value, onToggle, label, vertical }: SwitchInputProps) => {
+  const idRef = useRef(`switch-${random(100, 10000)}`);
+  return (
+    <Stack
+      alignItems="center"
+      width={160}
+      minHeight={45}
+      flexDirection={vertical ? 'row' : 'column'}
+      gap={vertical ? '$2' : '$0'}
+    >
+      <Label paddingRight="$0" justifyContent="flex-end" htmlFor={idRef.current}>
+        {label}
+      </Label>
+      <Checkbox
+        id={idRef.current}
+        checked={value}
+        onCheckedChange={onToggle}
+        defaultChecked={false}
+      >
+        <Checkbox.Indicator>
+          <CheckIcon />
+        </Checkbox.Indicator>
+      </Checkbox>
+    </Stack>
+  );
+};

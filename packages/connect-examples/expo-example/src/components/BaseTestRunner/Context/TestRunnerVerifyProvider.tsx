@@ -1,48 +1,30 @@
-import { useCallback, useMemo, useState } from 'react';
-import { createContext } from 'use-context-selector';
+import { atom } from 'jotai';
+import { selectAtom } from 'jotai/utils';
 import { VerifyState } from '../types';
 
 export type ItemVerifyState = { verify: VerifyState; error?: string };
 
-export const TestRunnerVerifyContext = createContext<{
-  setItemVerifyState: (key: string, newState: { verify: VerifyState; error?: string }) => void;
-  itemVerifyState: { [key: string]: ItemVerifyState };
-  clearItemVerifyState: () => void;
-}>({
-  setItemVerifyState: () => {},
-  itemVerifyState: {},
-  clearItemVerifyState: () => {},
+export const itemVerifyStateAtom = atom<{ [key: string]: ItemVerifyState }>({});
+
+const GLOBAL_NONE_STATE: ItemVerifyState = { verify: 'none', error: undefined };
+export const selectedItemVerifyStateAtom = (key: string) =>
+  selectAtom(itemVerifyStateAtom, states => states[key] || GLOBAL_NONE_STATE);
+
+export const clearItemVerifyStateAtom = atom(null, (get, set) => {
+  const currentState = get(itemVerifyStateAtom);
+  const newState = Object.keys(currentState).reduce((acc, key) => {
+    acc[key] = GLOBAL_NONE_STATE;
+    return acc;
+  }, {} as { [key: string]: ItemVerifyState });
+  set(itemVerifyStateAtom, newState);
 });
 
-export function TestRunnerVerifyProvider({ children }: { children: React.ReactNode }) {
-  const [itemVerifyState, setItemVerifyStateInternal] = useState<{
-    [key: string]: { verify: VerifyState; error?: string };
-  }>({});
-
-  const setItemVerifyState = useCallback(
-    (key: string, newState: { verify: VerifyState; error?: string }) => {
-      setItemVerifyStateInternal(prevState => ({
-        ...prevState,
-        [key]: newState,
-      }));
-    },
-    []
-  );
-
-  const clearItemVerifyState = useCallback(() => {
-    setItemVerifyStateInternal({});
-  }, []);
-
-  const value = useMemo(
-    () => ({
-      setItemVerifyState,
-      clearItemVerifyState,
-      itemVerifyState,
-    }),
-    [clearItemVerifyState, itemVerifyState, setItemVerifyState]
-  );
-
-  return (
-    <TestRunnerVerifyContext.Provider value={value}>{children}</TestRunnerVerifyContext.Provider>
-  );
-}
+export const setItemVerifyStateAtom = atom(
+  null,
+  (get, set, { key, newState }: { key: string; newState: ItemVerifyState }) => {
+    set(itemVerifyStateAtom, prev => ({
+      ...prev,
+      [key]: newState,
+    }));
+  }
+);

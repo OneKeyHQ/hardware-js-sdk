@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import electron from 'electron';
 import path from 'path';
 
 import type { ChildProcess } from 'child_process';
@@ -83,13 +84,14 @@ export default abstract class BaseProcess {
 
     this.stopped = false;
 
-    const processDir = path.join(
-      // @ts-expect-error
-      global.resourcesPath as string,
-      'bin',
-      this.resource,
-      isDev ? system : ''
-    );
+    const appPath = electron.app.getAppPath();
+    let processDir;
+    if (isDev) {
+      processDir = path.resolve(appPath, 'public', 'bin', this.resource, system);
+    } else {
+      processDir = path.resolve(appPath, '../', 'bin', this.resource);
+    }
+
     const processPath = path.join(processDir, `${this.processName}${ext}`);
     const processEnv = { ...process.env };
     // library search path for macOS

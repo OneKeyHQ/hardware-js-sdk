@@ -1,5 +1,6 @@
-import React, { ReactNode, useContext, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { ReactNode, useEffect, useState } from 'react';
+import { H4, Stack } from 'tamagui';
+import { ChevronDownCircle, ChevronUpCircle } from '@tamagui/lucide-icons';
 import { useExpandMode } from '../provider/ExpandModeProvider';
 
 interface CollapsibleSectionProps {
@@ -11,45 +12,30 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, c
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const isExpandMode = useExpandMode();
 
+  useEffect(() => {
+    setIsCollapsed(isExpandMode);
+  }, [isExpandMode]);
+
   return (
-    <View style={styles.section}>
-      <Pressable style={styles.header} onPress={() => setIsCollapsed(!isCollapsed)}>
-        <Text style={styles.title}>{title}</Text>
-      </Pressable>
-      {(!!isCollapsed || !!isExpandMode) && <View style={styles.content}>{children}</View>}
-    </View>
+    <Stack overflow="hidden" borderBottomColor="$border" borderBottomWidth="$px">
+      <Stack
+        backgroundColor="$bgApp"
+        height="$16"
+        onPress={() => setIsCollapsed(!isCollapsed)}
+        flexDirection="row"
+        justifyContent="space-between"
+        alignItems="center"
+        alignContent="center"
+      >
+        <H4 fontWeight="bold">{title}</H4>
+        {isCollapsed ? <ChevronDownCircle /> : <ChevronUpCircle />}
+      </Stack>
+
+      {!!isCollapsed && (
+        <Stack gap="$1" backgroundColor="$bgInfoSubdued">
+          {children}
+        </Stack>
+      )}
+    </Stack>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 5,
-    backgroundColor: '#F5FCFF',
-  },
-  header: {
-    backgroundColor: '#F5F5F5',
-    padding: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#CCC',
-  },
-  title: {
-    fontWeight: 'bold',
-    color: '#333',
-    fontSize: 26,
-  },
-  content: {
-    padding: 10,
-    backgroundColor: '#FFFFFF',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#CCC',
-  },
-  section: {
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-});

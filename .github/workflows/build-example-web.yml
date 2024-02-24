@@ -1,0 +1,39 @@
+name: build-deploy-example-web
+
+on: workflow_dispatch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      TEST_ENDPOINT: hardware-example.onekeytest.com
+      PROJECT_PATH: packages/connect-examples/expo-example
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Environment
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Package
+        run: |
+          yarn
+          yarn bootstrap
+
+      - name: Build Target
+        run: |
+          yarn build
+
+      - name: Build Web App
+        run: |
+          yarn expo export:web
+        working-directory: ${{ env.PROJECT_PATH }}
+
+      - name: Deploy Github Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./${{ env.PROJECT_PATH }}/web-build
+          cname: ${{ env.TEST_ENDPOINT }}
+          force_orphan: true

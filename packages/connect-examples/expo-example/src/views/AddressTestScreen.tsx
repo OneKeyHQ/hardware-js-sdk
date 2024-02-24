@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button, ScrollView, StyleSheet, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { Separator, Stack } from 'tamagui';
+import { useIntl } from 'react-intl';
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { TestSingleAddress } from '../testTools/addressTest/TestSingleAddress';
 import { TestBatchAddress } from '../testTools/addressTest/TestBatchAddress';
@@ -22,56 +22,56 @@ import {
   batchTestCases as batchVariantPubkeyTestCases,
   testCases as pubkeyVariantTestCases,
 } from '../testTools/pubkeyTest/dataVariant';
+import PageView from '../components/ui/Page';
+import PanelView from '../components/ui/Panel';
 
 export default function AddressTestScreen() {
-  const navigation = useNavigation();
+  const intl = useIntl();
   return (
-    <ScrollView>
-      <View style={styles.container}>
-        {/* @ts-expect-error */}
-        <Button title="Go Back Home" onPress={() => navigation.replace('Home')} />
-        {/* <View style={styles.container}> */}
-        <DeviceProvider>
-          <View style={styles.container}>
-            <TestSingleAddress title="Single Address Test" testCases={addressTestCases} />
-          </View>
-          <View style={styles.container}>
-            <TestBatchAddress title="Batch Address Test" testCases={batchAddressTestCases} />
-          </View>
-          <View style={styles.container}>
-            <TestSinglePubkey title="Single Pubkey Test" testCases={pubkeyTestCases} />
-          </View>
-          <View style={styles.container}>
-            <TestBatchPubkey title="Batch Pubkey Test" testCases={batchPubkeyTestCases} />
-          </View>
-          <br />
-          <br />
-          <View style={styles.container}>
+    <PageView>
+      <DeviceProvider>
+        <Stack>
+          <PanelView>
             <TestSingleAddress
-              title="Single Variant Address Test"
+              title={intl.formatMessage({ id: 'title__address_test_single' })}
+              testCases={addressTestCases}
+            />
+          </PanelView>
+          <PanelView>
+            <TestBatchAddress
+              title={intl.formatMessage({ id: 'title__address_test_batch' })}
+              testCases={batchAddressTestCases}
+            />
+          </PanelView>
+          <PanelView>
+            <TestSinglePubkey
+              title={intl.formatMessage({ id: 'title__publickey_test_single' })}
+              testCases={pubkeyTestCases}
+            />
+          </PanelView>
+          <PanelView>
+            <TestBatchPubkey
+              title={intl.formatMessage({ id: 'title__publickey_test_batch' })}
+              testCases={batchPubkeyTestCases}
+            />
+          </PanelView>
+
+          <Stack marginTop="$8" />
+
+          <PanelView>
+            <TestSingleAddress
+              title={intl.formatMessage({ id: 'title__address_variant_test_single' })}
               testCases={addressVariantTestCases}
             />
-          </View>
-          <View style={styles.container}>
+          </PanelView>
+          <PanelView>
             <TestBatchAddress
-              title="Batch Variant Address Test"
+              title={intl.formatMessage({ id: 'title__address_variant_test_batch' })}
               testCases={batchVariantAddressTestCases}
             />
-          </View>
-        </DeviceProvider>
-      </View>
-      {/* </View> */}
-    </ScrollView>
+          </PanelView>
+        </Stack>
+      </DeviceProvider>
+    </PageView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    display: 'flex',
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-  },
-});

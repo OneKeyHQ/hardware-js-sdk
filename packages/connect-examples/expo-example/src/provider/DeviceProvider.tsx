@@ -1,5 +1,6 @@
-import React, { createContext, useState, useCallback, useContext, useMemo, memo } from 'react';
-import { View } from 'react-native';
+import React, { createContext, useState, useContext, useMemo, memo, useEffect } from 'react';
+
+import { Stack } from 'tamagui';
 import type { Device } from '../components/DeviceList';
 import { DeviceList } from '../components/DeviceList';
 
@@ -15,7 +16,7 @@ const DeviceContext = createContext<DeviceContextState>(defaultState);
 
 export const useDevice = () => useContext(DeviceContext);
 
-export const DeviceProvider = ({ children }: { children: React.ReactNode }) => {
+function DeviceProviderContent({ children }: { children: React.ReactNode }) {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(defaultState.selectedDevice);
 
   const providerValue = useMemo(
@@ -29,10 +30,12 @@ export const DeviceProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <DeviceContext.Provider value={providerValue}>
-      <>
+      <Stack padding="$2">
         <DeviceList onSelected={setSelectedDevice} />
         {childMemo}
-      </>
+      </Stack>
     </DeviceContext.Provider>
   );
-};
+}
+
+export const DeviceProvider = memo(DeviceProviderContent);
