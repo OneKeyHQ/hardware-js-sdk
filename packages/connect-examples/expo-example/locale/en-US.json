@@ -19,6 +19,7 @@
   "action__full_coverage_res": "Upload Full Resource",
   "action__pick_file": "Pick File",
   "action__export_report": "Export Report",
+  "action__switch_device": "Input Pin on Device",
 
   "action__start_test": "Start Test",
   "action__stop_test": "Stop Test",
@@ -39,6 +40,7 @@
   "title__common_parameters": "Common Parameters",
   "title__hardware_api_test": "Hardware Api Test",
   "title__updating": "Updating",
+  "title__input_pin": "Input Pin",
 
   "title__device_info": "Device Information",
   "title__device_firmware_update": "Device Firmware Update",
@@ -96,7 +98,7 @@
   "message__reboot_to_bootloader": "Reboot to bootloader...",
   "message__wait_begin_update": "Wait begin update...",
   "message__confirm_on_device": "Confirm on device...",
-  "message__firmware_erase_success": "Firmware erase success",
+  "message__firmware_erase_success": "Firmware installing...",
   "message__firmware_start_transfer": "Firmware start transfer...",
   "message__firmware_installing": "Firmware installing...",
   "message__bootloader_update": "Bootloader update...",

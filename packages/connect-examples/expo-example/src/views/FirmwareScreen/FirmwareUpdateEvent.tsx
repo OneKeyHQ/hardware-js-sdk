@@ -1,9 +1,9 @@
-import { memo, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { useIsFocused } from '@react-navigation/core';
+import { memo, useCallback, useContext, useEffect, useState } from 'react';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Dialog, Stack, Text, Unspaced } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
+import { useFocusEffect } from '@react-navigation/native';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { Button } from '../../components/ui/Button';
 
@@ -18,9 +18,6 @@ function FirmwareUpdateEventView({
   const intl = useIntl();
   const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK, type } = useContext(HardwareSDKContext);
 
-  const focus = useIsFocused();
-  const focusRef = useRef<boolean>(false);
-
   const [updateState, setUpdateState] = useState<{
     progress: number;
     message: string;
@@ -28,10 +25,6 @@ function FirmwareUpdateEventView({
     progress: 0,
     message: '',
   });
-
-  useEffect(() => {
-    focusRef.current = focus;
-  }, [focus]);
 
   useEffect(() => {
     setUpdateState(pre => ({
@@ -93,39 +86,49 @@ function FirmwareUpdateEventView({
     [intl]
   );
 
-  useEffect(() => {
-    // 监听 SDK 事件
-    if (registerListener) {
-      return;
-    }
-    if (!SDK) return;
+  useFocusEffect(
+    useCallback(() => {
+      // 监听 SDK 事件
+      if (registerListener) {
+        return;
+      }
+      if (!SDK) return;
 
-    SDK.on(UI_EVENT, (message: CoreMessage) => {
-      if (!focusRef.current) return;
-      console.log('TopLEVEL EVENT ===>>>>: ', message);
-      if (message.type === UI_REQUEST.REQUEST_PIN) {
-        SDK.uiResponse({
-          type: UI_RESPONSE.RECEIVE_PIN,
-          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-        });
-      }
-      if (message.type === UI_REQUEST.FIRMWARE_TIP) {
-        const tip = message.payload.data.message;
+      const uiEventCallback = (message: CoreMessage) => {
+        console.log('TopLEVEL EVENT (Firmware Update)===>>>>: ', message);
+        if (message.type === UI_REQUEST.REQUEST_PIN) {
+          SDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PIN,
+            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+          });
+        }
+        if (message.type === UI_REQUEST.FIRMWARE_TIP) {
+          const tip = message.payload.data.message;
 
-        setUpdateState({
-          progress: 0,
-          message: getMessage(tip),
-        });
-      }
-      if (message.type === UI_REQUEST.FIRMWARE_PROGRESS) {
-        setUpdateState(pre => ({
-          ...pre,
-          progress: message.payload.progress,
-        }));
-      }
-    });
-    registerListener = true;
-  }, [HardwareLowLevelSDK, SDK, getMessage]);
+          setUpdateState({
+            progress: 0,
+            message: getMessage(tip),
+          });
+        }
+        if (message.type === UI_REQUEST.FIRMWARE_PROGRESS) {
+          setUpdateState(pre => ({
+            ...pre,
+            progress: message.payload.progress,
+          }));
+        }
+      };
+
+      SDK.on(UI_EVENT, uiEventCallback);
+      registerListener = true;
+      console.log('Firmware Update: register sdk listeners');
+
+      return () => {
+        console.log('Firmware Update: remove all sdk listeners');
+        SDK.off(UI_EVENT, uiEventCallback);
+        registerListener = false;
+      };
+    }, [SDK, getMessage])
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -18,7 +18,7 @@ const HeaderView = () => {
   const navigate = useCallback(
     (routeName: string) => {
       // @ts-expect-error
-      navigation.replace(routeName);
+      navigation.navigate(routeName);
       setOpen(false);
     },
     [navigation]
