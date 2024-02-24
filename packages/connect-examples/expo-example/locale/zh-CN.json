@@ -19,6 +19,7 @@
   "action__full_coverage_res": "上传完整资源",
   "action__pick_file": "选择文件",
   "action__export_report": "导出报告",
+  "action__switch_device": "切换到设备输入",
 
   "action__start_test": "开始测试",
   "action__stop_test": "停止测试",
@@ -39,6 +40,7 @@
   "title__common_parameters": "常用参数",
   "title__hardware_api_test": "硬件 API 测试",
   "title__updating": "正在更新",
+  "title__input_pin": "输入 PIN",
 
   "title__device_info": "设备信息",
   "title__device_firmware_update": "设备固件更新",
@@ -96,7 +98,7 @@
   "message__reboot_to_bootloader": "重启到 Bootloader...",
   "message__wait_begin_update": "等待开始更新中...",
   "message__confirm_on_device": "在设备上确认...",
-  "message__firmware_erase_success": "固件擦除成功",
+  "message__firmware_erase_success": "固件安装中...",
   "message__firmware_start_transfer": "固件开始传输中...",
   "message__firmware_installing": "固件安装中...",
   "message__bootloader_update": "Bootloader 更新中...",
