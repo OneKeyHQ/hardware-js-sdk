@@ -26,11 +26,6 @@ module.exports = {
       to: 'icons/512x512.png',
     },
   ],
-  publish: {
-    provider: 'github',
-    repo: 'hardware-js-sdk',
-    owner: 'OneKeyHQ',
-  },
   dmg: {
     sign: false,
     contents: [
@@ -68,8 +63,8 @@ module.exports = {
     darkModeSupport: false,
     category: 'productivity',
     target: [
-      { target: 'dmg', arch: ['x64', 'arm64'] },
-      // { target: 'zip', arch: ['x64', 'arm64'] },
+      //   { target: 'dmg', arch: ['x64', 'arm64'] },
+      { target: 'zip', arch: ['x64', 'arm64'] },
     ],
     entitlements: 'entitlements.mac.plist',
     extendInfo: {

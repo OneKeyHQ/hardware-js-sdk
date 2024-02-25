@@ -16,7 +16,7 @@
     "dev:electron": "electron --inspect=5858 dist/index.js",
     "build:package": "yarn build-electron-web && electron-forge package",
     "build:main": "webpack --config webpack.config.ts",
-    "make": "yarn clean:build && yarn build-electron-web && electron-builder build -mw --config electron-builder.config.js",
+    "make": "yarn clean:build && yarn build-electron-web && electron-builder build -mw --config electron-builder.config.js --publish never",
     "lint": "eslint --ext .tsx --ext .ts ./",
     "ts:check": "yarn tsc --noEmit"
   },
