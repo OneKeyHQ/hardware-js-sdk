@@ -87,7 +87,7 @@ export default abstract class BaseProcess {
     const appPath = electron.app.getAppPath();
     let processDir;
     if (isDev) {
-      processDir = path.resolve(appPath, 'public', 'bin', this.resource, system);
+      processDir = path.resolve(appPath, '../', 'public', 'bin', this.resource, system);
     } else {
       processDir = path.resolve(appPath, '../', 'bin', this.resource);
     }

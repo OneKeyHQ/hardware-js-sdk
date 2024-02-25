@@ -4,15 +4,15 @@ on: workflow_dispatch
 
 jobs:
   build-and-upload:
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     strategy:
       matrix:
-        os: [windows-latest, macos-latest]
         node-version: [20]
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
 
@@ -24,8 +24,8 @@ jobs:
       run: yarn build:example:desktop
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: example-${{ matrix.os }}
+        name: example-desktop
         path: |
-          packages/connect-examples/electron-example/out/make/**/*.zip
+          ./packages/connect-examples/electron-example/out/*.{dmg,zip,exe,AppImage}
