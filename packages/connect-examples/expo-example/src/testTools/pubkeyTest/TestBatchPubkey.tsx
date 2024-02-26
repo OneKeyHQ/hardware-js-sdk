@@ -161,6 +161,7 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
   return error;
 }
 
+let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
   const intl = useIntl();
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
@@ -217,7 +218,10 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
       return Promise.resolve(undefined);
     },
     initHardwareListener: sdk => {
-      sdk.on(UI_EVENT, (message: CoreMessage) => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+      hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           sdk.uiResponse({
@@ -235,7 +239,8 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
             });
           }, 200);
         }
-      });
+      };
+      sdk.on(UI_EVENT, hardwareUiEventListener);
       return Promise.resolve();
     },
     prepareRunner: async (connectId, deviceId, features, sdk) => {
@@ -300,6 +305,12 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
       return Promise.resolve({
         error,
       });
+    },
+    removeHardwareListener: sdk => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+      return Promise.resolve();
     },
     processRunnerDone: () => {
       console.log('=====>>> Success Data:\n', JSON.stringify(originDataRef.current, null, 2));

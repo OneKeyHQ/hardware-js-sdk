@@ -1,10 +1,9 @@
 import { useCallback, useContext, useRef } from 'react';
-import { UI_EVENT } from '@onekeyfe/hd-core';
+import { UI_EVENT, getDeviceType } from '@onekeyfe/hd-core';
 import { isEmpty } from 'lodash';
 import type { CoreApi, Features, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 import { useSetAtom } from 'jotai';
-import { getDeviceType } from '@onekeyfe/hd-core/src/utils/deviceFeaturesUtils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
 import type { TestCaseDataWithKey, VerifyState } from './types';
@@ -57,6 +56,7 @@ type RunnerConfig<T> = {
     verifyState?: VerifyState;
   }>;
   processRunnerDone?: () => void;
+  removeHardwareListener?: (sdk: CoreApi) => Promise<void>;
 };
 
 export function useRunnerTest<T>(config: RunnerConfig<T>) {
@@ -69,6 +69,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     generateRequestParams,
     processRequest,
     processResponse,
+    removeHardwareListener,
     processRunnerDone,
   } = config;
 
@@ -96,19 +97,16 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     setRunnerDone?.(false);
     if (SDK) {
       SDK.cancel();
-      SDK.removeAllListeners(UI_EVENT);
+      removeHardwareListener?.(SDK);
     }
-  }, [setItemValues, clearItemVerifyState, setRunnerDone, SDK]);
+  }, [setItemValues, clearItemVerifyState, setRunnerDone, SDK, removeHardwareListener]);
 
   const endTestRunner = useCallback(() => {
-    if (SDK) {
-      SDK.removeAllListeners(UI_EVENT);
-    }
-
+    removeHardwareListener?.(SDK);
     setTimestampEndTest?.(Date.now());
     setRunnerDone?.(true);
     processRunnerDone?.();
-  }, [SDK, processRunnerDone, setRunnerDone, setTimestampEndTest]);
+  }, [SDK, processRunnerDone, removeHardwareListener, setRunnerDone, setTimestampEndTest]);
 
   const beginTest = useCallback(async () => {
     if (!SDK) return;
@@ -153,9 +151,9 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       } else {
         const deviceType = getDeviceType(deviceFeatures);
         if (deviceType === 'classic1s') {
-          await delay(300);
+          await delay(200);
         } else if (deviceType === 'pro') {
-          await delay(300);
+          await delay(200);
         }
       }
 

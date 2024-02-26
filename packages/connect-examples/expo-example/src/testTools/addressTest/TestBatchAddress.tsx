@@ -70,6 +70,7 @@ function ExportReportView() {
   return null;
 }
 
+let hardwareUiEventListener: any | undefined;
 function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[] }) {
   const intl = useIntl();
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
@@ -127,7 +128,11 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       return Promise.resolve(undefined);
     },
     initHardwareListener: sdk => {
-      sdk.on(UI_EVENT, (message: CoreMessage) => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+
+      hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           sdk.uiResponse({
@@ -145,7 +150,8 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
             });
           }, 200);
         }
-      });
+      };
+      sdk.on(UI_EVENT, hardwareUiEventListener);
       return Promise.resolve();
     },
     prepareRunner: async (connectId, deviceId, features, sdk) => {
@@ -240,6 +246,12 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       return Promise.resolve({
         error,
       });
+    },
+    removeHardwareListener: sdk => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+      return Promise.resolve();
     },
     processRunnerDone: () => {
       console.log('=====>>> Success Data:\n', JSON.stringify(originDataRef.current, null, 2));

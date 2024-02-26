@@ -103,6 +103,7 @@ function validateFields(payload: any, result: any, prefix = '') {
   return error;
 }
 
+let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
   const intl = useIntl();
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
@@ -158,7 +159,10 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       return Promise.resolve(undefined);
     },
     initHardwareListener: sdk => {
-      sdk.on(UI_EVENT, (message: CoreMessage) => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+      hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           sdk.uiResponse({
@@ -176,7 +180,8 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
             });
           }, 200);
         }
-      });
+      };
+      sdk.on(UI_EVENT, hardwareUiEventListener);
       return Promise.resolve();
     },
     prepareRunner: async (connectId, deviceId, features, sdk) => {
@@ -213,6 +218,12 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       return Promise.resolve({
         error,
       });
+    },
+    removeHardwareListener: sdk => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+      return Promise.resolve();
     },
   });
 
