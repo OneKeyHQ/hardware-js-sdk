@@ -5,6 +5,7 @@
   "tab__address_test": "Address Test",
   "tab__security_check": "Security Check",
   "tab__functional_testing": "Functional testing",
+  "tab__api_export_test": "ApiExport Test",
 
   "action__search_device": "Search Device",
   "action__clean_device": "Disconnect Device",

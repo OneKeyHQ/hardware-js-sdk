@@ -114,6 +114,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
   }
   if (!hostBridge || prevFrameInstance !== iframe.instance?.contentWindow) {
     resetListenerFlag();
+
     createJsBridge({
       isHost: true,
       remoteFrame: iframe.instance?.contentWindow as Window,

@@ -1308,6 +1308,31 @@ export type ECDHSessionKey = {
   public_key?: string;
 };
 
+// CosiCommit
+export type CosiCommit = {
+  address_n: number[];
+  data?: string;
+};
+
+// CosiCommitment
+export type CosiCommitment = {
+  commitment?: string;
+  pubkey?: string;
+};
+
+// CosiSign
+export type CosiSign = {
+  address_n: number[];
+  data?: string;
+  global_commitment?: string;
+  global_pubkey?: string;
+};
+
+// CosiSignature
+export type CosiSignature = {
+  signature: string;
+};
+
 export type Path = {
   address_n: number[];
 };
@@ -1376,6 +1401,106 @@ export type DnxRTSigsRequest = {};
 export type DnxSignedTx = {
   signatures: string[];
   output_keys: string[];
+};
+
+export enum DebugSwipeDirection {
+  UP = 0,
+  DOWN = 1,
+  LEFT = 2,
+  RIGHT = 3,
+}
+
+// DebugLinkDecision
+export type DebugLinkDecision = {
+  yes_no?: boolean;
+  swipe?: DebugSwipeDirection;
+  input?: string;
+  x?: number;
+  y?: number;
+  wait?: boolean;
+  hold_ms?: number;
+};
+
+// DebugLinkLayout
+export type DebugLinkLayout = {
+  lines: string[];
+};
+
+// DebugLinkReseedRandom
+export type DebugLinkReseedRandom = {
+  value?: number;
+};
+
+// DebugLinkRecordScreen
+export type DebugLinkRecordScreen = {
+  target_directory?: string;
+};
+
+// DebugLinkGetState
+export type DebugLinkGetState = {
+  wait_word_list?: boolean;
+  wait_word_pos?: boolean;
+  wait_layout?: boolean;
+};
+
+// DebugLinkState
+export type DebugLinkState = {
+  layout?: string;
+  pin?: string;
+  matrix?: string;
+  mnemonic_secret?: string;
+  node?: HDNodeType;
+  passphrase_protection?: boolean;
+  reset_word?: string;
+  reset_entropy?: string;
+  recovery_fake_word?: string;
+  recovery_word_pos?: number;
+  reset_word_pos?: number;
+  mnemonic_type?: BackupType;
+  layout_lines: string[];
+};
+
+// DebugLinkStop
+export type DebugLinkStop = {};
+
+// DebugLinkLog
+export type DebugLinkLog = {
+  level?: number;
+  bucket?: string;
+  text?: string;
+};
+
+// DebugLinkMemoryRead
+export type DebugLinkMemoryRead = {
+  address?: number;
+  length?: number;
+};
+
+// DebugLinkMemory
+export type DebugLinkMemory = {
+  memory?: string;
+};
+
+// DebugLinkMemoryWrite
+export type DebugLinkMemoryWrite = {
+  address?: number;
+  memory?: string;
+  flash?: boolean;
+};
+
+// DebugLinkFlashErase
+export type DebugLinkFlashErase = {
+  sector?: number;
+};
+
+// DebugLinkEraseSdCard
+export type DebugLinkEraseSdCard = {
+  format?: boolean;
+};
+
+// DebugLinkWatchLayout
+export type DebugLinkWatchLayout = {
+  watch?: boolean;
 };
 
 // EmmcFixPermission
@@ -2349,8 +2474,31 @@ export type Entropy = {
   entropy: string;
 };
 
+// GetFirmwareHash
+export type GetFirmwareHash = {
+  challenge?: string;
+};
+
+// FirmwareHash
+export type FirmwareHash = {
+  hash: string;
+};
+
 // WipeDevice
 export type WipeDevice = {};
+
+// LoadDevice
+export type LoadDevice = {
+  mnemonics: string[];
+  pin?: string;
+  passphrase_protection?: boolean;
+  language?: string;
+  label?: string;
+  skip_checksum?: boolean;
+  u2f_counter?: number;
+  needs_backup?: boolean;
+  no_backup?: boolean;
+};
 
 // ResetDevice
 export type ResetDevice = {
@@ -2454,6 +2602,14 @@ export type BixinMessageSE = {
 // BixinOutMessageSE
 export type BixinOutMessageSE = {
   outmessage?: string;
+};
+
+// GetNonce
+export type GetNonce = {};
+
+// Nonce
+export type Nonce = {
+  nonce: string;
 };
 
 // DeviceBackToBoot
@@ -2673,6 +2829,17 @@ export type FileInfoList = {
 // DeviceEraseSector
 export type DeviceEraseSector = {
   sector: number;
+};
+
+// UnlockPath
+export type UnlockPath = {
+  address_n: number[];
+  mac?: string;
+};
+
+// UnlockedPathRequest
+export type UnlockedPathRequest = {
+  mac?: string;
 };
 
 export type MoneroRctKeyPublic = {
@@ -2997,6 +3164,26 @@ export type MoneroLiveRefreshFinalRequest = {};
 
 // MoneroLiveRefreshFinalAck
 export type MoneroLiveRefreshFinalAck = {};
+
+// DebugMoneroDiagRequest
+export type DebugMoneroDiagRequest = {
+  ins?: number;
+  p1?: number;
+  p2?: number;
+  pd: number[];
+  data1?: string;
+  data2?: string;
+};
+
+// DebugMoneroDiagAck
+export type DebugMoneroDiagAck = {
+  ins?: number;
+  p1?: number;
+  p2?: number;
+  pd: number[];
+  data1?: string;
+  data2?: string;
+};
 
 // NearGetAddress
 export type NearGetAddress = {
@@ -4023,6 +4210,39 @@ export type TronMessageSignature = {
   signature: string;
 };
 
+// WebAuthnListResidentCredentials
+export type WebAuthnListResidentCredentials = {};
+
+// WebAuthnAddResidentCredential
+export type WebAuthnAddResidentCredential = {
+  credential_id?: string;
+};
+
+// WebAuthnRemoveResidentCredential
+export type WebAuthnRemoveResidentCredential = {
+  index?: number;
+};
+
+export type WebAuthnCredential = {
+  index?: number;
+  id?: string;
+  rp_id?: string;
+  rp_name?: string;
+  user_id?: string;
+  user_name?: string;
+  user_display_name?: string;
+  creation_time?: number;
+  hmac_secret?: boolean;
+  use_sign_count?: boolean;
+  algorithm?: number;
+  curve?: number;
+};
+
+// WebAuthnCredentials
+export type WebAuthnCredentials = {
+  credentials: WebAuthnCredential[];
+};
+
 // facotry
 export type facotry = {};
 
@@ -4183,6 +4403,10 @@ export type MessageType = {
   SignedIdentity: SignedIdentity;
   GetECDHSessionKey: GetECDHSessionKey;
   ECDHSessionKey: ECDHSessionKey;
+  CosiCommit: CosiCommit;
+  CosiCommitment: CosiCommitment;
+  CosiSign: CosiSign;
+  CosiSignature: CosiSignature;
   Path: Path;
   BatchGetPublickeys: BatchGetPublickeys;
   EcdsaPublicKeys: EcdsaPublicKeys;
@@ -4195,6 +4419,20 @@ export type MessageType = {
   DnxInputAck: DnxInputAck;
   DnxRTSigsRequest: DnxRTSigsRequest;
   DnxSignedTx: DnxSignedTx;
+  DebugLinkDecision: DebugLinkDecision;
+  DebugLinkLayout: DebugLinkLayout;
+  DebugLinkReseedRandom: DebugLinkReseedRandom;
+  DebugLinkRecordScreen: DebugLinkRecordScreen;
+  DebugLinkGetState: DebugLinkGetState;
+  DebugLinkState: DebugLinkState;
+  DebugLinkStop: DebugLinkStop;
+  DebugLinkLog: DebugLinkLog;
+  DebugLinkMemoryRead: DebugLinkMemoryRead;
+  DebugLinkMemory: DebugLinkMemory;
+  DebugLinkMemoryWrite: DebugLinkMemoryWrite;
+  DebugLinkFlashErase: DebugLinkFlashErase;
+  DebugLinkEraseSdCard: DebugLinkEraseSdCard;
+  DebugLinkWatchLayout: DebugLinkWatchLayout;
   EmmcFixPermission: EmmcFixPermission;
   EmmcPath: EmmcPath;
   EmmcPathInfo: EmmcPathInfo;
@@ -4308,7 +4546,10 @@ export type MessageType = {
   Cancel: Cancel;
   GetEntropy: GetEntropy;
   Entropy: Entropy;
+  GetFirmwareHash: GetFirmwareHash;
+  FirmwareHash: FirmwareHash;
   WipeDevice: WipeDevice;
+  LoadDevice: LoadDevice;
   ResetDevice: ResetDevice;
   BackupDevice: BackupDevice;
   EntropyRequest: EntropyRequest;
@@ -4325,6 +4566,8 @@ export type MessageType = {
   BixinSeedOperate: BixinSeedOperate;
   BixinMessageSE: BixinMessageSE;
   BixinOutMessageSE: BixinOutMessageSE;
+  GetNonce: GetNonce;
+  Nonce: Nonce;
   DeviceBackToBoot: DeviceBackToBoot;
   BixinBackupRequest: BixinBackupRequest;
   BixinBackupAck: BixinBackupAck;
@@ -4363,6 +4606,8 @@ export type MessageType = {
   FileInfo: FileInfo;
   FileInfoList: FileInfoList;
   DeviceEraseSector: DeviceEraseSector;
+  UnlockPath: UnlockPath;
+  UnlockedPathRequest: UnlockedPathRequest;
   MoneroRctKeyPublic: MoneroRctKeyPublic;
   MoneroOutputEntry: MoneroOutputEntry;
   MoneroMultisigKLRki: MoneroMultisigKLRki;
@@ -4411,6 +4656,8 @@ export type MessageType = {
   MoneroLiveRefreshStepAck: MoneroLiveRefreshStepAck;
   MoneroLiveRefreshFinalRequest: MoneroLiveRefreshFinalRequest;
   MoneroLiveRefreshFinalAck: MoneroLiveRefreshFinalAck;
+  DebugMoneroDiagRequest: DebugMoneroDiagRequest;
+  DebugMoneroDiagAck: DebugMoneroDiagAck;
   NearGetAddress: NearGetAddress;
   NearAddress: NearAddress;
   NearSignTx: NearSignTx;
@@ -4547,6 +4794,11 @@ export type MessageType = {
   TronSignedTx: TronSignedTx;
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
+  WebAuthnListResidentCredentials: WebAuthnListResidentCredentials;
+  WebAuthnAddResidentCredential: WebAuthnAddResidentCredential;
+  WebAuthnRemoveResidentCredential: WebAuthnRemoveResidentCredential;
+  WebAuthnCredential: WebAuthnCredential;
+  WebAuthnCredentials: WebAuthnCredentials;
   facotry: facotry;
 };
 

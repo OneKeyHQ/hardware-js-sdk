@@ -38,7 +38,7 @@ export const getHardwareSDKInstance = memoizee(
         if (Platform.OS === 'web') {
           settings.connectSrc = CONNECT_SRC;
           settings.env = 'web';
-          settings.preRelease = false;
+          settings.preRelease = true;
           // HardwareLowLevelSDK = await importLowLevelSDK();
 
           // Override Connect src

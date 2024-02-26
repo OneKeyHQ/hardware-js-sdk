@@ -1,0 +1,1163 @@
+{
+  "nested": {
+    "Success": {
+      "fields": {
+        "message": {
+          "type": "string",
+          "id": 1,
+          "options": {
+            "default": ""
+          }
+        }
+      }
+    },
+    "Failure": {
+      "fields": {
+        "code": {
+          "type": "FailureType",
+          "id": 1
+        },
+        "message": {
+          "type": "string",
+          "id": 2
+        }
+      },
+      "nested": {
+        "FailureType": {
+          "values": {
+            "Failure_UnexpectedMessage": 1,
+            "Failure_ButtonExpected": 2,
+            "Failure_DataError": 3,
+            "Failure_ActionCancelled": 4,
+            "Failure_PinExpected": 5,
+            "Failure_PinCancelled": 6,
+            "Failure_PinInvalid": 7,
+            "Failure_InvalidSignature": 8,
+            "Failure_ProcessError": 9,
+            "Failure_NotEnoughFunds": 10,
+            "Failure_NotInitialized": 11,
+            "Failure_PinMismatch": 12,
+            "Failure_WipeCodeMismatch": 13,
+            "Failure_InvalidSession": 14,
+            "Failure_BatteryLow": 30,
+            "Failure_FirmwareError": 99
+          }
+        }
+      }
+    },
+    "Initialize": {
+      "fields": {
+        "session_id": {
+          "type": "bytes",
+          "id": 1
+        },
+        "_skip_passphrase": {
+          "type": "bool",
+          "id": 2,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "derive_cardano": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "GetFeatures": {
+      "fields": {}
+    },
+    "OneKeyDeviceType": {
+      "values": {
+        "CLASSIC": 0,
+        "CLASSIC1S": 1,
+        "MINI": 2,
+        "TOUCH": 3,
+        "PRO": 5
+      }
+    },
+    "OneKeySeType": {
+      "values": {
+        "THD89": 0,
+        "SE608A": 1
+      }
+    },
+    "OneKeySEState": {
+      "values": {
+        "BOOT": 0,
+        "APP": 1
+      }
+    },
+    "Features": {
+      "fields": {
+        "vendor": {
+          "type": "string",
+          "id": 1
+        },
+        "major_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "minor_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "patch_version": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "bootloader_mode": {
+          "type": "bool",
+          "id": 5
+        },
+        "device_id": {
+          "type": "string",
+          "id": 6
+        },
+        "pin_protection": {
+          "type": "bool",
+          "id": 7
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 8
+        },
+        "language": {
+          "type": "string",
+          "id": 9
+        },
+        "label": {
+          "type": "string",
+          "id": 10
+        },
+        "initialized": {
+          "type": "bool",
+          "id": 12
+        },
+        "revision": {
+          "type": "bytes",
+          "id": 13
+        },
+        "bootloader_hash": {
+          "type": "bytes",
+          "id": 14
+        },
+        "imported": {
+          "type": "bool",
+          "id": 15
+        },
+        "unlocked": {
+          "type": "bool",
+          "id": 16
+        },
+        "_passphrase_cached": {
+          "type": "bool",
+          "id": 17,
+          "options": {
+            "deprecated": true
+          }
+        },
+        "firmware_present": {
+          "type": "bool",
+          "id": 18
+        },
+        "needs_backup": {
+          "type": "bool",
+          "id": 19
+        },
+        "flags": {
+          "type": "uint32",
+          "id": 20
+        },
+        "model": {
+          "type": "string",
+          "id": 21
+        },
+        "fw_major": {
+          "type": "uint32",
+          "id": 22
+        },
+        "fw_minor": {
+          "type": "uint32",
+          "id": 23
+        },
+        "fw_patch": {
+          "type": "uint32",
+          "id": 24
+        },
+        "fw_vendor": {
+          "type": "string",
+          "id": 25
+        },
+        "unfinished_backup": {
+          "type": "bool",
+          "id": 27
+        },
+        "no_backup": {
+          "type": "bool",
+          "id": 28
+        },
+        "recovery_mode": {
+          "type": "bool",
+          "id": 29
+        },
+        "sd_card_present": {
+          "type": "bool",
+          "id": 32
+        },
+        "sd_protection": {
+          "type": "bool",
+          "id": 33
+        },
+        "wipe_code_protection": {
+          "type": "bool",
+          "id": 34
+        },
+        "session_id": {
+          "type": "bytes",
+          "id": 35
+        },
+        "passphrase_always_on_device": {
+          "type": "bool",
+          "id": 36
+        },
+        "auto_lock_delay_ms": {
+          "type": "uint32",
+          "id": 38
+        },
+        "display_rotation": {
+          "type": "uint32",
+          "id": 39
+        },
+        "experimental_features": {
+          "type": "bool",
+          "id": 40
+        },
+        "offset": {
+          "type": "uint32",
+          "id": 500
+        },
+        "ble_name": {
+          "type": "string",
+          "id": 501
+        },
+        "ble_ver": {
+          "type": "string",
+          "id": 502
+        },
+        "ble_enable": {
+          "type": "bool",
+          "id": 503
+        },
+        "se_enable": {
+          "type": "bool",
+          "id": 504
+        },
+        "se_ver": {
+          "type": "string",
+          "id": 506
+        },
+        "backup_only": {
+          "type": "bool",
+          "id": 507
+        },
+        "onekey_version": {
+          "type": "string",
+          "id": 508
+        },
+        "onekey_serial": {
+          "type": "string",
+          "id": 509
+        },
+        "bootloader_version": {
+          "type": "string",
+          "id": 510
+        },
+        "serial_no": {
+          "type": "string",
+          "id": 511
+        },
+        "spi_flash": {
+          "type": "string",
+          "id": 512
+        },
+        "initstates": {
+          "type": "uint32",
+          "id": 513
+        },
+        "NFT_voucher": {
+          "type": "bytes",
+          "id": 514
+        },
+        "cpu_info": {
+          "type": "string",
+          "id": 515
+        },
+        "pre_firmware": {
+          "type": "string",
+          "id": 516
+        },
+        "coin_switch": {
+          "type": "uint32",
+          "id": 517
+        },
+        "boardloader_version": {
+          "type": "string",
+          "id": 519
+        },
+        "onekey_device_type": {
+          "type": "OneKeyDeviceType",
+          "id": 600
+        },
+        "onekey_se_type": {
+          "type": "OneKeySeType",
+          "id": 601
+        },
+        "onekey_board_version": {
+          "type": "string",
+          "id": 602
+        },
+        "onekey_board_hash": {
+          "type": "bytes",
+          "id": 603
+        },
+        "onekey_se01_version": {
+          "type": "string",
+          "id": 606
+        },
+        "onekey_firmware_version": {
+          "type": "string",
+          "id": 609
+        },
+        "onekey_serial_no": {
+          "type": "string",
+          "id": 612
+        },
+        "onekey_ble_name": {
+          "type": "string",
+          "id": 614
+        },
+        "onekey_ble_version": {
+          "type": "string",
+          "id": 615
+        }
+      }
+    },
+    "wire_in": {
+      "type": "bool",
+      "id": 50002,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_out": {
+      "type": "bool",
+      "id": 50003,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_debug_in": {
+      "type": "bool",
+      "id": 50004,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_debug_out": {
+      "type": "bool",
+      "id": 50005,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_tiny": {
+      "type": "bool",
+      "id": 50006,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_bootloader": {
+      "type": "bool",
+      "id": 50007,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "wire_no_fsm": {
+      "type": "bool",
+      "id": 50008,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "bitcoin_only": {
+      "type": "bool",
+      "id": 60000,
+      "extend": "google.protobuf.EnumValueOptions"
+    },
+    "has_bitcoin_only_values": {
+      "type": "bool",
+      "id": 51001,
+      "extend": "google.protobuf.EnumOptions"
+    },
+    "experimental_message": {
+      "type": "bool",
+      "id": 52001,
+      "extend": "google.protobuf.MessageOptions"
+    },
+    "wire_type": {
+      "type": "uint32",
+      "id": 52002,
+      "extend": "google.protobuf.MessageOptions"
+    },
+    "experimental_field": {
+      "type": "bool",
+      "id": 53001,
+      "extend": "google.protobuf.FieldOptions"
+    },
+    "include_in_bitcoin_only": {
+      "type": "bool",
+      "id": 60000,
+      "extend": "google.protobuf.FileOptions"
+    },
+    "MessageType": {
+      "options": {
+        "(has_bitcoin_only_values)": true,
+        "allow_alias": true
+      },
+      "values": {
+        "MessageType_Initialize": 0,
+        "MessageType_Success": 2,
+        "MessageType_Failure": 3,
+        "MessageType_Features": 17,
+        "MessageType_GetFeatures": 55
+      }
+    },
+    "google": {
+      "nested": {
+        "protobuf": {
+          "nested": {
+            "FileDescriptorSet": {
+              "fields": {
+                "file": {
+                  "rule": "repeated",
+                  "type": "FileDescriptorProto",
+                  "id": 1
+                }
+              }
+            },
+            "FileDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "package": {
+                  "type": "string",
+                  "id": 2
+                },
+                "dependency": {
+                  "rule": "repeated",
+                  "type": "string",
+                  "id": 3
+                },
+                "public_dependency": {
+                  "rule": "repeated",
+                  "type": "int32",
+                  "id": 10,
+                  "options": {
+                    "packed": false
+                  }
+                },
+                "weak_dependency": {
+                  "rule": "repeated",
+                  "type": "int32",
+                  "id": 11,
+                  "options": {
+                    "packed": false
+                  }
+                },
+                "message_type": {
+                  "rule": "repeated",
+                  "type": "DescriptorProto",
+                  "id": 4
+                },
+                "enum_type": {
+                  "rule": "repeated",
+                  "type": "EnumDescriptorProto",
+                  "id": 5
+                },
+                "service": {
+                  "rule": "repeated",
+                  "type": "ServiceDescriptorProto",
+                  "id": 6
+                },
+                "extension": {
+                  "rule": "repeated",
+                  "type": "FieldDescriptorProto",
+                  "id": 7
+                },
+                "options": {
+                  "type": "FileOptions",
+                  "id": 8
+                },
+                "source_code_info": {
+                  "type": "SourceCodeInfo",
+                  "id": 9
+                },
+                "syntax": {
+                  "type": "string",
+                  "id": 12
+                }
+              }
+            },
+            "DescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "field": {
+                  "rule": "repeated",
+                  "type": "FieldDescriptorProto",
+                  "id": 2
+                },
+                "extension": {
+                  "rule": "repeated",
+                  "type": "FieldDescriptorProto",
+                  "id": 6
+                },
+                "nested_type": {
+                  "rule": "repeated",
+                  "type": "DescriptorProto",
+                  "id": 3
+                },
+                "enum_type": {
+                  "rule": "repeated",
+                  "type": "EnumDescriptorProto",
+                  "id": 4
+                },
+                "extension_range": {
+                  "rule": "repeated",
+                  "type": "ExtensionRange",
+                  "id": 5
+                },
+                "oneof_decl": {
+                  "rule": "repeated",
+                  "type": "OneofDescriptorProto",
+                  "id": 8
+                },
+                "options": {
+                  "type": "MessageOptions",
+                  "id": 7
+                },
+                "reserved_range": {
+                  "rule": "repeated",
+                  "type": "ReservedRange",
+                  "id": 9
+                },
+                "reserved_name": {
+                  "rule": "repeated",
+                  "type": "string",
+                  "id": 10
+                }
+              },
+              "nested": {
+                "ExtensionRange": {
+                  "fields": {
+                    "start": {
+                      "type": "int32",
+                      "id": 1
+                    },
+                    "end": {
+                      "type": "int32",
+                      "id": 2
+                    }
+                  }
+                },
+                "ReservedRange": {
+                  "fields": {
+                    "start": {
+                      "type": "int32",
+                      "id": 1
+                    },
+                    "end": {
+                      "type": "int32",
+                      "id": 2
+                    }
+                  }
+                }
+              }
+            },
+            "FieldDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "number": {
+                  "type": "int32",
+                  "id": 3
+                },
+                "label": {
+                  "type": "Label",
+                  "id": 4
+                },
+                "type": {
+                  "type": "Type",
+                  "id": 5
+                },
+                "type_name": {
+                  "type": "string",
+                  "id": 6
+                },
+                "extendee": {
+                  "type": "string",
+                  "id": 2
+                },
+                "default_value": {
+                  "type": "string",
+                  "id": 7
+                },
+                "oneof_index": {
+                  "type": "int32",
+                  "id": 9
+                },
+                "json_name": {
+                  "type": "string",
+                  "id": 10
+                },
+                "options": {
+                  "type": "FieldOptions",
+                  "id": 8
+                }
+              },
+              "nested": {
+                "Type": {
+                  "values": {
+                    "TYPE_DOUBLE": 1,
+                    "TYPE_FLOAT": 2,
+                    "TYPE_INT64": 3,
+                    "TYPE_UINT64": 4,
+                    "TYPE_INT32": 5,
+                    "TYPE_FIXED64": 6,
+                    "TYPE_FIXED32": 7,
+                    "TYPE_BOOL": 8,
+                    "TYPE_STRING": 9,
+                    "TYPE_GROUP": 10,
+                    "TYPE_MESSAGE": 11,
+                    "TYPE_BYTES": 12,
+                    "TYPE_UINT32": 13,
+                    "TYPE_ENUM": 14,
+                    "TYPE_SFIXED32": 15,
+                    "TYPE_SFIXED64": 16,
+                    "TYPE_SINT32": 17,
+                    "TYPE_SINT64": 18
+                  }
+                },
+                "Label": {
+                  "values": {
+                    "LABEL_OPTIONAL": 1,
+                    "LABEL_REQUIRED": 2,
+                    "LABEL_REPEATED": 3
+                  }
+                }
+              }
+            },
+            "OneofDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "options": {
+                  "type": "OneofOptions",
+                  "id": 2
+                }
+              }
+            },
+            "EnumDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "value": {
+                  "rule": "repeated",
+                  "type": "EnumValueDescriptorProto",
+                  "id": 2
+                },
+                "options": {
+                  "type": "EnumOptions",
+                  "id": 3
+                }
+              }
+            },
+            "EnumValueDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "number": {
+                  "type": "int32",
+                  "id": 2
+                },
+                "options": {
+                  "type": "EnumValueOptions",
+                  "id": 3
+                }
+              }
+            },
+            "ServiceDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "method": {
+                  "rule": "repeated",
+                  "type": "MethodDescriptorProto",
+                  "id": 2
+                },
+                "options": {
+                  "type": "ServiceOptions",
+                  "id": 3
+                }
+              }
+            },
+            "MethodDescriptorProto": {
+              "fields": {
+                "name": {
+                  "type": "string",
+                  "id": 1
+                },
+                "input_type": {
+                  "type": "string",
+                  "id": 2
+                },
+                "output_type": {
+                  "type": "string",
+                  "id": 3
+                },
+                "options": {
+                  "type": "MethodOptions",
+                  "id": 4
+                },
+                "client_streaming": {
+                  "type": "bool",
+                  "id": 5
+                },
+                "server_streaming": {
+                  "type": "bool",
+                  "id": 6
+                }
+              }
+            },
+            "FileOptions": {
+              "fields": {
+                "java_package": {
+                  "type": "string",
+                  "id": 1
+                },
+                "java_outer_classname": {
+                  "type": "string",
+                  "id": 8
+                },
+                "java_multiple_files": {
+                  "type": "bool",
+                  "id": 10
+                },
+                "java_generate_equals_and_hash": {
+                  "type": "bool",
+                  "id": 20,
+                  "options": {
+                    "deprecated": true
+                  }
+                },
+                "java_string_check_utf8": {
+                  "type": "bool",
+                  "id": 27
+                },
+                "optimize_for": {
+                  "type": "OptimizeMode",
+                  "id": 9,
+                  "options": {
+                    "default": "SPEED"
+                  }
+                },
+                "go_package": {
+                  "type": "string",
+                  "id": 11
+                },
+                "cc_generic_services": {
+                  "type": "bool",
+                  "id": 16
+                },
+                "java_generic_services": {
+                  "type": "bool",
+                  "id": 17
+                },
+                "py_generic_services": {
+                  "type": "bool",
+                  "id": 18
+                },
+                "deprecated": {
+                  "type": "bool",
+                  "id": 23
+                },
+                "cc_enable_arenas": {
+                  "type": "bool",
+                  "id": 31
+                },
+                "objc_class_prefix": {
+                  "type": "string",
+                  "id": 36
+                },
+                "csharp_namespace": {
+                  "type": "string",
+                  "id": 37
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [
+                [
+                  1000,
+                  536870911
+                ]
+              ],
+              "reserved": [
+                [
+                  38,
+                  38
+                ]
+              ],
+              "nested": {
+                "OptimizeMode": {
+                  "values": {
+                    "SPEED": 1,
+                    "CODE_SIZE": 2,
+                    "LITE_RUNTIME": 3
+                  }
+                }
+              }
+            },
+            "MessageOptions": {
+              "fields": {
+                "message_set_wire_format": {
+                  "type": "bool",
+                  "id": 1
+                },
+                "no_standard_descriptor_accessor": {
+                  "type": "bool",
+                  "id": 2
+                },
+                "deprecated": {
+                  "type": "bool",
+                  "id": 3
+                },
+                "map_entry": {
+                  "type": "bool",
+                  "id": 7
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [
+                [
+                  1000,
+                  536870911
+                ]
+              ],
+              "reserved": [
+                [
+                  8,
+                  8
+                ]
+              ]
+            },
+            "FieldOptions": {
+              "fields": {
+                "ctype": {
+                  "type": "CType",
+                  "id": 1,
+                  "options": {
+                    "default": "STRING"
+                  }
+                },
+                "packed": {
+                  "type": "bool",
+                  "id": 2
+                },
+                "jstype": {
+                  "type": "JSType",
+                  "id": 6,
+                  "options": {
+                    "default": "JS_NORMAL"
+                  }
+                },
+                "lazy": {
+                  "type": "bool",
+                  "id": 5
+                },
+                "deprecated": {
+                  "type": "bool",
+                  "id": 3
+                },
+                "weak": {
+                  "type": "bool",
+                  "id": 10
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [
+                [
+                  1000,
+                  536870911
+                ]
+              ],
+              "reserved": [
+                [
+                  4,
+                  4
+                ]
+              ],
+              "nested": {
+                "CType": {
+                  "values": {
+                    "STRING": 0,
+                    "CORD": 1,
+                    "STRING_PIECE": 2
+                  }
+                },
+                "JSType": {
+                  "values": {
+                    "JS_NORMAL": 0,
+                    "JS_STRING": 1,
+                    "JS_NUMBER": 2
+                  }
+                }
+              }
+            },
+            "OneofOptions": {
+              "fields": {
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [
+                [
+                  1000,
+                  536870911
+                ]
+              ]
+            },
+            "EnumOptions": {
+              "fields": {
+                "allow_alias": {
+                  "type": "bool",
+                  "id": 2
+                },
+                "deprecated": {
+                  "type": "bool",
+                  "id": 3
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [
+                [
+                  1000,
+                  536870911
+                ]
+              ]
+            },
+            "EnumValueOptions": {
+              "fields": {
+                "deprecated": {
+                  "type": "bool",
+                  "id": 1
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [
+                [
+                  1000,
+                  536870911
+                ]
+              ]
+            },
+            "ServiceOptions": {
+              "fields": {
+                "deprecated": {
+                  "type": "bool",
+                  "id": 33
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [
+                [
+                  1000,
+                  536870911
+                ]
+              ]
+            },
+            "MethodOptions": {
+              "fields": {
+                "deprecated": {
+                  "type": "bool",
+                  "id": 33
+                },
+                "uninterpreted_option": {
+                  "rule": "repeated",
+                  "type": "UninterpretedOption",
+                  "id": 999
+                }
+              },
+              "extensions": [
+                [
+                  1000,
+                  536870911
+                ]
+              ]
+            },
+            "UninterpretedOption": {
+              "fields": {
+                "name": {
+                  "rule": "repeated",
+                  "type": "NamePart",
+                  "id": 2
+                },
+                "identifier_value": {
+                  "type": "string",
+                  "id": 3
+                },
+                "positive_int_value": {
+                  "type": "uint64",
+                  "id": 4
+                },
+                "negative_int_value": {
+                  "type": "int64",
+                  "id": 5
+                },
+                "double_value": {
+                  "type": "double",
+                  "id": 6
+                },
+                "string_value": {
+                  "type": "bytes",
+                  "id": 7
+                },
+                "aggregate_value": {
+                  "type": "string",
+                  "id": 8
+                }
+              },
+              "nested": {
+                "NamePart": {
+                  "fields": {
+                    "name_part": {
+                      "rule": "required",
+                      "type": "string",
+                      "id": 1
+                    },
+                    "is_extension": {
+                      "rule": "required",
+                      "type": "bool",
+                      "id": 2
+                    }
+                  }
+                }
+              }
+            },
+            "SourceCodeInfo": {
+              "fields": {
+                "location": {
+                  "rule": "repeated",
+                  "type": "Location",
+                  "id": 1
+                }
+              },
+              "nested": {
+                "Location": {
+                  "fields": {
+                    "path": {
+                      "rule": "repeated",
+                      "type": "int32",
+                      "id": 1
+                    },
+                    "span": {
+                      "rule": "repeated",
+                      "type": "int32",
+                      "id": 2
+                    },
+                    "leading_comments": {
+                      "type": "string",
+                      "id": 3
+                    },
+                    "trailing_comments": {
+                      "type": "string",
+                      "id": 4
+                    },
+                    "leading_detached_comments": {
+                      "rule": "repeated",
+                      "type": "string",
+                      "id": 6
+                    }
+                  }
+                }
+              }
+            },
+            "GeneratedCodeInfo": {
+              "fields": {
+                "annotation": {
+                  "rule": "repeated",
+                  "type": "Annotation",
+                  "id": 1
+                }
+              },
+              "nested": {
+                "Annotation": {
+                  "fields": {
+                    "path": {
+                      "rule": "repeated",
+                      "type": "int32",
+                      "id": 1
+                    },
+                    "source_file": {
+                      "type": "string",
+                      "id": 2
+                    },
+                    "begin": {
+                      "type": "int32",
+                      "id": 3
+                    },
+                    "end": {
+                      "type": "int32",
+                      "id": 4
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
