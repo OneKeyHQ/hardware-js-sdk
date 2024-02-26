@@ -30,6 +30,10 @@ jobs:
           yarn expo export:web
         working-directory: ${{ env.PROJECT_PATH }}
 
+      - name: Copy index.html to 404.html for Github Pages deployment (client-side routing)
+        run: cp web-build/index.html web-build/404.html
+        working-directory: ${{ env.PROJECT_PATH }}
+
       - name: Deploy Github Pages
         uses: peaceiris/actions-gh-pages@v3
         with:

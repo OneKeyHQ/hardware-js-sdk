@@ -3,29 +3,49 @@ name: build-example-desktop
 on: workflow_dispatch
 
 jobs:
-  build-and-upload:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, macos-latest]
-        node-version: [20]
+  build:
+    runs-on: macos-latest
+    env:
+      PROJECT_PATH: packages/connect-examples/electron-example
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+    - uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: '20'
+        registry-url: 'https://registry.npmjs.org'
 
     - name: Install dependencies
       run: |
-        yarn setup
+        yarn
+        yarn bootstrap
 
-    - name: Build Application
+    - name: Build Target
+      run: |
+        yarn build
+
+    - name: Build Desktop Application
       run: yarn build:example:desktop
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
+    - name: Upload Mac x64 Artifacts
+      uses: actions/upload-artifact@v4
       with:
-        name: example-${{ matrix.os }}
+        name: mac-x64-example-desktop
         path: |
-          packages/connect-examples/electron-example/out/make/**/*.zip
+          ${{ env.PROJECT_PATH }}/out/*x64.dmg
+          ${{ env.PROJECT_PATH }}/out/*mac-x64.zip
+
+    - name: Upload Mac arm64 Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: mac-arm64-example-desktop
+        path: |
+          ${{ env.PROJECT_PATH }}/out/*arm64.dmg
+          ${{ env.PROJECT_PATH }}/out/*mac-arm64.zip
+
+    - name: Upload Windows Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: win-x64-example-desktop
+        path: |
+          ${{ env.PROJECT_PATH }}/out/*.exe

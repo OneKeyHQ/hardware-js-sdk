@@ -12,11 +12,11 @@
     "clean:build": "rimraf out",
     "dev-electron-web": "cross-env NODE_ENV=development yarn copy:inject && yarn build:main && cd ../expo-example && yarn dev:electron-web",
     "build-electron-web": "yarn copy:inject && yarn build:main && cd ../expo-example && yarn build:electron-web",
-    "dev": "npx concurrently \"yarn dev:electron-forge\" \"cross-env TRANSFORM_REGENERATOR_DISABLED=true BROWSER=none yarn dev-electron-web\"",
-    "dev:electron-forge": "electron-forge start",
+    "dev": "npx concurrently \"yarn dev:electron\" \"cross-env TRANSFORM_REGENERATOR_DISABLED=true BROWSER=none yarn dev-electron-web\"",
+    "dev:electron": "electron --inspect=5858 dist/index.js",
     "build:package": "yarn build-electron-web && electron-forge package",
     "build:main": "webpack --config webpack.config.ts",
-    "make": "yarn clean:build && yarn build-electron-web && electron-forge make",
+    "make": "yarn clean:build && yarn build-electron-web && electron-builder build -mw --config electron-builder.config.js --publish never",
     "lint": "eslint --ext .tsx --ext .ts ./",
     "ts:check": "yarn tsc --noEmit"
   },
@@ -26,13 +26,12 @@
     "node-fetch": "^2.6.7"
   },
   "devDependencies": {
-    "@electron-forge/cli": "^7.2.0",
-    "@electron-forge/maker-zip": "^7.2.0",
     "@types/webpack": "^5.28.5",
     "@types/webpack-node-externals": "^3.0.4",
     "clean-webpack-plugin": "^4.0.0",
     "cross-env": "^7.0.3",
     "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
     "webpack": "^5.90.2",
     "webpack-node-externals": "^3.0.0"
   }
