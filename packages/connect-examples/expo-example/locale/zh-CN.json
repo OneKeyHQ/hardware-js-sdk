@@ -5,6 +5,7 @@
   "tab__address_test": "地址测试",
   "tab__security_check": "安全检查",
   "tab__functional_testing": "功能测试",
+  "tab__api_export_test": "API 范围测试",
 
   "action__search_device": "搜索设备",
   "action__clean_device": "断开连接",
@@ -41,7 +42,7 @@
   "tip__no_select_file": "未选择文件",
   "tip__update_success": "更新成功",
 
-  "title__common_parameters": "常用参数",
+  "title__common_parameters": "通用参数 (每次请求都会使用)",
   "title__hardware_api_test": "硬件 API 测试",
   "title__updating": "正在更新",
   "title__input_pin": "输入 PIN",
@@ -152,7 +153,6 @@
   "message__address_not_match": "地址不匹配",
   "message__create": "创建",
   "message__generate": "生成",
-
   "message__passphrase_count_test_describe": "开始之后根据提示解锁硬件, 根据硬件提示确认 passphrase, 不用自己输入",
   "message__passphrase_count_test_step1": "1. 从零开始创建钱包 passphrase 并记录下来，注意在硬件按确认 passphrase",
   "message__passphrase_count_test_step2": "2. 每次创建完一个 passphrase 钱包，都会去检查一遍之前创建过的钱包，是否可以正常获取地址",

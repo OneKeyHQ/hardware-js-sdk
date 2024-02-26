@@ -53,6 +53,13 @@ import { evmSignTransaction } from './evmSignTransaction';
 import { evmSignTypedData } from './evmSignTypedData';
 import { evmVerifyMessage } from './evmVerifyMessage';
 
+import { evmGetAddressTrezor } from './evmGetAddressTrezor';
+import { evmGetPublicKeyTrezor } from './evmGetPublicKeyTrezor';
+import { evmSignMessageTrezor } from './evmSignMessageTrezor';
+import { evmSignTransactionTrezor } from './evmSignTransactionTrezor';
+import { evmSignTypedDataTrezor } from './evmSignTypedDataTrezor';
+import { evmVerifyMessageTrezor } from './evmVerifyMessageTrezor';
+
 import { btcGetAddress } from './btcGetAddress';
 import { btcGetPublicKey } from './btcGetPublicKey';
 import { btcSignMessage } from './btcSignMessage';
@@ -136,6 +143,85 @@ import { nervosSignTransaction } from './nervosSignTransaction';
 
 import { dnxGetAddress } from './dnxGetAddress';
 import { dnxSignTransaction } from './dnxSignTransaction';
+
+import { deviceSpiFlashWrite } from './deviceSpiFlashWrite';
+import { deviceSpiFlashRead } from './deviceSpiFlashRead';
+import { deviceInfoSettings } from './deviceInfoSettings';
+import { deviceGetInfo } from './deviceGetInfo';
+import { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
+import { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
+import { deviceSESignMessage } from './deviceSESignMessage';
+import { devicePing } from './devicePing';
+import { deviceGetEntropy } from './deviceGetEntropy';
+import { deviceSdProtect } from './deviceSdProtect';
+import { deviceChangeWipeCode } from './deviceChangeWipeCode';
+import { deviceEndSession } from './deviceEndSession';
+import { deviceLoad } from './deviceLoad';
+import { deviceDoPreauthorized } from './deviceDoPreauthorized';
+import { deviceCancelAuthorization } from './deviceCancelAuthorization';
+import { emmcDirList } from './emmcDirList';
+import { emmcDirMake } from './emmcDirMake';
+import { emmcDirRemove } from './emmcDirRemove';
+import { emmcFileDelete } from './emmcFileDelete';
+import { emmcFileRead } from './emmcFileRead';
+import { emmcFileWrite } from './emmcFileWrite';
+import { emmcFixPermission } from './emmcFixPermission';
+import { emmcPathInfo } from './emmcPathInfo';
+import { debugLinkDecision } from './debugLinkDecision';
+import { debugLinkEraseSdCard } from './debugLinkEraseSdCard';
+import { debugLinkFlashErase } from './debugLinkFlashErase';
+import { debugLinkGetState } from './debugLinkGetState';
+import { debugLinkMemoryRead } from './debugLinkMemoryRead';
+import { debugLinkMemoryWrite } from './debugLinkMemoryWrite';
+import { debugLinkRecordScreen } from './debugLinkRecordScreen';
+import { debugLinkReseedRandom } from './debugLinkReseedRandom';
+import { debugLinkStop } from './debugLinkStop';
+import { debugLinkWatchLayout } from './debugLinkWatchLayout';
+import { deviceGetFirmwareHash } from './deviceGetFirmwareHash';
+import { deviceUnlockPath } from './deviceUnlockPath';
+import { firmwareEraseEx } from './firmwareEraseEx';
+import { firmwareErase } from './firmwareErase';
+import { firmwareUpdateEmmcTest } from './firmwareUpdateEmmcTest';
+import { firmwareUploadTest } from './firmwareUploadTest';
+import { reboot } from './reboot';
+import { selfTest } from './selfTest';
+import { btcGetOwnershipId } from './btcGetOwnershipId';
+import { btcGetOwnershipProof } from './btcGetOwnershipProof';
+import { btcAuthorizeCoinJoin } from './btcAuthorizeCoinJoin';
+
+/**
+ * Crypto function
+ */
+import { cryptoBatchGetPublickeys } from './cryptoBatchGetPublickeys';
+import { cryptoCipherKeyValue } from './cryptoCipherKeyValue';
+import { cryptoCosiCommit } from './cryptoCosiCommit';
+import { cryptoCosiSign } from './cryptoCosiSign';
+import { cryptoGetECDHSessionKey } from './cryptoGetECDHSessionKey';
+import { cryptoSignIdentity } from './cryptoSignIdentity';
+import { nemDecryptMessage } from './nemDecryptMessage';
+import { tezosGetAddress } from './tezosGetAddress';
+import { tezosGetPublicKey } from './tezosGetPublicKey';
+import { tezosSignTx } from './tezosSignTx';
+import { moneroGetWatchKey } from './moneroGetWatchKey';
+import { moneroGetAddress } from './moneroGetAddress';
+import { eosGetPublicKey } from './eosGetPublicKey';
+import { eosSignTx } from './eosSignTx';
+import { binanceGetAddress } from './binanceGetAddress';
+import { binanceGetPublicKey } from './binanceGetPublicKey';
+import { binanceSignTx } from './binanceSignTx';
+import { webAuthnAddResidentCredential } from './webAuthnAddResidentCredential';
+import { webAuthnListResidentCredentials } from './webAuthnListResidentCredentials';
+import { webAuthnRemoveResidentCredential } from './webAuthnRemoveResidentCredential';
+import { getPublicKeyMultiple } from './getPublicKeyMultiple';
+import { listResDir } from './listResDir';
+import { nftWriteData } from './nftWriteData';
+import { nftWriteInfo } from './nftWriteInfo';
+import { readSEPublicKey } from './readSEPublicKey';
+import { resourceUpdate } from './resourceUpdate';
+import { bixinBackupDevice } from './bixinBackupDevice';
+import { bixinLoadDevice } from './bixinLoadDevice';
+import { bixinMessageSE } from './bixinMessageSE';
+import { bixinVerifyDeviceRequest } from './bixinVerifyDeviceRequest';
 
 import { tonGetAddress } from './tonGetAddress';
 import { tonSignMessage } from './tonSignMessage';
@@ -231,6 +317,16 @@ export type CoreApi = {
   evmVerifyMessage: typeof evmVerifyMessage;
 
   /**
+   * EVM function
+   */
+  evmGetAddressTrezor: typeof evmGetAddressTrezor;
+  evmGetPublicKeyTrezor: typeof evmGetPublicKeyTrezor;
+  evmSignMessageTrezor: typeof evmSignMessageTrezor;
+  evmSignTransactionTrezor: typeof evmSignTransactionTrezor;
+  evmSignTypedDataTrezor: typeof evmSignTypedDataTrezor;
+  evmVerifyMessageTrezor: typeof evmVerifyMessageTrezor;
+
+  /**
    * BTC function
    */
   btcGetAddress: typeof btcGetAddress;
@@ -239,6 +335,19 @@ export type CoreApi = {
   btcSignPsbt: typeof btcSignPsbt;
   btcSignTransaction: typeof btcSignTransaction;
   btcVerifyMessage: typeof btcVerifyMessage;
+  btcGetOwnershipId: typeof btcGetOwnershipId;
+  btcGetOwnershipProof: typeof btcGetOwnershipProof;
+  btcAuthorizeCoinJoin: typeof btcAuthorizeCoinJoin;
+
+  /**
+   * Crypto function
+   */
+  cryptoBatchGetPublickeys: typeof cryptoBatchGetPublickeys;
+  cryptoCipherKeyValue: typeof cryptoCipherKeyValue;
+  cryptoCosiCommit: typeof cryptoCosiCommit;
+  cryptoCosiSign: typeof cryptoCosiSign;
+  cryptoGetECDHSessionKey: typeof cryptoGetECDHSessionKey;
+  cryptoSignIdentity: typeof cryptoSignIdentity;
 
   /**
    * Starcoin function
@@ -254,6 +363,7 @@ export type CoreApi = {
    */
   nemGetAddress: typeof nemGetAddress;
   nemSignTransaction: typeof nemSignTransaction;
+  nemDecryptMessage: typeof nemDecryptMessage;
 
   /**
    * Solana function
@@ -401,4 +511,79 @@ export type CoreApi = {
   alephiumGetAddress: typeof alephiumGetAddress;
   alephiumSignMessage: typeof alephiumSignMessage;
   alephiumSignTransaction: typeof alephiumSignTransaction;
+
+  deviceSpiFlashWrite: typeof deviceSpiFlashWrite;
+  deviceSpiFlashRead: typeof deviceSpiFlashRead;
+  deviceInfoSettings: typeof deviceInfoSettings;
+  deviceGetInfo: typeof deviceGetInfo;
+  deviceReadSEPublicCert: typeof deviceReadSEPublicCert;
+  deviceWriteSEPublicCert: typeof deviceWriteSEPublicCert;
+  deviceSESignMessage: typeof deviceSESignMessage;
+  devicePing: typeof devicePing;
+  deviceGetEntropy: typeof deviceGetEntropy;
+  deviceGetFirmwareHash: typeof deviceGetFirmwareHash;
+  deviceUnlockPath: typeof deviceUnlockPath;
+  deviceSdProtect: typeof deviceSdProtect;
+  deviceChangeWipeCode: typeof deviceChangeWipeCode;
+  deviceEndSession: typeof deviceEndSession;
+  deviceLoad: typeof deviceLoad;
+  deviceDoPreauthorized: typeof deviceDoPreauthorized;
+  deviceCancelAuthorization: typeof deviceCancelAuthorization;
+
+  emmcDirList: typeof emmcDirList;
+  emmcDirMake: typeof emmcDirMake;
+  emmcDirRemove: typeof emmcDirRemove;
+  emmcFileDelete: typeof emmcFileDelete;
+  emmcFileRead: typeof emmcFileRead;
+  emmcFileWrite: typeof emmcFileWrite;
+  emmcFixPermission: typeof emmcFixPermission;
+  emmcPathInfo: typeof emmcPathInfo;
+
+  debugLinkDecision: typeof debugLinkDecision;
+  debugLinkEraseSdCard: typeof debugLinkEraseSdCard;
+  debugLinkFlashErase: typeof debugLinkFlashErase;
+  debugLinkGetState: typeof debugLinkGetState;
+  debugLinkMemoryRead: typeof debugLinkMemoryRead;
+  debugLinkMemoryWrite: typeof debugLinkMemoryWrite;
+  debugLinkRecordScreen: typeof debugLinkRecordScreen;
+  debugLinkReseedRandom: typeof debugLinkReseedRandom;
+  debugLinkStop: typeof debugLinkStop;
+  debugLinkWatchLayout: typeof debugLinkWatchLayout;
+
+  firmwareEraseEx: typeof firmwareEraseEx;
+  firmwareErase: typeof firmwareErase;
+  firmwareUpdateEmmcTest: typeof firmwareUpdateEmmcTest;
+  firmwareUploadTest: typeof firmwareUploadTest;
+  reboot: typeof reboot;
+  selfTest: typeof selfTest;
+
+  tezosGetAddress: typeof tezosGetAddress;
+  tezosGetPublicKey: typeof tezosGetPublicKey;
+  tezosSignTx: typeof tezosSignTx;
+
+  binanceGetAddress: typeof binanceGetAddress;
+  binanceGetPublicKey: typeof binanceGetPublicKey;
+  binanceSignTx: typeof binanceSignTx;
+
+  moneroGetWatchKey: typeof moneroGetWatchKey;
+  moneroGetAddress: typeof moneroGetAddress;
+
+  eosGetPublicKey: typeof eosGetPublicKey;
+  eosSignTx: typeof eosSignTx;
+
+  webAuthnAddResidentCredential: typeof webAuthnAddResidentCredential;
+  webAuthnListResidentCredentials: typeof webAuthnListResidentCredentials;
+  webAuthnRemoveResidentCredential: typeof webAuthnRemoveResidentCredential;
+
+  getPublicKeyMultiple: typeof getPublicKeyMultiple;
+  listResDir: typeof listResDir;
+  nftWriteData: typeof nftWriteData;
+  nftWriteInfo: typeof nftWriteInfo;
+  readSEPublicKey: typeof readSEPublicKey;
+  resourceUpdate: typeof resourceUpdate;
+
+  bixinBackupDevice: typeof bixinBackupDevice;
+  bixinLoadDevice: typeof bixinLoadDevice;
+  bixinMessageSE: typeof bixinMessageSE;
+  bixinVerifyDeviceRequest: typeof bixinVerifyDeviceRequest;
 };

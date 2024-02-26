@@ -4,46 +4,46 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
 import type { Features, SupportFeatureType } from '../types';
-import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
-import DataManager, { FirmwareField, MessageVersion } from '../data-manager/DataManager';
+import { DeviceModelToTypes } from '../types';
+import { FirmwareField, MessageVersion } from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { getCommonMessages, getMessages } from '../data-manager/MessagesManager';
 
 export const getSupportMessageVersion = (
   features: Features | undefined
 ): { messages: JSON; messageVersion: MessageVersion } => {
   if (!features)
     return {
-      messages: DataManager.messages.latest,
+      messages: getCommonMessages(),
       messageVersion: 'latest',
     };
 
   const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
   const deviceType = getDeviceType(features);
 
-  const deviceVersionConfigs =
-    PROTOBUF_MESSAGE_CONFIG[deviceType] ||
-    (DeviceTypeToModels[deviceType] &&
-      DeviceTypeToModels[deviceType]
-        .map(model => PROTOBUF_MESSAGE_CONFIG[model])
-        .find(range => range !== undefined));
+  const deviceVersionConfigs = PROTOBUF_MESSAGE_CONFIG[deviceType];
+
+  console.log('=====>>>>> deviceVersionConfigs', deviceType, deviceVersionConfigs);
 
   const sortedDeviceVersionConfigs =
     deviceVersionConfigs?.sort((a, b) => semver.compare(b.minVersion, a.minVersion)) ?? [];
 
   for (const { minVersion, messageVersion } of sortedDeviceVersionConfigs) {
     if (semver.gte(currentDeviceVersion, minVersion)) {
+      console.log('=====>>>>> deviceVersionConfigs deviceType', deviceType, messageVersion);
       return {
-        messages: DataManager.messages[messageVersion],
+        messages: getMessages(deviceType, messageVersion),
         messageVersion,
       };
     }
   }
 
+  console.log('=====>>>>> deviceVersionConfigs deviceType latest', deviceType);
   return {
-    messages: DataManager.messages.latest,
+    messages: getMessages(deviceType, 'latest'),
     messageVersion: 'latest',
   };
 };

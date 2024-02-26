@@ -108,7 +108,7 @@ const HeaderView = () => {
       padding="$3"
       justifyContent="space-between"
     >
-      <H3>Hardware Example</H3>
+      <H3>Example (Private Test)</H3>
 
       <XStack minHeight={40} gap="$2">
         <MenuButtons visibleItems={visibleItems} currentRoute={route.name} navigate={navigate} />

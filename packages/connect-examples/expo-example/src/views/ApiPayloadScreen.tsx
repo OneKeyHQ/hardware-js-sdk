@@ -133,6 +133,30 @@ const playgroundConfig = [
     title: 'TRON API',
     data: require('../data/tron').default,
   },
+  {
+    title: 'Ethereum Trezor API',
+    data: require('../data/ethereumTrezor').default,
+  },
+  {
+    title: 'Crypto API',
+    data: require('../data/crypto').default,
+  },
+  {
+    title: 'Other API',
+    data: require('../data/other').default,
+  },
+  {
+    title: 'Manager API',
+    data: require('../data/manager').default,
+  },
+  {
+    title: 'Emmc API',
+    data: require('../data/emmc').default,
+  },
+  {
+    title: 'Debug API',
+    data: require('../data/debug').default,
+  },
 ];
 
 function renderItem({ item }: { item: { title: string; data: any } }) {

@@ -8,17 +8,6 @@ export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloa
     this.skipForceUpdateCheck = true;
   }
 
-  getVersionRange() {
-    return {
-      classic: {
-        min: '2.1.11',
-      },
-      mini: {
-        min: '2.1.11',
-      },
-    };
-  }
-
   async run() {
     const res = await this.device.commands.typedCall('RebootToBootloader', 'Success');
 

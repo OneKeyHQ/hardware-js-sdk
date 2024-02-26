@@ -252,6 +252,64 @@ const api: PlaygroundProps[] = [
           signature:
             '0x1fdef26d2134034ec4c00874597be03591a2b16bc3e2cc86f06e4c4dc4df1f00a22eea8efca6446f145e12c5a8064b4f46be57e7ddb42759550eefe4f5d3c7c487',
         },
+        expect: {
+          common: {
+            normal: {
+              requestButton: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+          pro: {
+            normal: {
+              requestPin: true,
+            },
+          },
+        },
+      },
+    ],
+  },
+  {
+    method: 'btcGetOwnershipId',
+    description: 'btcGetOwnershipId',
+    presupposes: [
+      {
+        title: 'btcGetOwnershipId',
+        value: {
+          path: "m/44'/0'/0'/0/0",
+          coin: 'btc',
+        },
+      },
+    ],
+  },
+  {
+    method: 'btcGetOwnershipProof',
+    description: 'btcGetOwnershipProof',
+    presupposes: [
+      {
+        title: 'btcGetOwnershipProof',
+        value: {
+          path: "m/44'/0'/0'/0/0",
+          coin: 'btc',
+        },
+      },
+    ],
+  },
+  {
+    method: 'btcAuthorizeCoinJoin',
+    description: 'btcAuthorizeCoinJoin',
+    presupposes: [
+      {
+        title: 'btcAuthorizeCoinJoin',
+        value: {
+          path: "m/44'/0'/0'/0/0",
+          coin: 'btc',
+          coordinator: '0x123456',
+          max_total_fee: 1000,
+        },
       },
     ],
   },
