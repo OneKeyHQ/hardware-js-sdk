@@ -345,11 +345,13 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
               <DeviceField field="bootloader_version" value={features.bootloader_version} />
               <DeviceField field="build_id" value={features.build_id} />
               <DeviceField field="onekey_device_type" value={features.onekey_device_type} />
-              <DeviceField field="onekey_se_type" value={features.onekey_se_type} />
+              <DeviceField field="onekey_serial_no" value={features.onekey_serial_no} />
               <DeviceField field="onekey_board_version" value={features.onekey_board_version} />
               <DeviceField field="onekey_board_hash" value={features.onekey_board_hash} />
               <DeviceField field="onekey_boot_version" value={features.onekey_boot_version} />
               <DeviceField field="onekey_boot_hash" value={features.onekey_boot_hash} />
+              <DeviceField field="onekey_boot_build_id" value={features.onekey_boot_build_id} />
+              <DeviceField field="onekey_se_type" value={features.onekey_se_type} />
               <DeviceField field="onekey_se_version" value={features.onekey_se_version} />
               <DeviceField field="onekey_se_hash" value={features.onekey_se_hash} />
               <DeviceField field="onekey_se_build_id" value={features.onekey_se_build_id} />
@@ -362,7 +364,10 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
                 field="onekey_firmware_build_id"
                 value={features.onekey_firmware_build_id}
               />
-              <DeviceField field="onekey_serial_no" value={features.onekey_serial_no} />
+              <DeviceField field="onekey_ble_name" value={features.onekey_ble_name} />
+              <DeviceField field="onekey_ble_version" value={features.onekey_ble_version} />
+              <DeviceField field="onekey_ble_hash" value={features.onekey_ble_hash} />
+              <DeviceField field="onekey_ble_build_id" value={features.onekey_ble_build_id} />
             </Stack>
           </PanelView>
         </Stack>
