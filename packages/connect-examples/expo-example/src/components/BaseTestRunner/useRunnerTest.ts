@@ -4,6 +4,7 @@ import { isEmpty } from 'lodash';
 import type { CoreApi, Features, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 import { useSetAtom } from 'jotai';
+import { getDeviceType } from '@onekeyfe/hd-core/src/utils/deviceFeaturesUtils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
 import type { TestCaseDataWithKey, VerifyState } from './types';
@@ -28,7 +29,12 @@ type RunnerConfig<T> = {
     features: Features,
     sdk: CoreApi
   ) => Promise<void>;
-  prepareRunnerTestCase?: (item: TestCaseDataWithKey<T>) => Promise<void>;
+  prepareRunnerTestCase?: (
+    sdk: CoreApi,
+    connectId: string,
+    item: TestCaseDataWithKey<T>
+  ) => Promise<void>;
+  prepareRunnerTestCaseDelay?: () => Promise<number>;
   generateRequestParams: (item: TestCaseDataWithKey<T>) => Promise<{
     method: string;
     params: any;
@@ -44,9 +50,11 @@ type RunnerConfig<T> = {
   processResponse: (
     response: any,
     item: TestCaseDataWithKey<T>,
-    itemIndex: number
+    itemIndex: number,
+    res: Unsuccessful | Success<any>
   ) => Promise<{
     error: string | undefined;
+    verifyState?: VerifyState;
   }>;
   processRunnerDone?: () => void;
 };
@@ -57,6 +65,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     initHardwareListener,
     prepareRunner,
     prepareRunnerTestCase,
+    prepareRunnerTestCaseDelay,
     generateRequestParams,
     processRequest,
     processResponse,
@@ -130,13 +139,25 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     }
     const deviceId = featuresRes.payload?.device_id ?? '';
     setRunningDeviceFeatures?.(featuresRes.payload);
+    const deviceFeatures = featuresRes.payload;
 
-    await prepareRunner?.(connectId, deviceId, featuresRes.payload, SDK);
+    await prepareRunner?.(connectId, deviceId, deviceFeatures, SDK);
 
     for (let itemIndex = 0; itemIndex < currentTestCases.length; itemIndex++) {
       const item = currentTestCases[itemIndex];
 
-      prepareRunnerTestCase?.(item);
+      await prepareRunnerTestCase?.(SDK, connectId, item);
+      const delayTime = await prepareRunnerTestCaseDelay?.();
+      if (delayTime) {
+        await delay(delayTime);
+      } else {
+        const deviceType = getDeviceType(deviceFeatures);
+        if (deviceType === 'classic1s') {
+          await delay(300);
+        } else if (deviceType === 'pro') {
+          await delay(300);
+        }
+      }
 
       try {
         await new Promise(resolve => {
@@ -157,8 +178,18 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
         });
 
         let res: Unsuccessful | Success<any>;
+        let skipVerify = false;
         if (processRequest) {
-          res = await processRequest(SDK, method, connectId, deviceId, requestParams, item);
+          const result = await processRequest(
+            SDK,
+            method,
+            connectId,
+            deviceId,
+            requestParams,
+            item
+          );
+          res = result.payload;
+          skipVerify = result.skipVerify ?? false;
         } else {
           // @ts-expect-error
           res = await SDK[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
@@ -168,7 +199,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
         let verifyState: VerifyState = 'none';
         let error: string | undefined = '';
 
-        if (!res.success) {
+        if (!res.success && !skipVerify) {
           if (res.payload?.code === 802 || res.payload?.code === 803) {
             verifyState = 'skip';
           } else {
@@ -176,10 +207,12 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
             error = res.payload?.error;
           }
         } else {
-          const result = await processResponse(res.payload, item, itemIndex);
+          const result = await processResponse(res.payload, item, itemIndex, res);
           error = result.error;
 
-          if (isEmpty(error)) {
+          if (result.verifyState) {
+            verifyState = result.verifyState;
+          } else if (isEmpty(error)) {
             verifyState = 'success';
           } else {
             verifyState = 'fail';
@@ -206,8 +239,8 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     endTestRunner();
   }, [
     SDK,
-    setRunnerTestCaseTitle,
     initTestCase,
+    setRunnerTestCaseTitle,
     setItemValues,
     clearItemVerifyState,
     initHardwareListener,
@@ -218,6 +251,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     prepareRunner,
     endTestRunner,
     prepareRunnerTestCase,
+    prepareRunnerTestCaseDelay,
     generateRequestParams,
     setItemVerifyState,
     processRequest,
@@ -225,4 +259,10 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
   ]);
 
   return { beginTest, stopTest };
+}
+
+function delay(time: number) {
+  return new Promise(resolve => {
+    setTimeout(() => resolve(true), time);
+  });
 }
