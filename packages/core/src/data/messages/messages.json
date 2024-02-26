@@ -5713,6 +5713,26 @@
         "onekey_serial_no": {
           "type": "string",
           "id": 612
+        },
+        "onekey_boot_build_id": {
+          "type": "string",
+          "id": 613
+        },
+        "onekey_ble_name": {
+          "type": "string",
+          "id": 614
+        },
+        "onekey_ble_version": {
+          "type": "string",
+          "id": 615
+        },
+        "onekey_ble_build_id": {
+          "type": "string",
+          "id": 616
+        },
+        "onekey_ble_hash": {
+          "type": "string",
+          "id": 617
         }
       },
       "nested": {
@@ -5746,7 +5766,7 @@
             "CLASSIC1S": 1,
             "MINI": 2,
             "TOUCH": 3,
-            "TOUCH_PRO": 4
+            "PRO": 5
           }
         },
         "OneKeySeType": {
