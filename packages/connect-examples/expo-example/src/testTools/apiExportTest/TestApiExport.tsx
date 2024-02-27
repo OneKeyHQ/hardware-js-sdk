@@ -221,7 +221,7 @@ function ExecuteView() {
     }
 
     if (currentRequestDeviceRef.current === 'pro') {
-      delayMs = 500;
+      delayMs = 1000;
     }
 
     return sleep(delayMs);
@@ -239,7 +239,7 @@ function ExecuteView() {
       delayMs = 2500;
     }
     if (currentTestClass === 'normal' && currentRequestDeviceRef.current === 'pro') {
-      delayMs = 2000;
+      delayMs = 3000;
     }
 
     if (
