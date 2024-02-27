@@ -5,8 +5,8 @@ import { Picker } from '@react-native-picker/picker';
 import { useDevice } from '../../provider/DeviceProvider';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { TestChain, requestAddress, styles } from './utils';
-import { CommonInput } from '../CommonInput';
-import { SwitchInput } from '../SwitchInput';
+import { CommonInput } from '../../components/CommonInput';
+import { SwitchInput } from '../../components/SwitchInput';
 
 export default function TestWalletChangeView() {
   const { sdk: SDK } = useContext(HardwareSDKContext);

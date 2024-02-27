@@ -4,7 +4,7 @@ import { Button, Text, TextInput, View } from 'react-native';
 import { TestChain, requestAddress, styles } from './utils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
-import { CommonInput } from '../CommonInput';
+import { CommonInput } from '../../components/CommonInput';
 
 type TestPresupposeWallet = {
   id: string;

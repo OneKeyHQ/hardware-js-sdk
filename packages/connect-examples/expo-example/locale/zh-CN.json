@@ -53,6 +53,8 @@
   "title__address_variant_test_single": "单个变种地址测试",
   "title__address_variant_test_batch": "批量变种地址测试",
 
+  "title__passphrase_test": "Passphrase Count 测试",
+
   "label__keep_session": "保持 Session",
   "label__retry_count": "重试次数",
   "label__retry_interval_time": "重试间隔时间",
@@ -105,6 +107,27 @@
   "message__bootloader_update_success": "Bootloader 更新成功",
   "message__sys_resource_update": "系统资源更新中...",
   "message__sys_resource_update_success": "系统资源更新成功",
+
+  "message__scan_device_doing": "搜索设备中...",
+  "message__begin_test": "开始测试",
+  "message__stop_test": "停止测试",
+  "message__test_result": "测试结果",
+  "message__passphrase_stop_test": "设备要求输入 passphrase，通过测试钱包数量 ",
+  "message__testing": "测试中...",
+  "message__test_end": "测试结束",
+  "message__generate_wallet": "生成钱包",
+  "message__generate_wallet_error": "生成失败",
+  "message__address": "地址",
+  "message__fetch": "获取",
+  "message__fail": "失败",
+  "message__success": "成功",
+  "message__done": "完成",
+  "message__address_not_match": "地址不匹配",
+  
+  "message__passphrase_count_test_describe": "开始之后根据提示解锁硬件, 根据硬件提示确认 passphrase, 不用自己输入",
+  "message__passphrase_count_test_step1": "1. 从零开始创建钱包 passphrase 并记录下来，注意在硬件按确认 passphrase",
+  "message__passphrase_count_test_step2": "2. 每次创建完一个 passphrase 钱包，都会去检查一遍之前创建过的钱包，是否可以正常获取地址",
+  "message__passphrase_count_test_step3": "3. 当设备再次要求输入 passphrase 时，测试结束",
 
   "ignore": "忽略"
 }

@@ -1,7 +1,7 @@
 import { Stack } from 'tamagui';
 import { DeviceProvider } from '../../provider/DeviceProvider';
 
-import TestSessionView from './TestSessionView';
+import TestSessionView from './SessionCountTestView';
 import TestWalletChangeView from './TestWalletChangeView';
 import TestMultiWalletChangeView from './TestMultiWalletChangeView';
 
