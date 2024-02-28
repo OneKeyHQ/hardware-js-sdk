@@ -8,7 +8,7 @@ export const TestRunnerContext = createContext<{
   setRunnerTestCaseTitle?: React.Dispatch<React.SetStateAction<string>>;
 
   runnerDone?: boolean;
-  setRunnerDone?: React.Dispatch<React.SetStateAction<boolean>>;
+  setRunnerDone?: React.Dispatch<React.SetStateAction<boolean | undefined>>;
 
   runningDeviceFeatures?: Features;
   setRunningDeviceFeatures?: React.Dispatch<React.SetStateAction<Features>>;

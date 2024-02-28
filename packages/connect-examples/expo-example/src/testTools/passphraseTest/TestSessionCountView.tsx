@@ -62,7 +62,7 @@ function ExportReportView({
 }
 
 let hardwareUiEventListener: any | undefined;
-export default function SessionCountTestView() {
+export default function TestSessionCountView() {
   const intl = useIntl();
   const { sdk: SDK } = useContext(HardwareSDKContext);
   const { selectedDevice } = useDevice();

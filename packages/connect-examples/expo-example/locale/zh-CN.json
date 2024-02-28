@@ -90,6 +90,11 @@
   "label__device_update_bootloader": "更新 Bootloader",
   "label__device_update_sys_resource": "更新系统资源",
 
+  "label__wallet_count": "测试钱包数量",
+  "label__wallet_change_count": "测试切换次数",
+  "label__wallet_include_normal": "包含普通钱包",
+  "label__wallet_sequential_switch": "顺序切换",
+
   "message__no_device": "未连接设备",
   "message__current_selector_device": "当前选择的设备：",
   "message__search_device_and_connect_device": "搜索设备并连接设备",

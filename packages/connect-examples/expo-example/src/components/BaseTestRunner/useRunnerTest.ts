@@ -14,13 +14,6 @@ import {
 } from './Context/TestRunnerVerifyProvider';
 
 type RunnerConfig<T> = {
-  initTestCase: () => Promise<
-    | {
-        title: string;
-        data: TestCaseDataWithKey<T>[];
-      }
-    | undefined
-  >;
   initHardwareListener?: (sdk: CoreApi) => Promise<void>;
   prepareRunner?: (
     connectId: string,
@@ -28,6 +21,17 @@ type RunnerConfig<T> = {
     features: Features,
     sdk: CoreApi
   ) => Promise<void>;
+  initTestCase: (
+    sdk: CoreApi,
+    connectId: string,
+    deviceId: string
+  ) => Promise<
+    | {
+        title: string;
+        data: TestCaseDataWithKey<T>[];
+      }
+    | undefined
+  >;
   prepareRunnerTestCase?: (
     sdk: CoreApi,
     connectId: string,
@@ -94,7 +98,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     running.current = false;
     setItemValues?.([]);
     clearItemVerifyState?.();
-    setRunnerDone?.(false);
+    setRunnerDone?.(undefined);
     if (SDK) {
       SDK.cancel();
       removeHardwareListener?.(SDK);
@@ -112,22 +116,11 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     if (!SDK) return;
     SDK.removeAllListeners(UI_EVENT);
 
-    // init test cases
-    const initTestCaseRes = await initTestCase();
-    if (!initTestCaseRes) return;
-
-    const { title, data: currentTestCases } = initTestCaseRes;
-    setRunnerTestCaseTitle?.(title);
-    setItemValues?.(currentTestCases);
-    clearItemVerifyState?.();
-
     // init SDK listeners
     await initHardwareListener?.(SDK);
 
-    // begin test
     running.current = true;
     setRunnerDone?.(false);
-    setTimestampBeginTest?.(Date.now());
 
     const connectId = selectedDevice?.connectId ?? '';
     const featuresRes = await SDK.getFeatures(connectId);
@@ -135,11 +128,24 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       endTestRunner();
       return;
     }
+
     const deviceId = featuresRes.payload?.device_id ?? '';
     setRunningDeviceFeatures?.(featuresRes.payload);
     const deviceFeatures = featuresRes.payload;
 
     await prepareRunner?.(connectId, deviceId, deviceFeatures, SDK);
+
+    // begin test
+    setTimestampBeginTest?.(Date.now());
+
+    // init test cases
+    const initTestCaseRes = await initTestCase(SDK, connectId, deviceId);
+    if (!initTestCaseRes) return;
+
+    const { title, data: currentTestCases } = initTestCaseRes;
+    setRunnerTestCaseTitle?.(title);
+    setItemValues?.(currentTestCases);
+    clearItemVerifyState?.();
 
     for (let itemIndex = 0; itemIndex < currentTestCases.length; itemIndex++) {
       const item = currentTestCases[itemIndex];
