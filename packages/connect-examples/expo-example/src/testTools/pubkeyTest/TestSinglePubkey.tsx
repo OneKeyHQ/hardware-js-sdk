@@ -12,6 +12,7 @@ import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
+import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 
 type TestCaseDataType = PubkeyTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<PubkeyTestCase['data'][0]> };
@@ -250,18 +251,12 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
             onToggle={setShowOnOneKey}
             vertical
           />
-          <Button variant="primary" onPress={beginTest}>
-            {intl.formatMessage({ id: 'action__start_test' })}
-          </Button>
-          <Button variant="destructive" onPress={stopTest}>
-            {intl.formatMessage({ id: 'action__stop_test' })}
-          </Button>
+          <TestRunnerOptionButtons onStop={stopTest} onStart={stopTest} />
           <ExportReportView />
         </Stack>
       </>
     ),
     [
-      beginTest,
       currentTestCase?.name,
       findTestCase,
       intl,

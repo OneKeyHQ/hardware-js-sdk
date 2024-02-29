@@ -6,19 +6,22 @@ module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
 
   // Customize the config before returning it.
-  if (config.resolve.alias) {
-    config.resolve.alias.stream = 'stream-browserify';
-    config.resolve.alias.crypto = 'react-native-crypto';
-    config.resolve.alias.fs = 'react-native-level-fs';
-    config.resolve.alias.path = 'path-browserify';
-  } else {
-    config.resolve.alias = {
-      stream: 'stream-browserify',
-      crypto: 'react-native-crypto',
-      fs: 'react-native-level-fs',
-      path: 'path-browserify',
-    };
-  }
+  config.resolve.fallback = {
+    crypto: require.resolve('./shim/crypto'),
+    stream: require.resolve('stream-browserify'),
+    path: false,
+    https: false,
+    http: false,
+    net: false,
+    zlib: false,
+    tls: false,
+    child_process: false,
+    process: false,
+    fs: false,
+    util: false,
+    os: false,
+    buffer: require.resolve('buffer/'),
+  };
 
   // disable devtool in production
   if (process.env.NODE_ENV === 'production') {

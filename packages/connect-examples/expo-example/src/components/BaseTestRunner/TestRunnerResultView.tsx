@@ -4,12 +4,18 @@ import { Stack, Text, XStack } from 'tamagui';
 import { useAtomValue } from 'jotai';
 
 import { TestCaseDataWithKey } from './types';
-import { selectedItemVerifyStateAtom as createSelectedItemVerifyStateAtom } from './Context/TestRunnerVerifyProvider';
+import {
+  ItemVerifyState,
+  selectedItemVerifyStateAtom as createSelectedItemVerifyStateAtom,
+} from './Context/TestRunnerVerifyProvider';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
 
 export type TestItemViewProps = {
   item: TestCaseDataWithKey;
-  renderResultView: (item: TestCaseDataWithKey) => React.ReactNode;
+  renderResultView: (
+    item: TestCaseDataWithKey,
+    itemVerifyState: ItemVerifyState
+  ) => React.ReactNode;
 };
 
 const TestItemView = ({ item, renderResultView }: TestItemViewProps) => {
@@ -60,7 +66,7 @@ const TestItemView = ({ item, renderResultView }: TestItemViewProps) => {
     >
       {verifyStateViewMemo}
       <Stack flex={1}>
-        {renderResultView(item)}
+        {renderResultView(item, itemVerifyState)}
         {errorStateViewMemo}
       </Stack>
     </XStack>

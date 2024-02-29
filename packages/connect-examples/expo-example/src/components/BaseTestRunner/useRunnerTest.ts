@@ -58,6 +58,7 @@ type RunnerConfig<T> = {
   ) => Promise<{
     error: string | undefined;
     verifyState?: VerifyState;
+    ext?: any;
   }>;
   processRunnerDone?: () => void;
   removeHardwareListener?: (sdk: CoreApi) => Promise<void>;
@@ -106,153 +107,164 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
   }, [setItemValues, clearItemVerifyState, setRunnerDone, SDK, removeHardwareListener]);
 
   const endTestRunner = useCallback(() => {
-    removeHardwareListener?.(SDK);
+    running.current = false;
+    if (SDK) {
+      removeHardwareListener?.(SDK);
+    }
     setTimestampEndTest?.(Date.now());
     setRunnerDone?.(true);
     processRunnerDone?.();
   }, [SDK, processRunnerDone, removeHardwareListener, setRunnerDone, setTimestampEndTest]);
 
   const beginTest = useCallback(async () => {
-    if (!SDK) return;
-    SDK.removeAllListeners(UI_EVENT);
+    try {
+      if (!SDK) return;
+      SDK.removeAllListeners(UI_EVENT);
 
-    // init SDK listeners
-    await initHardwareListener?.(SDK);
+      // init SDK listeners
+      await initHardwareListener?.(SDK);
 
-    running.current = true;
-    setRunnerDone?.(false);
+      running.current = true;
+      setRunnerDone?.(false);
 
-    const connectId = selectedDevice?.connectId ?? '';
-    const featuresRes = await SDK.getFeatures(connectId);
-    if (!featuresRes.success) {
-      endTestRunner();
-      return;
-    }
-
-    const deviceId = featuresRes.payload?.device_id ?? '';
-    setRunningDeviceFeatures?.(featuresRes.payload);
-    const deviceFeatures = featuresRes.payload;
-
-    await prepareRunner?.(connectId, deviceId, deviceFeatures, SDK);
-
-    // begin test
-    setTimestampBeginTest?.(Date.now());
-
-    // init test cases
-    const initTestCaseRes = await initTestCase(SDK, connectId, deviceId);
-    if (!initTestCaseRes) return;
-
-    const { title, data: currentTestCases } = initTestCaseRes;
-    setRunnerTestCaseTitle?.(title);
-    setItemValues?.(currentTestCases);
-    clearItemVerifyState?.();
-
-    for (let itemIndex = 0; itemIndex < currentTestCases.length; itemIndex++) {
-      const item = currentTestCases[itemIndex];
-
-      await prepareRunnerTestCase?.(SDK, connectId, item);
-      const delayTime = await prepareRunnerTestCaseDelay?.();
-      if (delayTime) {
-        await delay(delayTime);
-      } else {
-        const deviceType = getDeviceType(deviceFeatures);
-        if (deviceType === 'classic1s') {
-          await delay(200);
-        } else if (deviceType === 'pro') {
-          await delay(200);
-        }
+      const connectId = selectedDevice?.connectId ?? '';
+      const featuresRes = await SDK.getFeatures(connectId);
+      if (!featuresRes.success) {
+        endTestRunner();
+        return;
       }
 
-      try {
-        await new Promise(resolve => {
-          setTimeout(() => resolve(true), 200);
-        });
+      const deviceId = featuresRes.payload?.device_id ?? '';
+      setRunningDeviceFeatures?.(featuresRes.payload);
+      const deviceFeatures = featuresRes.payload;
 
-        const { method, params } = await generateRequestParams(item);
-        const requestParams = {
-          retryCount: 1,
-          ...params,
-        };
+      await prepareRunner?.(connectId, deviceId, deviceFeatures, SDK);
 
-        setItemVerifyState?.({
-          key: item.$key,
-          newState: {
-            verify: 'pending',
-          },
-        });
+      // begin test
+      setTimestampBeginTest?.(Date.now());
 
-        let res: Unsuccessful | Success<any>;
-        let skipVerify = false;
-        if (processRequest) {
-          const result = await processRequest(
-            SDK,
-            method,
-            connectId,
-            deviceId,
-            requestParams,
-            item
-          );
-          res = result.payload;
-          skipVerify = result.skipVerify ?? false;
+      // init test cases
+      const initTestCaseRes = await initTestCase(SDK, connectId, deviceId);
+      if (!initTestCaseRes) return;
+
+      const { title, data: currentTestCases } = initTestCaseRes;
+      setRunnerTestCaseTitle?.(title);
+      setItemValues?.(currentTestCases);
+      clearItemVerifyState?.();
+
+      for (let itemIndex = 0; itemIndex < currentTestCases.length; itemIndex++) {
+        const item = currentTestCases[itemIndex];
+
+        await prepareRunnerTestCase?.(SDK, connectId, item);
+        const delayTime = await prepareRunnerTestCaseDelay?.();
+        if (delayTime) {
+          await delay(delayTime);
         } else {
-          // @ts-expect-error
-          res = await SDK[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
-        }
-
-        if (!running.current) return;
-        let verifyState: VerifyState = 'none';
-        let error: string | undefined = '';
-
-        if (!res.success && !skipVerify) {
-          if (res.payload?.code === 802 || res.payload?.code === 803) {
-            verifyState = 'skip';
-          } else {
-            verifyState = 'fail';
-            error = res.payload?.error;
-          }
-        } else {
-          const result = await processResponse(res.payload, item, itemIndex, res);
-          error = result.error;
-
-          if (result.verifyState) {
-            verifyState = result.verifyState;
-          } else if (isEmpty(error)) {
-            verifyState = 'success';
-          } else {
-            verifyState = 'fail';
+          const deviceType = getDeviceType(deviceFeatures);
+          if (deviceType === 'classic1s') {
+            await delay(200);
+          } else if (deviceType === 'pro') {
+            await delay(200);
           }
         }
-        setItemVerifyState?.({
-          key: item.$key,
-          newState: {
-            verify: verifyState,
-            error,
-          },
-        });
-      } catch (e) {
-        setItemVerifyState?.({
-          key: item.$key,
-          newState: {
-            verify: 'fail',
+
+        try {
+          await new Promise(resolve => {
+            setTimeout(() => resolve(true), 200);
+          });
+
+          const { method, params } = await generateRequestParams(item);
+          const requestParams = {
+            retryCount: 1,
+            ...params,
+          };
+
+          setItemVerifyState?.({
+            key: item.$key,
+            newState: {
+              verify: 'pending',
+            },
+          });
+
+          let res: Unsuccessful | Success<any>;
+          let skipVerify = false;
+          if (processRequest) {
+            const result = await processRequest(
+              SDK,
+              method,
+              connectId,
+              deviceId,
+              requestParams,
+              item
+            );
+            res = result.payload;
+            skipVerify = result.skipVerify ?? false;
+          } else {
             // @ts-expect-error
-            error: e?.message ?? '',
-          },
-        });
+            res = await SDK[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
+          }
+
+          if (!running.current) return;
+          let verifyState: VerifyState = 'none';
+          let error: string | undefined = '';
+          let ext: any;
+
+          if (!res.success && !skipVerify) {
+            if (res.payload?.code === 802 || res.payload?.code === 803) {
+              verifyState = 'skip';
+            } else {
+              verifyState = 'fail';
+              error = res.payload?.error;
+            }
+          } else {
+            const result = await processResponse(res.payload, item, itemIndex, res);
+            error = result.error;
+            ext = result.ext;
+
+            if (result.verifyState) {
+              verifyState = result.verifyState;
+            } else if (isEmpty(error)) {
+              verifyState = 'success';
+            } else {
+              verifyState = 'fail';
+            }
+          }
+          setItemVerifyState?.({
+            key: item.$key,
+            newState: {
+              verify: verifyState,
+              error,
+              ext,
+            },
+          });
+        } catch (e) {
+          setItemVerifyState?.({
+            key: item.$key,
+            newState: {
+              verify: 'fail',
+              // @ts-expect-error
+              error: e?.message ?? '',
+            },
+          });
+        }
       }
+      endTestRunner();
+    } catch (e) {
+      console.log('error', e);
+      stopTest();
     }
-    endTestRunner();
   }, [
     SDK,
+    initHardwareListener,
+    setRunnerDone,
+    selectedDevice?.connectId,
+    setRunningDeviceFeatures,
+    prepareRunner,
+    setTimestampBeginTest,
     initTestCase,
     setRunnerTestCaseTitle,
     setItemValues,
     clearItemVerifyState,
-    initHardwareListener,
-    setRunnerDone,
-    setTimestampBeginTest,
-    selectedDevice?.connectId,
-    setRunningDeviceFeatures,
-    prepareRunner,
     endTestRunner,
     prepareRunnerTestCase,
     prepareRunnerTestCaseDelay,
@@ -260,6 +272,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     setItemVerifyState,
     processRequest,
     processResponse,
+    stopTest,
   ]);
 
   return { beginTest, stopTest };

@@ -3,6 +3,7 @@ import { DeviceProvider } from '../../provider/DeviceProvider';
 
 import TestSessionView from './TestSessionCountView';
 import { TestSwitchPassphraseWallet } from './TestSwitchPassphraseWallet';
+import { TestSpecialPassphraseWallet } from './TestSpecialPassphraseWallet';
 
 export default function PassphraseTestScreen() {
   return (
@@ -11,6 +12,7 @@ export default function PassphraseTestScreen() {
         <Stack>
           <TestSessionView />
           <TestSwitchPassphraseWallet />
+          <TestSpecialPassphraseWallet />
         </Stack>
       </DeviceProvider>
     </Stack>

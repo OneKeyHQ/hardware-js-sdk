@@ -25,14 +25,11 @@ if (typeof localStorage !== 'undefined') {
   localStorage.debug = isDev ? '*' : '';
 }
 
-// If using the crypto shim, uncomment the following line to ensure
-// crypto is loaded first, so it can populate global.crypto
-if (typeof crypto === 'undefined') {
-  try {
-    // shimsLog('crypto');
-    // eslint-disable-next-line no-const-assign
-    global.crypto = require('crypto');
-  } catch (error) {
-    console.error(error);
-  }
+// TextEncoder and TextDecoder polyfill
+if (typeof TextDecoder === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  global.TextDecoder = require('text-encoding').TextDecoder;
+}
+if (typeof TextEncoder === 'undefined') {
+  global.TextEncoder = require('text-encoding').TextEncoder;
 }

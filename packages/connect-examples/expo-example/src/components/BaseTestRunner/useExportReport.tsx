@@ -25,7 +25,7 @@ export default function useExportReport<T>({
   const [showExportReport, setShowExportReport] = useState(false);
 
   useEffect(() => {
-    setShowExportReport(!!runnerInfo.runnerDone);
+    setShowExportReport(runnerInfo.runnerDone === true);
   }, [runnerInfo.runnerDone]);
 
   const exportReport = async () => {

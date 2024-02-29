@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
@@ -13,6 +13,7 @@ import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
+import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 
 type TestCaseDataType = PubkeyBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -334,26 +335,12 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
-          <Button variant="primary" onPress={beginTest}>
-            {intl.formatMessage({ id: 'action__start_test' })}
-          </Button>
-          <Button variant="destructive" onPress={stopTest}>
-            {intl.formatMessage({ id: 'action__stop_test' })}
-          </Button>
+          <TestRunnerOptionButtons onStop={stopTest} onStart={stopTest} />
           <ExportReportView />
         </XStack>
       </>
     ),
-    [
-      beginTest,
-      currentTestCase?.name,
-      findTestCase,
-      intl,
-      passphrase,
-      stopTest,
-      testCaseList,
-      testDescription,
-    ]
+    [currentTestCase?.name, findTestCase, passphrase, stopTest, testCaseList, testDescription]
   );
 
   return contentMemo;

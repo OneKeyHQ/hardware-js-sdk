@@ -14,6 +14,7 @@ import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
+import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 
 type TestCaseDataType = AddressBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -278,12 +279,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
             ))}
           </Picker>
 
-          <Button variant="primary" onPress={beginTest}>
-            {intl.formatMessage({ id: 'action__start_test' })}
-          </Button>
-          <Button variant="destructive" onPress={stopTest}>
-            {intl.formatMessage({ id: 'action__stop_test' })}
-          </Button>
+          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </Stack>
       </>
@@ -292,7 +288,6 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       beginTest,
       currentTestCase?.name,
       findTestCase,
-      intl,
       passphrase,
       stopTest,
       testCaseList,

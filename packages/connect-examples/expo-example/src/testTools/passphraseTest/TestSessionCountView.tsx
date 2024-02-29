@@ -13,6 +13,7 @@ import PanelView from '../../components/ui/Panel';
 import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
 import { downloadFile } from '../../utils/downloadUtils';
 import { SwitchInput } from '../../components/SwitchInput';
+import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 
 function generatePassphrase(list: any[] | undefined) {
   return `$A& b${(list?.length ?? 0) + 1}`;
@@ -425,14 +426,7 @@ export default function TestSessionCountView() {
               onToggle={setShowOnOnekey}
             />
 
-            <Button variant="primary" onPress={testSessionCount}>
-              {intl.formatMessage({ id: 'action__start_test' })}
-            </Button>
-            {testResult?.current?.done === false && (
-              <Button variant="destructive" onPress={stopTest}>
-                {intl.formatMessage({ id: 'action__stop_test' })}
-              </Button>
-            )}
+            <TestRunnerOptionButtons onStop={stopTest} onStart={testSessionCount} />
             {runnerExportReportMemo}
           </XStack>
 

@@ -17,7 +17,7 @@ import { TestChain } from './utils';
 import PanelView from '../../components/ui/Panel';
 import { baseParams } from '../addressTest/baseParams';
 import { replaceTemplate } from '../addressTest/data/utils';
-import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
+import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 
 type TestCaseDataType = {
   id: string;
@@ -169,26 +169,6 @@ function getRequestParams(method: string) {
   }
 
   return requestParams;
-}
-
-function RunnerOptionView({ stop, start }: { stop: () => void; start: () => void }) {
-  const runnerInfo = useContext(TestRunnerContext);
-  const intl = useIntl();
-
-  return (
-    <>
-      {runnerInfo.runnerDone === false ? (
-        <Button variant="destructive" onPress={stop}>
-          {intl.formatMessage({ id: 'action__stop_test' })}
-        </Button>
-      ) : null}
-      {runnerInfo.runnerDone !== false ? (
-        <Button variant="primary" onPress={start}>
-          {intl.formatMessage({ id: 'action__start_test' })}
-        </Button>
-      ) : null}
-    </>
-  );
 }
 
 let hardwareUiEventListener: any | undefined;
@@ -458,7 +438,7 @@ function ExecuteView() {
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
-          <RunnerOptionView stop={stopTest} start={beginTest} />
+          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </Stack>
       </>
