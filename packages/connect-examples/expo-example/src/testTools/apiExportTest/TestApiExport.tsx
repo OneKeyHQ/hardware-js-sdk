@@ -220,9 +220,9 @@ function ExecuteView() {
       delayMs = 500;
     }
 
-    if (currentRequestDeviceRef.current === 'pro') {
-      delayMs = 1000;
-    }
+    // if (currentRequestDeviceRef.current === 'pro') {
+    //   delayMs = 1000;
+    // }
 
     return sleep(delayMs);
   }
@@ -238,9 +238,9 @@ function ExecuteView() {
     ) {
       delayMs = 2500;
     }
-    if (currentTestClass === 'normal' && currentRequestDeviceRef.current === 'pro') {
-      delayMs = 3000;
-    }
+    // if (currentTestClass === 'normal' && currentRequestDeviceRef.current === 'pro') {
+    //   delayMs = 3000;
+    // }
 
     if (
       currentTestClass === 'bootloader' &&
@@ -251,9 +251,9 @@ function ExecuteView() {
       delayMs = 500;
     }
 
-    if (currentTestClass === 'bootloader' && currentRequestDeviceRef.current === 'pro') {
-      delayMs = 500;
-    }
+    // if (currentTestClass === 'bootloader' && currentRequestDeviceRef.current === 'pro') {
+    //   delayMs = 500;
+    // }
 
     return sleep(delayMs);
   }
