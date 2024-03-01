@@ -13,6 +13,13 @@ import {
   setItemVerifyStateAtom,
 } from './Context/TestRunnerVerifyProvider';
 
+type RunnerContext = {
+  deviceFeatures: Features;
+  deviceId: string | undefined;
+  connectId: string;
+  printLog: (log: string) => void;
+};
+
 type RunnerConfig<T> = {
   initHardwareListener?: (sdk: CoreApi) => Promise<void>;
   prepareRunner?: (
@@ -22,9 +29,8 @@ type RunnerConfig<T> = {
     sdk: CoreApi
   ) => Promise<void>;
   initTestCase: (
-    sdk: CoreApi,
-    connectId: string,
-    deviceId: string
+    context: RunnerContext,
+    sdk: CoreApi
   ) => Promise<
     | {
         title: string;
@@ -88,6 +94,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     setRunnerDone,
     setRunningDeviceFeatures,
     setItemValues,
+    setRunnerLogs,
   } = useContext(TestRunnerContext);
 
   const setItemVerifyState = useSetAtom(setItemVerifyStateAtom);
@@ -118,6 +125,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
 
   const beginTest = useCallback(async () => {
     try {
+      setRunnerLogs?.([]);
       if (!SDK) return;
       SDK.removeAllListeners(UI_EVENT);
 
@@ -138,13 +146,22 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       setRunningDeviceFeatures?.(featuresRes.payload);
       const deviceFeatures = featuresRes.payload;
 
+      const context = {
+        printLog: (log: string) => {
+          setRunnerLogs?.(prev => [...prev, log]);
+        },
+        deviceFeatures,
+        deviceId,
+        connectId,
+      };
+
       await prepareRunner?.(connectId, deviceId, deviceFeatures, SDK);
 
       // begin test
       setTimestampBeginTest?.(Date.now());
 
       // init test cases
-      const initTestCaseRes = await initTestCase(SDK, connectId, deviceId);
+      const initTestCaseRes = await initTestCase(context, SDK);
       if (!initTestCaseRes) return;
 
       const { title, data: currentTestCases } = initTestCaseRes;
@@ -254,6 +271,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       stopTest();
     }
   }, [
+    setRunnerLogs,
     SDK,
     initHardwareListener,
     setRunnerDone,

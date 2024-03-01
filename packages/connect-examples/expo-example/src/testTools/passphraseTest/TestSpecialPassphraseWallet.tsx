@@ -5,6 +5,7 @@ import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-cor
 import { Stack, Text } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get } from 'lodash';
+import { useSetAtom } from 'jotai';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
@@ -223,7 +224,7 @@ function ExecuteView() {
         });
       }
     },
-    initTestCase: async (sdk, connectId, deviceId) => {
+    initTestCase: async (context, sdk) => {
       const passphraseStateList = testCase.data;
 
       const cacheAddress = new Map<
@@ -232,9 +233,15 @@ function ExecuteView() {
           passphraseState?: string;
         }
       >();
+
       for (const item of passphraseStateList) {
         currentPassphrase.current = item.passphrase ?? '';
-        const passphraseStateRes = await sdk.getPassphraseState(connectId, {
+        context.printLog(
+          `${intl.formatMessage({ id: 'message__create' })} ${item.id}, passphrase: 「${
+            item.passphrase
+          }」`
+        );
+        const passphraseStateRes = await sdk.getPassphraseState(context.connectId, {
           initSession: true,
           useEmptyPassphrase: item.emptyPassphraseState,
         });
@@ -273,6 +280,13 @@ function ExecuteView() {
               method,
               $key: key,
             });
+            context.printLog(
+              `${intl.formatMessage({ id: 'message__generate' })} ${
+                item.id
+              } ${method} ${intl.formatMessage({ id: 'message__address' })} ${
+                mockRes?.payload?.address
+              }`
+            );
           } catch (e) {
             console.log('=====>>>>> error', e);
           }

@@ -129,6 +129,8 @@
   "message__success": "成功",
   "message__done": "完成",
   "message__address_not_match": "地址不匹配",
+  "message__create": "创建",
+  "message__generate": "生成",
   
   "message__passphrase_count_test_describe": "开始之后根据提示解锁硬件, 根据硬件提示确认 passphrase, 不用自己输入",
   "message__passphrase_count_test_step1": "1. 从零开始创建钱包 passphrase 并记录下来，注意在硬件按确认 passphrase",

@@ -241,7 +241,8 @@ function ExecuteView() {
         });
       }
     },
-    initTestCase: async (sdk, connectId, deviceId) => {
+    initTestCase: async (context, sdk) => {
+      const { connectId, deviceId, printLog } = context;
       const passphraseStateList: TestCaseDataType[] = [];
 
       Array.from({ length: testWalletCount }).forEach((_, index) => {
@@ -294,6 +295,11 @@ function ExecuteView() {
       >();
       for (const item of passphraseStateList) {
         currentPassphrase.current = item.passphrase;
+        context.printLog(
+          `${intl.formatMessage({ id: 'message__create' })} ${item.id}, passphrase: 「${
+            item.passphrase
+          }」`
+        );
         const passphraseStateRes = await sdk.getPassphraseState(connectId, {
           initSession: true,
           useEmptyPassphrase: item.emptyPassphraseState,
@@ -325,6 +331,7 @@ function ExecuteView() {
           address,
           passphraseState,
         });
+        context.printLog(`    ${intl.formatMessage({ id: 'message__address' })} ${address}`);
       }
 
       const currentTestCases = Array.from({ length: changeWalletCount }).map((_, index) => {

@@ -129,6 +129,8 @@
   "message__success": "Success",
   "message__done": "Done",
   "message__address_not_match": "Address not match",
+  "message__create": "create",
+  "message__generate": "generate",
   
   "message__passphrase_count_test_describe": "After starting, follow the prompts to unlock the hardware and confirm the passphrase according to the hardware prompts. Do not enter it yourself",
   "message__passphrase_count_test_step1": "1. Create wallet passphrase from scratch and record it, note in the hardware press Confirm passphrase",

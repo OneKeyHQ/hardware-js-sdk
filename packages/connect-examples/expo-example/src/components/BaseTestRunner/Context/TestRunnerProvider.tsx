@@ -21,12 +21,16 @@ export const TestRunnerContext = createContext<{
 
   itemValues: TestCaseDataWithKey[];
   setItemValues?: React.Dispatch<React.SetStateAction<TestCaseDataWithKey[]>>;
+
+  runnerLogs?: string[];
+  setRunnerLogs?: React.Dispatch<React.SetStateAction<string[]>>;
 }>({
   itemValues: [],
 });
 
 export function TestRunnerProvider({ children }: { children: React.ReactNode }) {
   const [itemValues, setItemValues] = useState<TestCaseDataWithKey[]>([]);
+  const [runnerLogs, setRunnerLogs] = useState<string[]>([]);
   const [runnerTestCaseTitle, setRunnerTestCaseTitle] = useState<string>();
   const [runnerDone, setRunnerDone] = useState<boolean>();
   const [runningDeviceFeatures, setRunningDeviceFeatures] = useState<Features>();
@@ -47,10 +51,13 @@ export function TestRunnerProvider({ children }: { children: React.ReactNode }) 
       setTimestampBeginTest,
       timestampEndTest,
       setTimestampEndTest,
+      runnerLogs,
+      setRunnerLogs,
     }),
     [
       itemValues,
       runnerDone,
+      runnerLogs,
       runnerTestCaseTitle,
       runningDeviceFeatures,
       timestampBeginTest,
