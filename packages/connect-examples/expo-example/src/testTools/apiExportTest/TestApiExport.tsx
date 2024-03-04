@@ -41,6 +41,7 @@ import suiApi from '../../data/sui';
 import tronApi from '../../data/tron';
 import { Button } from '../../components/ui/Button';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
+import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 
 type TestCaseDataType = ApiExportTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -259,7 +260,8 @@ function ExecuteView() {
   }
 
   const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
-    initTestCase: async (sdk, connectId) => {
+    initTestCase: async (context, sdk) => {
+      const { connectId } = context;
       const res = await sdk.getFeatures(connectId ?? '', {
         retryCount: 1,
       });
@@ -559,12 +561,7 @@ function ExecuteView() {
             <Picker.Item key={`${index + 1}`} label={testCase} value={testCase} />
           ))}
         </Picker>
-        <Button variant="primary" onPress={beginTest}>
-          {intl.formatMessage({ id: 'action__start_test' })}
-        </Button>
-        <Button variant="destructive" onPress={stopTest}>
-          {intl.formatMessage({ id: 'action__stop_test' })}
-        </Button>
+        <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
         <ExportReportView testScope={currentTestCaseType} testModel={currentTestClass} />
       </Stack>
     </>

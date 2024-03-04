@@ -5907,7 +5907,7 @@
           "id": 616
         },
         "onekey_ble_hash": {
-          "type": "string",
+          "type": "bytes",
           "id": 617
         }
       },

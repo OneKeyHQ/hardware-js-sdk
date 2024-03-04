@@ -57,6 +57,16 @@ const api: PlaygroundProps[] = [
               error: true,
             },
           },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+          pro: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
     ],

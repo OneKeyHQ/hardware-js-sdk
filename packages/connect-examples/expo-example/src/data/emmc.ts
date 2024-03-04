@@ -2,36 +2,6 @@ import { type PlaygroundProps } from '../components/Playground';
 
 const api: PlaygroundProps[] = [
   {
-    method: 'emmcDirList',
-    noDeviceIdReq: true,
-    description: 'emmcDirList',
-    presupposes: [
-      {
-        title: 'ListEmmcDir',
-        value: {
-          path: '/res',
-        },
-        expect: {
-          common: {
-            normal: {
-              unknownMessage: true,
-            },
-          },
-          touch: {
-            bootloader: {
-              error: true,
-            },
-          },
-          pro: {
-            bootloader: {
-              error: true,
-            },
-          },
-        },
-      },
-    ],
-  },
-  {
     method: 'emmcDirMake',
     noDeviceIdReq: true,
     description: 'create emmc dir',
@@ -39,7 +9,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'CreateEmmcDir',
         value: {
-          path: '/res/abc',
+          path: '0:test/',
         },
         expect: {
           common: {
@@ -48,14 +18,54 @@ const api: PlaygroundProps[] = [
             },
           },
           touch: {
+            normal: {
+              unknownMessage: true,
+            },
             bootloader: {
-              erro: true,
               success: true,
             },
           },
           pro: {
+            normal: {
+              unknownMessage: true,
+            },
             bootloader: {
-              erro: true,
+              success: true,
+            },
+          },
+        },
+      },
+    ],
+  },
+  {
+    method: 'emmcDirList',
+    noDeviceIdReq: true,
+    description: 'emmcDirList',
+    presupposes: [
+      {
+        title: 'ListEmmcDir',
+        value: {
+          path: '0:test/',
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              unknownMessage: true,
+            },
+            bootloader: {
+              success: true,
+            },
+          },
+          pro: {
+            normal: {
+              unknownMessage: true,
+            },
+            bootloader: {
               success: true,
             },
           },
@@ -71,7 +81,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'RemoveEmmcDir',
         value: {
-          path: '/res/abc',
+          path: '0:test/',
         },
         expect: {
           common: {
@@ -80,80 +90,18 @@ const api: PlaygroundProps[] = [
             },
           },
           touch: {
-            bootloader: {
-              success: true,
-              error: true,
-            },
-          },
-          pro: {
-            bootloader: {
-              success: true,
-              error: true,
-            },
-          },
-        },
-      },
-    ],
-  },
-  {
-    method: 'emmcFileDelete',
-    noDeviceIdReq: true,
-    description: 'remove emmc file',
-    presupposes: [
-      {
-        title: 'RemoveEmmcFile',
-        value: {
-          path: '/res/abc/a.txt',
-        },
-        expect: {
-          common: {
             normal: {
               unknownMessage: true,
             },
-          },
-          touch: {
             bootloader: {
-              error: true,
-            },
-          },
-          pro: {
-            bootloader: {
-              error: true,
-            },
-          },
-        },
-      },
-    ],
-  },
-  {
-    method: 'emmcFileRead',
-    noDeviceIdReq: true,
-    description: 'read emmc file',
-    presupposes: [
-      {
-        title: 'ReadEmmcFile',
-        value: {
-          file: {
-            path: '0:firmware.txt',
-            offset: 0,
-            len: 100,
-          },
-        },
-        expect: {
-          common: {
-            normal: {
-              unknownMessage: true,
-            },
-          },
-          touch: {
-            bootloader: {
-              error: true,
               success: true,
             },
           },
           pro: {
+            normal: {
+              unknownMessage: true,
+            },
             bootloader: {
-              error: true,
               success: true,
             },
           },
@@ -170,7 +118,7 @@ const api: PlaygroundProps[] = [
         title: 'WriteEmmcFile',
         value: {
           file: {
-            path: '0:firmware.txt',
+            path: '0:test.txt',
             offset: 0,
             len: 100,
             data: '1234567890',
@@ -185,13 +133,19 @@ const api: PlaygroundProps[] = [
             },
           },
           touch: {
+            normal: {
+              unknownMessage: true,
+            },
             bootloader: {
-              error: true,
+              success: true,
             },
           },
           pro: {
+            normal: {
+              unknownMessage: true,
+            },
             bootloader: {
-              error: true,
+              success: true,
             },
           },
         },
@@ -199,26 +153,44 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'emmcFixPermission',
+    method: 'emmcFileRead',
     noDeviceIdReq: true,
-    description: 'Fix emmc permission',
-    expect: {
-      common: {
-        normal: {
-          unknownMessage: true,
+    description: 'read emmc file',
+    presupposes: [
+      {
+        title: 'ReadEmmcFile',
+        value: {
+          file: {
+            path: '0:test.txt',
+            offset: 0,
+            len: 100,
+          },
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              unknownMessage: true,
+            },
+            bootloader: {
+              success: true,
+            },
+          },
+          pro: {
+            normal: {
+              unknownMessage: true,
+            },
+            bootloader: {
+              success: true,
+            },
+          },
         },
       },
-      touch: {
-        bootloader: {
-          success: true,
-        },
-      },
-      pro: {
-        bootloader: {
-          success: true,
-        },
-      },
-    },
+    ],
   },
   {
     method: 'emmcPathInfo',
@@ -228,7 +200,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'emmcPathInfo',
         value: {
-          path: '/res/abc/a.txt',
+          path: '0:test.txt',
         },
         expect: {
           common: {
@@ -237,11 +209,17 @@ const api: PlaygroundProps[] = [
             },
           },
           touch: {
+            normal: {
+              unknownMessage: true,
+            },
             bootloader: {
               error: true,
             },
           },
           pro: {
+            normal: {
+              unknownMessage: true,
+            },
             bootloader: {
               error: true,
             },
@@ -249,6 +227,70 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+  },
+  {
+    method: 'emmcFileDelete',
+    noDeviceIdReq: true,
+    description: 'remove emmc file',
+    presupposes: [
+      {
+        title: 'RemoveEmmcFile',
+        value: {
+          path: '0:test.txt',
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              unknownMessage: true,
+            },
+            bootloader: {
+              success: true,
+            },
+          },
+          pro: {
+            normal: {
+              unknownMessage: true,
+            },
+            bootloader: {
+              success: true,
+            },
+          },
+        },
+      },
+    ],
+  },
+  {
+    method: 'emmcFixPermission',
+    noDeviceIdReq: true,
+    description: 'Fix emmc permission,（Cause emmc error, remember to restart device）',
+    expect: {
+      common: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+      touch: {
+        normal: {
+          unknownMessage: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+      pro: {
+        normal: {
+          unknownMessage: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+    },
   },
 ];
 
