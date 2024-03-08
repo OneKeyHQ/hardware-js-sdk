@@ -37,6 +37,17 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
   }
 
   getVersionRange() {
+    if (this.existsVersionedTx()) {
+      return {
+        model_mini: {
+          min: '3.1.0',
+        },
+        model_touch: {
+          min: '4.3.0',
+        },
+      };
+    }
+
     return {
       classic: {
         min: '2.1.9',
@@ -45,6 +56,30 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
         min: '2.1.9',
       },
     };
+  }
+
+  isVersionedTx(hexString: string) {
+    if (hexString.length === 0) return false;
+    try {
+      const cleanHexString = hexString.startsWith('0x') ? hexString.slice(2) : hexString;
+      const binary = parseInt(cleanHexString[0], 16).toString(2);
+
+      // Check highest bit
+      return binary[0] === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  existsVersionedTx() {
+    for (let i = 0; i < this.params.length; i++) {
+      const param = this.params[i];
+      const { raw_tx } = param;
+      if (this.isVersionedTx(raw_tx)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   async run() {
