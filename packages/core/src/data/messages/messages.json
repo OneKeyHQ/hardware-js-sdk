@@ -5686,15 +5686,15 @@
           "type": "bytes",
           "id": 605
         },
-        "onekey_se_version": {
+        "onekey_se01_version": {
           "type": "string",
           "id": 606
         },
-        "onekey_se_hash": {
+        "onekey_se01_hash": {
           "type": "bytes",
           "id": 607
         },
-        "onekey_se_build_id": {
+        "onekey_se01_build_id": {
           "type": "string",
           "id": 608
         },
@@ -5713,6 +5713,130 @@
         "onekey_serial_no": {
           "type": "string",
           "id": 612
+        },
+        "onekey_boot_build_id": {
+          "type": "string",
+          "id": 613
+        },
+        "onekey_ble_name": {
+          "type": "string",
+          "id": 614
+        },
+        "onekey_ble_version": {
+          "type": "string",
+          "id": 615
+        },
+        "onekey_ble_build_id": {
+          "type": "string",
+          "id": 616
+        },
+        "onekey_ble_hash": {
+          "type": "bytes",
+          "id": 617
+        },
+        "onekey_board_build_id": {
+          "type": "string",
+          "id": 618
+        },
+        "onekey_se01_boot_version": {
+          "type": "string",
+          "id": 619
+        },
+        "onekey_se01_boot_hash": {
+          "type": "bytes",
+          "id": 620
+        },
+        "onekey_se01_boot_build_id": {
+          "type": "string",
+          "id": 621
+        },
+        "onekey_se02_version": {
+          "type": "string",
+          "id": 622
+        },
+        "onekey_se02_hash": {
+          "type": "bytes",
+          "id": 623
+        },
+        "onekey_se02_build_id": {
+          "type": "string",
+          "id": 624
+        },
+        "onekey_se02_boot_version": {
+          "type": "string",
+          "id": 625
+        },
+        "onekey_se02_boot_hash": {
+          "type": "bytes",
+          "id": 626
+        },
+        "onekey_se02_boot_build_id": {
+          "type": "string",
+          "id": 627
+        },
+        "onekey_se03_version": {
+          "type": "string",
+          "id": 628
+        },
+        "onekey_se03_hash": {
+          "type": "bytes",
+          "id": 629
+        },
+        "onekey_se03_build_id": {
+          "type": "string",
+          "id": 630
+        },
+        "onekey_se03_boot_version": {
+          "type": "string",
+          "id": 631
+        },
+        "onekey_se03_boot_hash": {
+          "type": "bytes",
+          "id": 632
+        },
+        "onekey_se03_boot_build_id": {
+          "type": "string",
+          "id": 633
+        },
+        "onekey_se04_version": {
+          "type": "string",
+          "id": 634
+        },
+        "onekey_se04_hash": {
+          "type": "bytes",
+          "id": 635
+        },
+        "onekey_se04_build_id": {
+          "type": "string",
+          "id": 636
+        },
+        "onekey_se04_boot_version": {
+          "type": "string",
+          "id": 637
+        },
+        "onekey_se04_boot_hash": {
+          "type": "bytes",
+          "id": 638
+        },
+        "onekey_se04_boot_build_id": {
+          "type": "string",
+          "id": 639
+        },
+        "onekey_se01_state": {
+          "type": "OneKeySEState",
+          "id": 640
+        },
+        "onekey_se02_state": {
+          "type": "OneKeySEState",
+          "id": 641
+        },
+        "onekey_se03_state": {
+          "type": "OneKeySEState",
+          "id": 642
+        },
+        "onekey_se04_state": {
+          "type": "OneKeySEState",
+          "id": 643
         }
       },
       "nested": {
@@ -5753,6 +5877,12 @@
           "values": {
             "THD89": 0,
             "SE608A": 1
+          }
+        },
+        "OneKeySEState": {
+          "values": {
+            "BOOT": 0,
+            "APP": 1
           }
         }
       }
@@ -7998,6 +8128,106 @@
     "NEMDecryptedMessage": {
       "fields": {
         "payload": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "NervosGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "network": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "NervosAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "NervosSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "data_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "witness_buffer": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "network": {
+          "rule": "required",
+          "type": "string",
+          "id": 4
+        },
+        "data_length": {
+          "type": "uint32",
+          "id": 5
+        }
+      }
+    },
+    "NervosSignedTx": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "NervosTxRequest": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "NervosTxAck": {
+      "fields": {
+        "data_chunk": {
           "rule": "required",
           "type": "bytes",
           "id": 1
@@ -10445,6 +10675,12 @@
         "MessageType_NostrSignedSchnorr": 11509,
         "MessageType_LnurlAuth": 11600,
         "MessageType_LnurlAuthResp": 11601,
+        "MessageType_NervosGetAddress": 11701,
+        "MessageType_NervosAddress": 11702,
+        "MessageType_NervosSignTx": 11703,
+        "MessageType_NervosSignedTx": 11704,
+        "MessageType_NervosTxRequest": 11705,
+        "MessageType_NervosTxAck": 11706,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,

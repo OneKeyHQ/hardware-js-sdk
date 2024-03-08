@@ -1994,6 +1994,11 @@ export enum OneKeySeType {
   SE608A = 1,
 }
 
+export enum OneKeySEState {
+  BOOT = 0,
+  APP = 1,
+}
+
 // Features
 export type Features = {
   vendor: string;
@@ -2060,13 +2065,44 @@ export type Features = {
   onekey_board_hash?: string;
   onekey_boot_version?: string;
   onekey_boot_hash?: string;
-  onekey_se_version?: string;
-  onekey_se_hash?: string;
-  onekey_se_build_id?: string;
+  onekey_se01_version?: string;
+  onekey_se01_hash?: string;
+  onekey_se01_build_id?: string;
   onekey_firmware_version?: string;
   onekey_firmware_hash?: string;
   onekey_firmware_build_id?: string;
   onekey_serial_no?: string;
+  onekey_boot_build_id?: string;
+  onekey_ble_name?: string;
+  onekey_ble_version?: string;
+  onekey_ble_build_id?: string;
+  onekey_ble_hash?: string;
+  onekey_board_build_id?: string;
+  onekey_se01_boot_version?: string;
+  onekey_se01_boot_hash?: string;
+  onekey_se01_boot_build_id?: string;
+  onekey_se02_version?: string;
+  onekey_se02_hash?: string;
+  onekey_se02_build_id?: string;
+  onekey_se02_boot_version?: string;
+  onekey_se02_boot_hash?: string;
+  onekey_se02_boot_build_id?: string;
+  onekey_se03_version?: string;
+  onekey_se03_hash?: string;
+  onekey_se03_build_id?: string;
+  onekey_se03_boot_version?: string;
+  onekey_se03_boot_hash?: string;
+  onekey_se03_boot_build_id?: string;
+  onekey_se04_version?: string;
+  onekey_se04_hash?: string;
+  onekey_se04_build_id?: string;
+  onekey_se04_boot_version?: string;
+  onekey_se04_boot_hash?: string;
+  onekey_se04_boot_build_id?: string;
+  onekey_se01_state?: string | null;
+  onekey_se02_state?: string | null;
+  onekey_se03_state?: string | null;
+  onekey_se04_state?: string | null;
 };
 
 // LockDevice
@@ -2956,6 +2992,45 @@ export type NEMDecryptMessage = {
 // NEMDecryptedMessage
 export type NEMDecryptedMessage = {
   payload: string;
+};
+
+// NervosGetAddress
+export type NervosGetAddress = {
+  address_n: number[];
+  network: string;
+  show_display?: boolean;
+};
+
+// NervosAddress
+export type NervosAddress = {
+  address: string;
+};
+
+// NervosSignTx
+export type NervosSignTx = {
+  address_n: number[];
+  data_initial_chunk: string;
+  witness_buffer: string;
+  network: string;
+  data_length?: number;
+};
+
+// NervosSignedTx
+export type NervosSignedTx = {
+  signature: string;
+  address: string;
+};
+
+// NervosTxRequest
+export type NervosTxRequest = {
+  data_length?: number;
+  public_key?: string;
+  signature?: string;
+};
+
+// NervosTxAck
+export type NervosTxAck = {
+  data_chunk: string;
 };
 
 // NexaGetAddress
@@ -4045,6 +4120,12 @@ export type MessageType = {
   NEMSignedTx: NEMSignedTx;
   NEMDecryptMessage: NEMDecryptMessage;
   NEMDecryptedMessage: NEMDecryptedMessage;
+  NervosGetAddress: NervosGetAddress;
+  NervosAddress: NervosAddress;
+  NervosSignTx: NervosSignTx;
+  NervosSignedTx: NervosSignedTx;
+  NervosTxRequest: NervosTxRequest;
+  NervosTxAck: NervosTxAck;
   NexaGetAddress: NexaGetAddress;
   NexaAddress: NexaAddress;
   NexaSignTx: NexaSignTx;
