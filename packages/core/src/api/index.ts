@@ -113,4 +113,8 @@ export { default as nostrSignEvent } from './nostr/NostrSignEvent';
 export { default as nostrEncryptMessage } from './nostr/NostrEncryptMessage';
 export { default as nostrDecryptMessage } from './nostr/NostrDecryptMessage';
 export { default as nostrSignSchnorr } from './nostr/NostrSignSchnorr';
+
 export { default as lnurlAuth } from './lightning/LnurlAuth';
+
+export { default as nervosGetAddress } from './nervos/NervosGetAddress';
+export { default as nervosSignTransaction } from './nervos/NervosSignTransaction';

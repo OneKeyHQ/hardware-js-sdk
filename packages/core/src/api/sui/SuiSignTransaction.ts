@@ -9,7 +9,9 @@ import { getDeviceFirmwareVersion, getDeviceType } from '../../utils/deviceFeatu
 import { DeviceModelToTypes } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
-export default class SuiSignTransaction extends BaseMethod<HardwareSuiSignTx> {
+type SuiSignTx = Omit<HardwareSuiSignTx, 'data_initial_chunk' | 'data_length'> & HardwareSuiSignTx;
+
+export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
@@ -59,12 +61,12 @@ export default class SuiSignTransaction extends BaseMethod<HardwareSuiSignTx> {
     return false;
   }
 
-  chunkSize = 1024;
+  chunkByteSize = 1024;
 
   processTxRequest = async (
     typedCall: TypedCall,
     res: TypedResponseMessage<'SuiSignedTx'> | TypedResponseMessage<'SuiTxRequest'>,
-    data: string,
+    data: Buffer,
     offset = 0
   ): Promise<SuiSignedTx> => {
     if (res.type === 'SuiSignedTx') {
@@ -78,10 +80,10 @@ export default class SuiSignTransaction extends BaseMethod<HardwareSuiSignTx> {
       return res.message;
     }
 
-    const payload = data.slice(offset, offset + data_length * 2);
+    const payload = data.subarray(offset, offset + data_length);
     const newOffset = offset + payload.length;
     const resourceAckParams = {
-      data_chunk: payload,
+      data_chunk: payload.toString('hex'),
     };
 
     const response = await typedCall('SuiTxAck', ['SuiSignedTx', 'SuiTxRequest'], {
@@ -93,18 +95,17 @@ export default class SuiSignTransaction extends BaseMethod<HardwareSuiSignTx> {
 
   async run() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const dataLength = this.params.raw_tx.length / 2;
     let offset = 0;
-    let data = '';
+    let data: Buffer;
 
     if (this.supportChunkTransfer()) {
-      offset = this.chunkSize;
-      data = this.params.raw_tx;
+      offset = this.chunkByteSize;
+      data = Buffer.from(this.params.raw_tx, 'hex');
       this.params = {
         address_n: this.params.address_n,
         raw_tx: '',
-        data_initial_chunk: this.params.raw_tx.slice(0, this.chunkSize * 2),
-        data_length: dataLength,
+        data_initial_chunk: data.subarray(0, this.chunkByteSize).toString('hex'),
+        data_length: data.length,
       };
     }
 
