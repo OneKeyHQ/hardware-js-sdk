@@ -2077,32 +2077,6 @@ export type Features = {
   onekey_ble_version?: string;
   onekey_ble_build_id?: string;
   onekey_ble_hash?: string;
-  onekey_board_build_id?: string;
-  onekey_se01_boot_version?: string;
-  onekey_se01_boot_hash?: string;
-  onekey_se01_boot_build_id?: string;
-  onekey_se02_version?: string;
-  onekey_se02_hash?: string;
-  onekey_se02_build_id?: string;
-  onekey_se02_boot_version?: string;
-  onekey_se02_boot_hash?: string;
-  onekey_se02_boot_build_id?: string;
-  onekey_se03_version?: string;
-  onekey_se03_hash?: string;
-  onekey_se03_build_id?: string;
-  onekey_se03_boot_version?: string;
-  onekey_se03_boot_hash?: string;
-  onekey_se03_boot_build_id?: string;
-  onekey_se04_version?: string;
-  onekey_se04_hash?: string;
-  onekey_se04_build_id?: string;
-  onekey_se04_boot_version?: string;
-  onekey_se04_boot_hash?: string;
-  onekey_se04_boot_build_id?: string;
-  onekey_se01_state?: string | null;
-  onekey_se02_state?: string | null;
-  onekey_se03_state?: string | null;
-  onekey_se04_state?: string | null;
 };
 
 // LockDevice

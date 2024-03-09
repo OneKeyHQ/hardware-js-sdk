@@ -282,4 +282,9 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nostrSignSchnorr' }),
   lnurlAuth: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'lnurlAuth' }),
+
+  nervosGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nervosGetAddress' }),
+  nervosSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'nervosSignTransaction' }),
 });
