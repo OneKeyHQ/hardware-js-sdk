@@ -43,10 +43,10 @@ export default class NervosGetAddress extends BaseMethod<HardwareNervosGetAddres
   getVersionRange() {
     return {
       model_mini: {
-        min: '3.2.0',
+        min: '3.7.0',
       },
       model_touch: {
-        min: '4.4.0',
+        min: '4.9.0',
       },
     };
   }

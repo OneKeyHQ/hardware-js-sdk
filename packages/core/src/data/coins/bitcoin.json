@@ -39,5 +39,6 @@
   { "name": "Viacoin", "label": "VIA", "slip44": 14 },
   { "name": "ZCore", "label": "ZCR", "slip44": 428 },
   { "name": "Zcash", "label": "ZEC", "slip44": 133 },
-  { "name": "Zcash Testnet", "label": "TAZ", "slip44": 1 }
+  { "name": "Zcash Testnet", "label": "TAZ", "slip44": 1 },
+  { "name": "Neurai", "label": "XNA", "slip44": 1900 }
 ]

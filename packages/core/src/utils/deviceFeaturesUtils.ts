@@ -84,7 +84,7 @@ export const getDeviceTypeByDeviceId = (deviceId?: string): IDeviceType => {
 export const getDeviceUUID = (features: Features) => {
   const deviceType = getDeviceType(features);
 
-  if (features.onekey_serial_no) return features.onekey_serial_no;
+  if (features?.onekey_serial_no) return features.onekey_serial_no;
 
   if (deviceType === 'classic') {
     return features.onekey_serial ?? '';

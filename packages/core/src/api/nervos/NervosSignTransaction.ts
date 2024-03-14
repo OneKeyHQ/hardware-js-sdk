@@ -40,10 +40,10 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
   getVersionRange() {
     return {
       model_mini: {
-        min: '2.10.0',
+        min: '3.7.0',
       },
       model_touch: {
-        min: '4.0.0',
+        min: '4.9.0',
       },
     };
   }

@@ -5686,15 +5686,15 @@
           "type": "bytes",
           "id": 605
         },
-        "onekey_se01_version": {
+        "onekey_se_version": {
           "type": "string",
           "id": 606
         },
-        "onekey_se01_hash": {
+        "onekey_se_hash": {
           "type": "bytes",
           "id": 607
         },
-        "onekey_se01_build_id": {
+        "onekey_se_build_id": {
           "type": "string",
           "id": 608
         },
@@ -5773,12 +5773,6 @@
           "values": {
             "THD89": 0,
             "SE608A": 1
-          }
-        },
-        "OneKeySEState": {
-          "values": {
-            "BOOT": 0,
-            "APP": 1
           }
         }
       }

@@ -1994,11 +1994,6 @@ export enum OneKeySeType {
   SE608A = 1,
 }
 
-export enum OneKeySEState {
-  BOOT = 0,
-  APP = 1,
-}
-
 // Features
 export type Features = {
   vendor: string;
@@ -2065,9 +2060,9 @@ export type Features = {
   onekey_board_hash?: string;
   onekey_boot_version?: string;
   onekey_boot_hash?: string;
-  onekey_se01_version?: string;
-  onekey_se01_hash?: string;
-  onekey_se01_build_id?: string;
+  onekey_se_version?: string;
+  onekey_se_hash?: string;
+  onekey_se_build_id?: string;
   onekey_firmware_version?: string;
   onekey_firmware_hash?: string;
   onekey_firmware_build_id?: string;
