@@ -5,6 +5,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { getCoinInfo } from './helpers/btcParamsUtils';
+import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 
 export default class BTCVerifyMessage extends BaseMethod<VerifyMessage> {
   init() {
@@ -29,6 +30,10 @@ export default class BTCVerifyMessage extends BaseMethod<VerifyMessage> {
       signature,
       coin_name: coinName,
     };
+  }
+
+  getVersionRange() {
+    return getBitcoinForkVersionRange([this.params.coin_name]);
   }
 
   async run() {

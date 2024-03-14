@@ -6,6 +6,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 import { BTCPublicKey } from '../../types/api/btcGetPublicKey';
+import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 
 export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   hasBundle = false;
@@ -56,6 +57,10 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
 
   private isBtcNetwork(param: GetPublicKey) {
     return param.coin_name === 'Testnet' || param.coin_name === 'Bitcoin';
+  }
+
+  getVersionRange() {
+    return getBitcoinForkVersionRange(this.params.map(param => param.coin_name));
   }
 
   async run() {
