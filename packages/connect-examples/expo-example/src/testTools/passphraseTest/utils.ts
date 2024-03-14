@@ -10,18 +10,20 @@ export const requestAddress = async ({
   deviceId,
   passphraseState,
   useEmptyPassphrase,
+  showOnOneKey = false,
 }: {
   sdk: CoreApi;
   testChain: TestChain;
   connectId: string;
   deviceId: string;
+  showOnOneKey?: boolean;
   passphraseState?: string;
   useEmptyPassphrase?: boolean;
 }) => {
   if (testChain === 'evm') {
     const evmAddressRes = await sdk.evmGetAddress(connectId, deviceId, {
-      path: "m/44'/60'/0'/0/1024",
-      showOnOneKey: false,
+      path: "m/44'/60'/0'/0/0",
+      showOnOneKey,
       passphraseState,
       useEmptyPassphrase,
     });
@@ -30,10 +32,10 @@ export const requestAddress = async ({
   if (testChain === 'dot') {
     // @ts-expect-error
     const ethAddressRes = await sdk.polkadotGetAddress(connectId, deviceId, {
-      path: "m/44'/354'/0'/0'/1001'",
+      path: "m/44'/354'/0'/0'/0'",
       prefix: '0',
       network: 'polkadot',
-      showOnOneKey: false,
+      showOnOneKey,
       passphraseState,
       useEmptyPassphrase,
     });
@@ -43,14 +45,14 @@ export const requestAddress = async ({
     const adaAddressRes = await sdk.cardanoGetAddress(connectId, deviceId, {
       addressParameters: {
         addressType: 0,
-        path: "m/1852'/1815'/0'/0/1002",
+        path: "m/1852'/1815'/0'/0/0",
         stakingPath: "m/1852'/1815'/0'/2/0",
       },
       protocolMagic: 764824073,
       networkId: 1,
       derivationType: 1,
       address: '',
-      showOnOneKey: false,
+      showOnOneKey,
       isCheck: false,
       passphraseState,
       useEmptyPassphrase,
@@ -58,9 +60,9 @@ export const requestAddress = async ({
     return adaAddressRes;
   }
   const btcAddressRes = await sdk.btcGetAddress(connectId, deviceId, {
-    path: "m/44'/0'/0'/0/1000",
+    path: "m/44'/0'/0'/0/0",
     coin: 'btc',
-    showOnOneKey: false,
+    showOnOneKey,
     passphraseState,
     useEmptyPassphrase,
   });

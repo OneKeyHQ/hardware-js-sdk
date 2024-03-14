@@ -345,14 +345,14 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
               <DeviceField field="bootloader_version" value={features.bootloader_version} />
               <DeviceField field="build_id" value={features.build_id} />
               <DeviceField field="onekey_device_type" value={features.onekey_device_type} />
+              <DeviceField field="onekey_serial_no" value={features.onekey_serial_no} />
               <DeviceField field="onekey_se_type" value={features.onekey_se_type} />
               <DeviceField field="onekey_board_version" value={features.onekey_board_version} />
               <DeviceField field="onekey_board_hash" value={features.onekey_board_hash} />
+              <DeviceField field="onekey_board_build_id" value={features.onekey_board_build_id} />
               <DeviceField field="onekey_boot_version" value={features.onekey_boot_version} />
               <DeviceField field="onekey_boot_hash" value={features.onekey_boot_hash} />
-              <DeviceField field="onekey_se_version" value={features.onekey_se_version} />
-              <DeviceField field="onekey_se_hash" value={features.onekey_se_hash} />
-              <DeviceField field="onekey_se_build_id" value={features.onekey_se_build_id} />
+              <DeviceField field="onekey_boot_build_id" value={features.onekey_boot_build_id} />
               <DeviceField
                 field="onekey_firmware_version"
                 value={features.onekey_firmware_version}
@@ -362,7 +362,72 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
                 field="onekey_firmware_build_id"
                 value={features.onekey_firmware_build_id}
               />
-              <DeviceField field="onekey_serial_no" value={features.onekey_serial_no} />
+            </Stack>
+
+            <Stack
+              flex={1}
+              padding="$2"
+              backgroundColor="$bgHover"
+              gap="$2"
+              flexDirection="row"
+              flexWrap="wrap"
+              borderRadius="$2"
+            >
+              <DeviceField field="onekey_se01_state" value={features.onekey_se01_state} />
+              <DeviceField field="onekey_se01_version" value={features.onekey_se01_version} />
+              <DeviceField field="onekey_se01_hash" value={features.onekey_se01_hash} />
+              <DeviceField field="onekey_se01_build_id" value={features.onekey_se01_build_id} />
+              <DeviceField
+                field="onekey_se01_boot_version"
+                value={features.onekey_se01_boot_version}
+              />
+              <DeviceField field="onekey_se01_boot_hash" value={features.onekey_se01_boot_hash} />
+              <DeviceField
+                field="onekey_se01_boot_build_id"
+                value={features.onekey_se01_boot_build_id}
+              />
+
+              <DeviceField field="onekey_se02_state" value={features.onekey_se02_state} />
+              <DeviceField field="onekey_se02_version" value={features.onekey_se02_version} />
+              <DeviceField field="onekey_se02_hash" value={features.onekey_se02_hash} />
+              <DeviceField field="onekey_se02_build_id" value={features.onekey_se02_build_id} />
+              <DeviceField
+                field="onekey_se02_boot_version"
+                value={features.onekey_se02_boot_version}
+              />
+              <DeviceField field="onekey_se02_boot_hash" value={features.onekey_se02_boot_hash} />
+              <DeviceField
+                field="onekey_se02_boot_build_id"
+                value={features.onekey_se02_boot_build_id}
+              />
+
+              <DeviceField field="onekey_se03_state" value={features.onekey_se03_state} />
+              <DeviceField field="onekey_se03_version" value={features.onekey_se03_version} />
+              <DeviceField field="onekey_se03_hash" value={features.onekey_se03_hash} />
+              <DeviceField field="onekey_se03_build_id" value={features.onekey_se03_build_id} />
+              <DeviceField
+                field="onekey_se03_boot_version"
+                value={features.onekey_se03_boot_version}
+              />
+              <DeviceField field="onekey_se03_boot_hash" value={features.onekey_se03_boot_hash} />
+              <DeviceField
+                field="onekey_se03_boot_build_id"
+                value={features.onekey_se03_boot_build_id}
+              />
+
+              <DeviceField field="onekey_se04_state" value={features.onekey_se04_state} />
+              <DeviceField field="onekey_se04_version" value={features.onekey_se04_version} />
+              <DeviceField field="onekey_se04_hash" value={features.onekey_se04_hash} />
+              <DeviceField field="onekey_se04_build_id" value={features.onekey_se04_build_id} />
+              <DeviceField
+                field="onekey_se04_boot_version"
+                value={features.onekey_se04_boot_version}
+              />
+              <DeviceField field="onekey_se04_boot_hash" value={features.onekey_se04_boot_hash} />
+              <DeviceField
+                field="onekey_se04_boot_build_id"
+                value={features.onekey_se04_boot_build_id}
+              />
             </Stack>
           </PanelView>
         </Stack>

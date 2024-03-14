@@ -1,5 +1,5 @@
 import React from 'react';
-import PassphraseTestView from '../components/PassphraseTest';
+import PassphraseTestView from '../testTools/passphraseTest';
 import PageView from '../components/ui/Page';
 
 export default function PassphraseTestScreen() {

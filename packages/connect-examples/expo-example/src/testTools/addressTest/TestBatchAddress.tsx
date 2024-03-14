@@ -14,6 +14,7 @@ import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
+import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 
 type TestCaseDataType = AddressBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -70,6 +71,7 @@ function ExportReportView() {
   return null;
 }
 
+let hardwareUiEventListener: any | undefined;
 function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[] }) {
   const intl = useIntl();
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
@@ -127,7 +129,11 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       return Promise.resolve(undefined);
     },
     initHardwareListener: sdk => {
-      sdk.on(UI_EVENT, (message: CoreMessage) => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+
+      hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           sdk.uiResponse({
@@ -145,7 +151,8 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
             });
           }, 200);
         }
-      });
+      };
+      sdk.on(UI_EVENT, hardwareUiEventListener);
       return Promise.resolve();
     },
     prepareRunner: async (connectId, deviceId, features, sdk) => {
@@ -241,6 +248,12 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
         error,
       });
     },
+    removeHardwareListener: sdk => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+      return Promise.resolve();
+    },
     processRunnerDone: () => {
       console.log('=====>>> Success Data:\n', JSON.stringify(originDataRef.current, null, 2));
     },
@@ -266,12 +279,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
             ))}
           </Picker>
 
-          <Button variant="primary" onPress={beginTest}>
-            {intl.formatMessage({ id: 'action__start_test' })}
-          </Button>
-          <Button variant="destructive" onPress={stopTest}>
-            {intl.formatMessage({ id: 'action__stop_test' })}
-          </Button>
+          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </Stack>
       </>
@@ -280,7 +288,6 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       beginTest,
       currentTestCase?.name,
       findTestCase,
-      intl,
       passphrase,
       stopTest,
       testCaseList,

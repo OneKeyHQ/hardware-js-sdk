@@ -46,11 +46,11 @@ export default {
         path: "m/44'/0'/$$INDEX$$'/0/0",
       },
       expectedAddress: {
-        '0': '1AztpmzfQdpZNM5Yshczadx5pzcLfDTox7',
-        '1': '12jkNt56fEYrFoAuNwgEZdjFCuu6L1XiRp',
-        '35': '1J624maH4iktxKdEkeEdJ7JTFV9aUkSxzR',
-        '2147483646': '1F9nThLS7ZLG517vsXAjfx9otPPLMb741e',
-        '2147483647': '1PJN7cd66B4Y36thasJSfS3K5EZvAfYgMF',
+        '0': '1Bq5DS1i3jiDz1ja64MmM9fNwpkcd7omsW',
+        '1': '1Ka75Sz1VCs6EUsrFWkSocZbKgAzWzCbej',
+        '35': '14uTUwEoJNe3TAzkWDavJ1Lb89y46QrhVw',
+        '2147483646': '1DNdHFTf3LsbZuiZU7KJBLh3MsUDMWdRzb',
+        '2147483647': '1CET9greUEbGx4ms1BxZKYmk6yAaZAXhUF',
       },
     },
     {

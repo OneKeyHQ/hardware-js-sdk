@@ -2,7 +2,7 @@ import { atom } from 'jotai';
 import { selectAtom } from 'jotai/utils';
 import { VerifyState } from '../types';
 
-export type ItemVerifyState = { verify: VerifyState; error?: string };
+export type ItemVerifyState = { verify: VerifyState; error?: string; ext?: any };
 
 export const itemVerifyStateAtom = atom<{ [key: string]: ItemVerifyState }>({});
 

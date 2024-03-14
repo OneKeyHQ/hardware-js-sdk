@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
@@ -12,6 +12,7 @@ import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
+import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 
 type TestCaseDataType = AddressTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -70,6 +71,7 @@ function ExportReportView() {
   return null;
 }
 
+let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
   const intl = useIntl();
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
@@ -125,7 +127,10 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
       return Promise.resolve(undefined);
     },
     initHardwareListener: sdk => {
-      sdk.on(UI_EVENT, (message: CoreMessage) => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+      hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           sdk.uiResponse({
@@ -143,7 +148,8 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
             });
           }, 200);
         }
-      });
+      };
+      sdk.on(UI_EVENT, hardwareUiEventListener);
       return Promise.resolve();
     },
     prepareRunner: async (connectId, deviceId, features, sdk) => {
@@ -190,6 +196,12 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
         error,
       });
     },
+    removeHardwareListener: sdk => {
+      if (hardwareUiEventListener) {
+        sdk.off(UI_EVENT, hardwareUiEventListener);
+      }
+      return Promise.resolve();
+    },
   });
 
   const contentMemo = useMemo(
@@ -215,12 +227,8 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
             onToggle={setShowOnOneKey}
             vertical
           />
-          <Button variant="primary" onPress={beginTest}>
-            {intl.formatMessage({ id: 'action__start_test' })}
-          </Button>
-          <Button variant="destructive" onPress={stopTest}>
-            {intl.formatMessage({ id: 'action__stop_test' })}
-          </Button>
+
+          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </Stack>
       </>
