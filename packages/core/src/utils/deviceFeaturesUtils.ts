@@ -45,7 +45,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
       return 'mini';
     case 'TOUCH':
       return 'touch';
-    case 'TOUCH_PRO':
+    case 'PRO':
       return 'pro';
     default:
     // other
