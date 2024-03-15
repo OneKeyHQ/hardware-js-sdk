@@ -1960,6 +1960,27 @@ export type Initialize = {
 // GetFeatures
 export type GetFeatures = {};
 
+// OnekeyGetFeatures
+export type OnekeyGetFeatures = {};
+
+export enum OneKeyDeviceType {
+  CLASSIC = 0,
+  CLASSIC1S = 1,
+  MINI = 2,
+  TOUCH = 3,
+  PRO = 5,
+}
+
+export enum OneKeySeType {
+  THD89 = 0,
+  SE608A = 1,
+}
+
+export enum OneKeySEState {
+  BOOT = 0,
+  APP = 1,
+}
+
 export enum Enum_Capability {
   Capability_Bitcoin = 1,
   Capability_Bitcoin_like = 2,
@@ -1980,24 +2001,6 @@ export enum Enum_Capability {
   Capability_PassphraseEntry = 17,
 }
 export type Capability = keyof typeof Enum_Capability;
-
-export enum OneKeyDeviceType {
-  CLASSIC = 0,
-  CLASSIC1S = 1,
-  MINI = 2,
-  TOUCH = 3,
-  TOUCH_PRO = 4,
-}
-
-export enum OneKeySeType {
-  THD89 = 0,
-  SE608A = 1,
-}
-
-export enum OneKeySEState {
-  BOOT = 0,
-  APP = 1,
-}
 
 // Features
 export type Features = {
