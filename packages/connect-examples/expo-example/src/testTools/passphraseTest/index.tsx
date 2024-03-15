@@ -1,7 +1,7 @@
 import { Stack } from 'tamagui';
 import { DeviceProvider } from '../../provider/DeviceProvider';
 
-import TestSessionView from './TestSessionCountView';
+import TestSessionCountView from './TestSessionCountView';
 import { TestSwitchPassphraseWallet } from './TestSwitchPassphraseWallet';
 import { TestSpecialPassphraseWallet } from './TestSpecialPassphraseWallet';
 
@@ -10,7 +10,7 @@ export default function PassphraseTestScreen() {
     <Stack>
       <DeviceProvider>
         <Stack>
-          <TestSessionView />
+          <TestSessionCountView />
           <TestSwitchPassphraseWallet />
           <TestSpecialPassphraseWallet />
         </Stack>
