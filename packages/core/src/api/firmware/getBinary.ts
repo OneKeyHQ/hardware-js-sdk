@@ -30,12 +30,13 @@ export const getBinary = async ({
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'no firmware found for this device');
   }
 
-  if (version && !semver.eq(releaseInfo.version.join('.'), version.join('.'))) {
-    const touchWithoutVersion = getDeviceType(features) === 'touch' && !features.onekey_version;
-    if (!touchWithoutVersion) {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware version mismatch');
-    }
-  }
+  // temporary disable version check
+  // if (version && !semver.eq(releaseInfo.version.join('.'), version.join('.'))) {
+  //   const touchWithoutVersion = getDeviceType(features) === 'touch' && !features.onekey_version;
+  //   if (!touchWithoutVersion) {
+  //     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware version mismatch');
+  //   }
+  // }
 
   const url =
     // eslint-disable-next-line no-nested-ternary
