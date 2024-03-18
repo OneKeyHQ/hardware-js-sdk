@@ -4,11 +4,10 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
 import { updateResources } from '../firmware/uploadFirmware';
-import { getDeviceType } from '../../utils';
+import { getDeviceType, getDeviceFirmwareVersion } from '../../utils';
 import { createUiMessage } from '../../events/ui-request';
 import type { KnownDevice, Features } from '../../types';
 import { DataManager } from '../../data-manager';
-import { getDeviceFirmwareVersion } from '../../utils/deviceFeaturesUtils';
 
 export default class DeviceFullyUploadResource extends BaseMethod {
   checkPromise: Deferred<any> | null = null;

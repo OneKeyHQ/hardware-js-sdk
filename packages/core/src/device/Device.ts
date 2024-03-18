@@ -9,13 +9,15 @@ import {
 } from '@onekeyfe/hd-shared';
 import {
   getDeviceBLEFirmwareVersion,
+  getDeviceBleName,
   getDeviceFirmwareVersion,
   getDeviceLabel,
   getDeviceType,
-  getDeviceTypeOnBootloader,
   getDeviceUUID,
-  getPassphraseStateWithRefreshDeviceInfo,
-} from '../utils/deviceFeaturesUtils';
+  getLogger,
+  LoggerNames,
+} from '../utils';
+import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
 
 import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
@@ -25,7 +27,6 @@ import type { Device as DeviceTyped, Features, UnavailableCapabilities } from '.
 import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
-import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 
@@ -133,23 +134,23 @@ export class Device extends EventEmitter {
     if (this.isUnacquired() || !this.features) return null;
 
     const env = DataManager.getSettings('env');
+    const deviceType = getDeviceType(this.features);
+
+    const bleName = getDeviceBleName(this.features);
+    const label = getDeviceLabel(this.features);
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
       connectId: DataManager.isBleConnect(env) ? this.mainId || null : getDeviceUUID(this.features),
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
-      deviceType: this.features.bootloader_mode
-        ? getDeviceTypeOnBootloader(this.features)
-        : getDeviceType(this.features),
+      deviceType,
       /** ID for current seeds, will clear after replace a new seed at device */
       deviceId: this.features.device_id || null,
       path: this.originalDescriptor.path,
-      name:
-        this.features.ble_name ||
-        this.features.label ||
-        `OneKey ${getDeviceType(this.features).toUpperCase()}`,
-      label: getDeviceLabel(this.features),
+      bleName,
+      name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
+      label: label || 'OneKey',
       mode: this.getMode(),
       features: this.features,
       firmwareVersion: this.getFirmwareVersion(),

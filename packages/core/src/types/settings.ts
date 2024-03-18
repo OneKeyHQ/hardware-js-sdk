@@ -62,8 +62,9 @@ export type IBLEFirmwareReleaseInfo = {
   };
 };
 
+type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
 export type DeviceTypeMap = {
-  [k in IDeviceType]: {
+  [k in IKnownDevice]: {
     firmware: IFirmwareReleaseInfo[];
     'firmware-v2'?: IFirmwareReleaseInfo[];
     'firmware-v5'?: IFirmwareReleaseInfo[];

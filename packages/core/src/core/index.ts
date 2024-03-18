@@ -10,16 +10,19 @@ import {
 } from '@onekeyfe/hd-shared';
 import {
   getDeviceFirmwareVersion,
-  getDeviceModel,
-  getDeviceType,
-  supportNewPassphrase,
-} from '../utils/deviceFeaturesUtils';
+  enableLog,
+  getLogger,
+  LoggerNames,
+  setLoggerPostMessage,
+  wait,
+  getMethodVersionRange,
+} from '../utils';
+import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { enableLog, getLogger, LoggerNames, setLoggerPostMessage, wait } from '../utils';
 import {
   CORE_EVENT,
   CoreMessage,
@@ -143,13 +146,10 @@ export const callAPI = async (message: CoreMessage) => {
   try {
     const inner = async (): Promise<void> => {
       // check firmware version
-      const deviceType = getDeviceType(device.features);
-      const deviceModel = getDeviceModel(device.features);
-      const versionRangeType = method.getVersionRange()[deviceType];
-      const versionRangeModel = method.getVersionRange()[deviceModel];
-
-      // Type has a higher priority than Model
-      const versionRange = versionRangeType ?? versionRangeModel;
+      const versionRange = getMethodVersionRange(
+        device.features,
+        type => method.getVersionRange()[type]
+      );
 
       if (device.features) {
         await DataManager.checkAndReloadData();

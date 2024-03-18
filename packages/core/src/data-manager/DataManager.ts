@@ -2,13 +2,13 @@ import axios from 'axios';
 import semver from 'semver';
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
-import { getTimeStamp } from '../utils';
 import {
+  getTimeStamp,
   getDeviceBLEFirmwareVersion,
   getDeviceFirmwareVersion,
   getDeviceType,
   getFirmwareUpdateField,
-} from '../utils/deviceFeaturesUtils';
+} from '../utils';
 
 import type {
   AssetsMap,
@@ -65,6 +65,8 @@ export default class DataManager {
 
   static getFirmwareStatus = (features: Features): IDeviceFirmwareStatus => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return 'unknown';
+
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
     if (features.firmware_present === false) {
       return 'none';
@@ -111,6 +113,7 @@ export default class DataManager {
    */
   static getSysFullResource = (features: Features) => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return undefined;
 
     if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
 
@@ -126,6 +129,7 @@ export default class DataManager {
 
   static getBootloaderResource = (features: Features) => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return undefined;
 
     if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
@@ -140,6 +144,7 @@ export default class DataManager {
 
   static getBootloaderTargetVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
@@ -153,6 +158,7 @@ export default class DataManager {
 
   static getBootloaderRelatedFirmwareVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return undefined;
 
     if (!DeviceModelToTypes.model_mini.includes(deviceType)) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
@@ -169,6 +175,8 @@ export default class DataManager {
 
   static getFirmwareChangelog = (features: Features) => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return [];
+
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
     if (
@@ -189,6 +197,8 @@ export default class DataManager {
 
   static getFirmwareLatestRelease = (features: Features) => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return undefined;
+
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
@@ -210,6 +220,8 @@ export default class DataManager {
 
   static getBLEFirmwareStatus = (features: Features): IDeviceBLEFirmwareStatus => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return 'unknown';
+
     const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
     /** mini has no device ble_ver */
@@ -224,6 +236,8 @@ export default class DataManager {
 
   static getBleFirmwareChangelog = (features: Features) => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return [];
+
     const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
     if (!deviceBLEFirmwareVersion) {
@@ -237,6 +251,8 @@ export default class DataManager {
 
   static getBleFirmwareLatestRelease = (features: Features) => {
     const deviceType = getDeviceType(features);
+    if (deviceType === 'unknown') return undefined;
+
     const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
     return findLatestRelease(targetDeviceConfigList);
   };

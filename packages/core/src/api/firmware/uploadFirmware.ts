@@ -3,14 +3,13 @@ import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Success } from '@onekeyfe/hd-transport';
-import { wait } from '../../utils/index';
+import { wait, getDeviceBootloaderVersion, getDeviceType } from '../../utils';
 import { DEVICE, CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
 import { PROTO } from '../../constants';
 import type { Device } from '../../device/Device';
 import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
-import { KnownDevice } from '../../types';
+import { DeviceModelToTypes, KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
-import { getDeviceBootloaderVersion, getDeviceModel } from '../../utils/deviceFeaturesUtils';
 import { DataManager } from '../../data-manager';
 import { DevicePool } from '../../device/DevicePool';
 
@@ -66,8 +65,8 @@ export const uploadFirmware = async (
   device: Device,
   { payload }: PROTO.FirmwareUpload
 ) => {
-  const deviceModel = getDeviceModel(device.features);
-  if (deviceModel === 'model_mini') {
+  const deviceType = getDeviceType(device.features);
+  if (DeviceModelToTypes.model_mini.includes(deviceType)) {
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
     const eraseCommand = updateType === 'firmware' ? 'FirmwareErase' : 'FirmwareErase_ex';
@@ -89,7 +88,7 @@ export const uploadFirmware = async (
     return message;
   }
 
-  if (deviceModel === 'model_touch') {
+  if (DeviceModelToTypes.model_touch.includes(deviceType)) {
     if (device.features) {
       const bootloaderVersion = getDeviceBootloaderVersion(device.features);
       if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {

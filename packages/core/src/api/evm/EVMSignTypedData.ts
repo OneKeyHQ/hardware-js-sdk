@@ -13,7 +13,7 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../utils/deviceFeaturesUtils';
+import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
 import {
   DeviceModelToTypes,
   type EthereumSignTypedDataMessage,

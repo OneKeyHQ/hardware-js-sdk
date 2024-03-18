@@ -12,11 +12,17 @@ import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
-import { getDeviceType, getDeviceUUID, wait, getLogger, LoggerNames } from '../utils';
+import {
+  getDeviceType,
+  getDeviceUUID,
+  wait,
+  getLogger,
+  LoggerNames,
+  getDeviceFirmwareVersion,
+} from '../utils';
 import { createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
-import { getDeviceFirmwareVersion } from '../utils/deviceFeaturesUtils';
 
 import type { KnownDevice, Features } from '../types';
 

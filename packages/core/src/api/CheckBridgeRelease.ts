@@ -3,8 +3,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
-import { getDeviceType } from '../utils';
-import { getDeviceFirmwareVersion } from '../utils/deviceFeaturesUtils';
+import { getDeviceType, getDeviceFirmwareVersion } from '../utils';
 import { DeviceModelToTypes } from '../types';
 
 const BridgeVersion = '2.2.0';
