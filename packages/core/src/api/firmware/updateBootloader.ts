@@ -1,11 +1,7 @@
 import ByteBuffer from 'bytebuffer';
 import semver from 'semver';
 import { DeviceModelToTypes, Features } from '../../types';
-import { getDeviceType } from '../../utils';
-import {
-  getDeviceBootloaderVersion,
-  getDeviceFirmwareVersion,
-} from '../../utils/deviceFeaturesUtils';
+import { getDeviceType, getDeviceBootloaderVersion, getDeviceFirmwareVersion } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { shouldUpdateBootloaderForClassicAndMini } from './bootloaderHelper';
 
