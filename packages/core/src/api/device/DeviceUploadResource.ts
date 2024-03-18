@@ -9,8 +9,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { hexToBytes } from '../helpers/hexUtils';
 import { createUiMessage, UI_REQUEST } from '../../events';
-import { getDeviceType } from '../../utils';
-import { getDeviceFirmwareVersion } from '../../utils/deviceFeaturesUtils';
+import { getDeviceType, getDeviceFirmwareVersion } from '../../utils';
 import { PROTO } from '../../constants';
 
 export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {

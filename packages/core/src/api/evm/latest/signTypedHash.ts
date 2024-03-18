@@ -2,7 +2,7 @@ import { MessageResponse, TypedCall } from '@onekeyfe/hd-transport';
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Device } from '../../../device/Device';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../../utils/deviceFeaturesUtils';
+import { getDeviceFirmwareVersion, getDeviceType } from '../../../utils';
 
 export const signTypedHash = async ({
   typedCall,
