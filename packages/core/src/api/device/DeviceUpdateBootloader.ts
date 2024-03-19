@@ -4,11 +4,13 @@ import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
 import { updateBootloader } from '../firmware/uploadFirmware';
 import { createUiMessage } from '../../events/ui-request';
-import type { Features, KnownDevice } from '../../types';
+import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { checkBootloaderLength, checkNeedUpdateBootForTouch } from '../firmware/updateBootloader';
-import type { Device } from '../../device/Device';
 import { getDeviceType } from '../../utils';
+
+import type { Device } from '../../device/Device';
+import type { Features, KnownDevice } from '../../types';
 
 export default class DeviceUpdateBootloader extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
@@ -74,7 +76,7 @@ export default class DeviceUpdateBootloader extends BaseMethod {
     const { features } = device;
 
     const deviceType = getDeviceType(features);
-    if (deviceType === 'touch') {
+    if (DeviceModelToTypes.model_touch.includes(deviceType)) {
       return this.updateTouchBootloader(device, features);
     }
 
