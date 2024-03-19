@@ -1,4 +1,4 @@
-import type { IDeviceType } from '../types';
+import { DeviceModelToTypes, DeviceTypeToModels, type IDeviceType } from '../types';
 
 export const getT1Data = () => ({
   default: {
@@ -235,7 +235,24 @@ export const getTouchData = () => ({
 });
 
 export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
-  const data = deviceType === 'touch' ? getTouchData() : getT1Data();
+  let data;
+  switch (deviceType) {
+    case 'classic':
+    case 'classic1s':
+    case 'mini':
+      data = getT1Data();
+      break;
+    case 'touch':
+      data = getTouchData();
+      break;
+    case 'pro':
+      data = {};
+      break;
+    default:
+      // eslint-disable-next-line no-case-declarations
+      const exhaustiveCheck: never = deviceType;
+  }
+
   // @ts-expect-errorpect
   return data[name]?.hex ?? '';
 };
