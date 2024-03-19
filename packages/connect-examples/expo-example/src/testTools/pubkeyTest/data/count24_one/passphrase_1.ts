@@ -4,7 +4,7 @@ import { PubkeyTestCaseData } from '../types';
 export default {
   name: 'one-passphrase24-密语1',
   passphrase: 'asdfg7890',
-  passphraseState: 'msySLzWLsiGnZVfcQCNBeLV4LaTxeoHFZj',
+  passphraseState: 'n4kk9unKaT8HBt5CgnarZLZSMyhk2SrsQE',
   description: '助记词详见 https://onekeyhq.atlassian.net/wiki/spaces/ONEKEY/pages/429162869',
   data: [
     {
@@ -12,15 +12,15 @@ export default {
       result: {
         '0': {
           publicKey:
-            'd0e757aaa95e35226662d2a6b4c4a28f9f75273bd81c379ae25d86f7fa666f94361b94f534cf9828a0e37c0d6e3327bd58217d95c7f82bbbc211fc04de79585c',
+            'd8f950e075473883d94d286ac9f9893275c15baf06498a5d827e4f7ea8ff43300cb0fc2e1511f3f8757075ef3175fd14c3e4782fbc13b2073f4303d24ef77003',
         },
         '10': {
           publicKey:
-            '40871e17a87b82482cd0f17b924ebd7b0426e206b21966b5b4ca16cd43a3ba46c42d82cf55debed67e815d97084bdcaed0306638d8c528eca08c293139a29d3b',
+            'b0a5810b2d7f14b3c198176558fe1234427db1c22538ec475b7dfcde740c3d63bee3321a8013dda4362e6c2bc008ecdae101ea7703d638d98384378202eb640d',
         },
         '2147483647': {
           publicKey:
-            '55ea973252095486f64dd321bc868ab0c3704be28b361cefc925b1f203d602b801e7d069b4b0440445040765bf30135884691946b2c578fb0d90a00852dafd8d',
+            '0b0dccbedfca6250c474baa5e940c7aa9a0f68a16831b1efcdae908924a99d21f5e6263187f1cb9c10a397cae47a79da6339b98318337f09e714c221579e302d',
         },
       },
     },
@@ -28,13 +28,13 @@ export default {
       method: 'aptosGetPublicKey',
       result: {
         '0': {
-          publicKey: 'f68ec768678746a5f0614b35107548445028fef076d4f18ac096c697c9569c6f',
+          publicKey: '16328a77c23f15b22ab5402a6e3d8b9c02d92701560d002f26cc2aede1327e6a',
         },
         '10': {
-          publicKey: '65aab7443571b31b3c39ab09a08c207a57465ef2dfbaa6318c04f2913289887e',
+          publicKey: 'b70b4d599ce93aefd60bdefbf3f7bbd779cb86f6d6a65e0ada9a967952d7f2db',
         },
         '2147483647': {
-          publicKey: '5b3821fa3874d325b093ce8f557a3675d600cd9276e77c7180beb8636498990f',
+          publicKey: 'ad4ce5c1d7c7c4072e68b19858b40757da7764505bbbd7e10d671bfcc94a0422',
         },
       },
     },
@@ -44,21 +44,21 @@ export default {
       result: {
         '0': {
           node: {
-            public_key: '02ad4d8be28fc6f90f2f5cfa5b64a44116bfac0e0fa8d9edf74471884d5dfa1bbc',
+            public_key: '03d03ced3231541169979861dab50010419d2ba6ea6d8963b2a63271e27126a840',
           },
-          xpub: 'xpub6Gr3B5snEXeTdpoLg1wxfZVRuRq8EUDtdAZ8TXFSJjvXyWcM8TBsANVruxr6Yxig7mmhn5o5AaNpZkf9iH2ZhKMLAn2EJQL1pMXxp5ht8jw',
+          xpub: 'xpub6FZKzFURDCbNYTtoZLddLh6wQaBYU8u7D3imHEZnJFnbjGzBMVRmT6qu4ehmf7EAhaJV6Matk7wbbchsUFeku1s2b2HdiEQtZkFfBjvBhpF',
         },
         '10': {
           node: {
-            public_key: '038c0425d654f4b91a97aae7e702ae4685eee2684b4a8211526bc04f593279068e',
+            public_key: '02abd39b3194e922afb04348bd35d01bb1d02b3a132549ff306b95cd8f7b823255',
           },
-          xpub: 'xpub6Gr3B5snEXeU5Qm83GpMSomEigizcE9hdj829rZebpHr6XMLZPBs2N68zyWN66PGdqjjZsGkHnzwZ7dv9hkf1WCvEQxu4rzkkLW69B4h2vz',
+          xpub: 'xpub6FZKzFURDCbNxdarq69M82E61megqog7nESumNj3WLiokMcwdfnMjF9JpEEp9P2pNs48bMycqK4Fw6dbrq9e4M4SabhvdUtPMUajZa8Rk88',
         },
         '2147483647': {
           node: {
-            public_key: '02d6aa582fa44e960eceea6cac2b4754040d2040f34f1ededbf788b53a71ab8150',
+            public_key: '02a685a726b50bb28dbb979177c1ffe237754656f884d26563c544a575d6ecfc58',
           },
-          xpub: 'xpub6Gr3B5svaCBRksW6tRKMb4Su7HS7VaDkJqZkQexSy8MpsEzidkRVdC8tkDVe1ATw7tzSL7NL6ZK9rWEhK9hhYx2sRkzKDTBbBjdczsCSeKc',
+          xpub: 'xpub6FZKzFUZYs8LgATP6WsJXWGUvNyZpEP2tbTK2S4mpKBD74hCyiVMfaQZXpLsrmwLeyr1HTqASraWy4DJzF5pocGD7K2NJBn1gJ6vvNa2mm8',
         },
       },
     },
@@ -72,21 +72,21 @@ export default {
       result: {
         '0': {
           node: {
-            public_key: '021f1a063ab5e34f842b46dedc0248704447f95d5b79be61e204eb996d0167b573',
+            public_key: '030b8dd210e5a593228a2b333f8c3fb67528fec63b3f26a038ca389a3b820c84b3',
           },
-          xpub: 'xpub6CwnaJC89YFntKwA9JQ9d2v3CyZaHQjhu7wNqwC8PvsSZ2GFCuqtYEWXYdVdgUNZTWkYpEE1cu2tAgDsUirus1WYW9hZaZRiqTSGuimr3fp',
+          xpub: 'xpub6DAR1Vpbvfv4NXmpMGUznPLDKuiwqW94HTdhwvLFX4QpvRmPurCJeumXETf3hq1PfaA1ppf3KfdBYP1ftBe1BEyPjukJ2HUbFj1fyFxfuTn',
         },
         '10': {
           node: {
-            public_key: '03c55a12f04e1fdb126fe6be93858ead8093a74b97a34766d492510f047129a835',
+            public_key: '0388c4e37ba18a561cff2ccb727be3f79a6e40f00739a35fcb8356fe37bc1bd9b8',
           },
-          xpub: 'xpub6CwnaJC89YFoLumfwTX4ecCDcB3DsFodEodjneJbYtWW7ov2JS4Rxy6nkyi7H1LuozuEfXXAmFZ8AbxH8VSDoak53CkyguiHA8BhS4SyC8D',
+          xpub: 'xpub6DAR1Vpbvfv4p2PuqaKUxLBR9qtVKse8Y8go2DaZneHzUvrPCogAEsXbbtKDZK6g4vmk4fskcEcm396KmqXhW5vYT8HdkUiTTnQ8b5Vgus5',
         },
         '2147483647': {
           node: {
-            public_key: '0222fb4b5fad3dba95a0adceae87f5ef732c60872656b71d7d639c1684766b11a4',
+            public_key: '027924c43d45b9c38c4bed90ee9a44a705131ecb5ebc90d4d35dd1784ab4c63853',
           },
-          xpub: 'xpub6CwnaJCGVCnm2UyTsFizApwFTE7nXBYakc9E8h74Kk4H3DpJjhnyZRHMnuHptSKenBRN2bGfiHiES85XytygWc2pzzQLFz8GQw9cy7bwtJL',
+          xpub: 'xpub6DAR1VpkGLT2WBXjweAqkTFnF8yPPVewtC3S3LwL4V7mZkMU88Afd76AE7CK3pEmb2ETmHMZFraag32gvfE9THYh9FgvHQRqKNVaYHgfMWm',
         },
       },
     },
@@ -94,13 +94,13 @@ export default {
       method: 'cosmosGetPublicKey',
       result: {
         '0': {
-          publicKey: '028a92a9ceb7620faa58d5e89b7279999a8811077d674813adefae555f8366a71d',
+          publicKey: '02d3665af442be1c832838612f435f9606c8fe61962867c7dbcbee584ed864276d',
         },
         '10': {
-          publicKey: '02d820ce729e264d112ea743a77243b7f81161e74a786619b86117cc348f6d36a5',
+          publicKey: '023fa118cd37d13b45f7e06838847eaaddcb133d5565329ea72b30763a8ba43f95',
         },
         '2147483647': {
-          publicKey: '028773c8908a3d62097643a81ef651cccef7d9cb70da914f19b3d04b112e7fcd42',
+          publicKey: '02fe75db5eebc2dc655514b75fff9149a7221f6acd313227a07f9220607475fd02',
         },
       },
     },
@@ -112,16 +112,16 @@ export default {
       },
       result: {
         '0': {
-          xpub: 'xpub6CJodMWk1rSjR2a4qVG3bLz5RPeMMr3F48xefM2nDrrkkv3H3dvphrN53BFn43xQQhVwXs9MgwQ7wJHCkxpjyVR1gSNid4khukeGJfJqT77',
-          publicKey: '03a0f1c16212529db1b79f7743085207911128e4340370382c05c91281ddeceb58',
+          xpub: 'xpub6CxQt11HqqGMotT83MVLS6Rppgq6ZRsQUHWsZ9C3obCkU7MHiiqUnJdT74EMv7ZSDuXg9dMuNPJgowsHfcYAg9Ag9o53b3D6q9ySU4RyryF',
+          publicKey: '03b77ad8974356e616123ab8ef240ce1d244ccfc132a9432183f778c6736d90296',
         },
         '10': {
-          xpub: 'xpub6CJodMWk1rSjrBtbJdR2cWuTwUFaKFWTLnXQEWZ8PRTJ5yjNyzUobC51XT75uzJxby2VtoJHgzSHDyLBpFVpaeNNjrNpepzbeQ4DtGF9hyC',
-          publicKey: '0222753a3a3243723a2b2c1ed76c3410bb4445ba5a3e1aa2e399bfa2083d0639ad',
+          xpub: 'xpub6CxQt11HqqGNDdGgD3UbwtEkzt537wLdib8p2qMeRpZuzDpg1MHYUncUGbMCfGMXcuPTGnj3pf3a1vjAfzoieRnUVZYC7AyKwB22tat9mFp',
+          publicKey: '03d5b3ab7b3739b6840238b3a994e04127cd6afa646e703a2af293b44744099bac',
         },
         '2147483647': {
-          xpub: 'xpub6CJodMWtMWyhYPhoQ962VzkyNWTp3bjWfCGV1xYiaBkXSw1cobtLkruHYgWp8tgVRKcnZ8ZAZHWug52Jzx2stmpuW79oLe5hBjmVcG9rzqM',
-          publicKey: '03b4ed7ccae3c7148e40835576c923601925114ffa41b92713fc91f02ebafbecac',
+          xpub: 'xpub6CxQt11SBVoKwKEyb1muRBH23oFrRbhMkqrhataSHQXK5A8DCVyaGDXR3sTcXhWFsEeqk58CJenjEuSYPiGHNLLTNj8cgCcjTGuD448UgJL',
+          publicKey: '03c263c44b16f482f09eee27055764b2d692439fca9b3f7f6be9e7d0e1dd85fe8b',
         },
       },
     },
@@ -130,16 +130,16 @@ export default {
       name: 'evmGetPublicKey-pubkey',
       result: {
         '0': {
-          xpub: 'xpub6HG1Jb9bmPhV7e25YfHpGbABYqHwxqXRZKZqnGJ45R9LBgmEU3VpNcfbZepWcz4u63QkQ9xH6jf2gTFN5uLxE56aMZpKy7Tp5eEeMpD1vZL',
-          publicKey: '029ecfc2cfdd1f675f2b682c8399277909b95027ccde9e89559e4a7214eb85f918',
+          xpub: 'xpub6FoVGu5AGoctTiKfC5WfY5XSW6sAoueCCC8mEPbaQPkjmo4imQZcnjR6jtPqmYJHdcYqpTMTXAxkJPRHC3vVFjZ2v6pEZJUysoHH3FjRYJt',
+          publicKey: '034ca842d84d9b8228e679c2fb8842778c736e7cd2001790b2772ed7c12e623188',
         },
         '10': {
-          xpub: 'xpub6HG1Jb9bmPhVZREZ8jssxWYpAqNhkYgBjdiWgNzv5Tf7FxkknarRa9qvm1ZskAkSratDjNeftYzdRDcYqJEqyiYtnBMHJ1bfEuJpN4eVT5H',
-          publicKey: '036d3ef8d5ebf2729e839649d8449c84f09e6665c31c3d778d14f2351ff0790311',
+          xpub: 'xpub6FoVGu5AGoctuJjgtssxZNfL2Z7pXygdrsnugrHMXF26Uu4SR4g7DuHyCUVkYMexxrXc7RpXDs9Do1mYnRFtJg39BUxJmetYra3BEndRZVk',
+          publicKey: '026fa312953551564cfa5133413e61fcbee6d4028367b9bee886ab9c469ce6278a',
         },
         '2147483647': {
-          xpub: 'xpub6HG1Jb9k74ETHJE9r2HgWUrxz36FhQhKCv4CddUXuNPqMwd65yREyqVjSazX32SxeJnDbCyXoXWDTd6mnki7x4gQhtGTZ7GsfXJD2bFvx2P',
-          publicKey: '0360c6c7efb3dd4a96226bb03b556bf272165c5c06dcf50a6f05b717b2b75e30e9',
+          xpub: 'xpub6FoVGu5JcU9rb55XmFXVpUXrPR9gTBPhmSLoUe7FSCuGrRmq1udA8WCLLQisFc4egNg1xRENSPt3dQ922SeMJWLD8Mora3Xhivoan6T2x29',
+          publicKey: '0205b1d4af2e2a22b6db88847a54851f1dcf384d1bd120cf5daa8c356a8b824f0b',
         },
       },
     },
@@ -147,16 +147,16 @@ export default {
       method: 'nostrGetPublicKey',
       result: {
         '0': {
-          npub: 'npub1hc2cgmyudrvh38ds3chtcpwwh98s9ezp2aw4fsmcu2j2kgkr3xxsfw0k7y',
-          publickey: 'be15846c9c68d9789db08e2ebc05ceb94f02e441575d54c378e2a4ab22c3898d',
+          npub: 'npub1dwh20lwmhmy3np3w0e4nn4mw8szgdkzl3pwfcf8tx7vera4mqceq37funy',
+          publickey: '6baea7fddbbec919862e7e6b39d76e3c0486d85f885c9c24eb379991f6bb0632',
         },
         '10': {
-          npub: 'npub10ctpcnlcwve8m4kauv5lk5862unnh7qh7f6sm76ljerhecqylnysplutr0',
-          publickey: '7e161c4ff873327dd6dde329fb50fa57273bf817f2750dfb5f96477ce004fcc9',
+          npub: 'npub1t3wy2lmn2jkjkquhcu0puftdyfqgs2h3gq0fu797ccjv75dewp5spn9vwz',
+          publickey: '5c5c457f7354ad2b0397c71e1e256d2240882af1401e9e78bec624cf51b97069',
         },
         '2147483647': {
-          npub: 'npub1anerpzn75ggk3cth3dq2vnrngxpz6turumt7rt2nfwaqlr92y5gqpejchk',
-          publickey: 'ecf2308a7ea21168e1778b40a64c7341822d2f83e6d7e1ad534bba0f8caa2510',
+          npub: 'npub1yvvcnkpn2kasqw3a4wwh39fuhfajga8ctujseajc4443gphj5kss5g8n0q',
+          publickey: '231989d83355bb003a3dab9d78953cba7b2474f85f250cf658ad6b1406f2a5a1',
         },
       },
     },
@@ -164,13 +164,13 @@ export default {
       method: 'polkadotGetAddress',
       result: {
         '0': {
-          publicKey: '0xe4cf40c3d87e515da14c1127513ab445c1533cc1534c0f28b29bb7593c8eb218',
+          publicKey: '0xec2a90e9227af944fd084467d8e6d8015750e3d587f28ee57db0a916c194954b',
         },
         '10': {
-          publicKey: '0x45c618a0fa1bc8907d108d7bff8748fd34420f04441a440321e854a8c2b37780',
+          publicKey: '0x95c7fe291c22534a650d6964ea4cd1a0847805f598905759f98f7fe6a040eaaa',
         },
         '2147483647': {
-          publicKey: '0x47d503dfaebff2c485d2b3d761ed19ae390a81a03207b8a810b81e35c639d96c',
+          publicKey: '0xe498fe1ee3034092740afbaaadb50105e98f17e925beee53a8ef06246dbbe7e1',
         },
       },
     },
@@ -178,13 +178,13 @@ export default {
       method: 'xrpGetAddress',
       result: {
         '0': {
-          publicKey: '030751e54e2b1294af35cb130bf67fd97b533fbd8e7f17bf80da679ec4f4b6b106',
+          publicKey: '02f686a75b19559cf06324cf4d66016acfbfa3b7d108e837c18948e78257bd4950',
         },
         '10': {
-          publicKey: '037c53d73fd05e44e288a74cb3d5e43ff07ea91ef4f89400d1f3de1eb1030e2fb5',
+          publicKey: '034f0a049e4126264694fc46de2b0a01b5590b3313af08476657603e1d56688332',
         },
         '2147483647': {
-          publicKey: '02b48990bf8f6bf5fc16b665bcd423de1eeb1333eb90cad5bdc4ffb88a10a567d4',
+          publicKey: '02a53c12fd42b188ae95610cda1313b8d5902422f4641e742f88e3d10bc99e1bb9',
         },
       },
     },
@@ -192,13 +192,13 @@ export default {
       method: 'suiGetPublicKey',
       result: {
         '0': {
-          publicKey: '94ab3d6a64d6d432697c622726409152cffc0da6460d34ceb3ac56b3ebb73ca1',
+          publicKey: '789b942372ae3c6357f05816a14ac802c503361fdcfc6e14b3b3c196ad2f9b6e',
         },
         '10': {
-          publicKey: '298deb405e3158ee35b88c4a3888e14e69af26d748cfd90f92bbaa17751cac82',
+          publicKey: 'becb190dd9dff9e1e845eafd59eebc9176918ded931970fc7a996c0dd127085b',
         },
         '2147483647': {
-          publicKey: 'ce44c30c73e7aaa1d24bcf23c5d43eb43b6356ab61e1b4cf385d8a5d1c3eb601',
+          publicKey: '18afe85dda33baa6f96bb202a03cabcf2b9d968bf2d9647cf119b4667ef195d6',
         },
       },
     },
