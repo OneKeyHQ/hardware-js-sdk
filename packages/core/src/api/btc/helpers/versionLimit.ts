@@ -1,6 +1,6 @@
-function doesCoinExistByParams(coinName: string, params: (string | undefined)[]) {
-  for (let i = 0; i < params.length; i++) {
-    const coin_name = params[i];
+function isCoinNameInList(coinName: string, coinNames: (string | undefined)[]) {
+  for (let i = 0; i < coinNames.length; i++) {
+    const coin_name = coinNames[i];
     if (coin_name?.toLowerCase() === coinName?.toLowerCase()) {
       return true;
     }
@@ -9,7 +9,7 @@ function doesCoinExistByParams(coinName: string, params: (string | undefined)[])
 }
 
 export function getBitcoinForkVersionRange(params: (string | undefined)[]) {
-  if (doesCoinExistByParams('Neurai', params)) {
+  if (isCoinNameInList('Neurai', params)) {
     return {
       model_mini: {
         min: '3.7.0',
