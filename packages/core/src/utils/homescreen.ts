@@ -1,6 +1,8 @@
-import { DeviceModelToTypes, DeviceTypeToModels, type IDeviceType } from '../types';
+import type { IDeviceType } from '../types';
 
-export const getT1Data = () => ({
+type IScreenData = { name: string; hex: string };
+
+export const getT1Data = (): Record<string, IScreenData> => ({
   default: {
     name: 'default',
     hex: '',
@@ -215,7 +217,7 @@ export const getT1Data = () => ({
   },
 });
 
-export const getTouchData = () => ({
+export const getTouchData = (): Record<string, IScreenData> => ({
   'wallpaper-1': {
     name: 'wallpaper-1',
     hex: '77616c6c70617065722d312e706e67',
@@ -235,7 +237,7 @@ export const getTouchData = () => ({
 });
 
 export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
-  let data;
+  let data: Record<string, IScreenData>;
   switch (deviceType) {
     case 'classic':
     case 'classic1s':
@@ -249,10 +251,8 @@ export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
       data = {};
       break;
     default:
-      // eslint-disable-next-line no-case-declarations
-      const exhaustiveCheck: never = deviceType;
+      data = {};
   }
 
-  // @ts-expect-errorpect
   return data[name]?.hex ?? '';
 };
