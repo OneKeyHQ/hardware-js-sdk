@@ -1,4 +1,4 @@
-name: release-web
+name: deploy-release-iframe-web
 
 on: workflow_dispatch
 
