@@ -32,6 +32,11 @@ export const baseParams = {
     coin: 'btc',
     showOnOneKey: false,
   },
+  nervosGetAddress: {
+    path: `m/44'/309'/${INDEX_MARK}'/${CHANGE_MARK}/${ADDRESS_INDEX_MARK}`,
+    network: 'ckb',
+    showOnOneKey: false,
+  },
   confluxGetAddress: {
     path: `m/44'/503'/0'/0/${INDEX_MARK}`,
     chainId: 1029,

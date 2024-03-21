@@ -171,6 +171,35 @@ export default {
       },
     },
     {
+      method: 'btcGetAddress',
+      name: 'btcGetAddress-Neurai',
+      params: {
+        path: "m/44'/1900'/$$INDEX$$'/0/0",
+        coin: 'neurai',
+      },
+      expectedAddress: {
+        "0": "NiEcwV1mKc6m85GNkbNPQwuKUDeD8AX4BC",
+        "1": "NVq17Fw57FBk1cRswacYYWhfUrVQrnwGEK",
+        "30": "Nj5BTNtbsXeVSndp8W5McxARcSDgpxtnBo",
+        "2147483646": "NdL3KeeYWLRXjD2YKt4FLmCDY3Adzoo1S5",
+        "2147483647": "NPQ1pDhqCQMraBaVexkyjpHnbkCuYS3waY"
+      },
+    },
+    {
+      method: 'nervosGetAddress',
+      name: 'nervosGetAddress',
+      params: {
+        path: "m/44'/309'/$$INDEX$$'/0/0",
+      },
+      expectedAddress: {
+        "0": "ckb1qyq0vzpf3puv6pawc48gvk24p2ez0gsynn5qxq4lek",
+        "1": "ckb1qyqvx4tyzy5mrhnes4ncgaekmf45lv86mvps9zffx3",
+        "30": "ckb1qyqpmtfauq7ya8tcs98xldym3xz42xynw4tqy6h9f3",
+        "2147483646": "ckb1qyqfrn3zwvx4hxc7gmk909cq8dtwgx2d4r9syu2se5",
+        "2147483647": "ckb1qyqzyj8s9zwp0yrzmnenh2hdhtk556syt8uq8yt7z2"
+      },
+    },
+    {
       method: 'confluxGetAddress',
       expectedAddress: {
         '0': 'cfx:aam6hz637w2xws8f9vfgjv3ycd2w8gt8pe3p01abcm',
@@ -443,6 +472,21 @@ export default {
         '30': 'j4Sni6BPRwVcxEo7VwqtENeHibfy2breZ3xyKbKnqUbrBWgik',
         '2147483646': 'j4RTnVtdA1ew8Q24ia4s41ux8tDwfxGLjJmEfewQwmSwYCEJt',
         '2147483647': 'j4SPTW3Ds7FwA6dBddtNooFKCHZR183YuLnYJxT7sc9DsSPjh',
+      },
+    },
+    {
+      method: 'polkadotGetAddress',
+      name: 'polkadotGetAddress-manta',
+      params: {
+        prefix: '77',
+        network: 'manta',
+      },
+      expectedAddress: {
+        "0": "dfXn6CS6puMD78C4D8W3HNvzsgHwuH1HPZSn66WdWF4nXRsVA",
+        "1": "dfXn2NUKzdMai34qsSTupvab7UZgGbVJKhXQVuRtDoTmiqjDq",
+        "30": "dfY27UyT4h6scSiSjaD5kCgH7p1WtV82HWHfaDrxdT592wUvz",
+        "2147483646": "dfWhBtggnmGBnbwPxCS4ZqwwY6ZVXqXiTm5vvHUajjvEPd3U8",
+        "2147483647": "dfXcrtqHVrsBpJYWsGFaKdHJbVtxs1Jvdo7EZazHfacWisE2G"
       },
     },
     {
