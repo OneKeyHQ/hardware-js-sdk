@@ -5686,15 +5686,15 @@
           "type": "bytes",
           "id": 605
         },
-        "onekey_se01_version": {
+        "onekey_se_version": {
           "type": "string",
           "id": 606
         },
-        "onekey_se01_hash": {
+        "onekey_se_hash": {
           "type": "bytes",
           "id": 607
         },
-        "onekey_se01_build_id": {
+        "onekey_se_build_id": {
           "type": "string",
           "id": 608
         },
@@ -5733,110 +5733,6 @@
         "onekey_ble_hash": {
           "type": "bytes",
           "id": 617
-        },
-        "onekey_board_build_id": {
-          "type": "string",
-          "id": 618
-        },
-        "onekey_se01_boot_version": {
-          "type": "string",
-          "id": 619
-        },
-        "onekey_se01_boot_hash": {
-          "type": "bytes",
-          "id": 620
-        },
-        "onekey_se01_boot_build_id": {
-          "type": "string",
-          "id": 621
-        },
-        "onekey_se02_version": {
-          "type": "string",
-          "id": 622
-        },
-        "onekey_se02_hash": {
-          "type": "bytes",
-          "id": 623
-        },
-        "onekey_se02_build_id": {
-          "type": "string",
-          "id": 624
-        },
-        "onekey_se02_boot_version": {
-          "type": "string",
-          "id": 625
-        },
-        "onekey_se02_boot_hash": {
-          "type": "bytes",
-          "id": 626
-        },
-        "onekey_se02_boot_build_id": {
-          "type": "string",
-          "id": 627
-        },
-        "onekey_se03_version": {
-          "type": "string",
-          "id": 628
-        },
-        "onekey_se03_hash": {
-          "type": "bytes",
-          "id": 629
-        },
-        "onekey_se03_build_id": {
-          "type": "string",
-          "id": 630
-        },
-        "onekey_se03_boot_version": {
-          "type": "string",
-          "id": 631
-        },
-        "onekey_se03_boot_hash": {
-          "type": "bytes",
-          "id": 632
-        },
-        "onekey_se03_boot_build_id": {
-          "type": "string",
-          "id": 633
-        },
-        "onekey_se04_version": {
-          "type": "string",
-          "id": 634
-        },
-        "onekey_se04_hash": {
-          "type": "bytes",
-          "id": 635
-        },
-        "onekey_se04_build_id": {
-          "type": "string",
-          "id": 636
-        },
-        "onekey_se04_boot_version": {
-          "type": "string",
-          "id": 637
-        },
-        "onekey_se04_boot_hash": {
-          "type": "bytes",
-          "id": 638
-        },
-        "onekey_se04_boot_build_id": {
-          "type": "string",
-          "id": 639
-        },
-        "onekey_se01_state": {
-          "type": "OneKeySEState",
-          "id": 640
-        },
-        "onekey_se02_state": {
-          "type": "OneKeySEState",
-          "id": 641
-        },
-        "onekey_se03_state": {
-          "type": "OneKeySEState",
-          "id": 642
-        },
-        "onekey_se04_state": {
-          "type": "OneKeySEState",
-          "id": 643
         }
       },
       "nested": {
@@ -5877,12 +5773,6 @@
           "values": {
             "THD89": 0,
             "SE608A": 1
-          }
-        },
-        "OneKeySEState": {
-          "values": {
-            "BOOT": 0,
-            "APP": 1
           }
         }
       }
