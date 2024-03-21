@@ -178,11 +178,11 @@ export default {
         coin: 'neurai',
       },
       expectedAddress: {
-        "0": "NQF62hGiPCBYaFoNH1AHKQahUiNiPTb6wN",
-        "1": "NaVRMpCZVxZ5TdTHYoA1Wgh3fGpfhSgCc9",
-        "50": "NX4x4SnQvXKLfF7Qu5488Y5GJkGsCVxFND",
-        "2147483646": "NNXzakhm2JtQyFhXpVF9d8AQU62ARoj95a",
-        "2147483647": "Nh6jP7fvfLweyhaoLpe4GRRM6omzbkTWh9"
+        '0': 'NQF62hGiPCBYaFoNH1AHKQahUiNiPTb6wN',
+        '1': 'NaVRMpCZVxZ5TdTHYoA1Wgh3fGpfhSgCc9',
+        '50': 'NX4x4SnQvXKLfF7Qu5488Y5GJkGsCVxFND',
+        '2147483646': 'NNXzakhm2JtQyFhXpVF9d8AQU62ARoj95a',
+        '2147483647': 'Nh6jP7fvfLweyhaoLpe4GRRM6omzbkTWh9',
       },
     },
     {
@@ -192,11 +192,11 @@ export default {
         path: "m/44'/309'/$$INDEX$$'/0/0",
       },
       expectedAddress: {
-        "0": "ckb1qyqqwz4jmvrdfemjc97r6tzayjha6hxewmks2t2rgf",
-        "1": "ckb1qyqpdkrgtej3qaumqnjx6f972v6tr87lj5vsdsufv0",
-        "50": "ckb1qyqrz6xrfmcjx6crmpcdhg7rgesmuuut6slsrwj7dx",
-        "2147483646": "ckb1qyqg59jdaq8ktmq78nyyay2k405skukkts3shgg0wc",
-        "2147483647": "ckb1qyq2j8dhu3w4n63vp6uwgnj8ku09rd2peyeqw953pj"
+        '0': 'ckb1qyqqwz4jmvrdfemjc97r6tzayjha6hxewmks2t2rgf',
+        '1': 'ckb1qyqpdkrgtej3qaumqnjx6f972v6tr87lj5vsdsufv0',
+        '50': 'ckb1qyqrz6xrfmcjx6crmpcdhg7rgesmuuut6slsrwj7dx',
+        '2147483646': 'ckb1qyqg59jdaq8ktmq78nyyay2k405skukkts3shgg0wc',
+        '2147483647': 'ckb1qyq2j8dhu3w4n63vp6uwgnj8ku09rd2peyeqw953pj',
       },
     },
     {
@@ -482,11 +482,11 @@ export default {
         network: 'manta',
       },
       expectedAddress: {
-        "0": "dfZ6fCAUm2ae952gcpqcCS7934K1RgxGSJh3aeEdFSzQxzng6",
-        "1": "dfc12cz8QABxWzohaLEp9GudtzrZsHqonPZbyvjo3pkoCZcZL",
-        "50": "dfXzHvhWhnEEwMf86VVFCx3BA1ZYTUJPreaGn7KzHo4kXmm4b",
-        "2147483646": "dfYt8cfWw3XzmqfimVhq1qJ8MD5YqG31HBSQisQvV1LfKFGNS",
-        "2147483647": "dfXUGVeYqWNaTYCv1Zp1Ka3PsqZyXpYxJe2zyoBWZKWPLx8Th"
+        '0': 'dfZ6fCAUm2ae952gcpqcCS7934K1RgxGSJh3aeEdFSzQxzng6',
+        '1': 'dfc12cz8QABxWzohaLEp9GudtzrZsHqonPZbyvjo3pkoCZcZL',
+        '50': 'dfXzHvhWhnEEwMf86VVFCx3BA1ZYTUJPreaGn7KzHo4kXmm4b',
+        '2147483646': 'dfYt8cfWw3XzmqfimVhq1qJ8MD5YqG31HBSQisQvV1LfKFGNS',
+        '2147483647': 'dfXUGVeYqWNaTYCv1Zp1Ka3PsqZyXpYxJe2zyoBWZKWPLx8Th',
       },
     },
     {

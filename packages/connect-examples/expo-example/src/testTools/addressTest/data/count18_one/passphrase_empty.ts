@@ -20,7 +20,6 @@ export default {
           'addr1q9ph66lsff6mhu73c22lnpl7qmx3f7z5l5nesu85z9jdvkf5e65lskad87286k9e0ee4sfvpl4dwcykkm45724e7wluq7tdkps',
       },
     },
-
     {
       method: 'algoGetAddress',
       expectedAddress: {
@@ -180,11 +179,11 @@ export default {
         coin: 'neurai',
       },
       expectedAddress: {
-        "0": "NSwx3Pq8qsQddHro2ANFJvjAWbC9X8Q3Y2",
-        "1": "NWCzbazbKRZMZZZDLJA2GpqLY5vtVnhxKq",
-        "25": "NMqC8Xbz24nLg5VMs214yX6WmepfbzboQA",
-        "2147483646": "NikpCMpe8kX77dVDzZPx9g2qFSGTJYW9fY",
-        "2147483647": "Nb4E3bi3e7mJRQRMQHZSBhTjq8FQZRf8KR"
+        '0': 'NSwx3Pq8qsQddHro2ANFJvjAWbC9X8Q3Y2',
+        '1': 'NWCzbazbKRZMZZZDLJA2GpqLY5vtVnhxKq',
+        '25': 'NMqC8Xbz24nLg5VMs214yX6WmepfbzboQA',
+        '2147483646': 'NikpCMpe8kX77dVDzZPx9g2qFSGTJYW9fY',
+        '2147483647': 'Nb4E3bi3e7mJRQRMQHZSBhTjq8FQZRf8KR',
       },
     },
     {
@@ -194,11 +193,11 @@ export default {
         path: "m/44'/309'/$$INDEX$$'/0/0",
       },
       expectedAddress: {
-        "0": "ckb1qyqynt6p6dd68v85n8tah4arrlh5wwhj034s6faunl",
-        "1": "ckb1qyqgt6vvf68mzjrzz9ngyd6uk3yuu8ejheas4v7qqx",
-        "25": "ckb1qyq2lcce9qra3lvrwg3c0vnj6qyurh7j3ugq8uh3lu",
-        "2147483646": "ckb1qyq99ya3q2j2n0sazmhmurd29nd7zhpmdueq2jvrt2",
-        "2147483647": "ckb1qyq0r66dwx4rfhgnm0hyg44slr23ws90dcnsjf4wcv"
+        '0': 'ckb1qyqynt6p6dd68v85n8tah4arrlh5wwhj034s6faunl',
+        '1': 'ckb1qyqgt6vvf68mzjrzz9ngyd6uk3yuu8ejheas4v7qqx',
+        '25': 'ckb1qyq2lcce9qra3lvrwg3c0vnj6qyurh7j3ugq8uh3lu',
+        '2147483646': 'ckb1qyq99ya3q2j2n0sazmhmurd29nd7zhpmdueq2jvrt2',
+        '2147483647': 'ckb1qyq0r66dwx4rfhgnm0hyg44slr23ws90dcnsjf4wcv',
       },
     },
     {
@@ -484,11 +483,11 @@ export default {
         network: 'manta',
       },
       expectedAddress: {
-        "0": "dfack3eCDagQastz63dp9JhgZ5f9ZQgPQdfyMFeq8QCQQEXNj",
-        "1": "dfX512sPuAAzp2gbgz4TP1uDYmns4uPjYZ3CDdCdFti8PJP5c",
-        "25": "dfWssT8Yq1zGf7TDL2DE7auMCvQzRZagkjagZhfbfSP5bR6Cm",
-        "2147483646": "dfbv7toUMfkyBG8K44HWPiuurL3E5Zf3jxYpw53imsQw56LHn",
-        "2147483647": "dfZHkVyc74tYQ7iUjdXydgpFVYfjGnNXyivwW1qGQg2hg2LzL"
+        '0': 'dfack3eCDagQastz63dp9JhgZ5f9ZQgPQdfyMFeq8QCQQEXNj',
+        '1': 'dfX512sPuAAzp2gbgz4TP1uDYmns4uPjYZ3CDdCdFti8PJP5c',
+        '25': 'dfWssT8Yq1zGf7TDL2DE7auMCvQzRZagkjagZhfbfSP5bR6Cm',
+        '2147483646': 'dfbv7toUMfkyBG8K44HWPiuurL3E5Zf3jxYpw53imsQw56LHn',
+        '2147483647': 'dfZHkVyc74tYQ7iUjdXydgpFVYfjGnNXyivwW1qGQg2hg2LzL',
       },
     },
     {

@@ -179,11 +179,11 @@ export default {
         coin: 'neurai',
       },
       expectedAddress: {
-        "0": "NYSTb357abjPDH3VRbnFgNdgQWM6hH4o6V",
-        "1": "NcdKnVssdxjUxXz6ZWUGEMQgccNFXzobn7",
-        "21234567": "NUEdJhWW3Jy2ez3D8eT2hMzrC26sfABYq4",
-        "2147483646": "NUrEoTqeHV18zF7ucNE3bF4FWsLy3K8RJ5",
-        "2147483647": "NSxaB5Xn9Tj96sntfDiS4TPZVeBucvVtwG"
+        '0': 'NYSTb357abjPDH3VRbnFgNdgQWM6hH4o6V',
+        '1': 'NcdKnVssdxjUxXz6ZWUGEMQgccNFXzobn7',
+        '21234567': 'NUEdJhWW3Jy2ez3D8eT2hMzrC26sfABYq4',
+        '2147483646': 'NUrEoTqeHV18zF7ucNE3bF4FWsLy3K8RJ5',
+        '2147483647': 'NSxaB5Xn9Tj96sntfDiS4TPZVeBucvVtwG',
       },
     },
     {
@@ -193,11 +193,11 @@ export default {
         path: "m/44'/309'/$$INDEX$$'/0/0",
       },
       expectedAddress: {
-        "0": "ckb1qyq2ev90yy5kumqjswy0ppe5xxtyjdw8ugus3cy75w",
-        "1": "ckb1qyqg4rygdk065n9x3h684fgn99q7h7z7v2cqzj0d9z",
-        "21234567": "ckb1qyq0gd5jl42hqjza6j7mk2qe69scqcc8v2yq2z07a0",
-        "2147483646": "ckb1qyq8nfqpfwjpmucn87q05js6akqwtynhy5xsrzjqsr",
-        "2147483647": "ckb1qyq9dfxz28zhdkmxhu5xtudx2fqg3se99chssptx94"
+        '0': 'ckb1qyq2ev90yy5kumqjswy0ppe5xxtyjdw8ugus3cy75w',
+        '1': 'ckb1qyqg4rygdk065n9x3h684fgn99q7h7z7v2cqzj0d9z',
+        '21234567': 'ckb1qyq0gd5jl42hqjza6j7mk2qe69scqcc8v2yq2z07a0',
+        '2147483646': 'ckb1qyq8nfqpfwjpmucn87q05js6akqwtynhy5xsrzjqsr',
+        '2147483647': 'ckb1qyq9dfxz28zhdkmxhu5xtudx2fqg3se99chssptx94',
       },
     },
     {
@@ -483,11 +483,11 @@ export default {
         network: 'manta',
       },
       expectedAddress: {
-        "0": "dfWehpHqh8oxzAhgYqaug1jL645tqmv72px2Y1iKuASBA4Jm7",
-        "1": "dfYRKLiQbEVidWRvcVmeXnTnLcEmwtkhfvPXdbP4vqAiK4b6X",
-        "21234567": "dfa2KCViJECu8bqzoDueJyc1gMvLrCGP8p759YpHyb3F7a2ex",
-        "2147483646": "dfZfUTzDt4VhbykTdBnEmj3ew4KCK2AdkWjbZxn9gyEhpWD6y",
-        "2147483647": "dfY6mMNbqZF66KmacTFnGPxc95DjbEoprG36EzAD6rCZRBBMe"
+        '0': 'dfWehpHqh8oxzAhgYqaug1jL645tqmv72px2Y1iKuASBA4Jm7',
+        '1': 'dfYRKLiQbEVidWRvcVmeXnTnLcEmwtkhfvPXdbP4vqAiK4b6X',
+        '21234567': 'dfa2KCViJECu8bqzoDueJyc1gMvLrCGP8p759YpHyb3F7a2ex',
+        '2147483646': 'dfZfUTzDt4VhbykTdBnEmj3ew4KCK2AdkWjbZxn9gyEhpWD6y',
+        '2147483647': 'dfY6mMNbqZF66KmacTFnGPxc95DjbEoprG36EzAD6rCZRBBMe',
       },
     },
     {
