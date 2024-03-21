@@ -80,10 +80,20 @@
   "label__show_on_onekey": "Show on OneKey",
 
   "label__device_type_sdk": "Device Type (SDK)",
-  "label__device_uuid": "Device UUID",
+  "label__device_uuid": "Device Serial Number",
   "label__device_firmware_version": "Firmware Version",
   "label__device_bootloader_version": "Bootloader Version",
+  "label__device_boardloader_version": "Boardloader Version",
   "label__device_bluetooth_version": "Bluetooth Version",
+  "label__device_device_statue": "Device Mode",
+
+  "label__device_bootloader_statue": "Bootloader",
+  "label__device_firmware_status": "Firmware",
+  
+  "label__device_se_info": "Device SE Information",
+  "label__device_info_update_time": "Update Time",
+  "label__device_info_refresh": "Refreshing Device Information",
+  "label__device_info_export": "Example Export device information",
 
   "label__device_update_firmware": "Update Firmware",
   "label__device_update_ble_firmware": "Update Bluetooth Firmware",

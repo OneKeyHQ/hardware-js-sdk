@@ -1,4 +1,12 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
+import {
+  ForwardedRef,
+  forwardRef,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from 'react';
 
 import { ListItem, Text, View } from 'tamagui';
 import { FlatList, Platform } from 'react-native';
@@ -72,11 +80,17 @@ const Item = ({ item, onPress, connected }: ItemProps) => {
 };
 
 type IDeviceListProps = {
-  onSelected: (device: Device) => void;
+  onSelected: (device: Device | undefined) => void;
   disableSaveDevice?: boolean;
 };
+export interface IDeviceListInstance {
+  searchDevices: () => Promise<void> | void;
+}
 
-export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceListProps) {
+function DeviceListFC(
+  { onSelected, disableSaveDevice = false }: IDeviceListProps,
+  ref: ForwardedRef<IDeviceListInstance>
+) {
   const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -94,15 +108,16 @@ export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceLis
   }, []);
 
   const selectDevice = useCallback(
-    (device: Device) => {
-      setSelectedId(device.connectId);
-      storeSelectedId(device.connectId);
+    (device: Device | undefined) => {
+      setSelectedId(device?.connectId ?? '');
+      storeSelectedId(device?.connectId ?? '');
       onSelected(device);
     },
     [onSelected]
   );
 
   const searchDevices = useCallback(async () => {
+    selectDevice(undefined);
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
     const response = await sdk.searchDevices();
@@ -118,6 +133,14 @@ export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceLis
     removeSelectedId();
     setSelectedId(null);
   }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      searchDevices,
+    }),
+    [searchDevices]
+  );
 
   const renderItem = ({ item }: { item: Device }) => {
     const connected = item.connectId === selectedId;
@@ -163,3 +186,5 @@ export function DeviceList({ onSelected, disableSaveDevice = false }: IDeviceLis
     </PanelView>
   );
 }
+
+export const DeviceList = forwardRef<IDeviceListInstance, IDeviceListProps>(DeviceListFC);

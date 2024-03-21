@@ -80,10 +80,20 @@
   "label__show_on_onekey": "在硬件上确认",
 
   "label__device_type_sdk": "设备类型（SDK）",
-  "label__device_uuid": "设备 UUID",
+  "label__device_uuid": "设备序列号",
   "label__device_firmware_version": "固件版本",
   "label__device_bootloader_version": "Bootloader 版本",
+  "label__device_boardloader_version": "Boardloader 版本",
   "label__device_bluetooth_version": "蓝牙版本",
+  "label__device_device_statue": "设备模式",
+
+  "label__device_bootloader_statue": "Bootloader 状态",
+  "label__device_firmware_status": "开机状态",
+  
+  "label__device_se_info": "设备 SE 信息",
+  "label__device_info_update_time": "更新时间",
+  "label__device_info_refresh": "刷新设备信息",
+  "label__device_info_export": "导出设备信息到文本",
 
   "label__device_update_firmware": "更新固件",
   "label__device_update_ble_firmware": "更新蓝牙固件",

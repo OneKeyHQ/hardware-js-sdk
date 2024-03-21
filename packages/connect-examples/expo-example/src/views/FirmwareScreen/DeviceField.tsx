@@ -22,20 +22,26 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
     <XStack
       flexWrap="wrap"
       width="100%"
-      $gtSm={{
+      $gtLg={{
         width: '49%',
       }}
-      $gtLg={{
-        width: '32%',
-      }}
     >
-      <Text color={isNil(fieldValue) ? '$textCritical' : '$text'} fontWeight="bold">
+      <Text
+        minWidth={260}
+        color={isNil(fieldValue) ? '$textCritical' : '$text'}
+        fontSize={18}
+        fontWeight="bold"
+      >
         {`${field}: `}
       </Text>
-      <Stack flex={1}>
-        <Text flex={1} flexWrap="wrap" color={isNil(fieldValue) ? '$textCritical' : '$text'}>{`${
-          fieldValue ?? ''
-        }`}</Text>
+      <Stack flex={1} paddingStart={4}>
+        <Text
+          flex={1}
+          flexWrap="wrap"
+          fontSize={18}
+          fontWeight="bold"
+          color={isNil(fieldValue) ? '$textCritical' : '$text'}
+        >{`${fieldValue ?? ''}`}</Text>
       </Stack>
     </XStack>
   );
