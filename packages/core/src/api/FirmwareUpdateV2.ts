@@ -246,7 +246,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         /**
          * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
          */
-        await wait(deviceType === 'touch' ? 3000 : 1500);
+        const isTouch = DeviceModelToTypes.model_touch.includes(deviceType);
+        await wait(isTouch ? 3000 : 1500);
       } catch (e) {
         if (e instanceof HardwareError) {
           return Promise.reject(e);
