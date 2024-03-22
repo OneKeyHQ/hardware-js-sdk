@@ -38,7 +38,7 @@ export default class CheckBridgeRelease extends BaseMethod {
       const isOldVersionBridge = semver.lt(version, BridgeVersion);
 
       let shouldUpdate = false;
-      if (deviceType === 'touch') {
+      if (DeviceModelToTypes.model_touch.includes(deviceType)) {
         if (semver.gte(willUpdateFirmwareVersion, TouchNeedUpdateVersion) && isOldVersionBridge) {
           shouldUpdate = true;
         }
