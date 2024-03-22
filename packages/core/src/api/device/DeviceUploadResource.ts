@@ -4,7 +4,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { ResourceUpload, Success } from '@onekeyfe/hd-transport';
 import { blake2s } from '@noble/hashes/blake2s';
 import { TypedResponseMessage } from '../../device/DeviceCommands';
-import { DeviceUploadResourceParams } from '../../types';
+import { DeviceModelToTypes, DeviceUploadResourceParams } from '../../types';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { hexToBytes } from '../helpers/hexUtils';
@@ -30,7 +30,7 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
   checkUploadNFTSupport() {
     const deviceType = getDeviceType(this.device.features);
     const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
-    if (deviceType !== 'touch') {
+    if (!DeviceModelToTypes.model_touch.includes(deviceType)) {
       throw ERRORS.TypedError(HardwareErrorCode.CallMethodError, 'Device Not Support Upload NFT');
     }
 

@@ -3,7 +3,7 @@ import type { Response } from '../params';
 
 export declare function deviceUpdateBootloader(
   connectId: string,
-  params: {
+  params?: {
     binary?: ArrayBuffer;
   }
 ): Response<Success>;

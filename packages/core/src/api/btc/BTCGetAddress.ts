@@ -5,6 +5,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { BTCAddress, BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
+import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 
 export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
   hasBundle = false;
@@ -52,6 +53,10 @@ export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
         script_type: scriptType || 'SPENDADDRESS',
       });
     });
+  }
+
+  getVersionRange() {
+    return getBitcoinForkVersionRange(this.params.map(param => param.coin_name));
   }
 
   async run() {
