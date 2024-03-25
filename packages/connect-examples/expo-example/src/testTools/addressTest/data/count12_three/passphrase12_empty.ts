@@ -172,6 +172,35 @@ export default {
       },
     },
     {
+      method: 'btcGetAddress',
+      name: 'btcGetAddress-Neurai',
+      params: {
+        path: "m/44'/1900'/$$INDEX$$'/0/0",
+        coin: 'neurai',
+      },
+      expectedAddress: {
+        '0': 'NbjoBMoWDP4M5grz3ndeD7g2j6eSaDQjCM',
+        '1': 'Nd5XdEkBeLkZuJ4dPDk5RAYpdskLCGxRn5',
+        '21234567': 'Ne9EGm17unVKyxMq7bHNSiuUd2xxsS9KXH',
+        '2147483646': 'NXhSXjgr6Mxk7JTwpv5bwUx2E5J7W8zvQm',
+        '2147483647': 'Ng6FjctM1PiQJgwii5c9yfk63aQzdpdwjn',
+      },
+    },
+    {
+      method: 'nervosGetAddress',
+      name: 'nervosGetAddress',
+      params: {
+        path: "m/44'/309'/$$INDEX$$'/0/0",
+      },
+      expectedAddress: {
+        '0': 'ckb1qyqf58jge3wegt05fmzmwnumuxumd0ymeahsjgtaak',
+        '1': 'ckb1qyqqas92c04gmyg499lt07cx9k98w3ftzk8s8kxqm8',
+        '21234567': 'ckb1qyq2fzdzc4ccru3y259gh4rx8vnys5mra70shq7rqt',
+        '2147483646': 'ckb1qyqq2epdccu2w49rhsvlrxj86cyrkuyzfvrqj4t3a2',
+        '2147483647': 'ckb1qyq92u677834cladxksgtv662pz3n0ze496s7w0xrr',
+      },
+    },
+    {
       method: 'confluxGetAddress',
       expectedAddress: {
         '0': 'cfx:aat74vz8k8f6m9mues4cfgd3785hmswjvu6jgbnh47',
@@ -444,6 +473,21 @@ export default {
         '21234567': 'j4X6caVZdKCUmJssErnaxyyamA8CeXkwibcRoucGMAdMcr3ts',
         '2147483646': 'j4VwjubsF3thxGFCX8YwYnVHDXg8hhrEo3qH9ftCvYUbuEigF',
         '2147483647': 'j4RRJCxPSUb6Yo8QohGtqephj1wBGKr2XYZCX4o8mFbx5iMSr',
+      },
+    },
+    {
+      method: 'polkadotGetAddress',
+      name: 'polkadotGetAddress-manta',
+      params: {
+        prefix: '77',
+        network: 'manta',
+      },
+      expectedAddress: {
+        '0': 'dfb2boq5xfy67kCAz1nHke6BGdWX7FnaZon8bFFj9mYC5Jp8v',
+        '1': 'dfZ5RCxobpJUgLWPRPPix8jcTUHEJUVCLWyFmkxw26i1qv5RW',
+        '21234567': 'dfcL1yHdG4ojRWoCUV9nUp1aANTkWR2KT3w84Y9S996eUGxhP',
+        '2147483646': 'dfbB9JPvsoVxcUAXkkv94cXGck1gZb7cXW9yQJRNiWwtkfLCk',
+        '2147483647': 'dfWehbkT5ECMD13k3Ke6MUrh8EGj8D7QFzstmhLJZE5Ew8wRP',
       },
     },
     {

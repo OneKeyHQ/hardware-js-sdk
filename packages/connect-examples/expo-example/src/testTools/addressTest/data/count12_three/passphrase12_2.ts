@@ -172,6 +172,35 @@ export default {
       },
     },
     {
+      method: 'btcGetAddress',
+      name: 'btcGetAddress-Neurai',
+      params: {
+        path: "m/44'/1900'/$$INDEX$$'/0/0",
+        coin: 'neurai',
+      },
+      expectedAddress: {
+        '0': 'NPLBHQ6tEd9NyKxYiGg3GcUuzNSJvs4DDc',
+        '1': 'NVhg51iDuwuwKTsbwSex4asKGWEryEPXd8',
+        '21234567': 'NhpToESeTZD73vf6Do76i3TjbZooSumgmv',
+        '2147483646': 'NRs8cDpcCgFb5yvJf87vMNjMWWTjqc54Ng',
+        '2147483647': 'NcdeD73rQRqm2b2jYERXgigxdfNjMrRRdp',
+      },
+    },
+    {
+      method: 'nervosGetAddress',
+      name: 'nervosGetAddress',
+      params: {
+        path: "m/44'/309'/$$INDEX$$'/0/0",
+      },
+      expectedAddress: {
+        '0': 'ckb1qyqfgdwx4zz7tjywdc9hxuytz6xe28yh7p9qr9z7mq',
+        '1': 'ckb1qyqvw06s4czscusdwvvpkt4krrmfk5xfr6tsz0cky5',
+        '21234567': 'ckb1qyqr3ph4clfrtcv53s2zuj7aaxcqyl6r99vs07kvfc',
+        '2147483646': 'ckb1qyqqr5qhpf3cr77jnk9yp7eteu66695vun0sqzlzgl',
+        '2147483647': 'ckb1qyqdh5qn7ce2cfq47pdjrznj7990p9fcaalsdrtu9t',
+      },
+    },
+    {
       method: 'confluxGetAddress',
       expectedAddress: {
         '0': 'cfx:aarjde7bmcehj036bj9h0j005ewcrvymty1d46aym2',
@@ -444,6 +473,21 @@ export default {
         '21234567': 'j4UVGeXwBuYdT5dY29krJZFP3uqKACqPDZWAb8BFvso5MWTDr',
         '2147483646': 'j4WAqbuEj2atNzxczRjpUM8JFPkVf6TifrbyFBSLN53DkcGTU',
         '2147483647': 'j4SjsMsfAYaza8fCuwQZwvd43y87hFJzHCbNuHFDCm7hY8JDX',
+      },
+    },
+    {
+      method: 'polkadotGetAddress',
+      name: 'polkadotGetAddress-manta',
+      params: {
+        prefix: '77',
+        network: 'manta',
+      },
+      expectedAddress: {
+        '0': 'dfXGrNHKwA4Qpo2S7q1K8Twj5npi37Qq2NcLXSwq9MHienVXs',
+        '1': 'dfWZfhzkWa9L9QVqVHCmtxq6Vgo3M2xNfhVnQJNe4vRY7WS6V',
+        '21234567': 'dfZig3Kzpf9t7HYsFn83pPHNT8As266kx1prqkiRirGNCwGng',
+        '2147483646': 'dfbQEzhJMnC93CsxE471zBAHec63Wyj6QJvfVoyWA3WWc384b',
+        '2147483647': 'dfXyGkfioJCFELaY9ZmmTkf3TBTfZ8aN1ev59unNzjazPYrkg',
       },
     },
     {
