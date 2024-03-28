@@ -13,6 +13,11 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
+    method: 'getOnekeyFeatures',
+    description: 'Get features of a device',
+    noDeviceIdReq: true,
+  },
+  {
     method: 'getPassphraseState',
     description: 'Get passphrase state of a device',
     noDeviceIdReq: true,

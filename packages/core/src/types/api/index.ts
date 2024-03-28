@@ -10,6 +10,7 @@ import { checkBootloaderRelease } from './checkBootloaderRelease';
 
 import { searchDevices } from './searchDevices';
 import { getFeatures } from './getFeatures';
+import { getOnekeyFeatures } from './getOnekeyFeatures';
 import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
@@ -154,6 +155,7 @@ export type CoreApi = {
   searchDevices: typeof searchDevices;
   requestWebUsbDevice: typeof requestWebUsbDevice;
   getFeatures: typeof getFeatures;
+  getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;

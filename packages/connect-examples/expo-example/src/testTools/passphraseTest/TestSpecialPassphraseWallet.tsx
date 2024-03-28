@@ -2,7 +2,7 @@ import { useContext, useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
-import { Stack, Text } from 'tamagui';
+import { Input, Label, Stack, Text, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get } from 'lodash';
 import { useSetAtom } from 'jotai';
@@ -349,22 +349,36 @@ function ExecuteView() {
 
   const contentMemo = useMemo(
     () => (
-      <Stack flexDirection="row" flexWrap="wrap" gap="$2">
-        <CommonInput
-          type="text"
-          label={intl.formatMessage({ id: 'label__wallet_mnemonic' })}
-          value={mnemonic.toString()}
-          onChange={str => setMnemonic(str)}
-        />
+      <YStack>
+        <YStack>
+          <Text fontSize={14}>
+            {intl.formatMessage({ id: 'message__passphrase_special_test_describe' })}
+          </Text>
+        </YStack>
 
-        <SwitchInput
-          label={intl.formatMessage({ id: 'label__show_on_onekey' })}
-          value={showOnOneKey}
-          onToggle={setShowOnOneKey}
-        />
-        <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
-        <ExportReportView />
-      </Stack>
+        <Stack flexDirection="row" flexWrap="wrap" gap="$2">
+          <Stack width="100%">
+            <Label paddingRight="$0" justifyContent="center">
+              {intl.formatMessage({ id: 'label__wallet_mnemonic' })}
+            </Label>
+            <Input
+              multiline
+              size="$4"
+              keyboardType="numeric"
+              value={mnemonic.toString()}
+              onChangeText={str => setMnemonic(str)}
+            />
+          </Stack>
+
+          <SwitchInput
+            label={intl.formatMessage({ id: 'label__show_on_onekey' })}
+            value={showOnOneKey}
+            onToggle={setShowOnOneKey}
+          />
+          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+          <ExportReportView />
+        </Stack>
+      </YStack>
     ),
     [beginTest, intl, mnemonic, showOnOneKey, stopTest]
   );

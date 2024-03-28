@@ -71,6 +71,8 @@ export type Device = KnownDevice;
 
 export type Features = PROTO.Features;
 
+export type OnekeyFeatures = PROTO.OnekeyFeatures;
+
 export type IDeviceType = 'classic' | 'classic1s' | 'mini' | 'touch' | 'pro';
 
 /**

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { H5, Stack, Text, XStack } from 'tamagui';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -11,6 +11,7 @@ import {
 } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
+import { OnekeyFeatures } from '@onekeyfe/hd-transport';
 import type { Device } from '../../components/DeviceList';
 import PageView from '../../components/ui/Page';
 import PanelView from '../../components/ui/Panel';
@@ -20,6 +21,8 @@ import { DeviceList } from '../../components/DeviceList';
 import { DeviceField } from './DeviceField';
 import { MessageBox } from './MessageBox';
 import { FirmwareUpdateEvent } from './FirmwareUpdateEvent';
+import { DeviceFieldContext } from './DeviceFieldContext';
+import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
 type UpdateState = {
@@ -120,11 +123,23 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
   const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
   const [features, setFeatures] = useState<Features | undefined>(undefined);
+  const [onekeyFeatures, setOnekeyFeatures] = useState<OnekeyFeatures | undefined>(undefined);
   const [connecting, setConnecting] = useState<boolean>(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const deviceType = getDeviceType(features);
 
   const [showUpdateDialog, setShowUpdateDialog] = useState<boolean>(false);
+
+  const loadOnekeyFeatures = useCallback(() => {
+    if (!sdk) return;
+    sdk.getOnekeyFeatures(selectDevice?.connectId).then(res => {
+      if (res.success) {
+        setOnekeyFeatures(res.payload);
+      } else {
+        setOnekeyFeatures(undefined);
+      }
+    });
+  }, [sdk, selectDevice?.connectId]);
 
   useEffect(() => {
     if (!sdk) return;
@@ -136,6 +151,7 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
       .then(res => {
         if (res.success) {
           setFeatures(res.payload);
+          loadOnekeyFeatures();
         } else {
           setError(res.payload.error);
         }
@@ -146,7 +162,7 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
       .finally(() => {
         setConnecting(false);
       });
-  }, [sdk, selectDevice?.connectId, selectDevice?.features]);
+  }, [loadOnekeyFeatures, sdk, selectDevice?.connectId, selectDevice?.features]);
 
   const disconnectDevice = useCallback(() => {
     setFeatures(undefined);
@@ -197,13 +213,11 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
 
       if (type === 'ble' || type === 'firmware' || type === 'bootloader') {
         setShowUpdateDialog(true);
-        // @ts-expect-error
         const res = await sdk.firmwareUpdate(
           Platform.OS === 'web' ? undefined : selectDevice.connectId,
           {
             updateType: type === 'bootloader' ? 'firmware' : type,
             binary: fileData,
-            platform: Platform.OS === 'web' ? 'web' : 'native',
           }
         );
 
@@ -238,6 +252,14 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
       }
     },
     [deviceType, features, intl, sdk, selectDevice]
+  );
+
+  const deviceFieldProviderValue = useMemo(
+    () => ({
+      features,
+      onekeyFeatures,
+    }),
+    [features, onekeyFeatures]
   );
 
   return (
@@ -323,113 +345,12 @@ function FirmwareUpdate({ selectDevice, onDisconnectDevice }: FirmwareUpdateProp
             </XStack>
           </PanelView>
 
-          <PanelView title={intl.formatMessage({ id: 'title__device_advanced_info' })}>
-            <Stack
-              flex={1}
-              padding="$2"
-              backgroundColor="$bgHover"
-              gap="$2"
-              flexDirection="row"
-              flexWrap="wrap"
-              borderRadius="$2"
-            >
-              <DeviceField field="device_id" value={features.device_id} />
-              <DeviceField field="serial_no" value={features.serial_no} />
-              <DeviceField field="label" value={features.label} />
-              <DeviceField field="bootloader_hash" value={features.bootloader_hash} />
-              <DeviceField field="ble_name" value={features.ble_name} />
-              <DeviceField field="ble_ver" value={features.ble_ver} />
-              <DeviceField field="se_ver" value={features.se_ver} />
-              <DeviceField field="onekey_version" value={features.onekey_version} />
-              <DeviceField field="onekey_serial" value={features.onekey_serial} />
-              <DeviceField field="bootloader_version" value={features.bootloader_version} />
-              <DeviceField field="build_id" value={features.build_id} />
-              <DeviceField field="onekey_device_type" value={features.onekey_device_type} />
-              <DeviceField field="onekey_serial_no" value={features.onekey_serial_no} />
-              <DeviceField field="onekey_se_type" value={features.onekey_se_type} />
-              <DeviceField field="onekey_board_version" value={features.onekey_board_version} />
-              <DeviceField field="onekey_board_hash" value={features.onekey_board_hash} />
-              <DeviceField field="onekey_board_build_id" value={features.onekey_board_build_id} />
-              <DeviceField field="onekey_boot_version" value={features.onekey_boot_version} />
-              <DeviceField field="onekey_boot_hash" value={features.onekey_boot_hash} />
-              <DeviceField field="onekey_boot_build_id" value={features.onekey_boot_build_id} />
-              <DeviceField
-                field="onekey_firmware_version"
-                value={features.onekey_firmware_version}
-              />
-              <DeviceField field="onekey_firmware_hash" value={features.onekey_firmware_hash} />
-              <DeviceField
-                field="onekey_firmware_build_id"
-                value={features.onekey_firmware_build_id}
-              />
-            </Stack>
-
-            <Stack
-              flex={1}
-              padding="$2"
-              backgroundColor="$bgHover"
-              gap="$2"
-              flexDirection="row"
-              flexWrap="wrap"
-              borderRadius="$2"
-            >
-              <DeviceField field="onekey_se01_state" value={features.onekey_se01_state} />
-              <DeviceField field="onekey_se01_version" value={features.onekey_se01_version} />
-              <DeviceField field="onekey_se01_hash" value={features.onekey_se01_hash} />
-              <DeviceField field="onekey_se01_build_id" value={features.onekey_se01_build_id} />
-              <DeviceField
-                field="onekey_se01_boot_version"
-                value={features.onekey_se01_boot_version}
-              />
-              <DeviceField field="onekey_se01_boot_hash" value={features.onekey_se01_boot_hash} />
-              <DeviceField
-                field="onekey_se01_boot_build_id"
-                value={features.onekey_se01_boot_build_id}
-              />
-
-              <DeviceField field="onekey_se02_state" value={features.onekey_se02_state} />
-              <DeviceField field="onekey_se02_version" value={features.onekey_se02_version} />
-              <DeviceField field="onekey_se02_hash" value={features.onekey_se02_hash} />
-              <DeviceField field="onekey_se02_build_id" value={features.onekey_se02_build_id} />
-              <DeviceField
-                field="onekey_se02_boot_version"
-                value={features.onekey_se02_boot_version}
-              />
-              <DeviceField field="onekey_se02_boot_hash" value={features.onekey_se02_boot_hash} />
-              <DeviceField
-                field="onekey_se02_boot_build_id"
-                value={features.onekey_se02_boot_build_id}
-              />
-
-              <DeviceField field="onekey_se03_state" value={features.onekey_se03_state} />
-              <DeviceField field="onekey_se03_version" value={features.onekey_se03_version} />
-              <DeviceField field="onekey_se03_hash" value={features.onekey_se03_hash} />
-              <DeviceField field="onekey_se03_build_id" value={features.onekey_se03_build_id} />
-              <DeviceField
-                field="onekey_se03_boot_version"
-                value={features.onekey_se03_boot_version}
-              />
-              <DeviceField field="onekey_se03_boot_hash" value={features.onekey_se03_boot_hash} />
-              <DeviceField
-                field="onekey_se03_boot_build_id"
-                value={features.onekey_se03_boot_build_id}
-              />
-
-              <DeviceField field="onekey_se04_state" value={features.onekey_se04_state} />
-              <DeviceField field="onekey_se04_version" value={features.onekey_se04_version} />
-              <DeviceField field="onekey_se04_hash" value={features.onekey_se04_hash} />
-              <DeviceField field="onekey_se04_build_id" value={features.onekey_se04_build_id} />
-              <DeviceField
-                field="onekey_se04_boot_version"
-                value={features.onekey_se04_boot_version}
-              />
-              <DeviceField field="onekey_se04_boot_hash" value={features.onekey_se04_boot_hash} />
-              <DeviceField
-                field="onekey_se04_boot_build_id"
-                value={features.onekey_se04_boot_build_id}
-              />
-            </Stack>
-          </PanelView>
+          <DeviceFieldContext.Provider value={deviceFieldProviderValue}>
+            <PanelView title={intl.formatMessage({ id: 'title__device_advanced_info' })}>
+              <DeviceInfoFieldGroup />
+              <DeviceSeFieldGroup />
+            </PanelView>
+          </DeviceFieldContext.Provider>
         </Stack>
       )}
     </Stack>

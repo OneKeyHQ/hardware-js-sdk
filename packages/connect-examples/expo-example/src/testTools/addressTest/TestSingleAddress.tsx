@@ -172,6 +172,7 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
       const { params } = item;
       const requestParams = {
         ...params,
+        showOnOneKey,
         passphraseState: currentTestCase?.extra?.passphraseState,
         useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
       };

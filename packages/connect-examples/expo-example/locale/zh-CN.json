@@ -53,7 +53,7 @@
   "title__address_variant_test_single": "单个变种地址测试",
   "title__address_variant_test_batch": "批量变种地址测试",
 
-  "title__passphrase_test": "Passphrase Count 测试",
+  "title__passphrase_test": "Passphrase Session Count 测试",
 
   "label__keep_session": "保持 Session",
   "label__retry_count": "重试次数",
@@ -94,7 +94,7 @@
   "label__wallet_change_count": "测试切换次数",
   "label__wallet_include_normal": "包含普通钱包",
   "label__wallet_sequential_switch": "顺序切换",
-  "label__wallet_mnemonic": "助记词",  
+  "label__wallet_mnemonic": "助记词",
 
   "message__no_device": "未连接设备",
   "message__current_selector_device": "当前选择的设备：",
@@ -131,11 +131,13 @@
   "message__address_not_match": "地址不匹配",
   "message__create": "创建",
   "message__generate": "生成",
-  
+
   "message__passphrase_count_test_describe": "开始之后根据提示解锁硬件, 根据硬件提示确认 passphrase, 不用自己输入",
   "message__passphrase_count_test_step1": "1. 从零开始创建钱包 passphrase 并记录下来，注意在硬件按确认 passphrase",
   "message__passphrase_count_test_step2": "2. 每次创建完一个 passphrase 钱包，都会去检查一遍之前创建过的钱包，是否可以正常获取地址",
   "message__passphrase_count_test_step3": "3. 当设备再次要求输入 passphrase 时，测试结束",
+
+  "message__passphrase_special_test_describe": "请输入与当前设备一致的助记词",
 
   "message__message_is_empty": "请先输入设备的助记词",
 
