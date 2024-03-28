@@ -1,0 +1,26 @@
+{
+  "files": {
+    "main.js": "/static/js/main.c4ffed2b.js",
+    "static/js/274.e58636b4.chunk.js": "/static/js/274.e58636b4.chunk.js",
+    "static/js/720.f1e35d86.chunk.js": "/static/js/720.f1e35d86.chunk.js",
+    "static/js/228.5157d471.chunk.js": "/static/js/228.5157d471.chunk.js",
+    "static/js/354.4c34b792.chunk.js": "/static/js/354.4c34b792.chunk.js",
+    "static/js/587.abf6c6ba.chunk.js": "/static/js/587.abf6c6ba.chunk.js",
+    "static/js/357.37012230.chunk.js": "/static/js/357.37012230.chunk.js",
+    "static/js/99.155a517d.chunk.js": "/static/js/99.155a517d.chunk.js",
+    "static/js/409.89f2683b.chunk.js": "/static/js/409.89f2683b.chunk.js",
+    "static/js/286.31c4b250.js": "/static/js/286.31c4b250.js",
+    "static/js/881.85a01933.chunk.js": "/static/js/881.85a01933.chunk.js",
+    "static/js/535.a29fa24e.chunk.js": "/static/js/535.a29fa24e.chunk.js",
+    "favicon.ico": "/favicon.ico",
+    "index.html": "/index.html",
+    "favicon-32.png": "/favicon-32.png",
+    "favicon-16.png": "/favicon-16.png",
+    "manifest.json": "/manifest.json",
+    "serve.json": "/serve.json"
+  },
+  "entrypoints": [
+    "static/js/286.31c4b250.js",
+    "static/js/main.c4ffed2b.js"
+  ]
+}
