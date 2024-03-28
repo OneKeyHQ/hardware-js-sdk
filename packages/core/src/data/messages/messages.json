@@ -5583,6 +5583,30 @@
     "GetFeatures": {
       "fields": {}
     },
+    "OnekeyGetFeatures": {
+      "fields": {}
+    },
+    "OneKeyDeviceType": {
+      "values": {
+        "CLASSIC": 0,
+        "CLASSIC1S": 1,
+        "MINI": 2,
+        "TOUCH": 3,
+        "PRO": 5
+      }
+    },
+    "OneKeySeType": {
+      "values": {
+        "THD89": 0,
+        "SE608A": 1
+      }
+    },
+    "OneKeySEState": {
+      "values": {
+        "BOOT": 0,
+        "APP": 1
+      }
+    },
     "Features": {
       "fields": {
         "vendor": {
@@ -5686,10 +5710,6 @@
         "fw_vendor": {
           "type": "string",
           "id": 25
-        },
-        "fw_vendor_keys": {
-          "type": "bytes",
-          "id": 26
         },
         "unfinished_backup": {
           "type": "bool",
@@ -5820,12 +5840,16 @@
           "id": 517
         },
         "build_id": {
-          "type": "string",
+          "type": "bytes",
           "id": 518
         },
-        "battery_level": {
-          "type": "uint32",
-          "id": 520
+        "boardloader_version": {
+          "type": "string",
+          "id": 519
+        },
+        "busy": {
+          "type": "bool",
+          "id": 41
         },
         "onekey_device_type": {
           "type": "OneKeyDeviceType",
@@ -5851,15 +5875,15 @@
           "type": "bytes",
           "id": 605
         },
-        "onekey_se_version": {
+        "onekey_se01_version": {
           "type": "string",
           "id": 606
         },
-        "onekey_se_hash": {
+        "onekey_se01_hash": {
           "type": "bytes",
           "id": 607
         },
-        "onekey_se_build_id": {
+        "onekey_se01_build_id": {
           "type": "string",
           "id": 608
         },
@@ -5898,6 +5922,34 @@
         "onekey_ble_hash": {
           "type": "bytes",
           "id": 617
+        },
+        "onekey_se02_version": {
+          "type": "string",
+          "id": 618
+        },
+        "onekey_se03_version": {
+          "type": "string",
+          "id": 619
+        },
+        "onekey_se04_version": {
+          "type": "string",
+          "id": 620
+        },
+        "onekey_se01_state": {
+          "type": "OneKeySEState",
+          "id": 621
+        },
+        "onekey_se02_state": {
+          "type": "OneKeySEState",
+          "id": 622
+        },
+        "onekey_se03_state": {
+          "type": "OneKeySEState",
+          "id": 623
+        },
+        "onekey_se04_state": {
+          "type": "OneKeySEState",
+          "id": 624
         }
       },
       "nested": {
@@ -5924,21 +5976,186 @@
             "Capability_ShamirGroups": 16,
             "Capability_PassphraseEntry": 17
           }
+        }
+      }
+    },
+    "OnekeyFeatures": {
+      "fields": {
+        "onekey_device_type": {
+          "type": "OneKeyDeviceType",
+          "id": 1
         },
-        "OneKeyDeviceType": {
-          "values": {
-            "CLASSIC": 0,
-            "CLASSIC1S": 1,
-            "MINI": 2,
-            "TOUCH": 3,
-            "PRO": 5
-          }
+        "onekey_board_version": {
+          "type": "string",
+          "id": 2
         },
-        "OneKeySeType": {
-          "values": {
-            "THD89": 0,
-            "SE608A": 1
-          }
+        "onekey_boot_version": {
+          "type": "string",
+          "id": 3
+        },
+        "onekey_firmware_version": {
+          "type": "string",
+          "id": 4
+        },
+        "onekey_board_hash": {
+          "type": "bytes",
+          "id": 5
+        },
+        "onekey_boot_hash": {
+          "type": "bytes",
+          "id": 6
+        },
+        "onekey_firmware_hash": {
+          "type": "bytes",
+          "id": 7
+        },
+        "onekey_board_build_id": {
+          "type": "string",
+          "id": 8
+        },
+        "onekey_boot_build_id": {
+          "type": "string",
+          "id": 9
+        },
+        "onekey_firmware_build_id": {
+          "type": "string",
+          "id": 10
+        },
+        "onekey_serial_no": {
+          "type": "string",
+          "id": 11
+        },
+        "onekey_ble_name": {
+          "type": "string",
+          "id": 12
+        },
+        "onekey_ble_version": {
+          "type": "string",
+          "id": 13
+        },
+        "onekey_ble_build_id": {
+          "type": "string",
+          "id": 14
+        },
+        "onekey_ble_hash": {
+          "type": "bytes",
+          "id": 15
+        },
+        "onekey_se_type": {
+          "type": "OneKeySeType",
+          "id": 16
+        },
+        "onekey_se01_state": {
+          "type": "OneKeySEState",
+          "id": 17
+        },
+        "onekey_se02_state": {
+          "type": "OneKeySEState",
+          "id": 18
+        },
+        "onekey_se03_state": {
+          "type": "OneKeySEState",
+          "id": 19
+        },
+        "onekey_se04_state": {
+          "type": "OneKeySEState",
+          "id": 20
+        },
+        "onekey_se01_version": {
+          "type": "string",
+          "id": 21
+        },
+        "onekey_se02_version": {
+          "type": "string",
+          "id": 22
+        },
+        "onekey_se03_version": {
+          "type": "string",
+          "id": 23
+        },
+        "onekey_se04_version": {
+          "type": "string",
+          "id": 24
+        },
+        "onekey_se01_hash": {
+          "type": "bytes",
+          "id": 25
+        },
+        "onekey_se02_hash": {
+          "type": "bytes",
+          "id": 26
+        },
+        "onekey_se03_hash": {
+          "type": "bytes",
+          "id": 27
+        },
+        "onekey_se04_hash": {
+          "type": "bytes",
+          "id": 28
+        },
+        "onekey_se01_build_id": {
+          "type": "string",
+          "id": 29
+        },
+        "onekey_se02_build_id": {
+          "type": "string",
+          "id": 30
+        },
+        "onekey_se03_build_id": {
+          "type": "string",
+          "id": 31
+        },
+        "onekey_se04_build_id": {
+          "type": "string",
+          "id": 32
+        },
+        "onekey_se01_boot_version": {
+          "type": "string",
+          "id": 33
+        },
+        "onekey_se02_boot_version": {
+          "type": "string",
+          "id": 34
+        },
+        "onekey_se03_boot_version": {
+          "type": "string",
+          "id": 35
+        },
+        "onekey_se04_boot_version": {
+          "type": "string",
+          "id": 36
+        },
+        "onekey_se01_boot_hash": {
+          "type": "bytes",
+          "id": 37
+        },
+        "onekey_se02_boot_hash": {
+          "type": "bytes",
+          "id": 38
+        },
+        "onekey_se03_boot_hash": {
+          "type": "bytes",
+          "id": 39
+        },
+        "onekey_se04_boot_hash": {
+          "type": "bytes",
+          "id": 40
+        },
+        "onekey_se01_boot_build_id": {
+          "type": "string",
+          "id": 41
+        },
+        "onekey_se02_boot_build_id": {
+          "type": "string",
+          "id": 42
+        },
+        "onekey_se03_boot_build_id": {
+          "type": "string",
+          "id": 43
+        },
+        "onekey_se04_boot_build_id": {
+          "type": "string",
+          "id": 44
         }
       }
     },
@@ -10768,8 +10985,8 @@
         "MessageType_ResourceUpdate": 10022,
         "MessageType_ListResDir": 10023,
         "MessageType_FileInfoList": 10024,
-        "MessageType_RebootToBoardloader": 10025,
-        "MessageType_DeviceEraseSector": 10026
+        "MessageType_OnekeyGetFeatures": 10025,
+        "MessageType_OnekeyFeatures": 10026
       }
     },
     "google": {
