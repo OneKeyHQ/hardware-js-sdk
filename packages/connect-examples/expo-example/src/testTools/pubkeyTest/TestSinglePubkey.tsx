@@ -205,6 +205,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       const { params } = item;
       const requestParams = {
         ...params,
+        showOnOneKey,
         passphraseState: currentTestCase?.extra?.passphraseState,
         useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
       };
@@ -257,6 +258,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       </>
     ),
     [
+      beginTest,
       currentTestCase?.name,
       findTestCase,
       intl,

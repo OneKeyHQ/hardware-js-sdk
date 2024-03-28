@@ -1,14 +1,17 @@
 import type { PROTO } from '../../constants';
 import type { Params, Response } from '../params';
 
+type IUpdateType = 'firmware' | 'ble';
+
 export interface FirmwareUpdateBinaryParams {
   binary: ArrayBuffer;
+  updateType: IUpdateType;
 }
 
 export interface FirmwareUpdateParams {
   version?: number[];
   btcOnly?: boolean;
-  updateType: 'firmware' | 'ble';
+  updateType: IUpdateType;
   forcedUpdateRes?: boolean;
   isUpdateBootloader?: boolean;
 }

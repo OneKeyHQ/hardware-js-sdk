@@ -53,7 +53,7 @@
   "title__address_variant_test_single": "Single Variant Address Test",
   "title__address_variant_test_batch": "Batch Variant Address Test",
 
-  "title__passphrase_test": "Passphrase Count Test",
+  "title__passphrase_test": "Passphrase Session Count Test",
 
   "label__keep_session": "Keep Session",
   "label__retry_count": "Retry Count",
@@ -136,6 +136,8 @@
   "message__passphrase_count_test_step1": "1. Create wallet passphrase from scratch and record it, note in the hardware press Confirm passphrase",
   "message__passphrase_count_test_step2": "2. Each time a passphrase wallet is created, it will check the previously created wallet to see if it can get the address properly",
   "message__passphrase_count_test_step3": "3. The test ends when the device asks for passphrase again",
+
+  "message__passphrase_special_test_describe": "To enter a mnemonic that is consistent with the current device",
 
   "message__message_is_empty": "Please enter the mnemonic of the device first",
   

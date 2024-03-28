@@ -1960,6 +1960,27 @@ export type Initialize = {
 // GetFeatures
 export type GetFeatures = {};
 
+// OnekeyGetFeatures
+export type OnekeyGetFeatures = {};
+
+export enum OneKeyDeviceType {
+  CLASSIC = 0,
+  CLASSIC1S = 1,
+  MINI = 2,
+  TOUCH = 3,
+  PRO = 5,
+}
+
+export enum OneKeySeType {
+  THD89 = 0,
+  SE608A = 1,
+}
+
+export enum OneKeySEState {
+  BOOT = 0,
+  APP = 1,
+}
+
 export enum Enum_Capability {
   Capability_Bitcoin = 1,
   Capability_Bitcoin_like = 2,
@@ -1980,19 +2001,6 @@ export enum Enum_Capability {
   Capability_PassphraseEntry = 17,
 }
 export type Capability = keyof typeof Enum_Capability;
-
-export enum OneKeyDeviceType {
-  CLASSIC = 0,
-  CLASSIC1S = 1,
-  MINI = 2,
-  TOUCH = 3,
-  PRO = 5,
-}
-
-export enum OneKeySeType {
-  THD89 = 0,
-  SE608A = 1,
-}
 
 // Features
 export type Features = {
@@ -2020,7 +2028,6 @@ export type Features = {
   fw_minor: number | null;
   fw_patch: number | null;
   fw_vendor: string | null;
-  fw_vendor_keys?: string;
   unfinished_backup: boolean | null;
   no_backup: boolean | null;
   recovery_mode: boolean | null;
@@ -2053,16 +2060,17 @@ export type Features = {
   pre_firmware?: string;
   coin_switch?: number;
   build_id?: string;
-  battery_level?: number;
+  boardloader_version?: string;
+  busy?: boolean;
   onekey_device_type?: string | null;
   onekey_se_type?: string | null;
   onekey_board_version?: string;
   onekey_board_hash?: string;
   onekey_boot_version?: string;
   onekey_boot_hash?: string;
-  onekey_se_version?: string;
-  onekey_se_hash?: string;
-  onekey_se_build_id?: string;
+  onekey_se01_version?: string;
+  onekey_se01_hash?: string;
+  onekey_se01_build_id?: string;
   onekey_firmware_version?: string;
   onekey_firmware_hash?: string;
   onekey_firmware_build_id?: string;
@@ -2072,6 +2080,61 @@ export type Features = {
   onekey_ble_version?: string;
   onekey_ble_build_id?: string;
   onekey_ble_hash?: string;
+  onekey_se02_version?: string;
+  onekey_se03_version?: string;
+  onekey_se04_version?: string;
+  onekey_se01_state?: string | null;
+  onekey_se02_state?: string | null;
+  onekey_se03_state?: string | null;
+  onekey_se04_state?: string | null;
+};
+
+// OnekeyFeatures
+export type OnekeyFeatures = {
+  onekey_device_type?: OneKeyDeviceType;
+  onekey_board_version?: string;
+  onekey_boot_version?: string;
+  onekey_firmware_version?: string;
+  onekey_board_hash?: string;
+  onekey_boot_hash?: string;
+  onekey_firmware_hash?: string;
+  onekey_board_build_id?: string;
+  onekey_boot_build_id?: string;
+  onekey_firmware_build_id?: string;
+  onekey_serial_no?: string;
+  onekey_ble_name?: string;
+  onekey_ble_version?: string;
+  onekey_ble_build_id?: string;
+  onekey_ble_hash?: string;
+  onekey_se_type?: OneKeySeType;
+  onekey_se01_state?: OneKeySEState;
+  onekey_se02_state?: OneKeySEState;
+  onekey_se03_state?: OneKeySEState;
+  onekey_se04_state?: OneKeySEState;
+  onekey_se01_version?: string;
+  onekey_se02_version?: string;
+  onekey_se03_version?: string;
+  onekey_se04_version?: string;
+  onekey_se01_hash?: string;
+  onekey_se02_hash?: string;
+  onekey_se03_hash?: string;
+  onekey_se04_hash?: string;
+  onekey_se01_build_id?: string;
+  onekey_se02_build_id?: string;
+  onekey_se03_build_id?: string;
+  onekey_se04_build_id?: string;
+  onekey_se01_boot_version?: string;
+  onekey_se02_boot_version?: string;
+  onekey_se03_boot_version?: string;
+  onekey_se04_boot_version?: string;
+  onekey_se01_boot_hash?: string;
+  onekey_se02_boot_hash?: string;
+  onekey_se03_boot_hash?: string;
+  onekey_se04_boot_hash?: string;
+  onekey_se01_boot_build_id?: string;
+  onekey_se02_boot_build_id?: string;
+  onekey_se03_boot_build_id?: string;
+  onekey_se04_boot_build_id?: string;
 };
 
 // LockDevice
@@ -3954,7 +4017,9 @@ export type MessageType = {
   LnurlAuthResp: LnurlAuthResp;
   Initialize: Initialize;
   GetFeatures: GetFeatures;
+  OnekeyGetFeatures: OnekeyGetFeatures;
   Features: Features;
+  OnekeyFeatures: OnekeyFeatures;
   LockDevice: LockDevice;
   EndSession: EndSession;
   ApplySettings: ApplySettings;
@@ -4205,5 +4270,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;

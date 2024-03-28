@@ -78,6 +78,8 @@ export const createCoreApi = (
    * 获取设备信息
    */
   getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
+  getOnekeyFeatures: (connectId, params) =>
+    call({ ...params, connectId, method: 'getOnekeyFeatures' }),
 
   /**
    * 检查固件版本
