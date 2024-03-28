@@ -251,7 +251,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
             onToggle={setShowOnOneKey}
             vertical
           />
-          <TestRunnerOptionButtons onStop={stopTest} onStart={stopTest} />
+          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </Stack>
       </>
@@ -263,6 +263,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       passphrase,
       showOnOneKey,
       stopTest,
+      beginTest,
       testCaseList,
       testDescription,
     ]
