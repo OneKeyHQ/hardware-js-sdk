@@ -205,7 +205,10 @@ function FirmwareUpdate({
       if (!fileData)
         return { payload: intl.formatMessage({ id: 'tip__need_pick_file' }), success: false };
 
-      if (type === 'bootloader' && (deviceType === 'touch' || deviceType === 'pro')) {
+      if (
+        type === 'bootloader' &&
+        (deviceType.toLowerCase() === 'touch' || deviceType.toLowerCase() === 'pro')
+      ) {
         setShowUpdateDialog(true);
         const res = await sdk.deviceUpdateBootloader(selectDevice.connectId, {
           binary: fileData,
