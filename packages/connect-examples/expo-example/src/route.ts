@@ -4,4 +4,6 @@ export const enum Routes {
   PassphraseTest = 'passphrase-test',
   AddressTest = 'address-test',
   SecurityCheck = 'security-check',
+  AirGapTest = 'air-gap-test',
+  Scan = 'scan',
 }

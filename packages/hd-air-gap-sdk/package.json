@@ -1,0 +1,31 @@
+{
+  "name": "@onekeyfe/hd-air-gap-sdk",
+  "version": "1.0.0-alpha.8",
+  "author": "OneKey",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "ISC",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ./rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ./rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@ngraveio/bc-ur": "^1.1.12",
+    "bs58check": "^3.0.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.8",
+    "rollup-plugin-copy": "^3.5.0"
+  }
+}

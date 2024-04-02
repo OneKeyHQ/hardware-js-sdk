@@ -4,6 +4,7 @@
   "tab__passphrase_test": "Passphrase Test",
   "tab__address_test": "Address Test",
   "tab__security_check": "Security Check",
+  "tab__air_gap_test": "AirGap Test",
 
   "action__search_device": "Search Device",
   "action__clean_device": "Disconnect Device",
@@ -154,5 +155,11 @@
 
   "message__message_is_empty": "Please enter the mnemonic of the device first",
   
+  "message__scan_qr_code": "Scan QR code",
+  "message__get_the_account_on_hardware": "Get the account on the hardware",
+  "message__request_sign_generate_transaction": "1. Generate transaction",
+  "message__request_sign_sign_on_device": "2. Use hardware to scan QR codes and sign transactions",
+  "message__request_sign_get_signature_on_hardware": "3. Scan the hardware signature result",
+
   "ignore": "ignore"
 }
