@@ -27,7 +27,7 @@ const HeaderView = () => {
   const groupItemMemo = useMemo(
     () => (
       <Group
-        $gtXs={{
+        $gtMd={{
           // @ts-expect-error
           orientation: 'horizontal',
         }}
@@ -63,6 +63,14 @@ const HeaderView = () => {
             onPress={() => navigate(Routes.AddressTest)}
           >
             {intl.formatMessage({ id: 'tab__address_test' })}
+          </Button>
+        </Group.Item>
+        <Group.Item>
+          <Button
+            variant={route.name === Routes.AirGapTest ? 'primary' : 'secondary'}
+            onPress={() => navigate(Routes.AirGapTest)}
+          >
+            {intl.formatMessage({ id: 'tab__air_gap_test' })}
           </Button>
         </Group.Item>
       </Group>
@@ -110,6 +118,11 @@ const HeaderView = () => {
               title={intl.formatMessage({ id: 'tab__address_test' })}
               onPress={() => navigate(Routes.AddressTest)}
             />
+
+            <ListItem
+              title={intl.formatMessage({ id: 'tab__air_gap_test' })}
+              onPress={() => navigate(Routes.AirGapTest)}
+            />
           </YGroup>
         </Sheet.Frame>
       </Sheet>
@@ -128,7 +141,7 @@ const HeaderView = () => {
       <H3>Hardware Example</H3>
 
       <XStack minHeight={40} gap="$2">
-        {media.gtSm ? (
+        {media.gtMd ? (
           groupItemMemo
         ) : (
           <>
