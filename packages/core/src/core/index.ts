@@ -236,7 +236,7 @@ export const callAPI = async (message: CoreMessage) => {
       }
 
       // Check to see if it is safe to use Passphrase
-      checkPassphraseSafety(method, device.features);
+      checkPassphraseEnableState(method, device.features);
 
       if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
         // check version
@@ -254,12 +254,14 @@ export const callAPI = async (message: CoreMessage) => {
         }
 
         // Check Device passphrase State
-        const passphraseState = await device.checkPassphraseState();
+        const passphraseStateSafety = await device.checkPassphraseStateSafety(
+          method.payload?.passphraseState
+        );
 
         // Double check, handles the special case of Touch/Pro
-        checkPassphraseSafety(method, device.features);
+        checkPassphraseEnableState(method, device.features);
 
-        if (passphraseState) {
+        if (!passphraseStateSafety) {
           DevicePool.clearDeviceCache(method.payload.connectId);
           return Promise.reject(
             ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
@@ -556,7 +558,7 @@ export const cancel = (connectId?: string) => {
   closePopup();
 };
 
-const checkPassphraseSafety = (method: BaseMethod, features?: Features) => {
+const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
   if (

@@ -122,7 +122,13 @@ export function ReceivePin({
             </Stack>
 
             <Dialog.Close asChild>
-              <Button size="large" onPress={() => onConfirm(val)}>
+              <Button
+                size="large"
+                onPress={() => {
+                  onConfirm(val);
+                  setVal('');
+                }}
+              >
                 {intl.formatMessage({ id: 'action__confirm' })}
               </Button>
             </Dialog.Close>
@@ -136,7 +142,10 @@ export function ReceivePin({
           <Unspaced>
             <Dialog.Close asChild>
               <Button
-                onPress={onCancel}
+                onPress={() => {
+                  setVal('');
+                  onCancel();
+                }}
                 variant="tertiary"
                 circular
                 width={32}

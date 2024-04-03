@@ -586,15 +586,17 @@ export class Device extends EventEmitter {
     return false;
   }
 
-  async checkPassphraseState() {
+  async checkPassphraseStateSafety(passphraseState?: string) {
     if (!this.features) return false;
     const newState = await getPassphraseStateWithRefreshDeviceInfo(this);
 
     // When exists passphraseState, check passphraseState
-    if (this.passphraseState && this.passphraseState !== newState) {
+    if (passphraseState && passphraseState !== newState) {
       this.clearInternalState();
-      return newState;
+      return false;
     }
+
+    return true;
   }
 }
 
