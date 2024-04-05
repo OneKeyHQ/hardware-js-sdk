@@ -17,6 +17,8 @@ import ApiPayloadScreen from './src/views/ApiPayloadScreen';
 const PassphraseTestScreen = lazy(() => import('./src/views/PassphraseTestScreen'));
 const FirmwareScreen = lazy(() => import('./src/views/FirmwareScreen'));
 const AddressTestScreen = lazy(() => import('./src/views/AddressTestScreen'));
+const AirGapScreen = lazy(() => import('./src/views/AirGapScreen'));
+const ScanScreen = lazy(() => import('./src/views/ScanScreen'));
 
 const prefix = ExpoLinking.createURL('/');
 
@@ -50,6 +52,8 @@ function NavigationContent() {
           <StackNavigator.Screen name={Routes.FirmwareUpdateTest} component={FirmwareScreen} />
           <StackNavigator.Screen name={Routes.PassphraseTest} component={PassphraseTestScreen} />
           <StackNavigator.Screen name={Routes.AddressTest} component={AddressTestScreen} />
+          <StackNavigator.Screen name={Routes.AirGapTest} component={AirGapScreen} />
+          <StackNavigator.Screen name={Routes.Scan} component={ScanScreen} />
         </StackNavigator.Navigator>
       </Stack>
     </NavigationContainer>

@@ -6,6 +6,7 @@
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx"
-, "src/utils/mockDevice/ecc.js"  ]
+    "**/*.tsx",
+    "src/utils/mockDevice/ecc.js"
+  ]
 }
