@@ -77,6 +77,10 @@ const playgroundConfig = [
     data: require('../data/nexa').default,
   },
   {
+    title: 'Nervos API',
+    data: require('../data/nervos').default,
+  },
+  {
     title: 'Polkadot API',
     data: require('../data/polkadot').default,
   },
