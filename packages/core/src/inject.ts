@@ -287,4 +287,9 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nervosGetAddress' }),
   nervosSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'nervosSignTransaction' }),
+
+  dnxGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'dnxGetAddress' }),
+  dnxSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'dnxSignTransaction' }),
 });

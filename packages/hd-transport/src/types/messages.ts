@@ -1245,6 +1245,61 @@ export type EcdsaPublicKeys = {
   public_keys: string[];
 };
 
+// DnxGetAddress
+export type DnxGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// DnxAddress
+export type DnxAddress = {
+  address?: string;
+};
+
+// DnxSignTx
+export type DnxSignTx = {
+  address_n: number[];
+  inputs_count: number;
+  to_address: string;
+  amount: UintType;
+  fee: UintType;
+  payment_id?: string;
+};
+
+export type DnxTxKey = {
+  ephemeral_tx_sec_key?: string;
+  ephemeral_tx_pub_key?: string;
+};
+
+export type DnxComputedKeyImage = {
+  key_image: string;
+};
+
+// DnxInputRequest
+export type DnxInputRequest = {
+  request_index?: number;
+  tx_key?: DnxTxKey;
+  computed_key_image?: DnxComputedKeyImage;
+};
+
+// DnxInputAck
+export type DnxInputAck = {
+  prev_index: number;
+  global_index: number;
+  tx_pubkey: string;
+  prev_out_pubkey: string;
+  amount: UintType;
+};
+
+// DnxRTSigsRequest
+export type DnxRTSigsRequest = {};
+
+// DnxSignedTx
+export type DnxSignedTx = {
+  signatures: string[];
+  output_keys: string[];
+};
+
 // EmmcFixPermission
 export type EmmcFixPermission = {};
 
@@ -3855,6 +3910,15 @@ export type MessageType = {
   Path: Path;
   BatchGetPublickeys: BatchGetPublickeys;
   EcdsaPublicKeys: EcdsaPublicKeys;
+  DnxGetAddress: DnxGetAddress;
+  DnxAddress: DnxAddress;
+  DnxSignTx: DnxSignTx;
+  DnxTxKey: DnxTxKey;
+  DnxComputedKeyImage: DnxComputedKeyImage;
+  DnxInputRequest: DnxInputRequest;
+  DnxInputAck: DnxInputAck;
+  DnxRTSigsRequest: DnxRTSigsRequest;
+  DnxSignedTx: DnxSignedTx;
   EmmcFixPermission: EmmcFixPermission;
   EmmcPath: EmmcPath;
   EmmcPathInfo: EmmcPathInfo;
