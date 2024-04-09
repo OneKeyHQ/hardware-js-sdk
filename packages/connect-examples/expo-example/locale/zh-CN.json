@@ -3,6 +3,7 @@
   "tab__firmware_update": "固件更新",
   "tab__passphrase_test": "Passphrase 测试",
   "tab__address_test": "地址测试",
+  "tab__security_check": "安全检查",
 
   "action__search_device": "搜索设备",
   "action__clean_device": "断开连接",
@@ -148,7 +149,9 @@
   "message__passphrase_count_test_step3": "3. 当设备再次要求输入 passphrase 时，测试结束",
 
   "message__passphrase_special_test_describe": "请输入与当前设备一致的助记词",
-
+  "message__test_device_create_wallet_describe": "在硬件上创建钱包，将助记词输入在这里，用来验证硬件的助记词是否正确",
+  "message__test_blind_signature_security_check_describe": "检查钱包盲签安全性，是否可以使用规定 CoinType 之外的私钥签名",
+  
   "message__message_is_empty": "请先输入设备的助记词",
 
   "ignore": "忽略"

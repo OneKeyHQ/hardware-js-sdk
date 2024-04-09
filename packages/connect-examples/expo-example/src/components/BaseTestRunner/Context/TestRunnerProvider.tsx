@@ -1,7 +1,7 @@
 import { createContext, useMemo, useState } from 'react';
 
-import type { Features } from '@onekeyfe/hd-transport';
-import type { TestCase, TestCaseDataWithKey } from '../types';
+import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
+import type { TestCaseDataWithKey } from '../types';
 
 export const TestRunnerContext = createContext<{
   runnerTestCaseTitle?: string;
@@ -12,6 +12,9 @@ export const TestRunnerContext = createContext<{
 
   runningDeviceFeatures?: Features;
   setRunningDeviceFeatures?: React.Dispatch<React.SetStateAction<Features>>;
+
+  runningOneKeyDeviceFeatures?: OnekeyFeatures;
+  setRunningOneKeyDeviceFeatures?: React.Dispatch<React.SetStateAction<OnekeyFeatures>>;
 
   timestampBeginTest?: number;
   setTimestampBeginTest?: React.Dispatch<React.SetStateAction<number>>;
@@ -34,6 +37,7 @@ export function TestRunnerProvider({ children }: { children: React.ReactNode }) 
   const [runnerTestCaseTitle, setRunnerTestCaseTitle] = useState<string>();
   const [runnerDone, setRunnerDone] = useState<boolean>();
   const [runningDeviceFeatures, setRunningDeviceFeatures] = useState<Features>();
+  const [runningOneKeyDeviceFeatures, setRunningOneKeyDeviceFeatures] = useState<OnekeyFeatures>();
   const [timestampBeginTest, setTimestampBeginTest] = useState<number>();
   const [timestampEndTest, setTimestampEndTest] = useState<number>();
 
@@ -47,6 +51,8 @@ export function TestRunnerProvider({ children }: { children: React.ReactNode }) 
       setRunnerDone,
       runningDeviceFeatures,
       setRunningDeviceFeatures,
+      runningOneKeyDeviceFeatures,
+      setRunningOneKeyDeviceFeatures,
       timestampBeginTest,
       setTimestampBeginTest,
       timestampEndTest,
@@ -60,6 +66,7 @@ export function TestRunnerProvider({ children }: { children: React.ReactNode }) 
       runnerLogs,
       runnerTestCaseTitle,
       runningDeviceFeatures,
+      runningOneKeyDeviceFeatures,
       timestampBeginTest,
       timestampEndTest,
     ]

@@ -266,7 +266,7 @@ function ExecuteView() {
             // @ts-expect-error
             const mockRes = mockDevice?.[method]?.('', '', {
               ...params,
-              mnemonic,
+              mnemonic: mnemonic.trim(),
               passphrase: item.passphrase,
             });
 

@@ -3,6 +3,7 @@
   "tab__firmware_update": "Firmware Update",
   "tab__passphrase_test": "Passphrase Test",
   "tab__address_test": "Address Test",
+  "tab__security_check": "Security Check",
 
   "action__search_device": "Search Device",
   "action__clean_device": "Disconnect Device",
@@ -148,6 +149,8 @@
   "message__passphrase_count_test_step3": "3. The test ends when the device asks for passphrase again",
 
   "message__passphrase_special_test_describe": "To enter a mnemonic that is consistent with the current device",
+  "message__test_device_create_wallet_describe": "Create a wallet on the hardware and enter the mnemonic words here to verify that the hardware's mnemonic words are correct",
+  "message__test_blind_signature_security_check_describe": "Check wallet blind signature security to see if you can sign with a private key other than the specified coin type",
 
   "message__message_is_empty": "Please enter the mnemonic of the device first",
   
