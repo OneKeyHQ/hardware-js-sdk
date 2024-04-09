@@ -36,6 +36,16 @@ const api: PlaygroundProps[] = [
     method: 'getOnekeyFeatures',
     description: 'Get features of a device',
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+    },
   },
   {
     method: 'getPassphraseState',

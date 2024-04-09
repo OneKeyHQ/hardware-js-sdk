@@ -26,6 +26,7 @@
   "action__update_restart": "Restart installation update",
 
   "action__start_test": "Start Test",
+  "action__start_error_test": "Start testing failed cases",
   "action__stop_test": "Stop Test",
 
   "tip__update_ready": "There are new versions that can be updated",

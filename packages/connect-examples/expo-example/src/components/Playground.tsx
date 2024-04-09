@@ -40,6 +40,7 @@ export type PlaygroundProps = {
   presupposes?: PresupposeProps[];
   deprecated?: boolean;
 
+  // eslint-disable-next-line react/no-unused-prop-types
   expect?: TestDeviceExpect;
 } & MethodPayload;
 

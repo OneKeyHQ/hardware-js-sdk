@@ -5215,7 +5215,7 @@
             "default": "kaspa"
           }
         },
-        "schema": {
+        "scheme": {
           "type": "string",
           "id": 4,
           "options": {
@@ -5248,7 +5248,7 @@
           "type": "bytes",
           "id": 2
         },
-        "schema": {
+        "scheme": {
           "type": "string",
           "id": 3,
           "options": {

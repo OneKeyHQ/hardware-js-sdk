@@ -11,13 +11,6 @@ const api: PlaygroundProps[] = [
           path: "m/44'/1237'/0'/0/0",
           showOnOneKey: true,
         },
-        expect: {
-          classic1s: {
-            normal: {
-              unknownMessage: true,
-            },
-          },
-        },
       },
       {
         title: 'Batch Get Public Key',
@@ -41,13 +34,6 @@ const api: PlaygroundProps[] = [
             },
           ],
         },
-        expect: {
-          classic1s: {
-            normal: {
-              unknownMessage: true,
-            },
-          },
-        },
       },
     ],
   },
@@ -64,13 +50,6 @@ const api: PlaygroundProps[] = [
             content: 'Hello world',
             tags: [],
             created_at: 1702268010,
-          },
-        },
-        expect: {
-          classic1s: {
-            normal: {
-              unknownMessage: true,
-            },
           },
         },
       },
@@ -90,13 +69,6 @@ const api: PlaygroundProps[] = [
             ],
           },
         },
-        expect: {
-          classic1s: {
-            normal: {
-              unknownMessage: true,
-            },
-          },
-        },
       },
     ],
   },
@@ -111,13 +83,6 @@ const api: PlaygroundProps[] = [
           pubkey: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
           plaintext: 'Hello world',
           showOnOneKey: false,
-        },
-        expect: {
-          classic1s: {
-            normal: {
-              unknownMessage: true,
-            },
-          },
         },
       },
     ],
@@ -134,13 +99,6 @@ const api: PlaygroundProps[] = [
           ciphertext: 'VpWFJ7JDFv16jL7pBZ1shw==?iv=$1tPpwGD3Ic1RTVXJx1ZG7Q==',
           showOnOneKey: false,
         },
-        expect: {
-          classic1s: {
-            normal: {
-              unknownMessage: true,
-            },
-          },
-        },
       },
     ],
   },
@@ -153,13 +111,6 @@ const api: PlaygroundProps[] = [
         value: {
           path: "m/44'/1237'/0'/0/0",
           hash: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
-        },
-        expect: {
-          classic1s: {
-            normal: {
-              unknownMessage: true,
-            },
-          },
         },
       },
     ],
