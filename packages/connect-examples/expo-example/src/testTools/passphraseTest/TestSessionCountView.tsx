@@ -10,9 +10,10 @@ import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import AutoWrapperTextArea from '../../components/ui/AutoWrapperTextArea';
 import { Button } from '../../components/ui/Button';
 import PanelView from '../../components/ui/Panel';
-import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
+
 import { downloadFile } from '../../utils/downloadUtils';
 import { SwitchInput } from '../../components/SwitchInput';
+import { getDeviceInfo } from '../../utils/deviceUtils';
 
 function generatePassphrase(list: any[] | undefined) {
   return `$A& b${(list?.length ?? 0) + 1}`;
@@ -34,7 +35,7 @@ function ExportReportView({
     markdown.push(`# Passphrase Count Test (${testCoin})`);
 
     markdown.push(`## Device Info`);
-    const deviceInfo = getDeviceInfo(deviceFeatures);
+    const deviceInfo = getDeviceInfo(deviceFeatures, undefined);
     markdown.push(`| Key | Value |`);
     markdown.push(`| --- | --- |`);
     Object.keys(deviceInfo).forEach(key => {

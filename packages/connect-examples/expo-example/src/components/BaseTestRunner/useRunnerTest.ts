@@ -55,7 +55,10 @@ type RunnerConfig<T> = {
     deviceId: string,
     requestParams: any,
     item: TestCaseDataWithKey<T>
-  ) => Promise<Unsuccessful | Success<any>>;
+  ) => Promise<{
+    payload: Unsuccessful | Success<any>;
+    skipVerify?: boolean;
+  }>;
   processResponse: (
     response: any,
     item: TestCaseDataWithKey<T>,
@@ -93,6 +96,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     setTimestampEndTest,
     setRunnerDone,
     setRunningDeviceFeatures,
+    setRunningOneKeyDeviceFeatures,
     setItemValues,
     setRunnerLogs,
   } = useContext(TestRunnerContext);
@@ -145,6 +149,14 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       const deviceId = featuresRes.payload?.device_id ?? '';
       setRunningDeviceFeatures?.(featuresRes.payload);
       const deviceFeatures = featuresRes.payload;
+
+      try {
+        const onekeyFeatures = await SDK.getOnekeyFeatures(connectId);
+        // @ts-expect-error
+        setRunningOneKeyDeviceFeatures?.(onekeyFeatures.payload);
+      } catch (error) {
+        // ignore
+      }
 
       const context = {
         printLog: (log: string) => {
@@ -206,7 +218,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
           let res: Unsuccessful | Success<any>;
           let skipVerify = false;
           if (processRequest) {
-            const result = await processRequest(
+            const response = await processRequest(
               SDK,
               method,
               connectId,
@@ -214,8 +226,9 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
               requestParams,
               item
             );
-            res = result.payload;
-            skipVerify = result.skipVerify ?? false;
+
+            res = response.payload;
+            skipVerify = response.skipVerify ?? false;
           } else {
             // @ts-expect-error
             res = await SDK[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
@@ -284,6 +297,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     setItemValues,
     clearItemVerifyState,
     endTestRunner,
+    setRunningOneKeyDeviceFeatures,
     prepareRunnerTestCase,
     prepareRunnerTestCaseDelay,
     generateRequestParams,
