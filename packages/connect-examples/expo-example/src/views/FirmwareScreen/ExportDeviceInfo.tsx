@@ -1,14 +1,8 @@
 import { useIntl } from 'react-intl';
-import {
-  getDeviceBootloaderVersion,
-  getDeviceFirmwareVersion,
-  getDeviceType,
-  getDeviceUUID,
-} from '@onekeyfe/hd-core';
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
 import { Button } from '../../components/ui/Button';
 import { downloadFile } from '../../utils/downloadUtils';
 import { useDeviceFieldContext } from './DeviceFieldContext';
+import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 
 export const deviceInfoKeys = [
   //   ['device_id', 'label'],
@@ -47,33 +41,6 @@ export function formatCurrentTime(timestamp: number) {
   return formatter.format(timestamp);
 }
 
-export function getDeviceBasicInfo(
-  features: Features | undefined,
-  onekeyFeatures: OnekeyFeatures | undefined
-) {
-  const deviceType = getDeviceType(features)?.toUpperCase() || 'UNKNOWN';
-  const serialNumber = features && getDeviceUUID(features);
-
-  const bleVersion = `${features?.ble_ver}-${onekeyFeatures?.onekey_ble_build_id}`;
-  const bootloaderVersion =
-    features &&
-    `${getDeviceBootloaderVersion(features)?.join('.')}-${onekeyFeatures?.onekey_boot_build_id}`;
-  const boardloaderVersion =
-    features && `${features?.onekey_board_version}-${onekeyFeatures?.onekey_board_build_id}`;
-  const firmwareVersion =
-    features &&
-    `${getDeviceFirmwareVersion(features)?.join('.')}-${onekeyFeatures?.onekey_firmware_build_id}`;
-
-  return {
-    deviceType,
-    serialNumber,
-    bleVersion,
-    bootloaderVersion,
-    boardloaderVersion,
-    firmwareVersion,
-  };
-}
-
 export function ExportDeviceInfo() {
   const intl = useIntl();
   const { features, onekeyFeatures } = useDeviceFieldContext();
@@ -94,7 +61,7 @@ export function ExportDeviceInfo() {
 
     const bootloaderMode = intl.formatMessage({
       id:
-        features.bootloader_mode === true
+        features?.bootloader_mode === true
           ? 'label__device_bootloader_statue'
           : 'label__device_firmware_status',
     });
