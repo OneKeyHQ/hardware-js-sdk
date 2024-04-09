@@ -2,10 +2,10 @@ import { useContext, useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
 
 import { TestCaseDataWithKey } from './types';
-import { getDeviceInfo } from './utils';
 import { downloadFile } from '../../utils/downloadUtils';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
 import { ItemVerifyState, itemVerifyStateAtom } from './Context/TestRunnerVerifyProvider';
+import { getDeviceInfo } from '../../utils/deviceUtils';
 
 export default function useExportReport<T>({
   fileName = 'TestReport',
@@ -35,6 +35,7 @@ export default function useExportReport<T>({
       timestampEndTest,
       itemValues,
       runningDeviceFeatures,
+      runningOneKeyDeviceFeatures,
     } = runnerInfo;
 
     if (!itemVerifyState) return;
@@ -60,7 +61,7 @@ export default function useExportReport<T>({
     markdown.push(``);
 
     markdown.push(`## Device Info`);
-    const deviceInfo = getDeviceInfo(runningDeviceFeatures);
+    const deviceInfo = getDeviceInfo(runningDeviceFeatures, runningOneKeyDeviceFeatures);
     markdown.push(`| Key | Value |`);
     markdown.push(`| --- | --- |`);
     Object.keys(deviceInfo).forEach(key => {

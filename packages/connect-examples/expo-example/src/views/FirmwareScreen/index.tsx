@@ -16,7 +16,8 @@ import { MessageBox } from './MessageBox';
 import { FirmwareUpdateEvent } from './FirmwareUpdateEvent';
 import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
-import { ExportDeviceInfo, formatCurrentTime, getDeviceBasicInfo } from './ExportDeviceInfo';
+import { ExportDeviceInfo, formatCurrentTime } from './ExportDeviceInfo';
+import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
 type UpdateState = {

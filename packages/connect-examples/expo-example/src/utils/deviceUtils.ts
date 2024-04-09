@@ -1,144 +1,99 @@
 import {
-  IDeviceType,
-  SearchDevice,
-  Success,
-  Unsuccessful,
+  getDeviceBootloaderVersion,
+  getDeviceFirmwareVersion,
   getDeviceType,
-  Features,
+  getDeviceUUID,
 } from '@onekeyfe/hd-core';
+import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
 
-import { getHardwareSDKInstance } from './hardwareInstance';
+export function getDeviceBasicInfo(
+  features: Features | undefined,
+  onekeyFeatures: OnekeyFeatures | undefined
+) {
+  const deviceType = getDeviceType(features)?.toUpperCase() || 'UNKNOWN';
+  const serialNumber = features && getDeviceUUID(features);
 
-/**
- * will delete packages/kit/src/utils/device
- * so declare it here
- */
+  const bleBuildId = onekeyFeatures?.onekey_ble_build_id || features?.onekey_ble_build_id;
+  const bleVersion = `${features?.ble_ver}-${bleBuildId}`;
 
-type IPollFn<T> = (time?: number) => T;
+  const bootloaderBuildId = onekeyFeatures?.onekey_boot_build_id || features?.onekey_boot_build_id;
+  const bootloaderVersion =
+    features && `${getDeviceBootloaderVersion(features)?.join('.')}-${bootloaderBuildId}`;
 
-const MAX_SEARCH_TRY_COUNT = 15;
-const MAX_CONNECT_TRY_COUNT = 5;
-const POLL_INTERVAL = 1000;
-const POLL_INTERVAL_RATE = 1.5;
+  const boardloaderVersion =
+    features && `${features?.onekey_board_version}-${onekeyFeatures?.onekey_board_build_id}`;
 
-export enum DeviceErrors {
-  ConnectTimeout = 'ConnectTimeout',
-  NeedOneKeyBridge = 'NeedOneKeyBridge',
+  const firmwareBuildId =
+    onekeyFeatures?.onekey_firmware_build_id || features?.onekey_firmware_build_id;
+  const firmwareVersion =
+    features && `${getDeviceFirmwareVersion(features)?.join('.')}-${firmwareBuildId}`;
+
+  return {
+    deviceType,
+    serialNumber,
+    bleVersion,
+    bootloaderVersion,
+    boardloaderVersion,
+    firmwareVersion,
+  };
 }
 
-class DeviceUtils {
-  connectedDeviceType: IDeviceType = 'classic';
+export function getDeviceInfo(
+  features: Features | undefined,
+  onekeyFeatures: OnekeyFeatures | undefined
+) {
+  const {
+    deviceType,
+    serialNumber,
+    bleVersion,
+    bootloaderVersion,
+    boardloaderVersion,
+    firmwareVersion,
+  } = getDeviceBasicInfo(features, onekeyFeatures);
 
-  scanning = false;
+  const firmwareHash = onekeyFeatures?.onekey_firmware_hash || features?.onekey_firmware_hash;
 
-  tryCount = 0;
+  const bootloaderHash =
+    onekeyFeatures?.onekey_boot_hash || features?.onekey_boot_hash || features?.bootloader_hash;
 
-  async getSDKInstance() {
-    return getHardwareSDKInstance();
-  }
+  const se01BuildId = onekeyFeatures?.onekey_se01_build_id || features?.onekey_se01_build_id;
+  const se01Version = `${features?.onekey_se01_version || features?.se_ver}-${se01BuildId}`;
+  const se01Hash = onekeyFeatures?.onekey_se01_hash;
 
-  startDeviceScan(callback: (searchResponse: Unsuccessful | Success<SearchDevice[]>) => void) {
-    const searchDevices = async () => {
-      const HardwareSDK = await this.getSDKInstance();
-      const searchResponse = await HardwareSDK?.searchDevices();
-      callback(searchResponse);
+  const se02BuildId = onekeyFeatures?.onekey_se02_build_id;
+  const se02Version = `${features?.onekey_se02_version}-${se02BuildId}`;
+  const se02Hash = onekeyFeatures?.onekey_se02_hash;
 
-      this.tryCount += 1;
-      return searchResponse;
-    };
+  const se03BuildId = onekeyFeatures?.onekey_se03_build_id;
+  const se03Version = `${features?.onekey_se03_version}-${se03BuildId}`;
+  const se03Hash = onekeyFeatures?.onekey_se03_hash;
 
-    const poll: IPollFn<void> = async (time = POLL_INTERVAL) => {
-      if (!this.scanning) {
-        return;
-      }
-      if (this.tryCount > MAX_SEARCH_TRY_COUNT) {
-        this.stopScan();
-        return;
-      }
+  const se04BuildId = onekeyFeatures?.onekey_se04_build_id;
+  const se04Version = `${features?.onekey_se04_version}-${se04BuildId}`;
+  const se04Hash = onekeyFeatures?.onekey_se04_hash;
 
-      const response = await searchDevices();
+  const boardloaderHash = onekeyFeatures?.onekey_board_hash || features?.onekey_board_hash;
 
-      if (!response.success) {
-        return Promise.reject(response);
-      }
+  const bleHash = onekeyFeatures?.onekey_ble_hash || features?.onekey_ble_hash;
 
-      return new Promise((resolve: (p: void) => void) =>
-        // eslint-disable-next-line no-promise-executor-return
-        setTimeout(() => resolve(poll(time * POLL_INTERVAL_RATE)), time)
-      );
-    };
-
-    this.scanning = true;
-    poll();
-  }
-
-  stopScan() {
-    this.scanning = false;
-    this.tryCount = 0;
-  }
-
-  async connect(connectId: string) {
-    const result = await this.getFeatures(connectId);
-    return result !== null;
-  }
-
-  async getFeatures(connectId: string) {
-    const HardwareSDK = await this.getSDKInstance();
-    const response = await HardwareSDK?.getFeatures(connectId);
-
-    if (response.success) {
-      this.connectedDeviceType = getDeviceType(response.payload);
-      return response.payload;
-    }
-    return null;
-  }
-
-  async getFeaturesWithError(connectId: string) {
-    const HardwareSDK = await this.getSDKInstance();
-    const response = await HardwareSDK?.getFeatures(connectId);
-    if (response.success) {
-      this.connectedDeviceType = getDeviceType(response.payload);
-      return response.payload;
-    }
-    throw new Error(response.payload.error ?? response.payload);
-  }
-
-  async ensureConnected(connectId: string) {
-    let tryCount = 0;
-    let connected = false;
-    const poll: IPollFn<Promise<Features>> = async (time = POLL_INTERVAL) => {
-      if (connected) {
-        return Promise.resolve({} as Features);
-      }
-      tryCount += 1;
-      try {
-        const feature = await this.getFeaturesWithError(connectId);
-        if (feature) {
-          connected = true;
-          return await Promise.resolve(feature);
-        }
-      } catch (e) {
-        console.log('feature 报错 ======== =========');
-        // stop when device not bonded
-        if ((e as unknown as Error).message.includes('device is not bonded')) {
-          return Promise.reject(e);
-        }
-        console.log(e);
-      }
-
-      if (tryCount > MAX_CONNECT_TRY_COUNT) {
-        return Promise.reject(DeviceErrors.ConnectTimeout);
-      }
-      return new Promise((resolve: (p: Promise<Features>) => void) =>
-        // eslint-disable-next-line no-promise-executor-return
-        setTimeout(() => resolve(poll(time * POLL_INTERVAL_RATE)), time)
-      );
-    };
-
-    return poll();
-  }
+  return {
+    deviceType,
+    serialNumber,
+    boardloaderVersion,
+    boardloaderHash,
+    bootloaderVersion,
+    bootloaderHash,
+    se01Version,
+    se01Hash,
+    se02Version,
+    se02Hash,
+    se03Version,
+    se03Hash,
+    se04Version,
+    se04Hash,
+    firmwareVersion,
+    firmwareHash,
+    bleVersion,
+    bleHash,
+  };
 }
-
-const deviceUtils = new DeviceUtils();
-
-export default deviceUtils;

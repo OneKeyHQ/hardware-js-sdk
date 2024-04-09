@@ -265,7 +265,6 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       passphrase,
       showOnOneKey,
       stopTest,
-      beginTest,
       testCaseList,
       testDescription,
     ]
