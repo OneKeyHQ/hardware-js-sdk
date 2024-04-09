@@ -18,10 +18,6 @@ import {
   batchTestCases as batchVariantAddressTestCases,
   testCases as addressVariantTestCases,
 } from '../testTools/addressTest/dataVariant';
-import {
-  batchTestCases as batchVariantPubkeyTestCases,
-  testCases as pubkeyVariantTestCases,
-} from '../testTools/pubkeyTest/dataVariant';
 import PageView from '../components/ui/Page';
 import PanelView from '../components/ui/Panel';
 import { MnemonicAddressValidation } from '../testTools/addressTest/MnemonicAddressValidation';

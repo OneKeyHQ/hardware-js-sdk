@@ -51,17 +51,22 @@ const api: PlaygroundProps[] = [
     expect: {
       common: {
         normal: {
-          skip: true,
+          requestPin: true,
         },
       },
       touch: {
         normal: {
-          requestPin: true,
+          unknownMessage: true,
+        },
+      },
+      classic1s: {
+        normal: {
+          unknownMessage: true,
         },
       },
       pro: {
         normal: {
-          requestPin: true,
+          unknownMessage: true,
         },
       },
     },
@@ -244,9 +249,24 @@ const api: PlaygroundProps[] = [
           pin_protection: true,
         },
         expect: {
+          common: {
+            normal: {
+              requestPin: true,
+            },
+          },
           classic1s: {
             normal: {
-              error: true,
+              unknownMessage: true,
+            },
+          },
+          touch: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
+          pro: {
+            normal: {
+              unknownMessage: true,
             },
           },
         },
@@ -408,6 +428,28 @@ const api: PlaygroundProps[] = [
     method: 'deviceBackup',
     description: 'Backup a device',
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          requestPin: true,
+        },
+      },
+      classic1s: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+      touch: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+      pro: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+    },
   },
   {
     method: 'deviceGetFirmwareHash',

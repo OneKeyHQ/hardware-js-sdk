@@ -26,6 +26,7 @@
   "action__update_restart": "重启并安装更新",
 
   "action__start_test": "开始测试",
+  "action__start_error_test": "开始测试失败用例",
   "action__stop_test": "停止测试",
 
   "tip__update_ready": "检测到新的版本可以更新，点击进行安装",

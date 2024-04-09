@@ -123,6 +123,8 @@ export function validateResult(
     expectedLength?: number | undefined | null;
   }
 ) {
+  console.log('=====>>>>> validateResult', result, nonNullableFields, options);
+
   if (Array.isArray(result)) {
     if (options?.expectedLength !== null && result.length !== options?.expectedLength) {
       throw invalidResponse(

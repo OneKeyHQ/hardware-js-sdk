@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useContext } from 'react';
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE, getDeviceType } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
 import { useIntl } from 'react-intl';
@@ -20,6 +20,7 @@ import cardanoApi from '../../../data/cardano';
 import confluxApi from '../../../data/conflux';
 import cosmosApi from '../../../data/cosmos';
 import cryptoApi from '../../../data/crypto';
+import dynexApi from '../../../data/dynex';
 import debugApi from '../../../data/debug';
 import emmcApi from '../../../data/emmc';
 import ethereumApi from '../../../data/ethereum';
@@ -43,11 +44,29 @@ import { Button } from '../../../components/ui/Button';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { CommonInput } from '../../../components/CommonInput';
+import { TestRunnerContext } from '../../../components/BaseTestRunner/Context/TestRunnerProvider';
 
 type TestCaseDataType = ApiExportTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
 
 type TestClass = 'normal' | 'bootloader';
+
+function TestRunnerErrorButtons({
+  onStart: start,
+  onExistsErrorCase,
+}: {
+  onStart: () => void;
+  onExistsErrorCase: () => boolean;
+}) {
+  const { runnerDone } = useContext(TestRunnerContext);
+  const intl = useIntl();
+
+  return runnerDone !== false && onExistsErrorCase?.() ? (
+    <Button variant="primary" onPress={start}>
+      {intl.formatMessage({ id: 'action__start_error_test' })}
+    </Button>
+  ) : null;
+}
 
 function ExportReportView({
   testModel = 'normal',
@@ -149,6 +168,7 @@ testCaseMap.set('cardano', cardanoApi);
 testCaseMap.set('conflux', confluxApi);
 testCaseMap.set('cosmos', cosmosApi);
 testCaseMap.set('crypto', cryptoApi);
+testCaseMap.set('dynex', dynexApi);
 testCaseMap.set('debug', debugApi);
 testCaseMap.set('device', deviceApi);
 testCaseMap.set('emmc', emmcApi);
@@ -210,6 +230,8 @@ function ExecuteView() {
 
   const normalNextDelayMs = useRef('2500');
   const bootNextDelayMs = useRef('500');
+
+  const errorCaseRef = useRef<TestCaseDataWithKey<TestCaseDataType>[]>([]);
 
   const nextRequestCleanUpRef = useRef(false);
   const currentRequestDeviceRef = useRef<TestDeviceType>(undefined);
@@ -273,6 +295,10 @@ function ExecuteView() {
     return sleep(delayMs);
   };
 
+  function addErrorCase(item: TestCaseDataWithKey<TestCaseDataType>) {
+    errorCaseRef.current.push(item);
+  }
+
   const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
     initTestCase: async (context, sdk) => {
       const { connectId } = context;
@@ -301,6 +327,15 @@ function ExecuteView() {
       if (currentTestClass === 'bootloader' && !hasBootloaderMode) {
         await sdk.deviceUpdateReboot(connectId ?? '');
         await sleep(5 * 1000);
+      }
+
+      if (errorCaseRef.current?.length > 0) {
+        const preErrorCase = errorCaseRef.current;
+        errorCaseRef.current = [];
+        return Promise.resolve({
+          title: 'Api Export Test (Pre Error)',
+          data: preErrorCase,
+        });
       }
 
       const testCases: TestCaseDataWithKey<TestCaseDataType>[] = [];
@@ -456,6 +491,7 @@ function ExecuteView() {
           }
           return { payload: res, skipVerify: true };
         } catch (error) {
+          addErrorCase(item);
           console.log('=====>>>>> processRequest error: ', error);
           return {
             payload: {
@@ -473,6 +509,8 @@ function ExecuteView() {
       const result = await withTimeout(sdkPromise(), 30 * 1000);
 
       if (result === 'timeout') {
+        addErrorCase(item);
+
         // clean up device
         nextRequestCleanUpRef.current = true;
         sdk.getFeatures(connectId, {
@@ -501,6 +539,7 @@ function ExecuteView() {
       if (res.payload?.code === 'timeout') {
         verifyState = 'fail';
         error = res.payload?.error;
+        addErrorCase(item);
       } else if (item.result.error && (res.payload?.code === 800 || res.success === false)) {
         verifyState = 'success';
       } else if (item.result.success && res.success) {
@@ -528,6 +567,7 @@ function ExecuteView() {
       } else {
         verifyState = 'fail';
         error = JSON.stringify(res.payload, null, 2);
+        addErrorCase(item);
       }
 
       return Promise.resolve({
@@ -587,6 +627,10 @@ function ExecuteView() {
         />
         <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
         <ExportReportView testScope={currentTestCaseType} testModel={currentTestClass} />
+        <TestRunnerErrorButtons
+          onStart={beginTest}
+          onExistsErrorCase={() => errorCaseRef.current.length > 0}
+        />
       </Stack>
     </>
   );
