@@ -130,7 +130,7 @@ function ExecuteView() {
       const res = await sdk[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
 
       const newRes = {
-        ...res,
+        payload: res,
         skipVerify: true,
       };
 
