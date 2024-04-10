@@ -15,12 +15,7 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
-    this.hasBundle = !!this.payload?.bundle;
-    const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
-
-    // check payload
-    validateParams(payload, [{ name: 'bundle', type: 'array' }]);
-
+    const { payload } = this;
     // init params
     const addressN = validatePath(payload.path, 3);
 
@@ -43,8 +38,10 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
       to_address: payload.toAddress,
       amount: payload.amount,
       fee: payload.fee,
-      payment_id: payload.paymentIdHex,
     };
+    if (payload.paymentIdHex) {
+      this.params.payment_id = stripHexPrefix(payload.paymentIdHex);
+    }
   }
 
   getVersionRange() {
@@ -67,11 +64,7 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
       const { inputs } = this.payload;
       const { request_index, tx_key, computed_key_image } = res.message;
 
-      if (tx_key) {
-        if (!tx_key.ephemeral_tx_sec_key || !tx_key.ephemeral_tx_pub_key) {
-          throw new Error('tx_key missing in response');
-        }
-
+      if (tx_key?.ephemeral_tx_sec_key && tx_key?.ephemeral_tx_pub_key) {
         signature = {
           ...signature,
           txKey: {
@@ -81,7 +74,7 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
         };
       }
 
-      if (computed_key_image) {
+      if (computed_key_image?.key_image) {
         signature = {
           ...signature,
           computedKeyImages: [...(signature.computedKeyImages ?? []), computed_key_image.key_image],
@@ -89,7 +82,8 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
       }
 
       if (request_index) {
-        const input = inputs[request_index];
+        const input = inputs[request_index - 1];
+
         const signRes = await typedCall('DnxInputAck', 'DnxInputRequest', {
           prev_index: input.prevIndex,
           global_index: input.globalIndex,

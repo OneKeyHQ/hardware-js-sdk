@@ -1272,7 +1272,7 @@ export type DnxTxKey = {
 };
 
 export type DnxComputedKeyImage = {
-  key_image: string;
+  key_image?: string;
 };
 
 // DnxInputRequest

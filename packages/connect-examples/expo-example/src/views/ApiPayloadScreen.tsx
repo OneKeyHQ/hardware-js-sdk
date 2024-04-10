@@ -53,6 +53,10 @@ const playgroundConfig = [
     data: require('../data/cosmos').default,
   },
   {
+    title: 'Dynex API',
+    data: require('../data/dynex').default,
+  },
+  {
     title: 'Filecoin API',
     data: require('../data/filecoin').default,
   },

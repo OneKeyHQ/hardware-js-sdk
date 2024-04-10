@@ -3527,7 +3527,6 @@
         "DnxComputedKeyImage": {
           "fields": {
             "key_image": {
-              "rule": "required",
               "type": "bytes",
               "id": 1
             }

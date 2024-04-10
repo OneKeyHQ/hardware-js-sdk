@@ -27,7 +27,6 @@ export default class DnxGetAddress extends BaseMethod<HardwareDnxGetAddress[]> {
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'showOnOneKey', type: 'boolean' },
-        { name: 'network', type: 'string' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
@@ -35,7 +34,6 @@ export default class DnxGetAddress extends BaseMethod<HardwareDnxGetAddress[]> {
       this.params.push({
         address_n: addressN,
         show_display: showOnOneKey,
-        network: batch.network,
       });
     });
   }
