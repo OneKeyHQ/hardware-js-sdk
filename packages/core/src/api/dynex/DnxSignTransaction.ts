@@ -46,11 +46,8 @@ export default class DnxSignTransaction extends BaseMethod<DnxSignTx> {
 
   getVersionRange() {
     return {
-      model_mini: {
-        min: '3.7.0',
-      },
-      model_touch: {
-        min: '4.9.0',
+      classic: {
+        min: '3.8.0',
       },
     };
   }

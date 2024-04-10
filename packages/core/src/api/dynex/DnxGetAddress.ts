@@ -40,11 +40,8 @@ export default class DnxGetAddress extends BaseMethod<HardwareDnxGetAddress[]> {
 
   getVersionRange() {
     return {
-      model_mini: {
-        min: '3.7.0',
-      },
-      model_touch: {
-        min: '4.9.0',
+      classic: {
+        min: '3.8.0',
       },
     };
   }

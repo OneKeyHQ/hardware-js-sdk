@@ -14,7 +14,7 @@ export type DnxSignTransactionParams = {
     txPubkey: string;
     prevOutPubkey: string;
     amount: UintType;
-  };
+  }[];
   toAddress: string;
   amount: UintType;
   fee: UintType;
