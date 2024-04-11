@@ -36,15 +36,15 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   const serialNo = getDeviceUUID(features);
 
   // not exist serialNo, bootloader mode, model 1 is classic
-  if (serialNo == null && features.bootloader_mode === true && features.model === '1') {
+  if (isEmpty(serialNo) && features.bootloader_mode === true && features.model === '1') {
     return 'classic';
   }
 
-  if (serialNo == null) return 'unknown';
+  if (isEmpty(serialNo)) return 'unknown';
 
   const miniFlag = serialNo.slice(0, 2);
   // By May 2021, the miniFlag is 'bixin' for all classic devices
-  if (serialNo.toLowerCase() === 'bi') return 'classic';
+  if (miniFlag.toLowerCase() === 'bi') return 'classic';
   if (miniFlag.toLowerCase() === 'cl') return 'classic';
   if (miniFlag.toLowerCase() === 'mi') return 'mini';
   if (miniFlag.toLowerCase() === 'tc') return 'touch';

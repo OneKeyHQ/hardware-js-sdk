@@ -114,7 +114,7 @@ const HeaderView = () => {
             <ListItem
               title={intl.formatMessage({ id: 'tab__address_test' })}
               onPress={() => navigate(Routes.AddressTest)}
-            />{' '}
+            />
             <ListItem
               title={intl.formatMessage({ id: 'tab__security_check' })}
               onPress={() => navigate(Routes.SecurityCheck)}
