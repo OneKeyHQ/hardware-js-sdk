@@ -47,8 +47,6 @@ export function convertTestData(
     for (let i = 0; i < keys.length; i++) {
       const key = keys[i];
 
-      console.log('=====>>>>> item', item.expected, item.expected[key]);
-
       if (item.params.path != null) {
         const path = replaceTemplate(key, item.params.path);
         dataList.push({
