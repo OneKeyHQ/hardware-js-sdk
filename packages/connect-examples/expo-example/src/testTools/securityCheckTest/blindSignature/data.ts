@@ -9,7 +9,20 @@ export default [
     method: 'algoSignTransaction',
     expected: {
       '283': true,
-      '999': false,
+      '60': false,
+    },
+  },
+  {
+    method: 'aptosSignTransaction',
+    expected: {
+      '637': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'confluxSignTransaction',
+    expected: {
+      '503': true,
       '60': false,
     },
   },
@@ -17,7 +30,6 @@ export default [
     method: 'cosmosSignTransaction',
     expected: {
       '118': true,
-      '999': false,
       '60': false,
     },
   },
@@ -25,7 +37,6 @@ export default [
     method: 'filecoinSignTransaction',
     expected: {
       '461': true,
-      '999': false,
       '60': false,
     },
   },
@@ -33,7 +44,6 @@ export default [
     method: 'kaspaSignTransaction',
     expected: {
       '111111': true,
-      '999': false,
       '60': false,
     },
   },
@@ -41,7 +51,6 @@ export default [
     method: 'nearSignTransaction',
     expected: {
       '397': true,
-      '999': false,
       '60': false,
     },
   },
@@ -53,10 +62,25 @@ export default [
     },
   },
   {
+    method: 'nemSignTransaction',
+    expected: {
+      '1': true,
+      '43': true,
+      '60': false,
+    },
+  },
+  {
     method: 'nostrSignSchnorr',
     expected: {
       '1237': true,
       '999': false,
+      '60': false,
+    },
+  },
+  {
+    method: 'nervosSignTransaction',
+    expected: {
+      '309': true,
       '60': false,
     },
   },
@@ -77,10 +101,81 @@ export default [
     },
   },
   {
+    method: 'starcoinSignTransaction',
+    expected: {
+      '101010': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'stellarSignTransaction',
+    expected: {
+      '148': true,
+      '60': false,
+    },
+  },
+  {
     method: 'suiSignTransaction',
     expected: {
       '784': true,
-      '999': false,
+      '60': false,
+    },
+  },
+  {
+    method: 'xrpSignTransaction',
+    expected: {
+      '144': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'tronSignTransaction',
+    expected: {
+      '195': true,
+      '60': false,
+    },
+  },
+
+  // ==== sign message ====
+  {
+    method: 'aptosSignMessage',
+    expected: {
+      '637': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'confluxSignMessage',
+    expected: {
+      '503': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'confluxSignMessageCIP23',
+    expected: {
+      '503': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'starcoinSignMessage',
+    expected: {
+      '101010': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'suiSignMessage',
+    expected: {
+      '784': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'tronSignMessage',
+    expected: {
+      '195': true,
       '60': false,
     },
   },
