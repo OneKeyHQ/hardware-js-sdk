@@ -122,6 +122,9 @@ import { lnurlAuth } from './lnurlAuth';
 import { nervosGetAddress } from './nervosGetAddress';
 import { nervosSignTransaction } from './nervosSignTransaction';
 
+import { dnxGetAddress } from './dnxGetAddress';
+import { dnxSignTransaction } from './dnxSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -331,4 +334,10 @@ export type CoreApi = {
    */
   nervosGetAddress: typeof nervosGetAddress;
   nervosSignTransaction: typeof nervosSignTransaction;
+
+  /**
+   * Dnx Network
+   */
+  dnxGetAddress: typeof dnxGetAddress;
+  dnxSignTransaction: typeof dnxSignTransaction;
 };
