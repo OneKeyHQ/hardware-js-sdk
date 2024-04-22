@@ -2,7 +2,7 @@
   "name": "hardware-example",
   "productName": "HardwareExample",
   "executableName": "onekey-hardware-example",
-  "version": "0.3.43-alpha.0",
+  "version": "0.3.43",
   "author": "OneKey",
   "description": "End-to-end encrypted workspaces for teams",
   "main": "dist/index.js",
