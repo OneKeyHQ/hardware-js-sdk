@@ -9,6 +9,7 @@ type BleFirmwareRelease = {
     'en-US': string;
   }[];
   release: IBLEFirmwareReleaseInfo;
+  bootloaderMode: boolean;
 };
 
 export declare function checkBLEFirmwareRelease(connectId?: string): Response<BleFirmwareRelease>;

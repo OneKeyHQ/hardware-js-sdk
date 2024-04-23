@@ -37,6 +37,7 @@ export default class CheckBootloaderRelease extends BaseMethod {
       shouldUpdate,
       status: shouldUpdate ? 'outdated' : 'valid',
       release: resource,
+      bootloaderMode: !!features.bootloader_mode,
     });
   }
 }
