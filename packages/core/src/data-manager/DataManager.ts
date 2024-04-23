@@ -72,7 +72,7 @@ export default class DataManager {
       return 'none';
     }
 
-    if (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloader_mode) {
+    if (DeviceModelToTypes.model_mini.includes(deviceType) && features.bootloader_mode) {
       return 'unknown';
     }
 
@@ -179,18 +179,20 @@ export default class DataManager {
 
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
-    if (
-      features.firmware_present === false ||
-      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloader_mode)
-    ) {
-      return [];
-    }
-
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
     }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
+
+    if (
+      features.firmware_present === false ||
+      (DeviceModelToTypes.model_classic.includes(deviceType) && features.bootloader_mode)
+    ) {
+      // Always return least changelog
+      return getReleaseChangelog(targetDeviceConfigList, '0.0.0');
+    }
+
     const currentVersion = deviceFirmwareVersion.join('.');
     return getReleaseChangelog(targetDeviceConfigList, currentVersion);
   };
