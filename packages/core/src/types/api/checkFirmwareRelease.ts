@@ -9,6 +9,7 @@ type FirmwareRelease = {
     'zh-CN': string;
   }[];
   release: IFirmwareReleaseInfo;
+  bootloaderMode: boolean;
 };
 
 export declare function checkFirmwareRelease(connectId?: string): Response<FirmwareRelease>;
