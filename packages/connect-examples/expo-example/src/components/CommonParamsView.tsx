@@ -50,6 +50,12 @@ export default function CommonParamsView() {
           value={!!commonParams.initSession}
           onToggle={value => handleSetParam('initSession', value)}
         />
+        <SwitchInput
+          // TODO: i18n
+          label="detectBootloaderDevice"
+          value={!!commonParams.detectBootloaderDevice}
+          onToggle={value => handleSetParam('detectBootloaderDevice', value)}
+        />
       </Stack>
     </PanelView>
   );
