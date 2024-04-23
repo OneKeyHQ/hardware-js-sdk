@@ -365,6 +365,10 @@ function initDevice(method: BaseMethod) {
   let device: Device | typeof undefined;
   const allDevices = _deviceList.allDevices();
 
+  if (method.payload.detectBootloaderDevice && allDevices.some(d => d.features?.bootloader_mode)) {
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode);
+  }
+
   if (method.connectId) {
     device = _deviceList.getDevice(method.connectId);
   } else if (allDevices.length === 1) {
@@ -432,7 +436,8 @@ type IPollFn<T> = (time?: number) => T;
 // eslint-disable-next-line @typescript-eslint/require-await
 const ensureConnected = async (method: BaseMethod, pollingId: number) => {
   let tryCount = 0;
-  const MAX_RETRY_COUNT = (method.payload && method.payload.retryCount) || 5;
+  const MAX_RETRY_COUNT =
+    method.payload && typeof method.payload.retryCount === 'number' ? method.payload.retryCount : 5;
   const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
   const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -516,6 +521,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
+            HardwareErrorCode.DeviceDetectInBootloaderMode,
           ].includes(error.errorCode)
         ) {
           reject(error);
@@ -523,7 +529,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         }
       }
 
-      if (tryCount > 5) {
+      if (tryCount > MAX_RETRY_COUNT) {
         if (timer) {
           clearTimeout(timer);
         }

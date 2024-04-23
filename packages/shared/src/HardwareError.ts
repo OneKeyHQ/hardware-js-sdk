@@ -122,6 +122,11 @@ export const HardwareErrorCode = {
   DeviceOpenedPassphrase: 114,
 
   /**
+   *  Detect hardware that is in bootloader mode and return an error.
+   */
+  DeviceDetectInBootloaderMode: 115,
+
+  /**
    * Not initialized
    */
   NotInitialized: 200,
@@ -368,6 +373,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceCheckPassphraseStateError]: 'Device passphrase state error',
   [HardwareErrorCode.DeviceNotOpenedPassphrase]: 'Device not opened passphrase',
   [HardwareErrorCode.DeviceOpenedPassphrase]: 'Device opened passphrase',
+  [HardwareErrorCode.DeviceDetectInBootloaderMode]: 'Device in bootloader mode',
 
   /**
    * Node Errors
