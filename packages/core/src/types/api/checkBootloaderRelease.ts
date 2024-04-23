@@ -4,6 +4,7 @@ export type CheckBootloaderReleaseResponse = {
   shouldUpdate: boolean;
   status: 'outdated' | 'valid';
   release: string | undefined;
+  bootloaderMode: boolean;
 } | null;
 
 export declare function checkBootloaderRelease(
