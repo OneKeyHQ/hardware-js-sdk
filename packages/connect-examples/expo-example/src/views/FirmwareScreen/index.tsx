@@ -137,6 +137,7 @@ function FirmwareUpdate({
     boardloaderVersion,
     firmwareVersion,
   } = getDeviceBasicInfo(features, onekeyFeatures);
+  const deviceTypeLowerCase = deviceType.toLowerCase();
 
   const loadOnekeyFeatures = useCallback(() => {
     if (!sdk) return;
@@ -208,7 +209,7 @@ function FirmwareUpdate({
 
       if (
         type === 'bootloader' &&
-        (deviceType.toLowerCase() === 'touch' || deviceType.toLowerCase() === 'pro')
+        (deviceTypeLowerCase === 'touch' || deviceTypeLowerCase === 'pro')
       ) {
         setShowUpdateDialog(true);
         const res = await sdk.deviceUpdateBootloader(selectDevice.connectId, {
@@ -267,7 +268,7 @@ function FirmwareUpdate({
         };
       }
     },
-    [deviceType, features, intl, sdk, selectDevice]
+    [deviceTypeLowerCase, features, intl, sdk, selectDevice]
   );
 
   const deviceFieldProviderValue = useMemo(
@@ -374,7 +375,7 @@ function FirmwareUpdate({
                 type="firmware"
                 onUpdate={updateFirmware}
               />
-              {deviceType !== 'mini' && (
+              {deviceTypeLowerCase !== 'mini' && (
                 <FirmwareLocalFile
                   title={intl.formatMessage({ id: 'label__device_update_ble_firmware' })}
                   type="firmware"
@@ -386,7 +387,7 @@ function FirmwareUpdate({
                 type="bootloader"
                 onUpdate={updateFirmware}
               />
-              {(deviceType === 'pro' || deviceType === 'touch') && (
+              {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
                 <FirmwareLocalFile
                   title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
                   type="source"
