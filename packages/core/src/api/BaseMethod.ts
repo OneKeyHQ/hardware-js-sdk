@@ -146,9 +146,10 @@ export abstract class BaseMethod<Params = undefined> {
    */
   async checkSafetyLevelOnTestNet() {
     let checkFlag = false;
+    // 3 - Ropsten, 4 - Rinkeby, 5 - Goerli, 420 - Optimism Goerli, 11155111 - zkSync Sepolia
     if (
       this.name === 'evmSignTransaction' &&
-      [3, 4, 5, 42].includes(Number(this.payload?.transaction?.chainId))
+      [3, 4, 5, 420, 11155111].includes(Number(this.payload?.transaction?.chainId))
     ) {
       checkFlag = true;
     }
