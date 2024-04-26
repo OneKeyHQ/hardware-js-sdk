@@ -22,9 +22,36 @@ type TestCaseDataType = {
   method: string;
   address?: string;
   path?: string;
+  variant?: string;
 };
 
 type MnemonicAddressTestCase = TestCase<TestCaseDataType[]>;
+
+const variantCase = ['0', '1', '25', '2147483646', '2147483647'];
+
+const testCase: MnemonicAddressTestCase = {
+  id: '1',
+  name: 'Mnemonic Address Test',
+  description: 'Test Mnemonic Address',
+  data: [
+    {
+      id: 'btcGetAddress',
+      method: 'btcGetAddress',
+    },
+    {
+      id: 'evmGetAddress',
+      method: 'evmGetAddress',
+    },
+    {
+      id: 'suiGetAddress',
+      method: 'suiGetAddress',
+    },
+    {
+      id: 'dnxGetAddress',
+      method: 'dnxGetAddress',
+    },
+  ],
+};
 
 type ResultViewProps = {
   item: TestCaseDataWithKey<TestCaseDataType>;
@@ -84,15 +111,15 @@ function ExportReportView() {
   return null;
 }
 
-function getRequestParams(method: string) {
+function getRequestParams(method: string, index: string) {
   // @ts-expect-error
   const params = baseParams[method];
   let requestParams = {};
 
   if (params?.addressParameters?.path) {
     // ada case
-    const path = replaceTemplate('0', params.addressParameters.path);
-    const stakingPath = replaceTemplate('0', params.addressParameters.stakingPath);
+    const path = replaceTemplate(index, params.addressParameters.path);
+    const stakingPath = replaceTemplate(index, params.addressParameters.stakingPath);
     requestParams = {
       ...params,
       addressParameters: {
@@ -102,7 +129,7 @@ function getRequestParams(method: string) {
       },
     };
   } else {
-    const path = replaceTemplate('0', params.path);
+    const path = replaceTemplate(index, params.path);
     requestParams = {
       ...params,
       path,
@@ -111,22 +138,6 @@ function getRequestParams(method: string) {
 
   return requestParams;
 }
-
-const testCase: MnemonicAddressTestCase = {
-  id: '1',
-  name: 'Mnemonic Address Test',
-  description: 'Test Mnemonic Address',
-  data: [
-    {
-      id: 'btcGetAddress',
-      method: 'btcGetAddress',
-    },
-    {
-      id: 'evmGetAddress',
-      method: 'evmGetAddress',
-    },
-  ],
-};
 
 let hardwareUiEventListener: any | undefined;
 function ExecuteView() {
@@ -170,31 +181,38 @@ function ExecuteView() {
       const currentTestCases: TestCaseDataWithKey<TestCaseDataType>[] = [];
       for (const item of passphraseStateList) {
         const { method } = item;
-        const params = getRequestParams(method);
 
-        try {
-          // @ts-expect-error
-          const mockRes = mockDevice?.[method]?.('', '', {
-            ...params,
-            mnemonic: mnemonic.trim(),
-          });
+        for (const variant of variantCase) {
+          const params = getRequestParams(method, variant);
+          console.log('======>>>>> passphraseStateList', params);
+          try {
+            // @ts-expect-error
+            const mockRes = mockDevice?.[method]?.('', '', {
+              ...params,
+              mnemonic: mnemonic.trim(),
+            });
 
-          const key = `${item.id}-${method}`;
-          currentTestCases.push({
-            ...item,
-            address: mockRes?.payload?.address,
-            path:
-              get(params, 'path', undefined) || get(params, 'addressParameters.path', undefined),
-            method,
-            $key: key,
-          });
-          context.printLog(
-            `${intl.formatMessage({ id: 'message__fetch' })} ${method} ${intl.formatMessage({
-              id: 'message__address',
-            })} ${mockRes?.payload?.address}`
-          );
-        } catch (e) {
-          console.log('=====>>>>> error', e);
+            const key = `${item.id}-${method}-${variant}`;
+            const caseObject = {
+              ...item,
+              address: mockRes?.payload?.address,
+              path:
+                get(params, 'path', undefined) || get(params, 'addressParameters.path', undefined),
+              method,
+              variant,
+              $key: key,
+            };
+            currentTestCases.push(caseObject);
+            context.printLog(
+              `${intl.formatMessage({ id: 'message__fetch' })} ${
+                caseObject.path
+              } ${method}  ${intl.formatMessage({
+                id: 'message__address',
+              })} ${mockRes?.payload?.address}`
+            );
+          } catch (e) {
+            console.log('=====>>>>> error', e);
+          }
         }
       }
 
@@ -211,9 +229,9 @@ function ExecuteView() {
     },
     generateRequestParams: item => {
       const requestParams = {
-        ...getRequestParams(item.method),
-        passphraseState: item.passphraseState,
-        useEmptyPassphrase: !item.passphrase,
+        ...getRequestParams(item.method, item.variant ?? '0'),
+        // passphraseState: item.passphraseState,
+        // useEmptyPassphrase: !item.passphrase,
         showOnOneKey,
       };
 
