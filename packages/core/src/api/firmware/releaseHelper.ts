@@ -26,3 +26,22 @@ export const getBleFirmwareReleaseInfo = (features: Features) => {
     bootloaderMode,
   };
 };
+
+export const getBootloaderReleaseInfo = (features: Features) => {
+  const release = DataManager.getFirmwareLatestRelease(features);
+  const changelog = [release?.bootloaderChangelog].filter(
+    item =>
+      item != null &&
+      typeof item === 'object' &&
+      Object.prototype.hasOwnProperty.call(item, 'zh-CN') &&
+      Object.prototype.hasOwnProperty.call(item, 'en-US')
+  );
+
+  const bootloaderMode = !!features.bootloader_mode;
+  return {
+    status: undefined,
+    changelog,
+    release,
+    bootloaderMode,
+  };
+};
