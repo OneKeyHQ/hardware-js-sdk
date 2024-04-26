@@ -259,7 +259,7 @@ function ExecuteView() {
 
       const currentTestCases: TestCaseDataWithKey<TestCaseDataType>[] = [];
       for (const item of passphraseStateList) {
-        ['btcGetAddress', 'evmGetAddress'].forEach(method => {
+        ['btcGetAddress', 'evmGetAddress', 'dnxGetAddress'].forEach(method => {
           const params = getRequestParams(method);
 
           try {

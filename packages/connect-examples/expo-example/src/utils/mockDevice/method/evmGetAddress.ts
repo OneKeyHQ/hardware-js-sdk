@@ -1,12 +1,8 @@
-import BIP32Factory from 'bip32';
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
-import { mnemonicToSeedSync } from 'bip39';
 import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { bytesToHex } from '@noble/hashes/utils';
 import { getPublicKey } from '@noble/secp256k1';
-import eccObj from '../ecc';
-
-const bip32Obj = BIP32Factory(eccObj);
+import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
 // EIP-55
 function toChecksumAddress(address: string) {
@@ -41,10 +37,8 @@ export default function evmGetAddress(
     }> {
   const { path, mnemonic, passphrase } = params;
 
-  const seed = mnemonicToSeedSync(mnemonic, passphrase);
-  const master = bip32Obj.fromSeed(seed);
-
-  const keyPair = master.derivePath(path);
+  const seed = mnemonicToSeed(mnemonic, passphrase);
+  const keyPair = deriveKeyPairWithPath(seed, path);
 
   const { privateKey } = keyPair;
 
