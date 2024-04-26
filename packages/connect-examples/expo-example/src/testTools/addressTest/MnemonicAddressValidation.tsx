@@ -125,6 +125,10 @@ const testCase: MnemonicAddressTestCase = {
       id: 'evmGetAddress',
       method: 'evmGetAddress',
     },
+    {
+      id: 'dnxGetAddress',
+      method: 'dnxGetAddress',
+    },
   ],
 };
 
@@ -171,7 +175,7 @@ function ExecuteView() {
       for (const item of passphraseStateList) {
         const { method } = item;
         const params = getRequestParams(method);
-
+        console.log('======>>>>> passphraseStateList', params);
         try {
           // @ts-expect-error
           const mockRes = mockDevice?.[method]?.('', '', {

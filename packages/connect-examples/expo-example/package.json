@@ -24,6 +24,7 @@
     "@react-navigation/bottom-tabs": "^6.5.12",
     "@react-navigation/native": "^6.1.10",
     "@react-navigation/native-stack": "^6.9.18",
+    "@scure/base": "^1.1.6",
     "@tamagui/babel-plugin": "1.90.2",
     "@tamagui/config": "1.90.2",
     "@tamagui/core": "1.90.2",
@@ -32,8 +33,10 @@
     "bip32": "^4.0.0",
     "bip39": "^3.1.0",
     "bitcoinjs-lib": "^6.1.5",
+    "bn.js": "^5.2.1",
     "buffer": "^6.0.3",
     "compressorjs": "^1.1.1",
+    "elliptic": "^6.5.5",
     "expo": "^50.0.6",
     "expo-clipboard": "~5.0.0",
     "expo-document-picker": "~11.10.1",
@@ -65,10 +68,13 @@
     "ripple-keypairs": "^1.1.4",
     "stream-browserify": "^3.0.0",
     "tamagui": "^1.90.2",
-    "text-encoding": "^0.7.0"
+    "text-encoding": "^0.7.0",
+    "varint": "^6.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@types/bn.js": "^5.1.5",
+    "@types/elliptic": "^6.4.18",
     "@types/lodash": "^4.14.194",
     "@types/memoizee": "^0.4.10",
     "@types/react": "~18.2.45",
