@@ -365,7 +365,7 @@ function initDevice(method: BaseMethod) {
   let device: Device | typeof undefined;
   const allDevices = _deviceList.allDevices();
 
-  if (method.payload.detectBootloaderDevice && allDevices.some(d => d.features?.bootloader_mode)) {
+  if (method.payload?.detectBootloaderDevice && allDevices.some(d => d.features?.bootloader_mode)) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode);
   }
 
