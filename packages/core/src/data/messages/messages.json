@@ -3580,6 +3580,27 @@
         }
       }
     },
+    "DnxGetTrackingKey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        }
+      }
+    },
+    "DnxTrackingKey": {
+      "fields": {
+        "tracking_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "EmmcFixPermission": {
       "fields": {}
     },
@@ -10722,6 +10743,8 @@
         "MessageType_DnxInputAck": 11804,
         "MessageType_DnxRTSigsRequest": 11805,
         "MessageType_DnxSignedTx": 11806,
+        "MessageType_DnxGetTrackingKey": 11807,
+        "MessageType_DnxTrackingKey": 11808,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
