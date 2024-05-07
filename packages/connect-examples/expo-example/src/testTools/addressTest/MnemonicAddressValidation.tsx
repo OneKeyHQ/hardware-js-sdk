@@ -193,9 +193,10 @@ function ExecuteView() {
             });
 
             const key = `${item.id}-${method}-${variant}`;
+            const address = mockRes?.payload?.address || mockRes?.payload?.trackingKey;
             const caseObject = {
               ...item,
-              address: mockRes?.payload?.address,
+              address,
               path:
                 get(params, 'path', undefined) || get(params, 'addressParameters.path', undefined),
               method,
@@ -208,7 +209,7 @@ function ExecuteView() {
                 caseObject.path
               } ${method}  ${intl.formatMessage({
                 id: 'message__address',
-              })} ${mockRes?.payload?.address}`
+              })} ${address}`
             );
           } catch (e) {
             console.log('=====>>>>> error', e);
@@ -248,9 +249,12 @@ function ExecuteView() {
 
       const error = '';
 
-      if (item.address?.toLowerCase() !== response.address?.toLowerCase()) {
+      const responseAddress =
+        // @ts-expect-error
+        response.address?.toLowerCase() || response.trackingKey?.toLowerCase();
+      if (item.address?.toLowerCase() !== responseAddress) {
         return Promise.resolve({
-          error: `actual: ${response.address}, expected: ${item.address}`,
+          error: `actual: ${responseAddress}, expected: ${item.address}`,
         });
       }
 
