@@ -1300,6 +1300,16 @@ export type DnxSignedTx = {
   output_keys: string[];
 };
 
+// DnxGetTrackingKey
+export type DnxGetTrackingKey = {
+  address_n: number[];
+};
+
+// DnxTrackingKey
+export type DnxTrackingKey = {
+  tracking_key: string;
+};
+
 // EmmcFixPermission
 export type EmmcFixPermission = {};
 
@@ -3919,6 +3929,8 @@ export type MessageType = {
   DnxInputAck: DnxInputAck;
   DnxRTSigsRequest: DnxRTSigsRequest;
   DnxSignedTx: DnxSignedTx;
+  DnxGetTrackingKey: DnxGetTrackingKey;
+  DnxTrackingKey: DnxTrackingKey;
   EmmcFixPermission: EmmcFixPermission;
   EmmcPath: EmmcPath;
   EmmcPathInfo: EmmcPathInfo;
