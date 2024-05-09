@@ -151,7 +151,8 @@ function ExecuteView() {
         if (
           !res.success &&
           (responseError.toLowerCase()?.indexOf('invalid path') !== -1 ||
-            responseError.toLowerCase()?.indexOf('forbidden key path') !== -1)
+            responseError.toLowerCase()?.indexOf('forbidden key path') !== -1 ||
+            responseError.toLowerCase()?.indexOf('invalid address path') !== -1)
         ) {
           return Promise.resolve({
             error: '',

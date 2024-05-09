@@ -5771,6 +5771,10 @@
           "type": "bool",
           "id": 40
         },
+        "busy": {
+          "type": "bool",
+          "id": 41
+        },
         "offset": {
           "type": "uint32",
           "id": 500
@@ -5847,9 +5851,9 @@
           "type": "string",
           "id": 519
         },
-        "busy": {
-          "type": "bool",
-          "id": 41
+        "battery_level": {
+          "type": "uint32",
+          "id": 520
         },
         "onekey_device_type": {
           "type": "OneKeyDeviceType",
