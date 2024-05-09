@@ -1,6 +1,6 @@
 import { MessageFactoryFn } from './utils';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from '../api/firmware/releaseHelper';
-import { Features } from '../types';
+import type { KnownDevice as Device } from '../types/device';
 
 export const FIRMWARE_EVENT = 'FIRMWARE_EVENT';
 export const FIRMWARE = {
@@ -8,14 +8,16 @@ export const FIRMWARE = {
   BLE_RELEASE_INFO: 'ble-firmware-release-info',
 } as const;
 
-export type ReleaseInfoPayload = ReturnType<typeof getFirmwareReleaseInfo> & { features: Features };
+export type ReleaseInfoPayload = ReturnType<typeof getFirmwareReleaseInfo> & {
+  device?: Device | null;
+};
 export interface ReleaseInfoEvent {
   type: typeof FIRMWARE.RELEASE_INFO;
   payload: ReleaseInfoPayload;
 }
 
 export type BleReleaseInfoPayload = ReturnType<typeof getBleFirmwareReleaseInfo> & {
-  features: Features;
+  device?: Device | null;
 };
 
 export interface BleReleaseInfoEvent {

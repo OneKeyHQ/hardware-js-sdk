@@ -115,14 +115,14 @@ export abstract class BaseMethod<Params = undefined> {
     this.postMessage(
       createFirmwareMessage(FIRMWARE.RELEASE_INFO, {
         ...releaseInfo,
-        features: this.device.features,
+        device: this.device.toMessageObject(),
       })
     );
     const bleReleaseInfo = getBleFirmwareReleaseInfo(this.device.features);
     this.postMessage(
       createFirmwareMessage(FIRMWARE.BLE_RELEASE_INFO, {
         ...bleReleaseInfo,
-        features: this.device.features,
+        device: this.device.toMessageObject(),
       })
     );
   }
@@ -131,6 +131,7 @@ export abstract class BaseMethod<Params = undefined> {
     if (!this.device || !this.device.features) return;
     const inputPinOnSoftware = supportInputPinOnSoftware(this.device.features);
     const modifyHomescreen = supportModifyHomescreen(this.device.features);
+
     this.postMessage(
       createDeviceMessage(DEVICE.SUPPORT_FEATURES, {
         inputPinOnSoftware,
