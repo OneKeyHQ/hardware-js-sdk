@@ -151,5 +151,4 @@ export type { NervosAddress, NervosGetAddressParams } from './nervosGetAddress';
 export type { NervosSignedTx, NervosSignTransactionParams } from './nervosSignTransaction';
 
 export type { DnxAddress, DnxGetAddressParams } from './dnxGetAddress';
-export type { DnxTrackingKey, DnxGetTrackingKeyParams } from './dnxGetTrackingKey';
 export type { DnxTxKey, DnxSignTransactionParams, DnxSignature } from './dnxSignTransaction';

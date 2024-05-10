@@ -120,5 +120,4 @@ export { default as nervosGetAddress } from './nervos/NervosGetAddress';
 export { default as nervosSignTransaction } from './nervos/NervosSignTransaction';
 
 export { default as dnxGetAddress } from './dynex/DnxGetAddress';
-export { default as dnxGetTrackingKey } from './dynex/DnxGetTrackingKey';
 export { default as dnxSignTransaction } from './dynex/DnxSignTransaction';
