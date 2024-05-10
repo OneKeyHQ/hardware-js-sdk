@@ -123,7 +123,6 @@ import { nervosGetAddress } from './nervosGetAddress';
 import { nervosSignTransaction } from './nervosSignTransaction';
 
 import { dnxGetAddress } from './dnxGetAddress';
-import { dnxGetTrackingKey } from './dnxGetTrackingKey';
 import { dnxSignTransaction } from './dnxSignTransaction';
 
 export * from './export';
@@ -340,6 +339,5 @@ export type CoreApi = {
    * Dnx Network
    */
   dnxGetAddress: typeof dnxGetAddress;
-  dnxGetTrackingKey: typeof dnxGetTrackingKey;
   dnxSignTransaction: typeof dnxSignTransaction;
 };

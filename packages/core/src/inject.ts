@@ -290,8 +290,6 @@ export const createCoreApi = (
 
   dnxGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'dnxGetAddress' }),
-  dnxGetTrackingKey: (connectId, deviceId, params) =>
-    call({ ...params, connectId, deviceId, method: 'dnxGetTrackingKey' }),
   dnxSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'dnxSignTransaction' }),
 });

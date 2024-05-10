@@ -34,18 +34,6 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'dnxGetTrackingKey',
-    description: 'Get TrackingKey',
-    presupposes: [
-      {
-        title: 'Get TrackingKey',
-        value: {
-          path: "m/44'/29538'/0'/0'/0'",
-        },
-      },
-    ],
-  },
-  {
     method: 'dnxSignTransaction',
     description: 'Sign Transaction',
     presupposes: [
