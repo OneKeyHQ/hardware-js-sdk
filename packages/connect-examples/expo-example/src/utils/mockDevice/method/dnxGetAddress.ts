@@ -46,19 +46,19 @@ export default function dnxGetAddress(
   const privateKey = Buffer.from(privateKeyArray);
   const publicKey = Buffer.from(publicKeyArray);
 
-  console.log('privateKey', privateKey.toString('hex'));
-  console.log('publicKey', publicKey.toString('hex'));
+  // console.log('privateKey', privateKey.toString('hex'));
+  // console.log('publicKey', publicKey.toString('hex'));
 
   const { sec: secretSpendKey, pub: publicSpendKey } = generateKeys(privateKey);
 
-  console.log('secretSpendKey', secretSpendKey.toString('hex'));
-  console.log('publicSpendKey', publicSpendKey.toString('hex'));
+  // console.log('secretSpendKey', secretSpendKey.toString('hex'));
+  // console.log('publicSpendKey', publicSpendKey.toString('hex'));
 
   // supports only deterministic wallet
   const { sec: secretViewKey, pub: publicViewKey } = generateKeys(fastHash(secretSpendKey));
 
-  console.log('secretViewKey', secretViewKey.toString('hex'));
-  console.log('publicViewKey', publicViewKey.toString('hex'));
+  // console.log('secretViewKey', secretViewKey.toString('hex'));
+  // console.log('publicViewKey', publicViewKey.toString('hex'));
 
   const config = getConfig('dnxmainnet');
 
@@ -69,7 +69,7 @@ export default function dnxGetAddress(
     publicViewKey,
   ]);
 
-  console.log('rawAddress', rawAddress.toString('hex'));
+  // console.log('rawAddress', rawAddress.toString('hex'));
 
   const address = base58xmrCheck(config.ADDRESS_CHECKSUM_SIZE).encode(rawAddress);
 

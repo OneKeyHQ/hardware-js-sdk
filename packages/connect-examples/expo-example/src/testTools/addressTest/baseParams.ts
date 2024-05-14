@@ -48,7 +48,7 @@ export const baseParams = {
     hrp: 'cosmos',
   },
   dnxGetAddress: {
-    path: `m/44'/29538'/${INDEX_MARK}'/0'/0'`,
+    path: `m/44'/29538'/0'/0'/${INDEX_MARK}'`,
     showOnOneKey: false,
   },
   dnxGetTrackingKey: {
