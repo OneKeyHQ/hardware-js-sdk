@@ -108,6 +108,11 @@ const api: PlaygroundProps[] = [
     description: 'Wipe a device',
     noDeviceIdReq: true,
   },
+  {
+    method: 'deviceUpdateBootloader',
+    description: 'Touch、Pro Update bootloader of a device',
+    noDeviceIdReq: true,
+  },
 ];
 
 export default api;
