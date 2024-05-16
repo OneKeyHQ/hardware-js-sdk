@@ -11,7 +11,7 @@ export type AutoQrCodeViewProps = {
   cbor: string;
 };
 
-const AutoQrCodeView: FC<AutoQrCodeViewProps> = ({ delay = 250, type, cbor }) => {
+const AutoQrCodeView: FC<AutoQrCodeViewProps> = ({ delay = 350, type, cbor }) => {
   const urEncoder = useMemo(
     // For NGRAVE ZERO support please keep to a maximum fragment size of 200
     () => {
@@ -23,16 +23,16 @@ const AutoQrCodeView: FC<AutoQrCodeViewProps> = ({ delay = 250, type, cbor }) =>
     [cbor, type]
   );
 
-  const [currentQRCode, setCurrentQRCode] = useState(urEncoder?.nextPart());
+  const [currentQRCode, setCurrentQRCode] = useState<string>('');
 
   useEffect(() => {
     const id = setInterval(() => {
-      setCurrentQRCode(urEncoder?.nextPart());
+      setCurrentQRCode(urEncoder?.nextPart() ?? '');
     }, delay);
     return () => {
       clearInterval(id);
     };
-  }, [delay, urEncoder]);
+  }, [cbor]);
 
   console.log('currentQRCode', currentQRCode);
 

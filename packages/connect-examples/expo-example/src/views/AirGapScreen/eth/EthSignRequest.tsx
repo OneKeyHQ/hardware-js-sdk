@@ -30,7 +30,9 @@ export default function EthSignRequestView() {
   const generateTransaction = () => {
     const ethsign = new EthSignRequest({
       requestId: Buffer.from('03e3f7'),
-      signData: Buffer.from('0x010203040506070809'), // 33 bytes
+      signData: Buffer.from(
+        '0x010203040506070809010203040506070809010203040506070809010203040506070809010203040506070809010203040506070809010203040506'
+      ), // 33 bytes
       dataType: DataType.personalMessage,
       chainId: 1,
       derivationPath: new CryptoKeypath([
