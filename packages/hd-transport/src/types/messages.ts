@@ -2097,6 +2097,7 @@ export type Features = {
   auto_lock_delay_ms: number | null;
   display_rotation: number | null;
   experimental_features: boolean | null;
+  busy?: boolean;
   offset?: number;
   ble_name?: string;
   ble_ver?: string;
@@ -2116,7 +2117,7 @@ export type Features = {
   coin_switch?: number;
   build_id?: string;
   boardloader_version?: string;
-  busy?: boolean;
+  battery_level?: number;
   onekey_device_type?: string | null;
   onekey_se_type?: string | null;
   onekey_board_version?: string;

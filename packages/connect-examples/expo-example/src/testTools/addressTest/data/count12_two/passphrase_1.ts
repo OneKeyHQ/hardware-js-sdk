@@ -186,20 +186,6 @@ export default {
       },
     },
     {
-      method: 'nervosGetAddress',
-      name: 'nervosGetAddress',
-      params: {
-        path: "m/44'/309'/$$INDEX$$'/0/0",
-      },
-      expectedAddress: {
-        '0': 'ckb1qyqyznqp0y9wa07jhayskvd25ztwwxrjmz0sk49m5f',
-        '1': 'ckb1qyq0f8fmjvqy2xy0ajdtpl5gx7n8vzt4ydyq4a8ch2',
-        '35': 'ckb1qyqtx3ngj6h52m0klj53gu3r33fd9vrlqxesyww5ra',
-        '2147483646': 'ckb1qyqq0cd2qugng8je8utz0w9gvx6wmf3dux5qspw9jg',
-        '2147483647': 'ckb1qyqzkykfzr6yrapx2lwcctldn30p3ek629ds32kjg8',
-      },
-    },
-    {
       method: 'confluxGetAddress',
       expectedAddress: {
         '0': 'cfx:aatt04ca45h5vrgwndehwnb9drtsc158w29fkm8g3d',
@@ -332,6 +318,18 @@ export default {
       },
     },
     {
+      method: 'dnxGetAddress',
+      expectedAddress: {
+        '0': 'XwodtGbVdAscgsrCGW6gc2CEue7wHc6KUA4eguezw1FHMurEV1aQ3vbKpUihcjrZ1CV815TDDpvczGmWVPszTvze234fQXSWL',
+        '1': 'Xwn7zUFSpoHFouBmMgrX4qAP8iniZsu7aDekEsCHb2NhfgAmGMguGpRAWCcEPgyCLKdTkWAXTRwY9VniyVoMnJoG2zNgVUw53',
+        '35': 'XwnAoWGZS8e76skBVXqEiqgcEHRxZADvNPP9hYoNGcVdAjzx5DzsEHEgmH35CQZrANY1iXmoXCL3NXz7cqA3Ym5V1LDETyG35',
+        '2147483646':
+          'XwnuGLqjcrKAmxsu5eJBURZ3r7GNF6ekNgUdJRGhZkMpPMwCCGZyBe6EVRJt7MnxyiXKSAW7Zwz9o2Q3cjuZ8Ktx2sfeiBh8p',
+        '2147483647':
+          'XwoAww4eaFjLv4tah5EV2fc99NdVDJ2McBPp6c2TSo7UPQnb5v7DHGW7MBkMknmTqujXET4g6AiR6CjnP9qpy96Q1DJqCyAoe',
+      },
+    },
+    {
       method: 'evmGetAddress',
       expectedAddress: {
         '0': '0x1ccDDB9A79301163F448d166e1bAb3b3FBc1bBdF',
@@ -397,6 +395,20 @@ export default {
         '35': '1df63b7e57f2eba692bb87b79c530b9f4286043b143070163b8096fb69eb029c',
         '2147483646': '9cb73d2bdd1a95249ebb5548ba4a2e81b0b2150c30c8aa7593e47ea090390469',
         '2147483647': 'fd4f5968945d27521761932f8009c63d705829791dbd229642881c0c471c0b29',
+      },
+    },
+    {
+      method: 'nervosGetAddress',
+      name: 'nervosGetAddress',
+      params: {
+        path: "m/44'/309'/$$INDEX$$'/0/0",
+      },
+      expectedAddress: {
+        '0': 'ckb1qyqyznqp0y9wa07jhayskvd25ztwwxrjmz0sk49m5f',
+        '1': 'ckb1qyq0f8fmjvqy2xy0ajdtpl5gx7n8vzt4ydyq4a8ch2',
+        '35': 'ckb1qyqtx3ngj6h52m0klj53gu3r33fd9vrlqxesyww5ra',
+        '2147483646': 'ckb1qyqq0cd2qugng8je8utz0w9gvx6wmf3dux5qspw9jg',
+        '2147483647': 'ckb1qyqzkykfzr6yrapx2lwcctldn30p3ek629ds32kjg8',
       },
     },
     {

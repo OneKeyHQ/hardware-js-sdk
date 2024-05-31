@@ -115,14 +115,14 @@ export abstract class BaseMethod<Params = undefined> {
     this.postMessage(
       createFirmwareMessage(FIRMWARE.RELEASE_INFO, {
         ...releaseInfo,
-        features: this.device.features,
+        device: this.device.toMessageObject(),
       })
     );
     const bleReleaseInfo = getBleFirmwareReleaseInfo(this.device.features);
     this.postMessage(
       createFirmwareMessage(FIRMWARE.BLE_RELEASE_INFO, {
         ...bleReleaseInfo,
-        features: this.device.features,
+        device: this.device.toMessageObject(),
       })
     );
   }
@@ -131,6 +131,7 @@ export abstract class BaseMethod<Params = undefined> {
     if (!this.device || !this.device.features) return;
     const inputPinOnSoftware = supportInputPinOnSoftware(this.device.features);
     const modifyHomescreen = supportModifyHomescreen(this.device.features);
+
     this.postMessage(
       createDeviceMessage(DEVICE.SUPPORT_FEATURES, {
         inputPinOnSoftware,
@@ -146,9 +147,10 @@ export abstract class BaseMethod<Params = undefined> {
    */
   async checkSafetyLevelOnTestNet() {
     let checkFlag = false;
+    // 3 - Ropsten, 4 - Rinkeby, 5 - Goerli, 420 - Optimism Goerli, 11155111 - zkSync Sepolia
     if (
       this.name === 'evmSignTransaction' &&
-      [3, 4, 5, 42].includes(Number(this.payload?.transaction?.chainId))
+      [3, 4, 5, 420, 11155111].includes(Number(this.payload?.transaction?.chainId))
     ) {
       checkFlag = true;
     }
