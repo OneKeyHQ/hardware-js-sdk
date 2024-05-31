@@ -375,7 +375,12 @@ function initDevice(method: BaseMethod) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {
     throw ERRORS.TypedError(
-      method.name === 'firmwareUpdateV2'
+      [
+        'firmwareUpdateV2',
+        'checkFirmwareRelease',
+        'checkBootloaderRelease',
+        'checkBLEFirmwareRelease',
+      ].includes(method.name)
         ? HardwareErrorCode.FirmwareUpdateLimitOneDevice
         : HardwareErrorCode.SelectDevice
     );
