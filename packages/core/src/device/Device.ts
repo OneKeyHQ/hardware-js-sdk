@@ -17,7 +17,10 @@ import {
   getLogger,
   LoggerNames,
 } from '../utils';
-import { getPassphraseStateWithRefreshDeviceInfo } from '../utils/deviceFeaturesUtils';
+import {
+  fixFeaturesFirmwareVersion,
+  getPassphraseStateWithRefreshDeviceInfo,
+} from '../utils/deviceFeaturesUtils';
 
 import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
@@ -360,7 +363,7 @@ export class Device extends EventEmitter {
     const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
     this._updateFeatures(message, options?.initSession);
 
-    await TransportManager.reconfigure(message);
+    await TransportManager.reconfigure(this.features);
   }
 
   async getFeatures() {
@@ -377,6 +380,8 @@ export class Device extends EventEmitter {
       this.setInternalState(feat.session_id, initSession);
     }
     feat.unlocked = feat.unlocked ?? true;
+
+    feat = fixFeaturesFirmwareVersion(feat);
 
     this.features = feat;
     this.featuresNeedsReload = false;

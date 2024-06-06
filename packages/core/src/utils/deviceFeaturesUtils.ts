@@ -1,4 +1,5 @@
 import semver from 'semver';
+import { isNaN } from 'lodash';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
@@ -166,4 +167,31 @@ export const getFirmwareUpdateField = ({
     return 'firmware-v5';
   }
   return 'firmware';
+};
+
+export function fixVersion(version: string) {
+  let parts = version.split('.');
+
+  while (parts.length < 3) {
+    parts.push('0');
+  }
+  parts = parts.map(part => (isNaN(parseInt(part, 10)) ? '0' : part));
+
+  return parts.join('.');
+}
+
+export const fixFeaturesFirmwareVersion = (features: Features): Features => {
+  // 修复 Touch、Pro 设备 bootloader 低于 2.5.2 版本时，返回的 features 中没有 firmware_version 错误的问题
+  // fix Touch、Pro device when bootloader version is lower than 2.5.2, the features returned do not have firmware_version error
+  const tempFeatures = { ...features };
+
+  if (tempFeatures.onekey_firmware_version && !semver.valid(tempFeatures.onekey_firmware_version)) {
+    tempFeatures.onekey_firmware_version = fixVersion(tempFeatures.onekey_firmware_version);
+  }
+
+  if (tempFeatures.onekey_version && !semver.valid(tempFeatures.onekey_version)) {
+    tempFeatures.onekey_version = fixVersion(tempFeatures.onekey_version);
+  }
+
+  return tempFeatures;
 };
