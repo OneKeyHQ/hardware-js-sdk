@@ -360,10 +360,23 @@ export class Device extends EventEmitter {
 
     Log.debug('initialize payload:', payload);
 
-    const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
-    this._updateFeatures(message, options?.initSession);
+    try {
+      // @ts-expect-error
+      const { message } = await Promise.race([
+        this.commands.typedCall('Initialize', 'Features', payload),
+        new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
+          }, 5 * 1000);
+        }),
+      ]);
 
-    await TransportManager.reconfigure(this.features);
+      this._updateFeatures(message, options?.initSession);
+      await TransportManager.reconfigure(this.features);
+    } catch (error) {
+      Log.error('Initialization failed:', error);
+      throw error;
+    }
   }
 
   async getFeatures() {
