@@ -26,7 +26,12 @@ import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands, PassphrasePromptResponse } from './DeviceCommands';
 
-import type { Device as DeviceTyped, Features, UnavailableCapabilities } from '../types';
+import {
+  EOneKeyDeviceMode,
+  type Device as DeviceTyped,
+  type Features,
+  type UnavailableCapabilities,
+} from '../types';
 import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
@@ -520,10 +525,23 @@ export class Device extends EventEmitter {
   }
 
   getMode() {
-    if (this.features?.bootloader_mode) return 'bootloader';
-    if (!this.features?.initialized) return 'initialize';
-    if (this.features?.no_backup) return 'seedless';
-    return 'normal';
+    if (this.features?.bootloader_mode) {
+      // bootloader mode
+      return EOneKeyDeviceMode.bootloader;
+    }
+
+    if (!this.features?.initialized) {
+      // not initialized
+      return EOneKeyDeviceMode.notInitialized;
+    }
+
+    if (this.features?.no_backup) {
+      // backup mode
+      return EOneKeyDeviceMode.backupMode;
+    }
+
+    // normal mode
+    return EOneKeyDeviceMode.normal;
   }
 
   getFirmwareVersion() {

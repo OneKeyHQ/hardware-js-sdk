@@ -3,7 +3,12 @@ import { IVersionArray } from './settings';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
-export type DeviceMode = 'normal' | 'bootloader' | 'initialize' | 'seedless';
+export enum EOneKeyDeviceMode {
+  bootloader = 'bootloader',
+  normal = 'normal',
+  notInitialized = 'notInitialized',
+  backupMode = 'backupMode',
+}
 
 export type UnavailableCapability =
   | 'no-capability'
@@ -23,7 +28,7 @@ export type KnownDevice = {
   bleName: string | null;
   name: string;
   error?: typeof undefined;
-  mode: DeviceMode;
+  mode: EOneKeyDeviceMode;
   features: PROTO.Features;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;

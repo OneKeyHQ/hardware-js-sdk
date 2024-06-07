@@ -15,11 +15,7 @@ export const getDeviceFirmwareVersion = (features: Features | undefined): IVersi
     return features.onekey_version?.split('.') as unknown as IVersionArray;
   }
 
-  return [
-    features.major_version ?? '0',
-    features.minor_version ?? '0',
-    features.patch_version ?? '0',
-  ];
+  return [0, 0, 0];
 };
 
 /**
@@ -53,7 +49,11 @@ export const getDeviceBootloaderVersion = (features: Features | undefined): IVer
   // low version hardware
   if (!features.bootloader_version) {
     if (features.bootloader_mode) {
-      return [features?.major_version, features?.minor_version, features?.patch_version];
+      return [
+        features?.major_version ?? 0,
+        features?.minor_version ?? 0,
+        features?.patch_version ?? 0,
+      ];
     }
     return [0, 0, 0];
   }
