@@ -64,6 +64,14 @@ const HeaderView = () => {
           >
             {intl.formatMessage({ id: 'tab__address_test' })}
           </Button>
+        </Group.Item>{' '}
+        <Group.Item>
+          <Button
+            variant={route.name === Routes.SecurityCheck ? 'primary' : 'secondary'}
+            onPress={() => navigate(Routes.SecurityCheck)}
+          >
+            {intl.formatMessage({ id: 'tab__security_check' })}
+          </Button>
         </Group.Item>
       </Group>
     ),
@@ -95,20 +103,21 @@ const HeaderView = () => {
               title={intl.formatMessage({ id: 'tab__api_payload' })}
               onPress={() => navigate(Routes.Payload)}
             />
-
             <ListItem
               title={intl.formatMessage({ id: 'tab__firmware_update' })}
               onPress={() => navigate(Routes.FirmwareUpdateTest)}
             />
-
             <ListItem
               title={intl.formatMessage({ id: 'tab__passphrase_test' })}
               onPress={() => navigate(Routes.PassphraseTest)}
             />
-
             <ListItem
               title={intl.formatMessage({ id: 'tab__address_test' })}
               onPress={() => navigate(Routes.AddressTest)}
+            />
+            <ListItem
+              title={intl.formatMessage({ id: 'tab__security_check' })}
+              onPress={() => navigate(Routes.SecurityCheck)}
             />
           </YGroup>
         </Sheet.Frame>

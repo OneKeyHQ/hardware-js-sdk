@@ -8,6 +8,7 @@ const defaultParams: CommonParams = {
   timeout: undefined,
   passphraseState: '',
   initSession: false,
+  detectBootloaderDevice: false,
 };
 
 const CommonParamsContext = createContext<{

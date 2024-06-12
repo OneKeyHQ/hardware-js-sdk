@@ -24,6 +24,7 @@ import {
 } from '../testTools/pubkeyTest/dataVariant';
 import PageView from '../components/ui/Page';
 import PanelView from '../components/ui/Panel';
+import { MnemonicAddressValidation } from '../testTools/addressTest/MnemonicAddressValidation';
 
 export default function AddressTestScreen() {
   const intl = useIntl();
@@ -31,6 +32,9 @@ export default function AddressTestScreen() {
     <PageView>
       <DeviceProvider>
         <Stack>
+          <PanelView>
+            <MnemonicAddressValidation />
+          </PanelView>
           <PanelView>
             <TestSingleAddress
               title={intl.formatMessage({ id: 'title__address_test_single' })}

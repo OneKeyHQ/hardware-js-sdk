@@ -124,6 +124,66 @@ const api: PlaygroundProps[] = [
         },
       },
       {
+        title: 'Sign Transaction(Empty data 1)',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            value: '0xf4240',
+            data: '0x',
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            gasPrice: '0xbebc200',
+          },
+        },
+      },
+      {
+        title: 'Sign Transaction(Empty data 2)',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            value: '0xf4240',
+            data: '',
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            gasPrice: '0xbebc200',
+          },
+        },
+      },
+      {
+        title: 'Sign Transaction(Send ERC20 USDC)',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            value: '0x0',
+            data: '0xa9059cbb0000000000000000000000009755c3921b56b166876e2268e5b750ed301fe1b100000000000000000000000000000000000000000000000000000002046f78cf',
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            gasPrice: '0xbebc200',
+          },
+        },
+      },
+      {
+        title: 'Sign Transaction(Send ERC721 NFT)',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            value: '0x0000000000000068F116a894984e2DB1123eB395',
+            data: '0x42842e0e0000000000000000000000007baa4e405e3fd07d361d5530e4a6180954106ee4000000000000000000000000d1464d62321c15bb73f80f9dcef7edc37acc22e40000000000000000000000000000000000000000000000000000000000000a65360c6ebe',
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            gasPrice: '0xbebc200',
+          },
+        },
+      },
+      {
         title: 'Sign Transaction (Big Data)',
         value: {
           path: "m/44'/60'/0'/0/0",
@@ -134,7 +194,72 @@ const api: PlaygroundProps[] = [
             chainId: 1,
             nonce: '0x0',
             gasLimit: '0x5208',
-            gasPrice: '0xbebc200',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0xbebc200',
+          },
+        },
+      },
+      {
+        title: 'Sign EIP1559 Transaction(Empty data 1)',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            value: '0xf4240',
+            data: '0x',
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0xbebc200',
+          },
+        },
+      },
+      {
+        title: 'Sign EIP1559 Transaction(Empty data 2)',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            value: '0xf4240',
+            data: '',
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0xbebc200',
+          },
+        },
+      },
+      {
+        title: 'Sign EIP1559 Transaction(Send ERC20 USDC)',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            value: '0x0',
+            data: '0xa9059cbb0000000000000000000000009755c3921b56b166876e2268e5b750ed301fe1b100000000000000000000000000000000000000000000000000000002046f78cf',
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0xbebc200',
+          },
+        },
+      },
+      {
+        title: 'Sign EIP1559 Transaction(Send ERC721 NFT)',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+            value: '0x0000000000000068F116a894984e2DB1123eB395',
+            data: '0x42842e0e0000000000000000000000007baa4e405e3fd07d361d5530e4a6180954106ee4000000000000000000000000d1464d62321c15bb73f80f9dcef7edc37acc22e40000000000000000000000000000000000000000000000000000000000000a65360c6ebe',
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0xbebc200',
           },
         },
       },

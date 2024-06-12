@@ -10,10 +10,10 @@ import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import AutoWrapperTextArea from '../../components/ui/AutoWrapperTextArea';
 import { Button } from '../../components/ui/Button';
 import PanelView from '../../components/ui/Panel';
-import { getDeviceInfo } from '../../components/BaseTestRunner/utils';
+
 import { downloadFile } from '../../utils/downloadUtils';
 import { SwitchInput } from '../../components/SwitchInput';
-import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
+import { getDeviceInfo } from '../../utils/deviceUtils';
 
 function generatePassphrase(list: any[] | undefined) {
   return `$A& b${(list?.length ?? 0) + 1}`;
@@ -35,7 +35,7 @@ function ExportReportView({
     markdown.push(`# Passphrase Count Test (${testCoin})`);
 
     markdown.push(`## Device Info`);
-    const deviceInfo = getDeviceInfo(deviceFeatures);
+    const deviceInfo = getDeviceInfo(deviceFeatures, undefined);
     markdown.push(`| Key | Value |`);
     markdown.push(`| --- | --- |`);
     Object.keys(deviceInfo).forEach(key => {
@@ -115,7 +115,13 @@ export default function TestSessionCountView() {
     };
 
     pushRunnerLog([intl.formatMessage({ id: 'message__test_end' })]);
-  }, [SDK, intl, pushRunnerLog]);
+
+    try {
+      SDK?.getFeatures(selectedDevice?.connectId ?? '');
+    } catch (e) {
+      // ignore
+    }
+  }, [SDK, intl, pushRunnerLog, selectedDevice?.connectId]);
 
   const testSessionCount = useCallback(async () => {
     if (!SDK) return;
@@ -382,17 +388,8 @@ export default function TestSessionCountView() {
     );
   }, [runnerLog, testChain]);
 
-  const ContentView = useMemo(() => {
-    let result;
-    if (testResult?.current?.done === undefined) {
-      result = '';
-    } else if (testResult?.current?.done) {
-      result = intl.formatMessage({ id: 'message__done' });
-    } else {
-      result = intl.formatMessage({ id: 'message__testing' });
-    }
-
-    return (
+  const ContentView = useMemo(
+    () => (
       <PanelView title={intl.formatMessage({ id: 'title__passphrase_test' })}>
         <View gap="$2">
           <YStack>
@@ -425,24 +422,29 @@ export default function TestSessionCountView() {
               value={showOnOneKey}
               onToggle={setShowOnOnekey}
             />
-
-            <TestRunnerOptionButtons onStop={stopTest} onStart={testSessionCount} />
+            <Button variant="primary" onPress={testSessionCount}>
+              {intl.formatMessage({ id: 'action__start_test' })}
+            </Button>
+            <Button variant="destructive" onPress={stopTest}>
+              {intl.formatMessage({ id: 'action__stop_test' })}
+            </Button>
             {runnerExportReportMemo}
           </XStack>
 
           {runnerLogViewMemo}
         </View>
       </PanelView>
-    );
-  }, [
-    intl,
-    testChain,
-    showOnOneKey,
-    testSessionCount,
-    stopTest,
-    runnerExportReportMemo,
-    runnerLogViewMemo,
-  ]);
+    ),
+    [
+      intl,
+      testChain,
+      showOnOneKey,
+      testSessionCount,
+      stopTest,
+      runnerExportReportMemo,
+      runnerLogViewMemo,
+    ]
+  );
 
   return ContentView;
 }

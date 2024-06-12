@@ -9,11 +9,16 @@ import {
 } from '@onekeyfe/hd-shared';
 import {
   getDeviceBLEFirmwareVersion,
+  getDeviceBleName,
   getDeviceFirmwareVersion,
   getDeviceLabel,
   getDeviceType,
-  getDeviceTypeOnBootloader,
   getDeviceUUID,
+  getLogger,
+  LoggerNames,
+} from '../utils';
+import {
+  fixFeaturesFirmwareVersion,
   getPassphraseStateWithRefreshDeviceInfo,
 } from '../utils/deviceFeaturesUtils';
 
@@ -21,11 +26,15 @@ import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands, PassphrasePromptResponse } from './DeviceCommands';
 
-import type { Device as DeviceTyped, Features, UnavailableCapabilities } from '../types';
+import {
+  EOneKeyDeviceMode,
+  type Device as DeviceTyped,
+  type Features,
+  type UnavailableCapabilities,
+} from '../types';
 import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
 import { UI_REQUEST } from '../constants/ui-request';
 import { PROTO } from '../constants';
-import { getLogger, LoggerNames } from '../utils';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 
@@ -133,23 +142,23 @@ export class Device extends EventEmitter {
     if (this.isUnacquired() || !this.features) return null;
 
     const env = DataManager.getSettings('env');
+    const deviceType = getDeviceType(this.features);
+
+    const bleName = getDeviceBleName(this.features);
+    const label = getDeviceLabel(this.features);
 
     return {
       /** Android uses Mac address, iOS uses uuid, USB uses uuid  */
       connectId: DataManager.isBleConnect(env) ? this.mainId || null : getDeviceUUID(this.features),
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
-      deviceType: this.features.bootloader_mode
-        ? getDeviceTypeOnBootloader(this.features)
-        : getDeviceType(this.features),
+      deviceType,
       /** ID for current seeds, will clear after replace a new seed at device */
       deviceId: this.features.device_id || null,
       path: this.originalDescriptor.path,
-      name:
-        this.features.ble_name ||
-        this.features.label ||
-        `OneKey ${getDeviceType(this.features).toUpperCase()}`,
-      label: getDeviceLabel(this.features),
+      bleName,
+      name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
+      label: label || 'OneKey',
       mode: this.getMode(),
       features: this.features,
       firmwareVersion: this.getFirmwareVersion(),
@@ -356,10 +365,23 @@ export class Device extends EventEmitter {
 
     Log.debug('initialize payload:', payload);
 
-    const { message } = await this.commands.typedCall('Initialize', 'Features', payload);
-    this._updateFeatures(message, options?.initSession);
+    try {
+      // @ts-expect-error
+      const { message } = await Promise.race([
+        this.commands.typedCall('Initialize', 'Features', payload),
+        new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
+          }, 5 * 1000);
+        }),
+      ]);
 
-    await TransportManager.reconfigure(message);
+      this._updateFeatures(message, options?.initSession);
+      await TransportManager.reconfigure(this.features);
+    } catch (error) {
+      Log.error('Initialization failed:', error);
+      throw error;
+    }
   }
 
   async getFeatures() {
@@ -376,6 +398,8 @@ export class Device extends EventEmitter {
       this.setInternalState(feat.session_id, initSession);
     }
     feat.unlocked = feat.unlocked ?? true;
+
+    feat = fixFeaturesFirmwareVersion(feat);
 
     this.features = feat;
     this.featuresNeedsReload = false;
@@ -501,10 +525,23 @@ export class Device extends EventEmitter {
   }
 
   getMode() {
-    if (this.features?.bootloader_mode) return 'bootloader';
-    if (!this.features?.initialized) return 'initialize';
-    if (this.features?.no_backup) return 'seedless';
-    return 'normal';
+    if (this.features?.bootloader_mode) {
+      // bootloader mode
+      return EOneKeyDeviceMode.bootloader;
+    }
+
+    if (!this.features?.initialized) {
+      // not initialized
+      return EOneKeyDeviceMode.notInitialized;
+    }
+
+    if (this.features?.no_backup) {
+      // backup mode
+      return EOneKeyDeviceMode.backupMode;
+    }
+
+    // normal mode
+    return EOneKeyDeviceMode.normal;
   }
 
   getFirmwareVersion() {

@@ -332,6 +332,18 @@ export default {
       },
     },
     {
+      method: 'dnxGetAddress',
+      expectedAddress: {
+        '0': 'XwoYf7XG3pJX6zKbZ1rxcBaXPLPpWCFDHhMLAjRdGAec6VrjNPK6vdR5YWQYwcusceQmGvwmMbeLhX4qAkzP4gtN1cA7Vy8XY',
+        '1': 'XwnYY3qcduYEdit9gUtXUpDvXxi7b8xqzfUP4SLZtFPweb2rTKPBCgLjTsDoT3FJ6aPwXT1D65VXA5nUV2utPefZ1kmuNBHv5',
+        '50': 'Xwoq8d4QE2kc25seaFg2NFH4akjDj4NC3ht1NkRvcnZjWbQzKE51syajGzLQnyxrRDhDkjusgLgrBDqtjF9HLkaJ2K3jvgwZ2',
+        '2147483646':
+          'XwmsXfRqqw7JPATQppUS3DQdKFY2eBwASaTvaB41MvhCMNrYeCRTdPJdU5EmpqG4xcPGkKD2GcamQMzqr5brv8pJ1pGk1ydDq',
+        '2147483647':
+          'Xwoge86JMewMeKgV6SHHr2SVftyFMgVf5JLY8jQf6EaW5HTbUZbCkJR6A2N5GM4VBN6qZMvzAnUkd1fg5tYBQzde2gNhKjUcY',
+      },
+    },
+    {
       method: 'evmGetAddress',
       expectedAddress: {
         '0': '0xC97cc00B8c7D082792c61Da5865fe61e67A92b53',

@@ -23,6 +23,8 @@ PODS:
     - ExpoModulesCore
   - ExpoKeepAwake (12.8.2):
     - ExpoModulesCore
+  - ExpoLocalization (14.8.3):
+    - ExpoModulesCore
   - ExpoModulesCore (1.11.9):
     - glog
     - RCT-Folly (= 2022.05.16.00)
@@ -926,7 +928,7 @@ PODS:
   - react-native-ble-plx (3.0.0):
     - MultiplatformBleAdapter (= 0.1.9)
     - React-Core
-  - react-native-randombytes (3.6.1):
+  - react-native-get-random-values (1.10.0):
     - React-Core
   - react-native-restart (0.0.24):
     - React-Core
@@ -1130,6 +1132,7 @@ DEPENDENCIES:
   - ExpoImageManipulator (from `../../../../node_modules/expo-image-manipulator/ios`)
   - ExpoImagePicker (from `../../../../node_modules/expo-image-picker/ios`)
   - ExpoKeepAwake (from `../../../../node_modules/expo-keep-awake/ios`)
+  - ExpoLocalization (from `../../../../node_modules/expo-localization/ios`)
   - ExpoModulesCore (from `../../../../node_modules/expo-modules-core`)
   - EXSplashScreen (from `../../../../node_modules/expo-splash-screen/ios`)
   - FBLazyVector (from `../../../../node_modules/react-native/Libraries/FBLazyVector`)
@@ -1162,7 +1165,7 @@ DEPENDENCIES:
   - React-Mapbuffer (from `../../../../node_modules/react-native/ReactCommon`)
   - react-native-ble-manager (from `../../../../node_modules/react-native-ble-manager`)
   - "react-native-ble-plx (from `../../../../node_modules/@onekeyfe/react-native-ble-plx`)"
-  - react-native-randombytes (from `../../../../node_modules/react-native-randombytes`)
+  - react-native-get-random-values (from `../../../../node_modules/react-native-get-random-values`)
   - react-native-restart (from `../../../../node_modules/react-native-restart`)
   - react-native-safe-area-context (from `../../../../node_modules/react-native-safe-area-context`)
   - React-nativeconfig (from `../../../../node_modules/react-native/ReactCommon`)
@@ -1224,6 +1227,8 @@ EXTERNAL SOURCES:
     :path: "../../../../node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
     :path: "../../../../node_modules/expo-keep-awake/ios"
+  ExpoLocalization:
+    :path: "../../../../node_modules/expo-localization/ios"
   ExpoModulesCore:
     :path: "../../../../node_modules/expo-modules-core"
   EXSplashScreen:
@@ -1283,8 +1288,8 @@ EXTERNAL SOURCES:
     :path: "../../../../node_modules/react-native-ble-manager"
   react-native-ble-plx:
     :path: "../../../../node_modules/@onekeyfe/react-native-ble-plx"
-  react-native-randombytes:
-    :path: "../../../../node_modules/react-native-randombytes"
+  react-native-get-random-values:
+    :path: "../../../../node_modules/react-native-get-random-values"
   react-native-restart:
     :path: "../../../../node_modules/react-native-restart"
   react-native-safe-area-context:
@@ -1355,6 +1360,7 @@ SPEC CHECKSUMS:
   ExpoImageManipulator: c1d7cb865eacd620a35659f3da34c70531f10b59
   ExpoImagePicker: 66970181d1c838f444e5e1f81b804ab2d5ff49bd
   ExpoKeepAwake: 0f5cad99603a3268e50af9a6eb8b76d0d9ac956c
+  ExpoLocalization: f5f5d71dc0c9514d3d77b2771144f6fed6398d04
   ExpoModulesCore: 1391529545de72f7f64ecabc7adb912306ab4d34
   EXSplashScreen: 39244885abfb1b12765aae89edb90f8c88db6bbd
   FBLazyVector: 84f6edbe225f38aebd9deaf1540a4160b1f087d7
@@ -1387,7 +1393,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: 63913773ed7f96b814a2521e13e6d010282096ad
   react-native-ble-manager: ea456961ad9fc43f82305645163b76125d3387f7
   react-native-ble-plx: 4b0b605e4c52453ecbeb82807878bc4a2652d1c9
-  react-native-randombytes: 421f1c7d48c0af8dbcd471b0324393ebf8fe7846
+  react-native-get-random-values: 384787fd76976f5aec9465aff6fa9e9129af1e74
   react-native-restart: 45c8dca02491980f2958595333cbccd6877cb57e
   react-native-safe-area-context: 0ee144a6170530ccc37a0fd9388e28d06f516a89
   React-nativeconfig: d7af5bae6da70fa15ce44f045621cf99ed24087c

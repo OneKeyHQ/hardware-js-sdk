@@ -5,9 +5,9 @@ import {
   checkNeedUpdateBootForClassicAndMini,
   checkNeedUpdateBootForTouch,
 } from './firmware/updateBootloader';
-import { DataManager } from '../data-manager';
 import { getDeviceType } from '../utils';
 import { DeviceModelToTypes } from '../types';
+import { getBootloaderReleaseInfo } from './firmware/releaseHelper';
 
 export default class CheckBootloaderRelease extends BaseMethod {
   init() {
@@ -32,11 +32,11 @@ export default class CheckBootloaderRelease extends BaseMethod {
     } else if (deviceType === 'touch') {
       shouldUpdate = checkNeedUpdateBootForTouch(features);
     }
-    const resource = DataManager.getBootloaderResource(features);
+    const releaseInfo = getBootloaderReleaseInfo(features);
     return Promise.resolve({
+      ...releaseInfo,
       shouldUpdate,
       status: shouldUpdate ? 'outdated' : 'valid',
-      release: resource,
     });
   }
 }

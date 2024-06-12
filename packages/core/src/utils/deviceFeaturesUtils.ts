@@ -1,156 +1,15 @@
 import semver from 'semver';
+import { isNaN } from 'lodash';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
-import type {
-  Features,
-  IDeviceModel,
-  IDeviceType,
-  IVersionArray,
-  SupportFeatureType,
-} from '../types';
+import type { Features, SupportFeatureType } from '../types';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
 import DataManager, { FirmwareField, MessageVersion } from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
-
-export const getDeviceModel = (features?: Features): IDeviceModel => {
-  if (!features || typeof features !== 'object') {
-    return 'model_mini';
-  }
-
-  if (!features.model) {
-    return 'model_mini';
-  }
-
-  if (features.model === '1') {
-    return 'model_mini';
-  }
-  // model === 'T'
-  return 'model_touch';
-};
-
-export const getDeviceType = (features?: Features): IDeviceType => {
-  if (!features || typeof features !== 'object') {
-    return 'classic';
-  }
-
-  // classic1s 3.5.0 pro 4.6.0
-  switch (features.onekey_device_type) {
-    case 'CLASSIC':
-      return 'classic';
-    case 'CLASSIC1S':
-      return 'classic1s';
-    case 'MINI':
-      return 'mini';
-    case 'TOUCH':
-      return 'touch';
-    case 'PRO':
-      return 'pro';
-    default:
-    // other
-  }
-
-  // low version hardware
-  if (!features.serial_no) return 'classic';
-  const serialNo = features.serial_no;
-  const miniFlag = serialNo.slice(0, 2);
-  if (miniFlag.toLowerCase() === 'mi') return 'mini';
-  if (miniFlag.toLowerCase() === 'tc') return 'touch';
-  if (miniFlag.toLowerCase() === 'pr') return 'pro';
-  return 'classic';
-};
-
-export const getDeviceTypeOnBootloader = (features?: Features): IDeviceType =>
-  getDeviceType(features);
-
-export const getDeviceTypeByBleName = (name?: string): IDeviceType | null => {
-  if (!name) return 'classic';
-  if (name.startsWith('MI')) return 'mini';
-  if (name.startsWith('T')) return 'touch';
-  if (name.startsWith('P')) return 'pro';
-  return 'classic';
-};
-
-// @deprecated
-export const getDeviceTypeByDeviceId = (deviceId?: string): IDeviceType => {
-  if (!deviceId) {
-    return 'classic';
-  }
-
-  const miniFlag = deviceId.slice(0, 2);
-  if (miniFlag.toLowerCase() === 'mi') return 'mini';
-  return 'classic';
-};
-
-export const getDeviceUUID = (features: Features) => {
-  const deviceType = getDeviceType(features);
-
-  if (features?.onekey_serial_no) return features.onekey_serial_no;
-
-  if (deviceType === 'classic') {
-    return features.onekey_serial ?? '';
-  }
-  return features.serial_no ?? '';
-};
-
-export const getDeviceLabel = (features: Features) => {
-  const deviceType = getDeviceType(features);
-  // '' empty string or string
-  if (typeof features.label === 'string') {
-    return features.label;
-  }
-  return `My OneKey ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`;
-};
-
-/**
- * Get Connected Device version by features
- */
-export const getDeviceFirmwareVersion = (features: Features | undefined): IVersionArray => {
-  if (!features) return [0, 0, 0];
-
-  if (semver.valid(features.onekey_firmware_version)) {
-    return features.onekey_firmware_version?.split('.') as unknown as IVersionArray;
-  }
-  if (semver.valid(features.onekey_version)) {
-    return features.onekey_version?.split('.') as unknown as IVersionArray;
-  }
-  return [
-    features.major_version ?? '0',
-    features.minor_version ?? '0',
-    features.patch_version ?? '0',
-  ];
-};
-
-/**
- * Get Connected Device bluetooth firmware version by features
- */
-export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray | null => {
-  if (!features.ble_ver) {
-    return null;
-  }
-  if (!semver.valid(features.ble_ver)) {
-    return null;
-  }
-  return features.ble_ver.split('.') as unknown as IVersionArray;
-};
-
-export const getDeviceBootloaderVersion = (features: Features): IVersionArray => {
-  // classic1s 3.5.0 pro 4.6.0
-  if (semver.valid(features.onekey_boot_version)) {
-    return features.onekey_boot_version?.split('.') as unknown as IVersionArray;
-  }
-  if (!features.bootloader_version) {
-    if (features.bootloader_mode) {
-      return [features.major_version, features.minor_version, features.patch_version];
-    }
-    return [0, 0, 0];
-  }
-  if (semver.valid(features.bootloader_version)) {
-    return features.bootloader_version?.split('.') as unknown as IVersionArray;
-  }
-  return [0, 0, 0];
-};
+import { getDeviceType } from './deviceInfoUtils';
+import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 
 export const getSupportMessageVersion = (
   features: Features | undefined
@@ -308,4 +167,31 @@ export const getFirmwareUpdateField = ({
     return 'firmware-v5';
   }
   return 'firmware';
+};
+
+export function fixVersion(version: string) {
+  let parts = version.split('.');
+
+  while (parts.length < 3) {
+    parts.push('0');
+  }
+  parts = parts.map(part => (isNaN(parseInt(part, 10)) ? '0' : part));
+
+  return parts.join('.');
+}
+
+export const fixFeaturesFirmwareVersion = (features: Features): Features => {
+  // 修复 Touch、Pro 设备 bootloader 低于 2.5.2 版本时，返回的 features 中没有 firmware_version 错误的问题
+  // fix Touch、Pro device when bootloader version is lower than 2.5.2, the features returned do not have firmware_version error
+  const tempFeatures = { ...features };
+
+  if (tempFeatures.onekey_firmware_version && !semver.valid(tempFeatures.onekey_firmware_version)) {
+    tempFeatures.onekey_firmware_version = fixVersion(tempFeatures.onekey_firmware_version);
+  }
+
+  if (tempFeatures.onekey_version && !semver.valid(tempFeatures.onekey_version)) {
+    tempFeatures.onekey_version = fixVersion(tempFeatures.onekey_version);
+  }
+
+  return tempFeatures;
 };
