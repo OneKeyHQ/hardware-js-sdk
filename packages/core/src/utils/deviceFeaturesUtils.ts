@@ -76,11 +76,19 @@ export const supportNewPassphrase = (features?: Features): SupportFeatureType =>
 export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) => {
   const { features, commands } = device;
   const locked = features?.unlocked === false;
+
   const passphraseState = await getPassphraseState(features, commands);
   const isModeT = getDeviceType(features) === 'touch' || getDeviceType(features) === 'pro';
 
+  // 如果可以获取到 passphraseState，但是设备 features 显示设备未开启 passphrase，需要刷新设备状态
+  // if passphraseState can be obtained, but the device features show that the device has not enabled passphrase, the device status needs to be refreshed
+  const needRefreshWithPassphrase = passphraseState && features?.passphrase_protection !== true;
+  // 如果 Touch/Pro 在之前是锁定状态，刷新设备状态
   // if Touch/Pro was locked before, refresh the device state
-  if (isModeT && locked) {
+  const needRefreshWithLocked = isModeT && locked;
+
+  if (needRefreshWithLocked || needRefreshWithPassphrase) {
+    // refresh device state
     await device.getFeatures();
   }
 
