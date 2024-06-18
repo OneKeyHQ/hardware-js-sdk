@@ -35,12 +35,9 @@ export default class DeviceUpdateBootloader extends BaseMethod {
 
   async updateTouchBootloader(device: Device, features?: Features) {
     if (features && !features.bootloader_mode) {
-      // check & upgrade firmware resource
-      const needUpdateBoot = checkNeedUpdateBootForTouch(features);
       const existsBootRes = this.payload?.binary != null;
 
-      const hasUpdateBootloader = needUpdateBoot || existsBootRes;
-      if (features && hasUpdateBootloader) {
+      if (features && existsBootRes) {
         let { binary } = this.payload;
         if (!binary) {
           this.postTipMessage('CheckLatestUiResource');
