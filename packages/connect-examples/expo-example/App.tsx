@@ -1,11 +1,12 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TamaguiProvider } from '@tamagui/core';
-import { PortalProvider, Text, Stack } from 'tamagui';
+import { PortalProvider, Text, Stack, Card } from 'tamagui';
 import * as ExpoLinking from 'expo-linking';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useIntl } from 'react-intl';
 import SDKProvider from './src/provider/SDKProvider';
 
 import config from './tamagui.config';
@@ -13,6 +14,7 @@ import { Routes } from './src/route';
 import AppIntlProvider from './src/provider/AppIntlProvider';
 
 import ApiPayloadScreen from './src/views/ApiPayloadScreen';
+import { Button } from './src/components/ui/Button';
 
 const PassphraseTestScreen = lazy(() => import('./src/views/PassphraseTestScreen'));
 const FirmwareScreen = lazy(() => import('./src/views/FirmwareScreen'));
@@ -71,6 +73,46 @@ function TamaguiProviderWrapper({ children }: { children: React.ReactNode }) {
 const TamaguiProviderWrapperMemo = React.memo(TamaguiProviderWrapper);
 TamaguiProviderWrapperMemo.displayName = 'TamaguiProviderWrapper';
 
+function UpdateTip() {
+  const [needRestart, setNeedRestart] = useState<boolean>(false);
+  const intl = useIntl();
+
+  useEffect(() => {
+    // @ts-expect-error
+    window.desktopApi.on('update/downloaded', () => {
+      setNeedRestart(true);
+    });
+  }, [needRestart]);
+
+  if (!needRestart) return undefined;
+
+  return (
+    <Card
+      elevate
+      size="$4"
+      bordered
+      padding="$6"
+      position="absolute"
+      right={20}
+      top={80}
+      zIndex={1000}
+      backgroundColor="$bgApp"
+    >
+      <Text>{intl.formatMessage({ id: 'tip__update_ready' })}</Text>
+      <Button
+        marginTop="$4"
+        variant="destructive"
+        onPress={() => {
+          // @ts-expect-error
+          window.desktopApi?.updateReload();
+        }}
+      >
+        {intl.formatMessage({ id: 'action__update_restart' })}
+      </Button>
+    </Card>
+  );
+}
+
 // Main App
 export default function App() {
   return (
@@ -78,6 +120,7 @@ export default function App() {
       <SafeAreaProvider>
         <SDKProvider>
           <AppIntlProvider>
+            <UpdateTip />
             <NavigationContentMemo />
           </AppIntlProvider>
         </SDKProvider>

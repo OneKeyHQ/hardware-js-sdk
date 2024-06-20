@@ -17,9 +17,7 @@
       "**/electron",
       "**/electron/**",
       "**/@electron",
-      "**/@electron/**",
-      "**/@electron-forge",
-      "**/@electron-forge/**"
+      "**/@electron/**"
     ]
   },
   "scripts": {
