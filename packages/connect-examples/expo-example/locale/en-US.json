@@ -21,10 +21,12 @@
   "action__pick_file": "Pick File",
   "action__export_report": "Export Report",
   "action__switch_device": "Input Pin on Device",
+  "action__update_restart": "Restart installation update",
 
   "action__start_test": "Start Test",
   "action__stop_test": "Stop Test",
 
+  "tip__update_ready": "There are new versions that can be updated",
   "tip__sdk_not_ready": "SDK not ready",
   "tip__sdk_loading": "SDK loading...",
   "tip__sdk_load_complete": "SDK Ready",
@@ -90,7 +92,7 @@
 
   "label__device_bootloader_statue": "Bootloader",
   "label__device_firmware_status": "Firmware",
-  
+
   "label__device_se_info": "Device SE Information",
   "label__device_info_update_time": "Update Time",
   "label__device_info_refresh": "Refreshing Device Information",
@@ -105,7 +107,7 @@
   "label__wallet_change_count": "Wallet Change Count",
   "label__wallet_include_normal": "Include Normal Wallet",
   "label__wallet_sequential_switch": "Sequential Switch",
-  "label__wallet_mnemonic": "Mnemonic",  
+  "label__wallet_mnemonic": "Mnemonic",
 
   "message__no_device": "No device",
   "message__current_selector_device": "Current selector device: ",
@@ -142,7 +144,7 @@
   "message__address_not_match": "Address not match",
   "message__create": "create",
   "message__generate": "generate",
-  
+
   "message__passphrase_count_test_describe": "After starting, follow the prompts to unlock the hardware and confirm the passphrase according to the hardware prompts. Do not enter it yourself",
   "message__passphrase_count_test_step1": "1. Create wallet passphrase from scratch and record it, note in the hardware press Confirm passphrase",
   "message__passphrase_count_test_step2": "2. Each time a passphrase wallet is created, it will check the previously created wallet to see if it can get the address properly",
@@ -153,6 +155,6 @@
   "message__test_blind_signature_security_check_describe": "Check wallet blind signature security to see if you can sign with a private key other than the specified coin type",
 
   "message__message_is_empty": "Please enter the mnemonic of the device first",
-  
+
   "ignore": "ignore"
 }

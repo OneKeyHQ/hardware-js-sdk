@@ -1,14 +1,17 @@
 /* eslint-disable no-template-curly-in-string */
+// eslint-disable-next-line import/no-import-module-exports, @typescript-eslint/no-var-requires
+const { version } = require('./package.json');
+
 module.exports = {
   extraMetadata: {
     main: 'dist/index.js',
-    version: '1',
+    version,
   },
   appId: 'so.onekey.example.hardware-desktop',
   productName: 'HardwareExample',
   copyright: 'Copyright © OeKey 2024',
   asar: true,
-  buildVersion: '1',
+  buildVersion: version,
   directories: {
     output: 'out',
   },
@@ -20,6 +23,7 @@ module.exports = {
     'dist/**/*.js',
     '!dist/__**',
     'package.json',
+    '!scripts/**',
   ],
   extraResources: [
     {
@@ -64,8 +68,8 @@ module.exports = {
     darkModeSupport: false,
     category: 'productivity',
     target: [
-      //   { target: 'dmg', arch: ['x64', 'arm64'] },
-      { target: 'zip', arch: ['x64', 'arm64'] },
+      { target: 'dmg', arch: ['x64', 'arm64'] },
+      // { target: 'zip', arch: ['x64', 'arm64'] },
     ],
     entitlements: 'entitlements.mac.plist',
     extendInfo: {
@@ -82,7 +86,12 @@ module.exports = {
     icon: 'public/icons/512x512.png',
     artifactName: 'Hardware-Example-win-${arch}.${ext}',
     verifyUpdateCodeSignature: false,
-    target: ['nsis'],
+    target: [
+      {
+        target: 'nsis',
+        arch: ['x64'],
+      },
+    ],
   },
   linux: {
     extraResources: [
@@ -97,4 +106,13 @@ module.exports = {
     category: 'Utility',
     target: ['AppImage'],
   },
+  publish: [
+    {
+      provider: 'github',
+      owner: 'OneKeyHQ',
+      repo: 'hardware-js-sdk',
+      private: false,
+      vPrefixedTagName: true,
+    },
+  ],
 };

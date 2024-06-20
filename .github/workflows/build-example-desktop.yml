@@ -25,6 +25,8 @@ jobs:
         yarn build
 
     - name: Build Desktop Application
+      env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: yarn build:example:desktop
 
     - name: Upload Mac x64 Artifacts

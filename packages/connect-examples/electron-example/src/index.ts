@@ -1,8 +1,16 @@
-import { screen, app, BrowserWindow, session } from 'electron';
+import { screen, app, BrowserWindow, session, ipcMain } from 'electron';
 import path from 'path';
 import isDevelopment from 'electron-is-dev';
 import { format as formatUrl } from 'url';
-import initProcess from './process';
+import log from 'electron-log';
+import { autoUpdater } from 'electron-updater';
+import initProcess, { restartBridge } from './process';
+import { ipcMessageKeys } from './config';
+
+// Set log level
+log.transports.file.level = 'info';
+log.transports.console.level = 'info';
+autoUpdater.logger = log;
 
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
@@ -86,7 +94,7 @@ function createMainWindow() {
 
   browserWindow.webContents.on('did-finish-load', () => {
     console.log('browserWindow >>>> did-finish-load');
-    browserWindow.webContents.send('SET_ONEKEY_DESKTOP_GLOBALS', {
+    browserWindow.webContents.send(ipcMessageKeys.INJECT_ONEKEY_DESKTOP_GLOBALS, {
       resourcesPath: (global as any).resourcesPath,
       staticPath: `file://${staticPath}`,
       sdkConnectSrc,
@@ -209,6 +217,42 @@ if (!singleInstance && !process.mas) {
     showMainWindow();
   });
 }
+
+ipcMain.on(ipcMessageKeys.UPDATE_RESTART, () => {
+  log.info('App Quit And Install');
+  autoUpdater.quitAndInstall();
+});
+
+ipcMain.on(ipcMessageKeys.APP_RELOAD_BRIDGE_PROCESS, () => {
+  restartBridge();
+});
+
+// 配置 GitHub 发布提供者
+autoUpdater.setFeedURL({
+  provider: 'github',
+  owner: 'OneKeyHQ',
+  repo: 'hardware-js-sdk',
+  private: false,
+  releaseType: 'release',
+});
+
+// 检查更新
+app.on('ready', () => {
+  autoUpdater.on('update-available', () => {
+    log.info('Update available.');
+    mainWindow?.webContents?.send(ipcMessageKeys.UPDATE_AVAILABLE);
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    log.info('Update downloaded.');
+    mainWindow?.webContents?.send(ipcMessageKeys.UPDATE_DOWNLOADED);
+  });
+
+  setTimeout(() => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    autoUpdater.checkForUpdatesAndNotify();
+  }, 5000);
+});
 
 // wuit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
