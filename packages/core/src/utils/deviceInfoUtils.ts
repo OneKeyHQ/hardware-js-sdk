@@ -119,16 +119,18 @@ export const getMethodVersionRange = (
   const deviceType = getDeviceType(features);
   let versionRange: IVersionRange | undefined = getVersionRange(deviceType);
 
-  if (!versionRange) {
+  if (versionRange) {
     return versionRange;
   }
 
-  if (DeviceModelToTypes.model_classic.includes(deviceType)) {
-    versionRange = getVersionRange('model_classic');
-  } else if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-    versionRange = getVersionRange('model_mini');
-  } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {
-    versionRange = getVersionRange('model_touch');
+  const modelFallbacks: IDeviceModel[] = ['model_classic', 'model_mini', 'model_touch'];
+  for (const model of modelFallbacks) {
+    if (DeviceModelToTypes[model].includes(deviceType)) {
+      versionRange = getVersionRange(model);
+      if (versionRange) {
+        return versionRange;
+      }
+    }
   }
 
   return versionRange;
