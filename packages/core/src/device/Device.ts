@@ -372,7 +372,8 @@ export class Device extends EventEmitter {
         new Promise((_, reject) => {
           setTimeout(() => {
             reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
-          }, 5 * 1000);
+            // iOS ble bound device timeout 20s
+          }, 25 * 1000);
         }),
       ]);
 
