@@ -1,3 +1,4 @@
+import type { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { BaseMethod } from './BaseMethod';
 import DeviceConnector from '../device/DeviceConnector';
 import TransportManager from '../data-manager/TransportManager';
@@ -26,11 +27,21 @@ export default class SearchDevices extends BaseMethod {
      * to avoid device pairing
      */
     if (DataManager.isBleConnect(env)) {
-      return devicesDescriptor.map(device => ({
-        ...device,
-        connectId: device.id,
-        deviceType: getDeviceTypeByBleName(device.name ?? ''),
-      }));
+      const devices = [];
+      const seenIds = new Set<string>();
+
+      for (const device of devicesDescriptor) {
+        const lowerId = device.id?.toLowerCase();
+        if (!seenIds.has(lowerId)) {
+          seenIds.add(lowerId);
+          devices.push({
+            ...device,
+            connectId: device.id,
+            deviceType: getDeviceTypeByBleName(device.name ?? ''),
+          });
+        }
+      }
+      return devices;
     }
 
     const { deviceList } = await DevicePool.getDevices(devicesDescriptor);
