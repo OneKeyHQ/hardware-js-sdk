@@ -79,7 +79,7 @@ function UpdateTip() {
 
   useEffect(() => {
     // @ts-expect-error
-    window.desktopApi.on('update/downloaded', () => {
+    window.desktopApi?.on('update/downloaded', () => {
       setNeedRestart(true);
     });
   }, [needRestart]);

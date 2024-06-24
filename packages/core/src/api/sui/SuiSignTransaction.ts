@@ -1,5 +1,6 @@
 import { SuiSignTx as HardwareSuiSignTx, TypedCall, SuiSignedTx } from '@onekeyfe/hd-transport';
 import semver from 'semver';
+import { bytesToHex } from '@noble/hashes/utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -83,7 +84,7 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
     const payload = data.subarray(offset, offset + data_length);
     const newOffset = offset + payload.length;
     const resourceAckParams = {
-      data_chunk: payload.toString('hex'),
+      data_chunk: bytesToHex(payload),
     };
 
     const response = await typedCall('SuiTxAck', ['SuiSignedTx', 'SuiTxRequest'], {
@@ -104,7 +105,7 @@ export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
       this.params = {
         address_n: this.params.address_n,
         raw_tx: '',
-        data_initial_chunk: data.subarray(0, this.chunkByteSize).toString('hex'),
+        data_initial_chunk: bytesToHex(data.subarray(0, this.chunkByteSize)),
         data_length: data.length,
       };
     }
