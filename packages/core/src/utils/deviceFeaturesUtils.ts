@@ -45,7 +45,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
       return 'mini';
     case 'TOUCH':
       return 'touch';
-    case 'TOUCH_PRO':
+    case 'PRO':
       return 'pro';
     default:
     // other
@@ -57,6 +57,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   const miniFlag = serialNo.slice(0, 2);
   if (miniFlag.toLowerCase() === 'mi') return 'mini';
   if (miniFlag.toLowerCase() === 'tc') return 'touch';
+  if (miniFlag.toLowerCase() === 'pr') return 'pro';
   return 'classic';
 };
 
@@ -67,6 +68,7 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType | null => {
   if (!name) return 'classic';
   if (name.startsWith('MI')) return 'mini';
   if (name.startsWith('T')) return 'touch';
+  if (name.startsWith('P')) return 'pro';
   return 'classic';
 };
 
@@ -84,7 +86,7 @@ export const getDeviceTypeByDeviceId = (deviceId?: string): IDeviceType => {
 export const getDeviceUUID = (features: Features) => {
   const deviceType = getDeviceType(features);
 
-  if (features.onekey_serial_no) return features.onekey_serial_no;
+  if (features?.onekey_serial_no) return features.onekey_serial_no;
 
   if (deviceType === 'classic') {
     return features.onekey_serial ?? '';
@@ -289,18 +291,21 @@ export const getFirmwareUpdateField = ({
   }
 
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-    return 'firmware-v4';
+    return 'firmware-v5';
   }
 
   if (deviceType === 'touch') {
     if (targetVersion) {
       if (semver.eq(targetVersion, '4.0.0')) return 'firmware-v2';
-      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v4';
+      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v5';
     }
 
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
 
-    return 'firmware-v4';
+    return 'firmware-v5';
+  }
+  if (deviceType === 'pro') {
+    return 'firmware-v5';
   }
   return 'firmware';
 };

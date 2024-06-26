@@ -1986,17 +1986,12 @@ export enum OneKeyDeviceType {
   CLASSIC1S = 1,
   MINI = 2,
   TOUCH = 3,
-  TOUCH_PRO = 4,
+  PRO = 5,
 }
 
 export enum OneKeySeType {
   THD89 = 0,
   SE608A = 1,
-}
-
-export enum OneKeySEState {
-  BOOT = 0,
-  APP = 1,
 }
 
 // Features
@@ -2065,9 +2060,9 @@ export type Features = {
   onekey_board_hash?: string;
   onekey_boot_version?: string;
   onekey_boot_hash?: string;
-  onekey_se01_version?: string;
-  onekey_se01_hash?: string;
-  onekey_se01_build_id?: string;
+  onekey_se_version?: string;
+  onekey_se_hash?: string;
+  onekey_se_build_id?: string;
   onekey_firmware_version?: string;
   onekey_firmware_hash?: string;
   onekey_firmware_build_id?: string;
@@ -2077,32 +2072,6 @@ export type Features = {
   onekey_ble_version?: string;
   onekey_ble_build_id?: string;
   onekey_ble_hash?: string;
-  onekey_board_build_id?: string;
-  onekey_se01_boot_version?: string;
-  onekey_se01_boot_hash?: string;
-  onekey_se01_boot_build_id?: string;
-  onekey_se02_version?: string;
-  onekey_se02_hash?: string;
-  onekey_se02_build_id?: string;
-  onekey_se02_boot_version?: string;
-  onekey_se02_boot_hash?: string;
-  onekey_se02_boot_build_id?: string;
-  onekey_se03_version?: string;
-  onekey_se03_hash?: string;
-  onekey_se03_build_id?: string;
-  onekey_se03_boot_version?: string;
-  onekey_se03_boot_hash?: string;
-  onekey_se03_boot_build_id?: string;
-  onekey_se04_version?: string;
-  onekey_se04_hash?: string;
-  onekey_se04_build_id?: string;
-  onekey_se04_boot_version?: string;
-  onekey_se04_boot_hash?: string;
-  onekey_se04_boot_build_id?: string;
-  onekey_se01_state?: string | null;
-  onekey_se02_state?: string | null;
-  onekey_se03_state?: string | null;
-  onekey_se04_state?: string | null;
 };
 
 // LockDevice

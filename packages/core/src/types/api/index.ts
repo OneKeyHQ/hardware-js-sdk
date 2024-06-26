@@ -122,6 +122,8 @@ import { nostrDecryptMessage } from './nostrDecryptMessage';
 import { nostrSignSchnorr } from './nostrSignSchnorr';
 
 import { lnurlAuth } from './lnurlAuth';
+import { nervosGetAddress } from './nervosGetAddress';
+import { nervosSignTransaction } from './nervosSignTransaction';
 
 export * from './export';
 
@@ -332,4 +334,10 @@ export type CoreApi = {
    * Lightning Network
    */
   lnurlAuth: typeof lnurlAuth;
+
+  /**
+   * Nervos Network
+   */
+  nervosGetAddress: typeof nervosGetAddress;
+  nervosSignTransaction: typeof nervosSignTransaction;
 };

@@ -14,6 +14,7 @@ import {
 import signtx from './helpers/signtx';
 import signtxLegacy from './helpers/signtxLegacy';
 import { getCoinInfo } from './helpers/btcParamsUtils';
+import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 
 type Params = {
   inputs: TxInputType[];
@@ -118,6 +119,10 @@ export default class BTCSignTransaction extends BaseMethod<Params> {
       },
       coinName,
     };
+  }
+
+  getVersionRange() {
+    return getBitcoinForkVersionRange([this.params.coinName]);
   }
 
   async run() {

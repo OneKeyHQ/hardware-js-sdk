@@ -146,3 +146,6 @@ export type {
   NexaSignInputParams,
   NexaSignOutputParams,
 } from './nexaSignTransaction';
+
+export type { NervosAddress, NervosGetAddressParams } from './nervosGetAddress';
+export type { NervosSignedTx, NervosSignTransactionParams } from './nervosSignTransaction';

@@ -5,6 +5,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { getCoinAndScriptType } from './helpers/btcParamsUtils';
+import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 
 export default class BTCSignMessage extends BaseMethod<SignMessage> {
   init() {
@@ -31,6 +32,10 @@ export default class BTCSignMessage extends BaseMethod<SignMessage> {
       script_type: noScriptType ? undefined : scriptType,
       no_script_type: noScriptType,
     };
+  }
+
+  getVersionRange() {
+    return getBitcoinForkVersionRange([this.params.coin_name]);
   }
 
   async run() {
