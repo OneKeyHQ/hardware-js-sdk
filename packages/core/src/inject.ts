@@ -271,7 +271,10 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nexaGetAddress' }),
   nexaSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'nexaSignTransaction' }),
-
+  stacksGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'stacksGetAddress' }),
+  stacksSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'stacksSignTransaction' }),
   nostrGetPublicKey: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'nostrGetPublicKey' }),
   nostrSignEvent: (connectId, deviceId, params) =>
