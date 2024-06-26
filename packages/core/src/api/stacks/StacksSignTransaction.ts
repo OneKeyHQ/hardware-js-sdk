@@ -1,16 +1,16 @@
-import { TypedCall } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { TypedCall } from '@onekeyfe/hd-transport';
 import { TypedResponseMessage } from '../../device/DeviceCommands';
-import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { NexaSignTransactionParams, NexaSignature } from '../../types';
+import { validatePath } from '../helpers/pathUtils';
+import { StacksSignTransactionParams, StacksSignature } from '../../types/api/stacksSignTransaction';
 
-export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionParams> {
+export default class StacksSignTransaction extends BaseMethod<StacksSignTransactionParams> {
   hasBundle = false;
 
   init() {
-    const payload = this.payload as NexaSignTransactionParams;
+    const payload = this.payload as StacksSignTransactionParams;
 
     payload.inputs.forEach(input => {
       validateParams(input, [
@@ -36,10 +36,10 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
 
   async processTxRequest(
     typedCall: TypedCall,
-    res: TypedResponseMessage<'NexaTxInputRequest'> | TypedResponseMessage<'NexaSignedTx'>,
+    res: TypedResponseMessage<'StacksTxInputRequest'> | TypedResponseMessage<'StacksSignedTx'>,
     index: number,
-    signatures: NexaSignature[]
-  ): Promise<NexaSignature[]> {
+    signatures: StacksSignature[]
+  ): Promise<StacksSignature[]> {
     const { signature } = res.message;
     if (!signature) {
       throw ERRORS.TypedError(
@@ -47,7 +47,7 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
         'signature is not valid'
       );
     }
-    if (res.type === 'NexaSignedTx') {
+    if (res.type === 'StacksSignedTx') {
       signatures.push({
         index,
         signature,
@@ -56,7 +56,7 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
       return signatures;
     }
 
-    if (res.type === 'NexaTxInputRequest') {
+    if (res.type === 'StacksTxInputRequest') {
       signatures.push({
         index,
         signature,
@@ -65,9 +65,9 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
       const nextIndex = res.message.request_index;
       const input = this.params.inputs[nextIndex];
       const response = await typedCall(
-        'NexaTxInputAck',
+        'StacksTxInputAck',
         // @ts-expect-error
-        ['NexaTxInputRequest', 'NexaSignedTx'],
+        ['StacksTxInputRequest', 'StacksSignedTx'],
         {
           address_n: input.path,
           raw_message: input.message,
@@ -86,8 +86,8 @@ export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionP
     const input = params.inputs[0];
 
     const response = await device.commands.typedCall(
-      'NexaSignTx',
-      ['NexaTxInputRequest', 'NexaSignedTx'],
+      'StacksSignTx',
+      ['StacksTxInputRequest', 'StacksSignedTx'],
       {
         address_n: validatePath(input.path, 3),
         raw_message: input.message,
