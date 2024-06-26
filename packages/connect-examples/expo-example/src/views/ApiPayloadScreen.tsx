@@ -53,6 +53,10 @@ const playgroundConfig = [
     data: require('../data/cosmos').default,
   },
   {
+    title: 'Dynex API',
+    data: require('../data/dynex').default,
+  },
+  {
     title: 'Filecoin API',
     data: require('../data/filecoin').default,
   },
@@ -75,6 +79,10 @@ const playgroundConfig = [
   {
     title: 'Nexa API',
     data: require('../data/nexa').default,
+  },
+  {
+    title: 'Nervos API',
+    data: require('../data/nervos').default,
   },
   {
     title: 'Polkadot API',

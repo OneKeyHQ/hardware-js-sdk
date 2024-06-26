@@ -3,4 +3,5 @@ export const enum Routes {
   FirmwareUpdateTest = 'firmware-update-test',
   PassphraseTest = 'passphrase-test',
   AddressTest = 'address-test',
+  SecurityCheck = 'security-check',
 }

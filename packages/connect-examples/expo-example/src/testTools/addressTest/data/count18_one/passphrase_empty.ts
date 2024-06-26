@@ -20,7 +20,6 @@ export default {
           'addr1q9ph66lsff6mhu73c22lnpl7qmx3f7z5l5nesu85z9jdvkf5e65lskad87286k9e0ee4sfvpl4dwcykkm45724e7wluq7tdkps',
       },
     },
-
     {
       method: 'algoGetAddress',
       expectedAddress: {
@@ -173,6 +172,35 @@ export default {
       },
     },
     {
+      method: 'btcGetAddress',
+      name: 'btcGetAddress-Neurai',
+      params: {
+        path: "m/44'/1900'/$$INDEX$$'/0/0",
+        coin: 'neurai',
+      },
+      expectedAddress: {
+        '0': 'NSwx3Pq8qsQddHro2ANFJvjAWbC9X8Q3Y2',
+        '1': 'NWCzbazbKRZMZZZDLJA2GpqLY5vtVnhxKq',
+        '25': 'NMqC8Xbz24nLg5VMs214yX6WmepfbzboQA',
+        '2147483646': 'NikpCMpe8kX77dVDzZPx9g2qFSGTJYW9fY',
+        '2147483647': 'Nb4E3bi3e7mJRQRMQHZSBhTjq8FQZRf8KR',
+      },
+    },
+    {
+      method: 'nervosGetAddress',
+      name: 'nervosGetAddress',
+      params: {
+        path: "m/44'/309'/$$INDEX$$'/0/0",
+      },
+      expectedAddress: {
+        '0': 'ckb1qyqynt6p6dd68v85n8tah4arrlh5wwhj034s6faunl',
+        '1': 'ckb1qyqgt6vvf68mzjrzz9ngyd6uk3yuu8ejheas4v7qqx',
+        '25': 'ckb1qyq2lcce9qra3lvrwg3c0vnj6qyurh7j3ugq8uh3lu',
+        '2147483646': 'ckb1qyq99ya3q2j2n0sazmhmurd29nd7zhpmdueq2jvrt2',
+        '2147483647': 'ckb1qyq0r66dwx4rfhgnm0hyg44slr23ws90dcnsjf4wcv',
+      },
+    },
+    {
       method: 'confluxGetAddress',
       expectedAddress: {
         '0': 'cfx:aasmmnue6rp28nb7d4re9jwnwy7hw1v642hagrf1ch',
@@ -302,6 +330,19 @@ export default {
         '100': 'celestia1t7f6q0r5xfeqf82vllq54sa68xkwevlsrj4hsx',
         '2147483646': 'celestia1v3a0s3j27aq8atmska7lccwws4hlwz9glgdj44',
         '2147483647': 'celestia12058wpqll57m0f3j5z9evwc50wvf4ty9m6vruu',
+      },
+    },
+    {
+      method: 'dnxGetAddress',
+      expectedAddress: {
+        '0': 'Xwn9NH5LaWgVvXrJnfMsJH5jkfa1W8HzWgFB5MBbEjsXFH69HTwc4E1Hb11hqoSJ4rhssJAgj65PUVa8r6otvRLy2ECgR28Mu',
+        '1': 'Xwn6uFCBfn2UhjaBntqgDGWRAbotDZySKEp16hC9CCcmaqK8BEeQdHEACDvZ4JindaWjLpTc8vMxuEpJPKrAaYpU1WxDFgAHc',
+        '100':
+          'XwmgQC3oWb5jRmDLQgRoL59KFyuBisEmNMu7PYLwZgc51bLMRjBfxFFXyhzZKhqx3chWavKnavjL8d2LRXaMBZRw3AGh1NYGN',
+        '2147483646':
+          'XwodMJJh3SSTbhDjZ9VQaWXdtXgBHDxddUY9qS5HVHoxJqZfT1gTKX9FWCyie2G6fVLkZ4Lsuh9CxhcCFodjukjy13NeuNiQe',
+        '2147483647':
+          'XwnvxUBEcRaFrVZEwgbpen9YrYCjtaCYmPbwhcwDQcEbSL8YTJAsekc626jnCMJ9C1Np87E94ySsp3Wukc62Hy1n2z22tChzi',
       },
     },
     {
@@ -445,6 +486,21 @@ export default {
         '100': 'j4VC2JcrohXNZTTDFpAPnBged6xpCKFhbCmjyNWHVhbTrjNd9',
         '2147483646': 'j4WgiW1Qiv9iX4CypRvJstsvT7hgDgPg1WE8gSWYytweDfUkQ',
         '2147483647': 'j4U4M7BYUKHHjuo9W1An7rnG6LLBQu7AFGcFFPJ6chZQpbYQf',
+      },
+    },
+    {
+      method: 'polkadotGetAddress',
+      name: 'polkadotGetAddress-manta',
+      params: {
+        prefix: '77',
+        network: 'manta',
+      },
+      expectedAddress: {
+        '0': 'dfack3eCDagQastz63dp9JhgZ5f9ZQgPQdfyMFeq8QCQQEXNj',
+        '1': 'dfX512sPuAAzp2gbgz4TP1uDYmns4uPjYZ3CDdCdFti8PJP5c',
+        '25': 'dfWssT8Yq1zGf7TDL2DE7auMCvQzRZagkjagZhfbfSP5bR6Cm',
+        '2147483646': 'dfbv7toUMfkyBG8K44HWPiuurL3E5Zf3jxYpw53imsQw56LHn',
+        '2147483647': 'dfZHkVyc74tYQ7iUjdXydgpFVYfjGnNXyivwW1qGQg2hg2LzL',
       },
     },
     {

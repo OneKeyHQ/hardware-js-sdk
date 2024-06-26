@@ -1,9 +1,11 @@
 import { memo } from 'react';
-import { Text, XStack } from 'tamagui';
+import { Stack, Text, XStack } from 'tamagui';
+import { Text as RNText } from 'react-native';
+import { useDeviceFieldContext } from './DeviceFieldContext';
 
 interface DeviceFieldProps {
   field: string;
-  value: string | null | undefined;
+  value?: string | undefined | null;
 }
 
 function isNil(value: string | undefined | null): value is string {
@@ -11,21 +13,41 @@ function isNil(value: string | undefined | null): value is string {
 }
 
 function DeviceFieldView({ field, value }: DeviceFieldProps) {
+  const { features, onekeyFeatures } = useDeviceFieldContext();
+
+  // @ts-expect-error
+  const fieldValue = onekeyFeatures?.[field] ?? features?.[field] ?? value;
+
   return (
     <XStack
-      width="100%"
       flexWrap="wrap"
-      gap="$2"
-      $gtSm={{
-        width: '48%',
-      }}
+      width="100%"
       $gtLg={{
-        width: '30%',
+        width: '49%',
       }}
     >
-      <Text color={isNil(value) ? '$textCritical' : '$text'} fontWeight="bold">{`${field}: `}</Text>
-      <Text color={isNil(value) ? '$textCritical' : '$text'}>{`${value ?? ''}`}</Text>
+      <Text
+        minWidth={260}
+        color={isNil(fieldValue) ? '$textCritical' : '$text'}
+        fontSize={18}
+        fontWeight="bold"
+      >
+        {`${field}: `}
+      </Text>
+      <Stack flex={1} paddingStart={4}>
+        <Text
+          flex={1}
+          flexWrap="wrap"
+          fontSize={18}
+          fontWeight="bold"
+          color={isNil(fieldValue) ? '$textCritical' : '$text'}
+        >{`${fieldValue ?? ''}`}</Text>
+      </Stack>
     </XStack>
   );
 }
-export const DeviceField = memo(DeviceFieldView);
+
+export const DeviceField = memo(
+  DeviceFieldView,
+  (prev, next) => prev.field === next.field && prev.value === next.value
+);

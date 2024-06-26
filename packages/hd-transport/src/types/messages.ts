@@ -1245,6 +1245,61 @@ export type EcdsaPublicKeys = {
   public_keys: string[];
 };
 
+// DnxGetAddress
+export type DnxGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// DnxAddress
+export type DnxAddress = {
+  address?: string;
+};
+
+// DnxSignTx
+export type DnxSignTx = {
+  address_n: number[];
+  inputs_count: number;
+  to_address: string;
+  amount: UintType;
+  fee: UintType;
+  payment_id?: string;
+};
+
+export type DnxTxKey = {
+  ephemeral_tx_sec_key?: string;
+  ephemeral_tx_pub_key?: string;
+};
+
+export type DnxComputedKeyImage = {
+  key_image?: string;
+};
+
+// DnxInputRequest
+export type DnxInputRequest = {
+  request_index?: number;
+  tx_key?: DnxTxKey;
+  computed_key_image?: DnxComputedKeyImage;
+};
+
+// DnxInputAck
+export type DnxInputAck = {
+  prev_index: number;
+  global_index: number;
+  tx_pubkey: string;
+  prev_out_pubkey: string;
+  amount: UintType;
+};
+
+// DnxRTSigsRequest
+export type DnxRTSigsRequest = {};
+
+// DnxSignedTx
+export type DnxSignedTx = {
+  signatures: string[];
+  output_keys: string[];
+};
+
 // EmmcFixPermission
 export type EmmcFixPermission = {};
 
@@ -1960,6 +2015,27 @@ export type Initialize = {
 // GetFeatures
 export type GetFeatures = {};
 
+// OnekeyGetFeatures
+export type OnekeyGetFeatures = {};
+
+export enum OneKeyDeviceType {
+  CLASSIC = 0,
+  CLASSIC1S = 1,
+  MINI = 2,
+  TOUCH = 3,
+  PRO = 5,
+}
+
+export enum OneKeySeType {
+  THD89 = 0,
+  SE608A = 1,
+}
+
+export enum OneKeySEState {
+  BOOT = 0,
+  APP = 1,
+}
+
 export enum Enum_Capability {
   Capability_Bitcoin = 1,
   Capability_Bitcoin_like = 2,
@@ -1980,19 +2056,6 @@ export enum Enum_Capability {
   Capability_PassphraseEntry = 17,
 }
 export type Capability = keyof typeof Enum_Capability;
-
-export enum OneKeyDeviceType {
-  CLASSIC = 0,
-  CLASSIC1S = 1,
-  MINI = 2,
-  TOUCH = 3,
-  PRO = 5,
-}
-
-export enum OneKeySeType {
-  THD89 = 0,
-  SE608A = 1,
-}
 
 // Features
 export type Features = {
@@ -2020,7 +2083,6 @@ export type Features = {
   fw_minor: number | null;
   fw_patch: number | null;
   fw_vendor: string | null;
-  fw_vendor_keys?: string;
   unfinished_backup: boolean | null;
   no_backup: boolean | null;
   recovery_mode: boolean | null;
@@ -2035,6 +2097,7 @@ export type Features = {
   auto_lock_delay_ms: number | null;
   display_rotation: number | null;
   experimental_features: boolean | null;
+  busy?: boolean;
   offset?: number;
   ble_name?: string;
   ble_ver?: string;
@@ -2053,6 +2116,7 @@ export type Features = {
   pre_firmware?: string;
   coin_switch?: number;
   build_id?: string;
+  boardloader_version?: string;
   battery_level?: number;
   onekey_device_type?: string | null;
   onekey_se_type?: string | null;
@@ -2060,9 +2124,9 @@ export type Features = {
   onekey_board_hash?: string;
   onekey_boot_version?: string;
   onekey_boot_hash?: string;
-  onekey_se_version?: string;
-  onekey_se_hash?: string;
-  onekey_se_build_id?: string;
+  onekey_se01_version?: string;
+  onekey_se01_hash?: string;
+  onekey_se01_build_id?: string;
   onekey_firmware_version?: string;
   onekey_firmware_hash?: string;
   onekey_firmware_build_id?: string;
@@ -2072,6 +2136,61 @@ export type Features = {
   onekey_ble_version?: string;
   onekey_ble_build_id?: string;
   onekey_ble_hash?: string;
+  onekey_se02_version?: string;
+  onekey_se03_version?: string;
+  onekey_se04_version?: string;
+  onekey_se01_state?: string | null;
+  onekey_se02_state?: string | null;
+  onekey_se03_state?: string | null;
+  onekey_se04_state?: string | null;
+};
+
+// OnekeyFeatures
+export type OnekeyFeatures = {
+  onekey_device_type?: OneKeyDeviceType;
+  onekey_board_version?: string;
+  onekey_boot_version?: string;
+  onekey_firmware_version?: string;
+  onekey_board_hash?: string;
+  onekey_boot_hash?: string;
+  onekey_firmware_hash?: string;
+  onekey_board_build_id?: string;
+  onekey_boot_build_id?: string;
+  onekey_firmware_build_id?: string;
+  onekey_serial_no?: string;
+  onekey_ble_name?: string;
+  onekey_ble_version?: string;
+  onekey_ble_build_id?: string;
+  onekey_ble_hash?: string;
+  onekey_se_type?: OneKeySeType;
+  onekey_se01_state?: OneKeySEState;
+  onekey_se02_state?: OneKeySEState;
+  onekey_se03_state?: OneKeySEState;
+  onekey_se04_state?: OneKeySEState;
+  onekey_se01_version?: string;
+  onekey_se02_version?: string;
+  onekey_se03_version?: string;
+  onekey_se04_version?: string;
+  onekey_se01_hash?: string;
+  onekey_se02_hash?: string;
+  onekey_se03_hash?: string;
+  onekey_se04_hash?: string;
+  onekey_se01_build_id?: string;
+  onekey_se02_build_id?: string;
+  onekey_se03_build_id?: string;
+  onekey_se04_build_id?: string;
+  onekey_se01_boot_version?: string;
+  onekey_se02_boot_version?: string;
+  onekey_se03_boot_version?: string;
+  onekey_se04_boot_version?: string;
+  onekey_se01_boot_hash?: string;
+  onekey_se02_boot_hash?: string;
+  onekey_se03_boot_hash?: string;
+  onekey_se04_boot_hash?: string;
+  onekey_se01_boot_build_id?: string;
+  onekey_se02_boot_build_id?: string;
+  onekey_se03_boot_build_id?: string;
+  onekey_se04_boot_build_id?: string;
 };
 
 // LockDevice
@@ -3855,6 +3974,15 @@ export type MessageType = {
   Path: Path;
   BatchGetPublickeys: BatchGetPublickeys;
   EcdsaPublicKeys: EcdsaPublicKeys;
+  DnxGetAddress: DnxGetAddress;
+  DnxAddress: DnxAddress;
+  DnxSignTx: DnxSignTx;
+  DnxTxKey: DnxTxKey;
+  DnxComputedKeyImage: DnxComputedKeyImage;
+  DnxInputRequest: DnxInputRequest;
+  DnxInputAck: DnxInputAck;
+  DnxRTSigsRequest: DnxRTSigsRequest;
+  DnxSignedTx: DnxSignedTx;
   EmmcFixPermission: EmmcFixPermission;
   EmmcPath: EmmcPath;
   EmmcPathInfo: EmmcPathInfo;
@@ -3954,7 +4082,9 @@ export type MessageType = {
   LnurlAuthResp: LnurlAuthResp;
   Initialize: Initialize;
   GetFeatures: GetFeatures;
+  OnekeyGetFeatures: OnekeyGetFeatures;
   Features: Features;
+  OnekeyFeatures: OnekeyFeatures;
   LockDevice: LockDevice;
   EndSession: EndSession;
   ApplySettings: ApplySettings;

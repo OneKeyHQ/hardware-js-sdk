@@ -3,7 +3,12 @@ import { IVersionArray } from './settings';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
-export type DeviceMode = 'normal' | 'bootloader' | 'initialize' | 'seedless';
+export enum EOneKeyDeviceMode {
+  bootloader = 'bootloader',
+  normal = 'normal',
+  notInitialized = 'notInitialized',
+  backupMode = 'backupMode',
+}
 
 export type UnavailableCapability =
   | 'no-capability'
@@ -17,12 +22,13 @@ export type KnownDevice = {
   connectId: string | null;
   uuid: string;
   deviceId: string | null;
-  deviceType: IDeviceType;
+  deviceType: IDeviceType | null;
   path: string;
   label: string;
+  bleName: string | null;
   name: string;
   error?: typeof undefined;
-  mode: DeviceMode;
+  mode: EOneKeyDeviceMode;
   features: PROTO.Features;
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
@@ -71,7 +77,9 @@ export type Device = KnownDevice;
 
 export type Features = PROTO.Features;
 
-export type IDeviceType = 'classic' | 'classic1s' | 'mini' | 'touch' | 'pro';
+export type OnekeyFeatures = PROTO.OnekeyFeatures;
+
+export type IDeviceType = 'unknown' | 'classic' | 'classic1s' | 'mini' | 'touch' | 'pro';
 
 /**
  * model_classic: 'classic' | 'classic1s'
@@ -92,6 +100,7 @@ export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] }
   mini: ['model_mini'],
   touch: ['model_touch'],
   pro: ['model_touch'],
+  unknown: [],
 };
 
 export type IDeviceFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';
@@ -100,8 +109,13 @@ export type IDeviceBLEFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unkn
 
 export type ITransportStatus = 'valid' | 'outdated';
 
+export type IVersionRange = {
+  min: string;
+  max?: string;
+};
+
 export type DeviceFirmwareRange = {
-  [deviceType in IDeviceType | IDeviceModel]?: { min: string; max?: string };
+  [deviceType in IDeviceType | IDeviceModel]?: IVersionRange;
 };
 
 type FeaturesNarrowing =

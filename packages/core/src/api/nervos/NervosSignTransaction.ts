@@ -1,4 +1,5 @@
 import type { NervosSignTx as HardwareNervosSignTx, TypedCall } from '@onekeyfe/hd-transport';
+import { bytesToHex } from '@noble/hashes/utils';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -83,7 +84,7 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
     const payload = data.subarray(offset, offset + data_length);
     const newOffset = offset + payload.length;
     const resourceAckParams = {
-      data_chunk: payload.toString('hex'),
+      data_chunk: bytesToHex(payload),
     };
 
     const response = await typedCall('NervosTxAck', ['NervosSignedTx', 'NervosTxRequest'], {
@@ -102,7 +103,7 @@ export default class NervosSignTransaction extends BaseMethod<NervosSignTx> {
 
     const res = await typedCall('NervosSignTx', 'NervosSignedTx', {
       address_n: this.params.address_n,
-      data_initial_chunk: data.subarray(0, offset).toString('hex'),
+      data_initial_chunk: bytesToHex(data.subarray(0, offset)),
       data_length: dataLength,
       witness_buffer: this.params.witness_buffer,
       network: this.params.network,

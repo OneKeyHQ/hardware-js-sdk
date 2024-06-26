@@ -13,6 +13,7 @@ import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
+import { stripHexPrefix } from '../../utils/hexstring';
 
 type TestCaseDataType = PubkeyTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<PubkeyTestCase['data'][0]> };
@@ -94,7 +95,9 @@ function validateFields(payload: any, result: any, prefix = '') {
 
     if (result[fieldKey] === undefined) break;
     if (typeof result[fieldKey] === 'string') {
-      if (fieldKey && payload?.[fieldKey] !== result[fieldKey]) {
+      const expected = stripHexPrefix(result?.[fieldKey]);
+      const actual = stripHexPrefix(payload?.[fieldKey]);
+      if (fieldKey && expected !== actual) {
         error += `${fullPath}: actual: ${payload?.[fieldKey]}, expected: ${result[fieldKey]}\n`;
       }
     } else {
@@ -205,6 +208,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       const { params } = item;
       const requestParams = {
         ...params,
+        showOnOneKey,
         passphraseState: currentTestCase?.extra?.passphraseState,
         useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
       };
@@ -251,12 +255,13 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
             onToggle={setShowOnOneKey}
             vertical
           />
-          <TestRunnerOptionButtons onStop={stopTest} onStart={stopTest} />
+          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </Stack>
       </>
     ),
     [
+      beginTest,
       currentTestCase?.name,
       findTestCase,
       intl,

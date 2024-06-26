@@ -1,17 +1,13 @@
 import ByteBuffer from 'bytebuffer';
 import semver from 'semver';
 import { DeviceModelToTypes, Features } from '../../types';
-import { getDeviceType } from '../../utils';
-import {
-  getDeviceBootloaderVersion,
-  getDeviceFirmwareVersion,
-} from '../../utils/deviceFeaturesUtils';
+import { getDeviceType, getDeviceBootloaderVersion, getDeviceFirmwareVersion } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { shouldUpdateBootloaderForClassicAndMini } from './bootloaderHelper';
 
 export function checkNeedUpdateBootForTouch(features: Features) {
   const deviceType = getDeviceType(features);
-  if (deviceType !== 'touch') return false;
+  if (!DeviceModelToTypes.model_touch.includes(deviceType)) return false;
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
   const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features);

@@ -10,6 +10,7 @@ import { checkBootloaderRelease } from './checkBootloaderRelease';
 
 import { searchDevices } from './searchDevices';
 import { getFeatures } from './getFeatures';
+import { getOnekeyFeatures } from './getOnekeyFeatures';
 import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
@@ -125,6 +126,9 @@ import { lnurlAuth } from './lnurlAuth';
 import { nervosGetAddress } from './nervosGetAddress';
 import { nervosSignTransaction } from './nervosSignTransaction';
 
+import { dnxGetAddress } from './dnxGetAddress';
+import { dnxSignTransaction } from './dnxSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -157,6 +161,7 @@ export type CoreApi = {
   searchDevices: typeof searchDevices;
   requestWebUsbDevice: typeof requestWebUsbDevice;
   getFeatures: typeof getFeatures;
+  getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
   deviceBackup: typeof deviceBackup;
   deviceChangePin: typeof deviceChangePin;
@@ -340,4 +345,10 @@ export type CoreApi = {
    */
   nervosGetAddress: typeof nervosGetAddress;
   nervosSignTransaction: typeof nervosSignTransaction;
+
+  /**
+   * Dnx Network
+   */
+  dnxGetAddress: typeof dnxGetAddress;
+  dnxSignTransaction: typeof dnxSignTransaction;
 };

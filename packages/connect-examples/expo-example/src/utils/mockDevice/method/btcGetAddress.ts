@@ -1,11 +1,7 @@
 import * as bitcoin from 'bitcoinjs-lib';
-import BIP32Factory, { BIP32Interface } from 'bip32';
-import { mnemonicToSeedSync } from 'bip39';
-import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
-import eccObj from '../ecc';
 
-bitcoin.initEccLib(eccObj);
-const bip32Obj = BIP32Factory(eccObj);
+import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
+import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
 /**
  * p2pkh、p2sh-p2wpkh、p2wpkh、taproot
@@ -28,12 +24,12 @@ function getAddressTypeByPath(path: string) {
   }
 }
 
-function getBtcAddress(type: string, keyPair: BIP32Interface, network: bitcoin.networks.Network) {
+function getBtcAddress(type: string, publicKey: Buffer, network: bitcoin.networks.Network) {
   let data;
   // p2pkh
   if (type === 'p2pkh') {
     data = bitcoin.payments.p2pkh({
-      pubkey: keyPair.publicKey,
+      pubkey: publicKey,
       network,
     });
   }
@@ -41,7 +37,7 @@ function getBtcAddress(type: string, keyPair: BIP32Interface, network: bitcoin.n
   else if (type === 'p2sh-p2wpkh') {
     data = bitcoin.payments.p2sh({
       redeem: bitcoin.payments.p2wpkh({
-        pubkey: keyPair.publicKey,
+        pubkey: publicKey,
         network,
       }),
     });
@@ -49,14 +45,14 @@ function getBtcAddress(type: string, keyPair: BIP32Interface, network: bitcoin.n
   // p2wpkh
   else if (type === 'p2wpkh') {
     data = bitcoin.payments.p2wpkh({
-      pubkey: keyPair.publicKey,
+      pubkey: publicKey,
       network,
     });
   }
   // taproot
   else if (type === 'p2tr') {
     data = bitcoin.payments.p2tr({
-      internalPubkey: keyPair.publicKey.slice(1, 33),
+      internalPubkey: publicKey.slice(1, 33),
     });
   }
   if (typeof data === 'undefined') {
@@ -82,10 +78,20 @@ export default function btcGetAddress(
   const { path, coin, mnemonic, passphrase } = params;
 
   const network = bitcoin.networks.bitcoin;
-  const seed = mnemonicToSeedSync(mnemonic, passphrase);
-  const master = bip32Obj.fromSeed(seed, network);
+  const seed = mnemonicToSeed(mnemonic, passphrase);
 
-  const keyPair = master.derivePath(path);
+  const keyPair = deriveKeyPairWithPath(seed, path);
+  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
+  if (!publicKeyArray) {
+    return {
+      success: false,
+      payload: {
+        code: 801,
+        error: 'Invalid public key',
+      },
+    };
+  }
+  const publicKey = Buffer.from(publicKeyArray);
 
   const addressType = getAddressTypeByPath(path);
 
@@ -102,7 +108,7 @@ export default function btcGetAddress(
   return {
     success: true,
     payload: {
-      address: getBtcAddress(addressType, keyPair, network),
+      address: getBtcAddress(addressType, publicKey, network),
       path,
     },
   };

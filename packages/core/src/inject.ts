@@ -78,6 +78,8 @@ export const createCoreApi = (
    * 获取设备信息
    */
   getFeatures: (connectId, params) => call({ ...params, connectId, method: 'getFeatures' }),
+  getOnekeyFeatures: (connectId, params) =>
+    call({ ...params, connectId, method: 'getOnekeyFeatures' }),
 
   /**
    * 检查固件版本
@@ -290,4 +292,9 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'nervosGetAddress' }),
   nervosSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'nervosSignTransaction' }),
+
+  dnxGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'dnxGetAddress' }),
+  dnxSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'dnxSignTransaction' }),
 });

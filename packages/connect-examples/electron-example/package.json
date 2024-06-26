@@ -2,7 +2,7 @@
   "name": "hardware-example",
   "productName": "HardwareExample",
   "executableName": "onekey-hardware-example",
-  "version": "0.3.42",
+  "version": "1.0.0",
   "author": "OneKey",
   "description": "End-to-end encrypted workspaces for teams",
   "main": "dist/index.js",
@@ -14,15 +14,17 @@
     "build-electron-web": "yarn copy:inject && yarn build:main && cd ../expo-example && yarn build:electron-web",
     "dev": "npx concurrently \"yarn dev:electron\" \"cross-env TRANSFORM_REGENERATOR_DISABLED=true BROWSER=none yarn dev-electron-web\"",
     "dev:electron": "electron --inspect=5858 dist/index.js",
-    "build:package": "yarn build-electron-web && electron-forge package",
     "build:main": "webpack --config webpack.config.ts",
-    "make": "yarn clean:build && yarn build-electron-web && electron-builder build -mw --config electron-builder.config.js --publish never",
+    "make": "yarn clean:build && yarn build-electron-web && electron-builder build -mw --config electron-builder.config.js --publish always",
     "lint": "eslint --ext .tsx --ext .ts ./",
     "ts:check": "yarn tsc --noEmit"
   },
   "dependencies": {
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",
+    "electron-log": "^5.1.5",
+    "electron-updater": "^6.2.1",
+    "fs-extra": "^11.2.0",
     "node-fetch": "^2.6.7"
   },
   "devDependencies": {

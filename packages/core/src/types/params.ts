@@ -29,6 +29,9 @@ export interface CommonParams {
    * Use derive cardano
    */
   deriveCardano?: boolean;
+
+  // Detect hardware that is in bootloader mode and return an error
+  detectBootloaderDevice?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

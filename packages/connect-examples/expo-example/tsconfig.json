@@ -7,5 +7,5 @@
   "include": [
     "**/*.ts",
     "**/*.tsx"
-, "src/utils/mockDevice/ecc.js"  ]
+, "src/utils/mockDevice/ecc.js", "src/utils/mockDevice/__test__/dnxGetAddress.test.js"  ]
 }

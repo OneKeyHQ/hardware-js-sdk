@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
@@ -14,6 +14,7 @@ import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
+import { stripHexPrefix } from '../../utils/hexstring';
 
 type TestCaseDataType = PubkeyBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -152,7 +153,9 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
 
     if (result[fieldKey] === undefined) break;
     if (typeof result[fieldKey] === 'string') {
-      if (fieldKey && payload?.[fieldKey] !== result[fieldKey]) {
+      const expected = stripHexPrefix(result?.[fieldKey]);
+      const actual = stripHexPrefix(payload?.[fieldKey]);
+      if (fieldKey && expected !== actual) {
         error += `(${key}) ${fullPath}: actual: ${payload?.[fieldKey]}, expected: ${result[fieldKey]}\n`;
       }
     } else {
@@ -164,7 +167,6 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
 
 let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
-  const intl = useIntl();
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PubkeyBatchTestCase>();
   const [testDescription, setTestDescription] = useState<string>();
@@ -335,12 +337,20 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
-          <TestRunnerOptionButtons onStop={stopTest} onStart={stopTest} />
+          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </XStack>
       </>
     ),
-    [currentTestCase?.name, findTestCase, passphrase, stopTest, testCaseList, testDescription]
+    [
+      currentTestCase?.name,
+      findTestCase,
+      passphrase,
+      stopTest,
+      beginTest,
+      testCaseList,
+      testDescription,
+    ]
   );
 
   return contentMemo;

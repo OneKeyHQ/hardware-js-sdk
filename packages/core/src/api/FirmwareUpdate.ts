@@ -1,4 +1,10 @@
-import { ERRORS, HardwareErrorCode, HardwareError, createDeferred } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  HardwareErrorCode,
+  HardwareError,
+  createDeferred,
+  Deferred,
+} from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
@@ -22,6 +28,8 @@ type Params = {
 const Log = getLogger(LoggerNames.Method);
 
 export default class FirmwareUpdate extends BaseMethod<Params> {
+  checkPromise: Deferred<any> | null = null;
+
   init() {
     this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
     this.requireDeviceMode = [];
@@ -33,14 +41,8 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
     validateParams(payload, [
       { name: 'version', type: 'array' },
       { name: 'binary', type: 'buffer' },
+      { name: 'updateType', type: 'string', required: true },
     ]);
-
-    if (!payload.updateType) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.CallMethodInvalidParameter,
-        'updateType is required'
-      );
-    }
 
     this.params = { updateType: payload.updateType };
 
@@ -71,11 +73,11 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
   };
 
   checkDeviceToBootloader(connectId: string | undefined) {
-    const checkPromise = createDeferred();
+    this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
     const isBleReconnect = connectId && DataManager.isBleConnect(env);
 
-    Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
+    Log.log('FirmwareUpdate [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
 
     // check device goto bootloader mode
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
@@ -90,7 +92,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
             await this.device.initialize();
             if (this.device.features?.bootloader_mode) {
               clearInterval(intervalTimer);
-              checkPromise?.resolve(true);
+              this.checkPromise?.resolve(true);
             }
           } catch (e) {
             // ignore error because of device is not connected
@@ -108,7 +110,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
             this.device.commands.disposed = false;
 
             clearInterval(intervalTimer);
-            checkPromise?.resolve(true);
+            this.checkPromise?.resolve(true);
           }
         }
       },
@@ -117,13 +119,11 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
 
     // check goto bootloader mode timeout and throw error
     setTimeout(() => {
-      if (checkPromise) {
+      if (this.checkPromise) {
         clearInterval(intervalTimer);
-        checkPromise.reject(new Error());
+        this.checkPromise.reject(new Error());
       }
     }, 30000);
-
-    return checkPromise;
   }
 
   async run() {
@@ -147,15 +147,15 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
           throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
         }
         this.postTipMessage('GoToBootloaderSuccess');
-        const checkPromise = this.checkDeviceToBootloader(this.payload.connectId);
+        this.checkDeviceToBootloader(this.payload.connectId);
 
         // force clean classic device cache so that the device can initialize again
         if (DeviceModelToTypes.model_classic.includes(deviceType)) {
           DevicePool.clearDeviceCache(uuid);
         }
         delete DevicePool.devicesCache[''];
-        await checkPromise?.promise;
-
+        await this.checkPromise?.promise;
+        this.checkPromise = null;
         /**
          * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
          */
@@ -183,16 +183,20 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
             'no features found for this device'
           );
         }
+        this.postTipMessage('DownloadFirmware');
         const firmware = await getBinary({
           features: device.features,
           version: params.version,
           updateType: params.updateType,
         });
         binary = firmware.binary;
+        this.postTipMessage('DownloadFirmwareSuccess');
       }
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
+
+    await this.device.acquire();
 
     return uploadFirmware(
       params.updateType,

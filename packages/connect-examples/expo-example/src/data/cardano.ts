@@ -25,7 +25,53 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Batch Get Address',
+        title: 'Classic Batch Get Address',
+        value: {
+          bundle: [
+            {
+              addressParameters: {
+                addressType: 0,
+                path: "m/1852'/1815'/0'/0/0",
+                stakingPath: "m/1852'/1815'/0'/2/0",
+              },
+              protocolMagic: 764824073,
+              networkId: 1,
+              derivationType: 1,
+              address: '',
+              showOnOneKey: false,
+              isCheck: false,
+            },
+            {
+              addressParameters: {
+                addressType: 0,
+                path: "m/1852'/1815'/0'/1/0",
+                stakingPath: "m/1852'/1815'/0'/2/0",
+              },
+              protocolMagic: 764824073,
+              networkId: 1,
+              derivationType: 1,
+              address: '',
+              showOnOneKey: false,
+              isCheck: false,
+            },
+            {
+              addressParameters: {
+                addressType: 0,
+                path: "m/1852'/1815'/0'/2/0",
+                stakingPath: "m/1852'/1815'/0'/2/0",
+              },
+              protocolMagic: 764824073,
+              networkId: 1,
+              derivationType: 1,
+              address: '',
+              showOnOneKey: false,
+              isCheck: false,
+            },
+          ],
+        },
+      },
+      {
+        title: 'Touch Batch Get Address',
         value: {
           bundle: [
             {
@@ -81,11 +127,33 @@ const api: PlaygroundProps[] = [
         value: {
           path: "m/1852'/1815'/0'",
           showOnOneKey: false,
-          derivationType: 2,
+          derivationType: 1,
         },
       },
       {
-        title: 'Batch Get PublicKey',
+        title: 'Classic Batch Get PublicKey',
+        value: {
+          bundle: [
+            {
+              path: "m/1852'/1815'/0'",
+              showOnOneKey: false,
+              derivationType: 1,
+            },
+            {
+              path: "m/1852'/1815'/0'",
+              showOnOneKey: false,
+              derivationType: 1,
+            },
+            {
+              path: "m/1852'/1815'/0'",
+              showOnOneKey: false,
+              derivationType: 1,
+            },
+          ],
+        },
+      },
+      {
+        title: 'Touch Batch Get PublicKey',
         value: {
           bundle: [
             {
@@ -157,7 +225,7 @@ const api: PlaygroundProps[] = [
           fee: '177513',
           protocolMagic: 764824073,
           networkId: 1,
-          derivationType: 2,
+          derivationType: 1,
         },
       },
     ],

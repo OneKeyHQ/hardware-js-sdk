@@ -3,6 +3,7 @@
   "tab__firmware_update": "Firmware Update",
   "tab__passphrase_test": "Passphrase Test",
   "tab__address_test": "Address Test",
+  "tab__security_check": "Security Check",
 
   "action__search_device": "Search Device",
   "action__clean_device": "Disconnect Device",
@@ -20,10 +21,12 @@
   "action__pick_file": "Pick File",
   "action__export_report": "Export Report",
   "action__switch_device": "Input Pin on Device",
+  "action__update_restart": "Restart installation update",
 
   "action__start_test": "Start Test",
   "action__stop_test": "Stop Test",
 
+  "tip__update_ready": "There are new versions that can be updated",
   "tip__sdk_not_ready": "SDK not ready",
   "tip__sdk_loading": "SDK loading...",
   "tip__sdk_load_complete": "SDK Ready",
@@ -53,7 +56,7 @@
   "title__address_variant_test_single": "Single Variant Address Test",
   "title__address_variant_test_batch": "Batch Variant Address Test",
 
-  "title__passphrase_test": "Passphrase Count Test",
+  "title__passphrase_test": "Passphrase Session Count Test",
 
   "label__keep_session": "Keep Session",
   "label__retry_count": "Retry Count",
@@ -80,10 +83,20 @@
   "label__show_on_onekey": "Show on OneKey",
 
   "label__device_type_sdk": "Device Type (SDK)",
-  "label__device_uuid": "Device UUID",
+  "label__device_uuid": "Device Serial Number",
   "label__device_firmware_version": "Firmware Version",
   "label__device_bootloader_version": "Bootloader Version",
+  "label__device_boardloader_version": "Boardloader Version",
   "label__device_bluetooth_version": "Bluetooth Version",
+  "label__device_device_statue": "Device Mode",
+
+  "label__device_bootloader_statue": "Bootloader",
+  "label__device_firmware_status": "Firmware",
+
+  "label__device_se_info": "Device SE Information",
+  "label__device_info_update_time": "Update Time",
+  "label__device_info_refresh": "Refreshing Device Information",
+  "label__device_info_export": "Example Export device information",
 
   "label__device_update_firmware": "Update Firmware",
   "label__device_update_ble_firmware": "Update Bluetooth Firmware",
@@ -94,7 +107,7 @@
   "label__wallet_change_count": "Wallet Change Count",
   "label__wallet_include_normal": "Include Normal Wallet",
   "label__wallet_sequential_switch": "Sequential Switch",
-  "label__wallet_mnemonic": "Mnemonic",  
+  "label__wallet_mnemonic": "Mnemonic",
 
   "message__no_device": "No device",
   "message__current_selector_device": "Current selector device: ",
@@ -131,13 +144,17 @@
   "message__address_not_match": "Address not match",
   "message__create": "create",
   "message__generate": "generate",
-  
+
   "message__passphrase_count_test_describe": "After starting, follow the prompts to unlock the hardware and confirm the passphrase according to the hardware prompts. Do not enter it yourself",
   "message__passphrase_count_test_step1": "1. Create wallet passphrase from scratch and record it, note in the hardware press Confirm passphrase",
   "message__passphrase_count_test_step2": "2. Each time a passphrase wallet is created, it will check the previously created wallet to see if it can get the address properly",
   "message__passphrase_count_test_step3": "3. The test ends when the device asks for passphrase again",
 
+  "message__passphrase_special_test_describe": "To enter a mnemonic that is consistent with the current device",
+  "message__test_device_create_wallet_describe": "Create a wallet on the hardware and enter the mnemonic words here to verify that the hardware's mnemonic words are correct",
+  "message__test_blind_signature_security_check_describe": "Check wallet blind signature security to see if you can sign with a private key other than the specified coin type",
+
   "message__message_is_empty": "Please enter the mnemonic of the device first",
-  
+
   "ignore": "ignore"
 }

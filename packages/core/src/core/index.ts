@@ -10,16 +10,19 @@ import {
 } from '@onekeyfe/hd-shared';
 import {
   getDeviceFirmwareVersion,
-  getDeviceModel,
-  getDeviceType,
-  supportNewPassphrase,
-} from '../utils/deviceFeaturesUtils';
+  enableLog,
+  getLogger,
+  LoggerNames,
+  setLoggerPostMessage,
+  wait,
+  getMethodVersionRange,
+} from '../utils';
+import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-import { enableLog, getLogger, LoggerNames, setLoggerPostMessage, wait } from '../utils';
 import {
   CORE_EVENT,
   CoreMessage,
@@ -143,13 +146,10 @@ export const callAPI = async (message: CoreMessage) => {
   try {
     const inner = async (): Promise<void> => {
       // check firmware version
-      const deviceType = getDeviceType(device.features);
-      const deviceModel = getDeviceModel(device.features);
-      const versionRangeType = method.getVersionRange()[deviceType];
-      const versionRangeModel = method.getVersionRange()[deviceModel];
-
-      // Type has a higher priority than Model
-      const versionRange = versionRangeType ?? versionRangeModel;
+      const versionRange = getMethodVersionRange(
+        device.features,
+        type => method.getVersionRange()[type]
+      );
 
       if (device.features) {
         await DataManager.checkAndReloadData();
@@ -236,7 +236,7 @@ export const callAPI = async (message: CoreMessage) => {
       }
 
       // Check to see if it is safe to use Passphrase
-      checkPassphraseSafety(method, device.features);
+      checkPassphraseEnableState(method, device.features);
 
       if (device.hasUsePassphrase() && method.useDevicePassphraseState) {
         // check version
@@ -254,12 +254,14 @@ export const callAPI = async (message: CoreMessage) => {
         }
 
         // Check Device passphrase State
-        const passphraseState = await device.checkPassphraseState();
+        const passphraseStateSafety = await device.checkPassphraseStateSafety(
+          method.payload?.passphraseState
+        );
 
         // Double check, handles the special case of Touch/Pro
-        checkPassphraseSafety(method, device.features);
+        checkPassphraseEnableState(method, device.features);
 
-        if (passphraseState) {
+        if (!passphraseStateSafety) {
           DevicePool.clearDeviceCache(method.payload.connectId);
           return Promise.reject(
             ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
@@ -363,13 +365,22 @@ function initDevice(method: BaseMethod) {
   let device: Device | typeof undefined;
   const allDevices = _deviceList.allDevices();
 
+  if (method.payload?.detectBootloaderDevice && allDevices.some(d => d.features?.bootloader_mode)) {
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceDetectInBootloaderMode);
+  }
+
   if (method.connectId) {
     device = _deviceList.getDevice(method.connectId);
   } else if (allDevices.length === 1) {
     [device] = allDevices;
   } else if (allDevices.length > 1) {
     throw ERRORS.TypedError(
-      method.name === 'firmwareUpdateV2'
+      [
+        'firmwareUpdateV2',
+        'checkFirmwareRelease',
+        'checkBootloaderRelease',
+        'checkBLEFirmwareRelease',
+      ].includes(method.name)
         ? HardwareErrorCode.FirmwareUpdateLimitOneDevice
         : HardwareErrorCode.SelectDevice
     );
@@ -430,7 +441,8 @@ type IPollFn<T> = (time?: number) => T;
 // eslint-disable-next-line @typescript-eslint/require-await
 const ensureConnected = async (method: BaseMethod, pollingId: number) => {
   let tryCount = 0;
-  const MAX_RETRY_COUNT = (method.payload && method.payload.retryCount) || 5;
+  const MAX_RETRY_COUNT =
+    method.payload && typeof method.payload.retryCount === 'number' ? method.payload.retryCount : 5;
   const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
   const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -514,6 +526,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
+            HardwareErrorCode.DeviceDetectInBootloaderMode,
           ].includes(error.errorCode)
         ) {
           reject(error);
@@ -521,7 +534,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         }
       }
 
-      if (tryCount > 5) {
+      if (tryCount > MAX_RETRY_COUNT) {
         if (timer) {
           clearTimeout(timer);
         }
@@ -556,7 +569,7 @@ export const cancel = (connectId?: string) => {
   closePopup();
 };
 
-const checkPassphraseSafety = (method: BaseMethod, features?: Features) => {
+const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
   if (

@@ -108,6 +108,32 @@ const api: PlaygroundProps[] = [
     description: 'Wipe a device',
     noDeviceIdReq: true,
   },
+  {
+    method: 'deviceUpdateBootloader',
+    description: 'Touch、Pro Update bootloader of a device',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'firmwareUpdateV2',
+    description: 'Update firmware of a device',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Update firmware',
+        value: {
+          updateType: 'firmware',
+          platform: 'web',
+        },
+      },
+      {
+        title: 'Update ble firmware',
+        value: {
+          updateType: 'ble',
+          platform: 'web',
+        },
+      },
+    ],
+  },
 ];
 
 export default api;

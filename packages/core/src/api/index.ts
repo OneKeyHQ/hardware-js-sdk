@@ -1,5 +1,6 @@
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
+export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
 export { default as getPassphraseState } from './GetPassphraseState';
 export { default as getLogs } from './GetLogs';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
@@ -118,3 +119,6 @@ export { default as lnurlAuth } from './lightning/LnurlAuth';
 
 export { default as nervosGetAddress } from './nervos/NervosGetAddress';
 export { default as nervosSignTransaction } from './nervos/NervosSignTransaction';
+
+export { default as dnxGetAddress } from './dynex/DnxGetAddress';
+export { default as dnxSignTransaction } from './dynex/DnxSignTransaction';

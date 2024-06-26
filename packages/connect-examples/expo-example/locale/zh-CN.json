@@ -3,6 +3,7 @@
   "tab__firmware_update": "固件更新",
   "tab__passphrase_test": "Passphrase 测试",
   "tab__address_test": "地址测试",
+  "tab__security_check": "安全检查",
 
   "action__search_device": "搜索设备",
   "action__clean_device": "断开连接",
@@ -20,10 +21,12 @@
   "action__pick_file": "选择文件",
   "action__export_report": "导出报告",
   "action__switch_device": "切换到设备输入",
+  "action__update_restart": "重启并安装更新",
 
   "action__start_test": "开始测试",
   "action__stop_test": "停止测试",
 
+  "tip__update_ready": "检测到新的版本可以更新，点击进行安装",
   "tip__sdk_not_ready": "SDK 未就绪",
   "tip__sdk_loading": "SDK 加载中...",
   "tip__sdk_load_complete": "SDK 准备就绪",
@@ -53,7 +56,7 @@
   "title__address_variant_test_single": "单个变种地址测试",
   "title__address_variant_test_batch": "批量变种地址测试",
 
-  "title__passphrase_test": "Passphrase Count 测试",
+  "title__passphrase_test": "Passphrase Session Count 测试",
 
   "label__keep_session": "保持 Session",
   "label__retry_count": "重试次数",
@@ -80,10 +83,20 @@
   "label__show_on_onekey": "在硬件上确认",
 
   "label__device_type_sdk": "设备类型（SDK）",
-  "label__device_uuid": "设备 UUID",
+  "label__device_uuid": "设备序列号",
   "label__device_firmware_version": "固件版本",
   "label__device_bootloader_version": "Bootloader 版本",
+  "label__device_boardloader_version": "Boardloader 版本",
   "label__device_bluetooth_version": "蓝牙版本",
+  "label__device_device_statue": "设备模式",
+
+  "label__device_bootloader_statue": "Bootloader 状态",
+  "label__device_firmware_status": "开机状态",
+
+  "label__device_se_info": "设备 SE 信息",
+  "label__device_info_update_time": "更新时间",
+  "label__device_info_refresh": "刷新设备信息",
+  "label__device_info_export": "导出设备信息到文本",
 
   "label__device_update_firmware": "更新固件",
   "label__device_update_ble_firmware": "更新蓝牙固件",
@@ -94,7 +107,7 @@
   "label__wallet_change_count": "测试切换次数",
   "label__wallet_include_normal": "包含普通钱包",
   "label__wallet_sequential_switch": "顺序切换",
-  "label__wallet_mnemonic": "助记词",  
+  "label__wallet_mnemonic": "助记词",
 
   "message__no_device": "未连接设备",
   "message__current_selector_device": "当前选择的设备：",
@@ -131,11 +144,15 @@
   "message__address_not_match": "地址不匹配",
   "message__create": "创建",
   "message__generate": "生成",
-  
+
   "message__passphrase_count_test_describe": "开始之后根据提示解锁硬件, 根据硬件提示确认 passphrase, 不用自己输入",
   "message__passphrase_count_test_step1": "1. 从零开始创建钱包 passphrase 并记录下来，注意在硬件按确认 passphrase",
   "message__passphrase_count_test_step2": "2. 每次创建完一个 passphrase 钱包，都会去检查一遍之前创建过的钱包，是否可以正常获取地址",
   "message__passphrase_count_test_step3": "3. 当设备再次要求输入 passphrase 时，测试结束",
+
+  "message__passphrase_special_test_describe": "请输入与当前设备一致的助记词",
+  "message__test_device_create_wallet_describe": "在硬件上创建钱包，将助记词输入在这里，用来验证硬件的助记词是否正确",
+  "message__test_blind_signature_security_check_describe": "检查钱包盲签安全性，是否可以使用规定 CoinType 之外的私钥签名",
 
   "message__message_is_empty": "请先输入设备的助记词",
 
