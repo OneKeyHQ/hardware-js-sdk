@@ -1,0 +1,25 @@
+{
+    "basePath": "./packages",
+    "targetEnvVar": "APP_MONOREPO_LOCAL_PATH",
+    "defaultWatchDir": "dist",
+    "projects": [
+      "hd-ble-sdk",
+      "hd-transport",
+      "hd-transport-lowlevel",
+      "hd-transport-webusb",
+      "shared",
+      "core",
+      "hd-common-connect-sdk",
+      "hd-transport-http",
+      "hd-transport-react-native",
+      "hd-web-sdk"
+    ],
+    "specialProjects": {
+      "hd-web-sdk": ["dist", "build"]
+    },
+    "ignoredPaths": [
+      "node_modules",
+      ".git",
+      "*.log"
+    ]
+  }
