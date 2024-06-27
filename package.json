@@ -42,7 +42,7 @@
     "dev:transport-rn": "cd ./packages/hd-transport-react-native && yarn dev",
     "dev:transport-lowlevel": "cd ./packages/hd-transport-lowlevel && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
-    "publish:yalc": "yarn setup && node ./scripts/publish-yalc.js"
+    "debug:watcher": "node ./scripts/monitor.js"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",

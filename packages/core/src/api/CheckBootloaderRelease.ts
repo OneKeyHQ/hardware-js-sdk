@@ -29,7 +29,7 @@ export default class CheckBootloaderRelease extends BaseMethod {
         features,
         this.payload.willUpdateFirmwareVersion
       );
-    } else if (deviceType === 'touch') {
+    } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {
       shouldUpdate = checkNeedUpdateBootForTouch(features);
     }
     const releaseInfo = getBootloaderReleaseInfo(features);
