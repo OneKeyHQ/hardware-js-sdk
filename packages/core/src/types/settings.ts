@@ -36,6 +36,7 @@ export type IFirmwareReleaseInfo = {
   fullResourceRange?: string[];
   bootloaderResource?: string;
   bootloaderVersion?: IVersionArray;
+  displayBootloaderVersion?: IVersionArray;
   bootloaderRelatedFirmwareVersion?: IVersionArray;
   bootloaderChangelog?: {
     [k in ILocale]: string;
