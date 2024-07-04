@@ -4,7 +4,8 @@ const chokidar = require('chokidar');
 const fs = require('fs-extra');
 const path = require('path');
 
-const config = require('./moniter-config.json');
+// @ts-ignore
+const config = require('./monitor-config.json');
 
 const targetDir = process.env[config.targetEnvVar];
 
@@ -67,6 +68,21 @@ async function handleFileEvent(filePath, eventType) {
         console.log(`Removed ${destPath}`);
       } else {
         copyFile(filePath, destPath, eventType === 'add');
+      }
+
+      // 特殊处理 web-sdk/build 文件夹
+      if (projectName === 'hd-web-sdk' && watchDir === 'build') {
+        const additionalDestPath = path.join(
+          targetDir,
+          'apps/desktop/public/static/js-sdk',
+          ...restPath
+        );
+        if (eventType === 'delete') {
+          await fs.remove(additionalDestPath);
+          console.log(`Removed ${additionalDestPath}`);
+        } else {
+          copyFile(filePath, additionalDestPath, eventType === 'add');
+        }
       }
     } catch (err) {
       console.error(`Error ${eventType === 'delete' ? 'removing' : 'copying'} ${filePath}:`, err);

@@ -8,6 +8,6 @@ export const safeThrowError = (error: any) => {
   } else if (error.code === 'ECONNABORTED') {
     throw ERRORS.TypedError(HardwareErrorCode.BridgeTimeoutError);
   } else {
-    throw ERRORS.TypedError(error);
+    throw ERRORS.TypedError(HardwareErrorCode.UnknownError, error.message);
   }
 };

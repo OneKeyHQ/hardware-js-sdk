@@ -68,6 +68,14 @@ let preConnectCache: {
   passphraseState: undefined,
 };
 
+const removeMethodFromQueue = (methodId: number | undefined) => {
+  const index = methodId ? callApiQueue.findIndex(m => m.responseID === methodId) : -1;
+  if (index > -1) {
+    callApiQueue.splice(index, 1);
+    console.log('Removed method from queue:', methodId);
+  }
+};
+
 export const callAPI = async (message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(ERRORS.TypedError('on call: message.id or message.payload is missing'));
@@ -131,6 +139,13 @@ export const callAPI = async (message: CoreMessage) => {
     return createResponseMessage(method.responseID, false, { error: e });
   }
 
+  if (method.hasCanceled()) {
+    removeMethodFromQueue(method.responseID);
+    return createResponseMessage(method.responseID, false, {
+      error: ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser),
+    });
+  }
+
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
 
@@ -145,6 +160,8 @@ export const callAPI = async (message: CoreMessage) => {
 
   try {
     const inner = async (): Promise<void> => {
+      method.inspectHasCanceled();
+
       // check firmware version
       const versionRange = getMethodVersionRange(
         device.features,
@@ -235,6 +252,8 @@ export const callAPI = async (message: CoreMessage) => {
         await TransportManager.reconfigure(device.features);
       }
 
+      method.inspectHasCanceled();
+
       // Check to see if it is safe to use Passphrase
       checkPassphraseEnableState(method, device.features);
 
@@ -282,6 +301,8 @@ export const callAPI = async (message: CoreMessage) => {
         return;
       }
 
+      method.inspectHasCanceled();
+
       try {
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ');
@@ -322,16 +343,7 @@ export const callAPI = async (message: CoreMessage) => {
     }
 
     // remove method from queue
-    const index = method.responseID
-      ? callApiQueue.findIndex(m => m.responseID === method.responseID)
-      : -1;
-    if (index > -1) {
-      callApiQueue.splice(index, 1);
-      Log.debug(
-        'Remove the finished method from the queue： ',
-        callApiQueue.map(m => m.name)
-      );
-    }
+    removeMethodFromQueue(method.responseID);
 
     closePopup();
 
@@ -534,6 +546,11 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         }
       }
 
+      if (method.hasCanceled()) {
+        reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser));
+        return;
+      }
+
       if (tryCount > MAX_RETRY_COUNT) {
         if (timer) {
           clearTimeout(timer);
@@ -564,6 +581,17 @@ export const cancel = (connectId?: string) => {
   } catch (e) {
     // Empty
     Log.error('Cancel API Error: ', e);
+  }
+  try {
+    if (connectId) {
+      for (const method of callApiQueue) {
+        if (method.payload.connectId === connectId) {
+          method.cancel();
+        }
+      }
+    }
+  } catch (e) {
+    Log.error('Cancel method error: ', e);
   }
   cleanup();
   closePopup();
