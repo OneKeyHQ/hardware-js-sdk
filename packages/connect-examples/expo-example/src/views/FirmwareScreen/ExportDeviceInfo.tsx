@@ -118,7 +118,7 @@ export function ExportDeviceInfo() {
       ?.replace(/\//g, '')
       ?.replace(/ /g, '-');
     let downloadFileName = `${deviceType}-${serialNumber}-${formatTime}.txt`;
-    if (features.bootloader_mode === true) {
+    if (features?.bootloader_mode === true) {
       downloadFileName = `${deviceType}-bootloader-${serialNumber}-${formatTime}.txt`;
     }
 

@@ -281,7 +281,11 @@ function FirmwareUpdate({
 
       if (
         type === 'bootloader' &&
+<<<<<<< HEAD
         (deviceTypeLowerCase === 'touch' || deviceTypeLowerCase === 'pro')
+=======
+        (deviceType.toLowerCase() === 'touch' || deviceType.toLowerCase() === 'pro')
+>>>>>>> 6b97d9dc0 (fix: pro update boot)
       ) {
         setShowUpdateDialog(true);
         const res = await sdk.deviceUpdateBootloader(selectDevice.connectId, {

@@ -2195,7 +2195,11 @@ export type Features = {
   coin_switch?: number;
   build_id?: string;
   boardloader_version?: string;
+<<<<<<< HEAD
   battery_level?: number;
+=======
+  busy?: boolean;
+>>>>>>> a417c8309 (fix: fix test error (#318))
   onekey_device_type?: string | null;
   onekey_se_type?: string | null;
   onekey_board_version?: string;
