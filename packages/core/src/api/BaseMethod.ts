@@ -1,3 +1,4 @@
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
@@ -81,6 +82,11 @@ export abstract class BaseMethod<Params = undefined> {
    */
   skipForceUpdateCheck = false;
 
+  /**
+   * 取消标志，比如还没有搜索到设备，用户取消了操作
+   */
+  private canceled = false;
+
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 
@@ -163,6 +169,21 @@ export abstract class BaseMethod<Params = undefined> {
   }
 
   dispose() {}
+
+  hasCanceled() {
+    return this.canceled;
+  }
+
+  inspectHasCanceled() {
+    if (this.hasCanceled()) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    }
+  }
+
+  cancel() {
+    this.canceled = true;
+    this.dispose();
+  }
 
   // Reusable events
   postPreviousAddressMessage = (data: { address?: string; path?: string }) => {
