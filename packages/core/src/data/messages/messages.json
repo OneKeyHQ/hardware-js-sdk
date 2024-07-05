@@ -6032,6 +6032,10 @@
           "type": "uint32",
           "id": 520
         },
+        "busy": {
+          "type": "bool",
+          "id": 41
+        },
         "onekey_device_type": {
           "type": "OneKeyDeviceType",
           "id": 600
