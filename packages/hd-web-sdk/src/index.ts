@@ -101,11 +101,19 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
       receiveHandler: async messageEvent => {
         const message = parseMessage(messageEvent);
         if (message.event !== 'LOG_EVENT') {
-          Log.debug('Host Bridge Receive message: ', message);
+          if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
+            Log.debug('Host Bridge Receive message: ', message);
+          } else {
+            Log.log('Host Bridge Receive message: ', message);
+          }
         }
         const response = await handleMessage(message);
         if (message.event !== 'LOG_EVENT') {
-          Log.debug('Host Bridge response: ', response);
+          if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
+            Log.debug('Host Bridge response: ', message);
+          } else {
+            Log.log('Host Bridge response: ', message);
+          }
         }
         return response;
       },
@@ -140,7 +148,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
 };
 
 const call = async (params: any) => {
-  Log.debug('call : ', params);
+  Log.log('call : ', params);
   /**
    * Try to recreate iframe if it's initialize failed
    */

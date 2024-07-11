@@ -618,7 +618,7 @@ const onDeviceDisconnectHandler = (device: Device) => {
 };
 
 const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin']) => {
-  Log.debug('onDevicePinHandler');
+  Log.log('request Input PIN');
   // create ui promise
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PIN, device);
   // request pin view
@@ -638,6 +638,7 @@ const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]
   postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
 
   if (request.code === 'ButtonRequest_PinEntry') {
+    Log.log('request Confirm Input PIN');
     postMessage(
       createUiMessage(UI_REQUEST.REQUEST_PIN, {
         device: device.toMessageObject() as KnownDevice,
@@ -645,6 +646,7 @@ const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]
       })
     );
   } else {
+    Log.log('request Confirm Button');
     postMessage(createUiMessage(UI_REQUEST.REQUEST_BUTTON, { device: device.toMessageObject() }));
   }
 };
@@ -722,6 +724,7 @@ export default class Core extends EventEmitter {
       case UI_RESPONSE.RECEIVE_PASSPHRASE: {
         const uiPromise = findUiPromise(message.type);
         if (uiPromise) {
+          Log.log('receive UI Response: ', message.type);
           uiPromise.resolve(message);
           removeUiPromise(uiPromise);
         }
@@ -736,9 +739,10 @@ export default class Core extends EventEmitter {
       }
 
       case IFRAME.CALL: {
+        Log.log('call API: ', message);
         const response = await callAPI(message);
         const { success, payload } = response;
-
+        Log.log('call API Response: ', response);
         if (success) {
           return response;
         }
@@ -753,6 +757,7 @@ export default class Core extends EventEmitter {
         };
       }
       case IFRAME.CANCEL: {
+        Log.log('cancel API: ', message);
         cancel(message.payload.connectId);
         break;
       }
