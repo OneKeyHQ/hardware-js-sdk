@@ -105,7 +105,12 @@ export default class TransportManager {
       this.plugin = plugin;
       Log.debug('set transport plugin: ', this.plugin);
     }
-    Log.debug('set transport: ', this.transport);
+    Log.debug(
+      'set transport: ',
+      this.transport.name,
+      this.transport.version,
+      this.transport.configured
+    );
   }
 
   static getTransport() {

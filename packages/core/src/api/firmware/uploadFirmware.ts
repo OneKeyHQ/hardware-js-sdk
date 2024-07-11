@@ -63,7 +63,12 @@ export const uploadFirmware = async (
   typedCall: TypedCall,
   postMessage: (message: CoreMessage) => void,
   device: Device,
-  { payload }: PROTO.FirmwareUpload
+  {
+    payload,
+    rebootOnSuccess,
+  }: PROTO.FirmwareUpload & {
+    rebootOnSuccess?: boolean;
+  }
 ) => {
   const deviceType = getDeviceType(device.features);
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
@@ -92,9 +97,15 @@ export const uploadFirmware = async (
     if (device.features) {
       const bootloaderVersion = getDeviceBootloaderVersion(device.features);
       if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
-        const response = await newTouchUpdateProcess(updateType, postMessage, device, {
-          payload,
-        });
+        const response = await newTouchUpdateProcess(
+          updateType,
+          postMessage,
+          device,
+          {
+            payload,
+          },
+          rebootOnSuccess
+        );
         return response.message;
       }
     }
@@ -138,7 +149,8 @@ const newTouchUpdateProcess = async (
   updateType: 'firmware' | 'ble',
   postMessage: (message: CoreMessage) => void,
   device: Device,
-  { payload }: PROTO.FirmwareUpload
+  { payload }: PROTO.FirmwareUpload,
+  rebootOnSuccess = true
 ) => {
   let typedCall = device.getCommands().typedCall.bind(device.getCommands());
   postProgressTip(device, 'StartTransferData', postMessage);
@@ -177,7 +189,7 @@ const newTouchUpdateProcess = async (
   // Firmware Update
   const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
     path: filePath,
-    reboot_on_success: true,
+    reboot_on_success: rebootOnSuccess,
   });
   return response;
 };

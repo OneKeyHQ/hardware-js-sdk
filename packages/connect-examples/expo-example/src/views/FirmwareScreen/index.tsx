@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { H5, Stack, Text, XStack } from 'tamagui';
+import { Checkbox, type CheckedState, H5, Label, Stack, Text, XStack } from 'tamagui';
+import { Check as CheckIcon } from '@tamagui/lucide-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
@@ -27,16 +28,19 @@ type UpdateState = {
 interface FirmwareLocalFileProps {
   title: string;
   type: UpdateType;
+  deviceType: string;
   onUpdate: (options: {
     type: UpdateType;
     file: DocumentPicker.DocumentPickerAsset;
+    reboot?: boolean;
   }) => Promise<UpdateState | undefined>;
 }
 
-function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
+function FirmwareLocalFile({ title, type, onUpdate, deviceType }: FirmwareLocalFileProps) {
   const intl = useIntl();
   const [fileAsset, setFileAsset] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState | undefined>();
+  const [reboot, setReboot] = useState<boolean>(true);
 
   const selectFile = () => {
     // source -> .zip
@@ -83,6 +87,18 @@ function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
         </Text>
         <Button onPress={selectFile}>{intl.formatMessage({ id: 'action__pick_file' })}</Button>
       </Stack>
+      {(deviceType === 'pro' || deviceType === 'touch') && type === 'firmware' ? (
+        <Stack flexDirection="row" alignItems="center">
+          <Checkbox checked={reboot} onCheckedChange={checked => setReboot(!!checked)}>
+            <Checkbox.Indicator>
+              <CheckIcon />
+            </Checkbox.Indicator>
+          </Checkbox>
+          <Label paddingRight="$0" justifyContent="flex-end">
+            {intl.formatMessage({ id: 'label__reboot_device_after_update' })}
+          </Label>
+        </Stack>
+      ) : null}
       <Button
         variant="primary"
         size="large"
@@ -93,6 +109,7 @@ function FirmwareLocalFile({ title, type, onUpdate }: FirmwareLocalFileProps) {
             type,
             // @ts-ignore
             file: fileAsset,
+            reboot,
           });
           setUpdateState(res);
         }}
@@ -184,7 +201,15 @@ function FirmwareUpdate({
   }, [onDisconnectDevice]);
 
   const updateFirmware = useCallback(
-    async ({ type, file }: { type: UpdateType; file: DocumentPicker.DocumentPickerAsset }) => {
+    async ({
+      type,
+      file,
+      reboot,
+    }: {
+      type: UpdateType;
+      file: DocumentPicker.DocumentPickerAsset;
+      reboot?: boolean;
+    }) => {
       if (!sdk)
         return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
       if (!features) return { payload: 'features is not ready', success: false };
@@ -235,6 +260,7 @@ function FirmwareUpdate({
           {
             updateType: type === 'bootloader' ? 'firmware' : type,
             binary: fileData,
+            rebootOnSuccess: reboot,
           }
         );
 
@@ -371,24 +397,28 @@ function FirmwareUpdate({
           <PanelView title={intl.formatMessage({ id: 'title__device_firmware_update' })}>
             <XStack flexWrap="wrap" gap="$2">
               <FirmwareLocalFile
+                deviceType={deviceTypeLowerCase}
                 title={intl.formatMessage({ id: 'label__device_update_firmware' })}
                 type="firmware"
                 onUpdate={updateFirmware}
               />
               {deviceTypeLowerCase !== 'mini' && (
                 <FirmwareLocalFile
+                  deviceType={deviceTypeLowerCase}
                   title={intl.formatMessage({ id: 'label__device_update_ble_firmware' })}
                   type="firmware"
                   onUpdate={updateFirmware}
                 />
               )}
               <FirmwareLocalFile
+                deviceType={deviceTypeLowerCase}
                 title={intl.formatMessage({ id: 'label__device_update_bootloader' })}
                 type="bootloader"
                 onUpdate={updateFirmware}
               />
               {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
                 <FirmwareLocalFile
+                  deviceType={deviceTypeLowerCase}
                   title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
                   type="source"
                   onUpdate={updateFirmware}

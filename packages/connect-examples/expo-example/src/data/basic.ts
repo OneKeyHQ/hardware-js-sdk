@@ -38,6 +38,12 @@ const api: PlaygroundProps[] = [
     description: 'Check bridge release of a device',
     noDeviceIdReq: true,
   },
+  {
+    method: 'getLogs',
+    description: 'get logs',
+    noDeviceIdReq: true,
+    noConnIdReq: true,
+  },
 ];
 
 export default api;

@@ -42,6 +42,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       { name: 'version', type: 'array' },
       { name: 'binary', type: 'buffer' },
       { name: 'updateType', type: 'string', required: true },
+      { name: 'rebootOnSuccess', type: 'boolean' },
     ]);
 
     this.params = { updateType: payload.updateType };
@@ -203,7 +204,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       this.device.getCommands().typedCall.bind(this.device.getCommands()),
       this.postMessage,
       device,
-      { payload: binary }
+      { payload: binary, rebootOnSuccess: this.payload.rebootOnSuccess }
     );
   }
 }
