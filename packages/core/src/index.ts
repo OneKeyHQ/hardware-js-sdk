@@ -13,6 +13,7 @@ export * from './utils';
 export * from './data-manager';
 export * from './events';
 export * from './types';
+export { whitelist, whitelistExtension } from './data/config';
 
 const HardwareSdk = ({
   init,

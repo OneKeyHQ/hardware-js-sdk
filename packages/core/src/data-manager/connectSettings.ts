@@ -20,6 +20,7 @@ const initialSettings: ConnectSettings = {
   connectSrc: DEFAULT_DOMAIN,
   iframeSrc: `${DEFAULT_DOMAIN}iframe.html`,
   parentOrigin: typeof window !== 'undefined' && window.location ? window.location.origin : '',
+  extension: chrome?.runtime?.id || '',
   supportedBrowser:
     typeof navigator !== 'undefined' ? !/Trident|MSIE|Edge/.test(navigator.userAgent) : true,
   env: 'web',
