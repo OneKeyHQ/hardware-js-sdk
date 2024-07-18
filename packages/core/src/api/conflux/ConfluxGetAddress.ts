@@ -2,7 +2,7 @@ import { ConfluxGetAddress as HardwareConfluxGetAddress } from '@onekeyfe/hd-tra
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { ConfluxAddress, ConfluxGetAddressParams } from '../../types/api/confluxGetAddress';
 
 export default class ConfluxGetAddress extends BaseMethod<HardwareConfluxGetAddress[]> {
@@ -67,6 +67,10 @@ export default class ConfluxGetAddress extends BaseMethod<HardwareConfluxGetAddr
         address: res.message.address,
       });
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

@@ -3,7 +3,7 @@ import { SuiGetAddress as HardwareSuiGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { SuiAddress, SuiGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { publicKeyToAddress } from './normalize';
@@ -68,6 +68,11 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
         publicKey,
         address: publicKeyToAddress(publicKey),
       }));
+
+      validateResult(result, ['address'], {
+        expectedLength: this.params.length,
+      });
+
       return Promise.resolve(result);
     }
 
@@ -88,6 +93,10 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

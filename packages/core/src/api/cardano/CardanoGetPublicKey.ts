@@ -1,7 +1,7 @@
 import { BaseMethod } from '../BaseMethod';
 import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { CardanoPublicKeyParams, CardanoPublicKey } from '../../types/api/cardanoGetPublicKey';
 
@@ -61,6 +61,11 @@ export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyPara
         node: message.node,
       });
     }
+
+    validateResult(responses, ['publicKey'], {
+      expectedLength: this.params.length,
+    });
+
     return this.hasBundle ? responses : responses[0];
   }
 }

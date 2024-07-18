@@ -2,7 +2,7 @@ import { NEMGetAddress as HardwareNEMGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath, serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { NEMAddress, NEMGetAddressParams } from '../../types';
 
 const MAINNET = 0x68; // 104
@@ -61,6 +61,10 @@ export default class NEMGetAddress extends BaseMethod<HardwareNEMGetAddress[]> {
         address: res.message.address,
       });
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

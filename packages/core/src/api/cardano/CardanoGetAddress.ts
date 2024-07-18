@@ -1,7 +1,7 @@
 import { BaseMethod } from '../BaseMethod';
 import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import {
   validateAddressParameters,
   addressParametersToProto,
@@ -128,6 +128,10 @@ export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParam
         address: response.message.address,
       });
     }
+
+    validateResult(responses, ['serializedPath', 'serializedStakingPath', 'address'], {
+      expectedLength: this.params.length,
+    });
 
     return this.hasBundle ? responses : responses[0];
   }

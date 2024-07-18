@@ -2,7 +2,7 @@ import type { NervosGetAddress as HardwareNervosGetAddress } from '@onekeyfe/hd-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 
 import type { NervosGetAddressParams, NervosAddress } from '../../types';
 
@@ -70,6 +70,10 @@ export default class NervosGetAddress extends BaseMethod<HardwareNervosGetAddres
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

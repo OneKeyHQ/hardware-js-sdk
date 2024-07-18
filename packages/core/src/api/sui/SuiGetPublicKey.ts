@@ -1,7 +1,7 @@
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { SuiGetAddressParams } from '../../types';
 
 export default class SuiGetPublicKey extends BaseMethod<any> {
@@ -57,6 +57,10 @@ export default class SuiGetPublicKey extends BaseMethod<any> {
       path: serializedPath((this.params as unknown as any[])[index].address_n),
       publicKey,
     }));
+
+    validateResult(responses, ['publicKey'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }
