@@ -186,9 +186,9 @@ export class DevicePool extends EventEmitter {
     this.upcoming = upcoming;
     this.current = this.upcoming;
 
-    console.log('device pool -> current: ', this.current);
-    console.log('device pool -> upcomming: ', this.upcoming);
-    console.log('DeviceCache.reportDeviceChange diff: ', diff);
+    Log.debug('device pool -> current: ', this.current);
+    Log.debug('device pool -> upcomming: ', this.upcoming);
+    Log.debug('DeviceCache.reportDeviceChange diff: ', diff);
 
     if (!diff.didUpdate) {
       return;

@@ -102,6 +102,7 @@
   "label__device_update_ble_firmware": "Update Bluetooth Firmware",
   "label__device_update_bootloader": "Update Bootloader",
   "label__device_update_sys_resource": "Update Sys Resource",
+  "label__reboot_device_after_update": "Reboot device after successful upgrade (Pro, Touch only)",
 
   "label__wallet_count": "Wallet Count",
   "label__wallet_change_count": "Wallet Change Count",

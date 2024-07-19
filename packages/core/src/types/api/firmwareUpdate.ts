@@ -18,11 +18,11 @@ export interface FirmwareUpdateParams {
 
 export declare function firmwareUpdate(
   connectId: string | undefined,
-  params: Params<FirmwareUpdateParams>
+  params: Params<FirmwareUpdateParams> & { rebootOnSuccess?: boolean }
 ): Response<PROTO.Success>;
 export declare function firmwareUpdate(
   connectId: string | undefined,
-  params: Params<FirmwareUpdateBinaryParams>
+  params: Params<FirmwareUpdateBinaryParams> & { rebootOnSuccess?: boolean }
 ): Response<PROTO.Success>;
 
 type IPlatform = 'native' | 'desktop' | 'ext' | 'web' | 'webEmbed';
