@@ -2,7 +2,7 @@ import { PolkadotGetAddress as HardwarePolkadotGetAddress } from '@onekeyfe/hd-t
 
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
 import { getPolkadotVersionRangeWithBundle } from './networks';
 
@@ -72,6 +72,10 @@ export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAd
         address,
       });
     }
+
+    validateResult(responses, ['address', 'publicKey'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

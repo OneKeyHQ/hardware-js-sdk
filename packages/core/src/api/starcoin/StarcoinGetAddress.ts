@@ -2,7 +2,7 @@ import { StarcoinGetAddress as HardwareStarcoinGetAddress } from '@onekeyfe/hd-t
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath, serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { StarcoinAddress, StarcoinGetAddressParams } from '../../types/api/starcoinGetAddress';
 
 export default class StarcoinGetAddress extends BaseMethod<HardwareStarcoinGetAddress[]> {
@@ -58,6 +58,10 @@ export default class StarcoinGetAddress extends BaseMethod<HardwareStarcoinGetAd
         address: res.message.address,
       });
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

@@ -3,7 +3,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { XrpAddress, XrpGetAddressParams } from '../../types/api/xrpGetAddress';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 
 export default class XrpGetAddress extends BaseMethod<
@@ -66,6 +66,11 @@ export default class XrpGetAddress extends BaseMethod<
         publicKey,
         address: deriveAddress(publicKey),
       }));
+
+      validateResult(result, ['address', 'publicKey'], {
+        expectedLength: this.params.length,
+      });
+
       return Promise.resolve(result);
     }
 
@@ -99,6 +104,10 @@ export default class XrpGetAddress extends BaseMethod<
         address,
       });
     }
+
+    validateResult(responses, ['address', 'publicKey'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

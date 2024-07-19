@@ -2,7 +2,7 @@ import { KaspaGetAddress as HardwareKaspaGetAddress } from '@onekeyfe/hd-transpo
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { KaspaGetAddressParams, KaspaAddress } from '../../types';
 
 export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[]> {
@@ -71,6 +71,10 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

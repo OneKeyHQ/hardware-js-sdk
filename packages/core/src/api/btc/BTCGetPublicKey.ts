@@ -2,7 +2,7 @@ import { GetPublicKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getScriptType, isTaprootPath, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 import { BTCPublicKey } from '../../types/api/btcGetPublicKey';
@@ -90,6 +90,10 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
 
       responses.push(response);
     }
+
+    validateResult(responses, ['xpub'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

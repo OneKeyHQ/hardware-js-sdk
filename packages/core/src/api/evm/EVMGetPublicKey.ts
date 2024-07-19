@@ -2,7 +2,7 @@ import { EthereumGetPublicKey, EthereumGetPublicKeyOneKey } from '@onekeyfe/hd-t
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { EVMGetPublicKeyParams, EVMPublicKey } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import TransportManager from '../../data-manager/TransportManager';
@@ -72,6 +72,10 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
         path: serializedPath((this.params as unknown as any[])[index].address_n),
         publicKey,
       }));
+
+      validateResult(responses, ['publicKey'], {
+        expectedLength: this.params.length,
+      });
       return Promise.resolve(result);
     }
 
@@ -86,6 +90,10 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
         ...res.message,
       });
     }
+
+    validateResult(responses, ['publicKey'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

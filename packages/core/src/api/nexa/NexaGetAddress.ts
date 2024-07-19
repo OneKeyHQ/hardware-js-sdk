@@ -2,7 +2,7 @@ import { NexaGetAddress as HardwareNexaGetAddress } from '@onekeyfe/hd-transport
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { NexaGetAddressParams } from '../../types';
 
 export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]> {
@@ -77,6 +77,10 @@ export default class NexaGetAddress extends BaseMethod<HardwareNexaGetAddress[]>
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
+
+    validateResult(responses, ['address', 'pub'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

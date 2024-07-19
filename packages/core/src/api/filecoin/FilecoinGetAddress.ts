@@ -2,7 +2,7 @@ import { FilecoinGetAddress as HardwareFilecoinGetAddress } from '@onekeyfe/hd-t
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { FilecoinAddress, FilecoinGetAddressParams } from '../../types';
 
 export default class FilecoinGetAddress extends BaseMethod<HardwareFilecoinGetAddress[]> {
@@ -69,6 +69,10 @@ export default class FilecoinGetAddress extends BaseMethod<HardwareFilecoinGetAd
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

@@ -1,7 +1,7 @@
 import { LnurlAuth as ILnurlAuth } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { bytesToHex } from '../helpers/hexUtils';
 
 export default class LnurlAuth1 extends BaseMethod<ILnurlAuth> {
@@ -40,6 +40,8 @@ export default class LnurlAuth1 extends BaseMethod<ILnurlAuth> {
       'LnurlAuthResp',
       this.params
     );
+
+    validateResult(message, ['publickey', 'path']);
 
     return message;
   }

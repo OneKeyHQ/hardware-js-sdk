@@ -2,7 +2,7 @@ import { CosmosGetAddress as HardwareCosmosGetAddress } from '@onekeyfe/hd-trans
 
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { CosmosAddress, CosmosGetAddressParams } from '../../types';
 
 export default class CosmosGetAddress extends BaseMethod<HardwareCosmosGetAddress[]> {
@@ -70,6 +70,10 @@ export default class CosmosGetAddress extends BaseMethod<HardwareCosmosGetAddres
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

@@ -2,7 +2,7 @@ import { StarcoinGetPublicKey as HardwareStarcoinGetPublicKey } from '@onekeyfe/
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath, serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import {
   StarcoinPublicKey,
   StarcoinGetPublicKeyParams,
@@ -59,6 +59,10 @@ export default class StarcoinGetPublicKey extends BaseMethod<HardwareStarcoinGet
         ...res.message,
       });
     }
+
+    validateResult(responses, ['public_key'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

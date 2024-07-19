@@ -2,7 +2,7 @@ import { EthereumGetAddressOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { EVMAddress, EVMGetAddressParams } from '../../types';
 import TransportManager from '../../data-manager/TransportManager';
 import getAddressLegacyV1 from './legacyV1/getAddress';
@@ -77,6 +77,10 @@ export default class EvmGetAddress extends BaseMethod<EthereumGetAddressOneKey[]
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
+
+    validateResult(responses, ['address'], {
+      expectedLength: this.params.length,
+    });
 
     return Promise.resolve(this.hasBundle ? responses : responses[0]);
   }

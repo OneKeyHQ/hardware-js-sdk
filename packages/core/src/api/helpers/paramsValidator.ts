@@ -23,6 +23,9 @@ export type SchemaParam = {
 const invalidParameter = (message: string) =>
   ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, message);
 
+const invalidResponse = (message: string) =>
+  ERRORS.TypedError(HardwareErrorCode.CallMethodError, message);
+
 export const validateParams = (values: any, fields: Array<SchemaParam>): void => {
   fields.forEach(field => {
     const existsProp = Object.prototype.hasOwnProperty.call(values, field.name);
@@ -112,3 +115,34 @@ export const validateParams = (values: any, fields: Array<SchemaParam>): void =>
     }
   });
 };
+
+export function validateResult(
+  result: any,
+  nonNullableFields: string[],
+  options?: {
+    expectedLength?: number | undefined | null;
+  }
+) {
+  if (Array.isArray(result)) {
+    if (options?.expectedLength !== null && result.length !== options?.expectedLength) {
+      throw invalidResponse(
+        `Expected array length of ${options?.expectedLength}, but got ${result.length}`
+      );
+    }
+    result.forEach((item, index) => {
+      nonNullableFields.forEach(field => {
+        if (item[field] == null) {
+          throw invalidResponse(`Field '${field}' in array item at index ${index} is null`);
+        }
+      });
+    });
+  } else if (typeof result === 'object' && result !== null) {
+    nonNullableFields.forEach(field => {
+      if (result[field] == null) {
+        throw invalidResponse(`Field '${field}' in object is null`);
+      }
+    });
+  } else {
+    throw invalidResponse('Result is neither an array nor a valid object');
+  }
+}
