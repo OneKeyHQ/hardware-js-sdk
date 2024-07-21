@@ -103,6 +103,16 @@ const api: PlaygroundProps[] = [
     description: 'get logs',
     noDeviceIdReq: true,
     noConnIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+    },
   },
 ];
 

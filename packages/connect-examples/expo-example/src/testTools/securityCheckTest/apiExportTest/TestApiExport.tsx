@@ -354,7 +354,11 @@ function ExecuteView() {
           item.presupposes.forEach((presuppose, index) => {
             const key = `${item.method}-${presuppose.title}-${index}`;
 
-            const expect = getExpectResult(deviceType, currentTestClass, presuppose.expect);
+            const expect = getExpectResult(
+              deviceType,
+              currentTestClass,
+              presuppose.expect || item.expect
+            );
 
             if (!expect) {
               return;

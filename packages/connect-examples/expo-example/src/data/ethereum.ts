@@ -103,6 +103,13 @@ const api: PlaygroundProps[] = [
       },
     ],
     deprecated: true,
+    expect: {
+      common: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+    },
   },
   {
     method: 'evmSignTransaction',

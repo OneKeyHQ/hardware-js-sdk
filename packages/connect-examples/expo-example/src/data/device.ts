@@ -546,6 +546,23 @@ const api: PlaygroundProps[] = [
     method: 'deviceUpdateBootloader',
     description: 'Touch、Pro Update bootloader of a device',
     noDeviceIdReq: true,
+    expect: {
+      mini: {
+        normal: {
+          success: true,
+        },
+      },
+      classic: {
+        normal: {
+          success: true,
+        },
+      },
+      classic1s: {
+        normal: {
+          success: true,
+        },
+      },
+    },
   },
   {
     method: 'firmwareUpdateV2',
@@ -567,6 +584,23 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+    expect: {
+      mini: {
+        normal: {
+          requestButton: true,
+        },
+      },
+      classic: {
+        normal: {
+          requestButton: true,
+        },
+      },
+      classic1s: {
+        normal: {
+          requestButton: true,
+        },
+      },
+    },
   },
   {
     method: 'checkAllFirmwareRelease',
