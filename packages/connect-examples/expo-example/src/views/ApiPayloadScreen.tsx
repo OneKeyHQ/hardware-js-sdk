@@ -26,6 +26,10 @@ const playgroundConfig = [
     data: require('../data/device').default,
   },
   {
+    title: 'AllNetwork API',
+    data: require('../data/allnetwork').default,
+  },
+  {
     title: 'Bitcoin API',
     data: require('../data/bitcoin').default,
   },

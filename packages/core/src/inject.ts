@@ -143,6 +143,9 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'getNextU2FCounter' }),
   setU2FCounter: (connectId, params) => call({ ...params, connectId, method: 'setU2FCounter' }),
 
+  allNetworkGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'allNetworkGetAddress' }),
+
   evmGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'evmGetAddress' }),
   evmGetPublicKey: (connectId, deviceId, params) =>

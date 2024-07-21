@@ -43,6 +43,8 @@ import { setU2FCounter } from './setU2FCounter';
 
 import { cipherKeyValue } from './cipherKeyValue';
 
+import { allNetworkGetAddress } from './allNetworkGetAddress';
+
 import { evmGetAddress } from './evmGetAddress';
 import { evmGetPublicKey } from './evmGetPublicKey';
 import { evmSignMessage } from './evmSignMessage';
@@ -204,6 +206,11 @@ export type CoreApi = {
   firmwareUpdateV2: typeof firmwareUpdateV2;
 
   cipherKeyValue: typeof cipherKeyValue;
+
+  /**
+   * All network function
+   */
+  allNetworkGetAddress: typeof allNetworkGetAddress;
 
   /**
    * EVM function

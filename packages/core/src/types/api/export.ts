@@ -23,6 +23,8 @@ export type { DeviceSupportFeatures } from './deviceSupportFeatures';
 export type { DeviceUploadResourceParams } from './deviceUploadResource';
 export type { FirmwareUpdateParams, FirmwareUpdateBinaryParams } from './firmwareUpdate';
 
+export type { AllNetworkAddressParams, AllNetworkGetAddressParams } from './allNetworkGetAddress';
+
 export type { EVMAddress, EVMGetAddressParams } from './evmGetAddress';
 export type { EVMPublicKey, EVMGetPublicKeyParams } from './evmGetPublicKey';
 export type { EVMSignMessageParams } from './evmSignMessage';
