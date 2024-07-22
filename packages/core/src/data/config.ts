@@ -16,7 +16,9 @@ export const whitelist = [
 
 export const whitelistExtension = [
   // OneKey
-  'fgddkaglmpbfaaeoldjafejilhdijpmi',
+  'jnmbobjmhlngoefaiojfljckilhhlhcj',
+  // OneKey Dev
+  'kgceiielgkmjgjlecaikalcejlbeegkc',
   // Rabby
   'acmacodkjbdgmoleebolmdjonilkdbch',
   // OKX
