@@ -21,12 +21,28 @@ import { getOrigin } from '../utils/urlUtils';
 import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
 
 import JSBridgeConfig from './bridge-config';
+import { isExtensionWhitelisted, isOriginWhitelisted } from '..';
 
 let _core: Core | undefined;
 const Log = getLogger(LoggerNames.Iframe);
 
 const handleMessage = (event: PostMessageEvent) => {
   if (event.source === window || !event.data) return;
+
+  // is message from popup or extension
+  const whitelist = isOriginWhitelisted(event.origin) && isExtensionWhitelisted(event.origin);
+  const isTrustedDomain = event.origin === window.location.origin || !!whitelist;
+
+  // ignore messages from domain other then parent.window or popup.window or chrome extension
+  const eventOrigin = getOrigin(event.origin);
+
+  if (
+    !isTrustedDomain &&
+    eventOrigin !== DataManager.getSettings('origin') &&
+    eventOrigin !== getOrigin(document.referrer)
+  ) {
+    return;
+  }
 
   const message = parseMessage(event);
 

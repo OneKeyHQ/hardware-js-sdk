@@ -76,7 +76,18 @@ const handleMessage = async (message: CoreMessage) => {
   }
 };
 
+function checkTrust(settings: ConnectSettings) {
+  const hasTrust =
+    isOriginWhitelisted(settings.parentOrigin ?? '') ||
+    isExtensionWhitelisted(settings.extension ?? '');
+
+  if (!hasTrust) {
+    throw ERRORS.TypedError(HardwareErrorCode.IframeDistrust, JSON.stringify(settings));
+  }
+}
+
 const dispose = () => {
+  checkTrust(_settings);
   eventEmitter.removeAllListeners();
   iframe.dispose();
   _settings = parseConnectSettings();
@@ -140,15 +151,8 @@ const init = async (settings: Partial<ConnectSettings>) => {
     throw ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized);
   }
 
-  const hasTrust =
-    isOriginWhitelisted(_settings.parentOrigin ?? '') ||
-    isExtensionWhitelisted(_settings.extension ?? '');
-
-  if (!hasTrust) {
-    throw ERRORS.TypedError(HardwareErrorCode.IframeDistrust);
-  }
-
   _settings = parseConnectSettings({ ..._settings, ...settings });
+  checkTrust(_settings);
 
   enableLog(!!settings.debug);
   setLoggerPostMessage(handleMessage);
@@ -174,6 +178,7 @@ const call = async (params: any) => {
    */
   if (!iframe.instance && !iframe.timeout) {
     _settings = parseConnectSettings(_settings);
+    checkTrust(_settings);
     Log.debug("Try to recreate iframe if it's initialize failed: ", _settings);
     try {
       const initResult = await init(_settings);
@@ -214,6 +219,7 @@ const updateSettings = async (settings: Partial<ConnectSettings>) => {
     throw ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized);
   }
 
+  checkTrust(_settings);
   Log.debug('updateSettings API Called =>: old settings: ', _settings);
   _settings = parseConnectSettings({ ..._settings, ...settings });
   Log.debug('updateSettings API Called =>: new settings: ', _settings);
