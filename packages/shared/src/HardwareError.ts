@@ -157,6 +157,11 @@ export const HardwareErrorCode = {
   IframeBlocked: 304,
 
   /**
+   * iframe host not trust
+   */
+  IframeDistrust: 305,
+
+  /**
    * Runtime errors during method execution
    */
   CallMethodError: 400,
@@ -387,6 +392,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.IFrameLoadFail]: 'IFrame load fail',
   [HardwareErrorCode.IframeTimeout]: 'init iframe time out',
   [HardwareErrorCode.IframeBlocked]: 'IFrame blocked',
+  [HardwareErrorCode.IframeDistrust]: 'IFrame host not trust',
 
   /**
    * Method Errors

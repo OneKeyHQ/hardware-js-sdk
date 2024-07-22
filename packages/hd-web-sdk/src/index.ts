@@ -20,16 +20,28 @@ import HardwareSdk, {
   DEVICE_EVENT,
   DEVICE,
   UI_REQUEST,
+  whitelist,
+  whitelistExtension,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
 import { sendMessage, createJsBridge, hostBridge, resetListenerFlag } from './utils/bridgeUtils';
+import { getHost } from './utils/urlUtils';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.Connect);
 
 let _settings = parseConnectSettings();
+
+export const isOriginWhitelisted = (origin: string) => {
+  const host = getHost(origin);
+
+  return whitelist.find(item => item.origin === origin || item.origin === host);
+};
+
+export const isExtensionWhitelisted = (origin: string) =>
+  whitelistExtension.find(item => item === origin);
 
 const handleMessage = async (message: CoreMessage) => {
   switch (message.event) {
@@ -126,6 +138,14 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
 const init = async (settings: Partial<ConnectSettings>) => {
   if (iframe.instance) {
     throw ERRORS.TypedError(HardwareErrorCode.IFrameAleradyInitialized);
+  }
+
+  const hasTrust =
+    isOriginWhitelisted(_settings.parentOrigin ?? '') ||
+    isExtensionWhitelisted(_settings.extension ?? '');
+
+  if (!hasTrust) {
+    throw ERRORS.TypedError(HardwareErrorCode.IframeDistrust);
   }
 
   _settings = parseConnectSettings({ ..._settings, ...settings });

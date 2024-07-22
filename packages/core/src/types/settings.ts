@@ -19,6 +19,7 @@ export type ConnectSettings = {
   isFrame?: boolean;
   preRelease?: boolean;
   fetchConfig?: boolean;
+  extension?: string;
 };
 
 export type IVersionArray = [number, number, number];
