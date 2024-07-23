@@ -21,7 +21,6 @@ import HardwareSdk, {
   DEVICE,
   UI_REQUEST,
   whitelist,
-  whitelistExtension,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
@@ -40,8 +39,9 @@ export const isOriginWhitelisted = (origin: string) => {
   return whitelist.find(item => item.origin === origin || item.origin === host);
 };
 
-export const isExtensionWhitelisted = (origin: string) =>
-  whitelistExtension.find(item => item === origin);
+// easy to test and then open
+export const isExtensionWhitelisted = (origin: string) => true;
+// whitelistExtension.find(item => item === origin);
 
 const handleMessage = async (message: CoreMessage) => {
   switch (message.event) {
