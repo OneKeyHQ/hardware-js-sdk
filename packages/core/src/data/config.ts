@@ -11,6 +11,7 @@ export const whitelist = [
   { origin: '1key.so' },
   { origin: 'onekey.so' },
   { origin: 'onekeycn.com' },
+  { origin: 'onekeytest.com' },
   { origin: 'localhost' },
 ];
 
