@@ -250,8 +250,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'cardanoGetPublicKey' }),
   cardanoSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cardanoSignTransaction' }),
-  // cardanoSignMessage: (connectId, deviceId, params) =>
-  //   call({ ...params, connectId, deviceId, method: 'cardanoSignMessage' }),
+  cardanoSignMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cardanoSignMessage' }),
 
   filecoinGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'filecoinGetAddress' }),
