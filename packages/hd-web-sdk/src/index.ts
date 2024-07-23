@@ -40,6 +40,7 @@ export const isOriginWhitelisted = (origin: string) => {
 };
 
 // easy to test and then open
+// @ts-expect-error
 export const isExtensionWhitelisted = (origin: string) => true;
 // whitelistExtension.find(item => item === origin);
 
