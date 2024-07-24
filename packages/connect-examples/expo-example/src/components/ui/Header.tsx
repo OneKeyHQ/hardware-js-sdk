@@ -64,7 +64,7 @@ const HeaderView = () => {
           >
             {intl.formatMessage({ id: 'tab__address_test' })}
           </Button>
-        </Group.Item>{' '}
+        </Group.Item>
         <Group.Item>
           <Button
             variant={route.name === Routes.SecurityCheck ? 'primary' : 'secondary'}
