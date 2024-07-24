@@ -376,7 +376,7 @@ function FirmwareUpdate({
             <PanelView title={intl.formatMessage({ id: 'title__device_advanced_info' })}>
               <XStack padding="$2" alignItems="center" gap="$8">
                 <Text color="$text" fontSize={18} fontWeight="bold">
-                  {intl.formatMessage({ id: 'label__device_info_update_time' })}:{' '}
+                  {intl.formatMessage({ id: 'label__device_info_update_time' })}:
                   {formatCurrentTime(Date.now())}
                 </Text>
                 <Button variant="primary" size="medium" onPress={onReconnectDevice}>
