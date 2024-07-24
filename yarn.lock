@@ -3847,6 +3847,30 @@
   resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-0.0.17.tgz#0c88c1a2febac44ec1600e0e59da732579cbd045"
   integrity sha512-QqjIPXQHb3UG9w79ujjL5L5Qd6oCrymQ/x2J2rYICtr56G6shHTmUvRZxAvne0ZsLv8UBGqZWbepVdnPipehYQ==
 
+"@onekeyfe/hd-shared@^1.0.6":
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-shared/-/hd-shared-1.0.6.tgz#244624e33e3cd4b6718fa2b053458b4771233036"
+  integrity sha512-PDXbd1oNW1tQc1JaAPDijNPYa8MQWNVk7TV/zp/vyJjHkwu8i92l++BQhjtNIUwHZtrQQhyhrAmeIHLQO6ZMeA==
+
+"@onekeyfe/hd-transport-react-native@^1.0.7-alpha.0":
+  version "1.0.7-alpha.0"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport-react-native/-/hd-transport-react-native-1.0.7-alpha.0.tgz#d764f580801b6109d0c9a03cf1d70b39d3c54a82"
+  integrity sha512-Q/t1ZvDfZuSHWZlXgfYUEjN0cKsdS+iVnwztUAWH4bC8TBLdrSOb8G6B0K0shnCfiX3RiheMqo+ZAyk/HHCW+A==
+  dependencies:
+    "@onekeyfe/hd-shared" "^1.0.7-alpha.0"
+    "@onekeyfe/hd-transport" "^1.0.7-alpha.0"
+    react-native-ble-manager "^8.1.0"
+    react-native-ble-plx "3.2.1"
+
+"@onekeyfe/hd-transport@^1.0.6":
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/hd-transport/-/hd-transport-1.0.6.tgz#b0468a22727beb15672c03861990f5c0f423d580"
+  integrity sha512-n9GvzsJp8+EcgN7LK3kD3e/RznzAsbtm/2BryuBOwnvvEz5IxA3XP3CGUTNriaTeifMZn4ZJXIvGjtPsD2etQg==
+  dependencies:
+    bytebuffer "^5.0.1"
+    long "^4.0.0"
+    protobufjs "^6.11.2"
+
 "@onekeyfe/react-native-ble-plx@3.0.0":
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-plx/-/react-native-ble-plx-3.0.0.tgz#508f40eb8d0b0ee3b81f3a2ec5ff7f23a9d6f24b"
@@ -16443,7 +16467,7 @@ react-native-ble-manager@^8.1.0, react-native-ble-manager@^8.3.0:
   resolved "https://registry.yarnpkg.com/react-native-ble-manager/-/react-native-ble-manager-8.3.0.tgz#851ab14ff33d9cbc9fd86d6c1f5938952f5c1c61"
   integrity sha512-h98Fp5Dn7Tfb9key4zZRD0BBc+K6KaYE+OmqmPo6asuQK6lheRT0vxuLli7hY4XQQQO3V+MQ8lkSflKgAgnUwQ==
 
-react-native-ble-plx@3.2.1:
+react-native-ble-plx@3.2.1, react-native-ble-plx@^3.2.1:
   version "3.2.1"
   resolved "https://registry.yarnpkg.com/react-native-ble-plx/-/react-native-ble-plx-3.2.1.tgz#6a518603b2b87caa968edc11c85bc228c3d58596"
   integrity sha512-cot4pu6qXh7DLcYh91n4BNI5Wm9/oMUSDj24G1tQ86F8sCFJ292AneKxRHkTH2+VxIGQuU2FVvWY1iY6ob0KZQ==
