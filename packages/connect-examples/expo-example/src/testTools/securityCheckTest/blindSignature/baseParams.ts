@@ -165,9 +165,9 @@ export const baseParams = {
   },
   polkadotSignTransaction: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0'/0'`,
-    network: 'kusama',
+    network: 'polkadot',
     rawTx:
-      '1f0400c5b74b18e5e691d0a0e1b816044ad44e6fefff7acedc4ac8d0a7276581d37a30006503ac0052000000020000009eb76c5184c4ab8679d2d5d819fdf90b9c001403e9e17da2e14b6d8aec4029c6cbefb7af897bf76fb9c51819167248171ef46a7ab0b7f0589d24388a2c48dccc',
+      '050000950ca256090ba9a4cd520e1d891081207e112b1353bbe8da0cd8a910d684481a025a6202c500040000154a0f001a00000091b171bb158e2d3848fa23a9f1c25182fb8e20313b2c1eb49219da7a70ce90c3e7f75975e0a90fd10ab432c76d9a0eb2b140732e4d7748c813d3d787909edfb300',
   },
   solSignTransaction: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0'`,
