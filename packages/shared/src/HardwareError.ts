@@ -269,6 +269,7 @@ export const HardwareErrorCode = {
   BleTimeoutError: 713,
   BleForceCleanRunPromise: 714,
   BleDeviceBondError: 715,
+  BleCharacteristicNotifyChangeFailure: 716,
 
   /**
    * Hardware runtiome errors
@@ -446,6 +447,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleTimeoutError]: 'The connection has timed out unexpectedly.',
   [HardwareErrorCode.BleForceCleanRunPromise]: 'Force clean Bluetooth run promise',
   [HardwareErrorCode.BleDeviceBondError]: 'Bluetooth pairing failed',
+  [HardwareErrorCode.BleCharacteristicNotifyChangeFailure]: 'Characteristic Notify Change Failure',
 
   /**
    * Runtime Error

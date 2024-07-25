@@ -32,6 +32,7 @@ const transportCache: Record<string, any> = {};
 let connectOptions: Record<string, unknown> = {
   requestMTU: 256,
   timeout: 3000,
+  refreshGatt: 'OnConnected',
 };
 
 const tryToGetConfiguration = (device: Device) => {
@@ -404,6 +405,21 @@ export default class ReactNativeBleTransport {
           }
           if (error.reason?.includes('Encryption is insufficient')) {
             ERROR = HardwareErrorCode.BleDeviceBondError;
+          }
+          if (
+            error.reason?.includes('Cannot write client characteristic config descriptor') ||
+            error.reason?.includes('Cannot find client characteristic config descriptor')
+          ) {
+            this.runPromise.reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
+                error.message ?? error.reason
+              )
+            );
+            this.Log.debug(
+              `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
+            );
+            return;
           }
           this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
           this.Log.debug(': monitor notify error, and has unreleased Promise');

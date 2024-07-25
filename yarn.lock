@@ -3410,6 +3410,11 @@
   resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-plx/-/react-native-ble-plx-3.0.0.tgz#508f40eb8d0b0ee3b81f3a2ec5ff7f23a9d6f24b"
   integrity sha512-YckXy6XiOcd6a/J7HMcXi+GFDhtBTpN+12FfukJNINwJQxYxWpo1RHgzaa5Rxpx6LQ/f8yC/YEQC48HqZq4b7A==
 
+"@onekeyfe/react-native-ble-plx@3.0.1":
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-plx/-/react-native-ble-plx-3.0.1.tgz#81d01414abf9e6ed242619f38dd69b04feafc6d9"
+  integrity sha512-kMNKh9iyuTVCnd9rYBUSq/urrzS/1gcwEhxOtor3hKl9TaFAre8qMq0mGv/VedgtePYNSY4H32hOFSQmWM6fSw==
+
 "@pkgjs/parseargs@^0.11.0":
   version "0.11.0"
   resolved "https://registry.yarnpkg.com/@pkgjs/parseargs/-/parseargs-0.11.0.tgz#a77ea742fab25775145434eb1d2328cf5013ac33"
