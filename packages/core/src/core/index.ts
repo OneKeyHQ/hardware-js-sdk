@@ -527,6 +527,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
+            HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
           ].includes(error.errorCode)
         ) {
           reject(error);
