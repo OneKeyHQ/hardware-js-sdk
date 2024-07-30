@@ -73,7 +73,7 @@ const handleMessage = async (message: CoreMessage) => {
       break;
 
     default:
-      Log.log('No need to be captured message', message.event);
+      Log.warn('No need to be captured message', message.event);
   }
 };
 
@@ -128,7 +128,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
             Log.debug('Host Bridge Receive message: ', message);
           } else {
-            Log.log('Host Bridge Receive message: ', message);
+            Log.debug('Host Bridge Receive message: ', message);
           }
         }
         const response = await handleMessage(message);
@@ -136,7 +136,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
             Log.debug('Host Bridge response: ', message);
           } else {
-            Log.log('Host Bridge response: ', message);
+            Log.debug('Host Bridge response: ', message);
           }
         }
         return response;
@@ -173,7 +173,7 @@ const init = async (settings: Partial<ConnectSettings>) => {
 };
 
 const call = async (params: any) => {
-  Log.log('call : ', params);
+  Log.debug('call : ', params);
   /**
    * Try to recreate iframe if it's initialize failed
    */
