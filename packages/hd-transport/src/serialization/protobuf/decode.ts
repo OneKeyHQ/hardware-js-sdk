@@ -73,7 +73,19 @@ function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['
 export const decode = (Message: Type, data: ByteBuffer) => {
   const buff = data.toBuffer();
   const a = new Uint8Array(buff);
-  const decoded = Message.decode(a);
+
+  let decoded;
+  try {
+    decoded = Message.decode(a);
+  } catch (error) {
+    // Fix a battery_level problem with the device
+    if (a.length > 1 && a[a.length - 1] === 0xff) {
+      a[a.length - 1] = 0x04;
+      decoded = Message.decode(a);
+    } else {
+      throw error;
+    }
+  }
 
   // [compatibility]: in the end it should be possible to get rid of messageToJSON method and call
   // Message.toObject(decoded) to return result as plain javascript object. This method should be able to do
