@@ -103,6 +103,7 @@
   "label__device_update_bootloader": "更新 Bootloader",
   "label__device_update_sys_resource": "更新系统资源",
   "label__reboot_device_after_update": "升级成功后重启设备（仅限 Pro、Touch）",
+  "label__reboot_device_board_model": "重启到 Board 模式",
 
   "label__wallet_count": "测试钱包数量",
   "label__wallet_change_count": "测试切换次数",

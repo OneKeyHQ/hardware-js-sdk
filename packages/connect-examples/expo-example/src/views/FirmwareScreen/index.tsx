@@ -25,6 +25,52 @@ type UpdateState = {
   success: boolean;
   payload?: string;
 };
+
+interface FirmwareActionButtonProps {
+  title: string;
+  deviceType: string;
+  onUpdate: () => Promise<UpdateState | undefined>;
+}
+
+function FirmwareActionButton({ title, onUpdate, deviceType }: FirmwareActionButtonProps) {
+  const intl = useIntl();
+  const [updateState, setUpdateState] = useState<UpdateState | undefined>();
+
+  return (
+    <Stack
+      padding="$2"
+      gap="$2"
+      borderColor="$border"
+      borderWidth="$px"
+      borderRadius="$3"
+      width="100%"
+      flex={1}
+      $gtSm={{ width: '48%' }}
+      $gtLg={{ width: '30%' }}
+    >
+      <H5>{title}</H5>
+      <Button
+        variant="primary"
+        size="large"
+        onPress={async () => {
+          setUpdateState(undefined);
+          const res = await onUpdate?.();
+          setUpdateState(res);
+        }}
+      >
+        {intl.formatMessage({ id: 'label__reboot_device_board_model' })}
+      </Button>
+      {updateState && (
+        <Text color={updateState?.success ? '$text' : '$textCritical'}>
+          {updateState?.success
+            ? intl.formatMessage({ id: 'tip__update_success' })
+            : updateState?.payload}
+        </Text>
+      )}
+    </Stack>
+  );
+}
+
 interface FirmwareLocalFileProps {
   title: string;
   type: UpdateType;
@@ -297,6 +343,23 @@ function FirmwareUpdate({
     [deviceTypeLowerCase, features, intl, sdk, selectDevice]
   );
 
+  const rebootBoardModel = useCallback(async () => {
+    if (!sdk) return;
+    if (!features) return;
+    if (!selectDevice) return;
+
+    const res = await sdk.deviceRebootToBoardloader(selectDevice.connectId);
+    if (!res.success) {
+      return {
+        success: false,
+        payload: res.payload.error,
+      };
+    }
+    return {
+      success: true,
+    };
+  }, [features, sdk, selectDevice]);
+
   const deviceFieldProviderValue = useMemo(
     () => ({
       features,
@@ -422,6 +485,13 @@ function FirmwareUpdate({
                   title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
                   type="source"
                   onUpdate={updateFirmware}
+                />
+              )}
+              {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
+                <FirmwareActionButton
+                  deviceType={deviceTypeLowerCase}
+                  title={intl.formatMessage({ id: 'label__reboot_device_board_model' })}
+                  onUpdate={rebootBoardModel}
                 />
               )}
             </XStack>
