@@ -55,7 +55,7 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Sign Transaction kusama(old)',
+        title: 'kusama(old) 会报错',
         value: {
           path: "m/44'/354'/0'/0'/0'",
           network: 'kusama',
@@ -64,7 +64,7 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Sign Transaction polkadot (1001003)',
+        title: 'polkadot (1001003)',
         value: {
           path: "m/44'/354'/0'/0'/0'",
           network: 'polkadot',
@@ -73,7 +73,7 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Sign Transaction kusama (1001003)',
+        title: 'kusama (1001003)',
         value: {
           path: "m/44'/354'/0'/0'/0'",
           network: 'kusama',
@@ -82,7 +82,7 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Sign Transaction astar (90)',
+        title: 'astar (90)',
         value: {
           path: "m/44'/354'/0'/0'/0'",
           network: 'astar',
@@ -91,7 +91,16 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Sign Transaction manta (4720)',
+        title: 'astar (90) dapp 盲签',
+        value: {
+          path: "m/44'/354'/0'/0'/0'",
+          network: 'astar',
+          rawTx:
+            '2208130000c84e676dc11bc40105020f4823f6d69952035a000000020000009eb76c5184c4ab8679d2d5d819fdf90b9c001403e9e17da2e14b6d8aec4029c689d914c1db03bd5fe91cffa4571570c8c19999ccd804e9746cecbf1d7dffd201',
+        },
+      },
+      {
+        title: 'manta (4710)',
         value: {
           path: "m/44'/354'/0'/0'/0'",
           network: 'manta',
@@ -100,7 +109,16 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Sign Transaction joystream (2004)',
+        title: 'manta (4720)',
+        value: {
+          path: "m/44'/354'/0'/0'/0'",
+          network: 'manta',
+          rawTx:
+            '0a000055049a67d4fb392f555fb154118e985dbc87a54d17aa634fcb358ca2956538640b00407a10f35a8503080000701200000a000000f3c7ad88f6a80f366c4be216691411ef0622e8b809b1046ea297ef106058d4ebc06d6bec77e532d831ab970834c8869bb0fe7fdc6704f8ae972f044f2952b7da00',
+        },
+      },
+      {
+        title: 'joystream (2004)',
         value: {
           path: "m/44'/354'/0'/0'/0'",
           network: 'joystream',
