@@ -408,7 +408,8 @@ export default class ReactNativeBleTransport {
           }
           if (
             error.reason?.includes('Cannot write client characteristic config descriptor') ||
-            error.reason?.includes('Cannot find client characteristic config descriptor')
+            error.reason?.includes('Cannot find client characteristic config descriptor') ||
+            error.reason?.includes('The handle is invalid')
           ) {
             this.runPromise.reject(
               ERRORS.TypedError(
