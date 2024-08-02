@@ -733,6 +733,7 @@ export default class Core extends EventEmitter {
       }
 
       case UI_REQUEST.BLUETOOTH_PERMISSION:
+      case UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
       case UI_REQUEST.LOCATION_PERMISSION:
       case UI_REQUEST.LOCATION_SERVICE_PERMISSION: {
         postMessage(message);
