@@ -527,6 +527,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
+            HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
           ].includes(error.errorCode)
         ) {
           reject(error);
@@ -732,6 +733,7 @@ export default class Core extends EventEmitter {
       }
 
       case UI_REQUEST.BLUETOOTH_PERMISSION:
+      case UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
       case UI_REQUEST.LOCATION_PERMISSION:
       case UI_REQUEST.LOCATION_SERVICE_PERMISSION: {
         postMessage(message);
