@@ -16,7 +16,7 @@ export interface TestExpect {
   requestPin?: boolean;
   requestButton?: boolean;
   unknownMessage?: boolean;
-  error?: boolean;
+  error?: boolean | number;
 }
 
 export interface TestModalExpect {

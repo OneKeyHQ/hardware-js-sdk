@@ -3,6 +3,7 @@ import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE, getDeviceType } from '@
 import { Picker } from '@react-native-picker/picker';
 import { useIntl } from 'react-intl';
 import { Stack, Text, View } from 'tamagui';
+import { number } from 'bitcoinjs-lib/src/script';
 import { TestRunnerView } from '../../../components/BaseTestRunner/TestRunnerView';
 import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest';
 import { ApiExportTestCase } from './types';
@@ -142,7 +143,11 @@ function ResultView({ item }: ResultViewProps) {
   } else if (item?.result?.unknownMessage) {
     result = 'UnknownMessage or Device Not Support';
   } else if (item?.result?.error) {
-    result = 'Call Error';
+    if (typeof item?.result?.error === 'number') {
+      result = `Error Code: ${item?.result?.error}`;
+    } else {
+      result = 'Call Error';
+    }
   }
 
   return (
@@ -316,17 +321,21 @@ function ExecuteView() {
 
       currentRequestDeviceRef.current = deviceType;
 
+      // goto bootloader
+      if (currentTestClass === 'bootloader' && !hasBootloaderMode) {
+        await sdk.deviceUpdateReboot(connectId ?? '');
+        await sleep(5 * 1000);
+      }
+
+      if (currentTestClass === 'normal' && hasBootloaderMode) {
+        return Promise.reject(new Error('重启设备到普通模式'));
+      }
+
       // lock device
       if (currentTestClass === 'normal' && !hasBootloaderMode && feature.unlocked === true) {
         await sdk.deviceLock(connectId ?? '', {
           retryCount: 1,
         });
-      }
-
-      // goto bootloader
-      if (currentTestClass === 'bootloader' && !hasBootloaderMode) {
-        await sdk.deviceUpdateReboot(connectId ?? '');
-        await sleep(5 * 1000);
       }
 
       if (errorCaseRef.current?.length > 0) {
@@ -408,7 +417,7 @@ function ExecuteView() {
       }
 
       hardwareUiEventListener = async (message: CoreMessage) => {
-        console.log('TopLEVEL EVENT ===>>>>: ', message);
+        console.log('TopLEVEL EVENT ===>>>> 123123123123123123: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           sdk.uiResponse({
             type: UI_RESPONSE.RECEIVE_PIN,
@@ -454,7 +463,6 @@ function ExecuteView() {
       currentRequestPinRef.current = item?.result?.requestPin || false;
       currentRequestButtonRef.current = item?.result?.requestButton || false;
       nextRequestCleanUpRef.current = false;
-
       return Promise.resolve();
     },
     generateRequestParams: item => {
@@ -544,8 +552,14 @@ function ExecuteView() {
         verifyState = 'fail';
         error = res.payload?.error;
         addErrorCase(item);
-      } else if (item.result.error && (res.payload?.code === 800 || res.success === false)) {
-        verifyState = 'success';
+      } else if (item.result.error) {
+        if (typeof item.result.error === 'number') {
+          if (res.payload?.code === item.result.error) {
+            verifyState = 'success';
+          }
+        } else if (res.payload?.code === 800 || res.success === false) {
+          verifyState = 'success';
+        }
       } else if (item.result.success && res.success) {
         verifyState = 'success';
       } else if (
@@ -629,7 +643,13 @@ function ExecuteView() {
           type="number"
           onChange={setBootNextDelayMsState}
         />
-        <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+        <TestRunnerOptionButtons
+          onStop={stopTest}
+          onStart={() => {
+            errorCaseRef.current = [];
+            beginTest();
+          }}
+        />
         <ExportReportView testScope={currentTestCaseType} testModel={currentTestClass} />
         <TestRunnerErrorButtons
           onStart={beginTest}

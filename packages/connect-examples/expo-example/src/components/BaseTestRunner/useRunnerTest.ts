@@ -279,9 +279,10 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
         }
       }
       endTestRunner();
-    } catch (e) {
-      console.log('error', e);
+    } catch (e: any) {
       stopTest();
+      console.log('error', e);
+      alert(e.message);
     }
   }, [
     setRunnerLogs,
