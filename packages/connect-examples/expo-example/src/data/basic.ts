@@ -45,6 +45,30 @@ const api: PlaygroundProps[] = [
           success: true,
         },
       },
+      classic: {
+        normal: {
+          unknownMessage: true,
+        },
+        bootloader: {
+          unknownMessage: true,
+        },
+      },
+      classic1s: {
+        normal: {
+          unknownMessage: true,
+        },
+        bootloader: {
+          unknownMessage: true,
+        },
+      },
+      mini: {
+        normal: {
+          unknownMessage: true,
+        },
+        bootloader: {
+          unknownMessage: true,
+        },
+      },
     },
   },
   {

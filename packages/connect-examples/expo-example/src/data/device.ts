@@ -1,3 +1,4 @@
+import { HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { type PlaygroundProps } from '../components/Playground';
 
 const api: PlaygroundProps[] = [
@@ -113,6 +114,9 @@ const api: PlaygroundProps[] = [
             normal: {
               requestPin: true,
             },
+            bootloader: {
+              unknownMessage: true,
+            },
           },
         },
       },
@@ -121,31 +125,11 @@ const api: PlaygroundProps[] = [
         value: {
           usePassphrase: true,
         },
-        expect: {
-          common: {
-            normal: {
-              skip: true,
-            },
-            bootloader: {
-              skip: true,
-            },
-          },
-        },
       },
       {
         title: 'Disable Passphrase',
         value: {
           usePassphrase: false,
-        },
-        expect: {
-          common: {
-            normal: {
-              skip: true,
-            },
-            bootloader: {
-              skip: true,
-            },
-          },
         },
       },
       {
@@ -153,31 +137,11 @@ const api: PlaygroundProps[] = [
         value: {
           passphraseAlwaysOnDevice: true,
         },
-        expect: {
-          common: {
-            normal: {
-              skip: true,
-            },
-            bootloader: {
-              skip: true,
-            },
-          },
-        },
       },
       {
         title: 'Set English language',
         value: {
           language: 'en_UK',
-        },
-        expect: {
-          common: {
-            normal: {
-              skip: true,
-            },
-            bootloader: {
-              skip: true,
-            },
-          },
         },
       },
       {
@@ -185,34 +149,24 @@ const api: PlaygroundProps[] = [
         value: {
           language: 'zh_CN',
         },
-        expect: {
-          common: {
-            normal: {
-              skip: true,
-            },
-            bootloader: {
-              skip: true,
-            },
-          },
-        },
       },
       {
         title: 'Set safetyChecks',
         value: {
           safetyChecks: 0,
         },
-        expect: {
-          common: {
-            normal: {
-              skip: true,
-            },
-            bootloader: {
-              skip: true,
-            },
-          },
-        },
       },
     ],
+    expect: {
+      common: {
+        normal: {
+          skip: true,
+        },
+        bootloader: {
+          skip: true,
+        },
+      },
+    },
   },
   {
     method: 'deviceCancel',
@@ -551,14 +505,23 @@ const api: PlaygroundProps[] = [
         normal: {
           success: true,
         },
+        bootloader: {
+          success: true,
+        },
       },
       classic: {
         normal: {
           success: true,
         },
+        bootloader: {
+          success: true,
+        },
       },
       classic1s: {
         normal: {
+          success: true,
+        },
+        bootloader: {
           success: true,
         },
       },
@@ -587,17 +550,27 @@ const api: PlaygroundProps[] = [
     expect: {
       mini: {
         normal: {
-          requestButton: true,
+          // You need to manually enter boot
+          error: HardwareErrorCode.FirmwareUpdateManuallyEnterBoot,
+        },
+        bootloader: {
+          skip: true,
         },
       },
       classic: {
         normal: {
           requestButton: true,
         },
+        bootloader: {
+          skip: true,
+        },
       },
       classic1s: {
         normal: {
           requestButton: true,
+        },
+        bootloader: {
+          skip: true,
         },
       },
     },
