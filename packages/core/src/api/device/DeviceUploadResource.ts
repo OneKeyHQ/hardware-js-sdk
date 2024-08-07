@@ -3,6 +3,7 @@ import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { bytesToHex } from '@noble/hashes/utils';
 import { ResourceUpload, Success } from '@onekeyfe/hd-transport';
 import { blake2s } from '@noble/hashes/blake2s';
+import { isEmpty } from 'lodash';
 import { TypedResponseMessage } from '../../device/DeviceCommands';
 import { DeviceModelToTypes, DeviceUploadResourceParams } from '../../types';
 import { BaseMethod } from '../BaseMethod';
@@ -53,6 +54,7 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       { name: 'thumbnailDataHex', type: 'string', required: true },
       { name: 'resType', type: 'number', required: true },
       { name: 'nftMetaData', type: 'string' },
+      { name: 'fileNameNoExt', type: 'string' },
     ]);
 
     const { suffix, dataHex, thumbnailDataHex, resType, nftMetaData } = this
@@ -65,9 +67,9 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
     };
 
     const fileHash = bytesToHex(blake2s(this.payload.dataHex)).slice(0, 8);
-    const file_name_no_ext = `${resType === 0 ? 'wp' : 'nft'}-${fileHash}-${Math.floor(
-      Date.now() / 1000
-    )}`;
+    const file_name_no_ext = isEmpty(this.payload.fileNameNoExt)
+      ? `${resType === 0 ? 'wp' : 'nft'}-${fileHash}-${Math.floor(Date.now() / 1000)}`
+      : this.payload.fileNameNoExt;
 
     this.params = {
       extension: suffix,
