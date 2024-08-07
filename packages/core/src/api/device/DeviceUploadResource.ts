@@ -53,7 +53,6 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       { name: 'thumbnailDataHex', type: 'string', required: true },
       { name: 'resType', type: 'number', required: true },
       { name: 'nftMetaData', type: 'string' },
-      { name: 'file_name_no_ext', type: 'boolean' },
     ]);
 
     const { suffix, dataHex, thumbnailDataHex, resType, nftMetaData } = this

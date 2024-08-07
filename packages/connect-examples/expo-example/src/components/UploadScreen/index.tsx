@@ -6,7 +6,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-import { DeviceUploadResourceParams, CoreApi, CommonParams, KnownDevice } from '@onekeyfe/hd-core';
+import { DeviceUploadResourceParams, getHomeScreenSize, getDeviceType } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
 import { Image, Label, Stack, View, XStack } from 'tamagui';
 import { Platform } from 'react-native';
@@ -32,14 +32,41 @@ function getUrlExtension(url: string) {
   return url.split(/[#?]/)[0].split('.').pop()?.trim();
 }
 
-export const generateUploadResParams = async (
-  uri: string,
-  width: number,
-  height: number,
-  cb?: (data: { base64?: string }) => void
-) => {
-  const data = await compressHomescreen(uri, 480, 800, width, height);
-  const zoomData = await compressHomescreen(uri, 144, 240, width, height);
+export const generateUploadResParams = async ({
+  uri,
+  width,
+  height,
+  homeScreenSize,
+  homeScreenThumbnailSize,
+  cb,
+}: {
+  uri: string;
+  width: number;
+  height: number;
+  homeScreenSize?: {
+    width: number;
+    height: number;
+  };
+  homeScreenThumbnailSize?: {
+    width: number;
+    height: number;
+  };
+  cb?: (data: { base64?: string }) => void;
+}) => {
+  const data = await compressHomescreen(
+    uri,
+    homeScreenSize?.width ?? 480,
+    homeScreenSize?.height ?? 800,
+    width,
+    height
+  );
+  const zoomData = await compressHomescreen(
+    uri,
+    homeScreenThumbnailSize?.width ?? 144,
+    homeScreenThumbnailSize?.height ?? 240,
+    width,
+    height
+  );
 
   cb?.(data as any);
 
@@ -136,6 +163,25 @@ function UploadScreenComponent() {
     if (nftUrl) {
       const imageUrl = nftUrl;
       (async () => {
+        const res = await SDK?.getFeatures();
+        if (!res) return;
+        if (!res.success) return;
+
+        const deviceType = getDeviceType(res.payload);
+        const screenType = uploadScreenParams?.resType?.toString() === '0' ? 'WallPaper' : 'Nft';
+        const HomeScreenSize = getHomeScreenSize({
+          deviceType,
+          homeScreenType: screenType,
+        });
+        const HomeScreenThumbnailSize = getHomeScreenSize({
+          deviceType,
+          homeScreenType: screenType,
+          thumbnail: true,
+        });
+
+        console.log('HomeScreenSize nft: ', HomeScreenSize);
+        console.log('HomeScreenThumbnailSize nft: ', HomeScreenThumbnailSize);
+
         const { width, height } = await getImageSize(imageUrl);
         console.log('image size: ', { width, height });
         const base64 = await imageToBase64(imageUrl);
@@ -143,9 +189,16 @@ function UploadScreenComponent() {
 
         let uploadResParams: DeviceUploadResourceParams | undefined;
         try {
-          uploadResParams = await generateUploadNFTParams(base64, width, height, data => {
-            setImage({ uri: base64 } as any);
-            setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+          uploadResParams = await generateUploadNFTParams({
+            uri: base64,
+            width,
+            height,
+            homeScreenSize: HomeScreenSize,
+            homeScreenThumbnailSize: HomeScreenThumbnailSize,
+            cb: data => {
+              setImage({ uri: base64 } as any);
+              setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+            },
           });
         } catch (e) {
           console.log('image operate error: ', e);
@@ -170,16 +223,37 @@ function UploadScreenComponent() {
   const handleScreenUpdate = async () => {
     // setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
 
+    const res = await SDK?.getFeatures();
+    if (!res) return;
+    if (!res.success) return;
+
+    const deviceType = getDeviceType(res.payload);
+    const screenType = uploadScreenParams?.resType?.toString() === '0' ? 'WallPaper' : 'Nft';
+    const HomeScreenSize = getHomeScreenSize({
+      deviceType,
+      homeScreenType: screenType,
+    });
+    const HomeScreenThumbnailSize = getHomeScreenSize({
+      deviceType,
+      homeScreenType: screenType,
+      thumbnail: true,
+    });
+
+    console.log('HomeScreenSize WallPaper: ', HomeScreenSize);
+    console.log('HomeScreenThumbnailSize WallPaper: ', HomeScreenThumbnailSize);
+
     let uploadResParams: DeviceUploadResourceParams | undefined;
     try {
-      uploadResParams = await generateUploadResParams(
-        image?.uri ?? '',
-        image?.width ?? 0,
-        image?.height ?? 0,
-        data => {
+      uploadResParams = await generateUploadResParams({
+        uri: image?.uri ?? '',
+        width: image?.width ?? 0,
+        height: image?.height ?? 0,
+        homeScreenSize: HomeScreenSize,
+        homeScreenThumbnailSize: HomeScreenThumbnailSize,
+        cb: data => {
           setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
-        }
-      );
+        },
+      });
     } catch (e) {
       console.log('image operate error: ', e);
       return;
@@ -222,20 +296,6 @@ function UploadScreenComponent() {
       <XStack flexWrap="wrap" gap="$4">
         <Stack width={160} minHeight={45}>
           <Label paddingRight="$0" justifyContent="center">
-            {intl.formatMessage({ id: 'label__upload_image_res_type' })}
-          </Label>
-          <Button onPress={pickImage}>{intl.formatMessage({ id: 'action__pick_image' })}</Button>
-        </Stack>
-        <CommonInput
-          type="text"
-          label={intl.formatMessage({ id: 'label__res_file_suffix' })}
-          value={uploadScreenParams?.suffix ?? ''}
-          onChange={v => {
-            setUploadScreenParams({ ...uploadScreenParams, suffix: v });
-          }}
-        />
-        <Stack width={160} minHeight={45}>
-          <Label paddingRight="$0" justifyContent="center">
             {intl.formatMessage({ id: 'label__image_res_type' })}
           </Label>
           <Picker
@@ -251,22 +311,48 @@ function UploadScreenComponent() {
             <Picker.Item label={intl.formatMessage({ id: 'label__res_type_nft' })} value="1" />
           </Picker>
         </Stack>
+        <Stack width={160} minHeight={45}>
+          <Label paddingRight="$0" justifyContent="center">
+            {intl.formatMessage({ id: 'label__upload_image_res_type' })}
+          </Label>
+          <Button onPress={pickImage}>{intl.formatMessage({ id: 'action__pick_image' })}</Button>
+        </Stack>
         <CommonInput
           type="text"
-          label={intl.formatMessage({ id: 'label__nft_data' })}
-          value={uploadScreenParams?.nftMetaData ?? ''}
+          label={intl.formatMessage({ id: 'label__res_file_suffix' })}
+          value={uploadScreenParams?.suffix ?? ''}
           onChange={v => {
-            setUploadScreenParams({ ...uploadScreenParams, nftMetaData: v });
+            setUploadScreenParams({ ...uploadScreenParams, suffix: v });
           }}
         />
         <CommonInput
           type="text"
-          label={intl.formatMessage({ id: 'label__nft_url' })}
-          value={nftUrl ?? ''}
+          label="File Name No Ext"
+          value={uploadScreenParams?.fileNameNoExt ?? ''}
           onChange={v => {
-            setNftUrl(v);
+            setUploadScreenParams({ ...uploadScreenParams, fileNameNoExt: v });
           }}
         />
+        {uploadScreenParams?.resType?.toString() === '1' && (
+          <>
+            <CommonInput
+              type="text"
+              label={intl.formatMessage({ id: 'label__nft_data' })}
+              value={uploadScreenParams?.nftMetaData ?? ''}
+              onChange={v => {
+                setUploadScreenParams({ ...uploadScreenParams, nftMetaData: v });
+              }}
+            />
+            <CommonInput
+              type="text"
+              label={intl.formatMessage({ id: 'label__nft_url' })}
+              value={nftUrl ?? ''}
+              onChange={v => {
+                setNftUrl(v);
+              }}
+            />
+          </>
+        )}
         <Button onPress={() => handleScreenUpdate()}>
           {intl.formatMessage({ id: 'action__upload' })}
         </Button>

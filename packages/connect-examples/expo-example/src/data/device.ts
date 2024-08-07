@@ -119,6 +119,11 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
+    method: 'deviceRebootToBoardloader',
+    description: 'DeviceRebootToBoardloader',
+    noDeviceIdReq: true,
+  },
+  {
     method: 'deviceUpdateBootloader',
     description: 'Touch、Pro Update bootloader of a device',
     noDeviceIdReq: true,

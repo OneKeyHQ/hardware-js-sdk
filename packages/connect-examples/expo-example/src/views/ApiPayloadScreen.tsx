@@ -9,6 +9,7 @@ import { DeviceProvider } from '../provider/DeviceProvider';
 import { CommonParamsProvider } from '../provider/CommonParamsProvider';
 import CommonParamsView from '../components/CommonParamsView';
 import { UploadScreen } from '../components/UploadScreen';
+import ChangeScreenComponent from '../components/ChangeScreen';
 import { ExpandModeProvider } from '../provider/ExpandModeProvider';
 import { CollapsibleSection } from '../components/CollapsibleSection';
 import Playground, { PlaygroundProps as ApiPayloadProps } from '../components/Playground';
@@ -158,6 +159,7 @@ const ApiPayload = () => {
             </PanelView>
           </ExpandModeProvider>
           <UploadScreen />
+          <ChangeScreenComponent />
         </CommonParamsProvider>
       </DeviceProvider>
     </Stack>
