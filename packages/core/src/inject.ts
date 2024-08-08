@@ -294,4 +294,11 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'dnxGetAddress' }),
   dnxSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'dnxSignTransaction' }),
+
+  tonGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tonGetAddress' }),
+  tonSignMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tonSignMessage' }),
+  tonSignProof: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'tonSignProof' }),
 });

@@ -122,3 +122,7 @@ export { default as nervosSignTransaction } from './nervos/NervosSignTransaction
 
 export { default as dnxGetAddress } from './dynex/DnxGetAddress';
 export { default as dnxSignTransaction } from './dynex/DnxSignTransaction';
+
+export { default as tonGetAddress } from './ton/TonGetAddress';
+export { default as tonSignMessage } from './ton/TonSignMessage';
+export { default as tonSignProof } from './ton/TonSignProof';

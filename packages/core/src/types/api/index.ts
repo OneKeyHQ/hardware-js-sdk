@@ -126,6 +126,10 @@ import { nervosSignTransaction } from './nervosSignTransaction';
 import { dnxGetAddress } from './dnxGetAddress';
 import { dnxSignTransaction } from './dnxSignTransaction';
 
+import { tonGetAddress } from './tonGetAddress';
+import { tonSignMessage } from './tonSignMessage';
+import { tonSignProof } from './tonSignProof';
+
 export * from './export';
 
 export type CoreApi = {
@@ -342,4 +346,11 @@ export type CoreApi = {
    */
   dnxGetAddress: typeof dnxGetAddress;
   dnxSignTransaction: typeof dnxSignTransaction;
+
+  /**
+   * TON Network
+   */
+  tonGetAddress: typeof tonGetAddress;
+  tonSignMessage: typeof tonSignMessage;
+  tonSignProof: typeof tonSignProof;
 };

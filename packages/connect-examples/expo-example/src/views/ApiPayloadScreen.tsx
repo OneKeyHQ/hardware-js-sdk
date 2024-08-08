@@ -77,12 +77,16 @@ const playgroundConfig = [
     data: require('../data/nem').default,
   },
   {
+    title: 'Nervos API',
+    data: require('../data/nervos').default,
+  },
+  {
     title: 'Nexa API',
     data: require('../data/nexa').default,
   },
   {
-    title: 'Nervos API',
-    data: require('../data/nervos').default,
+    title: 'Nostr API',
+    data: require('../data/nostr').default,
   },
   {
     title: 'Polkadot API',
@@ -109,12 +113,12 @@ const playgroundConfig = [
     data: require('../data/sui').default,
   },
   {
-    title: 'TRON API',
-    data: require('../data/tron').default,
+    title: 'TON API',
+    data: require('../data/ton').default,
   },
   {
-    title: 'Nostr API',
-    data: require('../data/nostr').default,
+    title: 'TRON API',
+    data: require('../data/tron').default,
   },
 ];
 

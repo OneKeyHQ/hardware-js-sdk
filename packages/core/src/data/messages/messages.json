@@ -2534,6 +2534,10 @@
           "rule": "required",
           "type": "uint32",
           "id": 4
+        },
+        "address_type": {
+          "type": "CardanoAddressType",
+          "id": 5
         }
       }
     },
@@ -10100,6 +10104,255 @@
         }
       }
     },
+    "TonWalletVersion": {
+      "values": {
+        "V3R1": 0,
+        "V3R2": 1,
+        "V4R1": 2,
+        "V4R2": 3
+      }
+    },
+    "TonWorkChain": {
+      "values": {
+        "BASECHAIN": 0,
+        "MASTERCHAIN": 1
+      }
+    },
+    "TonGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 3,
+          "options": {
+            "default": "V3R2"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 4,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 5,
+          "options": {
+            "default": false
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 6,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 7,
+          "options": {
+            "default": 698983191
+          }
+        }
+      }
+    },
+    "TonAddress": {
+      "fields": {
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "TonSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "destination": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "jetton_master_address": {
+          "type": "string",
+          "id": 3
+        },
+        "ton_amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "jetton_amount": {
+          "type": "uint64",
+          "id": 5
+        },
+        "fwd_fee": {
+          "type": "uint64",
+          "id": 6,
+          "options": {
+            "default": 0
+          }
+        },
+        "comment": {
+          "type": "string",
+          "id": 7
+        },
+        "mode": {
+          "type": "uint32",
+          "id": 8,
+          "options": {
+            "default": 3
+          }
+        },
+        "seqno": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 9
+        },
+        "expire_at": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 10
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 11,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 12,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 13,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 14,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 15,
+          "options": {
+            "default": false
+          }
+        }
+      }
+    },
+    "TonSignedMessage": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "TonSignProof": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "appdomain": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "comment": {
+          "type": "bytes",
+          "id": 3
+        },
+        "expire_at": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 5,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 6,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 7,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 8,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 9,
+          "options": {
+            "default": false
+          }
+        }
+      }
+    },
+    "TonSignedProof": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "TronGetAddress": {
       "fields": {
         "address_n": {
@@ -10943,6 +11196,12 @@
         "MessageType_DnxInputAck": 11804,
         "MessageType_DnxRTSigsRequest": 11805,
         "MessageType_DnxSignedTx": 11806,
+        "MessageType_TonGetAddress": 11901,
+        "MessageType_TonAddress": 11902,
+        "MessageType_TonSignMessage": 11903,
+        "MessageType_TonSignedMessage": 11904,
+        "MessageType_TonSignProof": 11905,
+        "MessageType_TonSignedProof": 11906,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,

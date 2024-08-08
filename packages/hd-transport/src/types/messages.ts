@@ -979,6 +979,7 @@ export type CardanoSignMessage = {
   message: string;
   derivation_type: CardanoDerivationType;
   network_id: number;
+  address_type?: CardanoAddressType;
 };
 
 // CardanoMessageSignature
@@ -3710,6 +3711,77 @@ export type TezosSignedTx = {
   operation_hash: string;
 };
 
+export enum TonWalletVersion {
+  V3R1 = 0,
+  V3R2 = 1,
+  V4R1 = 2,
+  V4R2 = 3,
+}
+
+export enum TonWorkChain {
+  BASECHAIN = 0,
+  MASTERCHAIN = 1,
+}
+
+// TonGetAddress
+export type TonGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+  wallet_version?: TonWalletVersion;
+  is_bounceable?: boolean;
+  is_testnet_only?: boolean;
+  workchain?: TonWorkChain;
+  wallet_id?: number;
+};
+
+// TonAddress
+export type TonAddress = {
+  public_key: string;
+  address: string;
+};
+
+// TonSignMessage
+export type TonSignMessage = {
+  address_n: number[];
+  destination: string;
+  jetton_master_address?: string;
+  ton_amount: number;
+  jetton_amount?: number;
+  fwd_fee?: number;
+  comment?: string;
+  mode?: number;
+  seqno: number;
+  expire_at: number;
+  wallet_version?: TonWalletVersion;
+  wallet_id?: number;
+  workchain?: TonWorkChain;
+  is_bounceable?: boolean;
+  is_testnet_only?: boolean;
+};
+
+// TonSignedMessage
+export type TonSignedMessage = {
+  signature?: string;
+};
+
+// TonSignProof
+export type TonSignProof = {
+  address_n: number[];
+  appdomain: string;
+  comment?: string;
+  expire_at: number;
+  wallet_version?: TonWalletVersion;
+  wallet_id?: number;
+  workchain?: TonWorkChain;
+  is_bounceable?: boolean;
+  is_testnet_only?: boolean;
+};
+
+// TonSignedProof
+export type TonSignedProof = {
+  signature?: string;
+};
+
 // TronGetAddress
 export type TronGetAddress = {
   address_n: number[];
@@ -4305,6 +4377,12 @@ export type MessageType = {
   TezosBallotOp: TezosBallotOp;
   TezosSignTx: TezosSignTx;
   TezosSignedTx: TezosSignedTx;
+  TonGetAddress: TonGetAddress;
+  TonAddress: TonAddress;
+  TonSignMessage: TonSignMessage;
+  TonSignedMessage: TonSignedMessage;
+  TonSignProof: TonSignProof;
+  TonSignedProof: TonSignedProof;
   TronGetAddress: TronGetAddress;
   TronAddress: TronAddress;
   TronTransferContract: TronTransferContract;
