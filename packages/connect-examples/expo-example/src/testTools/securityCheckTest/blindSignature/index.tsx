@@ -16,6 +16,18 @@ import type { SecurityCheckTestCase, ResultViewProps, TestCaseDataType } from '.
 import { convertTestData } from './utils';
 import data from './data';
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
+  let timeoutHandle: NodeJS.Timeout;
+  const timeoutPromise = new Promise<'timeout'>(resolve => {
+    timeoutHandle = setTimeout(() => resolve('timeout'), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).then(result => {
+    clearTimeout(timeoutHandle); // 清除超时计时器
+    return result;
+  });
+}
+
 function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const intl = useIntl();
   const title = `${item?.method} ${item.path}`;
@@ -126,15 +138,54 @@ function ExecuteView() {
       });
     },
     processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
-      // @ts-expect-error
-      const res = await sdk[`${method}` as keyof typeof sdk](connectId, deviceId, requestParams);
-
-      const newRes = {
-        payload: res,
-        skipVerify: true,
+      const sdkPromise = async () => {
+        try {
+          // @ts-expect-error
+          const res = await sdk[`${method}` as keyof typeof sdk](
+            connectId,
+            deviceId,
+            requestParams
+          );
+          return { payload: res, skipVerify: true };
+        } catch (error) {
+          console.log('=====>>>>> processRequest error: ', error);
+          return {
+            payload: {
+              success: false,
+              payload: {
+                code: 800,
+                error,
+              },
+            },
+            skipVerify: true,
+          };
+        }
       };
 
-      return Promise.resolve(newRes);
+      const result = await withTimeout(sdkPromise(), 45 * 1000);
+
+      if (result === 'timeout') {
+        // clean up device
+        sdk.cancel(connectId);
+        await sdk.getFeatures(connectId, {
+          retryCount: 1,
+        });
+        await sdk.getFeatures(connectId, {
+          retryCount: 1,
+        });
+        return {
+          payload: {
+            success: false,
+            payload: {
+              code: 'timeout',
+              error: 'Operation timed out after 45 seconds',
+            },
+          },
+          skipVerify: true,
+        };
+      }
+
+      return Promise.resolve(result);
     },
     processResponse: (_, item, __, res) => {
       const error = '';
