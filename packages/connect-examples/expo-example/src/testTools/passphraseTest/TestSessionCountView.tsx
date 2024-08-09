@@ -14,6 +14,7 @@ import PanelView from '../../components/ui/Panel';
 import { downloadFile } from '../../utils/downloadUtils';
 import { SwitchInput } from '../../components/SwitchInput';
 import { getDeviceInfo } from '../../utils/deviceUtils';
+import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 
 function generatePassphrase(list: any[] | undefined) {
   return `$A& b${(list?.length ?? 0) + 1}`;
@@ -67,6 +68,7 @@ export default function TestSessionCountView() {
   const intl = useIntl();
   const { sdk: SDK } = useContext(HardwareSDKContext);
   const { selectedDevice } = useDevice();
+  const { openDialog } = useHardwareInputPinDialog();
 
   const [testChain, setTestChain] = useState<TestChain>('btc');
   const [showOnOneKey, setShowOnOnekey] = useState<boolean>(false);
@@ -155,10 +157,7 @@ export default function TestSessionCountView() {
     hardwareUiEventListener = (message: CoreMessage) => {
       console.log('TopLEVEL EVENT ===>>>>: ', message);
       if (message.type === UI_REQUEST.REQUEST_PIN) {
-        SDK.uiResponse({
-          type: UI_RESPONSE.RECEIVE_PIN,
-          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-        });
+        openDialog(SDK, message.payload.device.features);
       }
       if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
         if (!allowInputPassphrase.current) {

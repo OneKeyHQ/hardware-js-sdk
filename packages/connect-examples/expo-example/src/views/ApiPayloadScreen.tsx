@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { FlatList } from 'react-native';
-import { Stack, XStack, YStack, useMedia } from 'tamagui';
+import { Stack, YStack } from 'tamagui';
 
 import { useIntl } from 'react-intl';
 import PageView from '../components/ui/Page';

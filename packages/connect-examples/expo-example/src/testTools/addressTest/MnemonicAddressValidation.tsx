@@ -16,6 +16,7 @@ import { replaceTemplate } from './data/utils';
 import { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import mockDevice from '../../utils/mockDevice';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
+import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 
 type TestCaseDataType = {
   id: string;
@@ -143,6 +144,7 @@ let hardwareUiEventListener: any | undefined;
 function ExecuteView() {
   const intl = useIntl();
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
+  const { openDialog } = useHardwareInputPinDialog();
 
   const [mnemonic, setMnemonic] = useState<string>('');
 
@@ -154,10 +156,7 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          sdk.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PIN,
-            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-          });
+          openDialog(sdk, message.payload.device.features);
         }
       };
       sdk.on(UI_EVENT, hardwareUiEventListener);

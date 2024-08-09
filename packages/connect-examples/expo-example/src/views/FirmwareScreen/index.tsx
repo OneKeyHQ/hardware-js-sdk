@@ -19,6 +19,7 @@ import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
 import { ExportDeviceInfo, formatCurrentTime } from './ExportDeviceInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
+import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
 type UpdateState = {
@@ -369,136 +370,138 @@ function FirmwareUpdate({
   );
 
   return (
-    <Stack>
-      <FirmwareUpdateEvent open={showUpdateDialog} onOpenChange={setShowUpdateDialog} />
+    <HardwareInputPinDialogProvider>
+      <Stack>
+        <FirmwareUpdateEvent open={showUpdateDialog} onOpenChange={setShowUpdateDialog} />
 
-      <Stack marginTop="$2">
-        {connecting && (
-          <MessageBox message={intl.formatMessage({ id: 'tip__connecting_device' })} />
-        )}
-        {!selectDevice && (
-          <MessageBox
-            message={intl.formatMessage({ id: 'tip__need_connect_and_search_device_first' })}
-          />
-        )}
-        {!!error && <MessageBox message={error} />}
-      </Stack>
+        <Stack marginTop="$2">
+          {connecting && (
+            <MessageBox message={intl.formatMessage({ id: 'tip__connecting_device' })} />
+          )}
+          {!selectDevice && (
+            <MessageBox
+              message={intl.formatMessage({ id: 'tip__need_connect_and_search_device_first' })}
+            />
+          )}
+          {!!error && <MessageBox message={error} />}
+        </Stack>
 
-      {features && (
-        <Stack>
-          <PanelView title={intl.formatMessage({ id: 'title__device_info' })}>
-            <Button variant="primary" size="large" onPress={disconnectDevice}>
-              {intl.formatMessage({ id: 'action__clean_device' })}
-            </Button>
-            <Stack
-              flex={1}
-              padding="$2"
-              backgroundColor="$bgHover"
-              gap="$2"
-              flexDirection="row"
-              flexWrap="wrap"
-              borderRadius="$2"
-            >
-              <DeviceField
-                field={intl.formatMessage({ id: 'label__device_type_sdk' })}
-                value={deviceType}
-              />
-              <DeviceField
-                field={intl.formatMessage({ id: 'label__device_uuid' })}
-                value={serialNumber}
-              />
-              <DeviceField
-                field={intl.formatMessage({ id: 'label__device_boardloader_version' })}
-                value={boardloaderVersion}
-              />
-              <DeviceField
-                field={intl.formatMessage({ id: 'label__device_bootloader_version' })}
-                value={bootloaderVersion}
-              />
-              <DeviceField
-                field={intl.formatMessage({ id: 'label__device_firmware_version' })}
-                value={firmwareVersion}
-              />
-              <DeviceField
-                field={intl.formatMessage({ id: 'label__device_bluetooth_version' })}
-                value={bleVersion}
-              />
-              <DeviceField
-                field={intl.formatMessage({ id: 'label__device_device_statue' })}
-                value={intl.formatMessage({
-                  id:
-                    features.bootloader_mode === true
-                      ? 'label__device_bootloader_statue'
-                      : 'label__device_firmware_status',
-                })}
-              />
-            </Stack>
-          </PanelView>
-
-          <DeviceFieldContext.Provider value={deviceFieldProviderValue}>
-            <PanelView title={intl.formatMessage({ id: 'title__device_advanced_info' })}>
-              <XStack padding="$2" alignItems="center" gap="$8">
-                <Text color="$text" fontSize={18} fontWeight="bold">
-                  {intl.formatMessage({ id: 'label__device_info_update_time' })}:
-                  {formatCurrentTime(Date.now())}
-                </Text>
-                <Button variant="primary" size="medium" onPress={onReconnectDevice}>
-                  {intl.formatMessage({ id: 'label__device_info_refresh' })}
-                </Button>
-                <ExportDeviceInfo />
-              </XStack>
-
-              <DeviceInfoFieldGroup />
-
-              <Text padding={8} fontWeight="bold">
-                {intl.formatMessage({ id: 'label__device_se_info' })}
-              </Text>
-              <DeviceSeFieldGroup />
+        {features && (
+          <Stack>
+            <PanelView title={intl.formatMessage({ id: 'title__device_info' })}>
+              <Button variant="primary" size="large" onPress={disconnectDevice}>
+                {intl.formatMessage({ id: 'action__clean_device' })}
+              </Button>
+              <Stack
+                flex={1}
+                padding="$2"
+                backgroundColor="$bgHover"
+                gap="$2"
+                flexDirection="row"
+                flexWrap="wrap"
+                borderRadius="$2"
+              >
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_type_sdk' })}
+                  value={deviceType}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_uuid' })}
+                  value={serialNumber}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_boardloader_version' })}
+                  value={boardloaderVersion}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_bootloader_version' })}
+                  value={bootloaderVersion}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_firmware_version' })}
+                  value={firmwareVersion}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_bluetooth_version' })}
+                  value={bleVersion}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_device_statue' })}
+                  value={intl.formatMessage({
+                    id:
+                      features.bootloader_mode === true
+                        ? 'label__device_bootloader_statue'
+                        : 'label__device_firmware_status',
+                  })}
+                />
+              </Stack>
             </PanelView>
-          </DeviceFieldContext.Provider>
 
-          <PanelView title={intl.formatMessage({ id: 'title__device_firmware_update' })}>
-            <XStack flexWrap="wrap" gap="$2">
-              <FirmwareLocalFile
-                deviceType={deviceTypeLowerCase}
-                title={intl.formatMessage({ id: 'label__device_update_firmware' })}
-                type="firmware"
-                onUpdate={updateFirmware}
-              />
-              {deviceTypeLowerCase !== 'mini' && (
+            <DeviceFieldContext.Provider value={deviceFieldProviderValue}>
+              <PanelView title={intl.formatMessage({ id: 'title__device_advanced_info' })}>
+                <XStack padding="$2" alignItems="center" gap="$8">
+                  <Text color="$text" fontSize={18} fontWeight="bold">
+                    {intl.formatMessage({ id: 'label__device_info_update_time' })}:
+                    {formatCurrentTime(Date.now())}
+                  </Text>
+                  <Button variant="primary" size="medium" onPress={onReconnectDevice}>
+                    {intl.formatMessage({ id: 'label__device_info_refresh' })}
+                  </Button>
+                  <ExportDeviceInfo />
+                </XStack>
+
+                <DeviceInfoFieldGroup />
+
+                <Text padding={8} fontWeight="bold">
+                  {intl.formatMessage({ id: 'label__device_se_info' })}
+                </Text>
+                <DeviceSeFieldGroup />
+              </PanelView>
+            </DeviceFieldContext.Provider>
+
+            <PanelView title={intl.formatMessage({ id: 'title__device_firmware_update' })}>
+              <XStack flexWrap="wrap" gap="$2">
                 <FirmwareLocalFile
                   deviceType={deviceTypeLowerCase}
-                  title={intl.formatMessage({ id: 'label__device_update_ble_firmware' })}
+                  title={intl.formatMessage({ id: 'label__device_update_firmware' })}
                   type="firmware"
                   onUpdate={updateFirmware}
                 />
-              )}
-              <FirmwareLocalFile
-                deviceType={deviceTypeLowerCase}
-                title={intl.formatMessage({ id: 'label__device_update_bootloader' })}
-                type="bootloader"
-                onUpdate={updateFirmware}
-              />
-              {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
+                {deviceTypeLowerCase !== 'mini' && (
+                  <FirmwareLocalFile
+                    deviceType={deviceTypeLowerCase}
+                    title={intl.formatMessage({ id: 'label__device_update_ble_firmware' })}
+                    type="firmware"
+                    onUpdate={updateFirmware}
+                  />
+                )}
                 <FirmwareLocalFile
                   deviceType={deviceTypeLowerCase}
-                  title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
-                  type="source"
+                  title={intl.formatMessage({ id: 'label__device_update_bootloader' })}
+                  type="bootloader"
                   onUpdate={updateFirmware}
                 />
-              )}
-              {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
-                <FirmwareActionButton
-                  deviceType={deviceTypeLowerCase}
-                  title={intl.formatMessage({ id: 'label__reboot_device_board_model' })}
-                  onUpdate={rebootBoardModel}
-                />
-              )}
-            </XStack>
-          </PanelView>
-        </Stack>
-      )}
-    </Stack>
+                {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
+                  <FirmwareLocalFile
+                    deviceType={deviceTypeLowerCase}
+                    title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
+                    type="source"
+                    onUpdate={updateFirmware}
+                  />
+                )}
+                {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
+                  <FirmwareActionButton
+                    deviceType={deviceTypeLowerCase}
+                    title={intl.formatMessage({ id: 'label__reboot_device_board_model' })}
+                    onUpdate={rebootBoardModel}
+                  />
+                )}
+              </XStack>
+            </PanelView>
+          </Stack>
+        )}
+      </Stack>
+    </HardwareInputPinDialogProvider>
   );
 }
 
