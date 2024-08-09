@@ -1,13 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
-import { Input, Label, Stack, Text, XStack, YStack } from 'tamagui';
+import { Stack, Text, XStack, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get } from 'lodash';
 import { TestRunnerView } from '../../../components/BaseTestRunner/TestRunnerView';
 import { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
-import { SwitchInput } from '../../../components/SwitchInput';
 import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../../components/ui/Button';
@@ -15,6 +14,7 @@ import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunn
 import type { SecurityCheckTestCase, ResultViewProps, TestCaseDataType } from './types';
 import { convertTestData } from './utils';
 import data from './data';
+import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
   let timeoutHandle: NodeJS.Timeout;
@@ -84,6 +84,7 @@ function ExportReportView() {
 let hardwareUiEventListener: any | undefined;
 function ExecuteView() {
   const intl = useIntl();
+  const { openDialog } = useHardwareInputPinDialog();
 
   const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
@@ -93,10 +94,11 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          sdk.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PIN,
-            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-          });
+          openDialog(sdk, message.payload.device.features);
+          // sdk.uiResponse({
+          //   type: UI_RESPONSE.RECEIVE_PIN,
+          //   payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+          // });
         }
       };
       sdk.on(UI_EVENT, hardwareUiEventListener);

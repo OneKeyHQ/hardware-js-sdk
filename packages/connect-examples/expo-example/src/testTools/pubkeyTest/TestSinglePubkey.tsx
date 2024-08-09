@@ -14,6 +14,7 @@ import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { stripHexPrefix } from '../../utils/hexstring';
+import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 
 type TestCaseDataType = PubkeyTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<PubkeyTestCase['data'][0]> };
@@ -110,6 +111,8 @@ function validateFields(payload: any, result: any, prefix = '') {
 let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
   const intl = useIntl();
+  const { openDialog } = useHardwareInputPinDialog();
+
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PubkeyTestCase>();
@@ -169,10 +172,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          sdk.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PIN,
-            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-          });
+          openDialog(sdk, message.payload.device.features);
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
           setTimeout(() => {

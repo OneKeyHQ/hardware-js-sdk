@@ -25,56 +25,59 @@ import {
 import PageView from '../components/ui/Page';
 import PanelView from '../components/ui/Panel';
 import { MnemonicAddressValidation } from '../testTools/addressTest/MnemonicAddressValidation';
+import { HardwareInputPinDialogProvider } from '../provider/HardwareInputPinProvider';
 
 export default function AddressTestScreen() {
   const intl = useIntl();
   return (
     <PageView>
       <DeviceProvider>
-        <Stack>
-          <PanelView>
-            <MnemonicAddressValidation />
-          </PanelView>
-          <PanelView>
-            <TestSingleAddress
-              title={intl.formatMessage({ id: 'title__address_test_single' })}
-              testCases={addressTestCases}
-            />
-          </PanelView>
-          <PanelView>
-            <TestBatchAddress
-              title={intl.formatMessage({ id: 'title__address_test_batch' })}
-              testCases={batchAddressTestCases}
-            />
-          </PanelView>
-          <PanelView>
-            <TestSinglePubkey
-              title={intl.formatMessage({ id: 'title__publickey_test_single' })}
-              testCases={pubkeyTestCases}
-            />
-          </PanelView>
-          <PanelView>
-            <TestBatchPubkey
-              title={intl.formatMessage({ id: 'title__publickey_test_batch' })}
-              testCases={batchPubkeyTestCases}
-            />
-          </PanelView>
+        <HardwareInputPinDialogProvider>
+          <Stack>
+            <PanelView>
+              <MnemonicAddressValidation />
+            </PanelView>
+            <PanelView>
+              <TestSingleAddress
+                title={intl.formatMessage({ id: 'title__address_test_single' })}
+                testCases={addressTestCases}
+              />
+            </PanelView>
+            <PanelView>
+              <TestBatchAddress
+                title={intl.formatMessage({ id: 'title__address_test_batch' })}
+                testCases={batchAddressTestCases}
+              />
+            </PanelView>
+            <PanelView>
+              <TestSinglePubkey
+                title={intl.formatMessage({ id: 'title__publickey_test_single' })}
+                testCases={pubkeyTestCases}
+              />
+            </PanelView>
+            <PanelView>
+              <TestBatchPubkey
+                title={intl.formatMessage({ id: 'title__publickey_test_batch' })}
+                testCases={batchPubkeyTestCases}
+              />
+            </PanelView>
 
-          <Stack marginTop="$8" />
+            <Stack marginTop="$8" />
 
-          <PanelView>
-            <TestSingleAddress
-              title={intl.formatMessage({ id: 'title__address_variant_test_single' })}
-              testCases={addressVariantTestCases}
-            />
-          </PanelView>
-          <PanelView>
-            <TestBatchAddress
-              title={intl.formatMessage({ id: 'title__address_variant_test_batch' })}
-              testCases={batchVariantAddressTestCases}
-            />
-          </PanelView>
-        </Stack>
+            <PanelView>
+              <TestSingleAddress
+                title={intl.formatMessage({ id: 'title__address_variant_test_single' })}
+                testCases={addressVariantTestCases}
+              />
+            </PanelView>
+            <PanelView>
+              <TestBatchAddress
+                title={intl.formatMessage({ id: 'title__address_variant_test_batch' })}
+                testCases={batchVariantAddressTestCases}
+              />
+            </PanelView>
+          </Stack>
+        </HardwareInputPinDialogProvider>
       </DeviceProvider>
     </PageView>
   );

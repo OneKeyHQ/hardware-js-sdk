@@ -6,6 +6,7 @@ import { useIntl } from 'react-intl';
 import { useFocusEffect } from '@react-navigation/native';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { Button } from '../../components/ui/Button';
+import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 
 let registerListener = false;
 function FirmwareUpdateEventView({
@@ -17,6 +18,7 @@ function FirmwareUpdateEventView({
 }) {
   const intl = useIntl();
   const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK, type } = useContext(HardwareSDKContext);
+  const { openDialog } = useHardwareInputPinDialog();
 
   const [updateState, setUpdateState] = useState<{
     progress: number;
@@ -97,10 +99,7 @@ function FirmwareUpdateEventView({
       const uiEventCallback = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT (Firmware Update)===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          SDK.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PIN,
-            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-          });
+          openDialog(SDK, message.payload.device.features);
         }
         if (message.type === UI_REQUEST.FIRMWARE_TIP) {
           const tip = message.payload.data.message;

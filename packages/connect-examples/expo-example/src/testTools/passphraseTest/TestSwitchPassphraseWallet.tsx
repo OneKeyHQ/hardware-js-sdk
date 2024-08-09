@@ -18,6 +18,7 @@ import PanelView from '../../components/ui/Panel';
 import { baseParams } from '../addressTest/baseParams';
 import { replaceTemplate } from '../addressTest/data/utils';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
+import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 
 type TestCaseDataType = {
   id: string;
@@ -174,6 +175,8 @@ function getRequestParams(method: string) {
 let hardwareUiEventListener: any | undefined;
 function ExecuteView() {
   const intl = useIntl();
+  const { openDialog } = useHardwareInputPinDialog();
+
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PassphraseTestCase>();
@@ -215,10 +218,7 @@ function ExecuteView() {
       hardwareUiEventListener = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT ===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
-          sdk.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PIN,
-            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
-          });
+          openDialog(sdk, message.payload.device.features);
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
           setTimeout(() => {
