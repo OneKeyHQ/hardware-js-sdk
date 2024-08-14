@@ -11,6 +11,7 @@ export { default as checkTransportRelease } from './CheckTransportRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';
 export { default as checkBridgeRelease } from './CheckBridgeRelease';
 export { default as checkBootloaderRelease } from './CheckBootloaderRelease';
+export { default as checkAllFirmwareRelease } from './CheckAllFirmwareRelease';
 export { default as deviceBackup } from './device/DeviceBackup';
 export { default as deviceChangePin } from './device/DeviceChangePin';
 export { default as deviceFlags } from './device/DeviceFlags';

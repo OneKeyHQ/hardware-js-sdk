@@ -150,6 +150,19 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'checkAllFirmwareRelease',
+    description: 'Check all firmware release of a device',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'checkAllFirmwareRelease',
+        value: {
+          platform: 'web',
+        },
+      },
+    ],
+  },
+  {
     method: 'setU2FCounter',
     description: 'setU2FCounter',
     noDeviceIdReq: true,

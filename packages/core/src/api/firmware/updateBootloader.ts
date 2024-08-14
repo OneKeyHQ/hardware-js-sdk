@@ -25,7 +25,7 @@ export function checkNeedUpdateBootForTouch(features: Features) {
 
 export function checkNeedUpdateBootForClassicAndMini(
   features: Features,
-  willUpdateFirmware: string
+  willUpdateFirmware?: string
 ) {
   const deviceType = getDeviceType(features);
   if (!DeviceModelToTypes.model_mini.includes(deviceType)) return false;

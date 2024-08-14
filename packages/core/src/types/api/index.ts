@@ -9,6 +9,7 @@ import { checkTransportRelease } from './checkTransportRelease';
 import { checkBridgeStatus } from './checkBridgeStatus';
 import { checkBridgeRelease } from './checkBridgeRelease';
 import { checkBootloaderRelease } from './checkBootloaderRelease';
+import { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
 
 import { searchDevices } from './searchDevices';
 import { getFeatures } from './getFeatures';
@@ -164,6 +165,7 @@ export type CoreApi = {
   /**
    * Core function
    */
+  checkAllFirmwareRelease: typeof checkAllFirmwareRelease;
   checkTransportRelease: typeof checkTransportRelease;
   checkBridgeStatus: typeof checkBridgeStatus;
   checkBridgeRelease: typeof checkBridgeRelease;

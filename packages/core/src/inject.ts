@@ -107,6 +107,9 @@ export const createCoreApi = (
   checkBootloaderRelease: (connectId, params) =>
     call({ ...params, connectId, method: 'checkBootloaderRelease' }),
 
+  checkAllFirmwareRelease: (connectId, params) =>
+    call({ ...params, connectId, method: 'checkAllFirmwareRelease' }),
+
   cipherKeyValue: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
 

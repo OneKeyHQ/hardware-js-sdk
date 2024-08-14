@@ -199,12 +199,18 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
 
     await this.device.acquire();
 
-    return uploadFirmware(
+    const response = await uploadFirmware(
       params.updateType,
       this.device.getCommands().typedCall.bind(this.device.getCommands()),
       this.postMessage,
       device,
       { payload: binary, rebootOnSuccess: this.payload.rebootOnSuccess }
     );
+
+    if (this.connectId) {
+      DevicePool.clearDeviceCache(this.connectId);
+    }
+
+    return response;
   }
 }
