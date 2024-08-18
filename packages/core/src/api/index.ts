@@ -1,3 +1,5 @@
+export { default as testInitializeDeviceDuration } from './test/TestInitializeDeviceDuration';
+
 export { default as searchDevices } from './SearchDevices';
 export { default as getFeatures } from './GetFeatures';
 export { default as getOnekeyFeatures } from './GetOnekeyFeatures';
@@ -24,6 +26,11 @@ export { default as deviceVerify } from './device/DeviceVerify';
 export { default as deviceWipe } from './device/DeviceWipe';
 export { default as deviceFullyUploadResource } from './device/DeviceFullyUploadResource';
 export { default as deviceUpdateBootloader } from './device/DeviceUpdateBootloader';
+export { default as deviceLock } from './device/DeviceLock';
+export { default as deviceCancel } from './device/DeviceCancel';
+
+export { default as setU2FCounter } from './u2f/SetU2FCounter';
+export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
 
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';

@@ -4,6 +4,7 @@
   "tab__passphrase_test": "Passphrase 测试",
   "tab__address_test": "地址测试",
   "tab__security_check": "安全检查",
+  "tab__functional_testing": "功能测试",
 
   "action__search_device": "搜索设备",
   "action__clean_device": "断开连接",
@@ -58,6 +59,9 @@
 
   "title__passphrase_test": "Passphrase Session Count 测试",
 
+  "label__wipe_device": "擦除设备",
+  "label__test_count": "测试次数",
+  "label__test_interval_time": "测试间隔时间",
   "label__keep_session": "保持 Session",
   "label__retry_count": "重试次数",
   "label__retry_interval_time": "重试间隔时间",

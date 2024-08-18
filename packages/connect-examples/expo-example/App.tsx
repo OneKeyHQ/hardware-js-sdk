@@ -20,6 +20,7 @@ const PassphraseTestScreen = lazy(() => import('./src/views/PassphraseTestScreen
 const FirmwareScreen = lazy(() => import('./src/views/FirmwareScreen'));
 const AddressTestScreen = lazy(() => import('./src/views/AddressTestScreen'));
 const SecurityCheckScreen = lazy(() => import('./src/views/SecurityCheckScreen'));
+const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTestingScreen'));
 
 const prefix = ExpoLinking.createURL('/');
 
@@ -54,6 +55,10 @@ function NavigationContent() {
           <StackNavigator.Screen name={Routes.PassphraseTest} component={PassphraseTestScreen} />
           <StackNavigator.Screen name={Routes.AddressTest} component={AddressTestScreen} />
           <StackNavigator.Screen name={Routes.SecurityCheck} component={SecurityCheckScreen} />
+          <StackNavigator.Screen
+            name={Routes.FunctionalTesting}
+            component={FunctionalTestingScreen}
+          />
         </StackNavigator.Navigator>
       </Stack>
     </NavigationContainer>

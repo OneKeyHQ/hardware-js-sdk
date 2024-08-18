@@ -47,6 +47,8 @@ const TestItemView = ({ item, renderResultView }: TestItemViewProps) => {
       color = 'green';
     } else if (verifyState === 'fail') {
       color = 'red';
+    } else if (verifyState === 'warning') {
+      color = 'orange';
     }
 
     return (

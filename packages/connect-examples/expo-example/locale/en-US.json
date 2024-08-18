@@ -4,6 +4,7 @@
   "tab__passphrase_test": "Passphrase Test",
   "tab__address_test": "Address Test",
   "tab__security_check": "Security Check",
+  "tab__functional_testing": "Functional testing",
 
   "action__search_device": "Search Device",
   "action__clean_device": "Disconnect Device",
@@ -58,6 +59,9 @@
 
   "title__passphrase_test": "Passphrase Session Count Test",
 
+  "label__wipe_device": "Wipe Device",
+  "label__test_count": "Test Count",
+  "label__test_interval_time": "Test Interval Time",
   "label__keep_session": "Keep Session",
   "label__retry_count": "Retry Count",
   "label__retry_interval_time": "Retry Interval Time",
