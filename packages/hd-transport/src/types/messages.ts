@@ -3831,6 +3831,17 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
+// SignPsbt
+export type SignPsbt = {
+  psbt: string;
+  coin_name?: string;
+};
+
+// SignedPsbt
+export type SignedPsbt = {
+  psbt: string;
+};
+
 // custom connect definitions
 export type MessageType = {
   AlgorandGetAddress: AlgorandGetAddress;

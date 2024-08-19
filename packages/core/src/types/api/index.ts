@@ -46,6 +46,7 @@ import { evmVerifyMessage } from './evmVerifyMessage';
 import { btcGetAddress } from './btcGetAddress';
 import { btcGetPublicKey } from './btcGetPublicKey';
 import { btcSignMessage } from './btcSignMessage';
+import { btcSignPsbt } from './btcSignPsbt';
 import { btcSignTransaction } from './btcSignTransaction';
 import { btcVerifyMessage } from './btcVerifyMessage';
 
@@ -199,6 +200,7 @@ export type CoreApi = {
   btcGetAddress: typeof btcGetAddress;
   btcGetPublicKey: typeof btcGetPublicKey;
   btcSignMessage: typeof btcSignMessage;
+  btcSignPsbt: typeof btcSignPsbt;
   btcSignTransaction: typeof btcSignTransaction;
   btcVerifyMessage: typeof btcVerifyMessage;
 

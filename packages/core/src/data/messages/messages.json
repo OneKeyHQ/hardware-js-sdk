@@ -1600,6 +1600,31 @@
         }
       }
     },
+    "SignPsbt": {
+      "fields": {
+        "psbt": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "coin_name": {
+          "type": "string",
+          "id": 2,
+          "options": {
+            "default": "Bitcoin"
+          }
+        }
+      }
+    },
+    "SignedPsbt": {
+      "fields": {
+        "psbt": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "SelfTest": {
       "fields": {
         "payload": {
@@ -10716,6 +10741,8 @@
         "MessageType_TezosSignedTx": 153,
         "MessageType_TezosGetPublicKey": 154,
         "MessageType_TezosPublicKey": 155,
+        "MessageType_SignPsbt": 10052,
+        "MessageType_SignedPsbt": 10053,
         "MessageType_StellarSignTx": 202,
         "MessageType_StellarTxOpRequest": 203,
         "MessageType_StellarGetAddress": 207,

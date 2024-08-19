@@ -99,6 +99,19 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'btcSignPsbt',
+    description: 'Sign psbt.',
+    presupposes: [
+      {
+        title: 'Sign Message',
+        value: {
+          psbt: '70736274ff0100db020000000141f56bec64ac3ed0a7900b61950525fcf9324f92771cb97f7f3a2f020b7a76000400000000fdffffff03307500000000000022512018ef253e59d4cb24a60607a6fc7c4cac95af3edad70813a198eeb5405c1c29b60000000000000000496a476262643400f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b203d5a0bb72d71993e435d6c5a70e2aa4db500a62cfaae33c56050deefee64ec00096bdae000000000000225120c3f45119b701bc0384b45e064a4abbea7949c8c492e278f0f594a1fd83f148973c2e03000001012bf824010000000000225120c3f45119b701bc0384b45e064a4abbea7949c8c492e278f0f594a1fd83f14897011720f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b200000000',
+          coin: 'TEST',
+        },
+      },
+    ],
+  },
+  {
     method: 'btcSignTransaction',
     description: 'Sign a Bitcoin transaction with your Bitcoin private key.',
     presupposes: [
