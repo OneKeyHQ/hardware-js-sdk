@@ -88,11 +88,29 @@ const api: PlaygroundProps[] = [
     description: 'Sign a message with your Bitcoin private key.',
     presupposes: [
       {
-        title: 'Sign Message',
+        title: 'Sign Message (Native Segwit)',
+        value: {
+          path: "m/84'/0'/0'/0/0",
+          coin: 'btc',
+          messageHex: '48656c6c6f20576f726c64',
+          noScriptType: false,
+        },
+      },
+      {
+        title: 'Sign Message (Nested Segwit)',
+        value: {
+          path: "m/49'/0'/0'/0/0",
+          coin: 'btc',
+          messageHex: '48656c6c6f20576f726c64',
+          noScriptType: false,
+        },
+      },
+      {
+        title: 'Sign Message (Legacy)',
         value: {
           path: "m/44'/0'/0'/0/0",
           coin: 'btc',
-          messageHex: '6578616d706c65206d657373616765',
+          messageHex: '48656c6c6f20576f726c64',
           noScriptType: false,
         },
       },
