@@ -274,6 +274,7 @@ export type SignMessage = {
   coin_name?: string;
   script_type?: InputScriptType;
   no_script_type?: boolean;
+  is_bip322_simple?: boolean;
 };
 
 // MessageSignature

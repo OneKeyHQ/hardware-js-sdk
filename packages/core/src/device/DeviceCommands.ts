@@ -76,6 +76,7 @@ export class DeviceCommands {
       this.callPromise = promise;
       const res = await promise;
       Log.debug('[DeviceCommands] [call] Received', res.type);
+      console.log('[DeviceCommands] [call] Received', res.type);
       return res;
     } catch (error) {
       Log.debug('[DeviceCommands] [call] Received error', error);

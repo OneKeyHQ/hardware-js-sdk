@@ -645,6 +645,10 @@
         "no_script_type": {
           "type": "bool",
           "id": 5
+        },
+        "is_bip322_simple": {
+          "type": "bool",
+          "id": 10
         }
       }
     },
