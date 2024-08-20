@@ -274,6 +274,7 @@ export type SignMessage = {
   coin_name?: string;
   script_type?: InputScriptType;
   no_script_type?: boolean;
+  is_bip322_simple?: boolean;
 };
 
 // MessageSignature
@@ -3831,6 +3832,17 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
+// SignPsbt
+export type SignPsbt = {
+  psbt: string;
+  coin_name?: string;
+};
+
+// SignedPsbt
+export type SignedPsbt = {
+  psbt: string;
+};
+
 // custom connect definitions
 export type MessageType = {
   AlgorandGetAddress: AlgorandGetAddress;
@@ -4250,6 +4262,8 @@ export type MessageType = {
   RipplePayment: RipplePayment;
   RippleSignTx: RippleSignTx;
   RippleSignedTx: RippleSignedTx;
+  SignPsbt: SignPsbt;
+  SignedPsbt: SignedPsbt;
   SolanaGetAddress: SolanaGetAddress;
   SolanaAddress: SolanaAddress;
   SolanaSignTx: SolanaSignTx;

@@ -6,6 +6,7 @@ export type BTCSignMessageParams = {
   messageHex: string;
   coin?: string;
   noScriptType?: boolean;
+  dAppSignType?: 'ecdsa' | 'bip322-simple';
 };
 
 export declare function btcSignMessage(
