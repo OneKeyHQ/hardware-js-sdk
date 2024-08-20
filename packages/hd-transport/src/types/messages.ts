@@ -4262,6 +4262,8 @@ export type MessageType = {
   RipplePayment: RipplePayment;
   RippleSignTx: RippleSignTx;
   RippleSignedTx: RippleSignedTx;
+  SignPsbt: SignPsbt;
+  SignedPsbt: SignedPsbt;
   SolanaGetAddress: SolanaGetAddress;
   SolanaAddress: SolanaAddress;
   SolanaSignTx: SolanaSignTx;

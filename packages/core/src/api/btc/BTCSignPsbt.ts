@@ -34,7 +34,6 @@ export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
   }
 
   async run() {
-    console.log('=====>>>>>::::PSBTTTTTTT');
     const res = await this.device.commands.typedCall('SignPsbt', 'SignedPsbt', {
       ...this.params,
     });
