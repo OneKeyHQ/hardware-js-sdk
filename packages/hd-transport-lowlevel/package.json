@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-lowlevel",
-  "version": "1.0.9-alpha.3",
+  "version": "1.0.9",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
   "main": "dist/index.js",
@@ -19,7 +19,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^1.0.9-alpha.3",
-    "@onekeyfe/hd-transport": "^1.0.9-alpha.3"
+    "@onekeyfe/hd-shared": "^1.0.9",
+    "@onekeyfe/hd-transport": "^1.0.9"
   }
 }
