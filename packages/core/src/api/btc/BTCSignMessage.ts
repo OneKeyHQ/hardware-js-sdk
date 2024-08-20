@@ -52,6 +52,13 @@ export default class BTCSignMessage extends BaseMethod<SignMessage> {
   }
 
   getVersionRange() {
+    if (this.payload.dAppSignType) {
+      return {
+        pro: {
+          min: '4.9.3',
+        },
+      };
+    }
     return getBitcoinForkVersionRange([this.params.coin_name]);
   }
 
