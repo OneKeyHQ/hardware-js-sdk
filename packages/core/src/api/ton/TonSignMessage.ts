@@ -29,6 +29,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       { name: 'workchain' },
       { name: 'isBounceable', type: 'boolean' },
       { name: 'isTestnetOnly', type: 'boolean' },
+      { name: 'extDestination', type: 'string' },
+      { name: 'extTonAmount', type: 'number' },
+      { name: 'extPayload', type: 'string' },
     ]);
 
     const { path } = this.payload as TonSignMessageParams;
@@ -50,6 +53,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       workchain: this.payload.workchain,
       is_bounceable: this.payload.isBounceable,
       is_testnet_only: this.payload.isTestnetOnly,
+      ext_destination: this.payload.extDestination,
+      ext_ton_amount: this.payload.extTonAmount,
+      ext_payload: this.payload.extPayload,
     };
   }
 

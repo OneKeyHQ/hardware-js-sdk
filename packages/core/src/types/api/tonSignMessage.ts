@@ -17,6 +17,9 @@ export type TonSignMessageParams = {
   workchain?: TonWorkChain;
   isBounceable?: boolean;
   isTestnetOnly?: boolean;
+  extDestination?: string;
+  extTonAmount?: number;
+  extPayload?: string;
 };
 
 export declare function tonSignMessage(

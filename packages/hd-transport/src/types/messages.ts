@@ -588,6 +588,17 @@ export type PublicKeyMultiple = {
   xpubs: string[];
 };
 
+// SignPsbt
+export type SignPsbt = {
+  psbt: string;
+  coin_name?: string;
+};
+
+// SignedPsbt
+export type SignedPsbt = {
+  psbt: string;
+};
+
 // FirmwareErase
 export type FirmwareErase = {
   length?: number;
@@ -3758,6 +3769,9 @@ export type TonSignMessage = {
   workchain?: TonWorkChain;
   is_bounceable?: boolean;
   is_testnet_only?: boolean;
+  ext_destination?: string;
+  ext_ton_amount?: number;
+  ext_payload?: string;
 };
 
 // TonSignedMessage
@@ -3903,17 +3917,6 @@ export enum CommandFlags {
   Default = 0,
   Factory_Only = 1,
 }
-
-// SignPsbt
-export type SignPsbt = {
-  psbt: string;
-  coin_name?: string;
-};
-
-// SignedPsbt
-export type SignedPsbt = {
-  psbt: string;
-};
 
 // custom connect definitions
 export type MessageType = {
