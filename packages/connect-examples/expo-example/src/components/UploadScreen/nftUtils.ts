@@ -142,14 +142,43 @@ export const compressNFT = async (
   };
 };
 
-export const generateUploadNFTParams = async (
-  uri: string,
-  width: number,
-  height: number,
-  cb?: (data: { base64?: string }) => void
-) => {
-  const data = await compressNFT(uri, 480, 800, width, height, false);
-  const zoomData = await compressNFT(uri, 238, 238, width, height, true);
+export const generateUploadNFTParams = async ({
+  uri,
+  width,
+  height,
+  homeScreenSize,
+  homeScreenThumbnailSize,
+  cb,
+}: {
+  uri: string;
+  width: number;
+  height: number;
+  homeScreenSize?: {
+    width: number;
+    height: number;
+  };
+  homeScreenThumbnailSize?: {
+    width: number;
+    height: number;
+  };
+  cb?: (data: { base64?: string }) => void;
+}) => {
+  const data = await compressNFT(
+    uri,
+    homeScreenSize?.width ?? 480,
+    homeScreenSize?.height ?? 800,
+    width,
+    height,
+    false
+  );
+  const zoomData = await compressNFT(
+    uri,
+    homeScreenThumbnailSize?.width ?? 238,
+    homeScreenThumbnailSize?.width ?? 238,
+    width,
+    height,
+    true
+  );
 
   cb?.(zoomData as any);
 

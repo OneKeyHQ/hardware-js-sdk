@@ -1,5 +1,10 @@
 import { DataManager } from '../../data-manager';
-import type { Features } from '../../types';
+import { DeviceModelToTypes, type Features } from '../../types';
+import {
+  checkNeedUpdateBootForClassicAndMini,
+  checkNeedUpdateBootForTouch,
+  getDeviceType,
+} from '../../utils';
 
 export const getFirmwareReleaseInfo = (features: Features) => {
   const firmwareStatus = DataManager.getFirmwareStatus(features);
@@ -27,7 +32,10 @@ export const getBleFirmwareReleaseInfo = (features: Features) => {
   };
 };
 
-export const getBootloaderReleaseInfo = (features: Features) => {
+export const getBootloaderReleaseInfo = (
+  features: Features,
+  willUpdateFirmwareVersion?: string
+) => {
   const release = DataManager.getFirmwareLatestRelease(features);
   const changelog = [release?.bootloaderChangelog].filter(
     item =>
@@ -38,8 +46,19 @@ export const getBootloaderReleaseInfo = (features: Features) => {
   );
 
   const bootloaderMode = !!features.bootloader_mode;
+
+  let shouldUpdate = false;
+
+  const deviceType = getDeviceType(features);
+  // classic mini classic1s
+  if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+    shouldUpdate = !!checkNeedUpdateBootForClassicAndMini(features, willUpdateFirmwareVersion);
+  } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {
+    shouldUpdate = checkNeedUpdateBootForTouch(features);
+  }
+
   return {
-    status: undefined,
+    status: shouldUpdate ? 'outdated' : 'valid',
     changelog,
     release,
     bootloaderMode,

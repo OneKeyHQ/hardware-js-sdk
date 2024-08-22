@@ -6,7 +6,7 @@ import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-import { DeviceUploadResourceParams, CoreApi, CommonParams, KnownDevice } from '@onekeyfe/hd-core';
+import { DeviceUploadResourceParams, getHomeScreenSize, getDeviceType } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
 import { Image, Label, Stack, View, XStack } from 'tamagui';
 import { Platform } from 'react-native';
@@ -23,6 +23,7 @@ interface UploadResourceParams {
   suffix?: string;
   resType?: number;
   nftMetaData?: string;
+  fileNameNoExt?: string;
 }
 
 function getUrlExtension(url: string) {
@@ -32,14 +33,41 @@ function getUrlExtension(url: string) {
   return url.split(/[#?]/)[0].split('.').pop()?.trim();
 }
 
-export const generateUploadResParams = async (
-  uri: string,
-  width: number,
-  height: number,
-  cb?: (data: { base64?: string }) => void
-) => {
-  const data = await compressHomescreen(uri, 480, 800, width, height);
-  const zoomData = await compressHomescreen(uri, 144, 240, width, height);
+export const generateUploadResParams = async ({
+  uri,
+  width,
+  height,
+  homeScreenSize,
+  homeScreenThumbnailSize,
+  cb,
+}: {
+  uri: string;
+  width: number;
+  height: number;
+  homeScreenSize?: {
+    width: number;
+    height: number;
+  };
+  homeScreenThumbnailSize?: {
+    width: number;
+    height: number;
+  };
+  cb?: (data: { base64?: string }) => void;
+}) => {
+  const data = await compressHomescreen(
+    uri,
+    homeScreenSize?.width ?? 480,
+    homeScreenSize?.height ?? 800,
+    width,
+    height
+  );
+  const zoomData = await compressHomescreen(
+    uri,
+    homeScreenThumbnailSize?.width ?? 144,
+    homeScreenThumbnailSize?.height ?? 240,
+    width,
+    height
+  );
 
   cb?.(data as any);
 
@@ -57,6 +85,7 @@ export const generateUploadResParams = async (
     dataHex: bytesToHex(data?.arrayBuffer as Uint8Array),
     thumbnailDataHex: bytesToHex(zoomData?.arrayBuffer as Uint8Array),
     nftMetaData: '',
+    fileNameNoExt: undefined,
   };
 
   return params;
@@ -129,13 +158,34 @@ function UploadScreenComponent() {
 
   const [image, setImage] = useState<ImagePicker.ImageInfo | null>(null);
   const [previewData, setPreviewData] = useState<string | null>(null);
-  const [nftUrl, setNftUrl] = useState('');
+  const [nftUrl, setNftUrl] = useState(
+    'https://static.unisat.io/content/f5565a87665e441edfb0da50a0f4042e0a8cbc046a568cfc1b6186299d18fe0ei0'
+  );
 
   useEffect(() => {
     // generate nft data
     if (nftUrl) {
       const imageUrl = nftUrl;
       (async () => {
+        const res = await SDK?.getFeatures();
+        if (!res) return;
+        if (!res.success) return;
+
+        const deviceType = getDeviceType(res.payload);
+        const screenType = uploadScreenParams?.resType?.toString() === '0' ? 'WallPaper' : 'Nft';
+        const HomeScreenSize = getHomeScreenSize({
+          deviceType,
+          homeScreenType: screenType,
+        });
+        const HomeScreenThumbnailSize = getHomeScreenSize({
+          deviceType,
+          homeScreenType: screenType,
+          thumbnail: true,
+        });
+
+        console.log('HomeScreenSize nft: ', HomeScreenSize);
+        console.log('HomeScreenThumbnailSize nft: ', HomeScreenThumbnailSize);
+
         const { width, height } = await getImageSize(imageUrl);
         console.log('image size: ', { width, height });
         const base64 = await imageToBase64(imageUrl);
@@ -143,46 +193,91 @@ function UploadScreenComponent() {
 
         let uploadResParams: DeviceUploadResourceParams | undefined;
         try {
-          uploadResParams = await generateUploadNFTParams(base64, width, height, data => {
-            setImage({ uri: base64 } as any);
-            setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+          uploadResParams = await generateUploadNFTParams({
+            uri: base64,
+            width,
+            height,
+            homeScreenSize: HomeScreenSize,
+            homeScreenThumbnailSize: HomeScreenThumbnailSize,
+            cb: data => {
+              setImage({ uri: base64 } as any);
+              setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+            },
           });
         } catch (e) {
           console.log('image operate error: ', e);
-          return;
-        }
-
-        if (uploadResParams) {
-          const response = await SDK?.deviceUploadResource(
-            type === 'Bluetooth' ? selectedDevice?.connectId ?? '' : '',
-            {
-              ...commonParams,
-              ...uploadResParams,
-            }
-          );
-          console.log('example firmwareUpdate response: ', response);
         }
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nftUrl]);
 
-  const handleScreenUpdate = async () => {
+  const handleScreenUpdate = async (screenType: 'WallPaper' | 'Nft') => {
     // setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
 
+    const res = await SDK?.getFeatures();
+    if (!res) return;
+    if (!res.success) return;
+
+    const deviceType = getDeviceType(res.payload);
+    const HomeScreenSize = getHomeScreenSize({
+      deviceType,
+      homeScreenType: screenType,
+    });
+    const HomeScreenThumbnailSize = getHomeScreenSize({
+      deviceType,
+      homeScreenType: screenType,
+      thumbnail: true,
+    });
+
+    console.log('HomeScreenSize WallPaper: ', HomeScreenSize);
+    console.log('HomeScreenThumbnailSize WallPaper: ', HomeScreenThumbnailSize);
+
     let uploadResParams: DeviceUploadResourceParams | undefined;
-    try {
-      uploadResParams = await generateUploadResParams(
-        image?.uri ?? '',
-        image?.width ?? 0,
-        image?.height ?? 0,
-        data => {
-          setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
-        }
-      );
-    } catch (e) {
-      console.log('image operate error: ', e);
-      return;
+    if (screenType === 'WallPaper') {
+      try {
+        uploadResParams = await generateUploadResParams({
+          uri: image?.uri ?? '',
+          width: image?.width ?? 0,
+          height: image?.height ?? 0,
+          homeScreenSize: HomeScreenSize,
+          homeScreenThumbnailSize: HomeScreenThumbnailSize,
+          cb: data => {
+            setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+          },
+        });
+        if (uploadResParams) uploadResParams.fileNameNoExt = uploadScreenParams?.fileNameNoExt;
+      } catch (e) {
+        console.log('image operate error: ', e);
+        return;
+      }
+    } else {
+      if (!nftUrl) {
+        alert('请输入 NFT URL');
+        return;
+      }
+      const imageUrl = nftUrl;
+      const { width, height } = await getImageSize(imageUrl);
+      console.log('image size: ', { width, height });
+      const base64 = await imageToBase64(imageUrl);
+      console.log(base64);
+
+      try {
+        uploadResParams = await generateUploadNFTParams({
+          uri: base64,
+          width,
+          height,
+          homeScreenSize: HomeScreenSize,
+          homeScreenThumbnailSize: HomeScreenThumbnailSize,
+          cb: data => {
+            setImage({ uri: base64 } as any);
+            setPreviewData(`data:image/png;base64,${data?.base64}` ?? null);
+          },
+        });
+      } catch (e) {
+        console.log('image operate error: ', e);
+        return;
+      }
     }
 
     if (uploadResParams) {
@@ -219,7 +314,17 @@ function UploadScreenComponent() {
 
   return (
     <PanelView title="Upload Screen Image & Video">
-      <XStack flexWrap="wrap" gap="$4">
+      <XStack
+        flexWrap="wrap"
+        gap="$4"
+        borderColor="$borderSubdued"
+        borderWidth="$0.5"
+        borderRadius="$2"
+        padding="$2"
+      >
+        <Label paddingRight="$0" justifyContent="center">
+          {intl.formatMessage({ id: 'label__upload_wall_paper' })}
+        </Label>
         <Stack width={160} minHeight={45}>
           <Label paddingRight="$0" justifyContent="center">
             {intl.formatMessage({ id: 'label__upload_image_res_type' })}
@@ -234,31 +339,30 @@ function UploadScreenComponent() {
             setUploadScreenParams({ ...uploadScreenParams, suffix: v });
           }}
         />
-        <Stack width={160} minHeight={45}>
-          <Label paddingRight="$0" justifyContent="center">
-            {intl.formatMessage({ id: 'label__image_res_type' })}
-          </Label>
-          <Picker
-            selectedValue={uploadScreenParams?.resType}
-            onValueChange={itemValue =>
-              setUploadScreenParams({ ...uploadScreenParams, resType: itemValue })
-            }
-          >
-            <Picker.Item
-              label={intl.formatMessage({ id: 'label__res_type_wall_paper' })}
-              value="0"
-            />
-            <Picker.Item label={intl.formatMessage({ id: 'label__res_type_nft' })} value="1" />
-          </Picker>
-        </Stack>
         <CommonInput
           type="text"
-          label={intl.formatMessage({ id: 'label__nft_data' })}
-          value={uploadScreenParams?.nftMetaData ?? ''}
+          label={intl.formatMessage({ id: 'label__res_file_name' })}
+          value={uploadScreenParams?.fileNameNoExt ?? ''}
+          placeholder="wp-file1-12345"
           onChange={v => {
-            setUploadScreenParams({ ...uploadScreenParams, nftMetaData: v });
+            setUploadScreenParams({ ...uploadScreenParams, fileNameNoExt: v });
           }}
         />
+        <Button onPress={() => handleScreenUpdate('WallPaper')}>
+          {intl.formatMessage({ id: 'action__upload' })}
+        </Button>
+      </XStack>
+      <XStack
+        flexWrap="wrap"
+        gap="$4"
+        borderColor="$borderSubdued"
+        borderWidth="$0.5"
+        borderRadius="$2"
+        padding="$2"
+      >
+        <Label paddingRight="$0" justifyContent="center">
+          {intl.formatMessage({ id: 'label__upload_nft' })}
+        </Label>
         <CommonInput
           type="text"
           label={intl.formatMessage({ id: 'label__nft_url' })}
@@ -267,20 +371,23 @@ function UploadScreenComponent() {
             setNftUrl(v);
           }}
         />
-        <Button onPress={() => handleScreenUpdate()}>
+        <CommonInput
+          type="text"
+          label={intl.formatMessage({ id: 'label__nft_data' })}
+          value={uploadScreenParams?.nftMetaData ?? ''}
+          onChange={v => {
+            setUploadScreenParams({ ...uploadScreenParams, nftMetaData: v });
+          }}
+        />
+        <Button onPress={() => handleScreenUpdate('Nft')}>
           {intl.formatMessage({ id: 'action__upload' })}
         </Button>
-        {Platform.OS === 'web' && (
-          <Button
-            onPress={() => SDK?.deviceFullyUploadResource(selectedDevice?.connectId ?? '', {})}
-          >
-            {intl.formatMessage({ id: 'action__full_coverage_res' })}
-          </Button>
-        )}
       </XStack>
-
       {Platform.OS === 'web' && (
         <View flexDirection="row" alignItems="center">
+          <Label paddingRight="$0" justifyContent="center">
+            预览
+          </Label>
           {image && (
             <Image
               height={800}

@@ -80,6 +80,8 @@
   "label__res_type_nft": "NFT",
   "label__nft_data": "NFT Data",
   "label__nft_url": "NFT URL",
+  "label__upload_nft": "Upload NFT",
+  "label__upload_wall_paper": "Upload WallPaper",
 
   "label__progress": "Progress",
   "label__expected": "Expected:",

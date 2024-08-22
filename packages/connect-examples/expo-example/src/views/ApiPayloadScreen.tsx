@@ -9,6 +9,7 @@ import { DeviceProvider } from '../provider/DeviceProvider';
 import { CommonParamsProvider } from '../provider/CommonParamsProvider';
 import CommonParamsView from '../components/CommonParamsView';
 import { UploadScreen } from '../components/UploadScreen';
+import ChangeScreenComponent from '../components/ChangeScreen';
 import { ExpandModeProvider } from '../provider/ExpandModeProvider';
 import { CollapsibleSection } from '../components/CollapsibleSection';
 import Playground, { PlaygroundProps as ApiPayloadProps } from '../components/Playground';
@@ -77,12 +78,16 @@ const playgroundConfig = [
     data: require('../data/nem').default,
   },
   {
+    title: 'Nervos API',
+    data: require('../data/nervos').default,
+  },
+  {
     title: 'Nexa API',
     data: require('../data/nexa').default,
   },
   {
-    title: 'Nervos API',
-    data: require('../data/nervos').default,
+    title: 'Nostr API',
+    data: require('../data/nostr').default,
   },
   {
     title: 'Polkadot API',
@@ -109,12 +114,12 @@ const playgroundConfig = [
     data: require('../data/sui').default,
   },
   {
-    title: 'TRON API',
-    data: require('../data/tron').default,
+    title: 'TON API',
+    data: require('../data/ton').default,
   },
   {
-    title: 'Nostr API',
-    data: require('../data/nostr').default,
+    title: 'TRON API',
+    data: require('../data/tron').default,
   },
 ];
 
@@ -158,6 +163,7 @@ const ApiPayload = () => {
             </PanelView>
           </ExpandModeProvider>
           <UploadScreen />
+          <ChangeScreenComponent />
         </CommonParamsProvider>
       </DeviceProvider>
     </Stack>

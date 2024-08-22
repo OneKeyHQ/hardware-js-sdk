@@ -7,6 +7,7 @@ export type DeviceUploadResourceParams = {
   thumbnailDataHex: string;
   resType: ResourceType;
   nftMetaData: string;
+  fileNameNoExt?: string;
 };
 
 export declare function deviceUploadResource(

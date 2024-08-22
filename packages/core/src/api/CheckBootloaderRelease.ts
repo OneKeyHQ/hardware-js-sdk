@@ -1,12 +1,6 @@
 import { BaseMethod } from './BaseMethod';
 
 import { UI_REQUEST } from '../constants/ui-request';
-import {
-  checkNeedUpdateBootForClassicAndMini,
-  checkNeedUpdateBootForTouch,
-} from './firmware/updateBootloader';
-import { getDeviceType } from '../utils';
-import { DeviceModelToTypes } from '../types';
 import { getBootloaderReleaseInfo } from './firmware/releaseHelper';
 
 export default class CheckBootloaderRelease extends BaseMethod {
@@ -21,22 +15,7 @@ export default class CheckBootloaderRelease extends BaseMethod {
       return null;
     }
     const { features } = this.device;
-    const deviceType = getDeviceType(features);
-    let shouldUpdate = false;
-    // classic mini classic1s
-    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-      shouldUpdate = !!checkNeedUpdateBootForClassicAndMini(
-        features,
-        this.payload.willUpdateFirmwareVersion
-      );
-    } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {
-      shouldUpdate = checkNeedUpdateBootForTouch(features);
-    }
-    const releaseInfo = getBootloaderReleaseInfo(features);
-    return Promise.resolve({
-      ...releaseInfo,
-      shouldUpdate,
-      status: shouldUpdate ? 'outdated' : 'valid',
-    });
+    const releaseInfo = getBootloaderReleaseInfo(features, this.payload.willUpdateFirmwareVersion);
+    return Promise.resolve(releaseInfo);
   }
 }

@@ -266,6 +266,8 @@ export default class DataManager {
     return isLatest ? 'valid' : 'outdated';
   };
 
+  static getBridgeChangelog = () => this.assets?.bridge.changelog;
+
   static async load(settings: ConnectSettings) {
     this.settings = settings;
     if (!settings.fetchConfig) {

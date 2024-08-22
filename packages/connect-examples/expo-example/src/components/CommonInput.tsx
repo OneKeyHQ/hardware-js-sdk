@@ -7,9 +7,10 @@ export type CommonInputProps = {
   value: string;
   onChange: (value: string) => void;
   label: string;
+  placeholder?: string;
   type?: 'number' | 'text';
 };
-export const CommonInput = ({ value, onChange, label, type }: CommonInputProps) => {
+export const CommonInput = ({ value, onChange, label, type, placeholder }: CommonInputProps) => {
   const onChangeCallback = useCallback(
     (text: string) => {
       if (type === 'number') {
@@ -34,6 +35,7 @@ export const CommonInput = ({ value, onChange, label, type }: CommonInputProps) 
         height={34}
         keyboardType="numeric"
         value={value}
+        placeholder={placeholder}
         onChangeText={onChangeCallback}
       />
     </Stack>

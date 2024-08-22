@@ -76,10 +76,13 @@
   "label__upload_image_res_type": "支持 PNG 和 MP4",
   "label__image_res_type": "资源类型",
   "label__res_file_suffix": "文件后缀",
+  "label__res_file_name": "文件名（wp|nft-{filename}-{random}）",
   "label__res_type_wall_paper": "壁纸",
   "label__res_type_nft": "NFT",
   "label__nft_data": "NFT 数据",
   "label__nft_url": "NFT URL",
+  "label__upload_nft": "上传 NFT",
+  "label__upload_wall_paper": "上传壁纸",
 
   "label__progress": "进度",
   "label__expected": "预期：",

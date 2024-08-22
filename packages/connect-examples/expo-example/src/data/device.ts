@@ -119,6 +119,11 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
+    method: 'deviceRebootToBoardloader',
+    description: 'DeviceRebootToBoardloader',
+    noDeviceIdReq: true,
+  },
+  {
     method: 'deviceUpdateBootloader',
     description: 'Touch、Pro Update bootloader of a device',
     noDeviceIdReq: true,
@@ -139,6 +144,19 @@ const api: PlaygroundProps[] = [
         title: 'Update ble firmware',
         value: {
           updateType: 'ble',
+          platform: 'web',
+        },
+      },
+    ],
+  },
+  {
+    method: 'checkAllFirmwareRelease',
+    description: 'Check all firmware release of a device',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'checkAllFirmwareRelease',
+        value: {
           platform: 'web',
         },
       },

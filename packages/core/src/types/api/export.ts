@@ -152,3 +152,7 @@ export type { NervosSignedTx, NervosSignTransactionParams } from './nervosSignTr
 
 export type { DnxAddress, DnxGetAddressParams } from './dnxGetAddress';
 export type { DnxTxKey, DnxSignTransactionParams, DnxSignature } from './dnxSignTransaction';
+
+export type { TonAddress, TonGetAddressParams } from './tonGetAddress';
+export type { TonSignMessageParams } from './tonSignMessage';
+export type { TonSignProofParams } from './tonSignProof';

@@ -1,4 +1,5 @@
-import type { IDeviceType } from '../types';
+import type { Features, IDeviceType } from '../types';
+import { getDeviceType } from './deviceInfoUtils';
 
 type IScreenData = { name: string; hex: string };
 
@@ -218,22 +219,20 @@ export const getT1Data = (): Record<string, IScreenData> => ({
 });
 
 export const getTouchData = (): Record<string, IScreenData> => ({
-  'wallpaper-1': {
-    name: 'wallpaper-1',
-    hex: '77616c6c70617065722d312e706e67',
-  },
-  'wallpaper-2': {
-    name: 'wallpaper-2',
-    hex: '77616c6c70617065722d322e706e67',
-  },
-  'wallpaper-3': {
-    name: 'wallpaper-3',
-    hex: '77616c6c70617065722d332e706e67',
-  },
-  'wallpaper-4': {
-    name: 'wallpaper-4',
-    hex: '77616c6c70617065722d342e706e67',
-  },
+  'wallpaper-1': { name: 'wallpaper-1', hex: '77616c6c70617065722d312e706e67' },
+  'wallpaper-2': { name: 'wallpaper-2', hex: '77616c6c70617065722d322e706e67' },
+  'wallpaper-3': { name: 'wallpaper-3', hex: '77616c6c70617065722d332e706e67' },
+  'wallpaper-4': { name: 'wallpaper-4', hex: '77616c6c70617065722d342e706e67' },
+});
+export const getProData = (): Record<string, IScreenData> => ({
+  'wallpaper-1': { name: 'wallpaper-1', hex: '77616c6c70617065722d312e6a7067' },
+  'wallpaper-2': { name: 'wallpaper-2', hex: '77616c6c70617065722d322e6a7067' },
+  'wallpaper-3': { name: 'wallpaper-3', hex: '77616c6c70617065722d332e6a7067' },
+  'wallpaper-4': { name: 'wallpaper-4', hex: '77616c6c70617065722d342e6a7067' },
+  // Current version cannot be modified
+  // 'wallpaper-5': { name: 'wallpaper-5', hex: '77616c6c70617065722d352e6a7067' },
+  // 'wallpaper-6': { name: 'wallpaper-6', hex: '77616c6c70617065722d362e6a7067' },
+  // 'wallpaper-7': { name: 'wallpaper-7', hex: '77616c6c70617065722d372e6a7067' },
 });
 
 export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
@@ -248,11 +247,83 @@ export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
       data = getTouchData();
       break;
     case 'pro':
-      data = {};
+      data = getProData();
       break;
     default:
       data = {};
   }
 
   return data[name]?.hex ?? '';
+};
+
+export const getHomeScreenDefaultList = (features: Features) => {
+  let data: Record<string, IScreenData>;
+  const deviceType = getDeviceType(features);
+
+  switch (deviceType) {
+    case 'classic':
+    case 'classic1s':
+    case 'mini':
+      data = getT1Data();
+      break;
+    case 'touch':
+      data = getTouchData();
+      break;
+    case 'pro':
+      data = getProData();
+      break;
+    default:
+      data = {};
+  }
+
+  return Object.keys(data);
+};
+
+type SizeConfig = {
+  width: number;
+  height: number;
+  radius?: number;
+};
+
+export const getHomeScreenSize = ({
+  deviceType,
+  homeScreenType,
+  thumbnail,
+}: {
+  deviceType: IDeviceType;
+  homeScreenType: 'WallPaper' | 'Nft';
+  thumbnail?: boolean;
+}) => {
+  const sizes: Partial<
+    Record<
+      IDeviceType,
+      {
+        thumbnail: {
+          Nft: SizeConfig;
+          WallPaper: SizeConfig;
+        };
+        full: SizeConfig;
+      }
+    >
+  > = {
+    touch: {
+      thumbnail: {
+        Nft: { width: 238, height: 238 },
+        WallPaper: { width: 144, height: 240 },
+      },
+      full: { width: 480, height: 800 },
+    },
+    pro: {
+      thumbnail: {
+        Nft: { width: 226, height: 226, radius: 40 },
+        WallPaper: { width: 144, height: 240, radius: 40 },
+      },
+      full: { width: 480, height: 800 },
+    },
+  };
+
+  const deviceConfig = sizes[deviceType];
+  if (!deviceConfig) return undefined;
+
+  return thumbnail ? deviceConfig.thumbnail[homeScreenType] : deviceConfig.full;
 };
