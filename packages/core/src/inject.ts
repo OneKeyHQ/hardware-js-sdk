@@ -161,6 +161,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'btcGetPublicKey' }),
   btcSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcSignMessage' }),
+  btcSignPsbt: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'btcSignPsbt' }),
   btcSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcSignTransaction' }),
   btcVerifyMessage: (connectId, deviceId, params) =>

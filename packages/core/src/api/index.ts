@@ -41,6 +41,7 @@ export { default as cipherKeyValue } from './CipherKeyValue';
 export { default as btcGetAddress } from './btc/BTCGetAddress';
 export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
 export { default as btcSignMessage } from './btc/BTCSignMessage';
+export { default as btcSignPsbt } from './btc/BTCSignPsbt';
 export { default as btcSignTransaction } from './btc/BTCSignTransaction';
 export { default as btcVerifyMessage } from './btc/BTCVerifyMessage';
 
