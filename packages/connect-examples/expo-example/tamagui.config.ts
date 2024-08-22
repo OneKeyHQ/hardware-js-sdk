@@ -356,6 +356,8 @@ const config = createTamagui({
     gtSm: { minWidth: 800 + 1 },
     gtMd: { minWidth: 1020 + 1 },
     gtLg: { minWidth: 1280 + 1 },
+    gtXl: { minWidth: 1420 + 1 },
+    gtXxl: { minWidth: 1600 + 1 },
     short: { maxHeight: 820 },
     tall: { minHeight: 820 },
     hoverNone: { hover: 'none' },

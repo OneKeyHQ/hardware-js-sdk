@@ -61,6 +61,16 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'deviceCancel',
+    description: 'cancel device',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'deviceLock',
+    description: 'lock device',
+    noDeviceIdReq: true,
+  },
+  {
     method: 'deviceSupportFeatures',
     description: 'Check if a device supports a feature',
     noDeviceIdReq: true,
@@ -133,6 +143,24 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+  },
+  {
+    method: 'setU2FCounter',
+    description: 'setU2FCounter',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'setU2FCounter',
+        value: {
+          u2f_counter: 1,
+        },
+      },
+    ],
+  },
+  {
+    method: 'getNextU2FCounter',
+    description: 'getNextU2FCounter',
+    noDeviceIdReq: true,
   },
 ];
 

@@ -8,8 +8,56 @@ import { Routes } from '../../route';
 import { Button } from './Button';
 import LocaleToggleButton from './LocaleToggleButton';
 
-const HeaderView = () => {
+interface MenuItem {
+  route: string;
+  labelId: string;
+}
+
+// 菜单项数组
+const menuItems: MenuItem[] = [
+  { route: Routes.Payload, labelId: 'tab__api_payload' },
+  { route: Routes.FirmwareUpdateTest, labelId: 'tab__firmware_update' },
+  { route: Routes.PassphraseTest, labelId: 'tab__passphrase_test' },
+  { route: Routes.AddressTest, labelId: 'tab__address_test' },
+  { route: Routes.SecurityCheck, labelId: 'tab__security_check' },
+  { route: Routes.FunctionalTesting, labelId: 'tab__functional_testing' },
+];
+
+// 菜单按钮组件
+const MenuButton = ({
+  item,
+  currentRoute,
+  onPress,
+}: {
+  item: MenuItem;
+  currentRoute: string;
+  onPress: (route: string) => void;
+}) => {
   const intl = useIntl();
+  return (
+    <Button
+      variant={currentRoute === item.route ? 'primary' : 'secondary'}
+      onPress={() => onPress(item.route)}
+    >
+      {intl.formatMessage({ id: item.labelId })}
+    </Button>
+  );
+};
+
+// 菜单列表项组件
+const MenuListItem = ({ item, onPress }: { item: MenuItem; onPress: (route: string) => void }) => {
+  const intl = useIntl();
+
+  return (
+    <ListItem
+      variant="active"
+      title={intl.formatMessage({ id: item.labelId })}
+      onPress={() => onPress(item.route)}
+    />
+  );
+};
+
+const HeaderView = () => {
   const media = useMedia();
   const route = useRoute();
   const navigation = useNavigation();
@@ -24,107 +72,21 @@ const HeaderView = () => {
     [navigation]
   );
 
-  const groupItemMemo = useMemo(
-    () => (
-      <Group
-        $gtXs={{
-          // @ts-expect-error
-          orientation: 'horizontal',
-        }}
-        orientation="vertical"
-      >
-        <Group.Item>
-          <Button
-            variant={route.name === Routes.Payload ? 'primary' : 'secondary'}
-            onPress={() => navigate(Routes.Payload)}
-          >
-            {intl.formatMessage({ id: 'tab__api_payload' })}
-          </Button>
-        </Group.Item>
-        <Group.Item>
-          <Button
-            variant={route.name === Routes.FirmwareUpdateTest ? 'primary' : 'secondary'}
-            onPress={() => navigate(Routes.FirmwareUpdateTest)}
-          >
-            {intl.formatMessage({ id: 'tab__firmware_update' })}
-          </Button>
-        </Group.Item>
-        <Group.Item>
-          <Button
-            variant={route.name === Routes.PassphraseTest ? 'primary' : 'secondary'}
-            onPress={() => navigate(Routes.PassphraseTest)}
-          >
-            {intl.formatMessage({ id: 'tab__passphrase_test' })}
-          </Button>
-        </Group.Item>
-        <Group.Item>
-          <Button
-            variant={route.name === Routes.AddressTest ? 'primary' : 'secondary'}
-            onPress={() => navigate(Routes.AddressTest)}
-          >
-            {intl.formatMessage({ id: 'tab__address_test' })}
-          </Button>
-        </Group.Item>
-        <Group.Item>
-          <Button
-            variant={route.name === Routes.SecurityCheck ? 'primary' : 'secondary'}
-            onPress={() => navigate(Routes.SecurityCheck)}
-          >
-            {intl.formatMessage({ id: 'tab__security_check' })}
-          </Button>
-        </Group.Item>
-      </Group>
-    ),
-    [intl, navigate, route.name]
-  );
-
-  const smallGroupItemMemo = useMemo(
-    () => (
-      <Sheet
-        forceRemoveScrollEnabled={open}
-        modal
-        open={open}
-        onOpenChange={setOpen}
-        snapPointsMode="fit"
-        dismissOnSnapToBottom
-        zIndex={100_000}
-        animation="quick"
-      >
-        <Sheet.Overlay
-          animation="quick"
-          enterStyle={{ opacity: 0 }}
-          exitStyle={{ opacity: 0 }}
-          backgroundColor="$bgBackdrop"
-        />
-        <Sheet.Handle />
-        <Sheet.Frame padding="$4" justifyContent="center" alignItems="center" space="$5">
-          <YGroup alignSelf="center" width={240}>
-            <ListItem
-              title={intl.formatMessage({ id: 'tab__api_payload' })}
-              onPress={() => navigate(Routes.Payload)}
-            />
-            <ListItem
-              title={intl.formatMessage({ id: 'tab__firmware_update' })}
-              onPress={() => navigate(Routes.FirmwareUpdateTest)}
-            />
-            <ListItem
-              title={intl.formatMessage({ id: 'tab__passphrase_test' })}
-              onPress={() => navigate(Routes.PassphraseTest)}
-            />
-            <ListItem
-              title={intl.formatMessage({ id: 'tab__address_test' })}
-              onPress={() => navigate(Routes.AddressTest)}
-            />
-            <ListItem
-              title={intl.formatMessage({ id: 'tab__security_check' })}
-              onPress={() => navigate(Routes.SecurityCheck)}
-            />
-          </YGroup>
-        </Sheet.Frame>
-      </Sheet>
-    ),
-    [intl, navigate, open]
-  );
+  const { visibleItems, dropdownItems } = useMemo(() => {
+    if (media.gtXxl)
+      return { visibleItems: menuItems.slice(0, 10), dropdownItems: menuItems.slice(10) };
+    if (media.gtXl)
+      return { visibleItems: menuItems.slice(0, 9), dropdownItems: menuItems.slice(9) };
+    if (media.gtLg)
+      return { visibleItems: menuItems.slice(0, 7), dropdownItems: menuItems.slice(7) };
+    if (media.gtMd)
+      return { visibleItems: menuItems.slice(0, 5), dropdownItems: menuItems.slice(5) };
+    if (media.gtSm)
+      return { visibleItems: menuItems.slice(0, 3), dropdownItems: menuItems.slice(3) };
+    if (media.gtXs)
+      return { visibleItems: menuItems.slice(0, 2), dropdownItems: menuItems.slice(2) };
+    return { visibleItems: [], dropdownItems: menuItems };
+  }, [media]);
 
   return (
     <Stack
@@ -137,14 +99,51 @@ const HeaderView = () => {
       <H3>Hardware Example</H3>
 
       <XStack minHeight={40} gap="$2">
-        {media.gtSm ? (
-          groupItemMemo
-        ) : (
+        {visibleItems?.length > 0 && (
+          <Group orientation="horizontal">
+            {visibleItems.map(item => (
+              <Group.Item>
+                <MenuButton
+                  key={item.route}
+                  item={item}
+                  currentRoute={route.name}
+                  onPress={navigate}
+                />
+              </Group.Item>
+            ))}
+          </Group>
+        )}
+
+        {dropdownItems?.length > 0 && (
           <>
             <Button onPress={() => setOpen(!open)}>
               <Menu size="$4" />
             </Button>
-            {smallGroupItemMemo}
+            <Sheet
+              forceRemoveScrollEnabled={open}
+              modal
+              open={open}
+              onOpenChange={setOpen}
+              snapPointsMode="fit"
+              dismissOnSnapToBottom
+              zIndex={100_000}
+              animation="quick"
+            >
+              <Sheet.Overlay
+                animation="quick"
+                enterStyle={{ opacity: 0 }}
+                exitStyle={{ opacity: 0 }}
+                backgroundColor="$bgBackdrop"
+              />
+              <Sheet.Handle />
+              <Sheet.Frame padding="$4" justifyContent="center" alignItems="center">
+                <YGroup alignSelf="center" width={240}>
+                  {dropdownItems.map(item => (
+                    <MenuListItem key={item.route} item={item} onPress={navigate} />
+                  ))}
+                </YGroup>
+              </Sheet.Frame>
+            </Sheet>
           </>
         )}
         <LocaleToggleButton />

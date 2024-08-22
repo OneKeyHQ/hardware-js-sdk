@@ -12,6 +12,7 @@ import { ListItem, Text, View } from 'tamagui';
 import { FlatList, Platform } from 'react-native';
 import { Check } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
+import type { Features } from '@onekeyfe/hd-transport';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
@@ -20,24 +21,26 @@ import { getItem, removeItem, setItem } from '../utils/storeUtil';
 export type Device = {
   connectId: string;
   name: string;
-  features?: any;
+  features?: Features;
   deviceType?: string;
 };
 
-const STORE_KEY = '@onekey/selectedId';
-const storeSelectedId = async (value: string) => {
+const STORE_KEY = '@onekey/selectedDevice';
+const storeSelectedDevice = async (value: Device | undefined) => {
   try {
-    await setItem(STORE_KEY, value);
+    if (value) {
+      await setItem(STORE_KEY, JSON.stringify(value));
+    }
   } catch (error) {
     console.log(error);
   }
 };
 
-const getSelectedId = async () => {
+const getSelectedDevice = async () => {
   try {
     const value = await getItem(STORE_KEY);
     if (value !== null) {
-      return value;
+      return JSON.parse(value) as Device;
     }
   } catch (error) {
     console.log(error);
@@ -98,10 +101,10 @@ function DeviceListFC(
 
   useEffect(() => {
     if (disableSaveDevice) return;
-    getSelectedId().then(value => {
+    getSelectedDevice().then(value => {
       if (value) {
-        setSelectedId(value);
-        onSelected({ connectId: value } as Device);
+        setSelectedId(value.connectId);
+        onSelected(value);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -110,7 +113,7 @@ function DeviceListFC(
   const selectDevice = useCallback(
     (device: Device | undefined) => {
       setSelectedId(device?.connectId ?? '');
-      storeSelectedId(device?.connectId ?? '');
+      storeSelectedDevice(device);
       onSelected(device);
     },
     [onSelected]

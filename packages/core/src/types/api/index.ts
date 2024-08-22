@@ -2,6 +2,8 @@ import { off, on, removeAllListeners } from './event';
 import { uiResponse } from './uiResponse';
 import { init, updateSettings } from './init';
 
+import { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
+
 import { getLogs } from './getLogs';
 import { checkTransportRelease } from './checkTransportRelease';
 import { checkBridgeStatus } from './checkBridgeStatus';
@@ -32,6 +34,11 @@ import { deviceUploadResource } from './deviceUploadResource';
 import { deviceSupportFeatures } from './deviceSupportFeatures';
 import { deviceFullyUploadResource } from './deviceFullyUploadResource';
 import { deviceUpdateBootloader } from './deviceUpdateBootloader';
+import { deviceLock } from './deviceLock';
+import { deviceCancel } from './deviceCancel';
+
+import { getNextU2FCounter } from './getNextU2FCounter';
+import { setU2FCounter } from './setU2FCounter';
 
 import { cipherKeyValue } from './cipherKeyValue';
 
@@ -146,6 +153,11 @@ export type CoreApi = {
   getLogs: typeof getLogs;
 
   /**
+   * Test function
+   */
+  testInitializeDeviceDuration: typeof testInitializeDeviceDuration;
+
+  /**
    * Core function
    */
   checkTransportRelease: typeof checkTransportRelease;
@@ -176,6 +188,10 @@ export type CoreApi = {
   deviceWipe: typeof deviceWipe;
   deviceFullyUploadResource: typeof deviceFullyUploadResource;
   deviceUpdateBootloader: typeof deviceUpdateBootloader;
+  deviceLock: typeof deviceLock;
+  deviceCancel: typeof deviceCancel;
+  getNextU2FCounter: typeof getNextU2FCounter;
+  setU2FCounter: typeof setU2FCounter;
   checkFirmwareRelease: typeof checkFirmwareRelease;
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;

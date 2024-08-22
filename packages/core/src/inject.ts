@@ -110,6 +110,9 @@ export const createCoreApi = (
   cipherKeyValue: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
 
+  testInitializeDeviceDuration: (connectId, params) =>
+    call({ ...params, connectId, method: 'testInitializeDeviceDuration' }),
+
   deviceBackup: connectId => call({ connectId, method: 'deviceBackup' }),
   deviceChangePin: (connectId, params) => call({ ...params, connectId, method: 'deviceChangePin' }),
   deviceFlags: (connectId, params) => call({ ...params, connectId, method: 'deviceFlags' }),
@@ -130,6 +133,12 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'deviceUpdateBootloader' }),
   getPassphraseState: (connectId, params) =>
     call({ ...params, connectId, method: 'getPassphraseState' }),
+  deviceCancel: (connectId, params) => call({ ...params, connectId, method: 'deviceCancel' }),
+  deviceLock: (connectId, params) => call({ ...params, connectId, method: 'deviceLock' }),
+
+  getNextU2FCounter: (connectId, params) =>
+    call({ ...params, connectId, method: 'getNextU2FCounter' }),
+  setU2FCounter: (connectId, params) => call({ ...params, connectId, method: 'setU2FCounter' }),
 
   evmGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'evmGetAddress' }),

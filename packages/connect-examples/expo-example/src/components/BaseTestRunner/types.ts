@@ -7,4 +7,4 @@ export type TestCase<T, E = any> = {
 };
 
 export type TestCaseDataWithKey<T = any> = { $key: string } & T;
-export type VerifyState = 'none' | 'pending' | 'skip' | 'success' | 'fail';
+export type VerifyState = 'none' | 'pending' | 'skip' | 'success' | 'fail' | 'warning';
