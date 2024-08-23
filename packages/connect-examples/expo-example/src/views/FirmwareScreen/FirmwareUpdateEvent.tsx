@@ -1,5 +1,5 @@
 import { memo, useCallback, useContext, useEffect, useState } from 'react';
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { CoreMessage, UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
 import { Dialog, Stack, Text, Unspaced } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
@@ -126,7 +126,7 @@ function FirmwareUpdateEventView({
         SDK.off(UI_EVENT, uiEventCallback);
         registerListener = false;
       };
-    }, [SDK, getMessage])
+    }, [SDK, getMessage, openDialog])
   );
 
   return (

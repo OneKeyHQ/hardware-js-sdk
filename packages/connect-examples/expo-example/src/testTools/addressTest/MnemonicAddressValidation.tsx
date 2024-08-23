@@ -44,12 +44,24 @@ const testCase: MnemonicAddressTestCase = {
       method: 'evmGetAddress',
     },
     {
-      id: 'suiGetAddress',
-      method: 'suiGetAddress',
+      id: 'alephiumGetAddress',
+      method: 'alephiumGetAddress',
     },
     {
       id: 'dnxGetAddress',
       method: 'dnxGetAddress',
+    },
+    {
+      id: 'tonGetAddress',
+      method: 'tonGetAddress',
+    },
+    {
+      id: 'scdoGetAddress',
+      method: 'scdoGetAddress',
+    },
+    {
+      id: 'suiGetAddress',
+      method: 'suiGetAddress',
     },
   ],
 };
@@ -186,7 +198,7 @@ function ExecuteView() {
           console.log('======>>>>> passphraseStateList', params);
           try {
             // @ts-expect-error
-            const mockRes = mockDevice?.[method]?.('', '', {
+            const mockRes = await mockDevice?.[method]?.('', '', {
               ...params,
               mnemonic: mnemonic.trim(),
             });
