@@ -141,6 +141,13 @@ import { tonGetAddress } from './tonGetAddress';
 import { tonSignMessage } from './tonSignMessage';
 import { tonSignProof } from './tonSignProof';
 
+import { scdoGetAddress } from './scdoGetAddress';
+import { scdoSignMessage } from './scdoSignMessage';
+import { scdoSignTransaction } from './scdoSignTransaction';
+import { alephiumGetAddress } from './alephiumGetAddress';
+import { alephiumSignMessage } from './alephiumSignMessage';
+import { alephiumSignTransaction } from './alephiumSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -380,4 +387,18 @@ export type CoreApi = {
   tonGetAddress: typeof tonGetAddress;
   tonSignMessage: typeof tonSignMessage;
   tonSignProof: typeof tonSignProof;
+
+  /**
+   * SCDO Network
+   */
+  scdoGetAddress: typeof scdoGetAddress;
+  scdoSignMessage: typeof scdoSignMessage;
+  scdoSignTransaction: typeof scdoSignTransaction;
+
+  /**
+   * Alephium Network
+   */
+  alephiumGetAddress: typeof alephiumGetAddress;
+  alephiumSignMessage: typeof alephiumSignMessage;
+  alephiumSignTransaction: typeof alephiumSignTransaction;
 };

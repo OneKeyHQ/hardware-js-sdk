@@ -137,3 +137,11 @@ export { default as dnxSignTransaction } from './dynex/DnxSignTransaction';
 export { default as tonGetAddress } from './ton/TonGetAddress';
 export { default as tonSignMessage } from './ton/TonSignMessage';
 export { default as tonSignProof } from './ton/TonSignProof';
+
+export { default as scdoGetAddress } from './scdo/ScdoGetAddress';
+export { default as scdoSignTransaction } from './scdo/ScdoSignTransaction';
+export { default as scdoSignMessage } from './scdo/ScdoSignMessage';
+
+export { default as alephiumGetAddress } from './alephium/AlephiumGetAddress';
+export { default as alephiumSignTransaction } from './alephium/AlephiumSignTransaction';
+export { default as alephiumSignMessage } from './alephium/AlephiumSignMessage';

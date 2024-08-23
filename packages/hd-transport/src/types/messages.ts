@@ -3,6 +3,67 @@
 // custom type uint32/64 may be represented as string
 export type UintType = string | number;
 
+// AlephiumGetAddress
+export type AlephiumGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// AlephiumAddress
+export type AlephiumAddress = {
+  address: string;
+};
+
+// AlephiumSignTx
+export type AlephiumSignTx = {
+  address_n: number[];
+  data_initial_chunk: string;
+  data_length?: number;
+};
+
+// AlephiumSignedTx
+export type AlephiumSignedTx = {
+  signature: string;
+  address: string;
+};
+
+// AlephiumTxRequest
+export type AlephiumTxRequest = {
+  data_length?: number;
+  public_key?: string;
+  signature?: string;
+};
+
+// AlephiumTxAck
+export type AlephiumTxAck = {
+  data_chunk: string;
+};
+
+// AlephiumBytecodeRequest
+export type AlephiumBytecodeRequest = {
+  data_length?: number;
+  public_key?: string;
+  signature?: string;
+};
+
+// AlephiumBytecodeAck
+export type AlephiumBytecodeAck = {
+  bytecode_data: string;
+};
+
+// AlephiumSignMessage
+export type AlephiumSignMessage = {
+  address_n: number[];
+  message?: string;
+  message_type?: string;
+};
+
+// AlephiumMessageSignature
+export type AlephiumMessageSignature = {
+  signature?: string;
+  address?: string;
+};
+
 // AlgorandGetAddress
 export type AlgorandGetAddress = {
   address_n: number[];
@@ -3291,6 +3352,54 @@ export type RippleSignedTx = {
   serialized_tx: string;
 };
 
+// ScdoGetAddress
+export type ScdoGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// ScdoAddress
+export type ScdoAddress = {
+  address: string;
+};
+
+// ScdoSignTx
+export type ScdoSignTx = {
+  address_n: number[];
+  nonce: string;
+  gas_price: string;
+  gas_limit: string;
+  to: string;
+  value: string;
+  timestamp?: string;
+  data_initial_chunk?: string;
+  data_length?: number;
+  tx_type?: number;
+};
+
+// ScdoSignedTx
+export type ScdoSignedTx = {
+  data_length?: number;
+  signature?: string;
+};
+
+// ScdoTxAck
+export type ScdoTxAck = {
+  data_chunk?: string;
+};
+
+// ScdoSignMessage
+export type ScdoSignMessage = {
+  address_n: number[];
+  message?: string;
+};
+
+// ScdoSignedMessage
+export type ScdoSignedMessage = {
+  signature?: string;
+  address?: string;
+};
+
 // SolanaGetAddress
 export type SolanaGetAddress = {
   address_n: number[];
@@ -3920,6 +4029,16 @@ export enum CommandFlags {
 
 // custom connect definitions
 export type MessageType = {
+  AlephiumGetAddress: AlephiumGetAddress;
+  AlephiumAddress: AlephiumAddress;
+  AlephiumSignTx: AlephiumSignTx;
+  AlephiumSignedTx: AlephiumSignedTx;
+  AlephiumTxRequest: AlephiumTxRequest;
+  AlephiumTxAck: AlephiumTxAck;
+  AlephiumBytecodeRequest: AlephiumBytecodeRequest;
+  AlephiumBytecodeAck: AlephiumBytecodeAck;
+  AlephiumSignMessage: AlephiumSignMessage;
+  AlephiumMessageSignature: AlephiumMessageSignature;
   AlgorandGetAddress: AlgorandGetAddress;
   AlgorandAddress: AlgorandAddress;
   AlgorandSignTx: AlgorandSignTx;
@@ -3983,6 +4102,8 @@ export type MessageType = {
   BIP32Address: BIP32Address;
   GetPublicKeyMultiple: GetPublicKeyMultiple;
   PublicKeyMultiple: PublicKeyMultiple;
+  SignPsbt: SignPsbt;
+  SignedPsbt: SignedPsbt;
   FirmwareErase: FirmwareErase;
   FirmwareRequest: FirmwareRequest;
   FirmwareUpload: FirmwareUpload;
@@ -4337,8 +4458,13 @@ export type MessageType = {
   RipplePayment: RipplePayment;
   RippleSignTx: RippleSignTx;
   RippleSignedTx: RippleSignedTx;
-  SignPsbt: SignPsbt;
-  SignedPsbt: SignedPsbt;
+  ScdoGetAddress: ScdoGetAddress;
+  ScdoAddress: ScdoAddress;
+  ScdoSignTx: ScdoSignTx;
+  ScdoSignedTx: ScdoSignedTx;
+  ScdoTxAck: ScdoTxAck;
+  ScdoSignMessage: ScdoSignMessage;
+  ScdoSignedMessage: ScdoSignedMessage;
   SolanaGetAddress: SolanaGetAddress;
   SolanaAddress: SolanaAddress;
   SolanaSignTx: SolanaSignTx;

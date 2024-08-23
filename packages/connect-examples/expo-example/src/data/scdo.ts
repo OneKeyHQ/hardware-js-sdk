@@ -1,0 +1,68 @@
+import { type PlaygroundProps } from '../components/Playground';
+
+const api: PlaygroundProps[] = [
+  {
+    method: 'scdoGetAddress',
+    description: 'Get address',
+    presupposes: [
+      {
+        title: 'Get address',
+        value: {
+          path: "m/44'/541'/0'/0/0",
+          showOnOneKey: false,
+        },
+      },
+      {
+        title: 'Batch Get Address',
+        value: {
+          bundle: [
+            {
+              path: "m/44'/541'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              path: "m/44'/541'/0'/0/1",
+              showOnOneKey: false,
+            },
+            {
+              path: "m/44'/541'/0'/0/2",
+              showOnOneKey: false,
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    method: 'scdoSignMessage',
+    description: 'Sign Message',
+    presupposes: [
+      {
+        title: 'Sign Message',
+        value: {
+          path: "m/44'/541'/0'/0/0",
+          messageHex: Buffer.from('hello', 'utf8').toString('hex'),
+        },
+      },
+    ],
+  },
+  {
+    method: 'scdoSignTransaction',
+    description: 'Sign Transaction',
+    presupposes: [
+      {
+        title: 'Sign Transaction',
+        value: {
+          path: "m/44'/541'/0'/0/0",
+          nonce: '0x0',
+          gasPrice: '0xbebc200',
+          gasLimit: '0x5208',
+          to: '1S0118a02f993fc7a4348fd36b7f7a596948f02b31',
+          value: '0xf4240',
+        },
+      },
+    ],
+  },
+];
+
+export default api;
