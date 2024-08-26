@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-react-native",
-  "version": "1.0.10-alpha.4",
+  "version": "1.0.10-alpha.5",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
   "main": "dist/index.js",
@@ -19,8 +19,8 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^1.0.10-alpha.4",
-    "@onekeyfe/hd-transport": "^1.0.10-alpha.4",
+    "@onekeyfe/hd-shared": "^1.0.10-alpha.5",
+    "@onekeyfe/hd-transport": "^1.0.10-alpha.5",
     "@onekeyfe/react-native-ble-plx": "3.0.1",
     "react-native-ble-manager": "^8.1.0"
   }
