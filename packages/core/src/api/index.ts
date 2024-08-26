@@ -39,6 +39,8 @@ export { default as requestWebUsbDevice } from './RequestWebUsbDevice';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 
+export { default as allNetworkGetAddress } from './allnetwork/AllNetworkGetAddress';
+
 export { default as btcGetAddress } from './btc/BTCGetAddress';
 export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';
 export { default as btcSignMessage } from './btc/BTCSignMessage';

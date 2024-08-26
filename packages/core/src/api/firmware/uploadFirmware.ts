@@ -3,7 +3,13 @@ import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Success } from '@onekeyfe/hd-transport';
-import { wait, getDeviceBootloaderVersion, getDeviceType } from '../../utils';
+import {
+  wait,
+  getDeviceBootloaderVersion,
+  getDeviceType,
+  LoggerNames,
+  getLogger,
+} from '../../utils';
 import { DEVICE, CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
 import { PROTO } from '../../constants';
 import type { Device } from '../../device/Device';
@@ -15,6 +21,8 @@ import { DevicePool } from '../../device/DevicePool';
 
 const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
+
+const Log = getLogger(LoggerNames.Core);
 
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
@@ -235,7 +243,7 @@ const emmcFileWriteWithRetry = async (
       const result = await writeFunc();
       return result;
     } catch (error) {
-      console.error(`emmcWrite error: `, error);
+      Log.error(`emmcWrite error: `, error);
       retryCount--;
       if (retryCount === 0) {
         throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');

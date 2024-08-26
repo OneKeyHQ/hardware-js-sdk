@@ -44,11 +44,25 @@ import DeviceConnector from '../device/DeviceConnector';
 
 const Log = getLogger(LoggerNames.Core);
 
+function hasDeriveCardano(method: BaseMethod): boolean {
+  if (
+    method.name.startsWith('allNetworkGetAddress') &&
+    method.payload &&
+    method.payload.bundle &&
+    // @ts-expect-error
+    method.payload.bundle.some(net => net && net.network === 'ada')
+  ) {
+    return true;
+  }
+
+  return method.name.startsWith('cardano') || method.payload?.deriveCardano;
+}
+
 const parseInitOptions = (method?: BaseMethod): InitOptions => ({
   initSession: method?.payload.initSession,
   passphraseState: method?.payload.passphraseState,
   deviceId: method?.payload.deviceId,
-  deriveCardano: method?.name.startsWith('cardano') || method?.payload?.deriveCardano,
+  deriveCardano: method && hasDeriveCardano(method),
 });
 
 let _core: Core;
@@ -283,6 +297,7 @@ export const callAPI = async (message: CoreMessage) => {
       }
 
       try {
+        console.log('=====>>>>>>Call API - Inner Running method', method.payload);
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ');
         messageResponse = createResponseMessage(method.responseID, true, response);
