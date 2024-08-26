@@ -97,7 +97,7 @@ export const baseParams = {
     showOnOneKey: false,
   },
   scdoGetAddress: {
-    path: `m/44'/541'/0'/0/${INDEX_MARK}`,
+    path: `m/44'/541'/${INDEX_MARK}'/0/0`,
     showOnOneKey: false,
   },
   solGetAddress: {

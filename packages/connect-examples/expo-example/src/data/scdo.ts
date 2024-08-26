@@ -21,11 +21,11 @@ const api: PlaygroundProps[] = [
               showOnOneKey: false,
             },
             {
-              path: "m/44'/541'/0'/0/1",
+              path: "m/44'/541'/1'/0/0",
               showOnOneKey: false,
             },
             {
-              path: "m/44'/541'/0'/0/2",
+              path: "m/44'/541'/2'/0/0",
               showOnOneKey: false,
             },
           ],
