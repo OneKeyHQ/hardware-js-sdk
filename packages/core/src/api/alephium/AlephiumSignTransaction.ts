@@ -38,11 +38,11 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
 
   getVersionRange() {
     return {
-      model_mini: {
-        min: '3.0.0',
+      classic1s: {
+        min: '4.0.0',
       },
       model_touch: {
-        min: '4.3.0',
+        min: '4.10.0',
       },
     };
   }

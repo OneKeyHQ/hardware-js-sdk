@@ -1,6 +1,11 @@
 export const COINTYPE_MARK = '$$COINTYPE$$';
 
 export const baseParams = {
+  alephiumSignTransaction: {
+    path: `m/44'/${COINTYPE_MARK}'/0'/0/0`,
+    rawTx:
+      '00010080004e20c1174876e80001f3bf9d774d87e65e79a72d5482da5ef35aac8d0b930b394bdd67586930f6ae7b4fd8362b0003f6bd3137b3cadbad59a73527c3b8e26429bba093722a59639f22af9d2adb477302c40de0b6b3a7640000001e98167f559360e002c3f3ceb3cc95c1dad848403f0296c76439093d2b9879ac00000000000000000000c43c7a13049ed60800001e98167f559360e002c3f3ceb3cc95c1dad848403f0296c76439093d2b9879ac00000000000000000000',
+  },
   algoSignTransaction: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0'/0'`,
     rawTx:
@@ -169,6 +174,14 @@ export const baseParams = {
     rawTx:
       '050000950ca256090ba9a4cd520e1d891081207e112b1353bbe8da0cd8a910d684481a025a6202c500040000154a0f001a00000091b171bb158e2d3848fa23a9f1c25182fb8e20313b2c1eb49219da7a70ce90c3e7f75975e0a90fd10ab432c76d9a0eb2b140732e4d7748c813d3d787909edfb300',
   },
+  scdoSignTransaction: {
+    path: `m/44'/${COINTYPE_MARK}'/0'/0/0`,
+    nonce: '0x0',
+    gasPrice: '0xbebc200',
+    gasLimit: '0x5208',
+    to: '1S0118a02f993fc7a4348fd36b7f7a596948f02b31',
+    value: '0xf4240',
+  },
   solSignTransaction: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0'`,
     rawTx:
@@ -243,6 +256,11 @@ export const baseParams = {
   },
 
   // ======= signMessage =======
+  alephiumSignMessage: {
+    path: `m/44'/${COINTYPE_MARK}'/0'/0/0`,
+    messageHex: '010203',
+    messageType: 'alephium',
+  },
   aptosSignMessage: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0'/0'`,
     payload: {
@@ -268,6 +286,25 @@ export const baseParams = {
     domainHash: '7c872d109a4e735dc1886c72af47e9b4888a1507557e0f49c85b570019163373',
     messageHash: '0x07bc1c4f3268fc74b60587e9bb7e01e38a7d8a9a3f51202bf25332aa2c75c644',
   },
+  scdoSignMessage: {
+    path: `m/44'/${COINTYPE_MARK}'/0'/0/0`,
+    messageHex: Buffer.from('hello', 'utf8').toString('hex'),
+  },
+  tonSignMessage: {
+    path: `m/44'/${COINTYPE_MARK}'/0'`,
+    destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+    tonAmount: 100,
+    seqno: 0,
+    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    jettonMasterAddress: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+    jettonAmount: 101,
+    fwdFee: 100,
+    comment: '48656c6c6f204f6e654b6579',
+    mode: 1,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false,
+  },
   starcoinSignMessage: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0'/0'`,
     messageHex: '6578616d706c65206d657373616765',
@@ -279,5 +316,14 @@ export const baseParams = {
   tronSignMessage: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0/0`,
     messageHex: '0x6578616d706c65206d657373616765',
+  },
+  tonSignProof: {
+    path: `m/44'/${COINTYPE_MARK}'/0'`,
+    appdomain: 'onekey.so',
+    comment: '48656c6c6f204f6e654b6579',
+    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false,
   },
 };

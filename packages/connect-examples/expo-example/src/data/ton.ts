@@ -8,7 +8,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'Get address',
         value: {
-          path: "m/44'/607'/0'/0'/0'/0'",
+          path: "m/44'/607'/0'",
           showOnOneKey: false,
           walletVersion: 3,
           isBounceable: false,
@@ -18,7 +18,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'Get multiaddress',
         value: {
-          path: "m/44'/607'/0'/0'/1'/0'",
+          path: "m/44'/607'/1'",
           showOnOneKey: false,
           walletVersion: 3,
           isBounceable: false,
@@ -30,21 +30,21 @@ const api: PlaygroundProps[] = [
         value: {
           bundle: [
             {
-              path: "m/44'/607'/0'/0'/0'/0'",
+              path: "m/44'/607'/0'",
               showOnOneKey: false,
               walletVersion: 3,
               isBounceable: false,
               isTestnetOnly: false,
             },
             {
-              path: "m/44'/607'/1'/0'/0'/0'",
+              path: "m/44'/607'/1'",
               showOnOneKey: false,
               walletVersion: 3,
               isBounceable: false,
               isTestnetOnly: false,
             },
             {
-              path: "m/44'/607'/2'/0'/0'/0'",
+              path: "m/44'/607'/2'",
               showOnOneKey: false,
               walletVersion: 3,
               isBounceable: false,
@@ -62,7 +62,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'Native',
         value: {
-          path: "m/44'/607'/0'/0'/0'/0'",
+          path: "m/44'/607'/0'",
           destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
           tonAmount: 100,
           seqno: 0,
@@ -75,7 +75,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'Multiple Native',
         value: {
-          path: "m/44'/607'/0'/0'/0'/0'",
+          path: "m/44'/607'/0'",
           destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
           tonAmount: 100,
           seqno: 0,
@@ -91,7 +91,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'Token',
         value: {
-          path: "m/44'/607'/0'/0'/0'/0'",
+          path: "m/44'/607'/0'",
           destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
           tonAmount: 100,
           seqno: 0,
@@ -115,7 +115,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'Sign Proof',
         value: {
-          path: "m/44'/607'/0'/0'/0'/0'",
+          path: "m/44'/607'/0'",
           appdomain: 'onekey.so',
           comment: '48656c6c6f204f6e654b6579',
           expireAt: Date.now() + 1000 * 60 * 60 * 24,

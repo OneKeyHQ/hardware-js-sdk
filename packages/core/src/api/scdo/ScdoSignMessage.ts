@@ -28,11 +28,11 @@ export default class ScdoSignMessage extends BaseMethod<HardwareScdoSignMessage>
 
   getVersionRange() {
     return {
-      model_mini: {
-        min: '3.4.0',
+      classic1s: {
+        min: '4.0.0',
       },
       model_touch: {
-        min: '4.6.0',
+        min: '4.10.0',
       },
     };
   }

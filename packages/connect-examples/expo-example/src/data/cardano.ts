@@ -237,7 +237,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'Sign Message',
         value: {
-          path: "m/1852'/1815'/0'",
+          path: "m/1852'/1815'/0'/0/0",
           message: 'Hello World',
           derivationType: 1,
           networkId: 1,

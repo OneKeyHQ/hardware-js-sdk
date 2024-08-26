@@ -117,7 +117,7 @@ export const baseParams = {
     showOnOneKey: false,
   },
   tonGetAddress: {
-    path: `m/44'/607'/0'/0'/${INDEX_MARK}'/0'`,
+    path: `m/44'/607'/${INDEX_MARK}'`,
     showOnOneKey: false,
     walletVersion: 3,
     isBounceable: false,

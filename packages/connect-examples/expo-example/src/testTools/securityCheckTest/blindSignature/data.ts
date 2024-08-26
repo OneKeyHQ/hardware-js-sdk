@@ -6,6 +6,13 @@ export type TestCaseDataType = {
 
 export default [
   {
+    method: 'alephiumSignTransaction',
+    expected: {
+      '1234': true,
+      '60': false,
+    },
+  },
+  {
     method: 'algoSignTransaction',
     expected: {
       '283': true,
@@ -108,6 +115,14 @@ export default [
     },
   },
   {
+    method: 'scdoSignTransaction',
+    expected: {
+      '541': true,
+      '999': false,
+      '60': false,
+    },
+  },
+  {
     method: 'starcoinSignTransaction',
     expected: {
       '101010': true,
@@ -136,6 +151,13 @@ export default [
     },
   },
   {
+    method: 'tonSignMessage',
+    expected: {
+      '607': true,
+      '60': false,
+    },
+  },
+  {
     method: 'tronSignTransaction',
     expected: {
       '195': true,
@@ -144,6 +166,13 @@ export default [
   },
 
   // ==== sign message ====
+  {
+    method: 'alephiumSignMessage',
+    expected: {
+      '1234': true,
+      '60': false,
+    },
+  },
   {
     method: 'aptosSignMessage',
     expected: {
@@ -166,6 +195,14 @@ export default [
     },
   },
   {
+    method: 'scdoSignMessage',
+    expected: {
+      '541': true,
+      '999': false,
+      '60': false,
+    },
+  },
+  {
     method: 'starcoinSignMessage',
     expected: {
       '101010': true,
@@ -183,6 +220,13 @@ export default [
     method: 'tronSignMessage',
     expected: {
       '195': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'tonSignProof',
+    expected: {
+      '607': true,
       '60': false,
     },
   },
