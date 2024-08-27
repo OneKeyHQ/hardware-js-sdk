@@ -6,7 +6,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { ScdoSignTransactionParams } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
-import { formatAnyHex } from '../helpers/hexUtils';
+import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
 
 export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> {
   init() {
@@ -34,12 +34,12 @@ export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> 
     // init params
     this.params = {
       address_n: addressN,
-      nonce: formatAnyHex(nonce),
-      gas_price: formatAnyHex(gasPrice),
-      gas_limit: formatAnyHex(gasLimit),
+      nonce: stripHexStartZeroes(formatAnyHex(nonce)),
+      gas_price: stripHexStartZeroes(formatAnyHex(gasPrice)),
+      gas_limit: stripHexStartZeroes(formatAnyHex(gasLimit)),
       to,
-      value: formatAnyHex(value),
-      timestamp: timestamp ? formatAnyHex(timestamp) : undefined,
+      value: stripHexStartZeroes(formatAnyHex(value)),
+      timestamp: timestamp ? stripHexStartZeroes(formatAnyHex(timestamp)) : undefined,
       tx_type: txType,
     };
   }

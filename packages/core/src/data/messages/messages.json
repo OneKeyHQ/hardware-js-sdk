@@ -121,11 +121,11 @@
           }
         },
         "message": {
-          "type": "string",
+          "type": "bytes",
           "id": 2
         },
         "message_type": {
-          "type": "string",
+          "type": "bytes",
           "id": 3
         }
       }

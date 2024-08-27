@@ -24,7 +24,7 @@ export default class AlephiumSignMessage extends BaseMethod<HardwareAlephiumSign
     this.params = {
       address_n: addressN,
       message: stripHexPrefix(messageHex),
-      message_type: messageType ?? 'alephium',
+      message_type: Buffer.from(messageType ?? 'alephium', 'utf-8').toString('hex'),
     };
   }
 

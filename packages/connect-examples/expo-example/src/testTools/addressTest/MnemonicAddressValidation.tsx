@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
 import { Input, Label, Stack, Text, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
-import { get } from 'lodash';
+import { get, isEmpty } from 'lodash';
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
@@ -17,6 +17,7 @@ import { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRun
 import mockDevice from '../../utils/mockDevice';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import { CommonInput } from '../../components/CommonInput';
 
 type TestCaseDataType = {
   id: string;
@@ -159,6 +160,9 @@ function ExecuteView() {
   const { openDialog } = useHardwareInputPinDialog();
 
   const [mnemonic, setMnemonic] = useState<string>('');
+  const [passphrase, setPassphrase] = useState<string>('');
+  const currentPassphrase = useRef<string | undefined>('');
+  const currentPassphraseState = useRef<string | undefined>('');
 
   const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
@@ -170,20 +174,51 @@ function ExecuteView() {
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           openDialog(sdk, message.payload.device.features);
         }
+        if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+          setTimeout(() => {
+            sdk.uiResponse({
+              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+              payload: {
+                value: currentPassphrase.current ?? '',
+              },
+            });
+          }, 200);
+        }
       };
       sdk.on(UI_EVENT, hardwareUiEventListener);
       return Promise.resolve();
     },
     prepareRunner: async (connectId, deviceId, features, sdk) => {
+      currentPassphraseState.current = undefined;
+
       if (!mnemonic) {
         alert(intl.formatMessage({ id: 'message__message_is_empty' }));
         return Promise.reject();
       }
 
-      if (features?.passphrase_protection) {
-        await sdk.deviceSettings(connectId, {
-          usePassphrase: false,
+      if (isEmpty(currentPassphrase.current)) {
+        if (features?.passphrase_protection) {
+          await sdk.deviceSettings(connectId, {
+            usePassphrase: false,
+          });
+        }
+      } else {
+        if (!features?.passphrase_protection) {
+          await sdk.deviceSettings(connectId, {
+            usePassphrase: true,
+          });
+        }
+        const passphraseStateRes = await sdk.getPassphraseState(connectId, {
+          initSession: true,
+          useEmptyPassphrase: false,
         });
+
+        if (!passphraseStateRes.success) {
+          alert('获取 passphraseState 失败');
+          return Promise.reject();
+        }
+
+        currentPassphraseState.current = passphraseStateRes.payload;
       }
     },
     initTestCase: async (context, sdk) => {
@@ -201,6 +236,7 @@ function ExecuteView() {
             const mockRes = await mockDevice?.[method]?.('', '', {
               ...params,
               mnemonic: mnemonic.trim(),
+              passphrase: currentPassphrase.current,
             });
 
             const key = `${item.id}-${method}-${variant}`;
@@ -245,6 +281,7 @@ function ExecuteView() {
         // passphraseState: item.passphraseState,
         // useEmptyPassphrase: !item.passphrase,
         showOnOneKey,
+        passphraseState: currentPassphraseState.current,
       };
 
       return Promise.resolve({
@@ -281,6 +318,21 @@ function ExecuteView() {
     },
   });
 
+  const passphraseInputMemo = useMemo(
+    () => (
+      <CommonInput
+        type="text"
+        label="Passphrase"
+        value={passphrase}
+        onChange={v => {
+          setPassphrase(v);
+          currentPassphrase.current = v;
+        }}
+      />
+    ),
+    [passphrase]
+  );
+
   const contentMemo = useMemo(
     () => (
       <Stack flexDirection="row" flexWrap="wrap" gap="$2">
@@ -302,6 +354,7 @@ function ExecuteView() {
             onChangeText={str => setMnemonic(str)}
           />
         </Stack>
+        {passphraseInputMemo}
         <SwitchInput
           label={intl.formatMessage({ id: 'label__show_on_onekey' })}
           value={showOnOneKey}
@@ -311,7 +364,7 @@ function ExecuteView() {
         <ExportReportView />
       </Stack>
     ),
-    [beginTest, intl, mnemonic, showOnOneKey, stopTest]
+    [beginTest, intl, mnemonic, passphraseInputMemo, showOnOneKey, stopTest]
   );
 
   return contentMemo;
