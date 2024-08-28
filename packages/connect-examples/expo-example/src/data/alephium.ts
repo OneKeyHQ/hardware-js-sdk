@@ -41,7 +41,7 @@ const api: PlaygroundProps[] = [
         title: 'Sign Alephium',
         value: {
           path: "m/44'/1234'/0'/0/0",
-          messageHex: '010203',
+          messageHex: '68656c6c6f',
           messageType: 'alephium',
         },
       },
@@ -49,7 +49,7 @@ const api: PlaygroundProps[] = [
         title: 'Sign Sha256 (不支持)',
         value: {
           path: "m/44'/1234'/0'/0/0",
-          messageHex: '010203',
+          messageHex: '68656c6c6f',
           messageType: 'sha256',
         },
       },
@@ -57,7 +57,7 @@ const api: PlaygroundProps[] = [
         title: 'Sign Blake2b (不支持)',
         value: {
           path: "m/44'/1234'/0'/0/0",
-          messageHex: '010203',
+          messageHex: '68656c6c6f',
           messageType: 'blake2b',
         },
       },
@@ -65,7 +65,7 @@ const api: PlaygroundProps[] = [
         title: 'Sign Identity (不支持)',
         value: {
           path: "m/44'/1234'/0'/0/0",
-          messageHex: '010203',
+          messageHex: '68656c6c6f',
           messageType: 'identity',
         },
       },
