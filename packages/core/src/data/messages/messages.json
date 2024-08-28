@@ -10415,9 +10415,6 @@
     },
     "TonWalletVersion": {
       "values": {
-        "V3R1": 0,
-        "V3R2": 1,
-        "V4R1": 2,
         "V4R2": 3
       }
     },
@@ -10445,7 +10442,7 @@
           "type": "TonWalletVersion",
           "id": 3,
           "options": {
-            "default": "V3R2"
+            "default": "V4R2"
           }
         },
         "is_bounceable": {
@@ -10511,29 +10508,33 @@
           "type": "string",
           "id": 3
         },
+        "jetton_wallet_address": {
+          "type": "string",
+          "id": 4
+        },
         "ton_amount": {
           "rule": "required",
           "type": "uint64",
-          "id": 4
+          "id": 5
         },
         "jetton_amount": {
           "type": "uint64",
-          "id": 5
+          "id": 6
         },
         "fwd_fee": {
           "type": "uint64",
-          "id": 6,
+          "id": 7,
           "options": {
             "default": 0
           }
         },
         "comment": {
           "type": "string",
-          "id": 7
+          "id": 8
         },
         "mode": {
           "type": "uint32",
-          "id": 8,
+          "id": 9,
           "options": {
             "default": 3
           }
@@ -10541,59 +10542,65 @@
         "seqno": {
           "rule": "required",
           "type": "uint32",
-          "id": 9
+          "id": 10
         },
         "expire_at": {
           "rule": "required",
           "type": "uint64",
-          "id": 10
+          "id": 11
         },
         "wallet_version": {
           "type": "TonWalletVersion",
-          "id": 11,
+          "id": 12,
           "options": {
             "default": "V4R2"
           }
         },
         "wallet_id": {
           "type": "uint32",
-          "id": 12,
+          "id": 13,
           "options": {
             "default": 698983191
           }
         },
         "workchain": {
           "type": "TonWorkChain",
-          "id": 13,
+          "id": 14,
           "options": {
             "default": "BASECHAIN"
           }
         },
         "is_bounceable": {
           "type": "bool",
-          "id": 14,
+          "id": 15,
           "options": {
             "default": false
           }
         },
         "is_testnet_only": {
           "type": "bool",
-          "id": 15,
+          "id": 16,
           "options": {
             "default": false
           }
         },
         "ext_destination": {
+          "rule": "repeated",
           "type": "string",
-          "id": 16
-        },
-        "ext_ton_amount": {
-          "type": "uint64",
           "id": 17
         },
+        "ext_ton_amount": {
+          "rule": "repeated",
+          "type": "uint64",
+          "id": 18,
+          "options": {
+            "packed": false
+          }
+        },
         "ext_payload": {
+          "rule": "repeated",
           "type": "string",
-          "id": 18
+          "id": 19
         }
       }
     },
@@ -10602,6 +10609,10 @@
         "signature": {
           "type": "bytes",
           "id": 1
+        },
+        "signning_message": {
+          "type": "bytes",
+          "id": 2
         }
       }
     },

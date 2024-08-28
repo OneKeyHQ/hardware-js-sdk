@@ -83,9 +83,9 @@ const api: PlaygroundProps[] = [
           walletVersion: 3,
           isBounceable: false,
           isTestnetOnly: false,
-          extDestination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
-          extTonAmount: 100,
-          extPayload: '48656c6c6f204f6e654b6579',
+          extDestination: ['UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_'],
+          extTonAmount: [100],
+          extPayload: ['48656c6c6f204f6e654b6579'],
         },
       },
       {

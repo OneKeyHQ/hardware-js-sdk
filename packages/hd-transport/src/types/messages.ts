@@ -3833,9 +3833,6 @@ export type TezosSignedTx = {
 };
 
 export enum TonWalletVersion {
-  V3R1 = 0,
-  V3R2 = 1,
-  V4R1 = 2,
   V4R2 = 3,
 }
 
@@ -3866,6 +3863,7 @@ export type TonSignMessage = {
   address_n: number[];
   destination: string;
   jetton_master_address?: string;
+  jetton_wallet_address?: string;
   ton_amount: number;
   jetton_amount?: number;
   fwd_fee?: number;
@@ -3878,14 +3876,15 @@ export type TonSignMessage = {
   workchain?: TonWorkChain;
   is_bounceable?: boolean;
   is_testnet_only?: boolean;
-  ext_destination?: string;
-  ext_ton_amount?: number;
-  ext_payload?: string;
+  ext_destination: string[];
+  ext_ton_amount: number[];
+  ext_payload: string[];
 };
 
 // TonSignedMessage
 export type TonSignedMessage = {
   signature?: string;
+  signning_message?: string;
 };
 
 // TonSignProof

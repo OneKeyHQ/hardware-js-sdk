@@ -12,11 +12,11 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     // init params
-
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'destination', type: 'string' },
       { name: 'jettonMasterAddress', type: 'string' },
+      { name: 'jettonWalletAddress', type: 'string' },
       { name: 'tonAmount', type: 'number' },
       { name: 'jettonAmount', type: 'number' },
       { name: 'fwdFee', type: 'number' },
@@ -29,9 +29,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       { name: 'workchain' },
       { name: 'isBounceable', type: 'boolean' },
       { name: 'isTestnetOnly', type: 'boolean' },
-      { name: 'extDestination', type: 'string' },
-      { name: 'extTonAmount', type: 'number' },
-      { name: 'extPayload', type: 'string' },
+      { name: 'extDestination', type: 'array' },
+      { name: 'extTonAmount', type: 'array' },
+      { name: 'extPayload', type: 'array' },
     ]);
 
     const { path } = this.payload as TonSignMessageParams;
@@ -41,6 +41,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       address_n: addressN,
       destination: this.payload.destination,
       jetton_master_address: this.payload.jettonMasterAddress,
+      jetton_wallet_address: this.payload.jettonWalletAddress,
       ton_amount: this.payload.tonAmount,
       jetton_amount: this.payload.jettonAmount,
       fwd_fee: this.payload.fwdFee,
