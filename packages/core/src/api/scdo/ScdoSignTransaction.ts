@@ -22,7 +22,7 @@ export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> 
       { name: 'to', required: true, type: 'string' },
       { name: 'value', required: true, type: 'string' },
       { name: 'timestamp', type: 'string' },
-      { name: 'data', type: 'string' },
+      { name: 'data', type: 'hexString' },
       { name: 'txType', type: 'number' },
     ]);
 
@@ -86,7 +86,8 @@ export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> 
   async run() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
 
-    const data = this.payload?.data && Buffer.from(this.payload.data, 'hex');
+    const rawData = this.payload?.data;
+    const data = rawData && Buffer.from(stripHexStartZeroes(formatAnyHex(rawData)), 'hex');
     const offset = this.chunkByteSize;
     if (data && data.length > 0) {
       this.params.data_initial_chunk = bytesToHex(data.subarray(0, this.chunkByteSize));

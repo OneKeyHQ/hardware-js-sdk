@@ -24,23 +24,32 @@ const menuItems: MenuItem[] = [
 ];
 
 // 菜单按钮组件
-const MenuButton = ({
-  item,
+const MenuButtons = ({
+  visibleItems,
   currentRoute,
-  onPress,
+  navigate,
 }: {
-  item: MenuItem;
+  visibleItems: MenuItem[];
   currentRoute: string;
-  onPress: (route: string) => void;
+  navigate: (route: string) => void;
 }) => {
   const intl = useIntl();
+
   return (
-    <Button
-      variant={currentRoute === item.route ? 'primary' : 'secondary'}
-      onPress={() => onPress(item.route)}
-    >
-      {intl.formatMessage({ id: item.labelId })}
-    </Button>
+    visibleItems?.length > 0 && (
+      <Group orientation="horizontal">
+        {visibleItems.map(item => (
+          <Group.Item>
+            <Button
+              variant={currentRoute === item.route ? 'primary' : 'secondary'}
+              onPress={() => navigate(item.route)}
+            >
+              {intl.formatMessage({ id: item.labelId })}
+            </Button>
+          </Group.Item>
+        ))}
+      </Group>
+    )
   );
 };
 
@@ -50,9 +59,12 @@ const MenuListItem = ({ item, onPress }: { item: MenuItem; onPress: (route: stri
 
   return (
     <ListItem
-      variant="active"
       title={intl.formatMessage({ id: item.labelId })}
       onPress={() => onPress(item.route)}
+      fontWeight="bold"
+      textAlign="center"
+      size="$5"
+      color="black"
     />
   );
 };
@@ -99,20 +111,7 @@ const HeaderView = () => {
       <H3>Hardware Example</H3>
 
       <XStack minHeight={40} gap="$2">
-        {visibleItems?.length > 0 && (
-          <Group orientation="horizontal">
-            {visibleItems.map(item => (
-              <Group.Item>
-                <MenuButton
-                  key={item.route}
-                  item={item}
-                  currentRoute={route.name}
-                  onPress={navigate}
-                />
-              </Group.Item>
-            ))}
-          </Group>
-        )}
+        <MenuButtons visibleItems={visibleItems} currentRoute={route.name} navigate={navigate} />
 
         {dropdownItems?.length > 0 && (
           <>
@@ -137,7 +136,7 @@ const HeaderView = () => {
               />
               <Sheet.Handle />
               <Sheet.Frame padding="$4" justifyContent="center" alignItems="center">
-                <YGroup alignSelf="center" width={240}>
+                <YGroup alignSelf="center">
                   {dropdownItems.map(item => (
                     <MenuListItem key={item.route} item={item} onPress={navigate} />
                   ))}
