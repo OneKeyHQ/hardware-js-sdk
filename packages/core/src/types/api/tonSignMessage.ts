@@ -10,6 +10,7 @@ export type TonSignMessageParams = {
   jettonAmount?: number;
   fwdFee?: number;
   comment?: string;
+  isRawData?: boolean;
   mode?: number;
   seqno: number;
   expireAt: number;

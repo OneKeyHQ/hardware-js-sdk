@@ -3868,6 +3868,7 @@ export type TonSignMessage = {
   jetton_amount?: number;
   fwd_fee?: number;
   comment?: string;
+  is_raw_data?: boolean;
   mode?: number;
   seqno: number;
   expire_at: number;
