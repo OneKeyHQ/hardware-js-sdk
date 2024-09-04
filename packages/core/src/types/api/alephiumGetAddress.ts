@@ -1,13 +1,15 @@
-import { AlephiumAddress as HardwareAlephiumAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type AlephiumAddress = {
   path: string;
-} & HardwareAlephiumAddress;
+  publicKey?: string;
+  address: string;
+};
 
 export type AlephiumGetAddressParams = {
   path: string | number[];
   showOnOneKey?: boolean;
+  includePublicKey?: boolean;
 };
 
 export declare function alephiumGetAddress(

@@ -13,6 +13,10 @@
         "show_display": {
           "type": "bool",
           "id": 2
+        },
+        "include_public_key": {
+          "type": "bool",
+          "id": 3
         }
       }
     },
@@ -22,6 +26,10 @@
           "rule": "required",
           "type": "string",
           "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
         }
       }
     },

@@ -26,6 +26,7 @@ export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAd
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'showOnOneKey', type: 'boolean' },
+        { name: 'includePublicKey', type: 'boolean' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
@@ -33,6 +34,7 @@ export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAd
       this.params.push({
         address_n: addressN,
         show_display: showOnOneKey,
+        include_public_key: batch.includePublicKey ?? false,
       });
     });
   }
@@ -63,6 +65,7 @@ export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAd
       const result = {
         path: serializedPath(param.address_n),
         address,
+        publicKey: param.include_public_key ? res.message.public_key : undefined,
       };
       responses.push(result);
 

@@ -7,11 +7,13 @@ export type UintType = string | number;
 export type AlephiumGetAddress = {
   address_n: number[];
   show_display?: boolean;
+  include_public_key?: boolean;
 };
 
 // AlephiumAddress
 export type AlephiumAddress = {
   address: string;
+  public_key?: string;
 };
 
 // AlephiumSignTx
