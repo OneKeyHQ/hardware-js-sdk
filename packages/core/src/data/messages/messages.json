@@ -17,6 +17,10 @@
         "include_public_key": {
           "type": "bool",
           "id": 3
+        },
+        "target_group": {
+          "type": "uint32",
+          "id": 4
         }
       }
     },
@@ -30,6 +34,14 @@
         "public_key": {
           "type": "bytes",
           "id": 2
+        },
+        "derived_path": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 3,
+          "options": {
+            "packed": false
+          }
         }
       }
     },

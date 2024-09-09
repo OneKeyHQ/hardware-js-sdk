@@ -8,12 +8,14 @@ export type AlephiumGetAddress = {
   address_n: number[];
   show_display?: boolean;
   include_public_key?: boolean;
+  target_group: number;
 };
 
 // AlephiumAddress
 export type AlephiumAddress = {
   address: string;
   public_key?: string;
+  derived_path: number[];
 };
 
 // AlephiumSignTx

@@ -4,12 +4,14 @@ export type AlephiumAddress = {
   path: string;
   publicKey?: string;
   address: string;
+  derivedPath: string;
 };
 
 export type AlephiumGetAddressParams = {
   path: string | number[];
   showOnOneKey?: boolean;
   includePublicKey?: boolean;
+  group: number;
 };
 
 export declare function alephiumGetAddress(

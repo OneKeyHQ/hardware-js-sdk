@@ -10,6 +10,7 @@ const api: PlaygroundProps[] = [
         value: {
           path: "m/44'/1234'/0'/0/0",
           showOnOneKey: false,
+          group: 0,
         },
       },
       {
@@ -19,14 +20,17 @@ const api: PlaygroundProps[] = [
             {
               path: "m/44'/1234'/0'/0/0",
               showOnOneKey: false,
+              group: 0,
             },
             {
               path: "m/44'/1234'/0'/0/1",
               showOnOneKey: false,
+              group: 0,
             },
             {
               path: "m/44'/1234'/0'/0/2",
               showOnOneKey: false,
+              group: 0,
             },
           ],
         },
