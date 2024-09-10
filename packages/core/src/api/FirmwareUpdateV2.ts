@@ -234,7 +234,14 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       // auto go to bootloader mode
       try {
         this.postTipMessage('AutoRebootToBootloader');
-        const bootRes = await commands.typedCall('DeviceBackToBoot', 'Success');
+        let bootRes;
+        if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+          // @ts-expect-error
+          bootRes = await commands.typedCall('BixinReboot', 'Success');
+        } else {
+          bootRes = await commands.typedCall('DeviceBackToBoot', 'Success');
+        }
+
         // @ts-expect-error
         if (bootRes.type === 'CallMethodError') {
           throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);

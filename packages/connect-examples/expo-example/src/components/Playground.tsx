@@ -2,20 +2,46 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Clipboard from 'expo-clipboard';
 import { Group, H4, Stack, Text } from 'tamagui';
 import { useIntl } from 'react-intl';
+import { IDeviceType } from '@onekeyfe/hd-core';
 import PlaygroundExecutor, { type MethodPayload } from './PlaygroundExecutor';
 import { useExpandMode } from '../provider/ExpandModeProvider';
 import { Button } from './ui/Button';
 import AutoWrapperTextArea from './ui/AutoWrapperTextArea';
 
+export type TestDeviceType = IDeviceType | 'common';
+
+export interface TestExpect {
+  skip?: boolean;
+  success?: boolean;
+  requestPin?: boolean;
+  requestButton?: boolean;
+  unknownMessage?: boolean;
+  error?: boolean | number;
+}
+
+export interface TestModalExpect {
+  normal?: TestExpect;
+  bootloader?: TestExpect;
+}
+
+export type TestDeviceExpect = {
+  [key in TestDeviceType]?: TestModalExpect;
+};
+
 export interface PresupposeProps {
   title: string;
   value: any; // JSON object
+
+  expect?: TestDeviceExpect;
 }
 
 export type PlaygroundProps = {
   description: string;
   presupposes?: PresupposeProps[];
   deprecated?: boolean;
+
+  // eslint-disable-next-line react/no-unused-prop-types
+  expect?: TestDeviceExpect;
 } & MethodPayload;
 
 const Playground = ({

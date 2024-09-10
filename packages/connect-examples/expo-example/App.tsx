@@ -5,7 +5,7 @@ import { TamaguiProvider } from '@tamagui/core';
 import { PortalProvider, Text, Stack, Card } from 'tamagui';
 import * as ExpoLinking from 'expo-linking';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import Watermark from '@uiw/react-watermark';
 import { useIntl } from 'react-intl';
 import SDKProvider from './src/provider/SDKProvider';
 

@@ -6,16 +6,70 @@ const api: PlaygroundProps[] = [
     description: 'Search for devices',
     noConnIdReq: true,
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+    },
   },
   {
     method: 'getFeatures',
     description: 'Get features of a device',
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+    },
   },
   {
     method: 'getOnekeyFeatures',
     description: 'Get features of a device',
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+      classic: {
+        normal: {
+          unknownMessage: true,
+        },
+        bootloader: {
+          unknownMessage: true,
+        },
+      },
+      classic1s: {
+        normal: {
+          unknownMessage: true,
+        },
+        bootloader: {
+          unknownMessage: true,
+        },
+      },
+      mini: {
+        normal: {
+          unknownMessage: true,
+        },
+        bootloader: {
+          unknownMessage: true,
+        },
+      },
+    },
   },
   {
     method: 'getPassphraseState',
@@ -26,23 +80,63 @@ const api: PlaygroundProps[] = [
     method: 'cancel',
     description: 'Cancel a request',
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          skip: true,
+        },
+        bootloader: {
+          skip: true,
+        },
+      },
+    },
   },
   {
     method: 'checkBridgeStatus',
     description: 'Check bridge status of a device',
     noConnIdReq: true,
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          skip: true,
+        },
+        bootloader: {
+          skip: true,
+        },
+      },
+    },
   },
   {
     method: 'checkBridgeRelease',
     description: 'Check bridge release of a device',
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          skip: true,
+        },
+        bootloader: {
+          skip: true,
+        },
+      },
+    },
   },
   {
     method: 'getLogs',
     description: 'get logs',
     noDeviceIdReq: true,
     noConnIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+    },
   },
 ];
 

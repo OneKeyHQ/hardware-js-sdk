@@ -103,6 +103,13 @@ const api: PlaygroundProps[] = [
       },
     ],
     deprecated: true,
+    expect: {
+      common: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+    },
   },
   {
     method: 'evmSignTransaction',
@@ -457,6 +464,23 @@ const api: PlaygroundProps[] = [
           signature:
             '11dc86c631ef5d9388c5e245501d571b864af1a717cbbb3ca1f6dacbf330742957242aa52b36bbe7bb46dce6ff0ead0548cc5a5ce76d0aaed166fd40cb3fc6e51c',
           chainId: 1,
+        },
+        expect: {
+          common: {
+            normal: {
+              requestButton: true,
+            },
+          },
+          touch: {
+            normal: {
+              requestPin: true,
+            },
+          },
+          pro: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
     ],

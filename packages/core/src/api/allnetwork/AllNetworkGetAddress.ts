@@ -225,8 +225,6 @@ export default class AllNetworkGetAddress extends BaseMethod<
     validateParams(this.payload, [{ name: 'bundle', type: 'array' }]);
 
     // check bundle
-    console.log('=====>>>>>> this.payload.bundle', this.payload.bundle);
-
     this.payload.bundle.forEach((batch: AllNetworkAddressParams) => {
       validateParams(batch, [
         { name: 'path', required: true },

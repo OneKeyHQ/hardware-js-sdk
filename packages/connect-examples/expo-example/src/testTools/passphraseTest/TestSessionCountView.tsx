@@ -350,6 +350,7 @@ export default function TestSessionCountView() {
     SDK,
     appendLastRunnerLog,
     intl,
+    openDialog,
     pushRunnerLog,
     selectedDevice?.connectId,
     showOnOneKey,

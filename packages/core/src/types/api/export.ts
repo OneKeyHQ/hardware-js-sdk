@@ -158,3 +158,11 @@ export type { DnxTxKey, DnxSignTransactionParams, DnxSignature } from './dnxSign
 export type { TonAddress, TonGetAddressParams } from './tonGetAddress';
 export type { TonSignMessageParams } from './tonSignMessage';
 export type { TonSignProofParams } from './tonSignProof';
+
+export type { ScdoAddress, ScdoGetAddressParams } from './scdoGetAddress';
+export type { ScdoSignMessageParams } from './scdoSignMessage';
+export type { ScdoSignTransactionParams, ScdoSignedTx } from './scdoSignTransaction';
+
+export type { AlephiumAddress, AlephiumGetAddressParams } from './alephiumGetAddress';
+export type { AlephiumSignMessageParams } from './alephiumSignMessage';
+export type { AlephiumSignTransactionParams, AlephiumSignedTx } from './alephiumSignTransaction';

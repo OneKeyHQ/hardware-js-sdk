@@ -19,6 +19,11 @@ export const baseParams = {
     showOnOneKey: false,
     isCheck: false,
   },
+  alephiumGetAddress: {
+    path: `m/44'/1234'/0'/0/${INDEX_MARK}`,
+    showOnOneKey: false,
+    group: 0,
+  },
   algoGetAddress: {
     path: `m/44'/283'/0'/0'/${INDEX_MARK}'`,
     showOnOneKey: false,
@@ -92,6 +97,10 @@ export const baseParams = {
     path: `m/44'/144'/${INDEX_MARK}'/0/0`,
     showOnOneKey: false,
   },
+  scdoGetAddress: {
+    path: `m/44'/541'/${INDEX_MARK}'/0/0`,
+    showOnOneKey: false,
+  },
   solGetAddress: {
     path: `m/44'/501'/${INDEX_MARK}'/0'`,
     showOnOneKey: false,
@@ -107,6 +116,13 @@ export const baseParams = {
   suiGetAddress: {
     path: `m/44'/784'/${INDEX_MARK}'/0'/0'`,
     showOnOneKey: false,
+  },
+  tonGetAddress: {
+    path: `m/44'/607'/${INDEX_MARK}'`,
+    showOnOneKey: false,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false,
   },
   tronGetAddress: {
     path: `m/44'/195'/0'/0/${INDEX_MARK}`,

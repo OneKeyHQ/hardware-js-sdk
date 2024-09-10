@@ -32,6 +32,23 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+    expect: {
+      common: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+      classic: {
+        normal: {
+          requestPin: true,
+        },
+      },
+      classic1s: {
+        normal: {
+          requestPin: true,
+        },
+      },
+    },
   },
   {
     method: 'dnxSignTransaction',
@@ -57,6 +74,23 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+    expect: {
+      common: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+      classic: {
+        normal: {
+          requestPin: true,
+        },
+      },
+      classic1s: {
+        normal: {
+          requestPin: true,
+        },
+      },
+    },
   },
 ];
 

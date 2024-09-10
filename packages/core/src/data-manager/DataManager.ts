@@ -1,7 +1,6 @@
 import axios from 'axios';
 import semver from 'semver';
-import MessagesJSON from '../data/messages/messages.json';
-import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
+
 import {
   getTimeStamp,
   getDeviceBLEFirmwareVersion,
@@ -23,6 +22,7 @@ import type {
 } from '../types';
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
+import { getCommonMessages as getCommonMessageJson } from './MessagesManager';
 
 export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5';
 
@@ -55,11 +55,6 @@ export default class DataManager {
   static assets: AssetsMap | null = null;
 
   static settings: ConnectSettings;
-
-  static messages: { [version in MessageVersion]: JSON } = {
-    latest: MessagesJSON as unknown as JSON,
-    v1: MessagesLegacyV1JSON as unknown as JSON,
-  };
 
   static lastCheckTimestamp = 0;
 
@@ -308,8 +303,8 @@ export default class DataManager {
     }
   }
 
-  static getProtobufMessages(messageVersion: MessageVersion = 'latest'): JSON {
-    return this.messages[messageVersion];
+  static getCommonMessages(): JSON {
+    return getCommonMessageJson();
   }
 
   static getSettings(key?: undefined): ConnectSettings;

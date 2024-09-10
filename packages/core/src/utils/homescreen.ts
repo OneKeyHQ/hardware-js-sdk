@@ -1,5 +1,7 @@
+import semver from 'semver';
 import type { Features, IDeviceType } from '../types';
 import { getDeviceType } from './deviceInfoUtils';
+import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 
 type IScreenData = { name: string; hex: string };
 
@@ -229,10 +231,9 @@ export const getProData = (): Record<string, IScreenData> => ({
   'wallpaper-2': { name: 'wallpaper-2', hex: '77616c6c70617065722d322e6a7067' },
   'wallpaper-3': { name: 'wallpaper-3', hex: '77616c6c70617065722d332e6a7067' },
   'wallpaper-4': { name: 'wallpaper-4', hex: '77616c6c70617065722d342e6a7067' },
-  // Current version cannot be modified
-  // 'wallpaper-5': { name: 'wallpaper-5', hex: '77616c6c70617065722d352e6a7067' },
-  // 'wallpaper-6': { name: 'wallpaper-6', hex: '77616c6c70617065722d362e6a7067' },
-  // 'wallpaper-7': { name: 'wallpaper-7', hex: '77616c6c70617065722d372e6a7067' },
+  'wallpaper-5': { name: 'wallpaper-5', hex: '77616c6c70617065722d352e6a7067' },
+  'wallpaper-6': { name: 'wallpaper-6', hex: '77616c6c70617065722d362e6a7067' },
+  'wallpaper-7': { name: 'wallpaper-7', hex: '77616c6c70617065722d372e6a7067' },
 });
 
 export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
@@ -259,6 +260,7 @@ export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
 export const getHomeScreenDefaultList = (features: Features) => {
   let data: Record<string, IScreenData>;
   const deviceType = getDeviceType(features);
+  const deviceVersion = getDeviceFirmwareVersion(features).join('.');
 
   switch (deviceType) {
     case 'classic':
@@ -270,7 +272,16 @@ export const getHomeScreenDefaultList = (features: Features) => {
       data = getTouchData();
       break;
     case 'pro':
-      data = getProData();
+      if (semver.gte(deviceVersion, '4.10.0')) {
+        data = getProData();
+      } else {
+        data = Object.keys(getProData())
+          .slice(0, 4)
+          .reduce((obj, key) => {
+            obj[key] = getProData()[key];
+            return obj;
+          }, {} as Record<string, IScreenData>);
+      }
       break;
     default:
       data = {};

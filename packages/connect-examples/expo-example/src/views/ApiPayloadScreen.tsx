@@ -38,6 +38,10 @@ const playgroundConfig = [
     data: require('../data/ethereum').default,
   },
   {
+    title: 'Alephium API',
+    data: require('../data/alephium').default,
+  },
+  {
     title: 'Algo API',
     data: require('../data/algo').default,
   },
@@ -102,6 +106,10 @@ const playgroundConfig = [
     data: require('../data/ripple').default,
   },
   {
+    title: 'Scdo API',
+    data: require('../data/scdo').default,
+  },
+  {
     title: 'Solana API',
     data: require('../data/solana').default,
   },
@@ -124,6 +132,30 @@ const playgroundConfig = [
   {
     title: 'TRON API',
     data: require('../data/tron').default,
+  },
+  {
+    title: 'Ethereum Trezor API',
+    data: require('../data/ethereumTrezor').default,
+  },
+  {
+    title: 'Crypto API',
+    data: require('../data/crypto').default,
+  },
+  {
+    title: 'Other API',
+    data: require('../data/other').default,
+  },
+  {
+    title: 'Manager API',
+    data: require('../data/manager').default,
+  },
+  {
+    title: 'Emmc API',
+    data: require('../data/emmc').default,
+  },
+  {
+    title: 'Debug API',
+    data: require('../data/debug').default,
   },
 ];
 

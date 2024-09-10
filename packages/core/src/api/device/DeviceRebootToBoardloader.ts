@@ -22,7 +22,7 @@ export default class DeviceRebootToBoardloader extends BaseMethod<RebootToBoardl
   async run() {
     // On Touch devices, messsage code 904 is RebootToBoardloader
     // so BininOutMessageSE message code 904 is used here
-    const res = await this.device.commands.typedCall('BixinOutMessageSE', 'Success');
+    const res = await this.device.commands.typedCall('RebootToBoardloader', 'Success');
 
     return Promise.resolve(res.message);
   }
