@@ -21,7 +21,7 @@ export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> 
       { name: 'gasLimit', required: true, type: 'string' },
       { name: 'to', required: true, type: 'string' },
       { name: 'value', required: true, type: 'string' },
-      { name: 'timestamp', type: 'string' },
+      { name: 'timestamp', required: true, type: 'string' },
       { name: 'data', type: 'hexString' },
       { name: 'txType', type: 'number' },
     ]);

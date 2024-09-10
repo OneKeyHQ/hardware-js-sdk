@@ -59,6 +59,7 @@ const api: PlaygroundProps[] = [
           gasLimit: '0x5208',
           to: '1S0118a02f993fc7a4348fd36b7f7a596948f02b31',
           value: '0xf4240',
+          timestamp: '0',
         },
       },
     ],
