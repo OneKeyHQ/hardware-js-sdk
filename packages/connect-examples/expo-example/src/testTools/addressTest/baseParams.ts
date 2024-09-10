@@ -22,6 +22,7 @@ export const baseParams = {
   alephiumGetAddress: {
     path: `m/44'/1234'/0'/0/${INDEX_MARK}`,
     showOnOneKey: false,
+    group: 0,
   },
   algoGetAddress: {
     path: `m/44'/283'/0'/0'/${INDEX_MARK}'`,
