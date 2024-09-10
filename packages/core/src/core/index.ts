@@ -15,7 +15,6 @@ import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
 
-import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
 import {
   CORE_EVENT,
   CoreMessage,
@@ -220,6 +219,10 @@ export const callAPI = async (message: CoreMessage) => {
       //     ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
       //   );
       // }
+
+      console.log('=====>>>>> method.deviceId', method.deviceId);
+      console.log('=====>>>>> method.checkDeviceId', method.checkDeviceId);
+      console.log('=====>>>>> device.features.device_id', device.features?.device_id);
 
       if (method.deviceId && method.checkDeviceId) {
         const isSameDeviceID = device.checkDeviceId(method.deviceId);

@@ -13,6 +13,7 @@ import { PlaygroundProps, TestDeviceExpect, TestDeviceType } from '../../../comp
 import deviceApi from '../../../data/device';
 import wipeDevice from '../../../data/wipeDevice';
 import managerApi from '../../../data/manager';
+import alephiumApi from '../../../data/alephium';
 import algoApi from '../../../data/algo';
 import aptosApi from '../../../data/aptos';
 import basicApi from '../../../data/basic';
@@ -36,10 +37,12 @@ import nostrApi from '../../../data/nostr';
 import otherApi from '../../../data/other';
 import polkadotApi from '../../../data/polkadot';
 import rippleApi from '../../../data/ripple';
+import scdoApi from '../../../data/scdo';
 import solanaApi from '../../../data/solana';
 import starcoinApi from '../../../data/starcoin';
 import stellarApi from '../../../data/stellar';
 import suiApi from '../../../data/sui';
+import tonApi from '../../../data/ton';
 import tronApi from '../../../data/tron';
 import { Button } from '../../../components/ui/Button';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
@@ -165,6 +168,7 @@ const testClassList = ['normal', 'bootloader'];
 const testCaseMap = new Map<string, PlaygroundProps[]>();
 
 testCaseMap.set('wipeDevice', wipeDevice);
+testCaseMap.set('alephium', alephiumApi);
 testCaseMap.set('algo', algoApi);
 testCaseMap.set('aptos', aptosApi);
 testCaseMap.set('basic', basicApi);
@@ -190,10 +194,12 @@ testCaseMap.set('nostr', nostrApi);
 testCaseMap.set('other', otherApi);
 testCaseMap.set('polkadot', polkadotApi);
 testCaseMap.set('ripple', rippleApi);
+testCaseMap.set('scdo', scdoApi);
 testCaseMap.set('solana', solanaApi);
 testCaseMap.set('starcoin', starcoinApi);
 testCaseMap.set('stellar', stellarApi);
 testCaseMap.set('sui', suiApi);
+testCaseMap.set('ton', tonApi);
 testCaseMap.set('tron', tronApi);
 
 function getExpectResult(
@@ -239,7 +245,7 @@ function ExecuteView() {
   const errorCaseRef = useRef<TestCaseDataWithKey<TestCaseDataType>[]>([]);
 
   const nextRequestCleanUpRef = useRef(false);
-  const currentRequestDeviceRef = useRef<TestDeviceType>(undefined);
+  const currentRequestDeviceRef = useRef<TestDeviceType | undefined>(undefined);
   const currentRequestPinRef = useRef(false);
   const currentRequestButtonRef = useRef(false);
 
@@ -425,21 +431,21 @@ function ExecuteView() {
           });
 
           if (currentRequestPinRef.current) {
-            const { connectId } = message.payload.device;
+            const { connectId } = message.payload.device || {};
 
             await responseUiEventDelay();
 
-            sdk.getFeatures(connectId, {
+            sdk.getFeatures(connectId ?? undefined, {
               retryCount: 1,
             });
           }
         } else if (message.type === 'ui-button') {
           if (currentRequestButtonRef.current) {
-            const { connectId } = message.payload.device;
+            const { connectId } = message.payload.device || {};
 
             await responseUiEventDelay();
 
-            sdk.getFeatures(connectId, {
+            sdk.getFeatures(connectId ?? undefined, {
               retryCount: 1,
             });
           }

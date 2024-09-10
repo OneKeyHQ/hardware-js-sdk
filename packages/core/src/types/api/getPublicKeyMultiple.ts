@@ -7,5 +7,8 @@ import type { CommonParams, Response } from '../params';
 export declare function getPublicKeyMultiple(
   connectId?: string,
   deviceId?: string,
-  params?: CommonParams & HardwareGetPublicKeyMultiple
+  params?: CommonParams &
+    Omit<HardwareGetPublicKeyMultiple, 'addresses'> & {
+      addresses: string[];
+    }
 ): Response<PublicKeyMultiple>;

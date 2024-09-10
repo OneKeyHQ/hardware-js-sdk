@@ -169,16 +169,6 @@ const api: PlaygroundProps[] = [
     },
   },
   {
-    method: 'deviceCancel',
-    description: 'cancel device',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'deviceLock',
-    description: 'lock device',
-    noDeviceIdReq: true,
-  },
-  {
     method: 'deviceFlags',
     noDeviceIdReq: true,
     description: 'device set flags',
@@ -492,11 +482,6 @@ const api: PlaygroundProps[] = [
     },
   },
   {
-    method: 'deviceRebootToBoardloader',
-    description: 'DeviceRebootToBoardloader',
-    noDeviceIdReq: true,
-  },
-  {
     method: 'deviceUpdateBootloader',
     description: 'Touch、Pro Update bootloader of a device',
     noDeviceIdReq: true,
@@ -548,6 +533,14 @@ const api: PlaygroundProps[] = [
       },
     ],
     expect: {
+      common: {
+        normal: {
+          requestPin: true,
+        },
+        bootloader: {
+          skip: true,
+        },
+      },
       mini: {
         normal: {
           // You need to manually enter boot
@@ -561,16 +554,10 @@ const api: PlaygroundProps[] = [
         normal: {
           requestButton: true,
         },
-        bootloader: {
-          skip: true,
-        },
       },
       classic1s: {
         normal: {
           requestButton: true,
-        },
-        bootloader: {
-          skip: true,
         },
       },
     },
@@ -587,6 +574,16 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+        bootloader: {
+          success: true,
+        },
+      },
+    },
   },
   {
     method: 'setU2FCounter',

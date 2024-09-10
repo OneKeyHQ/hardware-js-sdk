@@ -13,6 +13,10 @@ import ProMessageJSON from '../data/messages/pro/messages.json';
 const messages: {
   [deviceType in IDeviceType]: { [version in MessageVersion]: JSON };
 } = {
+  unknown: {
+    latest: CommonMessageJSON as unknown as JSON,
+    v1: LegacyMessageJSON as unknown as JSON,
+  },
   classic: {
     latest: ClassicMessageJSON as unknown as JSON,
     v1: LegacyMessageJSON as unknown as JSON,

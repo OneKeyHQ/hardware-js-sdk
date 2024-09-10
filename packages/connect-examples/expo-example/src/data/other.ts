@@ -543,21 +543,15 @@ const api: PlaygroundProps[] = [
       {
         title: 'getPublicKeyMultiple',
         value: {
-          addresses: [
-            {
-              address_n: [2147483692, 2147485463, 2147483648, 0, 0],
-            },
-          ],
+          addresses: ["m/44'/0'/0'/0/0"],
         },
         expect: {
-          touch: {
+          common: {
             normal: {
-              unknownMessage: true,
+              skip: true,
             },
-          },
-          pro: {
-            normal: {
-              unknownMessage: true,
+            bootloader: {
+              skip: true,
             },
           },
         },

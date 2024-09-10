@@ -33,7 +33,8 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
       if (!sdk) return intl.formatMessage({ id: 'tip__sdk_not_ready' });
 
       const connectId = selectedDevice?.connectId ?? '';
-      const deviceId = selectedDevice?.features?.deviceId ?? '';
+      const deviceId = '';
+
       const { method } = methodPayload;
 
       let requestParams;
