@@ -447,6 +447,7 @@ export class Device extends EventEmitter {
     options = parseRunOptions(options);
 
     this.runPromise = createDeferred(this._runInner.bind(this, fn, options));
+
     return this.runPromise.promise;
   }
 
@@ -454,7 +455,13 @@ export class Device extends EventEmitter {
     if (!this.isUsedHere() || this.commands.disposed) {
       const env = DataManager.getSettings('env');
       if (env !== 'react-native') {
-        await this.acquire();
+        try {
+          await this.acquire();
+        } catch (error) {
+          this.runPromise = null;
+          return Promise.reject(error);
+        }
+
         try {
           if (fn) {
             await this.initialize(options);

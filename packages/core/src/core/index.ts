@@ -297,7 +297,6 @@ export const callAPI = async (message: CoreMessage) => {
       }
 
       try {
-        console.log('=====>>>>>>Call API - Inner Running method', method.payload);
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ');
         messageResponse = createResponseMessage(method.responseID, true, response);

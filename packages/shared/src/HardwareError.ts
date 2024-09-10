@@ -354,6 +354,11 @@ export const HardwareErrorCode = {
   DataOverload: 816,
 
   /**
+   * device disconnected during action
+   */
+  BridgeDeviceDisconnected: 817,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -461,6 +466,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BridgeNetworkError]: 'Bridge network error',
   [HardwareErrorCode.BridgeTimeoutError]: 'Bridge network timeout',
   [HardwareErrorCode.BridgeNotInstalled]: 'Bridge not installed',
+  [HardwareErrorCode.BridgeDeviceDisconnected]: 'Bridge device disconnected during action',
   [HardwareErrorCode.PollingTimeout]: 'Polling timeout',
   [HardwareErrorCode.PollingStop]: 'Polling stop',
   [HardwareErrorCode.BlindSignDisabled]: 'Please confirm the BlindSign enabled',
@@ -494,6 +500,9 @@ export const serializeError = (payload: any) => {
       code: payload.error.errorCode,
       params: payload.error.params,
     };
+  }
+  if (payload && payload.error && payload.error.name === 'AxiosError') {
+    return { error: payload.error.message, code: HardwareErrorCode.BridgeNetworkError };
   }
   if (payload && payload.error instanceof Error) {
     return { error: payload.error.message, code: payload.error.code };
