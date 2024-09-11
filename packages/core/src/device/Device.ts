@@ -447,7 +447,6 @@ export class Device extends EventEmitter {
     options = parseRunOptions(options);
 
     this.runPromise = createDeferred(this._runInner.bind(this, fn, options));
-
     return this.runPromise.promise;
   }
 

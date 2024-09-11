@@ -23,6 +23,8 @@ import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
+
+import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
 import {
   CORE_EVENT,
   CoreMessage,
@@ -217,10 +219,11 @@ export const callAPI = async (message: CoreMessage) => {
         method.requireDeviceMode
       );
       if (unexpectedMode) {
-        if (unexpectedMode === UI_REQUEST.NOT_IN_BOOTLOADER) {
-          return Promise.reject(
-            ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedBootloaderMode)
-          );
+        if (unexpectedMode === UI_REQUEST_CONST.NOT_IN_BOOTLOADER) {
+          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.RequiredButInBootloaderMode));
+        }
+        if (unexpectedMode === UI_REQUEST_CONST.BOOTLOADER) {
+          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.NotAllowInBootloaderMode));
         }
         return Promise.reject(
           ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)

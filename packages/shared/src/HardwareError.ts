@@ -86,9 +86,9 @@ export const HardwareErrorCode = {
   DeviceInterruptedFromOutside: 107,
 
   /**
-   * Device is not in bootloader mode
+   * Device should be in bootloader mode
    */
-  DeviceUnexpectedBootloaderMode: 108,
+  RequiredButInBootloaderMode: 108,
 
   /**
    * Device interrupted from user
@@ -125,6 +125,11 @@ export const HardwareErrorCode = {
    *  Detect hardware that is in bootloader mode and return an error.
    */
   DeviceDetectInBootloaderMode: 115,
+
+  /**
+   * Device not allow in bootloader mode
+   */
+  NotAllowInBootloaderMode: 116,
 
   /**
    * Not initialized
@@ -378,14 +383,14 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceInitializeFailed]: 'Device initialization failed',
   [HardwareErrorCode.DeviceInterruptedFromOutside]: 'Device interrupted',
   [HardwareErrorCode.DeviceInterruptedFromUser]: 'Device interrupted',
-  [HardwareErrorCode.DeviceUnexpectedBootloaderMode]: 'Device should be in bootloader mode',
+  [HardwareErrorCode.RequiredButInBootloaderMode]: 'Device should be in bootloader mode',
   [HardwareErrorCode.DeviceCheckDeviceIdError]: 'Device Id in the features is not same.',
   [HardwareErrorCode.DeviceNotSupportPassphrase]: 'Device not support passphrase',
   [HardwareErrorCode.DeviceCheckPassphraseStateError]: 'Device passphrase state error',
   [HardwareErrorCode.DeviceNotOpenedPassphrase]: 'Device not opened passphrase',
   [HardwareErrorCode.DeviceOpenedPassphrase]: 'Device opened passphrase',
   [HardwareErrorCode.DeviceDetectInBootloaderMode]: 'Device in bootloader mode',
-
+  [HardwareErrorCode.NotAllowInBootloaderMode]: 'Device not allow in bootloader mode',
   /**
    * Node Errors
    */
