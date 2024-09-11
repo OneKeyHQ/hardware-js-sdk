@@ -43,9 +43,6 @@ export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAd
 
   getVersionRange() {
     return {
-      classic1s: {
-        min: '4.0.0',
-      },
       model_touch: {
         min: '4.10.0',
       },
