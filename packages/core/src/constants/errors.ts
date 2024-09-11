@@ -7,6 +7,8 @@ export const safeThrowError = (error: any) => {
     throw ERRORS.TypedError(HardwareErrorCode.BridgeNotInstalled);
   } else if (error.code === 'ECONNABORTED') {
     throw ERRORS.TypedError(HardwareErrorCode.BridgeTimeoutError);
+  } else if (error.code === 'ERR_BAD_REQUEST') {
+    throw ERRORS.TypedError(HardwareErrorCode.BridgeNetworkError);
   } else {
     throw ERRORS.TypedError(error);
   }

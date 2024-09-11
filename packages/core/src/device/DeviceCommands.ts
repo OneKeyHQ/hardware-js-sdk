@@ -90,13 +90,21 @@ export class DeviceCommands {
       }
 
       const responseData = error?.response?.data;
-      const responseError = responseData?.error;
+      let responseError = responseData?.error;
+      if (!responseError && responseData && typeof responseData === 'string') {
+        try {
+          const parsedData = JSON.parse(responseData);
+          responseError = parsedData?.error;
+        } catch (error) {
+          // ignore
+        }
+      }
 
       if (responseData) {
         Log.debug('error response', responseData);
       }
       if (responseError === 'device disconnected during action') {
-        return { type: 'BridgeNetworkError', message: {} } as any;
+        return { type: 'BridgeDeviceDisconnected', message: { error: responseError } } as any;
       }
 
       // undefined.indexOf('...') !== -1 Always true
@@ -158,6 +166,9 @@ export class DeviceCommands {
           }
           if (error.message.indexOf('BleDeviceBondError') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
+          }
+          if (error.message.indexOf('BridgeDeviceDisconnected') > -1) {
+            throw ERRORS.TypedError(HardwareErrorCode.BridgeDeviceDisconnected);
           }
         }
       } else {
