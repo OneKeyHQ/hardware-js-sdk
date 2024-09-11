@@ -23,8 +23,6 @@ export const UI_REQUEST = {
   FIRMWARE_PROGRESS: 'ui-firmware-progress',
   FIRMWARE_TIP: 'ui-firmware-tip',
 
-  NOT_IN_BOOTLOADER: 'ui-device_not_in_bootloader_mode',
-
   PREVIOUS_ADDRESS_RESULT: 'ui-previous_address_result',
 } as const;
 

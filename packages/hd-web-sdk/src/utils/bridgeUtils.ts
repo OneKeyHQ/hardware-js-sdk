@@ -44,9 +44,9 @@ export const sendMessage = async (messages: CoreMessage, isHost = true): Promise
     });
     if (messages.event !== 'LOG_EVENT') {
       if (blockLog) {
-        Log.debug('request: ', blockLog);
+        Log.debug('request result: ', blockLog);
       } else {
-        Log.debug('request: ', result);
+        Log.debug('request result: ', result);
       }
     }
     return result;
