@@ -12,15 +12,16 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     // init params
-
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'destination', type: 'string' },
       { name: 'jettonMasterAddress', type: 'string' },
+      { name: 'jettonWalletAddress', type: 'string' },
       { name: 'tonAmount', type: 'number' },
       { name: 'jettonAmount', type: 'number' },
       { name: 'fwdFee', type: 'number' },
       { name: 'comment', type: 'string' },
+      { name: 'isRawData', type: 'boolean' },
       { name: 'mode', type: 'number' },
       { name: 'seqno', type: 'number' },
       { name: 'expireAt', type: 'number' },
@@ -29,9 +30,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       { name: 'workchain' },
       { name: 'isBounceable', type: 'boolean' },
       { name: 'isTestnetOnly', type: 'boolean' },
-      { name: 'extDestination', type: 'string' },
-      { name: 'extTonAmount', type: 'number' },
-      { name: 'extPayload', type: 'string' },
+      { name: 'extDestination', type: 'array' },
+      { name: 'extTonAmount', type: 'array' },
+      { name: 'extPayload', type: 'array' },
     ]);
 
     const { path } = this.payload as TonSignMessageParams;
@@ -41,11 +42,13 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       address_n: addressN,
       destination: this.payload.destination,
       jetton_master_address: this.payload.jettonMasterAddress,
+      jetton_wallet_address: this.payload.jettonWalletAddress,
       ton_amount: this.payload.tonAmount,
       jetton_amount: this.payload.jettonAmount,
       fwd_fee: this.payload.fwdFee,
       comment: this.payload.comment,
       mode: this.payload.mode,
+      is_raw_data: this.payload.isRawData,
       seqno: this.payload.seqno,
       expire_at: this.payload.expireAt,
       wallet_version: this.payload.walletVersion,
@@ -61,11 +64,8 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
 
   getVersionRange() {
     return {
-      model_mini: {
-        min: '3.0.0',
-      },
       model_touch: {
-        min: '4.3.0',
+        min: '4.10.0',
       },
     };
   }

@@ -1,15 +1,12 @@
-import { TonGetAddress as HardwareTonGetAddress } from '@onekeyfe/hd-transport';
-
+import { AlephiumGetAddress as HardwareAlephiumGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { TonAddress, TonGetAddressParams } from '../../types';
+import { AlephiumAddress, AlephiumGetAddressParams } from '../../types';
 
-export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
+export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAddress[]> {
   hasBundle = false;
-
-  shouldConfirm = false;
 
   init() {
     this.checkDeviceId = true;
@@ -18,26 +15,19 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
-    this.shouldConfirm = this.hasBundle
-      ? this.payload.bundle.some((i: any) => !!i.showOnOneKey)
-      : false;
-
     // check payload
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);
 
     // init params
     this.params = [];
-    payload.bundle.forEach((batch: TonGetAddressParams) => {
+    payload.bundle.forEach((batch: AlephiumGetAddressParams) => {
       const addressN = validatePath(batch.path, 3);
 
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'showOnOneKey', type: 'boolean' },
-        { name: 'walletVersion' },
-        { name: 'isBounceable', type: 'boolean' },
-        { name: 'isTestnetOnly', type: 'boolean' },
-        { name: 'workchain' },
-        { name: 'walletId', type: 'number' },
+        { name: 'includePublicKey', type: 'boolean' },
+        { name: 'group', type: 'number' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
@@ -45,11 +35,8 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
       this.params.push({
         address_n: addressN,
         show_display: showOnOneKey,
-        wallet_version: batch.walletVersion,
-        is_bounceable: batch.isBounceable,
-        is_testnet_only: batch.isTestnetOnly,
-        workchain: batch.workchain,
-        wallet_id: batch.walletId,
+        include_public_key: batch.includePublicKey ?? false,
+        target_group: batch.group,
       });
     });
   }
@@ -63,26 +50,29 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
   }
 
   async run() {
-    const responses: TonAddress[] = [];
+    const responses: AlephiumAddress[] = [];
+
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
 
-      const res = await this.device.commands.typedCall('TonGetAddress', 'TonAddress', {
+      const res = await this.device.commands.typedCall('AlephiumGetAddress', 'AlephiumAddress', {
         ...param,
       });
 
-      const { address, public_key } = res.message;
+      const { address } = res.message;
 
       const result = {
         path: serializedPath(param.address_n),
-        publicKey: public_key,
         address,
+        publicKey: param.include_public_key ? res.message.public_key : undefined,
+        derivedPath: serializedPath(res.message.derived_path),
       };
       responses.push(result);
+
       this.postPreviousAddressMessage(result);
     }
 
-    validateResult(responses, ['address', 'publicKey'], {
+    validateResult(responses, ['address'], {
       expectedLength: this.params.length,
     });
 

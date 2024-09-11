@@ -1,6 +1,6 @@
 {
   "name": "expo-example",
-  "version": "1.0.10-alpha.2",
+  "version": "1.0.10",
   "scripts": {
     "start": "yarn expo start --dev-client",
     "android": "yarn expo run:android",
@@ -11,14 +11,15 @@
     "eject": "yarn expo eject"
   },
   "dependencies": {
+    "@alephium/web3-wallet": "^1.5.2",
     "@expo/webpack-config": "^19.0.0",
     "@noble/ed25519": "^2.1.0",
     "@noble/hashes": "^1.3.3",
     "@noble/secp256k1": "^1.7.1",
-    "@onekeyfe/hd-ble-sdk": "^1.0.10-alpha.2",
-    "@onekeyfe/hd-common-connect-sdk": "^1.0.10-alpha.2",
-    "@onekeyfe/hd-core": "^1.0.10-alpha.2",
-    "@onekeyfe/hd-web-sdk": "^1.0.10-alpha.2",
+    "@onekeyfe/hd-ble-sdk": "^1.0.10",
+    "@onekeyfe/hd-common-connect-sdk": "^1.0.10",
+    "@onekeyfe/hd-core": "^1.0.10",
+    "@onekeyfe/hd-web-sdk": "^1.0.10",
     "@onekeyfe/react-native-ble-plx": "3.0.0",
     "@react-native-async-storage/async-storage": "1.21.0",
     "@react-native-picker/picker": "2.6.1",
@@ -32,6 +33,7 @@
     "@tamagui/config": "1.90.2",
     "@tamagui/core": "1.90.2",
     "@tamagui/lucide-icons": "1.90.2",
+    "@ton/core": "^0.57.0",
     "asyncstorage-down": "^4.2.0",
     "bitcoinjs-lib": "^6.1.5",
     "bn.js": "^5.2.1",
@@ -68,9 +70,11 @@
     "react-native-svg": "^14.1.0",
     "react-native-web": "~0.19.10",
     "ripple-keypairs": "^1.1.4",
+    "rlp": "^3.0.0",
     "stream-browserify": "^3.0.0",
     "tamagui": "^1.90.2",
     "text-encoding": "^0.7.0",
+    "tonweb": "^0.0.66",
     "varint": "^6.0.0"
   },
   "devDependencies": {

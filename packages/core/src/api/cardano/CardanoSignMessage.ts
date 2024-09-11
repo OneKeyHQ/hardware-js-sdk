@@ -38,10 +38,7 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
   getVersionRange() {
     return {
       model_touch: {
-        min: '4.9.2',
-      },
-      model_mini: {
-        min: '3.0.0',
+        min: '4.10.0',
       },
     };
   }

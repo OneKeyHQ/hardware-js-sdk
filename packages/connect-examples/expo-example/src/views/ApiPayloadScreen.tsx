@@ -38,6 +38,10 @@ const playgroundConfig = [
     data: require('../data/ethereum').default,
   },
   {
+    title: 'Alephium API',
+    data: require('../data/alephium').default,
+  },
+  {
     title: 'Algo API',
     data: require('../data/algo').default,
   },
@@ -100,6 +104,10 @@ const playgroundConfig = [
   {
     title: 'Ripple API',
     data: require('../data/ripple').default,
+  },
+  {
+    title: 'Scdo API',
+    data: require('../data/scdo').default,
   },
   {
     title: 'Solana API',

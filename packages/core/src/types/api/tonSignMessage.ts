@@ -5,10 +5,12 @@ export type TonSignMessageParams = {
   path: string | number[];
   destination: string;
   jettonMasterAddress?: string;
+  jettonWalletAddress?: string;
   tonAmount: number;
   jettonAmount?: number;
   fwdFee?: number;
   comment?: string;
+  isRawData?: boolean;
   mode?: number;
   seqno: number;
   expireAt: number;
@@ -17,9 +19,9 @@ export type TonSignMessageParams = {
   workchain?: TonWorkChain;
   isBounceable?: boolean;
   isTestnetOnly?: boolean;
-  extDestination?: string;
-  extTonAmount?: number;
-  extPayload?: string;
+  extDestination?: string[];
+  extTonAmount?: number[];
+  extPayload?: string[];
 };
 
 export declare function tonSignMessage(

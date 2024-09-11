@@ -267,8 +267,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'cardanoGetPublicKey' }),
   cardanoSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cardanoSignTransaction' }),
-  // cardanoSignMessage: (connectId, deviceId, params) =>
-  //   call({ ...params, connectId, deviceId, method: 'cardanoSignMessage' }),
+  cardanoSignMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'cardanoSignMessage' }),
 
   filecoinGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'filecoinGetAddress' }),
@@ -318,4 +318,18 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'tonSignMessage' }),
   tonSignProof: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'tonSignProof' }),
+
+  scdoGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'scdoGetAddress' }),
+  scdoSignMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'scdoSignMessage' }),
+  scdoSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'scdoSignTransaction' }),
+
+  alephiumGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'alephiumGetAddress' }),
+  alephiumSignMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'alephiumSignMessage' }),
+  alephiumSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'alephiumSignTransaction' }),
 });

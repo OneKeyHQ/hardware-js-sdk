@@ -110,7 +110,7 @@ import { suiSignTransaction } from './suiSignTransaction';
 import { cardanoGetAddress } from './cardanoGetAddress';
 import { cardanoGetPublicKey } from './cardanoGetPublicKey';
 import { cardanoSignTransaction } from './cardanoSignTransaction';
-// import { cardanoSignMessage } from './cardanoSignMessage';
+import { cardanoSignMessage } from './cardanoSignMessage';
 
 import { filecoinGetAddress } from './filecoinGetAddress';
 import { filecoinSignTransaction } from './filecoinSignTransaction';
@@ -140,6 +140,13 @@ import { dnxSignTransaction } from './dnxSignTransaction';
 import { tonGetAddress } from './tonGetAddress';
 import { tonSignMessage } from './tonSignMessage';
 import { tonSignProof } from './tonSignProof';
+
+import { scdoGetAddress } from './scdoGetAddress';
+import { scdoSignMessage } from './scdoSignMessage';
+import { scdoSignTransaction } from './scdoSignTransaction';
+import { alephiumGetAddress } from './alephiumGetAddress';
+import { alephiumSignMessage } from './alephiumSignMessage';
+import { alephiumSignTransaction } from './alephiumSignTransaction';
 
 export * from './export';
 
@@ -322,7 +329,7 @@ export type CoreApi = {
   cardanoGetAddress: typeof cardanoGetAddress;
   cardanoGetPublicKey: typeof cardanoGetPublicKey;
   cardanoSignTransaction: typeof cardanoSignTransaction;
-  // cardanoSignMessage: typeof cardanoSignMessage;
+  cardanoSignMessage: typeof cardanoSignMessage;
 
   /**
    * Filecoin function
@@ -380,4 +387,18 @@ export type CoreApi = {
   tonGetAddress: typeof tonGetAddress;
   tonSignMessage: typeof tonSignMessage;
   tonSignProof: typeof tonSignProof;
+
+  /**
+   * SCDO Network
+   */
+  scdoGetAddress: typeof scdoGetAddress;
+  scdoSignMessage: typeof scdoSignMessage;
+  scdoSignTransaction: typeof scdoSignTransaction;
+
+  /**
+   * Alephium Network
+   */
+  alephiumGetAddress: typeof alephiumGetAddress;
+  alephiumSignMessage: typeof alephiumSignMessage;
+  alephiumSignTransaction: typeof alephiumSignTransaction;
 };
