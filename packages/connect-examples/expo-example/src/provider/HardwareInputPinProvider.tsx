@@ -31,16 +31,11 @@ export const HardwareInputPinDialogProvider: React.FC<{ children: ReactNode }> =
     });
   }, [dialogState.sdk]);
 
-  const openDialog = useCallback(
-    (sdk: any, features: Features) => {
-      if (supportInputPinOnSoftware(features).support) {
-        setDialogState({ isOpen: true, sdk });
-      } else {
-        onInputPinOnDeviceCallback();
-      }
-    },
-    [onInputPinOnDeviceCallback]
-  );
+  const openDialog = useCallback((sdk: any, features: Features) => {
+    if (supportInputPinOnSoftware(features).support) {
+      setDialogState({ isOpen: true, sdk });
+    }
+  }, []);
 
   const closeDialog = useCallback(() => {
     setDialogState(prevState => ({ ...prevState, isOpen: false, sdk: undefined }));
