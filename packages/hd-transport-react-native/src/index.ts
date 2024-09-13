@@ -6,7 +6,7 @@ import {
   BleErrorCode,
   Characteristic,
   ScanMode,
-} from '@onekeyfe/react-native-ble-plx';
+} from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
 import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
@@ -30,8 +30,9 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 const transportCache: Record<string, any> = {};
 
 let connectOptions: Record<string, unknown> = {
+  autoConnect: false,
   requestMTU: 256,
-  timeout: 3000,
+  // timeout: 60 * 1000,
   refreshGatt: 'OnConnected',
 };
 

@@ -121,15 +121,15 @@ function UpdateTip() {
 // Main App
 export default function App() {
   return (
-    <TamaguiProviderWrapperMemo>
-      <SafeAreaProvider>
-        <SDKProvider>
-          <AppIntlProvider>
+    <AppIntlProvider>
+      <TamaguiProviderWrapperMemo>
+        <SafeAreaProvider>
+          <SDKProvider>
             <UpdateTip />
             <NavigationContentMemo />
-          </AppIntlProvider>
-        </SDKProvider>
-      </SafeAreaProvider>
-    </TamaguiProviderWrapperMemo>
+          </SDKProvider>
+        </SafeAreaProvider>
+      </TamaguiProviderWrapperMemo>
+    </AppIntlProvider>
   );
 }

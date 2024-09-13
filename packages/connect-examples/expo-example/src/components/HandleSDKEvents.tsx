@@ -60,8 +60,6 @@ export default function HandleSDKEvents() {
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           if (supportInputPinOnSoftware(message.payload.device.features).support) {
             setShowPinInput(true);
-          } else {
-            onInputPinOnDeviceCallback();
           }
         }
         if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
@@ -111,7 +109,7 @@ export default function HandleSDKEvents() {
         SDK.off(UI_EVENT, uiEventCallback);
         registerListener = false;
       };
-    }, [HardwareLowLevelSDK, SDK, onInputPinOnDeviceCallback])
+    }, [HardwareLowLevelSDK, SDK])
   );
 
   return (
