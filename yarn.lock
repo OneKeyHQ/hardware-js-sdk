@@ -3466,6 +3466,18 @@
   dependencies:
     "@octokit/openapi-types" "^11.2.0"
 
+"@onekeyfe/cross-inpage-provider-core@2.1.9":
+  version "2.1.9"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-core/-/cross-inpage-provider-core-2.1.9.tgz#6c512802f465048781d9c5cffa96c375d35a7fa5"
+  integrity sha512-rFwllnTjD1gvUK6aCMmrWPFuEXV8463c9fPgUToJvtP6B5a/3FBIizhllRHhNuCvhrDiu0d2vl/g+th5epf2zQ==
+  dependencies:
+    "@onekeyfe/cross-inpage-provider-errors" "2.1.9"
+    "@onekeyfe/cross-inpage-provider-events" "2.1.9"
+    "@onekeyfe/cross-inpage-provider-types" "2.1.9"
+    events "^3.3.0"
+    lodash-es "^4.17.21"
+    ms "^2.1.3"
+
 "@onekeyfe/cross-inpage-provider-core@^0.0.17":
   version "0.0.17"
   resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-core/-/cross-inpage-provider-core-0.0.17.tgz#ca73217ca048e8991971ed6c06510b1efac1f30f"
@@ -3478,6 +3490,13 @@
     lodash "^4.17.21"
     ms "^2.1.3"
 
+"@onekeyfe/cross-inpage-provider-errors@2.1.9":
+  version "2.1.9"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-errors/-/cross-inpage-provider-errors-2.1.9.tgz#09e23e99d4d79b8eb3301f1c9892632470664f2e"
+  integrity sha512-4KKDzUhQWt4n4rdRJDgGbxr+o4UIjIIjx9na84muGHH+QCeGwV9UcuZl6HeoYd4vHeOUiKdz4qze2dJeQmw4Fg==
+  dependencies:
+    fast-safe-stringify "^2.0.6"
+
 "@onekeyfe/cross-inpage-provider-errors@^0.0.17":
   version "0.0.17"
   resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-errors/-/cross-inpage-provider-errors-0.0.17.tgz#1812c8993ca47e06f699db0c397c63a53c90b74d"
@@ -3485,15 +3504,33 @@
   dependencies:
     fast-safe-stringify "^2.1.1"
 
+"@onekeyfe/cross-inpage-provider-events@2.1.9":
+  version "2.1.9"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-events/-/cross-inpage-provider-events-2.1.9.tgz#2e4e6a457bc55c3c24aa2c9a1124fb2cbfa87d4f"
+  integrity sha512-Zjrkm0Jgi53rBny5mAhgqVqG8vquSEdtzV3KJFsrKmhb6+xDzHTci0coXZoA+gWDqcZbo2tonZZGRSApWnar0Q==
+
 "@onekeyfe/cross-inpage-provider-events@^0.0.17":
   version "0.0.17"
   resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-events/-/cross-inpage-provider-events-0.0.17.tgz#9412e8a164d55a157475d8aed19bedeb7c2df959"
   integrity sha512-mRpLJkBAhaDEhVIKY6WI9+Zwdb6LhFJjM8E0HLHgxZlOmswKmNAhY4lgYr3Z8iF2yX2//Z46DqW0C5nWsDdVYA==
 
+"@onekeyfe/cross-inpage-provider-types@2.1.9":
+  version "2.1.9"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-2.1.9.tgz#ac858a71c0daf40c82f17769196dcfc528216f2a"
+  integrity sha512-PVpsUHrjNMFfq+78G054T7bySyriJf96ndgCwTb7afPmj9lqqPeKgbpWXx87B0S077tTE3Q+xsk5Hf/XjWQOuw==
+
 "@onekeyfe/cross-inpage-provider-types@^0.0.17":
   version "0.0.17"
   resolved "https://registry.yarnpkg.com/@onekeyfe/cross-inpage-provider-types/-/cross-inpage-provider-types-0.0.17.tgz#0c88c1a2febac44ec1600e0e59da732579cbd045"
   integrity sha512-QqjIPXQHb3UG9w79ujjL5L5Qd6oCrymQ/x2J2rYICtr56G6shHTmUvRZxAvne0ZsLv8UBGqZWbepVdnPipehYQ==
+
+"@onekeyfe/onekey-cross-webview@^2.1.9":
+  version "2.1.9"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/onekey-cross-webview/-/onekey-cross-webview-2.1.9.tgz#cb0f638a7a0d53dd25277e48a4f9d08cbcd6c962"
+  integrity sha512-cFO+lF8vDjy6sekW04dV0LY4A6gDVU33Q4Ux1EoBfcB0RCu/UnU0Mr1NlcPLH3fqYkB5OhGSVKW60DlB4RCjxg==
+  dependencies:
+    "@onekeyfe/cross-inpage-provider-core" "2.1.9"
+    "@onekeyfe/cross-inpage-provider-types" "2.1.9"
 
 "@onekeyfe/react-native-ble-plx@3.0.0":
   version "3.0.0"
@@ -9729,15 +9766,15 @@ escape-html@^1.0.3, escape-html@~1.0.3:
   resolved "https://registry.yarnpkg.com/escape-html/-/escape-html-1.0.3.tgz#0258eae4d3d0c0974de1c169188ef0051d1d1988"
   integrity sha1-Aljq5NPQwJdN4cFpGI7wBR0dGYg=
 
+escape-string-regexp@2.0.0, escape-string-regexp@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-2.0.0.tgz#a30304e99daa32e23b2fd20f51babd07cffca344"
+  integrity sha512-UpzcLCXolUWcNu5HtVMHYdXJjArjsF9C0aNnquZYY4uW/Vu0miy5YoWvbV345HauVvcAUnpRuhMMcqTcGOY2+w==
+
 escape-string-regexp@^1.0.2, escape-string-regexp@^1.0.5:
   version "1.0.5"
   resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-1.0.5.tgz#1b61c0562190a8dff6ae3bb2cf0200ca130b86d4"
   integrity sha1-G2HAViGQqN/2rjuyzwIAyhMLhtQ=
-
-escape-string-regexp@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-2.0.0.tgz#a30304e99daa32e23b2fd20f51babd07cffca344"
-  integrity sha512-UpzcLCXolUWcNu5HtVMHYdXJjArjsF9C0aNnquZYY4uW/Vu0miy5YoWvbV345HauVvcAUnpRuhMMcqTcGOY2+w==
 
 escape-string-regexp@^4.0.0:
   version "4.0.0"
@@ -10425,7 +10462,7 @@ fast-loops@^1.1.3:
   resolved "https://registry.yarnpkg.com/fast-loops/-/fast-loops-1.1.3.tgz#ce96adb86d07e7bf9b4822ab9c6fac9964981f75"
   integrity sha512-8EZzEP0eKkEEVX+drtd9mtuQ+/QrlfW/5MlwcwK5Nds6EkZ/tRzEexkzUY2mIssnAyVLT+TKHuRXmFNNXYUd6g==
 
-fast-safe-stringify@^2.1.1:
+fast-safe-stringify@^2.0.6, fast-safe-stringify@^2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/fast-safe-stringify/-/fast-safe-stringify-2.1.1.tgz#c406a83b6e70d9e35ce3b30a81141df30aeba884"
   integrity sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==
@@ -11817,7 +11854,7 @@ intl-messageformat@10.5.11:
     "@formatjs/icu-messageformat-parser" "2.7.6"
     tslib "^2.4.0"
 
-invariant@^2.2.4:
+invariant@2.2.4, invariant@^2.2.4:
   version "2.2.4"
   resolved "https://registry.yarnpkg.com/invariant/-/invariant-2.2.4.tgz#610f3c92c9359ce1db616e538008d23ff35158e6"
   integrity sha512-phJfQVBuaJM5raOpJjSfkiD6BpbCE4Ns//LaXl6wGYtUBY83nWS6Rf9tXm2e8VaK60JEjYldbPif/A2B1C2gNA==
@@ -13599,6 +13636,11 @@ locate-path@^6.0.0:
   integrity sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==
   dependencies:
     p-locate "^5.0.0"
+
+lodash-es@^4.17.21:
+  version "4.17.21"
+  resolved "https://registry.yarnpkg.com/lodash-es/-/lodash-es-4.17.21.tgz#43e626c46e6591b7750beb2b50117390c609e3ee"
+  integrity sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw==
 
 lodash._reinterpolate@^3.0.0:
   version "3.0.0"
@@ -16306,6 +16348,14 @@ react-native-web@^0.19.10, react-native-web@~0.19.10:
     nullthrows "^1.1.1"
     postcss-value-parser "^4.2.0"
     styleq "^0.1.3"
+
+react-native-webview@13.6.4:
+  version "13.6.4"
+  resolved "https://registry.yarnpkg.com/react-native-webview/-/react-native-webview-13.6.4.tgz#6ef66db9dd78b2a2ae1b4fe79e1e3597aa29186e"
+  integrity sha512-AdgmaMBHPcyERTvng9eSGgHX6AleyUlSusWAxngSOSdiYGgHW81T6C5A8j/ImJAF9oZg0bQDxp43Hu56tzENZQ==
+  dependencies:
+    escape-string-regexp "2.0.0"
+    invariant "2.2.4"
 
 react-native@*:
   version "0.73.4"
