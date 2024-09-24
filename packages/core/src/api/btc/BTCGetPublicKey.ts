@@ -11,6 +11,8 @@ import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   hasBundle = false;
 
+  preCheckVersionLimit = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];

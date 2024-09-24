@@ -25,6 +25,8 @@ type Params = {
   coinName: string;
 };
 export default class BTCSignTransaction extends BaseMethod<Params> {
+  preCheckVersionLimit = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];

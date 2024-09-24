@@ -1,4 +1,3 @@
-import semver from 'semver';
 import EventEmitter from 'events';
 import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
@@ -8,15 +7,7 @@ import {
   HardwareError,
   HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
-import {
-  getDeviceFirmwareVersion,
-  enableLog,
-  getLogger,
-  LoggerNames,
-  setLoggerPostMessage,
-  wait,
-  getMethodVersionRange,
-} from '../utils';
+import { enableLog, getLogger, LoggerNames, setLoggerPostMessage, wait } from '../utils';
 import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
@@ -108,7 +99,10 @@ export const callAPI = async (message: CoreMessage) => {
       const response = await method.run();
       return createResponseMessage(method.responseID, true, response);
     } catch (error) {
-      return createResponseMessage(method.responseID, false, { error });
+      const unsupportedMethodError = method.handleUnsupportedMethodError(error);
+      return createResponseMessage(method.responseID, false, {
+        error: unsupportedMethodError ?? error,
+      });
     }
   }
 
@@ -162,11 +156,6 @@ export const callAPI = async (message: CoreMessage) => {
   try {
     const inner = async (): Promise<void> => {
       // check firmware version
-      const versionRange = getMethodVersionRange(
-        device.features,
-        type => method.getVersionRange()[type]
-      );
-
       if (device.features) {
         await DataManager.checkAndReloadData();
         const newVersionStatus = DataManager.getFirmwareStatus(device.features);
@@ -182,33 +171,10 @@ export const callAPI = async (message: CoreMessage) => {
           );
         }
 
-        if (versionRange) {
-          const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
-          if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
-            if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
-            }
-
-            return Promise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-                `Device firmware version is too low, please update to ${versionRange.min}`,
-                { current: currentVersion, require: versionRange.min }
-              )
-            );
-          }
-          if (
-            versionRange.max &&
-            semver.valid(versionRange.max) &&
-            semver.gte(currentVersion, versionRange.max)
-          ) {
-            return Promise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.CallMethodDeprecated,
-                `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
-                { current: currentVersion, deprecated: versionRange.max }
-              )
-            );
+        if (method.preCheckVersionLimit) {
+          const error = method.handleUnsupportedMethodError();
+          if (error) {
+            throw error;
           }
         }
       }
@@ -306,7 +272,10 @@ export const callAPI = async (message: CoreMessage) => {
         _callPromise?.resolve(messageResponse);
       } catch (error) {
         Log.debug('Call API - Inner Method Run Error: ', error);
-        messageResponse = createResponseMessage(method.responseID, false, { error });
+        const unsupportedMethodError = method.handleUnsupportedMethodError(error);
+        messageResponse = createResponseMessage(method.responseID, false, {
+          error: unsupportedMethodError ?? error,
+        });
         _callPromise?.resolve(messageResponse);
       }
     };

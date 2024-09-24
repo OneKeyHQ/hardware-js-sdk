@@ -9,6 +9,8 @@ import { getPolkadotVersionRange } from './networks';
 export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadotSignTx> {
   hasBundle = false;
 
+  preCheckVersionLimit = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode];

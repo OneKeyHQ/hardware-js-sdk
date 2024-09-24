@@ -8,6 +8,8 @@ import { getCoinAndScriptType } from './helpers/btcParamsUtils';
 import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 
 export default class BTCSignMessage extends BaseMethod<SignMessage> {
+  preCheckVersionLimit = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
