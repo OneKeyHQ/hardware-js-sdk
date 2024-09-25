@@ -21,7 +21,7 @@
     ]
   },
   "scripts": {
-    "bootstrap": "lerna bootstrap",
+    "bootstrap": "npx patch-package && lerna bootstrap",
     "build": "lerna run build",
     "clean": "lerna clean --yes",
     "clean-workspace": "yarn clean && lerna run clean",

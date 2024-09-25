@@ -1,0 +1,62 @@
+diff --git a/node_modules/@polkadot/util-crypto/cjs/hd/ledger/index.js b/node_modules/@polkadot/util-crypto/cjs/hd/ledger/index.js
+index dce3405..f0e8fe3 100644
+--- a/node_modules/@polkadot/util-crypto/cjs/hd/ledger/index.js
++++ b/node_modules/@polkadot/util-crypto/cjs/hd/ledger/index.js
+@@ -6,17 +6,15 @@ const index_js_2 = require("../../mnemonic/index.js");
+ const validatePath_js_1 = require("../validatePath.js");
+ const derivePrivate_js_1 = require("./derivePrivate.js");
+ const master_js_1 = require("./master.js");
+-function hdLedger(_mnemonic, path) {
++function hdLedger(_mnemonic, path, passphrase) {
+     const words = _mnemonic
+         .split(' ')
+         .map((s) => s.trim())
+         .filter((s) => s);
+-    if (![12, 24, 25].includes(words.length)) {
+-        throw new Error('Expected a mnemonic with 24 words (or 25 including a password)');
+-    }
+-    const [mnemonic, password] = words.length === 25
+-        ? [words.slice(0, 24).join(' '), words[24]]
+-        : [words.join(' '), ''];
++    // if (![12, 24, 25].includes(words.length)) {
++    //     throw new Error('Expected a mnemonic with 24 words (or 25 including a password)');
++    // }
++    const [mnemonic, password] = [words.join(' '), passphrase]
+     if (!(0, index_js_2.mnemonicValidate)(mnemonic)) {
+         throw new Error('Invalid mnemonic passed to ledger derivation');
+     }
+diff --git a/node_modules/@polkadot/util-crypto/hd/ledger/index.d.ts b/node_modules/@polkadot/util-crypto/hd/ledger/index.d.ts
+index 691d037..f33849c 100644
+--- a/node_modules/@polkadot/util-crypto/hd/ledger/index.d.ts
++++ b/node_modules/@polkadot/util-crypto/hd/ledger/index.d.ts
+@@ -1,2 +1,2 @@
+ import type { Keypair } from '../../types.js';
+-export declare function hdLedger(_mnemonic: string, path: string): Keypair;
++export declare function hdLedger(_mnemonic: string, path: string, passphrase?: string): Keypair;
+diff --git a/node_modules/@polkadot/util-crypto/hd/ledger/index.js b/node_modules/@polkadot/util-crypto/hd/ledger/index.js
+index 78f557b..2257c6a 100644
+--- a/node_modules/@polkadot/util-crypto/hd/ledger/index.js
++++ b/node_modules/@polkadot/util-crypto/hd/ledger/index.js
+@@ -3,17 +3,15 @@ import { mnemonicValidate } from '../../mnemonic/index.js';
+ import { HARDENED, hdValidatePath } from '../validatePath.js';
+ import { ledgerDerivePrivate } from './derivePrivate.js';
+ import { ledgerMaster } from './master.js';
+-export function hdLedger(_mnemonic, path) {
++export function hdLedger(_mnemonic, path, passphrase) {
+     const words = _mnemonic
+         .split(' ')
+         .map((s) => s.trim())
+         .filter((s) => s);
+-    if (![12, 24, 25].includes(words.length)) {
+-        throw new Error('Expected a mnemonic with 24 words (or 25 including a password)');
+-    }
+-    const [mnemonic, password] = words.length === 25
+-        ? [words.slice(0, 24).join(' '), words[24]]
+-        : [words.join(' '), ''];
++    // if (![12, 24, 25].includes(words.length)) {
++    //     throw new Error('Expected a mnemonic with 24 words (or 25 including a password)');
++    // }
++    const [mnemonic, password] = [words.join(' '), passphrase]
+     if (!mnemonicValidate(mnemonic)) {
+         throw new Error('Invalid mnemonic passed to ledger derivation');
+     }
