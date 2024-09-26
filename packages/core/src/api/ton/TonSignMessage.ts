@@ -4,7 +4,9 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { TonSignMessageParams } from '../../types';
+import { DeviceModelToTypes, TonSignMessageParams } from '../../types';
+s;
+import { getDeviceType } from '../../utils';
 
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   init() {
@@ -71,10 +73,16 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   }
 
   async run() {
+    const deviceType = getDeviceType(this.device.features);
     const res = await this.device.commands.typedCall('TonSignMessage', 'TonSignedMessage', {
       ...this.params,
     });
 
-    return Promise.resolve(res.message);
+    return Promise.resolve({
+      skip_validate:
+        DeviceModelToTypes.model_mini.includes(deviceType) ||
+        DeviceModelToTypes.model_classic.includes(deviceType),
+      ...res.message,
+    });
   }
 }
