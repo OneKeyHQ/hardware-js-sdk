@@ -3890,7 +3890,6 @@ export type TonSignMessage = {
 export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
-  skip_validate: boolean;
 };
 
 // TonSignProof

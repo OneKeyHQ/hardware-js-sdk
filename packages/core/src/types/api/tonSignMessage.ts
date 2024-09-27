@@ -1,4 +1,8 @@
-import { TonSignedMessage, TonWalletVersion, TonWorkChain } from '@onekeyfe/hd-transport';
+import {
+  TonSignedMessage as HardwareTonSignedMessage,
+  TonWalletVersion,
+  TonWorkChain,
+} from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type TonSignMessageParams = {
@@ -23,6 +27,10 @@ export type TonSignMessageParams = {
   extTonAmount?: number[];
   extPayload?: string[];
 };
+
+export type TonSignedMessage = {
+  skip_validate: boolean;
+} & HardwareTonSignedMessage;
 
 export declare function tonSignMessage(
   connectId: string,
