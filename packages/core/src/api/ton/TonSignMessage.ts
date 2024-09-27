@@ -76,10 +76,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     const res = await this.device.commands.typedCall('TonSignMessage', 'TonSignedMessage', {
       ...this.params,
     });
-
     return Promise.resolve({
-      skip_validate: DeviceModelToTypes.model_mini.includes(deviceType),
       ...res.message,
+      skip_validate: DeviceModelToTypes.model_mini.includes(deviceType),
     });
   }
 }

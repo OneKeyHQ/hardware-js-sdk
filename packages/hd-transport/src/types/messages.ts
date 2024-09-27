@@ -3890,6 +3890,7 @@ export type TonSignMessage = {
 export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
+  skip_validate: boolean;
 };
 
 // TonSignProof
@@ -4560,5 +4561,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;
