@@ -78,9 +78,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     });
 
     return Promise.resolve({
-      skip_validate:
-        DeviceModelToTypes.model_mini.includes(deviceType) ||
-        DeviceModelToTypes.model_classic.includes(deviceType),
+      skip_validate: DeviceModelToTypes.model_mini.includes(deviceType),
       ...res.message,
     });
   }
