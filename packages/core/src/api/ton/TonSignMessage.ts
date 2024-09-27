@@ -5,7 +5,6 @@ import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { DeviceModelToTypes, TonSignMessageParams } from '../../types';
-s;
 import { getDeviceType } from '../../utils';
 
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
