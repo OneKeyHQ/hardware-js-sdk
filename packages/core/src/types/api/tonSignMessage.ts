@@ -24,8 +24,12 @@ export type TonSignMessageParams = {
   extPayload?: string[];
 };
 
+export type TonSignedMessageResponse = {
+  skip_validate: boolean;
+} & TonSignedMessage;
+
 export declare function tonSignMessage(
   connectId: string,
   deviceId: string,
   params: CommonParams & TonSignMessageParams
-): Response<TonSignedMessage>;
+): Response<TonSignedMessageResponse>;
