@@ -11,7 +11,7 @@ import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
-import { baseParams } from './baseParams';
+import { ADDRESS_INDEX_MARK, baseParams, CHANGE_MARK, INDEX_MARK } from './baseParams';
 import { replaceTemplate } from './data/utils';
 import { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import mockDevice from '../../utils/mockDevice';
@@ -25,6 +25,7 @@ type TestCaseDataType = {
   address?: string;
   path?: string;
   variant?: string;
+  params?: any;
 };
 
 type MnemonicAddressTestCase = TestCase<TestCaseDataType[]>;
@@ -41,12 +42,24 @@ const testCase: MnemonicAddressTestCase = {
       method: 'btcGetAddress',
     },
     {
+      id: 'btcGetAddress-Neurai',
+      method: 'btcGetAddress',
+      params: {
+        path: `m/44'/1900'/${INDEX_MARK}'/${CHANGE_MARK}/${ADDRESS_INDEX_MARK}`,
+        coin: 'neurai',
+      },
+    },
+    {
       id: 'evmGetAddress',
       method: 'evmGetAddress',
     },
     {
       id: 'alephiumGetAddress',
       method: 'alephiumGetAddress',
+    },
+    {
+      id: 'algoGetAddress',
+      method: 'algoGetAddress',
     },
     {
       id: 'dnxGetAddress',
@@ -57,12 +70,79 @@ const testCase: MnemonicAddressTestCase = {
       method: 'tonGetAddress',
     },
     {
+      id: 'nervosGetAddress',
+      method: 'nervosGetAddress',
+    },
+    {
+      id: 'nexaGetAddress',
+      method: 'nexaGetAddress',
+    },
+    {
+      id: 'polkadotGetAddress-polkadot',
+      method: 'polkadotGetAddress',
+    },
+    {
+      id: 'polkadotGetAddress-kusama',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'kusama',
+        prefix: '2',
+      },
+    },
+    {
+      id: 'polkadotGetAddress-astar',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'astar',
+        prefix: '5',
+      },
+    },
+    {
+      id: 'polkadotGetAddress-westend',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'westend',
+        prefix: '42',
+      },
+    },
+    {
+      id: 'polkadotGetAddress-manta',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'manta',
+        prefix: '77',
+      },
+    },
+    {
+      id: 'polkadotGetAddress-joystream',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'joystream',
+        prefix: '126',
+      },
+    },
+    {
       id: 'scdoGetAddress',
       method: 'scdoGetAddress',
     },
     {
       id: 'suiGetAddress',
       method: 'suiGetAddress',
+    },
+    {
+      id: 'xrpGetAddress',
+      method: 'xrpGetAddress',
+    },
+    {
+      id: 'cosmosGetAddress',
+      method: 'cosmosGetAddress',
+    },
+    {
+      id: 'cosmosGetAddress-cosmos',
+      method: 'cosmosGetAddress',
+      params: {
+        hrp: 'osmosis',
+      },
     },
   ],
 };
@@ -74,7 +154,7 @@ type ResultViewProps = {
 
 function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const intl = useIntl();
-  const title = `${item?.method} ${item.path}`;
+  const title = `${item?.id} ${item.path}`;
 
   return (
     <>
@@ -125,9 +205,12 @@ function ExportReportView() {
   return null;
 }
 
-function getRequestParams(method: string, index: string) {
-  // @ts-expect-error
-  const params = baseParams[method];
+function getRequestParams(method: string, index: string, extraParams?: any) {
+  const params = {
+    // @ts-expect-error
+    ...baseParams[method],
+    ...extraParams,
+  };
   let requestParams = {};
 
   if (params?.addressParameters?.path) {
@@ -229,7 +312,7 @@ function ExecuteView() {
         const { method } = item;
 
         for (const variant of variantCase) {
-          const params = getRequestParams(method, variant);
+          const params = getRequestParams(method, variant, item.params);
           console.log('======>>>>> passphraseStateList', params);
           try {
             // @ts-expect-error
@@ -252,9 +335,9 @@ function ExecuteView() {
             };
             currentTestCases.push(caseObject);
             context.printLog(
-              `${intl.formatMessage({ id: 'message__fetch' })} ${
-                caseObject.path
-              } ${method}  ${intl.formatMessage({
+              `${intl.formatMessage({ id: 'message__fetch' })} ${caseObject.path} ${
+                item.id
+              }  ${intl.formatMessage({
                 id: 'message__address',
               })} ${address}`
             );
@@ -262,6 +345,8 @@ function ExecuteView() {
             console.log('=====>>>>> error', e);
           }
         }
+
+        context.printLog('------------------------------------------');
       }
 
       console.log('currentTestCases', currentTestCases);
@@ -277,7 +362,7 @@ function ExecuteView() {
     },
     generateRequestParams: item => {
       const requestParams = {
-        ...getRequestParams(item.method, item.variant ?? '0'),
+        ...getRequestParams(item.method, item.variant ?? '0', item.params),
         // passphraseState: item.passphraseState,
         // useEmptyPassphrase: !item.passphrase,
         showOnOneKey,

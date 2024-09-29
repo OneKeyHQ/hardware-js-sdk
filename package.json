@@ -21,12 +21,12 @@
     ]
   },
   "scripts": {
-    "bootstrap": "lerna bootstrap",
+    "bootstrap": "npx patch-package && lerna bootstrap",
     "build": "lerna run build",
     "clean": "lerna clean --yes",
     "clean-workspace": "yarn clean && lerna run clean",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint:staged": "lint-staged",
     "test": "lerna run test",
     "setup": "yarn && yarn bootstrap && yarn build",
     "publish-packages": "lerna publish from-package",
@@ -67,6 +67,7 @@
     "husky": "^9.1.6",
     "jest": "^28.1.0",
     "lerna": "^4.0.0",
+    "lint-staged": "^15.2.10",
     "prettier": "^2.7.1",
     "prettier-eslint": "^14.0.2",
     "rimraf": "^3.0.2",
@@ -75,6 +76,11 @@
     "shelljs": "0.8.5",
     "tsconfig-paths": "^4.0.0",
     "typescript": "5.1.6"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
   },
   "version": "0.0.0"
 }
