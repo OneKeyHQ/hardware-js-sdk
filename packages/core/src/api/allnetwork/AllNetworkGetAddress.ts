@@ -42,7 +42,7 @@ const networkAliases: {
 
 const networkConfigMap: NetworkConfigMap = {
   btc: {
-    methodName: 'btcGetAddress',
+    methodName: 'btcGetPublicKey',
     getParams: (baseParams: AllNetworkAddressParams, chainName?: string) => ({
       coin: chainName,
       ...baseParams,
