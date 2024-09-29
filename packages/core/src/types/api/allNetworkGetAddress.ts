@@ -27,7 +27,10 @@ export type INetwork =
   | 'kaspa'
   | 'nexa'
   | 'dynex'
-  | 'nervos';
+  | 'nervos'
+  | 'scdo'
+  | 'ton'
+  | 'alph';
 
 type CommonResponseParams = {
   path: string;
@@ -74,5 +77,5 @@ export type AllNetworkGetAddressParams = {
 export declare function allNetworkGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & AllNetworkGetAddressParams
+  params: CommonParams & AllNetworkGetAddressParams,
 ): Response<AllNetworkAddress>;
