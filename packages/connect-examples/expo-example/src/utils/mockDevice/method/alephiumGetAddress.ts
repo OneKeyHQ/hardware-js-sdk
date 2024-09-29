@@ -21,6 +21,7 @@ export default function alephiumGetAddress(
   const [pathPrefix, lastIndex] = getPathParts(path);
   let pathIndex = lastIndex;
 
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     const relativePath = `${pathPrefix}/${pathIndex}`;
     const { address, success, error } = deriveAddress(seed, relativePath);

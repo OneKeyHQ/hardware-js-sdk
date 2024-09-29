@@ -24,6 +24,58 @@ function getAddressTypeByPath(path: string) {
   }
 }
 
+const NetworkMap = {
+  btc: bitcoin.networks.bitcoin,
+  testnet: bitcoin.networks.testnet,
+  doge: {
+    messagePrefix: '\x19Dogecoin Signed Message:\n',
+    bech32: '',
+    bip32: {
+      public: 0x02_fa_ca_fd,
+      private: 0x02_fa_c3_98,
+    },
+    pubKeyHash: 0x1e,
+    scriptHash: 0x16,
+    wif: 0x9e,
+    maximumFeeRate: 1_000_000, // doge
+  },
+  ltc: {
+    messagePrefix: '\x19Litecoin Signed Message:\n',
+    bech32: 'ltc',
+    // TODO getVersionBytesByAddressEncoding
+    // EAddressEncodings.P2PKH read .bip32, others read .segwitVersionBytes
+    bip32: {
+      public: 0x01_9d_a4_62,
+      private: 0x01_9d_9c_fe,
+    },
+    pubKeyHash: 0x30,
+    scriptHash: 0x32,
+    wif: 0xb0,
+  },
+  neurai: {
+    messagePrefix: '\x19Neuraium Signed Message:\n',
+    bech32: '',
+    bip32: {
+      public: 0x04_88_ad_e4,
+      private: 0x04_88_b2_1e,
+    },
+    pubKeyHash: 0x35,
+    scriptHash: 0x75,
+    wif: 0x80,
+  },
+  dash: {
+    messagePrefix: '\x19DarkCoin Signed Message:\n',
+    bech32: '',
+    bip32: {
+      public: 0x02_fe_52_cc,
+      private: 0x02_fe_52_f8,
+    },
+    pubKeyHash: 0x4c,
+    scriptHash: 0x10,
+    wif: 0xcc,
+  },
+};
+
 function getBtcAddress(type: string, publicKey: Buffer, network: bitcoin.networks.Network) {
   let data;
   // p2pkh
@@ -77,7 +129,7 @@ export default function btcGetAddress(
     }> {
   const { path, coin, mnemonic, passphrase } = params;
 
-  const network = bitcoin.networks.bitcoin;
+  const network = NetworkMap[coin as keyof typeof NetworkMap];
   const seed = mnemonicToSeed(mnemonic, passphrase);
 
   const keyPair = deriveKeyPairWithPath(seed, path);
