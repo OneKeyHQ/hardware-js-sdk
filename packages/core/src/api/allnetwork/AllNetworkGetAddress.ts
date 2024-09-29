@@ -335,7 +335,7 @@ function handleHardwareError(e: any, device: Device, method: BaseMethod) {
   if (message.includes('Failure_UnexpectedMessage')) {
     const versionRange = getMethodVersionRange(
       device.features,
-      type => method.getVersionRange()[type],
+      type => method.getVersionRange()[type]
     );
     const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
 
@@ -347,7 +347,7 @@ function handleHardwareError(e: any, device: Device, method: BaseMethod) {
       message = ERRORS.TypedError(
         HardwareErrorCode.CallMethodNeedUpgradeFirmware,
         `Device firmware version is too low, please update to ${versionRange.min}`,
-        { current: currentVersion, require: versionRange.min },
+        { current: currentVersion, require: versionRange.min }
       ).message;
     }
   }

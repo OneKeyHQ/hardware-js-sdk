@@ -1,0 +1,6 @@
+
+# Run lint:fix
+npm run lint:fix
+
+# Add modified files to the commit
+git add .

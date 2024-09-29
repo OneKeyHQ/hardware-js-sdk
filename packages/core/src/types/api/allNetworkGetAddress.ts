@@ -77,5 +77,5 @@ export type AllNetworkGetAddressParams = {
 export declare function allNetworkGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & AllNetworkGetAddressParams,
+  params: CommonParams & AllNetworkGetAddressParams
 ): Response<AllNetworkAddress>;
