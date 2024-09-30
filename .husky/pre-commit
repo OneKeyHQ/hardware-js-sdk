@@ -3,4 +3,4 @@
 yarn lint:staged
 
 # Add files modified by lint:fix
-git diff --name-only | xargs git add
+git diff --name-only -z | xargs git add

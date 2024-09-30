@@ -198,12 +198,12 @@ const api: PlaygroundProps[] = [
               path: "m/44'/541'/0'/0/0",
               showOnOneKey: false,
             },
-            // https://github.com/trustwallet/wallet-core/issues/3387
-            // ton chain has a different derivation path
             {
               network: 'ton',
               path: "m/44'/607'/0'",
               showOnOneKey: false,
+              // https://github.com/trustwallet/wallet-core/issues/3387
+              // ton chain has a different derivation path
             },
             {
               network: 'alephium',
