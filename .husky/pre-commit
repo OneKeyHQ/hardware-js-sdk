@@ -1,0 +1,6 @@
+
+# Run lint:fix
+npm run lint:staged
+
+# Add files modified by lint:fix
+git diff --name-only | xargs git add
