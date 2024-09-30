@@ -27,7 +27,10 @@ export type INetwork =
   | 'kaspa'
   | 'nexa'
   | 'dynex'
-  | 'nervos';
+  | 'nervos'
+  | 'scdo'
+  | 'ton'
+  | 'alph';
 
 type CommonResponseParams = {
   path: string;
