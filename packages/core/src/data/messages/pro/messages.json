@@ -1860,64 +1860,6 @@
         }
       }
     },
-    "GetPublicKeyMultiple": {
-      "fields": {
-        "addresses": {
-          "rule": "repeated",
-          "type": "BIP32Address",
-          "id": 1
-        },
-        "ecdsa_curve_name": {
-          "type": "string",
-          "id": 2
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 3
-        },
-        "coin_name": {
-          "type": "string",
-          "id": 4,
-          "options": {
-            "default": "Bitcoin"
-          }
-        },
-        "script_type": {
-          "type": "InputScriptType",
-          "id": 5,
-          "options": {
-            "default": "SPENDADDRESS"
-          }
-        },
-        "ignore_xpub_magic": {
-          "type": "bool",
-          "id": 6
-        }
-      },
-      "nested": {
-        "BIP32Address": {
-          "fields": {
-            "address_n": {
-              "rule": "repeated",
-              "type": "uint32",
-              "id": 1,
-              "options": {
-                "packed": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "PublicKeyMultiple": {
-      "fields": {
-        "xpubs": {
-          "rule": "repeated",
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
     "SignPsbt": {
       "fields": {
         "psbt": {
@@ -3838,150 +3780,6 @@
         "watch": {
           "type": "bool",
           "id": 1
-        }
-      }
-    },
-    "DnxGetAddress": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 2
-        }
-      }
-    },
-    "DnxAddress": {
-      "fields": {
-        "address": {
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
-    "DnxSignTx": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "inputs_count": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        },
-        "to_address": {
-          "rule": "required",
-          "type": "string",
-          "id": 3
-        },
-        "amount": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 4
-        },
-        "fee": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 5
-        },
-        "payment_id": {
-          "type": "bytes",
-          "id": 6
-        }
-      }
-    },
-    "DnxInputRequest": {
-      "fields": {
-        "request_index": {
-          "type": "uint32",
-          "id": 1
-        },
-        "tx_key": {
-          "type": "DnxTxKey",
-          "id": 2
-        },
-        "computed_key_image": {
-          "type": "DnxComputedKeyImage",
-          "id": 3
-        }
-      },
-      "nested": {
-        "DnxTxKey": {
-          "fields": {
-            "ephemeral_tx_sec_key": {
-              "type": "bytes",
-              "id": 1
-            },
-            "ephemeral_tx_pub_key": {
-              "type": "bytes",
-              "id": 2
-            }
-          }
-        },
-        "DnxComputedKeyImage": {
-          "fields": {
-            "key_image": {
-              "type": "bytes",
-              "id": 1
-            }
-          }
-        }
-      }
-    },
-    "DnxInputAck": {
-      "fields": {
-        "prev_index": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "global_index": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        },
-        "tx_pubkey": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 3
-        },
-        "prev_out_pubkey": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 4
-        },
-        "amount": {
-          "rule": "required",
-          "type": "uint64",
-          "id": 5
-        }
-      }
-    },
-    "DnxRTSigsRequest": {
-      "fields": {}
-    },
-    "DnxSignedTx": {
-      "fields": {
-        "signatures": {
-          "rule": "repeated",
-          "type": "bytes",
-          "id": 1
-        },
-        "output_keys": {
-          "rule": "repeated",
-          "type": "bytes",
-          "id": 2
         }
       }
     },
@@ -6212,10 +6010,6 @@
           "type": "bool",
           "id": 40
         },
-        "busy": {
-          "type": "bool",
-          "id": 41
-        },
         "offset": {
           "type": "uint32",
           "id": 500
@@ -6291,10 +6085,6 @@
         "boardloader_version": {
           "type": "string",
           "id": 519
-        },
-        "battery_level": {
-          "type": "uint32",
-          "id": 520
         },
         "busy": {
           "type": "bool",
@@ -9269,6 +9059,7 @@
           "id": 6
         },
         "timestamp": {
+          "rule": "required",
           "type": "bytes",
           "id": 7
         },
@@ -11133,30 +10924,6 @@
         }
       }
     },
-    "URCryptoHdkey": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "show_display": {
-          "type": "bool",
-          "id": 2
-        }
-      }
-    },
-    "URResponse": {
-      "fields": {
-        "data": {
-          "type": "string",
-          "id": 1
-        }
-      }
-    },
     "WebAuthnListResidentCredentials": {
       "fields": {}
     },
@@ -11662,21 +11429,12 @@
         "MessageType_NostrSignedSchnorr": 11509,
         "MessageType_LnurlAuth": 11600,
         "MessageType_LnurlAuthResp": 11601,
-        "MessageType_URCryptoHdkey": 21000,
-        "MessageType_URResponse": 21001,
         "MessageType_NervosGetAddress": 11701,
         "MessageType_NervosAddress": 11702,
         "MessageType_NervosSignTx": 11703,
         "MessageType_NervosSignedTx": 11704,
         "MessageType_NervosTxRequest": 11705,
         "MessageType_NervosTxAck": 11706,
-        "MessageType_DnxGetAddress": 11800,
-        "MessageType_DnxAddress": 11801,
-        "MessageType_DnxSignTx": 11802,
-        "MessageType_DnxInputRequest": 11803,
-        "MessageType_DnxInputAck": 11804,
-        "MessageType_DnxRTSigsRequest": 11805,
-        "MessageType_DnxSignedTx": 11806,
         "MessageType_TonGetAddress": 11901,
         "MessageType_TonAddress": 11902,
         "MessageType_TonSignMessage": 11903,

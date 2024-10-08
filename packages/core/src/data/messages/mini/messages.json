@@ -4773,26 +4773,6 @@
         }
       }
     },
-    "EthereumSignMessageEIP712": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "domain_hash": {
-          "type": "bytes",
-          "id": 2
-        },
-        "message_hash": {
-          "type": "bytes",
-          "id": 3
-        }
-      }
-    },
     "EthereumGetPublicKey": {
       "fields": {
         "address_n": {
@@ -10268,7 +10248,7 @@
         "MessageType_BixinBackupDevice": 914,
         "MessageType_BixinBackupDeviceAck": 915,
         "MessageType_BixinPinInputOnDevice": 10000,
-        "MessageType_EthereumSignMessageEIP712": 10200,
+        "MessageType_Deprecated_EthereumSignMessageEIP712": 10200,
         "MessageType_GetPublicKeyMultiple": 10210,
         "MessageType_PublicKeyMultiple": 10211,
         "MessageType_ConfluxGetAddress": 10112,

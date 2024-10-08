@@ -1,5 +1,167 @@
 {
   "nested": {
+    "AlephiumGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "include_public_key": {
+          "type": "bool",
+          "id": 3
+        },
+        "target_group": {
+          "type": "uint32",
+          "id": 4
+        }
+      }
+    },
+    "AlephiumAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "derived_path": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 3,
+          "options": {
+            "packed": false
+          }
+        }
+      }
+    },
+    "AlephiumSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "data_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "data_length": {
+          "type": "uint32",
+          "id": 3
+        }
+      }
+    },
+    "AlephiumSignedTx": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "AlephiumTxRequest": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "AlephiumTxAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "AlephiumBytecodeRequest": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "AlephiumBytecodeAck": {
+      "fields": {
+        "bytecode_data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "AlephiumSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "type": "bytes",
+          "id": 2
+        },
+        "message_type": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "AlephiumMessageSignature": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
     "AlgorandGetAddress": {
       "fields": {
         "address_n": {
@@ -4774,26 +4936,6 @@
         }
       }
     },
-    "EthereumSignMessageEIP712": {
-      "fields": {
-        "address_n": {
-          "rule": "repeated",
-          "type": "uint32",
-          "id": 1,
-          "options": {
-            "packed": false
-          }
-        },
-        "domain_hash": {
-          "type": "bytes",
-          "id": 2
-        },
-        "message_hash": {
-          "type": "bytes",
-          "id": 3
-        }
-      }
-    },
     "EthereumGetPublicKey": {
       "fields": {
         "address_n": {
@@ -8218,6 +8360,142 @@
         }
       }
     },
+    "ScdoGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "ScdoAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "ScdoSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "gas_price": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "gas_limit": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "to": {
+          "rule": "required",
+          "type": "string",
+          "id": 5
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 6
+        },
+        "timestamp": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        },
+        "data_initial_chunk": {
+          "type": "bytes",
+          "id": 8,
+          "options": {
+            "default": ""
+          }
+        },
+        "data_length": {
+          "type": "uint32",
+          "id": 9,
+          "options": {
+            "default": 0
+          }
+        },
+        "tx_type": {
+          "type": "uint32",
+          "id": 10,
+          "options": {
+            "default": 0
+          }
+        }
+      }
+    },
+    "ScdoSignedTx": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ScdoTxAck": {
+      "fields": {
+        "data_chunk": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "ScdoSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ScdoSignedMessage": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
     "SolanaGetAddress": {
       "fields": {
         "address_n": {
@@ -9420,6 +9698,285 @@
         }
       }
     },
+    "TonWalletVersion": {
+      "values": {
+        "V4R2": 3
+      }
+    },
+    "TonWorkChain": {
+      "values": {
+        "BASECHAIN": 0,
+        "MASTERCHAIN": 1
+      }
+    },
+    "TonGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 3,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 4,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 5,
+          "options": {
+            "default": false
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 6,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 7,
+          "options": {
+            "default": 698983191
+          }
+        }
+      }
+    },
+    "TonAddress": {
+      "fields": {
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "TonSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "destination": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "jetton_master_address": {
+          "type": "string",
+          "id": 3
+        },
+        "jetton_wallet_address": {
+          "type": "string",
+          "id": 4
+        },
+        "ton_amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 5
+        },
+        "jetton_amount": {
+          "type": "uint64",
+          "id": 6
+        },
+        "fwd_fee": {
+          "type": "uint64",
+          "id": 7,
+          "options": {
+            "default": 0
+          }
+        },
+        "comment": {
+          "type": "string",
+          "id": 8
+        },
+        "is_raw_data": {
+          "type": "bool",
+          "id": 9,
+          "options": {
+            "default": false
+          }
+        },
+        "mode": {
+          "type": "uint32",
+          "id": 10,
+          "options": {
+            "default": 3
+          }
+        },
+        "seqno": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 11
+        },
+        "expire_at": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 12
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 13,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 14,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 15,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 16,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 17,
+          "options": {
+            "default": false
+          }
+        },
+        "ext_destination": {
+          "rule": "repeated",
+          "type": "string",
+          "id": 18
+        },
+        "ext_ton_amount": {
+          "rule": "repeated",
+          "type": "uint64",
+          "id": 19,
+          "options": {
+            "packed": false
+          }
+        },
+        "ext_payload": {
+          "rule": "repeated",
+          "type": "string",
+          "id": 20
+        }
+      }
+    },
+    "TonSignedMessage": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "signning_message": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "TonSignProof": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "appdomain": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "comment": {
+          "type": "bytes",
+          "id": 3
+        },
+        "expire_at": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 5,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 6,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 7,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 8,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 9,
+          "options": {
+            "default": false
+          }
+        }
+      }
+    },
+    "TonSignedProof": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "TronGetAddress": {
       "fields": {
         "address_n": {
@@ -10156,7 +10713,6 @@
         "MessageType_BixinBackupDevice": 914,
         "MessageType_BixinBackupDeviceAck": 915,
         "MessageType_BixinPinInputOnDevice": 10000,
-        "MessageType_EthereumSignMessageEIP712": 10200,
         "MessageType_GetPublicKeyMultiple": 10210,
         "MessageType_PublicKeyMultiple": 10211,
         "MessageType_ConfluxGetAddress": 10112,
@@ -10231,6 +10787,29 @@
         "MessageType_NervosSignedTx": 11704,
         "MessageType_NervosTxRequest": 11705,
         "MessageType_NervosTxAck": 11706,
+        "MessageType_TonGetAddress": 11901,
+        "MessageType_TonAddress": 11902,
+        "MessageType_TonSignMessage": 11903,
+        "MessageType_TonSignedMessage": 11904,
+        "MessageType_TonSignProof": 11905,
+        "MessageType_TonSignedProof": 11906,
+        "MessageType_ScdoGetAddress": 12001,
+        "MessageType_ScdoAddress": 12002,
+        "MessageType_ScdoSignTx": 12003,
+        "MessageType_ScdoSignedTx": 12004,
+        "MessageType_ScdoTxAck": 12005,
+        "MessageType_ScdoSignMessage": 12006,
+        "MessageType_ScdoSignedMessage": 12007,
+        "MessageType_AlephiumGetAddress": 12101,
+        "MessageType_AlephiumAddress": 12102,
+        "MessageType_AlephiumSignTx": 12103,
+        "MessageType_AlephiumSignedTx": 12104,
+        "MessageType_AlephiumTxRequest": 12105,
+        "MessageType_AlephiumTxAck": 12106,
+        "MessageType_AlephiumBytecodeRequest": 12107,
+        "MessageType_AlephiumBytecodeAck": 12108,
+        "MessageType_AlephiumSignMessage": 12109,
+        "MessageType_AlephiumMessageSignature": 12110,
         "MessageType_DeviceEraseSector": 10026
       }
     },

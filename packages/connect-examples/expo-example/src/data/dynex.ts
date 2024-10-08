@@ -35,17 +35,12 @@ const api: PlaygroundProps[] = [
     expect: {
       common: {
         normal: {
+          requestPin: true,
+        },
+      },
+      touch: {
+        normal: {
           unknownMessage: true,
-        },
-      },
-      classic: {
-        normal: {
-          requestPin: true,
-        },
-      },
-      classic1s: {
-        normal: {
-          requestPin: true,
         },
       },
     },
@@ -77,17 +72,12 @@ const api: PlaygroundProps[] = [
     expect: {
       common: {
         normal: {
+          requestPin: true,
+        },
+      },
+      touch: {
+        normal: {
           unknownMessage: true,
-        },
-      },
-      classic: {
-        normal: {
-          requestPin: true,
-        },
-      },
-      classic1s: {
-        normal: {
-          requestPin: true,
         },
       },
     },
