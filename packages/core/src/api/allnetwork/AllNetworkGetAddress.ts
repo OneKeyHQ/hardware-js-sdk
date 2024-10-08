@@ -1,5 +1,6 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { get } from 'lodash';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -9,6 +10,7 @@ import { CoreApi } from '../../types';
 import type {
   AllNetworkAddress,
   AllNetworkAddressParams,
+  CommonResponseParams,
   INetwork,
 } from '../../types/api/allNetworkGetAddress';
 import { findMethod } from '../utils';
@@ -21,7 +23,8 @@ const Mainnet = 'mainnet';
 
 type NetworkConfig = {
   methodName: keyof CoreApi;
-  getParams?: (baseParams: AllNetworkAddressParams, chainName?: string) => any;
+  getParams?: (baseParams: AllNetworkAddressParams, chainName?: string, methodName?: string) => any;
+  dependOnMethodName?: (keyof CoreApi)[];
 };
 
 type INetworkReal = Exclude<INetwork, 'tbtc' | 'bch' | 'doge' | 'ltc' | 'neurai'>;
@@ -96,7 +99,7 @@ const networkConfigMap: NetworkConfigMap = {
     methodName: 'xrpGetAddress',
   },
   cosmos: {
-    methodName: 'cosmosGetAddress',
+    methodName: 'cosmosGetPublicKey',
     getParams: (baseParams: AllNetworkAddressParams) => {
       const { path, prefix, showOnOneKey } = baseParams;
       return {
@@ -138,6 +141,14 @@ const networkConfigMap: NetworkConfigMap = {
   },
   sui: {
     methodName: 'suiGetAddress',
+    dependOnMethodName: ['suiGetPublicKey'],
+    getParams: (baseParams: AllNetworkAddressParams) => {
+      const { path, showOnOneKey } = baseParams;
+      return {
+        path,
+        showOnOneKey,
+      };
+    },
   },
   fil: {
     methodName: 'filecoinGetAddress',
@@ -216,6 +227,9 @@ const networkConfigMap: NetworkConfigMap = {
   alph: {
     methodName: 'alephiumGetAddress',
   },
+  nostr: {
+    methodName: 'nostrGetPublicKey',
+  },
 };
 
 export default class AllNetworkGetAddress extends BaseMethod<
@@ -252,7 +266,13 @@ export default class AllNetworkGetAddress extends BaseMethod<
     payload: AllNetworkAddressParams;
   }): {
     methodName: keyof CoreApi;
-    params: Parameters<CoreApi[keyof CoreApi]>[0];
+    params: Parameters<CoreApi[keyof CoreApi]>[0] & { originPayload: AllNetworkAddressParams };
+    dependOnMethods:
+      | {
+          methodName: keyof CoreApi;
+          params: Parameters<CoreApi[keyof CoreApi]>[0];
+        }[]
+      | undefined;
   } {
     const { name: networkName, coin } = networkAliases[network] || {
       name: network,
@@ -263,64 +283,104 @@ export default class AllNetworkGetAddress extends BaseMethod<
       throw new Error(`Unsupported network: ${network}`);
     }
 
+    const dependOnMethods = config.dependOnMethodName?.map(dependOnMethodName => ({
+      methodName: dependOnMethodName,
+      params: config?.getParams?.(payload, coin, dependOnMethodName),
+    }));
+
     return {
       methodName: config.methodName,
-      params: config?.getParams?.(payload, coin) ?? payload,
+      params: {
+        ...(config?.getParams?.(payload, coin, config.methodName) ?? payload),
+        originPayload: payload,
+      },
+      dependOnMethods,
     };
+  }
+
+  async callMethod(methodName: keyof CoreApi, params: any, baseParams: CommonResponseParams) {
+    const method: BaseMethod = findMethod({
+      event: IFRAME.CALL,
+      type: IFRAME.CALL,
+      payload: {
+        connectId: this.payload.connectId,
+        deviceId: this.payload.deviceId,
+        method: methodName,
+        ...params,
+      },
+    });
+
+    method.connector = this.connector;
+    method.postMessage = this.postMessage;
+    method.init();
+    method.setDevice?.(this.device);
+
+    let result: AllNetworkAddress;
+    try {
+      const response = await method.run();
+      result = {
+        ...baseParams,
+        success: true,
+        error: response.error,
+        payload: response,
+      };
+    } catch (e: any) {
+      const errorMessage =
+        e instanceof Error ? handleHardwareError(e, this.device, method) : 'Unknown error';
+
+      result = {
+        ...baseParams,
+        success: false,
+        error: errorMessage,
+      };
+    }
+
+    return result;
   }
 
   async run() {
     const responses: AllNetworkAddress[] = [];
     for (let i = 0; i < this.payload.bundle.length; i++) {
       const param = this.payload.bundle[i];
-      const { methodName, params } = this.generateMethodName({
+      const { methodName, params, dependOnMethods } = this.generateMethodName({
         network: param.network as INetwork,
         payload: param,
       });
 
-      const method: BaseMethod = findMethod({
-        event: IFRAME.CALL,
-        type: IFRAME.CALL,
-        payload: {
-          connectId: this.payload.connectId,
-          deviceId: this.payload.deviceId,
-          method: methodName,
-          ...params,
-        },
-      });
-
-      method.connector = this.connector;
-      method.postMessage = this.postMessage;
-      method.init();
-      method.setDevice?.(this.device);
-
-      const baseParams = {
-        network: param.network,
-        path: typeof param.path === 'string' ? param.path : serializedPath(param.path),
-        chainName: param.chainName,
-        prefix: param.prefix,
-      };
-
-      let result: AllNetworkAddress;
-      try {
-        const response = await method.run();
-        result = {
-          ...baseParams,
-          success: true,
-          error: response.error,
-          payload: response,
-        };
-      } catch (e: any) {
-        const errorMessage =
-          e instanceof Error ? handleHardwareError(e, this.device, method) : 'Unknown error';
-
-        result = {
-          ...baseParams,
-          success: false,
-          error: errorMessage,
-        };
+      // run depend on methods
+      const dependOnMethodResults: AllNetworkAddress[] = [];
+      for (const dependOnMethod of dependOnMethods ?? []) {
+        const response = await this.callMethod(
+          dependOnMethod.methodName,
+          dependOnMethod.params,
+          param
+        );
+        dependOnMethodResults.push(response);
       }
 
+      // if any depend on method failed, return the error
+      if (dependOnMethodResults.some(result => !result.success)) {
+        responses.push({
+          ...param,
+          success: false,
+          error: dependOnMethodResults.find(result => !result.success)?.error,
+        });
+        return Promise.resolve(responses);
+      }
+
+      // call method
+      const response = await this.callMethod(methodName, params, param);
+
+      const dependOnPayloads = dependOnMethodResults.reduce(
+        (acc, cur) => Object.assign(acc, get(cur, 'payload', {})),
+        {}
+      );
+
+      const result: AllNetworkAddress = {
+        ...response,
+        // @ts-expect-error
+        payload: { ...response.payload, ...dependOnPayloads },
+      };
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
