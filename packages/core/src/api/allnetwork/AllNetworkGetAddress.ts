@@ -207,6 +207,15 @@ const networkConfigMap: NetworkConfigMap = {
       };
     },
   },
+  scdo: {
+    methodName: 'scdoGetAddress',
+  },
+  ton: {
+    methodName: 'tonGetAddress',
+  },
+  alph: {
+    methodName: 'alephiumGetAddress',
+  },
 };
 
 export default class AllNetworkGetAddress extends BaseMethod<

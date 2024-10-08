@@ -2,7 +2,7 @@
   "name": "expo-example",
   "version": "1.0.12-alpha.0",
   "scripts": {
-    "start": "yarn expo start --dev-client",
+    "start": "CONNECT_SRC=https://localhost:8087/ yarn expo start --dev-client",
     "android": "yarn expo run:android",
     "ios": "yarn expo run:ios",
     "web": "yarn expo start --web",
