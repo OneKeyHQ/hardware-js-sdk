@@ -30,9 +30,10 @@ export type INetwork =
   | 'nervos'
   | 'scdo'
   | 'ton'
-  | 'alph';
+  | 'alph'
+  | 'nostr';
 
-type CommonResponseParams = {
+export type CommonResponseParams = {
   path: string;
   network: INetwork;
   chainName?: string;
@@ -51,6 +52,8 @@ type AllNetworkAddressPayload =
   | {
       address: string;
       publicKey?: string;
+      pub?: string;
+      npub?: string;
     }
   | {
       // Cardano

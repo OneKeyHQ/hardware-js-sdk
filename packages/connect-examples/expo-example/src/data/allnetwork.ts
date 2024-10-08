@@ -206,8 +206,13 @@ const api: PlaygroundProps[] = [
               // ton chain has a different derivation path
             },
             {
-              network: 'alephium',
+              network: 'alph',
               path: "m/44'/1234'/0'/0/0",
+              showOnOneKey: false,
+            },
+            {
+              network: 'nostr',
+              path: "m/44'/1237'/0'/0/0",
               showOnOneKey: false,
             },
           ],
