@@ -371,16 +371,15 @@ export default class AllNetworkGetAddress extends BaseMethod<
       // call method
       const response = await this.callMethod(methodName, params, param);
 
+      const dependOnPayloads = dependOnMethodResults.reduce(
+        (acc, cur) => Object.assign(acc, get(cur, 'payload', {})),
+        {}
+      );
+
       const result: AllNetworkAddress = {
         ...response,
         // @ts-expect-error
-        payload: {
-          ...response.payload,
-          ...dependOnMethodResults.reduce(
-            (acc, cur) => ({ ...get(cur, 'payload', {}), ...acc }),
-            {}
-          ),
-        },
+        payload: { ...response.payload, ...dependOnPayloads },
       };
       responses.push(result);
       this.postPreviousAddressMessage(result);

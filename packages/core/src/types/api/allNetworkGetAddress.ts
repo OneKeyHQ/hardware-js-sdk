@@ -53,6 +53,7 @@ type AllNetworkAddressPayload =
       address: string;
       publicKey?: string;
       pub?: string;
+      // Nostr public key (bech32)
       npub?: string;
     }
   | {
