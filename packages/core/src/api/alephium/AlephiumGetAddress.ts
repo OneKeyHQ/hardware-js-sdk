@@ -36,7 +36,7 @@ export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAd
         address_n: addressN,
         show_display: showOnOneKey,
         include_public_key: batch.includePublicKey ?? false,
-        target_group: batch.group,
+        target_group: batch.group || 0,
       });
     });
   }
