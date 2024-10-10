@@ -36,7 +36,8 @@ export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAd
         address_n: addressN,
         show_display: showOnOneKey,
         include_public_key: batch.includePublicKey ?? false,
-        target_group: batch.group ?? 0,
+        // When group is 'null', the 'group' parameter will not be sent
+        ...(batch.group !== null && { target_group: batch.group ?? 0 }),
       });
     });
   }
