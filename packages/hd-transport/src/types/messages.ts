@@ -8,7 +8,7 @@ export type AlephiumGetAddress = {
   address_n: number[];
   show_display?: boolean;
   include_public_key?: boolean;
-  target_group: number;
+  target_group?: number;
 };
 
 // AlephiumAddress
