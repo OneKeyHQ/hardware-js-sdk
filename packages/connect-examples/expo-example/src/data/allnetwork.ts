@@ -208,7 +208,9 @@ const api: PlaygroundProps[] = [
             {
               network: 'alph',
               path: "m/44'/1234'/0'/0/0",
+              includePublicKey: true,
               showOnOneKey: false,
+              group: 0,
             },
             {
               network: 'nostr',
