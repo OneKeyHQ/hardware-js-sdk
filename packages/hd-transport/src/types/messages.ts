@@ -8,7 +8,7 @@ export type AlephiumGetAddress = {
   address_n: number[];
   show_display?: boolean;
   include_public_key?: boolean;
-  target_group: number;
+  target_group?: number;
 };
 
 // AlephiumAddress
@@ -4560,5 +4560,5 @@ export type MessageResponse<T extends MessageKey> = {
 export type TypedCall = <T extends MessageKey, R extends MessageKey>(
   type: T,
   resType: R,
-  message?: MessageType[T]
+  message?: MessageType[T],
 ) => Promise<MessageResponse<R>>;
