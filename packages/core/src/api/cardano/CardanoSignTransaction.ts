@@ -1,3 +1,5 @@
+import semver from 'semver';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { BaseMethod } from '../BaseMethod';
 import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
@@ -24,7 +26,10 @@ import type {
   CardanoSignedTxData,
   CardanoSignedTxWitness,
   CardanoAuxiliaryDataSupplement,
+  CardanoSignTransaction as CardanoSignTransactionType,
 } from '../../types/api/cardano';
+import { DeviceFirmwareRange } from '../../types';
+import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 
 export default class CardanoSignTransaction extends BaseMethod<any> {
   hasBundle?: boolean;
@@ -48,6 +53,16 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
 
     const { payload } = this;
 
+    // convert legacy parameters to new parameter
+    // payload.auxiliaryData.governanceRegistrationParameters are legacy params kept for backward compatibility (for now)
+    if (payload.auxiliaryData && payload.auxiliaryData.governanceRegistrationParameters) {
+      console.warn(
+        'Please use cVoteRegistrationParameters instead of governanceRegistrationParameters.'
+      );
+      payload.auxiliaryData.cVoteRegistrationParameters =
+        payload.auxiliaryData.governanceRegistrationParameters;
+    }
+
     // validate incoming parameters
     validateParams(payload, [
       { name: 'signingMode', type: 'number', required: true },
@@ -69,6 +84,8 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       { name: 'additionalWitnessRequests', type: 'array', allowEmpty: true },
       { name: 'derivationType', type: 'number' },
       { name: 'includeNetworkId', type: 'boolean' },
+      { name: 'chunkify', type: 'boolean' },
+      { name: 'tagCborSets', type: 'boolean' },
     ]);
 
     const inputsWithPath = payload.inputs.map(transformInput);
@@ -172,8 +189,64 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
           ? payload.derivationType
           : PROTO.CardanoDerivationType.ICARUS,
       includeNetworkId: payload.includeNetworkId,
+      chunkify: payload.chunkify,
+      tagCborSets: payload.tagCborSets,
     };
   }
+
+  hasConway = () => {
+    const payload = this.payload as CardanoSignTransactionType;
+    if (payload.tagCborSets != null) {
+      return true;
+    }
+    if (payload.auxiliaryData?.cVoteRegistrationParameters != null) {
+      return true;
+    }
+    for (const certificate of payload.certificates ?? []) {
+      if (certificate.dRep != null) {
+        return true;
+      }
+      if (certificate.deposit != null) {
+        return true;
+      }
+      if (
+        certificate.type === PROTO.CardanoCertificateType.STAKE_REGISTRATION_CONWAY ||
+        certificate.type === PROTO.CardanoCertificateType.STAKE_DEREGISTRATION_CONWAY ||
+        certificate.type === PROTO.CardanoCertificateType.VOTE_DELEGATION
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  supportConwayVersionRange = (): DeviceFirmwareRange => ({
+    model_touch: {
+      min: '4.11.0',
+    },
+  });
+
+  checkSupportConway = () => {
+    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
+
+    const versionRange = getMethodVersionRange(
+      this.device.features,
+      type => this.supportConwayVersionRange()[type]
+    );
+
+    if (!versionRange) {
+      return;
+    }
+
+    if (!semver.valid(firmwareVersion) || semver.lt(firmwareVersion, versionRange.min)) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+        `Device firmware version is too low, please update to ${versionRange.min}`,
+        { current: firmwareVersion, require: versionRange.min }
+      );
+    }
+  };
 
   async signTx(): Promise<CardanoSignedTxData> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
@@ -202,6 +275,8 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
       reference_inputs_count: this.params.referenceInputs.length,
       derivation_type: this.params.derivationType,
       include_network_id: this.params.includeNetworkId,
+      chunkify: this.params.chunkify,
+      tag_cbor_sets: this.params.tagCborSets,
     };
 
     // init
@@ -250,9 +325,10 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
         auxiliaryDataSupplement = {
           type: auxiliaryDataType,
           auxiliaryDataHash: message.auxiliary_data_hash as unknown as string,
+          cVoteRegistrationSignature: message.cvote_registration_signature,
           // @ts-expect-error
-          governanceSignature: message.governance_signature,
-          catalystSignature: message.governance_signature,
+          catalystSignature: message.cvote_registration_signature,
+          governanceSignature: message.cvote_registration_signature,
         };
       }
       await typedCall('CardanoTxHostAck', 'CardanoTxItemAck');
@@ -310,6 +386,8 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
   }
 
   run() {
+    this.checkSupportConway();
+
     return this.signTx();
   }
 }
