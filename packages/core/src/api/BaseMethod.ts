@@ -1,3 +1,5 @@
+import semver from 'semver';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
@@ -6,7 +8,8 @@ import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange, KnownDevice } from '../types';
 import { CoreMessage, createFirmwareMessage, createUiMessage, DEVICE, FIRMWARE } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
-import { getLogger, LoggerNames } from '../utils';
+import { getDeviceFirmwareVersion, getLogger, getMethodVersionRange, LoggerNames } from '../utils';
+import { DataManager } from '../data-manager';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -81,6 +84,12 @@ export abstract class BaseMethod<Params = undefined> {
    */
   skipForceUpdateCheck = false;
 
+  /**
+   * 是否需要预先检查版本限制
+   * @default false
+   */
+  preCheckVersionLimit = false;
+
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 
@@ -125,6 +134,53 @@ export abstract class BaseMethod<Params = undefined> {
         device: this.device.toMessageObject(),
       })
     );
+  }
+
+  handleUnsupportedMethodError(error?: HardwareError) {
+    console.log('handleUnsupportedMethodError:', error);
+
+    if (
+      // Not unexpected message is not processed
+      !error?.message?.includes('Failure_UnexpectedMessage') ||
+      // Only preCheckVersionLimit will have no error
+      (error == null && !this.preCheckVersionLimit)
+    ) {
+      return undefined;
+    }
+
+    const versionRange = getMethodVersionRange(
+      this.device.features,
+      type => this.getVersionRange()[type]
+    );
+
+    if (!versionRange || !this.device.features) {
+      return ERRORS.TypedError(HardwareErrorCode.UnsupportedMethod);
+    }
+    const newVersionStatus = DataManager.getFirmwareStatus(this.device.features);
+    const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
+      if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
+        throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
+      }
+
+      return ERRORS.TypedError(
+        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+        `Device firmware version is too low, please update to ${versionRange.min}`,
+        { current: currentVersion, require: versionRange.min }
+      );
+    }
+
+    if (
+      versionRange.max &&
+      semver.valid(versionRange.max) &&
+      semver.gte(currentVersion, versionRange.max)
+    ) {
+      return ERRORS.TypedError(
+        HardwareErrorCode.CallMethodDeprecated,
+        `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
+        { current: currentVersion, deprecated: versionRange.max }
+      );
+    }
   }
 
   checkDeviceSupportFeature() {

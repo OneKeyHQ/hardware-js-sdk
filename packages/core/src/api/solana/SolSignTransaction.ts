@@ -7,6 +7,8 @@ import { SolanaSignedTx, SolanaSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
 
 export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[]> {
+  preCheckVersionLimit = true;
+
   hasBundle = false;
 
   init() {

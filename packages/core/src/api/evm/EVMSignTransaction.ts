@@ -10,6 +10,8 @@ import { signTransaction } from './latest/signTransaction';
 import { signTransaction as signTransactionLegacyV1 } from './legacyV1/signTransaction';
 
 export default class EVMSignTransaction extends BaseMethod {
+  preCheckVersionLimit = true;
+
   addressN: number[] = [];
 
   isEIP1559 = false;

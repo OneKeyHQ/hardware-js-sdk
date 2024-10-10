@@ -364,6 +364,11 @@ export const HardwareErrorCode = {
   BridgeDeviceDisconnected: 817,
 
   /**
+   * Unsupported Method
+   */
+  UnsupportedMethod: 818,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -480,7 +485,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.CheckDownloadFileError]: 'Check download file error',
   [HardwareErrorCode.NotInSigningMode]: 'not in signing mode',
   [HardwareErrorCode.DataOverload]: 'Params data overload',
-
+  [HardwareErrorCode.UnsupportedMethod]: 'Unsupported method',
   /**
    * Lowlevel transport
    */

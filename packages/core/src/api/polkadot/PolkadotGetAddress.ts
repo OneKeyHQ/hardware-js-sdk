@@ -9,6 +9,8 @@ import { getPolkadotVersionRangeWithBundle } from './networks';
 export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAddress[]> {
   hasBundle = false;
 
+  preCheckVersionLimit = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode];

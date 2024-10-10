@@ -6,6 +6,8 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 
 export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
+  preCheckVersionLimit = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];

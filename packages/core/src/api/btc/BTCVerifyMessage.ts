@@ -8,6 +8,8 @@ import { getCoinInfo } from './helpers/btcParamsUtils';
 import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 
 export default class BTCVerifyMessage extends BaseMethod<VerifyMessage> {
+  preCheckVersionLimit = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
