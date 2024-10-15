@@ -5,6 +5,9 @@ export type CardanoPublicKey = {
   path: number[];
   serializedPath: string;
   pub: string;
+  /**
+   * @deprecated Use `pub` instead.
+   */
   publicKey?: string;
   node: PROTO.HDNodeType;
 };

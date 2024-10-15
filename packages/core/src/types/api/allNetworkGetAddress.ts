@@ -55,6 +55,9 @@ type AllNetworkAddressPayload =
   | {
       address: string;
       pub?: string;
+      /**
+       * @deprecated Use `pub` instead.
+       */
       publicKey?: string;
       // Nostr public key (bech32)
       npub?: string;

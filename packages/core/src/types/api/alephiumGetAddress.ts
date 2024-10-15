@@ -2,6 +2,9 @@ import type { CommonParams, Response } from '../params';
 
 export type AlephiumAddress = {
   path: string;
+  /**
+   * @deprecated Use `pub` instead.
+   */
   publicKey?: string;
   pub?: string;
   address: string;
