@@ -753,6 +753,16 @@ export enum CardanoCertificateType {
   STAKE_DEREGISTRATION = 1,
   STAKE_DELEGATION = 2,
   STAKE_POOL_REGISTRATION = 3,
+  STAKE_REGISTRATION_CONWAY = 7,
+  STAKE_DEREGISTRATION_CONWAY = 8,
+  VOTE_DELEGATION = 9,
+}
+
+export enum CardanoDRepType {
+  KEY_HASH = 0,
+  SCRIPT_HASH = 1,
+  ABSTAIN = 2,
+  NO_CONFIDENCE = 3,
 }
 
 export enum CardanoPoolRelayType {
@@ -763,10 +773,10 @@ export enum CardanoPoolRelayType {
 
 export enum CardanoTxAuxiliaryDataSupplementType {
   NONE = 0,
-  GOVERNANCE_REGISTRATION_SIGNATURE = 1,
+  CVOTE_REGISTRATION_SIGNATURE = 1,
 }
 
-export enum CardanoGovernanceRegistrationFormat {
+export enum CardanoCVoteRegistrationFormat {
   CIP15 = 0,
   CIP36 = 1,
 }
@@ -831,6 +841,7 @@ export type CardanoGetAddress = {
   network_id: number;
   address_parameters: CardanoAddressParametersType;
   derivation_type: CardanoDerivationType;
+  chunkify?: boolean;
 };
 
 // CardanoAddress
@@ -874,6 +885,8 @@ export type CardanoSignTxInit = {
   has_collateral_return?: boolean;
   total_collateral?: UintType;
   reference_inputs_count?: number;
+  chunkify?: boolean;
+  tag_cbor_sets?: boolean;
 };
 
 // CardanoTxInput
@@ -952,6 +965,13 @@ export type CardanoPoolParametersType = {
   relays_count: number;
 };
 
+// CardanoDRep
+export type CardanoDRep = {
+  type: CardanoDRepType;
+  key_hash?: string;
+  script_hash?: string;
+};
+
 // CardanoTxCertificate
 export type CardanoTxCertificate = {
   type: CardanoCertificateType;
@@ -960,6 +980,8 @@ export type CardanoTxCertificate = {
   pool_parameters?: CardanoPoolParametersType;
   script_hash?: string;
   key_hash?: string;
+  deposit?: UintType;
+  drep?: CardanoDRep;
 };
 
 // CardanoTxWithdrawal
@@ -970,26 +992,27 @@ export type CardanoTxWithdrawal = {
   key_hash?: string;
 };
 
-// CardanoGovernanceRegistrationDelegation
-export type CardanoGovernanceRegistrationDelegation = {
-  voting_public_key: string;
+// CardanoCVoteRegistrationDelegation
+export type CardanoCVoteRegistrationDelegation = {
+  vote_public_key: string;
   weight: number;
 };
 
-// CardanoGovernanceRegistrationParametersType
-export type CardanoGovernanceRegistrationParametersType = {
-  voting_public_key?: string;
+// CardanoCVoteRegistrationParametersType
+export type CardanoCVoteRegistrationParametersType = {
+  vote_public_key?: string;
   staking_path: number[];
-  reward_address_parameters: CardanoAddressParametersType;
+  payment_address_parameters?: CardanoAddressParametersType;
   nonce: number;
-  format?: CardanoGovernanceRegistrationFormat;
-  delegations: CardanoGovernanceRegistrationDelegation[];
+  format?: CardanoCVoteRegistrationFormat;
+  delegations: CardanoCVoteRegistrationDelegation[];
   voting_purpose?: number;
+  payment_address?: string;
 };
 
 // CardanoTxAuxiliaryData
 export type CardanoTxAuxiliaryData = {
-  governance_registration_parameters?: CardanoGovernanceRegistrationParametersType;
+  cvote_registration_parameters?: CardanoCVoteRegistrationParametersType;
   hash?: string;
 };
 
@@ -1023,7 +1046,7 @@ export type CardanoTxItemAck = {};
 export type CardanoTxAuxiliaryDataSupplement = {
   type: CardanoTxAuxiliaryDataSupplementType;
   auxiliary_data_hash?: string;
-  governance_signature?: string;
+  cvote_registration_signature?: string;
 };
 
 // CardanoTxWitnessRequest
@@ -4135,10 +4158,11 @@ export type MessageType = {
   CardanoPoolRelayParameters: CardanoPoolRelayParameters;
   CardanoPoolMetadataType: CardanoPoolMetadataType;
   CardanoPoolParametersType: CardanoPoolParametersType;
+  CardanoDRep: CardanoDRep;
   CardanoTxCertificate: CardanoTxCertificate;
   CardanoTxWithdrawal: CardanoTxWithdrawal;
-  CardanoGovernanceRegistrationDelegation: CardanoGovernanceRegistrationDelegation;
-  CardanoGovernanceRegistrationParametersType: CardanoGovernanceRegistrationParametersType;
+  CardanoCVoteRegistrationDelegation: CardanoCVoteRegistrationDelegation;
+  CardanoCVoteRegistrationParametersType: CardanoCVoteRegistrationParametersType;
   CardanoTxAuxiliaryData: CardanoTxAuxiliaryData;
   CardanoTxMint: CardanoTxMint;
   CardanoTxCollateralInput: CardanoTxCollateralInput;
