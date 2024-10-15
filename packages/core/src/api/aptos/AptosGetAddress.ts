@@ -23,7 +23,8 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
     this.shouldConfirm =
-      this.payload.showOnOneKey || this.payload.bundle?.some((i: any) => !!i.showOnOneKey);
+      this.payload.showOnOneKey ||
+      this.payload.bundle?.some((i: AptosGetAddressParams) => !!i.showOnOneKey);
 
     // check payload
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);

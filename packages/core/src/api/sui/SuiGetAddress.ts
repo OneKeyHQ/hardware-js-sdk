@@ -21,7 +21,8 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
     this.shouldConfirm =
-      this.payload.showOnOneKey || this.payload.bundle?.some((i: any) => !!i.showOnOneKey);
+      this.payload.showOnOneKey ||
+      this.payload.bundle?.some((i: SuiGetAddressParams) => !!i.showOnOneKey);
 
     // check payload
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);
