@@ -1,6 +1,7 @@
 import type { CommonParams, Response } from '../params';
 
 export interface LnurlAuth {
+  pub?: string;
   publickey?: string;
   path?: string;
   signature?: string;

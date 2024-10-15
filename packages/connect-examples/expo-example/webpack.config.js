@@ -28,5 +28,14 @@ module.exports = async function (env, argv) {
     config.devtool = false;
   }
 
+  const definePlugin = config.plugins.find(plugin => plugin.constructor.name === 'DefinePlugin');
+  if (definePlugin) {
+    const processEnv = {};
+    Object.keys(process.env).forEach(key => {
+      processEnv[key] = JSON.stringify(process.env[key]);
+    });
+
+    definePlugin.definitions['process.env'] = processEnv;
+  }
   return config;
 };

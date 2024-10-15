@@ -3,7 +3,8 @@ import type { CommonParams, Response } from '../params';
 
 export type TonAddress = {
   path: string;
-  publicKey: string;
+  pub: string;
+  publicKey?: string;
   address: string;
 };
 

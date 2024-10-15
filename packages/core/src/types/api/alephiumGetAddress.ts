@@ -3,6 +3,7 @@ import type { CommonParams, Response } from '../params';
 export type AlephiumAddress = {
   path: string;
   publicKey?: string;
+  pub?: string;
   address: string;
   derivedPath: string;
 };

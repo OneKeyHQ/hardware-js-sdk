@@ -3,7 +3,8 @@ import type { CommonParams, Response } from '../params';
 
 export type PolkadotAddress = {
   path: string;
-  publicKey: string;
+  pub: string;
+  publicKey?: string;
 } & HardwarePolkadotAddress;
 
 export type PolkadotGetAddressParams = {

@@ -2,7 +2,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { SuiGetAddressParams } from '../../types';
+import { SuiGetAddressParams, SuiPublicKey } from '../../types';
 
 export default class SuiGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
@@ -53,12 +53,15 @@ export default class SuiGetPublicKey extends BaseMethod<any> {
       ecdsa_curve_name: 'ed25519',
     });
 
-    const responses = res.message.public_keys.map((publicKey: string, index: number) => ({
-      path: serializedPath((this.params as unknown as any[])[index].address_n),
-      publicKey,
-    }));
+    const responses: SuiPublicKey[] = res.message.public_keys.map(
+      (publicKey: string, index: number) => ({
+        path: serializedPath((this.params as unknown as any[])[index].address_n),
+        publicKey,
+        pub: publicKey,
+      })
+    );
 
-    validateResult(responses, ['publicKey'], {
+    validateResult(responses, ['pub'], {
       expectedLength: this.params.length,
     });
 

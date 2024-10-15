@@ -2,7 +2,8 @@ import type { CommonParams, Response } from '../params';
 
 export type AptosPublicKey = {
   path: string;
-  publicKey: string;
+  pub: string;
+  publicKey?: string;
 };
 
 export type AptosGetPublicKeyParams = {

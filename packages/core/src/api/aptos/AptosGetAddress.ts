@@ -22,9 +22,8 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
-    this.shouldConfirm = this.hasBundle
-      ? this.payload.bundle.some((i: any) => !!i.showOnOneKey)
-      : false;
+    this.shouldConfirm =
+      this.payload.showOnOneKey || this.payload.bundle?.some((i: any) => !!i.showOnOneKey);
 
     // check payload
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);
@@ -64,46 +63,71 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
   }
 
   async run() {
-    if (this.hasBundle && supportBatchPublicKey(this.device?.features) && !this.shouldConfirm) {
-      const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
-        paths: this.params,
-        ecdsa_curve_name: 'ed25519',
-      });
-      const result = res.message.public_keys.map((publicKey: string, index: number) => ({
-        path: serializedPath((this.params as unknown as any[])[index].address_n),
-        publicKey,
-        address: this.publicKeyToAddress(publicKey),
-      }));
+    const supportsBatchPublicKey = supportBatchPublicKey(this.device?.features);
+    let responses: AptosAddress[] = [];
+    if (supportsBatchPublicKey) {
+      const publicKeyRes = await this.device.commands.typedCall(
+        'BatchGetPublickeys',
+        'EcdsaPublicKeys',
+        {
+          paths: this.params,
+          ecdsa_curve_name: 'ed25519',
+        }
+      );
 
-      validateResult(result, ['address'], {
-        expectedLength: this.params.length,
-      });
+      for (let i = 0; i < this.params.length; i++) {
+        const param = this.params[i];
+        const publicKey = publicKeyRes.message.public_keys[i];
+        let address: string;
 
-      return Promise.resolve(result);
-    }
+        if (this.shouldConfirm) {
+          const addressRes = await this.device.commands.typedCall(
+            'AptosGetAddress',
+            'AptosAddress',
+            param
+          );
+          address = addressRes.message.address?.toLowerCase() ?? '';
+        } else {
+          address = this.publicKeyToAddress(publicKey);
+        }
 
-    const responses: AptosAddress[] = [];
-    for (let i = 0; i < this.params.length; i++) {
-      const param = this.params[i];
+        const result: AptosAddress = {
+          path: serializedPath(param.address_n),
+          address,
+          publicKey,
+          pub: publicKey,
+        };
 
-      const res = await this.device.commands.typedCall('AptosGetAddress', 'AptosAddress', {
-        ...param,
-      });
+        if (this.shouldConfirm) {
+          this.postPreviousAddressMessage(result);
+        }
 
-      const { address } = res.message;
-
-      const result = {
-        path: serializedPath(param.address_n),
-        address: address?.toLowerCase(),
-      };
-      responses.push(result);
-      this.postPreviousAddressMessage(result);
+        responses.push(result);
+      }
+    } else {
+      responses = await Promise.all(
+        this.params.map(async param => {
+          const res = await this.device.commands.typedCall(
+            'AptosGetAddress',
+            'AptosAddress',
+            param
+          );
+          const result = {
+            path: serializedPath(param.address_n),
+            address: res.message.address?.toLowerCase() ?? '',
+          };
+          if (this.shouldConfirm) {
+            this.postPreviousAddressMessage(result);
+          }
+          return result;
+        })
+      );
     }
 
     validateResult(responses, ['address'], {
       expectedLength: this.params.length,
     });
 
-    return Promise.resolve(this.hasBundle ? responses : responses[0]);
+    return this.hasBundle ? responses : responses[0];
   }
 }

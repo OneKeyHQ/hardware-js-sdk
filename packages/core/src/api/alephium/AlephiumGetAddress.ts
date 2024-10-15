@@ -62,10 +62,11 @@ export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAd
 
       const { address } = res.message;
 
-      const result = {
+      const result: AlephiumAddress = {
         path: serializedPath(param.address_n),
         address,
         publicKey: param.include_public_key ? res.message.public_key : undefined,
+        pub: param.include_public_key ? res.message.public_key : undefined,
         derivedPath: serializedPath(res.message.derived_path),
       };
       responses.push(result);

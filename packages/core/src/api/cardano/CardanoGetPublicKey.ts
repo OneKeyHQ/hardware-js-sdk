@@ -57,12 +57,13 @@ export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyPara
       responses.push({
         path: batch.address_n,
         serializedPath: serializedPath(batch.address_n),
+        pub: message.xpub,
         publicKey: message.xpub,
         node: message.node,
       });
     }
 
-    validateResult(responses, ['publicKey'], {
+    validateResult(responses, ['pub'], {
       expectedLength: this.params.length,
     });
 

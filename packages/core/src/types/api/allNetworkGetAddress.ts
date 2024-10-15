@@ -46,13 +46,16 @@ export type AllNetworkAddressParams = {
   chainName?: string;
   prefix?: string;
   showOnOneKey?: boolean;
+
+  includePublicKey?: boolean;
+  group?: string;
 };
 
 type AllNetworkAddressPayload =
   | {
       address: string;
-      publicKey?: string;
       pub?: string;
+      publicKey?: string;
       // Nostr public key (bech32)
       npub?: string;
     }
@@ -84,7 +87,10 @@ type AllNetworkAddressPayload =
 
 export type AllNetworkAddress = CommonResponseParams & {
   success: boolean;
+  // custom error message
   error?: string;
+  // native error message
+  errorCode?: string;
   payload?: AllNetworkAddressPayload;
 };
 

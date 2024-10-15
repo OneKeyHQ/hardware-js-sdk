@@ -3,6 +3,7 @@ import type { CommonParams, Response } from '../params';
 
 export type SuiAddress = {
   path: string;
+  pub?: string;
   publicKey?: string;
 } & HardwareSuiAddress;
 
