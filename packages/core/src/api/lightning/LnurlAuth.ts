@@ -43,6 +43,9 @@ export default class LnurlAuth1 extends BaseMethod<ILnurlAuth> {
 
     validateResult(message, ['publickey', 'path']);
 
-    return message;
+    return {
+      ...message,
+      pub: message.publickey,
+    };
   }
 }

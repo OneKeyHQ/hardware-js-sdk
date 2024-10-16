@@ -3,6 +3,10 @@ import type { CommonParams, Response } from '../params';
 
 export type AptosAddress = {
   path: string;
+  pub?: string;
+  /**
+   * @deprecated Use `pub` instead.
+   */
   publicKey?: string;
 } & HardwareAptosAddress;
 

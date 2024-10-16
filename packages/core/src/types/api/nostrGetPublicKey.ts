@@ -2,7 +2,11 @@ import type { CommonParams, Response } from '../params';
 
 export type NostrPublicKey = {
   npub?: string;
-  publickey?: string;
+  pub?: string;
+  /**
+   * @deprecated Use `pub` instead.
+   */
+  publicKey?: string;
   path: string;
 };
 

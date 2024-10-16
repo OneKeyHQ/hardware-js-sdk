@@ -141,14 +141,6 @@ const networkConfigMap: NetworkConfigMap = {
   },
   sui: {
     methodName: 'suiGetAddress',
-    dependOnMethodName: ['suiGetPublicKey'],
-    getParams: (baseParams: AllNetworkAddressParams) => {
-      const { path, showOnOneKey } = baseParams;
-      return {
-        path,
-        showOnOneKey,
-      };
-    },
   },
   fil: {
     methodName: 'filecoinGetAddress',
@@ -325,14 +317,22 @@ export default class AllNetworkGetAddress extends BaseMethod<
         payload: response,
       };
     } catch (e: any) {
-      const errorMessage =
-        e instanceof Error ? handleHardwareError(e, this.device, method) : 'Unknown error';
-
-      result = {
-        ...baseParams,
-        success: false,
-        error: errorMessage,
-      };
+      if (e instanceof Error) {
+        const errorMessage = handleHardwareError(e, this.device, method);
+        result = {
+          ...baseParams,
+          success: false,
+          errorCode: e.message,
+          error: errorMessage,
+        };
+      } else {
+        result = {
+          ...baseParams,
+          success: false,
+          errorCode: 'Unknown error',
+          error: 'Unknown error',
+        };
+      }
     }
 
     return result;
