@@ -4,11 +4,7 @@ import { PROTO } from '../../constants';
 export type CardanoPublicKey = {
   path: number[];
   serializedPath: string;
-  pub: string;
-  /**
-   * @deprecated Use `pub` instead.
-   */
-  publicKey?: string;
+  xpub: string;
   node: PROTO.HDNodeType;
 };
 
