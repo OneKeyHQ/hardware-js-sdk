@@ -10628,6 +10628,10 @@
           "rule": "repeated",
           "type": "string",
           "id": 20
+        },
+        "jetton_amount_bytes": {
+          "type": "bytes",
+          "id": 21
         }
       }
     },

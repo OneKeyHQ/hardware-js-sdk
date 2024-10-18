@@ -1,4 +1,9 @@
-import { TonSignedMessage, TonWalletVersion, TonWorkChain } from '@onekeyfe/hd-transport';
+import type {
+  TonSignedMessage,
+  TonWalletVersion,
+  TonWorkChain,
+  UintType,
+} from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type TonSignMessageParams = {
@@ -6,21 +11,21 @@ export type TonSignMessageParams = {
   destination: string;
   jettonMasterAddress?: string;
   jettonWalletAddress?: string;
-  tonAmount: number;
-  jettonAmount?: number;
-  fwdFee?: number;
+  tonAmount: UintType;
+  jettonAmount?: UintType;
+  fwdFee?: UintType;
   comment?: string;
   isRawData?: boolean;
   mode?: number;
   seqno: number;
-  expireAt: number;
+  expireAt: UintType;
   walletVersion?: TonWalletVersion;
   walletId?: number;
   workchain?: TonWorkChain;
   isBounceable?: boolean;
   isTestnetOnly?: boolean;
   extDestination?: string[];
-  extTonAmount?: number[];
+  extTonAmount?: UintType[];
   extPayload?: string[];
 };
 
