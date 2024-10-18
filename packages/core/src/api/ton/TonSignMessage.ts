@@ -9,6 +9,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { DeviceFirmwareRange, DeviceModelToTypes, TonSignMessageParams } from '../../types';
 import { getDeviceFirmwareVersion, getDeviceType, getMethodVersionRange } from '../../utils';
+import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
 
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   init() {
@@ -146,7 +147,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     const { jettonAmount } = this.payload;
     if (jettonAmount) {
       if (this.checkSupportJettonAmountBytes()) {
-        this.params.jetton_amount_bytes = new BigNumber(jettonAmount).toString(16);
+        this.params.jetton_amount_bytes = stripHexStartZeroes(
+          formatAnyHex(new BigNumber(jettonAmount).toString(16))
+        );
       } else {
         this.params.jetton_amount = jettonAmount;
       }

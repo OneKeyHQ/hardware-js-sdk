@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-shared",
-  "version": "1.0.12-alpha.2",
+  "version": "1.0.12",
   "description": "Hardware SDK's shared tool library",
   "keywords": [
     "Hardware-SDK",
