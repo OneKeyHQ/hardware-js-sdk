@@ -16,7 +16,7 @@ export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
       { name: 'path', required: true },
       { name: 'appdomain', type: 'string' },
       { name: 'comment', type: 'string' },
-      { name: 'expireAt', type: 'number' },
+      { name: 'expireAt' },
       { name: 'walletVersion' },
       { name: 'walletId', type: 'number' },
       { name: 'workchain' },

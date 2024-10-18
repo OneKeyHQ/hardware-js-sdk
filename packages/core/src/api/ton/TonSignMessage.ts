@@ -1,11 +1,14 @@
 import { TonSignMessage as HardwareTonSignMessage } from '@onekeyfe/hd-transport';
-
+import semver from 'semver';
+import BigNumber from 'bignumber.js';
+import { isEmpty } from 'lodash';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { DeviceModelToTypes, TonSignMessageParams } from '../../types';
-import { getDeviceType } from '../../utils';
+import { DeviceFirmwareRange, DeviceModelToTypes, TonSignMessageParams } from '../../types';
+import { getDeviceFirmwareVersion, getDeviceType, getMethodVersionRange } from '../../utils';
 
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   init() {
@@ -18,14 +21,14 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       { name: 'destination', type: 'string' },
       { name: 'jettonMasterAddress', type: 'string' },
       { name: 'jettonWalletAddress', type: 'string' },
-      { name: 'tonAmount', type: 'number' },
-      { name: 'jettonAmount', type: 'number' },
-      { name: 'fwdFee', type: 'number' },
+      { name: 'tonAmount' },
+      { name: 'jettonAmount' },
+      { name: 'fwdFee' },
       { name: 'comment', type: 'string' },
       { name: 'isRawData', type: 'boolean' },
       { name: 'mode', type: 'number' },
       { name: 'seqno', type: 'number' },
-      { name: 'expireAt', type: 'number' },
+      { name: 'expireAt' },
       { name: 'walletVersion' },
       { name: 'walletId', type: 'number' },
       { name: 'workchain' },
@@ -45,7 +48,6 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       jetton_master_address: this.payload.jettonMasterAddress,
       jetton_wallet_address: this.payload.jettonWalletAddress,
       ton_amount: this.payload.tonAmount,
-      jetton_amount: this.payload.jettonAmount,
       fwd_fee: this.payload.fwdFee,
       comment: this.payload.comment,
       mode: this.payload.mode,
@@ -68,10 +70,88 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       model_touch: {
         min: '4.10.0',
       },
+      classic1s: {
+        min: '3.10.0',
+      },
     };
   }
 
+  getSupportJettonAmountBytesVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.10.2',
+      },
+    };
+  }
+
+  checkSupportJettonAmountBytes() {
+    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
+    const versionRange = getMethodVersionRange(
+      this.device.features,
+      type => this.getSupportJettonAmountBytesVersionRange()[type]
+    );
+
+    if (!versionRange) {
+      // Equipment that does not need to be repaired
+      return true;
+    }
+
+    if (semver.valid(firmwareVersion) && semver.gte(firmwareVersion, versionRange.min)) {
+      return true;
+    }
+    return false;
+  }
+
+  getFixCommentErrorVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.10.1',
+      },
+    };
+  }
+
+  checkFixCommentError() {
+    // The issue of missing comments when transferring tokens.
+    const { comment, jettonAmount } = this.payload;
+
+    if (isEmpty(comment) || jettonAmount === null || jettonAmount === undefined) {
+      return;
+    }
+
+    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
+    const versionRange = getMethodVersionRange(
+      this.device.features,
+      type => this.getFixCommentErrorVersionRange()[type]
+    );
+
+    if (!versionRange) {
+      // Equipment that does not need to be repaired
+      return;
+    }
+
+    if (semver.valid(firmwareVersion) && semver.lt(firmwareVersion, versionRange.min)) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+        `Device firmware version is too low, please update to ${versionRange.min}`,
+        { current: firmwareVersion, require: versionRange.min }
+      );
+    }
+  }
+
   async run() {
+    // checkFixCommentError
+    this.checkFixCommentError();
+
+    // check jettonAmount
+    const { jettonAmount } = this.payload;
+    if (jettonAmount) {
+      if (this.checkSupportJettonAmountBytes()) {
+        this.params.jetton_amount_bytes = new BigNumber(jettonAmount).toString(16);
+      } else {
+        this.params.jetton_amount = jettonAmount;
+      }
+    }
+
     const deviceType = getDeviceType(this.device.features);
     const res = await this.device.commands.typedCall('TonSignMessage', 'TonSignedMessage', {
       ...this.params,

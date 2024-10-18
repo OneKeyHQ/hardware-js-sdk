@@ -1,11 +1,16 @@
-import { TonSignedProof, TonWalletVersion, TonWorkChain } from '@onekeyfe/hd-transport';
+import type {
+  TonSignedProof,
+  TonWalletVersion,
+  TonWorkChain,
+  UintType,
+} from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type TonSignProofParams = {
   path: string | number[];
   appdomain: string;
   comment?: string;
-  expireAt: number;
+  expireAt: UintType;
   walletVersion?: TonWalletVersion;
   walletId?: number;
   workchain?: TonWorkChain;

@@ -201,6 +201,12 @@ const TYPE_PATCH = {
   'TezosDelegationOp.source': 'Uint8Array',
   'TezosDelegationOp.delegate': 'Uint8Array',
   'TezosSignTx.branch': 'Uint8Array',
+  'TonSignMessage.ton_amount': UINT_TYPE,
+  'TonSignMessage.jetton_amount': UINT_TYPE,
+  'TonSignMessage.fwd_fee': UINT_TYPE,
+  'TonSignMessage.expire_at': UINT_TYPE,
+  'TonSignMessage.ext_ton_amount': UINT_TYPE,
+  'TonSignProof.expire_at': UINT_TYPE,
 };
 
 const DEFINITION_PATCH = {
