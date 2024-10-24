@@ -16,7 +16,7 @@ export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
       { name: 'path', required: true },
       { name: 'appdomain', type: 'string' },
       { name: 'comment', type: 'string' },
-      { name: 'expireAt', type: 'number' },
+      { name: 'expireAt' },
       { name: 'walletVersion' },
       { name: 'walletId', type: 'number' },
       { name: 'workchain' },
@@ -42,12 +42,6 @@ export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
 
   getVersionRange() {
     return {
-      mini: {
-        min: '4.0.0',
-      },
-      classic1s: {
-        min: '4.0.0',
-      },
       model_touch: {
         min: '4.10.0',
       },

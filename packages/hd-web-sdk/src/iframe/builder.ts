@@ -29,8 +29,8 @@ export const init = async (settings: any) => {
     }
   }
 
-  const manifest = `version=${settings.version as string}`;
-  const src = `${settings.iframeSrc as string}?${manifest}`;
+  // const manifest = `version=${settings.version as string}`;
+  const src = `${settings.iframeSrc as string}`;
 
   instance.setAttribute('src', src);
 

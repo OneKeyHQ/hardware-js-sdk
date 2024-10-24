@@ -46,8 +46,6 @@ export const getHardwareSDKInstance = memoizee(
           if (sdkConnectSrc) {
             settings.connectSrc = sdkConnectSrc;
           }
-
-          console.log('======>>>>> Hardware SDK Init ConnectSrc:', settings.connectSrc);
         }
 
         try {

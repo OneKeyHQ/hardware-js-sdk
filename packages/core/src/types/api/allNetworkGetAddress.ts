@@ -27,9 +27,13 @@ export type INetwork =
   | 'kaspa'
   | 'nexa'
   | 'dynex'
-  | 'nervos';
+  | 'nervos'
+  | 'scdo'
+  | 'ton'
+  | 'alph'
+  | 'nostr';
 
-type CommonResponseParams = {
+export type CommonResponseParams = {
   path: string;
   network: INetwork;
   chainName?: string;
@@ -48,6 +52,9 @@ type AllNetworkAddressPayload =
   | {
       address: string;
       publicKey?: string;
+      pub?: string;
+      // Nostr public key (bech32)
+      npub?: string;
     }
   | {
       // Cardano
@@ -59,6 +66,20 @@ type AllNetworkAddressPayload =
       address: string;
       xpub?: string;
       stakeAddress?: string;
+    }
+  | {
+      // BTC
+      node: {
+        depth: number;
+        fingerprint: number;
+        child_num: number;
+        chain_code: string;
+        private_key: string | null;
+        public_key: string;
+      };
+      xpub: string;
+      root_fingerprint: number;
+      xpubSegwit: string;
     };
 
 export type AllNetworkAddress = CommonResponseParams & {
@@ -75,4 +96,4 @@ export declare function allNetworkGetAddress(
   connectId: string,
   deviceId: string,
   params: CommonParams & AllNetworkGetAddressParams
-): Response<AllNetworkAddress>;
+): Response<AllNetworkAddress[]>;

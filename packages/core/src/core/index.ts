@@ -14,6 +14,8 @@ import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
+
+import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
 import {
   CORE_EVENT,
   CoreMessage,
@@ -203,20 +205,21 @@ export const callAPI = async (message: CoreMessage) => {
       }
 
       // check call method mode
-      // const unexpectedMode = device.hasUnexpectedMode(
-      //   method.notAllowDeviceMode,
-      //   method.requireDeviceMode
-      // );
-      // if (unexpectedMode) {
-      //   if (unexpectedMode === UI_REQUEST.NOT_IN_BOOTLOADER) {
-      //     return Promise.reject(
-      //       ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedBootloaderMode)
-      //     );
-      //   }
-      //   return Promise.reject(
-      //     ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
-      //   );
-      // }
+      const unexpectedMode = device.hasUnexpectedMode(
+        method.notAllowDeviceMode,
+        method.requireDeviceMode
+      );
+      if (unexpectedMode) {
+        if (unexpectedMode === UI_REQUEST_CONST.NOT_IN_BOOTLOADER) {
+          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.RequiredButInBootloaderMode));
+        }
+        if (unexpectedMode === UI_REQUEST_CONST.BOOTLOADER) {
+          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.NotAllowInBootloaderMode));
+        }
+        return Promise.reject(
+          ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
+        );
+      }
 
       if (method.deviceId && method.checkDeviceId) {
         const isSameDeviceID = device.checkDeviceId(method.deviceId);
@@ -288,7 +291,6 @@ export const callAPI = async (message: CoreMessage) => {
       }
 
       try {
-        console.log('=====>>>>>>Call API - Inner Running method', method.payload);
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ');
         messageResponse = createResponseMessage(method.responseID, true, response);

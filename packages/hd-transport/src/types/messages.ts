@@ -8,7 +8,7 @@ export type AlephiumGetAddress = {
   address_n: number[];
   show_display?: boolean;
   include_public_key?: boolean;
-  target_group: number;
+  target_group?: number;
 };
 
 // AlephiumAddress
@@ -4055,22 +4055,23 @@ export type TonSignMessage = {
   destination: string;
   jetton_master_address?: string;
   jetton_wallet_address?: string;
-  ton_amount: number;
-  jetton_amount?: number;
-  fwd_fee?: number;
+  ton_amount: UintType;
+  jetton_amount?: UintType;
+  fwd_fee?: UintType;
   comment?: string;
   is_raw_data?: boolean;
   mode?: number;
   seqno: number;
-  expire_at: number;
+  expire_at: UintType;
   wallet_version?: TonWalletVersion;
   wallet_id?: number;
   workchain?: TonWorkChain;
   is_bounceable?: boolean;
   is_testnet_only?: boolean;
   ext_destination: string[];
-  ext_ton_amount: number[];
+  ext_ton_amount: UintType[];
   ext_payload: string[];
+  jetton_amount_bytes?: string;
 };
 
 // TonSignedMessage
@@ -4084,7 +4085,7 @@ export type TonSignProof = {
   address_n: number[];
   appdomain: string;
   comment?: string;
-  expire_at: number;
+  expire_at: UintType;
   wallet_version?: TonWalletVersion;
   wallet_id?: number;
   workchain?: TonWorkChain;

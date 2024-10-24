@@ -9,9 +9,9 @@ jobs:
       TEST_ENDPOINT: hardware-example.onekeytest.com
       PROJECT_PATH: packages/connect-examples/expo-example/android
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Use Node.js 20
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -42,7 +42,7 @@ jobs:
         working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: example-android
           path: |

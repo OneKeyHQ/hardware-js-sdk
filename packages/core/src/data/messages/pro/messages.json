@@ -10743,6 +10743,10 @@
           "rule": "repeated",
           "type": "string",
           "id": 20
+        },
+        "jetton_amount_bytes": {
+          "type": "bytes",
+          "id": 21
         }
       }
     },
@@ -12114,18 +12118,8 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ],
-              "reserved": [
-                [
-                  38,
-                  38
-                ]
-              ],
+              "extensions": [[1000, 536870911]],
+              "reserved": [[38, 38]],
               "nested": {
                 "OptimizeMode": {
                   "values": {
@@ -12160,18 +12154,8 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ],
-              "reserved": [
-                [
-                  8,
-                  8
-                ]
-              ]
+              "extensions": [[1000, 536870911]],
+              "reserved": [[8, 8]]
             },
             "FieldOptions": {
               "fields": {
@@ -12211,18 +12195,8 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ],
-              "reserved": [
-                [
-                  4,
-                  4
-                ]
-              ],
+              "extensions": [[1000, 536870911]],
+              "reserved": [[4, 4]],
               "nested": {
                 "CType": {
                   "values": {
@@ -12248,12 +12222,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "EnumOptions": {
               "fields": {
@@ -12271,12 +12240,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "EnumValueOptions": {
               "fields": {
@@ -12290,12 +12254,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "ServiceOptions": {
               "fields": {
@@ -12309,12 +12268,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "MethodOptions": {
               "fields": {
@@ -12328,12 +12282,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "UninterpretedOption": {
               "fields": {

@@ -46,9 +46,6 @@ export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> 
 
   getVersionRange() {
     return {
-      classic1s: {
-        min: '4.0.0',
-      },
       model_touch: {
         min: '4.10.0',
       },

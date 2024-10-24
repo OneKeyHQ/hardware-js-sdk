@@ -1,2 +1,3 @@
-export const CONNECT_SRC = 'https://jssdk.onekeytest.com/';
-// export const CONNECT_SRC = 'https://localhost:8087/';
+import { version } from '../../package.json';
+
+export const CONNECT_SRC = process.env.CONNECT_SRC || `https://jssdk.onekeytest.com/${version}/`;
