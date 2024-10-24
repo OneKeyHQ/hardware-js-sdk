@@ -3,5 +3,5 @@ import type { CommonParams, Response } from '../params';
 
 export declare function deviceReadSEPublicCert(
   connectId: string,
-  params: CommonParams
+  params?: CommonParams
 ): Response<SEPublicCert>;
