@@ -9,10 +9,13 @@ export default class DeviceWriteSEPublicCert extends BaseMethod<WriteSEPublicCer
     this.params = {
       public_cert: this.payload.public_cert,
     };
+    this.skipForceUpdateCheck = true;
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('WriteSEPublicCert', 'Success');
+    const res = await this.device.commands.typedCall('WriteSEPublicCert', 'Success', {
+      ...this.params,
+    });
 
     return Promise.resolve(res.message);
   }

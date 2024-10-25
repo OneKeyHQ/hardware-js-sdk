@@ -2700,6 +2700,11 @@ export type DeviceInfo = {
   pre_firmware?: string;
 };
 
+// WriteSEPrivateKey
+export type WriteSEPrivateKey = {
+  private_key: string;
+};
+
 // ReadSEPublicKey
 export type ReadSEPublicKey = {};
 

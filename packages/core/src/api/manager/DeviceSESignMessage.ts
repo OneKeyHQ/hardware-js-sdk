@@ -8,10 +8,13 @@ export default class DeviceSESignMessage extends BaseMethod<SESignMessage> {
     this.params = {
       message: this.payload.message,
     };
+    this.skipForceUpdateCheck = true;
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('SESignMessage', 'SEMessageSignature');
+    const res = await this.device.commands.typedCall('SESignMessage', 'SEMessageSignature', {
+      ...this.params,
+    });
 
     return Promise.resolve(res.message);
   }

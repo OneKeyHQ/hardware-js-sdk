@@ -148,6 +148,7 @@ import { deviceSpiFlashWrite } from './deviceSpiFlashWrite';
 import { deviceSpiFlashRead } from './deviceSpiFlashRead';
 import { deviceInfoSettings } from './deviceInfoSettings';
 import { deviceGetInfo } from './deviceGetInfo';
+import { deviceWriteSEPrivateKey } from './deviceWriteSEPrivateKey';
 import { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
 import { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
 import { deviceSESignMessage } from './deviceSESignMessage';
@@ -511,4 +512,84 @@ export type CoreApi = {
   alephiumGetAddress: typeof alephiumGetAddress;
   alephiumSignMessage: typeof alephiumSignMessage;
   alephiumSignTransaction: typeof alephiumSignTransaction;
+
+  /**
+   * Only use in test/api
+   */
+
+  deviceSpiFlashWrite: typeof deviceSpiFlashWrite;
+  deviceSpiFlashRead: typeof deviceSpiFlashRead;
+  deviceInfoSettings: typeof deviceInfoSettings;
+  deviceGetInfo: typeof deviceGetInfo;
+  deviceWriteSEPrivateKey: typeof deviceWriteSEPrivateKey;
+  deviceReadSEPublicCert: typeof deviceReadSEPublicCert;
+  deviceWriteSEPublicCert: typeof deviceWriteSEPublicCert;
+  deviceSESignMessage: typeof deviceSESignMessage;
+  devicePing: typeof devicePing;
+  deviceGetEntropy: typeof deviceGetEntropy;
+  deviceGetFirmwareHash: typeof deviceGetFirmwareHash;
+  deviceUnlockPath: typeof deviceUnlockPath;
+  deviceSdProtect: typeof deviceSdProtect;
+  deviceChangeWipeCode: typeof deviceChangeWipeCode;
+  deviceEndSession: typeof deviceEndSession;
+  deviceLoad: typeof deviceLoad;
+  deviceDoPreauthorized: typeof deviceDoPreauthorized;
+  deviceCancelAuthorization: typeof deviceCancelAuthorization;
+
+  emmcDirList: typeof emmcDirList;
+  emmcDirMake: typeof emmcDirMake;
+  emmcDirRemove: typeof emmcDirRemove;
+  emmcFileDelete: typeof emmcFileDelete;
+  emmcFileRead: typeof emmcFileRead;
+  emmcFileWrite: typeof emmcFileWrite;
+  emmcFixPermission: typeof emmcFixPermission;
+  emmcPathInfo: typeof emmcPathInfo;
+
+  debugLinkDecision: typeof debugLinkDecision;
+  debugLinkEraseSdCard: typeof debugLinkEraseSdCard;
+  debugLinkFlashErase: typeof debugLinkFlashErase;
+  debugLinkGetState: typeof debugLinkGetState;
+  debugLinkMemoryRead: typeof debugLinkMemoryRead;
+  debugLinkMemoryWrite: typeof debugLinkMemoryWrite;
+  debugLinkRecordScreen: typeof debugLinkRecordScreen;
+  debugLinkReseedRandom: typeof debugLinkReseedRandom;
+  debugLinkStop: typeof debugLinkStop;
+  debugLinkWatchLayout: typeof debugLinkWatchLayout;
+
+  firmwareEraseEx: typeof firmwareEraseEx;
+  firmwareErase: typeof firmwareErase;
+  firmwareUpdateEmmcTest: typeof firmwareUpdateEmmcTest;
+  firmwareUploadTest: typeof firmwareUploadTest;
+  reboot: typeof reboot;
+  selfTest: typeof selfTest;
+
+  tezosGetAddress: typeof tezosGetAddress;
+  tezosGetPublicKey: typeof tezosGetPublicKey;
+  tezosSignTx: typeof tezosSignTx;
+
+  binanceGetAddress: typeof binanceGetAddress;
+  binanceGetPublicKey: typeof binanceGetPublicKey;
+  binanceSignTx: typeof binanceSignTx;
+
+  moneroGetWatchKey: typeof moneroGetWatchKey;
+  moneroGetAddress: typeof moneroGetAddress;
+
+  eosGetPublicKey: typeof eosGetPublicKey;
+  eosSignTx: typeof eosSignTx;
+
+  webAuthnAddResidentCredential: typeof webAuthnAddResidentCredential;
+  webAuthnListResidentCredentials: typeof webAuthnListResidentCredentials;
+  webAuthnRemoveResidentCredential: typeof webAuthnRemoveResidentCredential;
+
+  getPublicKeyMultiple: typeof getPublicKeyMultiple;
+  listResDir: typeof listResDir;
+  nftWriteData: typeof nftWriteData;
+  nftWriteInfo: typeof nftWriteInfo;
+  readSEPublicKey: typeof readSEPublicKey;
+  resourceUpdate: typeof resourceUpdate;
+
+  bixinBackupDevice: typeof bixinBackupDevice;
+  bixinLoadDevice: typeof bixinLoadDevice;
+  bixinMessageSE: typeof bixinMessageSE;
+  bixinVerifyDeviceRequest: typeof bixinVerifyDeviceRequest;
 };
