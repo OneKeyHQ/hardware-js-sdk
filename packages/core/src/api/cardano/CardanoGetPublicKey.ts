@@ -62,7 +62,7 @@ export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyPara
       });
     }
 
-    validateResult(responses, ['pub'], {
+    validateResult(responses, ['xpub'], {
       expectedLength: this.params.length,
     });
 
