@@ -3,6 +3,10 @@ import type { CommonParams, Response } from '../params';
 
 export type SuiAddress = {
   path: string;
+  pub?: string;
+  /**
+   * @deprecated Use `pub` instead.
+   */
   publicKey?: string;
 } & HardwareSuiAddress;
 

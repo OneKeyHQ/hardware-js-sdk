@@ -70,10 +70,11 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
       });
       const result = res.message.public_keys.map((publicKey: string, index: number) => ({
         path: serializedPath((this.params as unknown as any[])[index].address_n),
+        pub: publicKey,
         publicKey,
       }));
 
-      validateResult(responses, ['publicKey'], {
+      validateResult(responses, ['pub'], {
         expectedLength: this.params.length,
       });
       return Promise.resolve(result);
@@ -86,12 +87,13 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
 
       responses.push({
         path: serializedPath(param.address_n),
+        pub: res.message.node.public_key,
         publicKey: res.message.node.public_key,
         ...res.message,
       });
     }
 
-    validateResult(responses, ['publicKey'], {
+    validateResult(responses, ['pub'], {
       expectedLength: this.params.length,
     });
 

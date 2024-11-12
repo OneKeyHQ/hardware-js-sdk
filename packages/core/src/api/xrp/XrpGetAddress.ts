@@ -97,6 +97,7 @@ export default class XrpGetAddress extends BaseMethod<
         path,
         address,
         publicKey: publicKey.message?.public_keys?.[0],
+        pub: publicKey.message?.public_keys?.[0],
       });
 
       this.postPreviousAddressMessage({
@@ -105,7 +106,7 @@ export default class XrpGetAddress extends BaseMethod<
       });
     }
 
-    validateResult(responses, ['address', 'publicKey'], {
+    validateResult(responses, ['address', 'pub'], {
       expectedLength: this.params.length,
     });
 

@@ -2,7 +2,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { AptosGetAddressParams } from '../../types';
+import { AptosGetAddressParams, AptosPublicKey } from '../../types';
 
 export default class AptosGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
@@ -50,12 +50,15 @@ export default class AptosGetPublicKey extends BaseMethod<any> {
       ecdsa_curve_name: 'ed25519',
     });
 
-    const responses = res.message.public_keys.map((publicKey: string, index: number) => ({
-      path: serializedPath((this.params as unknown as any[])[index].address_n),
-      publicKey,
-    }));
+    const responses: AptosPublicKey[] = res.message.public_keys.map(
+      (publicKey: string, index: number) => ({
+        path: serializedPath((this.params as unknown as any[])[index].address_n),
+        pub: publicKey,
+        publicKey,
+      })
+    );
 
-    validateResult(responses, ['publicKey'], {
+    validateResult(responses, ['pub'], {
       expectedLength: this.params.length,
     });
 

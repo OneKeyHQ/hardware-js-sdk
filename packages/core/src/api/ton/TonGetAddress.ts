@@ -76,13 +76,14 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
       const result = {
         path: serializedPath(param.address_n),
         publicKey: public_key,
+        pub: public_key,
         address,
       };
       responses.push(result);
       this.postPreviousAddressMessage(result);
     }
 
-    validateResult(responses, ['address', 'publicKey'], {
+    validateResult(responses, ['address', 'pub'], {
       expectedLength: this.params.length,
     });
 
