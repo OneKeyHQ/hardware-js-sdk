@@ -2,7 +2,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { CosmosGetPublicKeyParams } from '../../types';
+import { CosmosAddress, CosmosGetPublicKeyParams } from '../../types';
 
 export default class CosmosGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
@@ -64,12 +64,15 @@ export default class CosmosGetPublicKey extends BaseMethod<any> {
       ecdsa_curve_name: this.params[0].curve,
     });
 
-    const responses = res.message.public_keys.map((publicKey: string, index: number) => ({
-      path: serializedPath((this.params as unknown as any[])[index].address_n),
-      publicKey,
-    }));
+    const responses: CosmosAddress[] = res.message.public_keys.map(
+      (publicKey: string, index: number) => ({
+        path: serializedPath((this.params as unknown as any[])[index].address_n),
+        pub: publicKey,
+        publicKey,
+      })
+    );
 
-    validateResult(responses, ['publicKey'], {
+    validateResult(responses, ['pub'], {
       expectedLength: this.params.length,
     });
 

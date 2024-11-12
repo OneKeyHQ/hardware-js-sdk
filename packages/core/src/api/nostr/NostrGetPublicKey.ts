@@ -60,7 +60,9 @@ export default class NostrGetPublicKey extends BaseMethod<GetPublicKey[]> {
 
       const response = {
         path: serializedPath(param.address_n),
-        ...res.message,
+        npub: res.message.npub,
+        pub: res.message.publickey,
+        publickey: res.message.publickey,
       };
 
       responses.push(response);

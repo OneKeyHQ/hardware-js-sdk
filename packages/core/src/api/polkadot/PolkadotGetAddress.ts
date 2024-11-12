@@ -64,6 +64,7 @@ export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAd
       responses.push({
         path,
         address,
+        pub: public_key ?? '',
         publicKey: public_key ?? '',
       });
 
@@ -73,7 +74,7 @@ export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAd
       });
     }
 
-    validateResult(responses, ['address', 'publicKey'], {
+    validateResult(responses, ['address', 'pub'], {
       expectedLength: this.params.length,
     });
 
