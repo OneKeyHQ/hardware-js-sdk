@@ -387,10 +387,11 @@ export default class AllNetworkGetAddress extends BaseMethod<
         payload: { ...response.payload, ...dependOnPayloads },
       };
       responses.push(result);
-      this.postPreviousAddressMessage(result);
-      if (i === 0 && this.payload?.bundle?.length > 1) {
-        this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW));
+      if (this.payload?.bundle?.length > 1) {
+        const progress = Math.round(((i + 1) / this.payload?.bundle?.length) * 100);
+        this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, { progress }));
       }
+      this.postPreviousAddressMessage(result);
     }
 
     return Promise.resolve(responses);
