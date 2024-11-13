@@ -13,4 +13,5 @@ export const UI_REQUEST = {
   FIRMWARE_TIP: 'ui-firmware-tip',
 
   PREVIOUS_ADDRESS_RESULT: 'ui-previous_address_result',
+  CLOSE_UI_WINDOW: 'ui-close_window',
 } as const;

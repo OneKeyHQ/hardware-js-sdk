@@ -90,11 +90,14 @@ type AllNetworkAddressPayload =
 
 export type AllNetworkAddress = CommonResponseParams & {
   success: boolean;
-  // custom error message
-  error?: string;
-  // native error message
-  errorCode?: string;
-  payload?: AllNetworkAddressPayload;
+  payload?:
+    | AllNetworkAddressPayload
+    | {
+        error: string;
+        code: number;
+        connectId: string;
+        deviceId: string;
+      };
 };
 
 export type AllNetworkGetAddressParams = {
@@ -104,5 +107,5 @@ export type AllNetworkGetAddressParams = {
 export declare function allNetworkGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & AllNetworkGetAddressParams
+  params: CommonParams & AllNetworkGetAddressParams,
 ): Response<AllNetworkAddress[]>;
