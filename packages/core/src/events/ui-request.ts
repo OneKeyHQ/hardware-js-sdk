@@ -13,6 +13,7 @@ export const UI_REQUEST = {
   REQUEST_PASSPHRASE_ON_DEVICE: 'ui-request_passphrase_on_device',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
+  DEVICE_PROGRESS: 'ui-device_progress',
 
   BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
   BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
@@ -81,6 +82,13 @@ export interface FirmwareTip {
   };
 }
 
+export interface DeviceProgress {
+  type: typeof UI_REQUEST.DEVICE_PROGRESS;
+  payload: {
+    progress?: number;
+  };
+}
+
 export interface PreviousAddressResult {
   type: typeof UI_REQUEST.PREVIOUS_ADDRESS_RESULT;
   payload: {
@@ -100,6 +108,7 @@ export type UiEvent =
   | UiRequestPassphrase
   | FirmwareProgress
   | FirmwareTip
+  | DeviceProgress
   | PreviousAddressResult;
 
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
