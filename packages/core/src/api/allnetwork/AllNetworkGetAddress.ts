@@ -1,8 +1,7 @@
 import semver from 'semver';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { get } from 'lodash';
-import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -19,8 +18,7 @@ import { createUiMessage, IFRAME } from '../../events';
 import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 import { Device } from '../../device/Device';
 import { PROTO } from '../../constants';
-
-import { HardwareError } from '@onekeyfe/hd-shared';
+import { UI_REQUEST } from '../../constants/ui-request';
 
 const Mainnet = 'mainnet';
 
@@ -388,7 +386,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
       };
       responses.push(result);
       if (this.payload?.bundle?.length > 1) {
-        const progress = Math.round(((i + 1) / this.payload?.bundle?.length) * 100);
+        const progress = Math.round(((i + 1) / this.payload.bundle.length) * 100);
         this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, { progress }));
       }
       this.postPreviousAddressMessage(result);
@@ -403,9 +401,9 @@ function handleSkippableHardwareError(
   device: Device,
   method: BaseMethod,
 ): HardwareError | undefined {
-  let error: HardwareError | undefined = undefined;
+  let error: HardwareError | undefined;
 
-  if (e.message.includes('Failure_UnexpectedMessage')) {
+  if (e.message?.includes('Failure_UnexpectedMessage')) {
     const versionRange = getMethodVersionRange(
       device.features,
       type => method.getVersionRange()[type],
@@ -425,12 +423,12 @@ function handleSkippableHardwareError(
     } else {
       error = ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse, e.message);
     }
-  } else if (e.message.includes('Forbidden key path')) {
+  } else if (e.message?.includes('Forbidden key path')) {
     error = ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, e.message);
   } else if (e.message.includes('DeviceCheckPassphraseStateError')) {
     error = ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError, e.message);
   } else if (e instanceof HardwareError) {
-    const errorCode = e.errorCode;
+    const { errorCode } = e;
     if (errorCode === HardwareErrorCode.CallMethodInvalidParameter) {
       error = e;
     }
