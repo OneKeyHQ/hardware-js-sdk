@@ -305,23 +305,23 @@ export default class AllNetworkGetAddress extends BaseMethod<
 
     method.connector = this.connector;
     method.postMessage = this.postMessage;
-    method.init();
-    method.setDevice?.(this.device);
 
     let result: AllNetworkAddress;
     try {
+      method.init();
+      method.setDevice?.(this.device);
+
       const response = await method.run();
       result = {
         ...baseParams,
         success: true,
-        payload: {
-          ...response,
-          error: response.payload?.error,
-          errorCode: response.payload?.errorCode,
-        },
+        payload: response,
       };
     } catch (e: any) {
+      console.log('=====>>>>>>> error', e, JSON.stringify(e));
+
       const error = handleSkippableHardwareError(e, this.device, method);
+
       if (error) {
         result = {
           ...baseParams,
@@ -403,7 +403,14 @@ function handleSkippableHardwareError(
 ): HardwareError | undefined {
   let error: HardwareError | undefined;
 
-  if (e.message?.includes('Failure_UnexpectedMessage')) {
+  if (e instanceof HardwareError && e.errorCode !== HardwareErrorCode.RuntimeError) {
+    const { errorCode } = e;
+    if (errorCode === HardwareErrorCode.CallMethodInvalidParameter) {
+      error = e;
+    } else if (errorCode === HardwareErrorCode.CallMethodNeedUpgradeFirmware) {
+      error = e;
+    }
+  } else if (e.message?.includes('Failure_UnexpectedMessage')) {
     const versionRange = getMethodVersionRange(
       device.features,
       type => method.getVersionRange()[type],
@@ -423,15 +430,11 @@ function handleSkippableHardwareError(
     } else {
       error = ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse, e.message);
     }
-  } else if (e.message?.includes('Forbidden key path')) {
+  } else if (
+    e.message?.toLowerCase()?.includes('forbidden key path') ||
+    e.message?.toLowerCase()?.includes('invalid path')
+  ) {
     error = ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, e.message);
-  } else if (e.message.includes('DeviceCheckPassphraseStateError')) {
-    error = ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError, e.message);
-  } else if (e instanceof HardwareError) {
-    const { errorCode } = e;
-    if (errorCode === HardwareErrorCode.CallMethodInvalidParameter) {
-      error = e;
-    }
   }
 
   return error;
