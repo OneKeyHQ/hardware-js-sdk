@@ -43,9 +43,6 @@ export default class DnxGetAddress extends BaseMethod<HardwareDnxGetAddress[]> {
       classic: {
         min: '3.8.0',
       },
-      model_touch: {
-        min: '6.0.0',
-      },
     };
   }
 

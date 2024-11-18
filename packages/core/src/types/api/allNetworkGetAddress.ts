@@ -95,8 +95,9 @@ export type AllNetworkAddress = CommonResponseParams & {
     | {
         error: string;
         code: number;
-        connectId: string;
-        deviceId: string;
+        connectId?: string;
+        deviceId?: string;
+        params: any;
       };
 };
 

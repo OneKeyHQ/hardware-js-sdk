@@ -1,5 +1,5 @@
 import semver from 'semver';
-import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode, serializeError } from '@onekeyfe/hd-shared';
 
 import { get } from 'lodash';
 import { serializedPath } from '../helpers/pathUtils';
@@ -318,8 +318,6 @@ export default class AllNetworkGetAddress extends BaseMethod<
         payload: response,
       };
     } catch (e: any) {
-      console.log('=====>>>>>>> error', e, JSON.stringify(e));
-
       const error = handleSkippableHardwareError(e, this.device, method);
 
       if (error) {
@@ -329,8 +327,9 @@ export default class AllNetworkGetAddress extends BaseMethod<
           payload: {
             error: error.message,
             code: error.errorCode,
-            connectId: this.payload.connectId,
-            deviceId: this.payload.deviceId,
+            params: error.params,
+            connectId: method.connectId,
+            deviceId: method.deviceId,
           },
         };
       } else {
@@ -356,7 +355,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
         const response = await this.callMethod(
           dependOnMethod.methodName,
           dependOnMethod.params,
-          param,
+          param
         );
         dependOnMethodResults.push(response);
       }
@@ -376,7 +375,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
 
       const dependOnPayloads = dependOnMethodResults.reduce(
         (acc, cur) => Object.assign(acc, get(cur, 'payload', {})),
-        {},
+        {}
       );
 
       const result: AllNetworkAddress = {
@@ -399,7 +398,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
 function handleSkippableHardwareError(
   e: any,
   device: Device,
-  method: BaseMethod,
+  method: BaseMethod
 ): HardwareError | undefined {
   let error: HardwareError | undefined;
 
@@ -413,7 +412,7 @@ function handleSkippableHardwareError(
   } else if (e.message?.includes('Failure_UnexpectedMessage')) {
     const versionRange = getMethodVersionRange(
       device.features,
-      type => method.getVersionRange()[type],
+      type => method.getVersionRange()[type]
     );
     const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
 
@@ -422,11 +421,7 @@ function handleSkippableHardwareError(
       semver.valid(versionRange.min) &&
       semver.lt(currentVersion, versionRange.min)
     ) {
-      error = ERRORS.TypedError(
-        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-        `Device firmware version is too low, please update to ${versionRange.min}`,
-        { current: currentVersion, require: versionRange.min },
-      );
+      error = ERRORS.createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min);
     } else {
       error = ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse, e.message);
     }

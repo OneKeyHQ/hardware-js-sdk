@@ -492,6 +492,21 @@ export class Device extends EventEmitter {
           this.runPromise.reject(e);
         }
 
+        if (
+          e instanceof HardwareError &&
+          (e.errorCode === HardwareErrorCode.DeviceInitializeFailed ||
+            e.errorCode === HardwareErrorCode.DeviceInterruptedFromOutside ||
+            e.errorCode === HardwareErrorCode.DeviceInterruptedFromUser ||
+            e.errorCode === HardwareErrorCode.DeviceCheckPassphraseStateError ||
+            e.errorCode === HardwareErrorCode.ResponseUnexpectTypeError ||
+            e.errorCode === HardwareErrorCode.PinInvalid ||
+            e.errorCode === HardwareErrorCode.PinCancelled ||
+            e.errorCode === HardwareErrorCode.UnexpectPassphrase)
+        ) {
+          await this.release();
+          Log.debug(`error code ${e.errorCode} release device, mainId: ${this.mainId}`);
+        }
+
         this.runPromise = null;
         return;
       }
