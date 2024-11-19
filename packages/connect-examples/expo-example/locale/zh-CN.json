@@ -69,6 +69,7 @@
   "label__retry_interval_time": "重试间隔时间",
   "label__connection_timeout": "连接超时时间",
   "label__init_session": "初始化 Session",
+  "label__use_empty_passphrase": "使用空 Passphrase",
   "label__default_parameters": "预设参数",
   "label__parameters": "参数",
   "label__enter_parameters_tip": "在此输入您的参数...",

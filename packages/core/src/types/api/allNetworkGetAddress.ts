@@ -95,8 +95,9 @@ export type AllNetworkAddress = CommonResponseParams & {
     | {
         error: string;
         code: number;
-        connectId: string;
-        deviceId: string;
+        connectId?: string;
+        deviceId?: string;
+        params: any;
       };
 };
 
@@ -107,5 +108,5 @@ export type AllNetworkGetAddressParams = {
 export declare function allNetworkGetAddress(
   connectId: string,
   deviceId: string,
-  params: CommonParams & AllNetworkGetAddressParams,
+  params: CommonParams & AllNetworkGetAddressParams
 ): Response<AllNetworkAddress[]>;

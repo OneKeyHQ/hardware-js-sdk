@@ -2,6 +2,10 @@ import EventEmitter from 'events';
 import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
+  createDeprecatedHardwareError,
+  createNeedUpgradeFirmwareHardwareError,
+  createNewFirmwareForceUpdateHardwareError,
+  createNewFirmwareUnReleaseHardwareError,
   Deferred,
   ERRORS,
   HardwareError,
@@ -109,7 +113,7 @@ export const callAPI = async (message: CoreMessage) => {
   if (callApiQueue.length > 1) {
     Log.debug(
       'should cancel the previous method execution: ',
-      callApiQueue.map(m => m.name)
+      callApiQueue.map(m => m.name),
     );
   }
 
@@ -145,7 +149,7 @@ export const callAPI = async (message: CoreMessage) => {
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
   device.on(
     DEVICE.PASSPHRASE,
-    message.payload.useEmptyPassphrase ? onEmptyPassphraseHandler : onDevicePassphraseHandler
+    message.payload.useEmptyPassphrase ? onEmptyPassphraseHandler : onDevicePassphraseHandler,
   );
   device.on(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
@@ -166,48 +170,34 @@ export const callAPI = async (message: CoreMessage) => {
           (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
           method.skipForceUpdateCheck === false
         ) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.NewFirmwareForceUpdate,
-            'Device firmware version is too low, please update to the latest version',
-            { connectId: method.connectId, deviceId: method.deviceId }
-          );
+          throw createNewFirmwareForceUpdateHardwareError(method.connectId, method.deviceId);
         }
 
-        // if (versionRange) {
-        //   const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
-        //   if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
-        //     if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-        //       throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
-        //     }
+        if (versionRange) {
+          const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+          if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
+            if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
+              throw createNewFirmwareUnReleaseHardwareError(currentVersion, versionRange.min);
+            }
 
-        //     return Promise.reject(
-        //       ERRORS.TypedError(
-        //         HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-        //         `Device firmware version is too low, please update to ${versionRange.min}`,
-        //         { current: currentVersion, require: versionRange.min }
-        //       )
-        //     );
-        //   }
-        //   if (
-        //     versionRange.max &&
-        //     semver.valid(versionRange.max) &&
-        //     semver.gte(currentVersion, versionRange.max)
-        //   ) {
-        //     return Promise.reject(
-        //       ERRORS.TypedError(
-        //         HardwareErrorCode.CallMethodDeprecated,
-        //         `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
-        //         { current: currentVersion, deprecated: versionRange.max }
-        //       )
-        //     );
-        //   }
-        // }
+            return Promise.reject(
+              createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min),
+            );
+          }
+          if (
+            versionRange.max &&
+            semver.valid(versionRange.max) &&
+            semver.gte(currentVersion, versionRange.max)
+          ) {
+            return Promise.reject(createDeprecatedHardwareError(currentVersion, versionRange.max));
+          }
+        }
       }
 
       // check call method mode
       const unexpectedMode = device.hasUnexpectedMode(
         method.notAllowDeviceMode,
-        method.requireDeviceMode
+        method.requireDeviceMode,
       );
       if (unexpectedMode) {
         if (unexpectedMode === UI_REQUEST_CONST.NOT_IN_BOOTLOADER) {
@@ -217,7 +207,7 @@ export const callAPI = async (message: CoreMessage) => {
           return Promise.reject(ERRORS.TypedError(HardwareErrorCode.NotAllowInBootloaderMode));
         }
         return Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
+          ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode),
         );
       }
 
@@ -256,14 +246,14 @@ export const callAPI = async (message: CoreMessage) => {
               `Device not support passphrase, please update to ${support.require}`,
               {
                 require: support.require,
-              }
-            )
+              },
+            ),
           );
         }
 
         // Check Device passphrase State
         const passphraseStateSafety = await device.checkPassphraseStateSafety(
-          method.payload?.passphraseState
+          method.payload?.passphraseState,
         );
 
         // Double check, handles the special case of Touch/Pro
@@ -272,7 +262,7 @@ export const callAPI = async (message: CoreMessage) => {
         if (!passphraseStateSafety) {
           DevicePool.clearDeviceCache(method.payload.connectId);
           return Promise.reject(
-            ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
+            ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError),
           );
         }
       }
@@ -337,7 +327,7 @@ export const callAPI = async (message: CoreMessage) => {
       callApiQueue.splice(index, 1);
       Log.debug(
         'Remove the finished method from the queue： ',
-        callApiQueue.map(m => m.name)
+        callApiQueue.map(m => m.name),
       );
     }
 
@@ -390,7 +380,7 @@ function initDevice(method: BaseMethod) {
         'checkBLEFirmwareRelease',
       ].includes(method.name)
         ? HardwareErrorCode.FirmwareUpdateLimitOneDevice
-        : HardwareErrorCode.SelectDevice
+        : HardwareErrorCode.SelectDevice,
     );
   }
 
@@ -456,7 +446,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   Log.debug(
-    `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
+    `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `,
   );
 
   const poll: IPollFn<Promise<Device>> = async (time = POLL_INTERVAL_TIME) =>
@@ -484,7 +474,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         Log.debug('device list error: ', error);
         if (
           [HardwareErrorCode.BridgeNotInstalled, HardwareErrorCode.BridgeTimeoutError].includes(
-            error.errorCode
+            error.errorCode,
           )
         ) {
           _deviceList = undefined;
@@ -635,7 +625,7 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
     createUiMessage(UI_REQUEST.REQUEST_PIN, {
       device: device.toMessageObject() as unknown as KnownDevice,
       type,
-    })
+    }),
   );
   // wait for pin
   const uiResp = await uiPromise.promise;
@@ -652,7 +642,7 @@ const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]
       createUiMessage(UI_REQUEST.REQUEST_PIN, {
         device: device.toMessageObject() as KnownDevice,
         type: 'ButtonRequest_PinEntry',
-      })
+      }),
     );
   } else {
     Log.log('request Confirm Button');
@@ -671,7 +661,7 @@ const onDevicePassphraseHandler = async (...[device, callback]: DeviceEvents['pa
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
-    })
+    }),
   );
   // wait for passphrase
   const uiResp = await uiPromise.promise;
@@ -697,7 +687,7 @@ const onEnterPassphraseOnDeviceHandler = (
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
-    })
+    }),
   );
 };
 
@@ -800,7 +790,7 @@ const initTransport = (Transport: any, plugin?: LowlevelTransportSharedPlugin) =
 export const init = async (
   settings: ConnectSettings,
   Transport: any,
-  plugin?: LowlevelTransportSharedPlugin
+  plugin?: LowlevelTransportSharedPlugin,
 ) => {
   try {
     try {

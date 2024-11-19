@@ -1,8 +1,7 @@
 import semver from 'semver';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode, serializeError } from '@onekeyfe/hd-shared';
 
 import { get } from 'lodash';
-import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -19,8 +18,7 @@ import { createUiMessage, IFRAME } from '../../events';
 import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 import { Device } from '../../device/Device';
 import { PROTO } from '../../constants';
-
-import { HardwareError } from '@onekeyfe/hd-shared';
+import { UI_REQUEST } from '../../constants/ui-request';
 
 const Mainnet = 'mainnet';
 
@@ -307,23 +305,21 @@ export default class AllNetworkGetAddress extends BaseMethod<
 
     method.connector = this.connector;
     method.postMessage = this.postMessage;
-    method.init();
-    method.setDevice?.(this.device);
 
     let result: AllNetworkAddress;
     try {
+      method.init();
+      method.setDevice?.(this.device);
+
       const response = await method.run();
       result = {
         ...baseParams,
         success: true,
-        payload: {
-          ...response,
-          error: response.payload?.error,
-          errorCode: response.payload?.errorCode,
-        },
+        payload: response,
       };
     } catch (e: any) {
       const error = handleSkippableHardwareError(e, this.device, method);
+
       if (error) {
         result = {
           ...baseParams,
@@ -331,8 +327,9 @@ export default class AllNetworkGetAddress extends BaseMethod<
           payload: {
             error: error.message,
             code: error.errorCode,
-            connectId: this.payload.connectId,
-            deviceId: this.payload.deviceId,
+            params: error.params,
+            connectId: method.connectId,
+            deviceId: method.deviceId,
           },
         };
       } else {
@@ -358,7 +355,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
         const response = await this.callMethod(
           dependOnMethod.methodName,
           dependOnMethod.params,
-          param,
+          param
         );
         dependOnMethodResults.push(response);
       }
@@ -378,7 +375,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
 
       const dependOnPayloads = dependOnMethodResults.reduce(
         (acc, cur) => Object.assign(acc, get(cur, 'payload', {})),
-        {},
+        {}
       );
 
       const result: AllNetworkAddress = {
@@ -388,7 +385,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
       };
       responses.push(result);
       if (this.payload?.bundle?.length > 1) {
-        const progress = Math.round(((i + 1) / this.payload?.bundle?.length) * 100);
+        const progress = Math.round(((i + 1) / this.payload.bundle.length) * 100);
         this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, { progress }));
       }
       this.postPreviousAddressMessage(result);
@@ -401,14 +398,21 @@ export default class AllNetworkGetAddress extends BaseMethod<
 function handleSkippableHardwareError(
   e: any,
   device: Device,
-  method: BaseMethod,
+  method: BaseMethod
 ): HardwareError | undefined {
-  let error: HardwareError | undefined = undefined;
+  let error: HardwareError | undefined;
 
-  if (e.message.includes('Failure_UnexpectedMessage')) {
+  if (e instanceof HardwareError && e.errorCode !== HardwareErrorCode.RuntimeError) {
+    const { errorCode } = e;
+    if (errorCode === HardwareErrorCode.CallMethodInvalidParameter) {
+      error = e;
+    } else if (errorCode === HardwareErrorCode.CallMethodNeedUpgradeFirmware) {
+      error = e;
+    }
+  } else if (e.message?.includes('Failure_UnexpectedMessage')) {
     const versionRange = getMethodVersionRange(
       device.features,
-      type => method.getVersionRange()[type],
+      type => method.getVersionRange()[type]
     );
     const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
 
@@ -417,23 +421,15 @@ function handleSkippableHardwareError(
       semver.valid(versionRange.min) &&
       semver.lt(currentVersion, versionRange.min)
     ) {
-      error = ERRORS.TypedError(
-        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-        `Device firmware version is too low, please update to ${versionRange.min}`,
-        { current: currentVersion, require: versionRange.min },
-      );
+      error = ERRORS.createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min);
     } else {
       error = ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse, e.message);
     }
-  } else if (e.message.includes('Forbidden key path')) {
+  } else if (
+    e.message?.toLowerCase()?.includes('forbidden key path') ||
+    e.message?.toLowerCase()?.includes('invalid path')
+  ) {
     error = ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter, e.message);
-  } else if (e.message.includes('DeviceCheckPassphraseStateError')) {
-    error = ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError, e.message);
-  } else if (e instanceof HardwareError) {
-    const errorCode = e.errorCode;
-    if (errorCode === HardwareErrorCode.CallMethodInvalidParameter) {
-      error = e;
-    }
   }
 
   return error;

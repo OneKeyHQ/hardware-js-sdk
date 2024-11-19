@@ -523,3 +523,41 @@ export const CreateErrorByMessage = (message: string): HardwareError => {
   }
   return new HardwareError(message);
 };
+
+const createNewFirmwareUnReleaseHardwareError = (currentVersion: string, requireVersion: string) =>
+  TypedError(
+    HardwareErrorCode.NewFirmwareUnRelease,
+    'Device firmware version is too low, please update to the latest version',
+    { current: currentVersion, require: requireVersion }
+  );
+
+const createNeedUpgradeFirmwareHardwareError = (currentVersion: string, requireVersion: string) =>
+  TypedError(
+    HardwareErrorCode.CallMethodNeedUpgradeFirmware,
+    `Device firmware version is too low, please update to ${requireVersion}`,
+    { current: currentVersion, require: requireVersion }
+  );
+
+const createNewFirmwareForceUpdateHardwareError = (
+  connectId: string | undefined,
+  deviceId: string | undefined
+) =>
+  TypedError(
+    HardwareErrorCode.NewFirmwareForceUpdate,
+    'Device firmware version is too low, please update to the latest version',
+    { connectId, deviceId }
+  );
+
+const createDeprecatedHardwareError = (currentVersion: string, deprecatedVersion: string) =>
+  TypedError(
+    HardwareErrorCode.CallMethodDeprecated,
+    `Device firmware version is too high, this method has been deprecated in ${deprecatedVersion}`,
+    { current: currentVersion, deprecated: deprecatedVersion }
+  );
+
+export {
+  createNewFirmwareUnReleaseHardwareError,
+  createNeedUpgradeFirmwareHardwareError,
+  createNewFirmwareForceUpdateHardwareError,
+  createDeprecatedHardwareError,
+};

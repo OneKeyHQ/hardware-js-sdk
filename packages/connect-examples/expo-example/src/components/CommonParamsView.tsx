@@ -51,6 +51,11 @@ export default function CommonParamsView() {
           onToggle={value => handleSetParam('initSession', value)}
         />
         <SwitchInput
+          label={intl.formatMessage({ id: 'label__use_empty_passphrase' })}
+          value={!!commonParams.useEmptyPassphrase}
+          onToggle={value => handleSetParam('useEmptyPassphrase', value)}
+        />
+        <SwitchInput
           // TODO: i18n
           label="detectBootloaderDevice"
           value={!!commonParams.detectBootloaderDevice}
