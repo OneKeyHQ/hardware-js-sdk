@@ -67,6 +67,7 @@
   "label__retry_interval_time": "Retry Interval Time",
   "label__connection_timeout": "Connection Timeout Time",
   "label__init_session": "Init Session",
+  "label__use_empty_passphrase": "Use Empty Passphrase",
   "label__default_parameters": "Default Parameters",
   "label__parameters": "Parameters",
   "label__enter_parameters_tip": "Enter your parameters here...",

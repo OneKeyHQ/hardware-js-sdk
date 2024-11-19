@@ -3,6 +3,10 @@ import EventEmitter from 'events';
 import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
+  createDeprecatedHardwareError,
+  createNeedUpgradeFirmwareHardwareError,
+  createNewFirmwareForceUpdateHardwareError,
+  createNewFirmwareUnReleaseHardwareError,
   Deferred,
   ERRORS,
   HardwareError,
@@ -175,26 +179,18 @@ export const callAPI = async (message: CoreMessage) => {
           (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
           method.skipForceUpdateCheck === false
         ) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.NewFirmwareForceUpdate,
-            'Device firmware version is too low, please update to the latest version',
-            { connectId: method.connectId, deviceId: method.deviceId }
-          );
+          throw createNewFirmwareForceUpdateHardwareError(method.connectId, method.deviceId);
         }
 
         if (versionRange) {
           const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
           if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
             if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw ERRORS.TypedError(HardwareErrorCode.NewFirmwareUnRelease);
+              throw createNewFirmwareUnReleaseHardwareError(currentVersion, versionRange.min);
             }
 
             return Promise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-                `Device firmware version is too low, please update to ${versionRange.min}`,
-                { current: currentVersion, require: versionRange.min }
-              )
+              createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min)
             );
           }
           if (
@@ -202,13 +198,7 @@ export const callAPI = async (message: CoreMessage) => {
             semver.valid(versionRange.max) &&
             semver.gte(currentVersion, versionRange.max)
           ) {
-            return Promise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.CallMethodDeprecated,
-                `Device firmware version is too high, this method has been deprecated in ${versionRange.max}`,
-                { current: currentVersion, deprecated: versionRange.max }
-              )
-            );
+            return Promise.reject(createDeprecatedHardwareError(currentVersion, versionRange.max));
           }
         }
       }
