@@ -42,7 +42,7 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
   getVersionRange() {
     return {
       model_touch: {
-        min: '4.10.3',
+        min: '4.10.2',
       },
     };
   }

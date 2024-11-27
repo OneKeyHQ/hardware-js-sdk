@@ -86,7 +86,6 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
         const result = {
           path: serializedPath(param.address_n),
           address,
-          publicKey,
           pub: publicKey,
         };
 

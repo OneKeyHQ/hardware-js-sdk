@@ -51,7 +51,6 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
     const responses: BenfenPublicKey[] = res.message.public_keys.map(
       (publicKey: string, index: number) => ({
         path: serializedPath((this.params as any[])[index].address_n),
-        publicKey,
         pub: publicKey,
       })
     );
