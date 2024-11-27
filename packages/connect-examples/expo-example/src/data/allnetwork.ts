@@ -189,6 +189,11 @@ const api: PlaygroundProps[] = [
               showOnOneKey: false,
             },
             {
+              network: 'benfen',
+              path: "m/44'/728'/0'/0'/0'",
+              showOnOneKey: false,
+            },
+            {
               network: 'tron',
               path: "m/44'/195'/0'/0/0",
               showOnOneKey: false,

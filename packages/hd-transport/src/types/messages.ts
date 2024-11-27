@@ -133,6 +133,56 @@ export type AptosMessageSignature = {
   address: string;
 };
 
+// BenfenGetAddress
+export type BenfenGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// BenfenAddress
+export type BenfenAddress = {
+  address?: string;
+};
+
+// BenfenSignTx
+export type BenfenSignTx = {
+  address_n: number[];
+  raw_tx: string;
+  data_initial_chunk?: string;
+  coin_type?: string;
+  data_length?: number;
+};
+
+// BenfenSignedTx
+export type BenfenSignedTx = {
+  public_key: string;
+  signature: string;
+};
+
+// BenfenTxRequest
+export type BenfenTxRequest = {
+  data_length?: number;
+  public_key: string;
+  signature: string;
+};
+
+// BenfenTxAck
+export type BenfenTxAck = {
+  data_chunk: string;
+};
+
+// BenfenSignMessage
+export type BenfenSignMessage = {
+  address_n: number[];
+  message: string;
+};
+
+// BenfenMessageSignature
+export type BenfenMessageSignature = {
+  signature: string;
+  address: string;
+};
+
 // BinanceGetAddress
 export type BinanceGetAddress = {
   address_n: number[];
@@ -4055,6 +4105,14 @@ export type MessageType = {
   AptosMessagePayload: AptosMessagePayload;
   AptosSignMessage: AptosSignMessage;
   AptosMessageSignature: AptosMessageSignature;
+  BenfenGetAddress: BenfenGetAddress;
+  BenfenAddress: BenfenAddress;
+  BenfenSignTx: BenfenSignTx;
+  BenfenSignedTx: BenfenSignedTx;
+  BenfenTxRequest: BenfenTxRequest;
+  BenfenTxAck: BenfenTxAck;
+  BenfenSignMessage: BenfenSignMessage;
+  BenfenMessageSignature: BenfenMessageSignature;
   BinanceGetAddress: BinanceGetAddress;
   BinanceAddress: BinanceAddress;
   BinanceGetPublicKey: BinanceGetPublicKey;

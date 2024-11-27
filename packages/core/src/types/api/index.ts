@@ -148,6 +148,11 @@ import { alephiumGetAddress } from './alephiumGetAddress';
 import { alephiumSignMessage } from './alephiumSignMessage';
 import { alephiumSignTransaction } from './alephiumSignTransaction';
 
+import { benfenGetAddress } from './benfenGetAddress';
+import { benfenGetPublicKey } from './benfenGetPublicKey';
+import { benfenSignTransaction } from './benfenSignTransaction';
+import { benfenSignMessage } from './benfenSignMessage';
+
 export * from './export';
 
 export type CoreApi = {
@@ -401,4 +406,12 @@ export type CoreApi = {
   alephiumGetAddress: typeof alephiumGetAddress;
   alephiumSignMessage: typeof alephiumSignMessage;
   alephiumSignTransaction: typeof alephiumSignTransaction;
+
+  /**
+   * Benfen Network
+   */
+  benfenGetAddress: typeof benfenGetAddress;
+  benfenGetPublicKey: typeof benfenGetPublicKey;
+  benfenSignTransaction: typeof benfenSignTransaction;
+  benfenSignMessage: typeof benfenSignMessage;
 };

@@ -143,6 +143,9 @@ const networkConfigMap: NetworkConfigMap = {
   sui: {
     methodName: 'suiGetAddress',
   },
+  benfen: {
+    methodName: 'benfenGetAddress',
+  },
   fil: {
     methodName: 'filecoinGetAddress',
     getParams: (baseParams: AllNetworkAddressParams, chainName?: string) => {
