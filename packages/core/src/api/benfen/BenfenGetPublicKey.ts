@@ -34,13 +34,13 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
     });
   }
 
-  getVersionRange() {
-    return {
-      model_touch: {
-        min: '4.10.3',
-      },
-    };
-  }
+  // getVersionRange() {
+  //   return {
+  //     model_touch: {
+  //       min: '4.12.0',
+  //     },
+  //   };
+  // }
 
   async run() {
     const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
