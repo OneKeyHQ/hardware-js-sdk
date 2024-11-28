@@ -37,7 +37,6 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
   //   };
   // }
 
-
   chunkByteSize = 1024;
 
   processTxRequest = async (
