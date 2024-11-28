@@ -14,7 +14,6 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
   shouldConfirm = false;
 
   init() {
-    this.skipForceUpdateCheck = true;
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
