@@ -1,4 +1,5 @@
 import { BenfenSignTx, TypedCall, BenfenSignedTx, MessageType } from '@onekeyfe/hd-transport';
+
 import { bytesToHex } from '@noble/hashes/utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
@@ -35,6 +36,7 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
   //     },
   //   };
   // }
+
 
   chunkByteSize = 1024;
 

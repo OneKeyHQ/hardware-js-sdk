@@ -32,6 +32,7 @@ export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMess
   //   };
   // }
 
+
   async run() {
     const response = await this.device.commands.typedCall(
       'BenfenSignMessage',
