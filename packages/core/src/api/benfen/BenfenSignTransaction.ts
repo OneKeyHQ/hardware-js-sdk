@@ -47,23 +47,6 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
     };
   }
 
-  supportChunkTransfer() {
-    const deviceType = getDeviceType(this.device.features);
-    const deviceFirmwareVersion = getDeviceFirmwareVersion(this.device.features).join('.');
-
-    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-      if (semver.valid(deviceFirmwareVersion)) {
-        return semver.gte(deviceFirmwareVersion, '3.7.0');
-      }
-    } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {
-      if (semver.valid(deviceFirmwareVersion)) {
-        return semver.gte(deviceFirmwareVersion, '4.8.0');
-      }
-    }
-
-    return false;
-  }
-
   chunkByteSize = 1024;
 
   processTxRequest = async (
@@ -106,20 +89,15 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
 
   async run() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    let offset = 0;
-    let data: Buffer = Buffer.from('');
-
-    if (this.supportChunkTransfer()) {
-      offset = this.chunkByteSize;
-      data = Buffer.from(this.params.raw_tx, 'hex');
-      this.params = {
-        address_n: this.params.address_n,
-        coin_type: this.params.coin_type,
-        raw_tx: '',
-        data_initial_chunk: bytesToHex(new Uint8Array(data.buffer).subarray(0, this.chunkByteSize)),
-        data_length: data.length,
-      };
-    }
+    const offset = this.chunkByteSize;
+    const data = Buffer.from(this.params.raw_tx, 'hex');
+    this.params = {
+      address_n: this.params.address_n,
+      coin_type: this.params.coin_type,
+      raw_tx: '',
+      data_initial_chunk: bytesToHex(new Uint8Array(data.buffer).subarray(0, this.chunkByteSize)),
+      data_length: data.length,
+    };
 
     const res = await typedCall('BenfenSignTx', ['BenfenSignedTx', 'BenfenTxRequest'], {
       ...this.params,

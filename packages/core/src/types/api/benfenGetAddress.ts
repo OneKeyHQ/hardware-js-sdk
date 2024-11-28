@@ -4,10 +4,6 @@ import type { CommonParams, Response } from '../params';
 export type BenfenAddress = {
   path: string;
   pub?: string;
-  /**
-   * @deprecated Use `pub` instead.
-   */
-  publicKey?: string;
 } & HardwareBenfenAddress;
 
 export type BenfenGetAddressParams = {
