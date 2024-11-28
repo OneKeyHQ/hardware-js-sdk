@@ -54,7 +54,7 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
       | TypedResponseMessage<'AlephiumBytecodeRequest'>,
     data: Buffer,
     scriptOpt?: Buffer,
-    dataOffset = 0,
+    dataOffset = 0
   ): Promise<AlephiumSignedTx> => {
     if (res.type === 'AlephiumSignedTx') {
       return res.message;
@@ -80,7 +80,7 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
         ['AlephiumSignedTx', 'AlephiumTxRequest', 'AlephiumBytecodeRequest'],
         {
           ...resourceAckParams,
-        },
+        }
       );
 
       return this.processTxRequest(typedCall, response, data, scriptOpt, newOffset);
@@ -100,7 +100,7 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
         ['AlephiumSignedTx', 'AlephiumBytecodeRequest'],
         {
           ...resourceAckParams,
-        },
+        }
       );
 
       return this.processTxRequest(typedCall, response, data, scriptOpt, dataOffset);
@@ -126,7 +126,7 @@ export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephium
       ['AlephiumSignedTx', 'AlephiumTxRequest', 'AlephiumBytecodeRequest'],
       {
         ...this.params,
-      },
+      }
     );
 
     return this.processTxRequest(typedCall, res, data, scriptOpt, offset);
