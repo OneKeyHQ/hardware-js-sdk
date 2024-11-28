@@ -34,6 +34,10 @@ const playgroundConfig = [
     data: require('../data/bitcoin').default,
   },
   {
+    title: 'Benfen API',
+    data: require('../data/benfen').default,
+  },
+  {
     title: 'Ethereum API',
     data: require('../data/ethereum').default,
   },
