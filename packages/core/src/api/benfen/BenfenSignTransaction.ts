@@ -4,15 +4,12 @@ import {
   BenfenSignedTx,
   MessageType,
 } from '@onekeyfe/hd-transport';
-import semver from 'semver';
 import { bytesToHex } from '@noble/hashes/utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
-import { DeviceModelToTypes } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 type BenfenSignTx = Omit<HardwareBenfenSignTx, 'data_initial_chunk' | 'data_length'> &
