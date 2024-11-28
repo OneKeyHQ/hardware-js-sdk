@@ -332,4 +332,13 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'alephiumSignMessage' }),
   alephiumSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'alephiumSignTransaction' }),
+
+  benfenGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'benfenGetAddress' }),
+  benfenGetPublicKey: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'benfenGetPublicKey' }),
+  benfenSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'benfenSignTransaction' }),
+  benfenSignMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'benfenSignMessage' }),
 });

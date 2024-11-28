@@ -31,7 +31,8 @@ export type INetwork =
   | 'scdo'
   | 'ton'
   | 'alph'
-  | 'nostr';
+  | 'nostr'
+  | 'benfen';
 
 export type CommonResponseParams = {
   path: string;

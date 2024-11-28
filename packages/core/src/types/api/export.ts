@@ -166,3 +166,8 @@ export type { ScdoSignTransactionParams, ScdoSignedTx } from './scdoSignTransact
 export type { AlephiumAddress, AlephiumGetAddressParams } from './alephiumGetAddress';
 export type { AlephiumSignMessageParams } from './alephiumSignMessage';
 export type { AlephiumSignTransactionParams, AlephiumSignedTx } from './alephiumSignTransaction';
+
+export type { BenfenAddress, BenfenGetAddressParams } from './benfenGetAddress';
+export type { BenfenPublicKey, BenfenGetPublicKeyParams } from './benfenGetPublicKey';
+export type { BenfenSignMessageParams } from './benfenSignMessage';
+export type { BenfenSignedTx, BenfenSignTransactionParams } from './benfenSignTransaction';
