@@ -1,9 +1,5 @@
-import {
-  BenfenSignTx as HardwareBenfenSignTx,
-  TypedCall,
-  BenfenSignedTx,
-  MessageType,
-} from '@onekeyfe/hd-transport';
+import { BenfenSignTx, TypedCall, BenfenSignedTx, MessageType } from '@onekeyfe/hd-transport';
+
 import { bytesToHex } from '@noble/hashes/utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
@@ -11,9 +7,6 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
-
-type BenfenSignTx = Omit<HardwareBenfenSignTx, 'data_initial_chunk' | 'data_length'> &
-  HardwareBenfenSignTx;
 
 export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
   init() {
@@ -36,13 +29,13 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
     };
   }
 
-  getVersionRange() {
-    return {
-      model_touch: {
-        min: '4.10.2',
-      },
-    };
-  }
+  // getVersionRange() {
+  //   return {
+  //     model_touch: {
+  //       min: '4.12.0',
+  //     },
+  //   };
+  // }
 
   chunkByteSize = 1024;
 
