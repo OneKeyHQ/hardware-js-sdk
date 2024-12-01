@@ -101,7 +101,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
           const res = await this.device.commands.typedCall('BenfenGetAddress', 'Address', param);
           const result = {
             path: serializedPath(param.address_n),
-            address: hex2BfcAddress(res.message.address?.toLowerCase()),
+            address: hex2BfcAddress(res.message.address),
           };
           if (this.shouldConfirm) {
             this.postPreviousAddressMessage(result);
