@@ -27,6 +27,12 @@ export function publicKeyToAddress(publicKey: string) {
   );
 }
 
+/**
+ * 将十六进制地址转换为 BFC 格式地址
+ * @param hexAddress - 输入的十六进制地址（可以带有0x前缀）
+ * @returns BFC格式的地址，格式为：BFC + 64位地址 + 4位校验和
+ * @throws {Error} 当输入地址格式无效时
+ */
 export function hex2BfcAddress(hexAddress: string): string {
   // 如果已经是BFC格式，直接返回
   if (/^BFC/i.test(hexAddress)) {
@@ -37,7 +43,7 @@ export function hex2BfcAddress(hexAddress: string): string {
   const hex = hexAddress.replace(/^0x/, '').padStart(64, '0').toLowerCase();
 
   // 使用SHA-256计算校验和
-  const hash = sha256(new TextEncoder().encode(hex));
+  const hash = sha256(hexToBytes(hex));
   const checksumHex = bytesToHex(hash).slice(0, 4);
 
   // 返回BFC格式地址

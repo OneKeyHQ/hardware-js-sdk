@@ -80,7 +80,7 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
             'SuiAddress',
             param
           );
-          address = addressRes.message.address?.toLowerCase();
+          address = addressRes.message.address?.toLowerCase() ?? '';
         } else {
           address = publicKeyToAddress(publicKey);
         }
