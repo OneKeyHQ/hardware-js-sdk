@@ -8,6 +8,7 @@ export type BenfenSignedTx = {
 
 export type BenfenSignTransactionParams = {
   path: string | number[];
+  coinType?: string;
   rawTx?: string;
 };
 
