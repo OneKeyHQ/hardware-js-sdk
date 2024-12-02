@@ -16,19 +16,18 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'rawTx', type: 'hexString', required: true },
-      { name: 'coinType', type: 'string', required: true },
+      { name: 'coinType', type: 'string', required: false },
     ]);
 
     const { path, rawTx, coinType } = this.payload;
     const addressN = validatePath(path, 3);
-    const coinTypeHex = coinType.startsWith('0x')
-      ? coinType.slice(2)
-      : Buffer.from(coinType).toString('hex');
 
     this.params = {
       address_n: addressN,
       raw_tx: formatAnyHex(rawTx),
-      coin_type: formatAnyHex(coinTypeHex),
+      ...(coinType && {
+        coin_type: formatAnyHex(Buffer.from(coinType).toString('hex')),
+      }),
     };
   }
 
