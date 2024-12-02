@@ -77,7 +77,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
             'Address',
             param
           );
-          address = addressRes.message.address?.toLowerCase();
+          address = addressRes.message.address;
         } else {
           address = publicKeyToAddress(publicKey);
         }
