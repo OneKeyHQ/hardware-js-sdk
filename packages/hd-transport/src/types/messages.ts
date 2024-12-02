@@ -141,7 +141,7 @@ export type BenfenGetAddress = {
 
 // BenfenAddress
 export type BenfenAddress = {
-  address?: string;
+  address: string;
 };
 
 // BenfenSignTx
@@ -3912,7 +3912,7 @@ export type SuiGetAddress = {
 
 // SuiAddress
 export type SuiAddress = {
-  address?: string;
+  address: string;
 };
 
 // SuiSignTx
