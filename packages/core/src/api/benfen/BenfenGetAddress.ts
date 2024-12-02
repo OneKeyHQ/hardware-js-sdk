@@ -4,7 +4,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { publicKeyToAddress } from './normalize';
+import { hex2BfcAddress, publicKeyToAddress } from './normalize';
 import { BenfenAddress, BenfenGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 
@@ -77,14 +77,15 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
             'Address',
             param
           );
-          address = addressRes.message.address?.toLowerCase() ?? '';
+          address = addressRes.message.address;
         } else {
           address = publicKeyToAddress(publicKey);
         }
 
         const result = {
           path: serializedPath(param.address_n),
-          address,
+          // 将 address 转为BFC格式
+          address: hex2BfcAddress(address),
           pub: publicKey,
         };
 
@@ -100,7 +101,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
           const res = await this.device.commands.typedCall('BenfenGetAddress', 'Address', param);
           const result = {
             path: serializedPath(param.address_n),
-            address: res.message.address?.toLowerCase() ?? '',
+            address: hex2BfcAddress(res.message.address),
           };
           if (this.shouldConfirm) {
             this.postPreviousAddressMessage(result);
