@@ -26,9 +26,7 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
       address_n: addressN,
       raw_tx: formatAnyHex(rawTx),
       ...(coinType && {
-        coin_type: formatAnyHex(
-          coinType.startsWith('0x') ? coinType.slice(2) : Buffer.from(coinType).toString('hex')
-        ),
+        coin_type: formatAnyHex(Buffer.from(coinType).toString('hex')),
       }),
     };
   }
