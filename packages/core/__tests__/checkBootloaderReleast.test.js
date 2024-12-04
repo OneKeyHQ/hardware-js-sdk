@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-const { shouldUpdateBootloaderForClassicAndMini } = require('../src/api/firmware/bootloaderHelper');
+import { shouldUpdateBootloaderForClassicAndMini } from '../src/api/firmware/bootloaderHelper';
+
+// Add mock for config module
+jest.mock('../src/data/config', () => ({
+  getSDKVersion: () => '1.0.0',
+  DEFAULT_DOMAIN: 'https://jssdk.onekey.so/1.0.0/',
+}));
 
 const fixtures = [
   {
