@@ -11,12 +11,10 @@ export default {
       method: 'cardanoGetPublicKey',
       result: {
         '0': {
-          publicKey:
-            'd6caa5a3f04f0136a492c6e38ccd9c1fcf40ca7e91a64f6e465d637b20dae1249f6dd650fffe5679aa569a8752f53d92a73eea64bdf077ef6129eb4a2d607d0e',
+          xpub: 'd6caa5a3f04f0136a492c6e38ccd9c1fcf40ca7e91a64f6e465d637b20dae1249f6dd650fffe5679aa569a8752f53d92a73eea64bdf077ef6129eb4a2d607d0e',
         },
         '1': {
-          publicKey:
-            '595356ee87d49cdd76d0d674fb09c050938278b120c95fb0c5476ec94000b649dab39e150055d2c92331d60c1fe4764b5b679560aa1b88b370e32607f64c3c3a',
+          xpub: '595356ee87d49cdd76d0d674fb09c050938278b120c95fb0c5476ec94000b649dab39e150055d2c92331d60c1fe4764b5b679560aa1b88b370e32607f64c3c3a',
         },
       },
     },

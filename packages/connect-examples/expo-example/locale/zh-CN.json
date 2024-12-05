@@ -89,6 +89,7 @@
   "label__expected": "预期：",
 
   "label__show_on_onekey": "在硬件上确认",
+  "label__turn_off_security_check": "关闭安全检查",
 
   "label__device_type_sdk": "设备类型（SDK）",
   "label__device_uuid": "设备序列号",
