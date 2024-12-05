@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
@@ -15,6 +15,7 @@ import type { SecurityCheckTestCase, ResultViewProps, TestCaseDataType } from '.
 import { convertTestData } from './utils';
 import data from './data';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
+import { SwitchInput } from '../../../components/SwitchInput';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
   let timeoutHandle: NodeJS.Timeout;
@@ -85,6 +86,7 @@ let hardwareUiEventListener: any | undefined;
 function ExecuteView() {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
+  const [disableSecurityCheck, setDisableSecurityCheck] = useState(true);
 
   const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
@@ -108,6 +110,18 @@ function ExecuteView() {
       if (features?.passphrase_protection) {
         await sdk.deviceSettings(connectId, {
           usePassphrase: false,
+        });
+      }
+      if (disableSecurityCheck) {
+        await sdk.deviceSettings(connectId, {
+          // @ts-expect-error
+          // 0: Strict, 1: PromptTemporarily, 2: Off
+          safetyChecks: 2,
+        });
+      } else {
+        await sdk.deviceSettings(connectId, {
+          // @ts-expect-error
+          safetyChecks: 0,
         });
       }
     },
@@ -146,7 +160,7 @@ function ExecuteView() {
           const res = await sdk[`${method}` as keyof typeof sdk](
             connectId,
             deviceId,
-            requestParams
+            requestParams,
           );
           return { payload: res, skipVerify: true };
         } catch (error) {
@@ -243,12 +257,17 @@ function ExecuteView() {
         </YStack>
 
         <XStack flexWrap="wrap">
+          <SwitchInput
+            label={intl.formatMessage({ id: 'label__turn_off_security_check' })}
+            value={disableSecurityCheck}
+            onToggle={setDisableSecurityCheck}
+          />
           <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
           <ExportReportView />
         </XStack>
       </YStack>
     ),
-    [beginTest, intl, stopTest]
+    [beginTest, disableSecurityCheck, intl, stopTest]
   );
 
   return contentMemo;
