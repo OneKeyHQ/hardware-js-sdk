@@ -11,16 +11,13 @@ export default {
       method: 'cardanoGetPublicKey',
       result: {
         '0': {
-          publicKey:
-            'c432a6857a36ab8f11ad624915f6fd6ede8df2ecca17087ae263e54e9b302efbe52f81f11ff10bb6c0e76d71d83ac715b4c3646e673484d217d63633b6f32f5c',
+          xpub: 'c432a6857a36ab8f11ad624915f6fd6ede8df2ecca17087ae263e54e9b302efbe52f81f11ff10bb6c0e76d71d83ac715b4c3646e673484d217d63633b6f32f5c',
         },
         '10': {
-          publicKey:
-            '2c47e7b37835cf3741623aed4f4bcd8f9762227143b13a250fccef883e9afc76d5b2d0dfec25ced85d38a499443ebf9d5b4cd2848fdfcef67b1773ebd555144d',
+          xpub: '2c47e7b37835cf3741623aed4f4bcd8f9762227143b13a250fccef883e9afc76d5b2d0dfec25ced85d38a499443ebf9d5b4cd2848fdfcef67b1773ebd555144d',
         },
         '2147483647': {
-          publicKey:
-            'd9a0e25ee66cf2b7b6f46fcdc776803c0691c517e460007ec1faca3740785c758b0c39bf6541a54a0227af320b09ad999912f10e72675a646c8836e8bcf9138b',
+          xpub: 'd9a0e25ee66cf2b7b6f46fcdc776803c0691c517e460007ec1faca3740785c758b0c39bf6541a54a0227af320b09ad999912f10e72675a646c8836e8bcf9138b',
         },
       },
     },

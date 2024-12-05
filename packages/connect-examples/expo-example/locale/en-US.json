@@ -90,6 +90,7 @@
   "label__expected": "Expected:",
 
   "label__show_on_onekey": "Show on OneKey",
+  "label__turn_off_security_check": "Turn off security check",
 
   "label__device_type_sdk": "Device Type (SDK)",
   "label__device_uuid": "Device Serial Number",
