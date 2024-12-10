@@ -563,5 +563,15 @@ export default {
         '2147483647': 'TP3cQWgbq2kopNkXHjHDvJXGo6a15j3zmi',
       },
     },
+    {
+      method: 'benfenGetAddress',
+      expectedAddress: {
+        '0': 'BFC5a6464236476bf2bedd6eba0629d83aa0f7c8ce74e51733a8b1f20081fc279ef66b0',
+        '1': 'BFC8c9f9d4cf8c9828379c0744d68b0d3478b17989e42d9d80aab0bd0a66f4f93dda2b8',
+        '100': 'BFCfca709d9c44629f4a9a1b6b5c9458b3735c4fc8b872ff36a6f32325550725aac4a6a',
+        '2147483646': 'BFCd136df3783e0902d4673bcaf51911eb326be16cde4941e624da998d75f72641d0882',
+        '2147483647': 'BFC702b092829741fd123e5054168f66ca53b19aa6ed626e84b3d3f1489889b98fcf33e',
+      },
+    },
   ],
 } as AddressTestCaseData;

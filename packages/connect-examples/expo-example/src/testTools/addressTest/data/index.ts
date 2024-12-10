@@ -20,7 +20,6 @@ export const testCases: AddressTestCase[] = [
   ...singleAddressTestCount18Three,
   ...singleAddressTestCount24Three,
 ];
-
 export const batchTestCases: AddressBatchTestCase[] = [
   ...batchAddressTestCount12One,
   ...batchAddressTestCount18One,

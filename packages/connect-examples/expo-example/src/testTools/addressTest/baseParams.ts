@@ -128,4 +128,8 @@ export const baseParams = {
     path: `m/44'/195'/0'/0/${INDEX_MARK}`,
     showOnOneKey: false,
   },
+  benfenGetAddress: {
+    path: `m/44'/728'/${INDEX_MARK}'/0'/0'`,
+    showOnOneKey: false,
+  },
 };
