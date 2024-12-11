@@ -7,11 +7,7 @@ import { useIntl } from 'react-intl';
 import { Routes } from '../../route';
 import { Button } from './Button';
 import LocaleToggleButton from './LocaleToggleButton';
-
-interface MenuItem {
-  route: string;
-  labelId: string;
-}
+import { MenuItem, MenuListItem } from './MenuListItem';
 
 // 菜单项数组
 const menuItems: MenuItem[] = [
@@ -50,22 +46,6 @@ const MenuButtons = ({
         ))}
       </Group>
     )
-  );
-};
-
-// 菜单列表项组件
-const MenuListItem = ({ item, onPress }: { item: MenuItem; onPress: (route: string) => void }) => {
-  const intl = useIntl();
-
-  return (
-    <ListItem
-      title={intl.formatMessage({ id: item.labelId })}
-      onPress={() => onPress(item.route)}
-      fontWeight="bold"
-      textAlign="center"
-      size="$5"
-      color="black"
-    />
   );
 };
 
