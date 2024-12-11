@@ -18,7 +18,6 @@ export const MenuListItem = ({
   return (
     <ListItem
       title={intl.formatMessage({ id: item.labelId })}
-      // title={item.labelId}
       onPress={() => onPress(item.route)}
       fontWeight="bold"
       textAlign="center"
