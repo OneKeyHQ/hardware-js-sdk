@@ -364,6 +364,11 @@ export const HardwareErrorCode = {
   BridgeDeviceDisconnected: 817,
 
   /**
+   * BTC PSBT too many utxos
+   */
+  BTCPsbtTooManyUtxos: 818,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -480,6 +485,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.CheckDownloadFileError]: 'Check download file error',
   [HardwareErrorCode.NotInSigningMode]: 'not in signing mode',
   [HardwareErrorCode.DataOverload]: 'Params data overload',
+  [HardwareErrorCode.BTCPsbtTooManyUtxos]: 'PSBT too many utxos',
 
   /**
    * Lowlevel transport
