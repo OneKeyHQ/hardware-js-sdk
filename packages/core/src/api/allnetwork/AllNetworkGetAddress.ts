@@ -311,6 +311,8 @@ export default class AllNetworkGetAddress extends BaseMethod<
 
     let result: AllNetworkAddress;
     try {
+      preCheckDeviceSupport(this.device, method);
+
       method.init();
       method.setDevice?.(this.device);
 
@@ -398,6 +400,29 @@ export default class AllNetworkGetAddress extends BaseMethod<
   }
 }
 
+/**
+ * @experiment Check if the device supports the method
+ * @param device
+ * @param method BaseMethod
+ */
+function preCheckDeviceSupport(device: Device, method: BaseMethod) {
+  const versionRange = getMethodVersionRange(
+    device.features,
+    type => method.getVersionRange()[type]
+  );
+  const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
+
+  if (
+    versionRange &&
+    semver.valid(versionRange.min) &&
+    semver.lt(currentVersion, versionRange.min)
+  ) {
+    throw ERRORS.createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min);
+  } else if (method.strictCheckDeviceSupport && !versionRange) {
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod);
+  }
+}
+
 function handleSkippableHardwareError(
   e: any,
   device: Device,
@@ -410,6 +435,8 @@ function handleSkippableHardwareError(
     if (errorCode === HardwareErrorCode.CallMethodInvalidParameter) {
       error = e;
     } else if (errorCode === HardwareErrorCode.CallMethodNeedUpgradeFirmware) {
+      error = e;
+    } else if (errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
       error = e;
     }
   } else if (e.message?.includes('Failure_UnexpectedMessage')) {
@@ -426,7 +453,7 @@ function handleSkippableHardwareError(
     ) {
       error = ERRORS.createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min);
     } else {
-      error = ERRORS.TypedError(HardwareErrorCode.CallMethodNotResponse, e.message);
+      error = ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod, e.message);
     }
   } else if (
     e.message?.toLowerCase()?.includes('forbidden key path') ||

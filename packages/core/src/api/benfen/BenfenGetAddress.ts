@@ -13,6 +13,8 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
 
   shouldConfirm = false;
 
+  strictCheckDeviceSupport = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
@@ -44,13 +46,16 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
     });
   }
 
-  // getVersionRange() {
-  //   return {
-  //     model_touch: {
-  //       min: '4.12.0',
-  //     },
-  //   };
-  // }
+  getVersionRange() {
+    return {
+      pro: {
+        min: '4.12.0',
+      },
+      classic1s: {
+        min: '3.11.0',
+      },
+    };
+  }
 
   async run() {
     const supportsBatchPublicKey = supportBatchPublicKey(this.device?.features);

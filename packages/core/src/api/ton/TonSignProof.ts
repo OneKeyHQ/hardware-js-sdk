@@ -42,8 +42,11 @@ export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
 
   getVersionRange() {
     return {
-      model_touch: {
+      pro: {
         min: '4.10.0',
+      },
+      classic1s: {
+        min: '3.10.0',
       },
     };
   }

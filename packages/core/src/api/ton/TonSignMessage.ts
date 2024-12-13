@@ -68,7 +68,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
 
   getVersionRange() {
     return {
-      model_touch: {
+      pro: {
         min: '4.10.0',
       },
       classic1s: {

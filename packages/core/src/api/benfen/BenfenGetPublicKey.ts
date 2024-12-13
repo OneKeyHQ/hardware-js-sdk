@@ -7,6 +7,8 @@ import { BenfenPublicKey, BenfenGetPublicKeyParams } from '../../types';
 export default class BenfenGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
 
+  strictCheckDeviceSupport = true;
+
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
@@ -34,13 +36,16 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
     });
   }
 
-  // getVersionRange() {
-  //   return {
-  //     model_touch: {
-  //       min: '4.12.0',
-  //     },
-  //   };
-  // }
+  getVersionRange() {
+    return {
+      pro: {
+        min: '4.12.0',
+      },
+      classic1s: {
+        min: '3.11.0',
+      },
+    };
+  }
 
   async run() {
     const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
