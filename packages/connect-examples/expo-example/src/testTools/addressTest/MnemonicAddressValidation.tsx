@@ -37,113 +37,113 @@ const testCase: MnemonicAddressTestCase = {
   name: 'Mnemonic Address Test',
   description: 'Test Mnemonic Address',
   data: [
-    // {
-    //   id: 'btcGetAddress',
-    //   method: 'btcGetAddress',
-    // },
-    // {
-    //   id: 'btcGetAddress-Neurai',
-    //   method: 'btcGetAddress',
-    //   params: {
-    //     path: `m/44'/1900'/${INDEX_MARK}'/${CHANGE_MARK}/${ADDRESS_INDEX_MARK}`,
-    //     coin: 'neurai',
-    //   },
-    // },
-    // {
-    //   id: 'evmGetAddress',
-    //   method: 'evmGetAddress',
-    // },
-    // {
-    //   id: 'alephiumGetAddress',
-    //   method: 'alephiumGetAddress',
-    // },
-    // {
-    //   id: 'algoGetAddress',
-    //   method: 'algoGetAddress',
-    // },
-    // {
-    //   id: 'dnxGetAddress',
-    //   method: 'dnxGetAddress',
-    // },
-    // {
-    //   id: 'tonGetAddress',
-    //   method: 'tonGetAddress',
-    // },
-    // {
-    //   id: 'nervosGetAddress',
-    //   method: 'nervosGetAddress',
-    // },
-    // {
-    //   id: 'nexaGetAddress',
-    //   method: 'nexaGetAddress',
-    // },
-    // {
-    //   id: 'polkadotGetAddress-polkadot',
-    //   method: 'polkadotGetAddress',
-    // },
-    // {
-    //   id: 'polkadotGetAddress-kusama',
-    //   method: 'polkadotGetAddress',
-    //   params: {
-    //     network: 'kusama',
-    //     prefix: '2',
-    //   },
-    // },
-    // {
-    //   id: 'polkadotGetAddress-astar',
-    //   method: 'polkadotGetAddress',
-    //   params: {
-    //     network: 'astar',
-    //     prefix: '5',
-    //   },
-    // },
-    // {
-    //   id: 'polkadotGetAddress-westend',
-    //   method: 'polkadotGetAddress',
-    //   params: {
-    //     network: 'westend',
-    //     prefix: '42',
-    //   },
-    // },
-    // {
-    //   id: 'polkadotGetAddress-manta',
-    //   method: 'polkadotGetAddress',
-    //   params: {
-    //     network: 'manta',
-    //     prefix: '77',
-    //   },
-    // },
-    // {
-    //   id: 'polkadotGetAddress-joystream',
-    //   method: 'polkadotGetAddress',
-    //   params: {
-    //     network: 'joystream',
-    //     prefix: '126',
-    //   },
-    // },
-    // {
-    //   id: 'scdoGetAddress',
-    //   method: 'scdoGetAddress',
-    // },
-    // {
-    //   id: 'suiGetAddress',
-    //   method: 'suiGetAddress',
-    // },
-    // {
-    //   id: 'xrpGetAddress',
-    //   method: 'xrpGetAddress',
-    // },
-    // {
-    //   id: 'cosmosGetAddress',
-    //   method: 'cosmosGetAddress',
-    // },
-    // {
-    //   id: 'cosmosGetAddress-cosmos',
-    //   method: 'cosmosGetAddress',
-    //   params: {
-    //     hrp: 'osmosis',
-    //   },
-    // },
+    {
+      id: 'btcGetAddress',
+      method: 'btcGetAddress',
+    },
+    {
+      id: 'btcGetAddress-Neurai',
+      method: 'btcGetAddress',
+      params: {
+        path: `m/44'/1900'/${INDEX_MARK}'/${CHANGE_MARK}/${ADDRESS_INDEX_MARK}`,
+        coin: 'neurai',
+      },
+    },
+    {
+      id: 'evmGetAddress',
+      method: 'evmGetAddress',
+    },
+    {
+      id: 'alephiumGetAddress',
+      method: 'alephiumGetAddress',
+    },
+    {
+      id: 'algoGetAddress',
+      method: 'algoGetAddress',
+    },
+    {
+      id: 'dnxGetAddress',
+      method: 'dnxGetAddress',
+    },
+    {
+      id: 'tonGetAddress',
+      method: 'tonGetAddress',
+    },
+    {
+      id: 'nervosGetAddress',
+      method: 'nervosGetAddress',
+    },
+    {
+      id: 'nexaGetAddress',
+      method: 'nexaGetAddress',
+    },
+    {
+      id: 'polkadotGetAddress-polkadot',
+      method: 'polkadotGetAddress',
+    },
+    {
+      id: 'polkadotGetAddress-kusama',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'kusama',
+        prefix: '2',
+      },
+    },
+    {
+      id: 'polkadotGetAddress-astar',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'astar',
+        prefix: '5',
+      },
+    },
+    {
+      id: 'polkadotGetAddress-westend',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'westend',
+        prefix: '42',
+      },
+    },
+    {
+      id: 'polkadotGetAddress-manta',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'manta',
+        prefix: '77',
+      },
+    },
+    {
+      id: 'polkadotGetAddress-joystream',
+      method: 'polkadotGetAddress',
+      params: {
+        network: 'joystream',
+        prefix: '126',
+      },
+    },
+    {
+      id: 'scdoGetAddress',
+      method: 'scdoGetAddress',
+    },
+    {
+      id: 'suiGetAddress',
+      method: 'suiGetAddress',
+    },
+    {
+      id: 'xrpGetAddress',
+      method: 'xrpGetAddress',
+    },
+    {
+      id: 'cosmosGetAddress',
+      method: 'cosmosGetAddress',
+    },
+    {
+      id: 'cosmosGetAddress-cosmos',
+      method: 'cosmosGetAddress',
+      params: {
+        hrp: 'osmosis',
+      },
+    },
     {
       id: 'benfenGetaddress',
       method: 'benfenGetaddress',
