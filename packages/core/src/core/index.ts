@@ -200,6 +200,8 @@ export const callAPI = async (message: CoreMessage) => {
           ) {
             return Promise.reject(createDeprecatedHardwareError(currentVersion, versionRange.max));
           }
+        } else if (method.strictCheckDeviceSupport) {
+          throw ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod);
         }
       }
 

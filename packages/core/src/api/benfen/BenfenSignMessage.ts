@@ -24,13 +24,16 @@ export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMess
     };
   }
 
-  // getVersionRange() {
-  //   return {
-  //     model_touch: {
-  //       min: '4.12.0',
-  //     },
-  //   };
-  // }
+  getVersionRange() {
+    return {
+      pro: {
+        min: '4.12.0',
+      },
+      classic1s: {
+        min: '3.11.0',
+      },
+    };
+  }
 
   async run() {
     const response = await this.device.commands.typedCall(

@@ -231,6 +231,11 @@ export const HardwareErrorCode = {
   NewFirmwareForceUpdate: 414,
 
   /**
+   * Device not support this method
+   */
+  DeviceNotSupportMethod: 415,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -365,6 +370,7 @@ export const HardwareErrorCode = {
 
   /**
    * BTC PSBT too many utxos
+   * @params:{ count: number }
    */
   BTCPsbtTooManyUtxos: 818,
 
@@ -428,6 +434,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.NewFirmwareForceUpdate]: 'new firmware has been released, please update',
   [HardwareErrorCode.UseDesktopToUpdateFirmware]:
     'Please use OneKey desktop client to update the firmware',
+  [HardwareErrorCode.DeviceNotSupportMethod]: 'Device not support this method',
 
   /**
    * Network Errors
