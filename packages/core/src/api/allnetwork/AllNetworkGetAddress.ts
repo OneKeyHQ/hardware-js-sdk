@@ -360,7 +360,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
         const response = await this.callMethod(
           dependOnMethod.methodName,
           dependOnMethod.params,
-          param,
+          param
         );
         dependOnMethodResults.push(response);
       }
@@ -380,7 +380,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
 
       const dependOnPayloads = dependOnMethodResults.reduce(
         (acc, cur) => Object.assign(acc, get(cur, 'payload', {})),
-        {},
+        {}
       );
 
       const result: AllNetworkAddress = {
@@ -408,7 +408,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
 function preCheckDeviceSupport(device: Device, method: BaseMethod) {
   const versionRange = getMethodVersionRange(
     device.features,
-    type => method.getVersionRange()[type],
+    type => method.getVersionRange()[type]
   );
   const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
 
@@ -426,7 +426,7 @@ function preCheckDeviceSupport(device: Device, method: BaseMethod) {
 function handleSkippableHardwareError(
   e: any,
   device: Device,
-  method: BaseMethod,
+  method: BaseMethod
 ): HardwareError | undefined {
   let error: HardwareError | undefined;
 
@@ -442,7 +442,7 @@ function handleSkippableHardwareError(
   } else if (e.message?.includes('Failure_UnexpectedMessage')) {
     const versionRange = getMethodVersionRange(
       device.features,
-      type => method.getVersionRange()[type],
+      type => method.getVersionRange()[type]
     );
     const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
 
