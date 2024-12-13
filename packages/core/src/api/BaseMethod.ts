@@ -81,6 +81,13 @@ export abstract class BaseMethod<Params = undefined> {
    */
   skipForceUpdateCheck = false;
 
+  /**
+   * 严格检查设备是否支持该方法，不支持则抛出错误
+   * @experiment 默认不严格检查，如果需要严格检查，则需要设置为 true
+   * @default false
+   */
+  strictCheckDeviceSupport = false;
+
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 

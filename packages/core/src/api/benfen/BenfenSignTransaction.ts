@@ -31,13 +31,16 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
     };
   }
 
-  // getVersionRange() {
-  //   return {
-  //     model_touch: {
-  //       min: '4.12.0',
-  //     },
-  //   };
-  // }
+  getVersionRange() {
+    return {
+      pro: {
+        min: '4.12.0',
+      },
+      classic1s: {
+        min: '3.11.0',
+      },
+    };
+  }
 
   chunkByteSize = 1024;
 
