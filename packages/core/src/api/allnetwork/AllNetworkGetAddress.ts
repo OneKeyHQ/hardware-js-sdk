@@ -311,10 +311,10 @@ export default class AllNetworkGetAddress extends BaseMethod<
 
     let result: AllNetworkAddress;
     try {
-      preCheckDeviceSupport(this.device, method);
-
       method.init();
       method.setDevice?.(this.device);
+
+      preCheckDeviceSupport(this.device, method);
 
       const response = await method.run();
       result = {
