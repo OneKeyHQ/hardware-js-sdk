@@ -5,7 +5,17 @@ const createExpoWebpackConfigAsync = require('@expo/webpack-config');
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
 
-  // Customize the config before returning it.
+  // 只为我们自己的代码启用 source map
+  config.module.rules = config.module.rules.filter(rule => {
+    if (!rule || !rule.use) return true;
+    const uses = Array.isArray(rule.use) ? rule.use : [rule.use];
+    return !uses.some(use => {
+      const loader = typeof use === 'string' ? use : use.loader;
+      return loader && loader.includes('source-map-loader');
+    });
+  });
+
+  // 保持其他配置不变
   config.resolve.fallback = {
     crypto: require.resolve('./shim/crypto'),
     stream: require.resolve('stream-browserify'),

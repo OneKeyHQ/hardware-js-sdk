@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
+import { IVersionArray } from '../src';
 import { shouldUpdateBootloaderForClassicAndMini } from '../src/api/firmware/bootloaderHelper';
 
 // Add mock for config module
@@ -105,8 +105,8 @@ describe('CheckBootloaderReleast', () => {
         currentVersion,
         bootloaderVersion,
         willUpdateFirmware,
-        targetBootloaderVersion,
-        bootloaderRelatedFirmwareVersion,
+        targetBootloaderVersion: targetBootloaderVersion as IVersionArray,
+        bootloaderRelatedFirmwareVersion: bootloaderRelatedFirmwareVersion as IVersionArray,
       });
       expect(shouldUpdateBootloader).toBe(data.shouldUpdateBootloader);
     });

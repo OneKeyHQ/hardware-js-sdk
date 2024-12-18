@@ -68,6 +68,10 @@ export function convertTestSingleData(
 ): AddressTestCase {
   const testCase = fullPath(data);
 
+  // only in local test
+  // let testCase = fullPath(data);
+  // testCase.data = testCase.data.filter(item => item.method === 'benfenGetAddress');
+
   const dataList: AddressCaseData[] = [];
   for (const item of testCase.data) {
     const keys = Object.keys(item.expectedAddress);
@@ -132,6 +136,9 @@ export function convertTestSingleData(
 export function convertTestBatchData(data: AddressTestCaseData): AddressBatchTestCase {
   const testCase = fullPath(data);
 
+  // only in local test
+  // let testCase = fullPath(data);
+  // testCase.data = testCase.data.filter(item => item.method === 'benfenGetAddress');
   const dataList: AddressBatchCaseData[] = [];
   for (const item of testCase.data) {
     if (item.params?.addressParameters?.path) {

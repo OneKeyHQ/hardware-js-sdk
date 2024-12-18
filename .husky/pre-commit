@@ -1,4 +1,7 @@
 
+# Run tests
+yarn test
+
 # Run lint:fix
 yarn lint:staged
 
