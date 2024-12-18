@@ -162,8 +162,8 @@ export type BenfenSignedTx = {
 // BenfenTxRequest
 export type BenfenTxRequest = {
   data_length?: number;
-  public_key: string;
-  signature: string;
+  public_key?: string;
+  signature?: string;
 };
 
 // BenfenTxAck
@@ -3720,7 +3720,7 @@ export type SuiGetAddress = {
 
 // SuiAddress
 export type SuiAddress = {
-  address: string;
+  address?: string;
 };
 
 // SuiSignTx

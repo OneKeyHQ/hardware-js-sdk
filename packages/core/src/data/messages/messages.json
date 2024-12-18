@@ -345,6 +345,7 @@
     "BenfenAddress": {
       "fields": {
         "address": {
+          "rule": "required",
           "type": "string",
           "id": 1
         }
@@ -11710,14 +11711,14 @@
         "MessageType_AlephiumBytecodeAck": 12108,
         "MessageType_AlephiumSignMessage": 12109,
         "MessageType_AlephiumMessageSignature": 12110,
-        "MessageType_BenfenGetAddress": 13100,
-        "MessageType_BenfenAddress": 13101,
-        "MessageType_BenfenSignTx": 13102,
-        "MessageType_BenfenSignedTx": 13103,
-        "MessageType_BenfenSignMessage": 13104,
-        "MessageType_BenfenMessageSignature": 13105,
-        "MessageType_BenfenTxRequest": 13106,
-        "MessageType_BenfenTxAck": 13107,
+        "MessageType_BenfenGetAddress": 12201,
+        "MessageType_BenfenAddress": 12202,
+        "MessageType_BenfenSignTx": 12203,
+        "MessageType_BenfenSignedTx": 12204,
+        "MessageType_BenfenSignMessage": 12205,
+        "MessageType_BenfenMessageSignature": 12206,
+        "MessageType_BenfenTxRequest": 12207,
+        "MessageType_BenfenTxAck": 12208,
         "MessageType_DeviceBackToBoot": 903,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
