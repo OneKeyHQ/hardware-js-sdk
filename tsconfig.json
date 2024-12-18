@@ -21,22 +21,14 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "types": [
-      "jest",
-      "node"
-    ],
+    "types": ["jest", "node"],
     "esModuleInterop": true,
     "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "noEmit": false
+    "noEmit": false,
+    "outDir": "./dist"
   },
-  "exclude": [
-    "**/node_modules",
-    "**/lib",
-    "**/dist",
-    "**/coverage",
-    "**/public"
-  ],
+  "exclude": ["**/node_modules", "**/lib", "**/dist", "**/coverage", "**/public"],
   "extends": "expo/tsconfig.base"
 }

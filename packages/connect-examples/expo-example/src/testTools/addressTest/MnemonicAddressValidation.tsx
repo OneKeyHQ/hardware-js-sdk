@@ -144,6 +144,10 @@ const testCase: MnemonicAddressTestCase = {
         hrp: 'osmosis',
       },
     },
+    {
+      id: 'benfenGetaddress',
+      method: 'benfenGetaddress',
+    },
   ],
 };
 
