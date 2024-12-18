@@ -26,12 +26,12 @@ export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMess
 
   getVersionRange() {
     return {
-      // pro: {
-      //   min: '4.12.0',
-      // },
-      // classic1s: {
-      //   min: '3.11.0',
-      // },
+      pro: {
+        min: '4.12.0',
+      },
+      classic1s: {
+        min: '3.11.0',
+      },
     };
   }
 
