@@ -48,12 +48,12 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
 
   getVersionRange() {
     return {
-      pro: {
-        min: '4.12.0',
-      },
-      classic1s: {
-        min: '3.11.0',
-      },
+      // pro: {
+      //   min: '4.12.0',
+      // },
+      // classic1s: {
+      //   min: '3.11.0',
+      // },
     };
   }
 

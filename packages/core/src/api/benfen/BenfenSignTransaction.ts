@@ -33,12 +33,12 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
 
   getVersionRange() {
     return {
-      pro: {
-        min: '4.12.0',
-      },
-      classic1s: {
-        min: '3.11.0',
-      },
+      // pro: {
+      //   min: '4.12.0',
+      // },
+      // classic1s: {
+      //   min: '3.11.0',
+      // },
     };
   }
 
