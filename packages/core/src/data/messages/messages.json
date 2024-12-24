@@ -10758,6 +10758,10 @@
         "jetton_amount_bytes": {
           "type": "bytes",
           "id": 21
+        },
+        "init_state": {
+          "type": "string",
+          "id": 22
         }
       }
     },

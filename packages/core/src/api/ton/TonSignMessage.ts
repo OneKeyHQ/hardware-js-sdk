@@ -38,6 +38,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       { name: 'extDestination', type: 'array' },
       { name: 'extTonAmount', type: 'array' },
       { name: 'extPayload', type: 'array' },
+      { name: 'initState', type: 'string' },
     ]);
 
     const { path } = this.payload as TonSignMessageParams;
@@ -63,6 +64,8 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       ext_destination: this.payload.extDestination,
       ext_ton_amount: this.payload.extTonAmount,
       ext_payload: this.payload.extPayload,
+      // @ts-expect-error
+      init_state: this.payload.initState,
     };
   }
 
