@@ -66,6 +66,7 @@ export type {
 
 export type { SolanaAddress, SolanaGetAddressParams } from './solGetAddress';
 export type { SolanaSignedTx, SolanaSignTransactionParams } from './solSignTransaction';
+export type { SolSignedMessage, SolSignMessageParams } from './solSignMessage';
 
 export type { StellarAddress, StellarGetAddressParams } from './stellarGetAddress';
 export type {
