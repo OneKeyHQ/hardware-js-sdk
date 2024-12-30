@@ -90,6 +90,7 @@ export { default as nemDecryptMessage } from './nem/NEMDecryptMessage';
 
 export { default as solGetAddress } from './solana/SolGetAddress';
 export { default as solSignTransaction } from './solana/SolSignTransaction';
+export { default as solSignMessage } from './solana/SolSignMessage';
 
 export { default as stellarGetAddress } from './stellar/StellarGetAddress';
 export { default as stellarSignTransaction } from './stellar/StellarSignTransaction';

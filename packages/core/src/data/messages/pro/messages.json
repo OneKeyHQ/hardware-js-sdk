@@ -9530,6 +9530,66 @@
         }
       }
     },
+    "SolanaMessageVersion": {
+      "values": {
+        "MESSAGE_VERSION_0": 0
+      }
+    },
+    "SolanaMessageFormat": {
+      "values": {
+        "V0_RESTRICTED_ASCII": 0,
+        "V0_LIMITED_UTF8": 1
+      }
+    },
+    "SolanaSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "message_version": {
+          "type": "SolanaMessageVersion",
+          "id": 3,
+          "options": {
+            "default": "MESSAGE_VERSION_0"
+          }
+        },
+        "message_format": {
+          "type": "SolanaMessageFormat",
+          "id": 4,
+          "options": {
+            "default": "V0_RESTRICTED_ASCII"
+          }
+        },
+        "application_domain": {
+          "type": "bytes",
+          "id": 5
+        }
+      }
+    },
+    "SolanaSignedMessage": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
     "StarcoinGetAddress": {
       "fields": {
         "address_n": {
@@ -11713,6 +11773,8 @@
         "MessageType_BinanceOrderMsg": 707,
         "MessageType_BinanceCancelMsg": 708,
         "MessageType_BinanceSignedTx": 709,
+        "MessageType_SolanaSignMessage": 10104,
+        "MessageType_SolanaSignedMessage": 10105,
         "MessageType_StarcoinGetAddress": 10300,
         "MessageType_StarcoinAddress": 10301,
         "MessageType_StarcoinGetPublicKey": 10302,

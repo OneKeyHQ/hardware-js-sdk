@@ -228,6 +228,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'solGetAddress' }),
   solSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'solSignTransaction' }),
+  solSignMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'solSignMessage' }),
 
   stellarGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'stellarGetAddress' }),
