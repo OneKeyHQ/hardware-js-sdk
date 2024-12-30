@@ -6,8 +6,6 @@ import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
 export default class SolSignMessage extends BaseMethod<HardwareSolSignMessage> {
-  strictCheckDeviceSupport = true;
-
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
