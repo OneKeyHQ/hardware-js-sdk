@@ -8,9 +8,20 @@ export const deviceInfoKeys = [
   //   ['device_id', 'label'],
   ['onekey_device_type', 'onekey_serial_no', 'onekey_se_type'],
   ['onekey_board_version', 'onekey_board_hash', 'onekey_board_build_id'],
-  ['onekey_boot_version', 'onekey_boot_hash', 'onekey_boot_build_id'],
-  ['onekey_firmware_version', 'onekey_firmware_hash', 'onekey_firmware_build_id'],
-  ['onekey_ble_version', 'onekey_ble_hash', 'onekey_ble_build_id', 'onekey_ble_name'],
+  ['onekey_boot_version', 'onekey_boot_hash', 'onekey_boot_build_id', 'onekey_boot_url'],
+  [
+    'onekey_firmware_version',
+    'onekey_firmware_hash',
+    'onekey_firmware_build_id',
+    'onekey_firmware_url',
+  ],
+  [
+    'onekey_ble_version',
+    'onekey_ble_hash',
+    'onekey_ble_build_id',
+    'onekey_ble_name',
+    'onekey_ble_url',
+  ],
 ];
 
 export const deviceSEInfoKeys = [
@@ -74,7 +85,9 @@ export function ExportDeviceInfo() {
       `${intl.formatMessage({ id: 'label__device_device_statue' })}:    ${bootloaderMode}`
     );
     markdown.push(
-      `${intl.formatMessage({ id: 'label__device_boardloader_version' })}:    ${boardloaderVersion}`
+      `${intl.formatMessage({
+        id: 'label__device_boardloader_version',
+      })}:    ${boardloaderVersion}`
     );
     markdown.push(
       `${intl.formatMessage({ id: 'label__device_bootloader_version' })}:    ${bootloaderVersion}`

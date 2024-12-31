@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Stack, Text, XStack } from 'tamagui';
-import { Text as RNText } from 'react-native';
 import { useDeviceFieldContext } from './DeviceFieldContext';
+import { getReleaseUrl } from '../../utils/deviceUtils';
 
 interface DeviceFieldProps {
   field: string;
@@ -14,9 +14,15 @@ function isNil(value: string | undefined | null): value is string {
 
 function DeviceFieldView({ field, value }: DeviceFieldProps) {
   const { features, onekeyFeatures } = useDeviceFieldContext();
-
-  // @ts-expect-error
-  const fieldValue = onekeyFeatures?.[field] ?? features?.[field] ?? value;
+  const fieldValue =
+    (onekeyFeatures as Record<string, string>)?.[field] ??
+    (features as Record<string, any>)?.[field] ??
+    (
+      getReleaseUrl({
+        features,
+      }) as Record<string, string>
+    )?.[field] ??
+    value;
 
   return (
     <XStack
@@ -35,13 +41,30 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
         {`${field}: `}
       </Text>
       <Stack flex={1} paddingStart={4}>
-        <Text
-          flex={1}
-          flexWrap="wrap"
-          fontSize={18}
-          fontWeight="bold"
-          color={isNil(fieldValue) ? '$textCritical' : '$text'}
-        >{`${fieldValue ?? ''}`}</Text>
+        {fieldValue?.startsWith('http') ? (
+          <Text
+            flex={1}
+            flexWrap="wrap"
+            fontSize={18}
+            fontWeight="bold"
+            color="$textInfo"
+            textDecorationLine="underline"
+            cursor="pointer"
+            onPress={() => {
+              window.open(fieldValue, '_blank');
+            }}
+          >
+            {fieldValue}
+          </Text>
+        ) : (
+          <Text
+            flex={1}
+            flexWrap="wrap"
+            fontSize={18}
+            fontWeight="bold"
+            color={isNil(fieldValue) ? '$textCritical' : '$text'}
+          >{`${fieldValue ?? ''}`}</Text>
+        )}
       </Stack>
     </XStack>
   );
