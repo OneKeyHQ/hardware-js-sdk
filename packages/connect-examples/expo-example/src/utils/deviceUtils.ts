@@ -6,6 +6,44 @@ import {
 } from '@onekeyfe/hd-core';
 import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
 
+export const getReleaseUrl = ({ features }: { features?: Features }) => {
+  const deviceType = getDeviceType(features)?.toUpperCase() || 'UNKNOWN';
+  // const { firmwareUrl, bleVersion } = getDeviceBasicInfo(features, onekeyFeatures);
+  // classic 类型（包括classci 1s, mini, classic），不需要更新bootloader
+  const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
+  const bootloaderVersion = `${getDeviceBootloaderVersion(features)?.join('.')}`;
+  switch (deviceType) {
+    case 'CLASSIC1S':
+      return {
+        onekey_boot_url: '',
+        onekey_firmware_url: firmwareVersion
+          ? `https://github.com/OneKeyHQ/firmware-classic1s/releases/tag/v${firmwareVersion}`
+          : '',
+        onekey_ble_url: features?.ble_ver
+          ? `https://github.com/OneKeyHQ/bluetooth-firmware-classic/releases/tag/v${features?.ble_ver}`
+          : '',
+      };
+    case 'PRO':
+      return {
+        onekey_boot_url: bootloaderVersion
+          ? `https://github.com/OneKeyHQ/firmware-pro/releases/tag/bootloader-v${bootloaderVersion}`
+          : '',
+        onekey_firmware_url: firmwareVersion
+          ? `https://github.com/OneKeyHQ/firmware-pro/releases/tag/v${firmwareVersion}`
+          : '',
+        onekey_ble_url: features?.ble_ver
+          ? `https://github.com/OneKeyHQ/bluetooth-firmware-pro/releases/tag/v${features?.ble_ver}`
+          : '',
+      };
+    default:
+      return {
+        onekey_boot_url: ``,
+        onekey_firmware_url: ``,
+        onekey_ble_url: ``,
+      };
+  }
+};
+
 export function getDeviceBasicInfo(
   features: Features | undefined,
   onekeyFeatures: OnekeyFeatures | undefined
@@ -28,6 +66,14 @@ export function getDeviceBasicInfo(
   const firmwareVersion =
     features && `${getDeviceFirmwareVersion(features)?.join('.')}-${firmwareBuildId}`;
 
+  const {
+    onekey_firmware_url: firmwareUrl,
+    onekey_boot_url: bootUrl,
+    onekey_ble_url: bleUrl,
+  } = getReleaseUrl({
+    features,
+  });
+
   return {
     deviceType,
     serialNumber,
@@ -35,6 +81,9 @@ export function getDeviceBasicInfo(
     bootloaderVersion,
     boardloaderVersion,
     firmwareVersion,
+    bootUrl,
+    firmwareUrl,
+    bleUrl,
   };
 }
 
