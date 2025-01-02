@@ -71,7 +71,7 @@ import { nemSignTransaction } from './nemSignTransaction';
 
 import { solGetAddress } from './solGetAddress';
 import { solSignTransaction } from './solSignTransaction';
-import { solSignMessage } from './solSignMessage';
+import { solSignOffchainMessage } from './solSignOffchainMessage';
 
 import { stellarGetAddress } from './stellarGetAddress';
 import { stellarSignTransaction } from './stellarSignTransaction';
@@ -266,7 +266,7 @@ export type CoreApi = {
    */
   solGetAddress: typeof solGetAddress;
   solSignTransaction: typeof solSignTransaction;
-  solSignMessage: typeof solSignMessage;
+  solSignOffchainMessage: typeof solSignOffchainMessage;
 
   /**
    * Stellar function

@@ -1,12 +1,12 @@
 import { SolanaMessageFormat, SolanaMessageVersion } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
-export type SolSignedMessage = {
+export type SolSignOffchainMessageResponse = {
   signature: string;
   publicKey: string;
 };
 
-export type SolSignMessageParams = {
+export type SolSignOffchainMessageParams = {
   path: string | number[];
   messageHex: string;
   messageVersion?: SolanaMessageVersion;
@@ -14,8 +14,8 @@ export type SolSignMessageParams = {
   applicationDomainHex?: string;
 };
 
-export declare function solSignMessage(
+export declare function solSignOffchainMessage(
   connectId: string,
   deviceId: string,
-  params: CommonParams & SolSignMessageParams
-): Response<SolSignedMessage>;
+  params: CommonParams & SolSignOffchainMessageParams
+): Response<SolSignOffchainMessageResponse>;

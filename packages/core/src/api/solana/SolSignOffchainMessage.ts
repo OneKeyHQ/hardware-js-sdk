@@ -5,7 +5,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
 
-export default class SolSignMessage extends BaseMethod<HardwareSolSignMessage> {
+export default class SolSignOffchainMessage extends BaseMethod<HardwareSolSignMessage> {
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
