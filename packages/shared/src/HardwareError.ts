@@ -236,6 +236,11 @@ export const HardwareErrorCode = {
   DeviceNotSupportMethod: 415,
 
   /**
+   * Forbidden key path
+   */
+  ForbiddenKeyPath: 416,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -435,6 +440,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.UseDesktopToUpdateFirmware]:
     'Please use OneKey desktop client to update the firmware',
   [HardwareErrorCode.DeviceNotSupportMethod]: 'Device not support this method',
+  [HardwareErrorCode.ForbiddenKeyPath]: 'Forbidden key path',
 
   /**
    * Network Errors

@@ -3,6 +3,7 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { CosmosAddress, CosmosGetPublicKeyParams } from '../../types';
+import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
 export default class CosmosGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
@@ -59,11 +60,7 @@ export default class CosmosGetPublicKey extends BaseMethod<any> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
-      paths: this.params,
-      ecdsa_curve_name: this.params[0].curve,
-    });
-
+    const res = await batchGetPublickeys(this.device, this.params, this.params[0].curve, 118);
     const responses: CosmosAddress[] = res.message.public_keys.map(
       (publicKey: string, index: number) => ({
         path: serializedPath((this.params as unknown as any[])[index].address_n),

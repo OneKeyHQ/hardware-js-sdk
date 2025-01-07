@@ -7,6 +7,7 @@ import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { SuiAddress, SuiGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { publicKeyToAddress } from './normalize';
+import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
 export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
   hasBundle = false;
@@ -61,18 +62,11 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
     const supportsBatchPublicKey = supportBatchPublicKey(this.device?.features);
     let responses: SuiAddress[] = [];
     if (supportsBatchPublicKey) {
-      const publicKeyRes = await this.device.commands.typedCall(
-        'BatchGetPublickeys',
-        'EcdsaPublicKeys',
-        {
-          paths: this.params,
-          ecdsa_curve_name: 'ed25519',
-        }
-      );
+      const publicKeyRes = await batchGetPublickeys(this.device, this.params, 'ed25519', 784);
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
         const publicKey = publicKeyRes.message.public_keys[i];
-        let address: string;
+        let address: string | undefined;
 
         if (this.shouldConfirm) {
           const addressRes = await this.device.commands.typedCall(

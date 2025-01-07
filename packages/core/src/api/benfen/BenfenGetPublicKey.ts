@@ -3,6 +3,7 @@ import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BenfenPublicKey, BenfenGetPublicKeyParams } from '../../types';
+import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
 export default class BenfenGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
@@ -48,10 +49,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
-      paths: this.params,
-      ecdsa_curve_name: 'ed25519',
-    });
+    const res = await batchGetPublickeys(this.device, this.params, 'ed25519', 728);
 
     const responses: BenfenPublicKey[] = res.message.public_keys.map(
       (publicKey: string, index: number) => ({

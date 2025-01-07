@@ -42,6 +42,12 @@ export const getHDPath = (path: string): Array<number> => {
     });
 };
 
+export const isEqualBip44CoinType = (path: Array<number>, coinType: number): boolean =>
+  isBip44Path(path) && path[1] === toHardened(coinType);
+
+export const isBip44Path = (path: Array<number>): boolean =>
+  Array.isArray(path) && path[0] === toHardened(44);
+
 export const isMultisigPath = (path: Array<number>): boolean =>
   Array.isArray(path) && path[0] === toHardened(48);
 
