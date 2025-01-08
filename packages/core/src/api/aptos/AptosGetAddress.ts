@@ -9,6 +9,7 @@ import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { AptosAddress, AptosGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { hexToBytes } from '../helpers/hexUtils';
+import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
 export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[]> {
   hasBundle = false;
@@ -67,14 +68,7 @@ export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[
     const supportsBatchPublicKey = supportBatchPublicKey(this.device?.features);
     let responses: AptosAddress[] = [];
     if (supportsBatchPublicKey) {
-      const publicKeyRes = await this.device.commands.typedCall(
-        'BatchGetPublickeys',
-        'EcdsaPublicKeys',
-        {
-          paths: this.params,
-          ecdsa_curve_name: 'ed25519',
-        }
-      );
+      const publicKeyRes = await batchGetPublickeys(this.device, this.params, 'ed25519', 637);
 
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
