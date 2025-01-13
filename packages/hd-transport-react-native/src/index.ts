@@ -360,6 +360,9 @@ export default class ReactNativeBleTransport {
       );
     }
 
+    // release transport before new transport instance
+    await this.release(uuid);
+
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
     transport.nofitySubscription = this._monitorCharacteristic(transport.notifyCharacteristic);
     transportCache[uuid] = transport;
