@@ -6,7 +6,7 @@ import { updateBootloader } from '../firmware/uploadFirmware';
 import { createUiMessage } from '../../events/ui-request';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
-import { checkBootloaderLength, checkNeedUpdateBootForTouch } from '../firmware/updateBootloader';
+import { checkBootloaderLength } from '../firmware/updateBootloader';
 import { getDeviceType } from '../../utils';
 
 import type { Device } from '../../device/Device';

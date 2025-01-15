@@ -3,11 +3,12 @@ import semver from 'semver';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
-import { updateResources } from '../firmware/uploadFirmware';
+import { updateResources, updateResourcesInBootloaderMode } from '../firmware/uploadFirmware';
 import { getDeviceType, getDeviceFirmwareVersion } from '../../utils';
 import { createUiMessage } from '../../events/ui-request';
 import type { KnownDevice, Features } from '../../types';
 import { DataManager } from '../../data-manager';
+import { enterBootloaderMode, REBOOT_TYPE, rebootDevice } from '../firmware/bootloaderHelper';
 
 export default class DeviceFullyUploadResource extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
@@ -59,12 +60,28 @@ export default class DeviceFullyUploadResource extends BaseMethod {
             }
           }
         }
-        await updateResources(
-          this.device.getCommands().typedCall.bind(this.device.getCommands()),
-          this.postMessage,
-          device,
-          binary
-        );
+        const bootloaderVersion = getDeviceFirmwareVersion(features);
+        // 2.4.4版本之后才支持emmcFileWrite
+        if (semver.gte(bootloaderVersion.join('.'), '2.4.4')) {
+          await enterBootloaderMode(device, this.postMessage, this.connectId);
+          await updateResourcesInBootloaderMode(
+            this.device.getCommands().typedCall.bind(this.device.getCommands()),
+            this.postMessage,
+            device,
+            binary
+          );
+          await rebootDevice(
+            this.device.getCommands().typedCall.bind(this.device.getCommands()),
+            REBOOT_TYPE.REBOOT_NORMAL
+          );
+        } else {
+          await updateResources(
+            this.device.getCommands().typedCall.bind(this.device.getCommands()),
+            this.postMessage,
+            device,
+            binary
+          );
+        }
       }
     }
   }

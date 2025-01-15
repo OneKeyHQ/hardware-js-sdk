@@ -1,3 +1,5 @@
+// Helpers utils
+export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
 export * from './assets';
 export * from './versionUtils';
 export * from './patch';
@@ -21,9 +23,6 @@ export {
   checkNeedUpdateBootForTouch,
   checkNeedUpdateBootForClassicAndMini,
 } from '../api/firmware/updateBootloader';
-
-// Helpers utils
-export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
 
 export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pathUtils';
 

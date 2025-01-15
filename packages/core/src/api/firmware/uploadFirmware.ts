@@ -18,12 +18,15 @@ import { DeviceModelToTypes, KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
 import { DataManager } from '../../data-manager';
 import { DevicePool } from '../../device/DevicePool';
+import { rebootDevice, createFolder, REBOOT_TYPE } from './bootloaderHelper';
 
+// Constants
 const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
-
+const INIT_DATA_CHUNK_SIZE = 16 * 1024;
 const Log = getLogger(LoggerNames.Core);
 
+// UI Helper Functions
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
   if (device.features?.firmware_present) {
@@ -59,6 +62,7 @@ const postProgressTip = (
   );
 };
 
+// Basic Utility Functions
 export const waitBleInstall = async (updateType: string) => {
   if (updateType === 'ble') {
     // wait for device install
@@ -66,6 +70,7 @@ export const waitBleInstall = async (updateType: string) => {
   }
 };
 
+// Core Functions
 export const uploadFirmware = async (
   updateType: 'firmware' | 'ble',
   typedCall: TypedCall,
@@ -105,12 +110,13 @@ export const uploadFirmware = async (
     if (device.features) {
       const bootloaderVersion = getDeviceBootloaderVersion(device.features);
       if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
-        const response = await newTouchUpdateProcess(
-          updateType,
+        const filePath = `0:${updateType === 'ble' ? 'ble-' : ''}firmware.bin`;
+        const response = await newTouchUpdateFirmwareProcess(
           postMessage,
           device,
           {
             payload,
+            filePath,
           },
           rebootOnSuccess
         );
@@ -153,17 +159,110 @@ export const uploadFirmware = async (
   throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'uploadFirmware: unknown device model');
 };
 
-const newTouchUpdateProcess = async (
-  updateType: 'firmware' | 'ble',
+export const updateResource = async (typedCall: TypedCall, fileName: string, data: ArrayBuffer) => {
+  const chunk = new Uint8Array(data.slice(0, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength)));
+  const digest = blake2s(chunk);
+
+  const res = await typedCall('ResourceUpdate', ['ResourceRequest', 'Success'], {
+    file_name: fileName,
+    data_length: data.byteLength,
+    initial_data_chunk: bytesToHex(chunk),
+    hash: bytesToHex(digest),
+  });
+
+  return processResourceRequest(typedCall, res, data);
+};
+
+export const updateResources = async (
+  typedCall: TypedCall,
   postMessage: (message: CoreMessage) => void,
   device: Device,
-  { payload }: PROTO.FirmwareUpload,
-  rebootOnSuccess = true
+  source: ArrayBuffer
 ) => {
-  let typedCall = device.getCommands().typedCall.bind(device.getCommands());
-  postProgressTip(device, 'StartTransferData', postMessage);
-  // Write File
-  const filePath = `0:${updateType === 'ble' ? 'ble-' : ''}firmware.bin`;
+  postProgressTip(device, 'UpdateSysResource', postMessage);
+
+  const zipData = await JSZip.loadAsync(source);
+  const files = Object.entries(zipData.files);
+
+  let progress = 0;
+  const stepProgress = 100 / files.length;
+
+  for (const [fileName, file] of files) {
+    const name = fileName.split('/').pop();
+    if (!file.dir && fileName.indexOf('__MACOSX') === -1 && name) {
+      const data = await file.async('arraybuffer');
+      await updateResource(typedCall, name, data);
+    }
+
+    progress += stepProgress;
+    postProgressMessage(device, Math.floor(progress), postMessage);
+  }
+
+  postProgressMessage(device, 100, postMessage);
+  postProgressTip(device, 'UpdateSysResourceSuccess', postMessage);
+  return true;
+};
+
+export const updateBootloader = async (
+  typedCall: TypedCall,
+  postMessage: (message: CoreMessage) => void,
+  device: Device,
+  source: ArrayBuffer
+) => {
+  postProgressTip(device, 'UpdateBootloader', postMessage);
+  postProgressMessage(device, Math.floor(0), postMessage);
+  await updateResource(typedCall, 'bootloader.bin', source);
+  postProgressMessage(device, Math.floor(100), postMessage);
+  postProgressTip(device, 'UpdateBootloaderSuccess', postMessage);
+  return true;
+};
+
+// Complex Process Functions
+const processResourceRequest = async (
+  typedCall: TypedCall,
+  res: TypedResponseMessage<'ResourceRequest'> | TypedResponseMessage<'Success'>,
+  data: ArrayBuffer
+): Promise<Success> => {
+  if (res.type === 'Success') {
+    return res.message;
+  }
+
+  const { offset, data_length } = res.message;
+
+  if (offset === undefined) {
+    throw new Error('offset is undefined');
+  }
+
+  const payload = new Uint8Array(
+    data.slice(offset, Math.min(offset + data_length, data.byteLength))
+  );
+  const digest = blake2s(payload);
+
+  const resourceAckParams = {
+    data_chunk: bytesToHex(payload),
+    hash: bytesToHex(digest),
+  };
+
+  const response = await typedCall('ResourceAck', ['ResourceRequest', 'Success'], {
+    ...resourceAckParams,
+  });
+  return processResourceRequest(typedCall, response, data);
+};
+
+/**
+ * 在bootloader模式下更新文件
+ * @param payload 文件数据
+ * @param filePath 文件路径
+ * @param manulProgress 手动进度
+ */
+const emmcCommonUpdateProcess = async (
+  device: Device,
+  {
+    payload,
+    filePath,
+    manulProgress,
+  }: PROTO.FirmwareUpload & { filePath: string; manulProgress?: number }
+) => {
   const env = DataManager.getSettings('env');
   const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;
   const chunkSize = 1024 * perPackageSize;
@@ -183,23 +282,12 @@ const newTouchUpdateProcess = async (
       offset,
       chunk,
       overwrite,
-      progress
+      manulProgress ?? progress
     );
     // @ts-expect-error
     offset += writeRes.message.processed_byte;
     postProgressMessage(device, progress, postMessage);
   }
-
-  postConfirmationMessage(device);
-  postProgressTip(device, 'ConfirmOnDevice', postMessage);
-  postProgressTip(device, 'InstallingFirmware', postMessage);
-  typedCall = device.getCommands().typedCall.bind(device.getCommands());
-  // Firmware Update
-  const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
-    path: filePath,
-    reboot_on_success: rebootOnSuccess,
-  });
-  return response;
 };
 
 const emmcFileWriteWithRetry = async (
@@ -209,7 +297,7 @@ const emmcFileWriteWithRetry = async (
   offset: number,
   chunk: ArrayBuffer,
   overwrite: boolean,
-  progress: number
+  progress: number | null
 ) => {
   const writeFunc = async () => {
     const typedCall = device.getCommands().typedCall.bind(device.getCommands());
@@ -268,93 +356,123 @@ const emmcFileWriteWithRetry = async (
   }
 };
 
-const processResourceRequest = async (
-  typedCall: TypedCall,
-  res: TypedResponseMessage<'ResourceRequest'> | TypedResponseMessage<'Success'>,
-  data: ArrayBuffer
-): Promise<Success> => {
-  if (res.type === 'Success') {
-    return res.message;
-  }
+const newTouchUpdateFirmwareProcess = async (
+  postMessage: (message: CoreMessage) => void,
+  device: Device,
+  { payload, filePath }: PROTO.FirmwareUpload & { filePath: string },
+  rebootOnSuccess = true
+) => {
+  let typedCall = device.getCommands().typedCall.bind(device.getCommands());
+  postProgressTip(device, 'StartTransferData', postMessage);
+  // Write File
+  await emmcCommonUpdateProcess(device, { payload, filePath });
 
-  const { offset, data_length } = res.message;
-
-  if (offset === undefined) {
-    throw new Error('offset is undefined');
-  }
-
-  const payload = new Uint8Array(
-    data.slice(offset, Math.min(offset + data_length, data.byteLength))
-  );
-  const digest = blake2s(payload);
-
-  const resourceAckParams = {
-    data_chunk: bytesToHex(payload),
-    hash: bytesToHex(digest),
-  };
-
-  const response = await typedCall('ResourceAck', ['ResourceRequest', 'Success'], {
-    ...resourceAckParams,
+  postConfirmationMessage(device);
+  postProgressTip(device, 'ConfirmOnDevice', postMessage);
+  postProgressTip(device, 'InstallingFirmware', postMessage);
+  typedCall = device.getCommands().typedCall.bind(device.getCommands());
+  // Firmware Update
+  const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
+    path: filePath,
+    reboot_on_success: rebootOnSuccess,
   });
-  return processResourceRequest(typedCall, response, data);
+  return response;
 };
 
-// Fixed size
-const INIT_DATA_CHUNK_SIZE = 16 * 1024;
-export const updateResource = async (typedCall: TypedCall, fileName: string, data: ArrayBuffer) => {
-  const chunk = new Uint8Array(data.slice(0, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength)));
-  const digest = blake2s(chunk);
-
-  const res = await typedCall('ResourceUpdate', ['ResourceRequest', 'Success'], {
-    file_name: fileName,
-    data_length: data.byteLength,
-    initial_data_chunk: bytesToHex(chunk),
-    hash: bytesToHex(digest),
-  });
-
-  return processResourceRequest(typedCall, res, data);
-};
-
-export const updateResources = async (
+export const updateResourcesInBootloaderMode = async (
   typedCall: TypedCall,
   postMessage: (message: CoreMessage) => void,
   device: Device,
   source: ArrayBuffer
 ) => {
-  postProgressTip(device, 'UpdateSysResource', postMessage);
-
-  const zipData = await JSZip.loadAsync(source);
-  const files = Object.entries(zipData.files);
-
-  let progress = 0;
-  const stepProgress = 100 / files.length;
-
-  for (const [fileName, file] of files) {
-    const name = fileName.split('/').pop();
-    if (!file.dir && fileName.indexOf('__MACOSX') === -1 && name) {
-      const data = await file.async('arraybuffer');
-      await updateResource(typedCall, name, data);
-    }
-
-    progress += stepProgress;
-    postProgressMessage(device, Math.floor(progress), postMessage);
+  // 更新资源需要进入bootloader模式, 然后使用emmc接口更新assets文件夹
+  const bootloaderVersion = getDeviceBootloaderVersion(device.features).join('.');
+  if (semver.lte(bootloaderVersion, '2.4.4')) {
+    throw new Error('bootloader version is too low to update resources in bootloader mode');
+  }
+  if (!device.isBootloader()) {
+    throw new Error('device is not in bootloader mode');
   }
 
-  postProgressMessage(device, 100, postMessage);
-  postProgressTip(device, 'UpdateSysResourceSuccess', postMessage);
-  return true;
+  if (device.features) {
+    postProgressTip(device, 'UpdateSysResource', postMessage);
+
+    const prepareResourceFolders = async (zipData: JSZip) => {
+      const requiredFolders: Set<string> = new Set();
+      for (const [key, value] of Object.entries(zipData.files)) {
+        if (value.dir) {
+          if (key.includes('assets')) {
+            const name = key.slice(key.indexOf('/') + 1, key.length - 1);
+            requiredFolders.add(name);
+          }
+        }
+      }
+      const folderList = Array.from(requiredFolders);
+      for (const folder of folderList) {
+        await createFolder(
+          device.getCommands().typedCall.bind(device.getCommands()),
+          `0:/${folder}`
+        );
+      }
+    };
+
+    // 添加文件
+    const uploadNewResources = async (newFiles: [string, JSZip.JSZipObject][]) => {
+      let progress = 0;
+      const stepProgress = 100 / newFiles.length;
+      postProgressTip(device, 'StartTransferData', postMessage);
+
+      const getResourcePath = (fileName: string): string => {
+        const name = fileName.slice(fileName.indexOf('/') + 1, fileName.length);
+        if (fileName.includes('assets/')) {
+          return `0:/assets/${name.split('assets/')[1]}`;
+        }
+
+        if (fileName.includes('Resource')) {
+          return `0:/res/${name.split('/').pop()}`;
+        }
+
+        return `0:/res/${name}`;
+      };
+      for (const [fileName, file] of newFiles) {
+        if (!file.dir && fileName.indexOf('__MACOSX') === -1 && fileName) {
+          const data = await file.async('arraybuffer');
+          const path = getResourcePath(fileName);
+          await emmcCommonUpdateProcess(device, {
+            payload: data,
+            filePath: path,
+            manulProgress: Math.floor(progress),
+          });
+        }
+        progress += stepProgress;
+        postProgressMessage(device, Math.floor(progress), postMessage);
+      }
+    };
+
+    const zipData = await JSZip.loadAsync(source);
+
+    await device.acquire();
+    await prepareResourceFolders(zipData);
+
+    const newFiles: [string, JSZip.JSZipObject][] = Object.entries(zipData.files);
+    await uploadNewResources(newFiles);
+
+    postProgressMessage(device, 100, postMessage);
+    postProgressTip(device, 'UpdateSysResourceSuccess', postMessage);
+    return true;
+  }
 };
 
-export const updateBootloader = async (
+// TODO: 后续再加入在bootloader中更新firmware, res, bootlaoder
+export const updateBootloaderInBootloaderMode = async (
   typedCall: TypedCall,
-  postMessage: (message: CoreMessage) => void,
   device: Device,
   source: ArrayBuffer
 ) => {
-  postProgressTip(device, 'UpdateBootloader', postMessage);
-  postProgressMessage(device, Math.floor(0), postMessage);
-  await updateResource(typedCall, 'bootloader.bin', source);
-  postProgressMessage(device, Math.floor(100), postMessage);
-  postProgressTip(device, 'UpdateBootloaderSuccess', postMessage);
+  await emmcCommonUpdateProcess(device, {
+    payload: source,
+    filePath: '0:boot/bootloader.bin',
+  });
+  await rebootDevice(typedCall, REBOOT_TYPE.REBOOT_BOOTLOADER);
   return true;
 };

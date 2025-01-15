@@ -172,7 +172,10 @@ export const getFirmwareUpdateField = ({
     return 'firmware-v5';
   }
   if (deviceType === 'pro') {
-    return 'firmware-v5';
+    if (targetVersion) {
+      if (semver.lte(targetVersion, '4.12.0')) return 'firmware-v5';
+      if (semver.gt(targetVersion, '4.12.0')) return 'firmware-v6';
+    }
   }
   return 'firmware';
 };
