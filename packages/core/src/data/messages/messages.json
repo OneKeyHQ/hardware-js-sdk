@@ -10955,6 +10955,27 @@
         "jetton_amount_bytes": {
           "type": "bytes",
           "id": 21
+        },
+        "init_data_initial_chunk": {
+          "type": "bytes",
+          "id": 22
+        },
+        "init_data_length": {
+          "type": "uint32",
+          "id": 23
+        },
+        "signing_message_repr": {
+          "type": "bytes",
+          "id": 24
+        }
+      }
+    },
+    "TonTxAck": {
+      "fields": {
+        "init_data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -10967,6 +10988,10 @@
         "signning_message": {
           "type": "bytes",
           "id": 2
+        },
+        "init_data_length": {
+          "type": "uint32",
+          "id": 3
         }
       }
     },
@@ -11893,6 +11918,7 @@
         "MessageType_TonSignedMessage": 11904,
         "MessageType_TonSignProof": 11905,
         "MessageType_TonSignedProof": 11906,
+        "MessageType_TonTxAck": 11907,
         "MessageType_ScdoGetAddress": 12001,
         "MessageType_ScdoAddress": 12002,
         "MessageType_ScdoSignTx": 12003,
