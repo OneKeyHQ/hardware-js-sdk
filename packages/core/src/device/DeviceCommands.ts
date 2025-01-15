@@ -170,6 +170,7 @@ export class DeviceCommands {
           if (error.message.indexOf('BridgeDeviceDisconnected') > -1) {
             throw ERRORS.TypedError(HardwareErrorCode.BridgeDeviceDisconnected);
           }
+          throw ERRORS.TypedError(HardwareErrorCode.ResponseUnexpectTypeError);
         }
       } else {
         // throw error anyway, next call should be resolved properly// throw error anyway, next call should be resolved properly
