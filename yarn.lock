@@ -37,36 +37,6 @@
     path-browserify "^1.0.1"
     stream-browserify "^3.0.0"
 
-"@alephium/web3-wallet@^1.5.2":
-  version "1.5.2"
-  resolved "https://registry.yarnpkg.com/@alephium/web3-wallet/-/web3-wallet-1.5.2.tgz#d8111a5111623a85b2b3ac5280ce95756dee77bb"
-  integrity sha512-BIGmV1nfvj3/HH33/4YeYKDvNNboXkp2//wMFibhfXXCphRgRS/ghAmMRod35uBPb7LCHVjQOen4LGDNcgVyTQ==
-  dependencies:
-    "@alephium/web3" "^1.5.2"
-    "@noble/secp256k1" "1.7.1"
-    "@types/node" "^16.18.23"
-    bip32 "3.1.0"
-    bip39 "3.0.4"
-    elliptic "6.5.4"
-    fs-extra "10.0.1"
-
-"@alephium/web3@^1.5.2":
-  version "1.5.2"
-  resolved "https://registry.yarnpkg.com/@alephium/web3/-/web3-1.5.2.tgz#d311005b0773146f4db46a0f98edb28975462702"
-  integrity sha512-H5fzL64F4uw7BshR+MfBXa118vTGgESA0rkc5PS93Ign4O0rvUx4CMt6Uy+E7Fqk2+oaZViMiB5rueM9DECwtw==
-  dependencies:
-    "@noble/secp256k1" "1.7.1"
-    base-x "4.0.0"
-    bignumber.js "^9.1.1"
-    blakejs "1.2.1"
-    bn.js "5.2.1"
-    cross-fetch "^3.1.5"
-    crypto-browserify "^3.12.0"
-    elliptic "6.5.4"
-    eventemitter3 "^4.0.7"
-    path-browserify "^1.0.1"
-    stream-browserify "^3.0.0"
-
 "@ampproject/remapping@^2.2.0":
   version "2.2.1"
   resolved "https://registry.yarnpkg.com/@ampproject/remapping/-/remapping-2.2.1.tgz#99e8e11851128b8702cd57c33684f1d0f260b630"
@@ -6505,6 +6475,18 @@
     "@typescript-eslint/types" "5.62.0"
     eslint-visitor-keys "^3.3.0"
 
+"@uiw/react-watermark@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@uiw/react-watermark/-/react-watermark-1.0.1.tgz#9efb86e7d1cbca1b648990c99f54c60c9da1ee7d"
+  integrity sha512-vgredbDTD0YUjLICXiAFEt7z+lmBGAos+iApedsBdEBkkTxxINCsA3cNYKGJTohMOfa4kFQ/+RR7ygVSsisnfw==
+  dependencies:
+    "@uiw/watermark.js" "1.0.1"
+
+"@uiw/watermark.js@1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@uiw/watermark.js/-/watermark.js-1.0.1.tgz#8815ef7c74692ea6a1aafd697756ade84206d1e9"
+  integrity sha512-ymn0LPfp9f4UhMIFonSEHtRnuF32OCLieQs3dQu0gJpXXqz4bnAdMU4Gx+qLr2oWdS6l3IMrDQLEYAhDytxLuA==
+
 "@unimodules/core@*":
   version "7.1.2"
   resolved "https://registry.yarnpkg.com/@unimodules/core/-/core-7.1.2.tgz#5181b99586476a5d87afd0958f26a04714c47fa1"
@@ -7651,11 +7633,6 @@ bignumber.js@^9.0.2:
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/bignumber.js/-/bignumber.js-9.0.2.tgz#71c6c6bed38de64e24a65ebe16cfcf23ae693673"
   integrity sha512-GAcQvbpsM0pUb0zw1EI0KhQEZ+lRwR5fYaAp3vPOYuP7aDvGy6cVN6XHLauvF8SOga2y0dcLcjt3iQDTSEliyw==
-
-bignumber.js@^9.1.1:
-  version "9.1.2"
-  resolved "https://registry.yarnpkg.com/bignumber.js/-/bignumber.js-9.1.2.tgz#b7c4242259c008903b13707983b5f4bbd31eda0c"
-  integrity sha512-2/mKyZH9K85bzOEfhXDBFZTGd1CTs+5IHpeFQo9luiBG7hghdC851Pj2WAhb6E3R6b9tZj/XKhbg4fum+Kepug==
 
 binary-extensions@^2.0.0:
   version "2.2.0"
