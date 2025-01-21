@@ -9,6 +9,9 @@ import { DevicePool } from '../../device/DevicePool';
 import { type KnownDevice, DeviceModelToTypes, Features, IVersionArray } from '../../types';
 import type { TypedCall } from '../../device/DeviceCommands';
 
+// Constants
+export const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
+
 // Reboot constants
 export const REBOOT_TYPE = {
   REBOOT_NORMAL: 0,

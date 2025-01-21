@@ -18,10 +18,13 @@ import { DeviceModelToTypes, KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
 import { DataManager } from '../../data-manager';
 import { DevicePool } from '../../device/DevicePool';
-import { rebootDevice, createFolder, REBOOT_TYPE } from './bootloaderHelper';
+import {
+  rebootDevice,
+  createFolder,
+  REBOOT_TYPE,
+  NEW_BOOT_UPRATE_FIRMWARE_VERSION,
+} from './bootloaderHelper';
 
-// Constants
-const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
 const INIT_DATA_CHUNK_SIZE = 16 * 1024;
 const Log = getLogger(LoggerNames.Core);
@@ -380,14 +383,13 @@ const newTouchUpdateFirmwareProcess = async (
 };
 
 export const updateResourcesInBootloaderMode = async (
-  typedCall: TypedCall,
   postMessage: (message: CoreMessage) => void,
   device: Device,
   source: ArrayBuffer
 ) => {
   // 更新资源需要进入bootloader模式, 然后使用emmc接口更新assets文件夹
   const bootloaderVersion = getDeviceBootloaderVersion(device.features).join('.');
-  if (semver.lte(bootloaderVersion, '2.4.4')) {
+  if (semver.lt(bootloaderVersion, NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
     throw new Error('bootloader version is too low to update resources in bootloader mode');
   }
   if (!device.isBootloader()) {

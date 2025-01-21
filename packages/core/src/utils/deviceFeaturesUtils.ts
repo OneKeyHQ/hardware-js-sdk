@@ -9,7 +9,8 @@ import DataManager, { FirmwareField, MessageVersion } from '../data-manager/Data
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
-import { getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { getDeviceBootloaderVersion, getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { NEW_BOOT_UPRATE_FIRMWARE_VERSION } from '../api/firmware/bootloaderHelper';
 
 export const getSupportMessageVersion = (
   features: Features | undefined
@@ -172,10 +173,10 @@ export const getFirmwareUpdateField = ({
     return 'firmware-v5';
   }
   if (deviceType === 'pro') {
-    if (targetVersion) {
-      if (semver.lte(targetVersion, '4.12.0')) return 'firmware-v5';
-      if (semver.gt(targetVersion, '4.12.0')) return 'firmware-v6';
-    }
+    // emmc need bootloader version >= 2.4.4
+    const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+    if (semver.gte(bootloaderVersion, NEW_BOOT_UPRATE_FIRMWARE_VERSION)) return 'firmware-v6';
+    return 'firmware-v5';
   }
   return 'firmware';
 };

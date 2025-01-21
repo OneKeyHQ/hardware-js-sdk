@@ -8,7 +8,12 @@ import { getDeviceType, getDeviceFirmwareVersion } from '../../utils';
 import { createUiMessage } from '../../events/ui-request';
 import type { KnownDevice, Features } from '../../types';
 import { DataManager } from '../../data-manager';
-import { enterBootloaderMode, REBOOT_TYPE, rebootDevice } from '../firmware/bootloaderHelper';
+import {
+  enterBootloaderMode,
+  NEW_BOOT_UPRATE_FIRMWARE_VERSION,
+  REBOOT_TYPE,
+  rebootDevice,
+} from '../firmware/bootloaderHelper';
 
 export default class DeviceFullyUploadResource extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
@@ -62,14 +67,9 @@ export default class DeviceFullyUploadResource extends BaseMethod {
         }
         const bootloaderVersion = getDeviceFirmwareVersion(features);
         // 2.4.4版本之后才支持emmcFileWrite
-        if (semver.gte(bootloaderVersion.join('.'), '2.4.4')) {
+        if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
           await enterBootloaderMode(device, this.postMessage, this.connectId);
-          await updateResourcesInBootloaderMode(
-            this.device.getCommands().typedCall.bind(this.device.getCommands()),
-            this.postMessage,
-            device,
-            binary
-          );
+          await updateResourcesInBootloaderMode(this.postMessage, device, binary);
           await rebootDevice(
             this.device.getCommands().typedCall.bind(this.device.getCommands()),
             REBOOT_TYPE.REBOOT_NORMAL
