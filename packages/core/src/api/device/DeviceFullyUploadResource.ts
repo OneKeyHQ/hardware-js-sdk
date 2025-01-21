@@ -2,18 +2,15 @@ import { Deferred } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
-import { getSysResourceBinary } from '../firmware/getBinary';
-import { updateResources, updateResourcesInBootloaderMode } from '../firmware/uploadFirmware';
+import { getSysResourceBinary } from '../firmware/utils/getBinary';
+import { updateResources, updateResourcesInBootloaderMode } from '../firmware/uploadResource';
 import { getDeviceType, getDeviceFirmwareVersion } from '../../utils';
 import { createUiMessage } from '../../events/ui-request';
 import type { KnownDevice, Features } from '../../types';
 import { DataManager } from '../../data-manager';
-import {
-  enterBootloaderMode,
-  NEW_BOOT_UPRATE_FIRMWARE_VERSION,
-  REBOOT_TYPE,
-  rebootDevice,
-} from '../firmware/bootloaderHelper';
+import { enterBootloaderMode } from '../firmware/utils/bootloaderHelper';
+import { REBOOT_TYPE, NEW_BOOT_UPRATE_FIRMWARE_VERSION } from '../firmware/utils/const';
+import { rebootDevice } from '../firmware/utils/typedCallHelper';
 
 export default class DeviceFullyUploadResource extends BaseMethod {
   checkPromise: Deferred<any> | null = null;

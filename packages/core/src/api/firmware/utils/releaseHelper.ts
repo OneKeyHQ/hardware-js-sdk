@@ -1,10 +1,10 @@
-import { DataManager } from '../../data-manager';
-import { DeviceModelToTypes, type Features } from '../../types';
+import { DataManager } from '../../../data-manager';
+import { DeviceModelToTypes, type Features } from '../../../types';
 import {
   checkNeedUpdateBootForClassicAndMini,
   checkNeedUpdateBootForTouch,
   getDeviceType,
-} from '../../utils';
+} from '../../../utils';
 
 export const getFirmwareReleaseInfo = (features: Features) => {
   const firmwareStatus = DataManager.getFirmwareStatus(features);

@@ -1,7 +1,7 @@
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
 
-import { getFirmwareReleaseInfo } from './firmware/releaseHelper';
+import { getFirmwareReleaseInfo } from './firmware/utils/releaseHelper';
 
 export default class CheckFirmwareRelease extends BaseMethod {
   init() {

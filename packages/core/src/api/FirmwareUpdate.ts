@@ -8,12 +8,12 @@ import {
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
-import { getBinary } from './firmware/getBinary';
+import { getBinary } from './firmware/utils/getBinary';
 import { uploadFirmware } from './firmware/uploadFirmware';
 import { createUiMessage } from '../events';
 import { type KnownDevice, DeviceModelToTypes } from '../types';
 
-import { isEnteredManuallyBoot } from './firmware/bootloaderHelper';
+import { isEnteredManuallyBoot } from './firmware/utils/bootloaderHelper';
 
 import { LoggerNames, getDeviceType, getDeviceUUID, getLogger, wait } from '../utils';
 import { DataManager } from '../data-manager';

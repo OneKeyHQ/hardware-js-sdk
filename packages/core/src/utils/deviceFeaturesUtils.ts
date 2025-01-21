@@ -10,7 +10,7 @@ import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceBootloaderVersion, getDeviceFirmwareVersion } from './deviceVersionUtils';
-import { NEW_BOOT_UPRATE_FIRMWARE_VERSION } from '../api/firmware/bootloaderHelper';
+import { NEW_BOOT_UPRATE_FIRMWARE_VERSION } from '../api/firmware/utils/const';
 
 export const getSupportMessageVersion = (
   features: Features | undefined

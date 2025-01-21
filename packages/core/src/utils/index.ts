@@ -22,7 +22,7 @@ export { getFirmwareUpdateField, supportInputPinOnSoftware } from './deviceFeatu
 export {
   checkNeedUpdateBootForTouch,
   checkNeedUpdateBootForClassicAndMini,
-} from '../api/firmware/updateBootloader';
+} from '../api/firmware/utils/bootloaderHelper';
 
 export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pathUtils';
 

@@ -1,12 +1,12 @@
 import { Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
-import { getSysResourceBinary } from '../firmware/getBinary';
-import { updateBootloader } from '../firmware/uploadFirmware';
+import { getSysResourceBinary } from '../firmware/utils/getBinary';
+import { updateBootloader } from '../firmware/uploadBootloader';
 import { createUiMessage } from '../../events/ui-request';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
-import { checkBootloaderLength } from '../firmware/updateBootloader';
+import { checkBootloaderLength } from '../firmware/utils/bootloaderHelper';
 import { getDeviceType } from '../../utils';
 
 import type { Device } from '../../device/Device';

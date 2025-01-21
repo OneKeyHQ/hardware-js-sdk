@@ -1,24 +1,35 @@
 import semver from 'semver';
 
 import { createDeferred, ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { getDeviceType, getDeviceUUID, wait } from '../../utils';
-import { CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
-import type { Device } from '../../device/Device';
-import { DataManager } from '../../data-manager';
-import { DevicePool } from '../../device/DevicePool';
-import { type KnownDevice, DeviceModelToTypes, Features, IVersionArray } from '../../types';
-import type { TypedCall } from '../../device/DeviceCommands';
+import ByteBuffer from 'bytebuffer';
+import {
+  getDeviceBootloaderVersion,
+  getDeviceFirmwareVersion,
+  getDeviceType,
+  getDeviceUUID,
+  wait,
+} from '../../../utils';
+import { CoreMessage, createUiMessage, UI_REQUEST } from '../../../events';
+import type { Device } from '../../../device/Device';
+import { DataManager } from '../../../data-manager';
+import { DevicePool } from '../../../device/DevicePool';
+import { type KnownDevice, DeviceModelToTypes, Features, IVersionArray } from '../../../types';
+import { INIT_DATA_CHUNK_SIZE } from './const';
 
-// Constants
-export const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
-
-// Reboot constants
-export const REBOOT_TYPE = {
-  REBOOT_NORMAL: 0,
-  REBOOT_BOARDLOADER: 1,
-  REBOOT_BOOTLOADER: 2,
-};
-
+function postTipMessage(
+  device: Device,
+  postMessage: (message: CoreMessage) => void,
+  message: string
+) {
+  postMessage(
+    createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
+      device: device.toMessageObject() as KnownDevice,
+      data: {
+        message,
+      },
+    })
+  );
+}
 async function checkDeviceToBootloader(device: any, connectId?: string) {
   const checkPromise = createDeferred();
   const env = DataManager.getSettings('env');
@@ -57,21 +68,6 @@ async function checkDeviceToBootloader(device: any, connectId?: string) {
     }
   }, 30000);
   return checkPromise.promise;
-}
-
-function postTipMessage(
-  device: Device,
-  postMessage: (message: CoreMessage) => void,
-  message: string
-) {
-  postMessage(
-    createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
-      device: device.toMessageObject() as KnownDevice,
-      data: {
-        message,
-      },
-    })
-  );
 }
 
 export async function enterBootloaderMode(
@@ -159,24 +155,66 @@ export function isEnteredManuallyBoot(features: Features, updateType: string) {
   return isMini || isBoot183ClassicUpBle;
 }
 
-export const rebootDevice = async (typedCall: TypedCall, rebootType: number) => {
-  // rebootDevice 会包默认会报错：失联。
-  try {
-    await typedCall('Reboot', 'Success', {
-      reboot_type: rebootType,
-    });
-  } catch (e) {
-    console.log('rebootDevice', e);
+export function checkNeedUpdateBootForTouch(features: Features) {
+  const deviceType = getDeviceType(features);
+  if (!DeviceModelToTypes.model_touch.includes(deviceType)) return false;
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+  const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+  const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features);
+  if (!targetBootloaderVersion) return false;
+
+  return (
+    // support ResourceUpdate version 3.2.0
+    semver.gte(currentVersion, '3.2.0') &&
+    // support update bootloader version 4.1.0
+    semver.gte(currentVersion, '4.1.0') &&
+    // target bootloader version
+    semver.lte(bootloaderVersion, targetBootloaderVersion.join('.'))
+  );
+}
+
+export function checkNeedUpdateBootForClassicAndMini(
+  features: Features,
+  willUpdateFirmware?: string
+) {
+  const deviceType = getDeviceType(features);
+  if (!DeviceModelToTypes.model_mini.includes(deviceType)) return false;
+  if (!willUpdateFirmware) return false;
+  const currentVersion = getDeviceFirmwareVersion(features).join('.');
+  const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+  const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features);
+  if (targetBootloaderVersion && semver.gte(bootloaderVersion, targetBootloaderVersion.join('.'))) {
+    return false;
   }
-};
 
-export const createFolder = async (typedCall: TypedCall, path: string) => {
-  await typedCall('EmmcDirMake', 'Success', {
-    path,
-  });
-};
+  const bootloaderRelatedFirmwareVersion =
+    DataManager.getBootloaderRelatedFirmwareVersion(features);
+  if (!bootloaderRelatedFirmwareVersion) return false;
 
-export const getFolderDir = async (typedCall: TypedCall, path: string) =>
-  typedCall('EmmcDirList', 'EmmcDir', {
-    path,
+  return shouldUpdateBootloaderForClassicAndMini({
+    currentVersion,
+    bootloaderVersion,
+    willUpdateFirmware,
+    targetBootloaderVersion,
+    bootloaderRelatedFirmwareVersion,
   });
+}
+
+export function checkBootloaderLength(data: ArrayBuffer) {
+  const chunk = new Uint8Array(data.slice(0, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength)));
+  const buffer = ByteBuffer.wrap(chunk, undefined, undefined, true);
+  buffer.LE();
+  // byte 'O', 'K', 'T', 'B'
+  buffer.readByte();
+  buffer.readByte();
+  buffer.readByte();
+  buffer.readByte();
+  // g_header_end - g_header
+  const hdrlen = buffer.readUint32();
+  // word 0
+  buffer.readUint32();
+  // codelen
+  const codelen = buffer.readUint32();
+  const bootloaderLength = hdrlen + codelen;
+  return bootloaderLength === data.byteLength;
+}

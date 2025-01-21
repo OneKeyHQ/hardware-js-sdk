@@ -5,7 +5,7 @@ import { Device } from '../device/Device';
 import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange, KnownDevice } from '../types';
 import { CoreMessage, createFirmwareMessage, createUiMessage, DEVICE, FIRMWARE } from '../events';
-import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
+import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/utils/releaseHelper';
 import { getLogger, LoggerNames } from '../utils';
 
 const Log = getLogger(LoggerNames.Method);

@@ -1,11 +1,11 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Features } from '../../types';
-import { getDeviceType, httpRequest } from '../../utils';
-import { DataManager } from '../../data-manager';
-import { findLatestRelease } from '../../utils/release';
-import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
-import { FirmwareField } from '../../data-manager/DataManager';
+import { Features } from '../../../types';
+import { getDeviceType, httpRequest } from '../../../utils';
+import { DataManager } from '../../../data-manager';
+import { findLatestRelease } from '../../../utils/release';
+import { getFirmwareUpdateField } from '../../../utils/deviceFeaturesUtils';
+import { FirmwareField } from '../../../data-manager/DataManager';
 
 export interface GetInfoProps {
   features: Features;

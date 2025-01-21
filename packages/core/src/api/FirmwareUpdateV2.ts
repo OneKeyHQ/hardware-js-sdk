@@ -10,8 +10,9 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
-import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
-import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
+import { getBinary, getInfo, getSysResourceBinary } from './firmware/utils/getBinary';
+import { uploadFirmware } from './firmware/uploadFirmware';
+import { updateResources } from './firmware/uploadResource';
 import {
   getDeviceType,
   getDeviceUUID,

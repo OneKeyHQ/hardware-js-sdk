@@ -4,12 +4,13 @@ import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
-import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
+import { getBinary, getInfo, getSysResourceBinary } from './firmware/utils/getBinary';
 import { updateResourcesInBootloaderMode, uploadFirmware } from './firmware/uploadFirmware';
 import { getDeviceType, getDeviceFirmwareVersion, getDeviceBootloaderVersion } from '../utils';
 import { createUiMessage } from '../events/ui-request';
 import { DataManager } from '../data-manager';
-import { enterBootloaderMode, NEW_BOOT_UPRATE_FIRMWARE_VERSION } from './firmware/bootloaderHelper';
+import { enterBootloaderMode } from './firmware/utils/bootloaderHelper';
+import { NEW_BOOT_UPRATE_FIRMWARE_VERSION } from './firmware/utils/const';
 
 import type { KnownDevice, Features } from '../types';
 
