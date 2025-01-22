@@ -43,10 +43,7 @@ export const updateResourcesInBootloaderMode = async (
       }
       const folderList = Array.from(requiredFolders);
       for (const folder of folderList) {
-        await createFolder(
-          device.getCommands().typedCall.bind(device.getCommands()),
-          `0:/${folder}`
-        );
+        await createFolder(device, `0:/${folder}`);
       }
     };
 
@@ -72,11 +69,15 @@ export const updateResourcesInBootloaderMode = async (
         if (!file.dir && fileName.indexOf('__MACOSX') === -1 && fileName) {
           const data = await file.async('arraybuffer');
           const path = getResourcePath(fileName);
-          await emmcCommonUpdateProcess(device, {
-            payload: data,
-            filePath: path,
-            manulProgress: Math.floor(progress),
-          });
+          await emmcCommonUpdateProcess(
+            device,
+            {
+              payload: data,
+              filePath: path,
+              manulProgress: Math.floor(progress),
+            },
+            postMessage
+          );
         }
         progress += stepProgress;
         postProgressMessage(device, Math.floor(progress), postMessage);

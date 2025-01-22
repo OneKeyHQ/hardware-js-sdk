@@ -5,7 +5,7 @@ import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/utils/getBinary';
-import { updateResourcesInBootloaderMode, uploadFirmware } from './firmware/uploadFirmware';
+import { uploadFirmware } from './firmware/uploadFirmware';
 import { getDeviceType, getDeviceFirmwareVersion, getDeviceBootloaderVersion } from '../utils';
 import { createUiMessage } from '../events/ui-request';
 import { DataManager } from '../data-manager';
@@ -13,6 +13,7 @@ import { enterBootloaderMode } from './firmware/utils/bootloaderHelper';
 import { NEW_BOOT_UPRATE_FIRMWARE_VERSION } from './firmware/utils/const';
 
 import type { KnownDevice, Features } from '../types';
+import { updateResourcesInBootloaderMode } from './firmware/uploadResource';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -144,36 +145,12 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
     this.checkVersionForCopyTouchResource(features);
 
-    if (!features?.bootloader_mode && features) {
-      // Check if manual boot is required
-      if (this.isEnteredManuallyBoot(features)) {
-        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
-      }
-
-      // Enter bootloader mode
-      await enterBootloaderMode(this.device, this.postMessage, this.payload.connectId);
-    }
-
-    // Handle resource updates if needed
-    // Only support resource update with touch and pro device
-    if (features && this.isSupportResourceUpdate(features, params.updateType)) {
-      this.postTipMessage('CheckLatestUiResource');
-      const resourceUrl = DataManager.getSysResourcesLatestRelease(
-        features,
-        params.forcedUpdateRes
-      );
-      if (resourceUrl) {
-        this.postTipMessage('DownloadLatestUiResource');
-        const resource = await getSysResourceBinary(resourceUrl);
-        this.postTipMessage('DownloadLatestUiResourceSuccess');
-        if (resource) {
-          await updateResourcesInBootloaderMode(this.postMessage, device, resource.binary);
-        }
-      }
-    }
-
+    // firmware
     let binary;
+    // png, font ... resource
+    let resource;
 
+    // download firmware
     try {
       if (params.binary) {
         binary = this.params.binary;
@@ -198,7 +175,38 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
+    // download resource
+    if (features && this.isSupportResourceUpdate(features, params.updateType)) {
+      this.postTipMessage('CheckLatestUiResource');
+      const resourceUrl = DataManager.getSysResourcesLatestRelease(
+        features,
+        params.forcedUpdateRes
+      );
+      if (resourceUrl) {
+        this.postTipMessage('DownloadLatestUiResource');
+        resource = await getSysResourceBinary(resourceUrl);
+        this.postTipMessage('DownloadLatestUiResourceSuccess');
+      }
+    }
+
+    // enter bootloader mode
+    if (!features?.bootloader_mode && features) {
+      // Check if manual boot is required
+      if (this.isEnteredManuallyBoot(features)) {
+        return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
+      }
+      // Enter bootloader mode
+      await enterBootloaderMode(this.device, this.postMessage, this.payload.connectId);
+    }
+
     await this.device.acquire();
+
+    // Handle resource updates if needed
+    // Only support resource update with touch and pro device
+    // update resource
+    if (resource) {
+      await updateResourcesInBootloaderMode(this.postMessage, device, resource.binary);
+    }
 
     const response = await uploadFirmware(
       params.updateType,

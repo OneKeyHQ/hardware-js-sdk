@@ -67,10 +67,7 @@ export default class DeviceFullyUploadResource extends BaseMethod {
         if (semver.gte(bootloaderVersion.join('.'), NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
           await enterBootloaderMode(device, this.postMessage, this.connectId);
           await updateResourcesInBootloaderMode(this.postMessage, device, binary);
-          await rebootDevice(
-            this.device.getCommands().typedCall.bind(this.device.getCommands()),
-            REBOOT_TYPE.REBOOT_NORMAL
-          );
+          await rebootDevice(device, REBOOT_TYPE.REBOOT_NORMAL);
         } else {
           await updateResources(
             this.device.getCommands().typedCall.bind(this.device.getCommands()),

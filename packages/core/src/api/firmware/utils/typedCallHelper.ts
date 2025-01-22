@@ -9,14 +9,15 @@ import { DevicePool } from '../../../device/DevicePool';
 import type { TypedCall, TypedResponseMessage } from '../../../device/DeviceCommands';
 import { PROTO } from '../../../constants';
 import { wait, LoggerNames, getLogger } from '../../../utils';
+import type { CoreMessage } from '../../../events';
 
 const SESSION_ERROR = 'session not found';
 const Log = getLogger(LoggerNames.Core);
 
-export const rebootDevice = async (typedCall: TypedCall, rebootType: number) => {
+export const rebootDevice = async (device: Device, rebootType: number) => {
   // rebootDevice 会包默认会报错：失联。
   try {
-    await typedCall('Reboot', 'Success', {
+    await device.getCommands().typedCall('Reboot', 'Success', {
       reboot_type: rebootType,
     });
   } catch (e) {
@@ -24,16 +25,17 @@ export const rebootDevice = async (typedCall: TypedCall, rebootType: number) => 
   }
 };
 
-export const createFolder = async (typedCall: TypedCall, path: string) => {
-  await typedCall('EmmcDirMake', 'Success', {
+export const createFolder = async (device: Device, path: string) => {
+  await device.getCommands().typedCall('EmmcDirMake', 'Success', {
     path,
   });
 };
 
-export const getFolderDir = async (typedCall: TypedCall, path: string) =>
-  typedCall('EmmcDirList', 'EmmcDir', {
+export const getFolderDir = async (device: Device, path: string) => {
+  await device.getCommands().typedCall('EmmcDirList', 'EmmcDir', {
     path,
   });
+};
 
 // Complex Process Functions
 export const processResourceRequest = async (
@@ -79,7 +81,8 @@ export const emmcCommonUpdateProcess = async (
     payload,
     filePath,
     manulProgress,
-  }: PROTO.FirmwareUpload & { filePath: string; manulProgress?: number }
+  }: PROTO.FirmwareUpload & { filePath: string; manulProgress?: number },
+  postMessage: (message: CoreMessage) => void
 ) => {
   const env = DataManager.getSettings('env');
   const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;
