@@ -12,6 +12,7 @@ import { wait, LoggerNames, getLogger } from '../../../utils';
 
 const SESSION_ERROR = 'session not found';
 const Log = getLogger(LoggerNames.Core);
+
 export const rebootDevice = async (typedCall: TypedCall, rebootType: number) => {
   // rebootDevice 会包默认会报错：失联。
   try {
