@@ -48,6 +48,6 @@ export const updateBootloaderInBootloaderMode = async (
     },
     postMessage
   );
-  await rebootDevice(device, REBOOT_TYPE.REBOOT_BOOTLOADER);
+  await rebootDevice(device, REBOOT_TYPE.REBOOT_NORMAL);
   return true;
 };

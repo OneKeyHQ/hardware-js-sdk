@@ -18,7 +18,11 @@ export {
   getDeviceFirmwareVersion,
   getDeviceBLEFirmwareVersion,
 } from './deviceVersionUtils';
-export { getFirmwareUpdateField, supportInputPinOnSoftware } from './deviceFeaturesUtils';
+export {
+  getFirmwareUpdateField,
+  supportInputPinOnSoftware,
+  getFirmwareUpdateFieldArray,
+} from './deviceFeaturesUtils';
 export {
   checkNeedUpdateBootForTouch,
   checkNeedUpdateBootForClassicAndMini,
