@@ -51,8 +51,6 @@ export const updateResourcesInBootloaderMode = async (
     const uploadNewResources = async (newFiles: [string, JSZip.JSZipObject][]) => {
       let progress = 0;
       const stepProgress = 100 / newFiles.length;
-      postProgressTip(device, 'StartTransferData', postMessage);
-
       const getResourcePath = (fileName: string): string => {
         const name = fileName.slice(fileName.indexOf('/') + 1, fileName.length);
         if (fileName.includes('assets/')) {
@@ -65,22 +63,34 @@ export const updateResourcesInBootloaderMode = async (
 
         return `0:/res/${name}`;
       };
+
+      let validFileCount = 0;
+      // 先计算有效文件数量
+      for (const [fileName, file] of newFiles) {
+        if (!file.dir && fileName.indexOf('__MACOSX') === -1 && fileName) {
+          validFileCount++;
+        }
+      }
+
+      let processedCount = 0;
       for (const [fileName, file] of newFiles) {
         if (!file.dir && fileName.indexOf('__MACOSX') === -1 && fileName) {
           const data = await file.async('arraybuffer');
           const path = getResourcePath(fileName);
+          processedCount++;
+
           await emmcCommonUpdateProcess(
             device,
             {
               payload: data,
               filePath: path,
-              manulProgress: Math.floor(progress),
+              manulProgress: processedCount === validFileCount ? 100 : Math.floor(progress),
             },
             postMessage
           );
         }
         progress += stepProgress;
-        postProgressMessage(device, Math.floor(progress), postMessage);
+        // postProgressMessage(device, Math.floor(progress), postMessage);
       }
     };
 

@@ -107,7 +107,7 @@ export const emmcCommonUpdateProcess = async (
     );
     // @ts-expect-error
     offset += writeRes.message.processed_byte;
-    postProgressMessage(device, progress, postMessage);
+    postProgressMessage(device, manulProgress ?? progress, postMessage);
   }
 };
 

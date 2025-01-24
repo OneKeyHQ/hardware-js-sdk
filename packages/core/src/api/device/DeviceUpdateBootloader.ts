@@ -46,6 +46,8 @@ export default class DeviceUpdateBootloader extends BaseMethod {
           if (resource) {
             binary = resource.binary;
           }
+        } else {
+          throw new Error(`Could not found bootloader resource`);
         }
       }
 

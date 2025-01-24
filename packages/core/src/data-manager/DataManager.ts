@@ -129,7 +129,7 @@ export default class DataManager {
 
   static getBootloaderResource = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === 'unknown') throw new Error('Device type is unknown');
 
     if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
@@ -137,6 +137,11 @@ export default class DataManager {
       updateType: 'firmware',
     }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
+    if (targetDeviceConfigList.length === 0) {
+      throw new Error(
+        `Could not found bootloader resource with deviceType:${deviceType} firmwareUpdateField:${firmwareUpdateField}`
+      );
+    }
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
     return findLatestRelease(targetDeviceConfig)?.bootloaderResource;

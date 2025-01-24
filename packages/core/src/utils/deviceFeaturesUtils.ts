@@ -13,7 +13,7 @@ import { getDeviceBootloaderVersion, getDeviceFirmwareVersion } from './deviceVe
 import { NEW_BOOT_UPRATE_FIRMWARE_VERSION } from '../api/firmware/utils/const';
 
 export const getSupportMessageVersion = (
-  features: Features | undefined
+  features: Features | undefined,
 ): { messages: JSON; messageVersion: MessageVersion } => {
   if (!features)
     return {
@@ -98,7 +98,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) =>
 
 export const getPassphraseState = async (
   features: Features | undefined,
-  commands: DeviceCommands
+  commands: DeviceCommands,
 ) => {
   if (!features) return false;
   const { message, type } = await commands.typedCall('GetAddress', 'Address', {
@@ -174,8 +174,8 @@ export const getFirmwareUpdateField = ({
   }
   if (deviceType === 'pro') {
     // emmc need bootloader version >= 2.4.4
-    const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
-    if (semver.gte(bootloaderVersion, NEW_BOOT_UPRATE_FIRMWARE_VERSION)) return 'firmware-v6';
+    // const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+    // if (semver.gte(bootloaderVersion, NEW_BOOT_UPRATE_FIRMWARE_VERSION)) return 'firmware-v6';
     return 'firmware-v5';
   }
   return 'firmware';
@@ -185,7 +185,7 @@ export const getFirmwareUpdateField = ({
  */
 export const getFirmwareUpdateFieldArray = (
   features: Features,
-  updateType: 'firmware' | 'ble' | 'bootloader'
+  updateType: 'firmware' | 'ble' | 'bootloader',
 ): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v5')[] => {
   const deviceType = getDeviceType(features);
   if (updateType === 'ble') {

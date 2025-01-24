@@ -201,6 +201,9 @@ export function checkNeedUpdateBootForClassicAndMini(
 }
 
 export function checkBootloaderLength(data: ArrayBuffer) {
+  if (!data) {
+    throw new Error('bootloader data is null');
+  }
   const chunk = new Uint8Array(data.slice(0, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength)));
   const buffer = ByteBuffer.wrap(chunk, undefined, undefined, true);
   buffer.LE();

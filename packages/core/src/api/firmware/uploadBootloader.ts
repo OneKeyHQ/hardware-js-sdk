@@ -6,7 +6,7 @@ import type { TypedCall } from '../../device/DeviceCommands';
 import { updateResource } from './uploadResource';
 import { rebootDevice, emmcCommonUpdateProcess } from './utils/typedCallHelper';
 import { NEW_BOOT_UPRATE_FIRMWARE_VERSION, REBOOT_TYPE } from './utils/const';
-import { getDeviceBootloaderVersion } from '../../utils';
+import { getDeviceBootloaderVersion, wait } from '../../utils';
 import { enterBootloaderMode } from './utils/bootloaderHelper';
 
 export const updateBootloader = async (
@@ -22,6 +22,7 @@ export const updateBootloader = async (
 
   if (semver.gte(bootloaderVersion, NEW_BOOT_UPRATE_FIRMWARE_VERSION)) {
     await updateBootloaderInBootloaderMode(device, postMessage, source);
+    await rebootDevice(device, REBOOT_TYPE.REBOOT_NORMAL);
   } else {
     await updateResource(typedCall, 'bootloader.bin', source);
   }
@@ -48,6 +49,5 @@ export const updateBootloaderInBootloaderMode = async (
     },
     postMessage
   );
-  await rebootDevice(device, REBOOT_TYPE.REBOOT_NORMAL);
   return true;
 };
