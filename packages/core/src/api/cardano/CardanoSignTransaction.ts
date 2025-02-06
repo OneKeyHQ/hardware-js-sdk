@@ -196,7 +196,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
 
   hasConway = () => {
     const payload = this.payload as CardanoSignTransactionType;
-    if (payload.tagCborSets != null) {
+    if (payload.tagCborSets === true) {
       return true;
     }
     if (payload.auxiliaryData?.cVoteRegistrationParameters != null) {
@@ -222,12 +222,19 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
   };
 
   supportConwayVersionRange = (): DeviceFirmwareRange => ({
-    model_touch: {
-      min: '4.11.0',
+    pro: {
+      min: '4.12.0',
+    },
+    touch: {
+      min: '4.10.0',
     },
   });
 
   checkSupportConway = () => {
+    if (!this.hasConway()) {
+      return;
+    }
+
     const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
 
     const versionRange = getMethodVersionRange(
