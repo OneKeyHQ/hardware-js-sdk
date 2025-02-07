@@ -1,3 +1,4 @@
+import type { UintType } from '@onekeyfe/hd-transport';
 import type { PROTO } from '../../constants';
 
 export interface CardanoAddressParameters {
@@ -32,6 +33,12 @@ export type AssetGroupWithTokens = {
   tokens: PROTO.CardanoToken[];
 };
 
+export interface CardanoDRep {
+  type: PROTO.CardanoDRepType;
+  keyHash?: string;
+  scriptHash?: string;
+}
+
 export interface CardanoCertificate {
   type: PROTO.CardanoCertificateType;
   path?: string | number[];
@@ -39,6 +46,8 @@ export interface CardanoCertificate {
   poolParameters?: CardanoPoolParameters;
   scriptHash?: string;
   keyHash?: string;
+  deposit?: UintType;
+  dRep?: CardanoDRep;
 }
 
 export type CertificateWithPoolOwnersAndRelays = {
@@ -129,8 +138,8 @@ export interface CardanoReferenceInput {
   prev_index: number;
 }
 
-export interface CardanoGovernanceRegistrationDelegation {
-  votingPublicKey: string;
+export interface CardanoCVoteRegistrationDelegation {
+  votePublicKey: string;
   weight: number;
 }
 
@@ -141,19 +150,20 @@ export interface CardanoCatalystRegistrationParameters {
   nonce: string;
 }
 
-export interface CardanoGovernanceRegistrationParameters {
-  votingPublicKey?: string;
+export interface CardanoCVoteRegistrationParameters {
+  votePublicKey?: string;
   stakingPath: string | number[];
-  rewardAddressParameters: CardanoAddressParameters;
+  paymentAddressParameters: CardanoAddressParameters;
   nonce: string;
-  format?: PROTO.CardanoGovernanceRegistrationFormat;
-  delegations?: CardanoGovernanceRegistrationDelegation[];
+  format?: PROTO.CardanoCVoteRegistrationFormat;
+  delegations?: CardanoCVoteRegistrationDelegation[];
   votingPurpose?: number;
+  paymentAddress?: string;
 }
 
 export interface CardanoAuxiliaryData {
   hash?: string;
-  governanceRegistrationParameters?: CardanoGovernanceRegistrationParameters;
+  cVoteRegistrationParameters?: CardanoCVoteRegistrationParameters;
 }
 
 export interface CardanoSignTransaction {
@@ -178,6 +188,8 @@ export interface CardanoSignTransaction {
   signingMode: PROTO.CardanoTxSigningMode;
   derivationType?: PROTO.CardanoDerivationType;
   includeNetworkId?: boolean;
+  chunkify?: boolean;
+  tagCborSets?: boolean;
 }
 
 export interface CardanoSignedTxWitness {
@@ -190,7 +202,7 @@ export interface CardanoSignedTxWitness {
 export interface CardanoAuxiliaryDataSupplement {
   type: PROTO.CardanoTxAuxiliaryDataSupplementType;
   auxiliaryDataHash: string;
-  catalystSignature?: string;
+  cVoteRegistrationSignature?: string;
 }
 
 export interface CardanoSignedTxData {
