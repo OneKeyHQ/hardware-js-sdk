@@ -101,8 +101,15 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
 
     // check device goto bootloader mode
+    let isFirstCheck = true;
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
+        Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
+        if (isFirstCheck) {
+          isFirstCheck = false;
+          Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 5000ms');
+          await wait(5000);
+        }
         if (isBleReconnect) {
           try {
             await this.device.deviceConnector?.acquire(
@@ -291,6 +298,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
+    await wait(10000);
     await this.device.acquire();
 
     const response = await uploadFirmware(

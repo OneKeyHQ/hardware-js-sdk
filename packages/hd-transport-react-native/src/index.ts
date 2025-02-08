@@ -374,14 +374,21 @@ export default class ReactNativeBleTransport {
     });
 
     const disconnectSubscription = device.onDisconnected(() => {
-      this.Log.debug('device disconnect: ', device?.id);
-      this.emitter?.emit('device-disconnect', {
-        name: device?.name,
-        id: device?.id,
-        connectId: device?.id,
-      });
-      this.release(uuid);
-      disconnectSubscription?.remove();
+      try {
+        this.Log.debug('device disconnect: ', device?.id);
+        this.emitter?.emit('device-disconnect', {
+          name: device?.name,
+          id: device?.id,
+          connectId: device?.id,
+        });
+        if (this.runPromise) {
+          this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError));
+        }
+      } finally {
+        this.runPromise = null;
+        this.release(uuid);
+        disconnectSubscription?.remove();
+      }
     });
 
     return { uuid };
@@ -392,41 +399,45 @@ export default class ReactNativeBleTransport {
     let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
       if (error) {
-        this.Log.debug(
-          `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
-            error as unknown as string
-          }`
-        );
-        if (this.runPromise) {
-          let ERROR:
-            | typeof HardwareErrorCode.BleDeviceBondError
-            | typeof HardwareErrorCode.BleCharacteristicNotifyError
-            | typeof HardwareErrorCode.BleTimeoutError =
-            HardwareErrorCode.BleCharacteristicNotifyError;
-          if (error.reason?.includes('The connection has timed out unexpectedly')) {
-            ERROR = HardwareErrorCode.BleTimeoutError;
+        try {
+          this.Log.debug(
+            `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
+              error as unknown as string
+            }`
+          );
+          if (this.runPromise) {
+            let ERROR:
+              | typeof HardwareErrorCode.BleDeviceBondError
+              | typeof HardwareErrorCode.BleCharacteristicNotifyError
+              | typeof HardwareErrorCode.BleTimeoutError =
+              HardwareErrorCode.BleCharacteristicNotifyError;
+            if (error.reason?.includes('The connection has timed out unexpectedly')) {
+              ERROR = HardwareErrorCode.BleTimeoutError;
+            }
+            if (error.reason?.includes('Encryption is insufficient')) {
+              ERROR = HardwareErrorCode.BleDeviceBondError;
+            }
+            if (
+              error.reason?.includes('Cannot write client characteristic config descriptor') ||
+              error.reason?.includes('Cannot find client characteristic config descriptor') ||
+              error.reason?.includes('The handle is invalid')
+            ) {
+              this.runPromise.reject(
+                ERRORS.TypedError(
+                  HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
+                  error.message ?? error.reason
+                )
+              );
+              this.Log.debug(
+                `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
+              );
+              return;
+            }
+            this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
+            this.Log.debug(': monitor notify error, and has unreleased Promise');
           }
-          if (error.reason?.includes('Encryption is insufficient')) {
-            ERROR = HardwareErrorCode.BleDeviceBondError;
-          }
-          if (
-            error.reason?.includes('Cannot write client characteristic config descriptor') ||
-            error.reason?.includes('Cannot find client characteristic config descriptor') ||
-            error.reason?.includes('The handle is invalid')
-          ) {
-            this.runPromise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
-                error.message ?? error.reason
-              )
-            );
-            this.Log.debug(
-              `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
-            );
-            return;
-          }
-          this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
-          this.Log.debug(': monitor notify error, and has unreleased Promise');
+        } finally {
+          this.runPromise = null;
         }
         return;
       }
@@ -516,7 +527,7 @@ export default class ReactNativeBleTransport {
       this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
     }
 
-    const buffers = buildBuffers(messages, name, data);
+    const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
 
     if (name === 'FirmwareUpload' || name === 'EmmcFileWrite') {
       const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
@@ -531,12 +542,12 @@ export default class ReactNativeBleTransport {
           // Upgrading Packet Logs, Too much content to ignore
           // this.Log.debug('send more packet hex strting: ', chunk.toString('hex'));
           try {
-            await transport.writeCharacteristic.writeWithoutResponse(chunk.toString('base64'));
+            await transport.writeWithRetry(chunk.toString('base64'));
             chunk = ByteBuffer.allocate(packetCapacity);
           } catch (e) {
             this.runPromise = null;
             this.Log.error('writeCharacteristic write error: ', e);
-            return;
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
       }
@@ -546,17 +557,17 @@ export default class ReactNativeBleTransport {
         // Upload resources on low-end phones may OOM
         // this.Log.debug('send hex strting: ', o.toString('hex'));
         try {
-          await transport.writeCharacteristic.writeWithoutResponse(outData);
+          await transport.writeWithRetry(outData);
         } catch (e) {
           this.Log.debug('writeCharacteristic write error: ', e);
           this.runPromise = null;
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
-          }
-          if (e.errorCode === BleErrorCode.OperationStartFailed) {
+          } else if (e.errorCode === BleErrorCode.OperationStartFailed) {
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, e.reason);
+          } else {
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
-          return;
         }
       }
     }

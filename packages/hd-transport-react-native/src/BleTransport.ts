@@ -1,4 +1,8 @@
-import { Device, Characteristic } from '@onekeyfe/react-native-ble-plx';
+import { Device, Characteristic, BleErrorCode } from '@onekeyfe/react-native-ble-plx';
+import { getLogger, LoggerNames, wait } from '@onekeyfe/hd-core';
+// import { wait } from '@onekeyfe/hd-core/src/utils';
+
+const Log = getLogger(LoggerNames.HdBleTransport);
 
 export default class BleTransport {
   id: string;
@@ -13,6 +17,10 @@ export default class BleTransport {
 
   nofitySubscription?: () => void;
 
+  static MAX_RETRIES = 10;
+
+  static RETRY_DELAY = 2000;
+
   constructor(
     device: Device,
     writeCharacteristic: Characteristic,
@@ -23,5 +31,28 @@ export default class BleTransport {
     this.writeCharacteristic = writeCharacteristic;
     this.notifyCharacteristic = notifyCharacteristic;
     console.log(`BleTransport(${String(this.id)}) new instance`);
+  }
+
+  async writeWithRetry(data: string, retryCount = BleTransport.MAX_RETRIES): Promise<void> {
+    try {
+      await this.writeCharacteristic.writeWithoutResponse(data);
+    } catch (error) {
+      Log?.debug(
+        `Write retry attempt ${BleTransport.MAX_RETRIES - retryCount + 1}, error: ${error}`
+      );
+      if (retryCount > 0) {
+        await wait(BleTransport.RETRY_DELAY);
+        if (error.errorCode === BleErrorCode.DeviceDisconnected) {
+          try {
+            await this.device.connect();
+            await this.device.discoverAllServicesAndCharacteristics();
+          } catch (e) {
+            Log?.debug(`Connect or discoverAllServicesAndCharacteristics error: ${e}`);
+          }
+        }
+        await this.writeWithRetry(data, retryCount - 1);
+      }
+      throw error;
+    }
   }
 }
