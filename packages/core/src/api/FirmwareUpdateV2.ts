@@ -107,8 +107,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
         if (isFirstCheck) {
           isFirstCheck = false;
-          Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 5000ms');
-          await wait(5000);
+          Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
+          await wait(3000);
         }
         if (isBleReconnect) {
           try {
@@ -298,7 +298,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
-    await wait(10000);
     await this.device.acquire();
 
     const response = await uploadFirmware(
