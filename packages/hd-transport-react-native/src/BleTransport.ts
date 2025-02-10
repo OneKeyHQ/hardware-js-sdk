@@ -50,7 +50,7 @@ export default class BleTransport {
             Log?.debug(`Connect or discoverAllServicesAndCharacteristics error: ${e}`);
           }
         }
-        await this.writeWithRetry(data, retryCount - 1);
+        return this.writeWithRetry(data, retryCount - 1);
       }
       throw error;
     }
