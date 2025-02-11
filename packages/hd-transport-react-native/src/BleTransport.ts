@@ -33,6 +33,12 @@ export default class BleTransport {
     console.log(`BleTransport(${String(this.id)}) new instance`);
   }
 
+  /**
+   * @description only for pro / touch , while upgrade firmware
+   * @param data
+   * @param retryCount
+   * @returns
+   */
   async writeWithRetry(data: string, retryCount = BleTransport.MAX_RETRIES): Promise<void> {
     try {
       await this.writeCharacteristic.writeWithoutResponse(data);
@@ -42,13 +48,18 @@ export default class BleTransport {
       );
       if (retryCount > 0) {
         await wait(BleTransport.RETRY_DELAY);
-        if (error.errorCode === BleErrorCode.DeviceDisconnected) {
+        if (
+          error.errorCode === BleErrorCode.DeviceDisconnected ||
+          error.errorCode === BleErrorCode.CharacteristicNotFound
+        ) {
           try {
             await this.device.connect();
             await this.device.discoverAllServicesAndCharacteristics();
           } catch (e) {
             Log?.debug(`Connect or discoverAllServicesAndCharacteristics error: ${e}`);
           }
+        } else {
+          Log?.debug(`writeCharacteristic error: ${error}`);
         }
         return this.writeWithRetry(data, retryCount - 1);
       }

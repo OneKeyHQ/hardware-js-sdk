@@ -529,35 +529,60 @@ export default class ReactNativeBleTransport {
 
     const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
 
-    if (name === 'FirmwareUpload' || name === 'EmmcFileWrite') {
+    async function writeChunkedData(
+      buffers: ByteBuffer[],
+      writeFunction: (data: string) => Promise<void>,
+      onError: (e: any) => void
+    ) {
       const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
       let index = 0;
       let chunk = ByteBuffer.allocate(packetCapacity);
+
       while (index < buffers.length) {
         const buffer = buffers[index].toBuffer();
         chunk.append(buffer);
         index += 1;
+
         if (chunk.offset === packetCapacity || index >= buffers.length) {
           chunk.reset();
-          // Upgrading Packet Logs, Too much content to ignore
-          // this.Log.debug('send more packet hex strting: ', chunk.toString('hex'));
           try {
-            await transport.writeWithRetry(chunk.toString('base64'));
+            await writeFunction(chunk.toString('base64'));
             chunk = ByteBuffer.allocate(packetCapacity);
           } catch (e) {
-            this.runPromise = null;
-            this.Log.error('writeCharacteristic write error: ', e);
+            onError(e);
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
       }
+    }
+
+    if (name === 'EmmcFileWrite') {
+      await writeChunkedData(
+        buffers,
+        data => transport.writeWithRetry(data),
+        e => {
+          this.runPromise = null;
+          this.Log.error('writeCharacteristic write error: ', e);
+        }
+      );
+    } else if (name === 'FirmwareUpload') {
+      await writeChunkedData(
+        buffers,
+        async data => {
+          await transport.writeCharacteristic.writeWithoutResponse(data);
+        },
+        e => {
+          this.runPromise = null;
+          this.Log.error('writeCharacteristic write error: ', e);
+        }
+      );
     } else {
       for (const o of buffers) {
         const outData = o.toString('base64');
         // Upload resources on low-end phones may OOM
         // this.Log.debug('send hex strting: ', o.toString('hex'));
         try {
-          await transport.writeWithRetry(outData);
+          await transport.writeCharacteristic.writeWithoutResponse(outData);
         } catch (e) {
           this.Log.debug('writeCharacteristic write error: ', e);
           this.runPromise = null;
