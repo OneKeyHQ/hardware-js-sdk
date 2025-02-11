@@ -21,6 +21,7 @@ export const UI_REQUEST = {
   LOCATION_PERMISSION: 'ui-location_permission',
   LOCATION_SERVICE_PERMISSION: 'ui-location_service_permission',
 
+  FIRMWARE_PROCESSING: 'ui-firmware-processing',
   FIRMWARE_PROGRESS: 'ui-firmware-progress',
   FIRMWARE_TIP: 'ui-firmware-tip',
 
@@ -33,8 +34,16 @@ export interface UiRequestWithoutPayload {
     | typeof UI_REQUEST.BLUETOOTH_PERMISSION
     | typeof UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE
     | typeof UI_REQUEST.LOCATION_PERMISSION
-    | typeof UI_REQUEST.LOCATION_SERVICE_PERMISSION;
+    | typeof UI_REQUEST.LOCATION_SERVICE_PERMISSION
+    | typeof UI_REQUEST.FIRMWARE_PROCESSING;
   payload?: typeof undefined;
+}
+
+export interface UiRequestFirmwareProgressing {
+  type: typeof UI_REQUEST.FIRMWARE_PROCESSING;
+  payload: {
+    type: 'firmware' | 'ble' | 'bootloader' | 'resource';
+  };
 }
 
 export type UiRequestDeviceAction = {
