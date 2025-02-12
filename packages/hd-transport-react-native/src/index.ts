@@ -374,14 +374,21 @@ export default class ReactNativeBleTransport {
     });
 
     const disconnectSubscription = device.onDisconnected(() => {
-      this.Log.debug('device disconnect: ', device?.id);
-      this.emitter?.emit('device-disconnect', {
-        name: device?.name,
-        id: device?.id,
-        connectId: device?.id,
-      });
-      this.release(uuid);
-      disconnectSubscription?.remove();
+      try {
+        this.Log.debug('device disconnect: ', device?.id);
+        this.emitter?.emit('device-disconnect', {
+          name: device?.name,
+          id: device?.id,
+          connectId: device?.id,
+        });
+        if (this.runPromise) {
+          this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError));
+        }
+      } finally {
+        this.runPromise = null;
+        this.release(uuid);
+        disconnectSubscription?.remove();
+      }
     });
 
     return { uuid };
@@ -392,41 +399,45 @@ export default class ReactNativeBleTransport {
     let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
       if (error) {
-        this.Log.debug(
-          `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
-            error as unknown as string
-          }`
-        );
-        if (this.runPromise) {
-          let ERROR:
-            | typeof HardwareErrorCode.BleDeviceBondError
-            | typeof HardwareErrorCode.BleCharacteristicNotifyError
-            | typeof HardwareErrorCode.BleTimeoutError =
-            HardwareErrorCode.BleCharacteristicNotifyError;
-          if (error.reason?.includes('The connection has timed out unexpectedly')) {
-            ERROR = HardwareErrorCode.BleTimeoutError;
+        try {
+          this.Log.debug(
+            `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
+              error as unknown as string
+            }`
+          );
+          if (this.runPromise) {
+            let ERROR:
+              | typeof HardwareErrorCode.BleDeviceBondError
+              | typeof HardwareErrorCode.BleCharacteristicNotifyError
+              | typeof HardwareErrorCode.BleTimeoutError =
+              HardwareErrorCode.BleCharacteristicNotifyError;
+            if (error.reason?.includes('The connection has timed out unexpectedly')) {
+              ERROR = HardwareErrorCode.BleTimeoutError;
+            }
+            if (error.reason?.includes('Encryption is insufficient')) {
+              ERROR = HardwareErrorCode.BleDeviceBondError;
+            }
+            if (
+              error.reason?.includes('Cannot write client characteristic config descriptor') ||
+              error.reason?.includes('Cannot find client characteristic config descriptor') ||
+              error.reason?.includes('The handle is invalid')
+            ) {
+              this.runPromise.reject(
+                ERRORS.TypedError(
+                  HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
+                  error.message ?? error.reason
+                )
+              );
+              this.Log.debug(
+                `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
+              );
+              return;
+            }
+            this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
+            this.Log.debug(': monitor notify error, and has unreleased Promise');
           }
-          if (error.reason?.includes('Encryption is insufficient')) {
-            ERROR = HardwareErrorCode.BleDeviceBondError;
-          }
-          if (
-            error.reason?.includes('Cannot write client characteristic config descriptor') ||
-            error.reason?.includes('Cannot find client characteristic config descriptor') ||
-            error.reason?.includes('The handle is invalid')
-          ) {
-            this.runPromise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
-                error.message ?? error.reason
-              )
-            );
-            this.Log.debug(
-              `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
-            );
-            return;
-          }
-          this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
-          this.Log.debug(': monitor notify error, and has unreleased Promise');
+        } finally {
+          this.runPromise = null;
         }
         return;
       }
@@ -516,30 +527,55 @@ export default class ReactNativeBleTransport {
       this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
     }
 
-    const buffers = buildBuffers(messages, name, data);
+    const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
 
-    if (name === 'FirmwareUpload' || name === 'EmmcFileWrite') {
+    async function writeChunkedData(
+      buffers: ByteBuffer[],
+      writeFunction: (data: string) => Promise<void>,
+      onError: (e: any) => void
+    ) {
       const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
       let index = 0;
       let chunk = ByteBuffer.allocate(packetCapacity);
+
       while (index < buffers.length) {
         const buffer = buffers[index].toBuffer();
         chunk.append(buffer);
         index += 1;
+
         if (chunk.offset === packetCapacity || index >= buffers.length) {
           chunk.reset();
-          // Upgrading Packet Logs, Too much content to ignore
-          // this.Log.debug('send more packet hex strting: ', chunk.toString('hex'));
           try {
-            await transport.writeCharacteristic.writeWithoutResponse(chunk.toString('base64'));
+            await writeFunction(chunk.toString('base64'));
             chunk = ByteBuffer.allocate(packetCapacity);
           } catch (e) {
-            this.runPromise = null;
-            this.Log.error('writeCharacteristic write error: ', e);
-            return;
+            onError(e);
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
       }
+    }
+
+    if (name === 'EmmcFileWrite') {
+      await writeChunkedData(
+        buffers,
+        data => transport.writeWithRetry(data),
+        e => {
+          this.runPromise = null;
+          this.Log.error('writeCharacteristic write error: ', e);
+        }
+      );
+    } else if (name === 'FirmwareUpload') {
+      await writeChunkedData(
+        buffers,
+        async data => {
+          await transport.writeCharacteristic.writeWithoutResponse(data);
+        },
+        e => {
+          this.runPromise = null;
+          this.Log.error('writeCharacteristic write error: ', e);
+        }
+      );
     } else {
       for (const o of buffers) {
         const outData = o.toString('base64');
@@ -552,11 +588,11 @@ export default class ReactNativeBleTransport {
           this.runPromise = null;
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
-          }
-          if (e.errorCode === BleErrorCode.OperationStartFailed) {
+          } else if (e.errorCode === BleErrorCode.OperationStartFailed) {
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, e.reason);
+          } else {
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
-          return;
         }
       }
     }

@@ -4,11 +4,11 @@ import { isPrimitiveField } from '../../utils/protobuf';
 
 const transform = (field: Field, value: any) => {
   // [compatibility]: optional undefined keys should be null. Example: Features.fw_major.
-  if (field.optional && typeof value === 'undefined') {
+  if (field?.optional && typeof value === 'undefined') {
     return null;
   }
 
-  if (field.type === 'bytes') {
+  if (field?.type === 'bytes') {
     return ByteBuffer.wrap(value).toString('hex');
     // return value.toString('hex');
   }
@@ -16,7 +16,7 @@ const transform = (field: Field, value: any) => {
   // [compatibility]
   // it is likely that we can remove this right away because trezor-connect tests don't ever trigger this condition
   // we should probably make sure that trezor-connect treats following protobuf types as strings: int64, uint64, sint64, fixed64, sfixed64
-  if (field.long) {
+  if (field?.long) {
     if (Number.isSafeInteger(value.toNumber())) {
       // old trezor-link behavior https://github.com/trezor/trezor-link/blob/9c200cc5608976cff0542484525e98c753ba1888/src/lowlevel/protobuf/message_decoder.js#L80
       return value.toNumber();
