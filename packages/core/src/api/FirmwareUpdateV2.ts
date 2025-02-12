@@ -102,10 +102,13 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
     // check device goto bootloader mode
     let isFirstCheck = true;
+    const isTouchOrProDevice =
+      getDeviceType(this?.device?.features) === 'touch' ||
+      getDeviceType(this?.device?.features) === 'pro';
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
         Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
-        if (isFirstCheck) {
+        if (isTouchOrProDevice && isFirstCheck) {
           isFirstCheck = false;
           Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
           await wait(3000);
