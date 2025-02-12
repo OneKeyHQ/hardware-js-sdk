@@ -72,6 +72,7 @@ import { nemSignTransaction } from './nemSignTransaction';
 import { solGetAddress } from './solGetAddress';
 import { solSignTransaction } from './solSignTransaction';
 import { solSignOffchainMessage } from './solSignOffchainMessage';
+import { solSignMessage } from './solSignMessage';
 
 import { stellarGetAddress } from './stellarGetAddress';
 import { stellarSignTransaction } from './stellarSignTransaction';
@@ -153,6 +154,7 @@ import { benfenGetAddress } from './benfenGetAddress';
 import { benfenGetPublicKey } from './benfenGetPublicKey';
 import { benfenSignTransaction } from './benfenSignTransaction';
 import { benfenSignMessage } from './benfenSignMessage';
+
 
 export * from './export';
 
@@ -267,6 +269,7 @@ export type CoreApi = {
   solGetAddress: typeof solGetAddress;
   solSignTransaction: typeof solSignTransaction;
   solSignOffchainMessage: typeof solSignOffchainMessage;
+  solSignMessage: typeof solSignMessage;
 
   /**
    * Stellar function
