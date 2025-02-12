@@ -60,6 +60,19 @@ const api: PlaygroundProps[] = [
       },
     ],
   },
+  {
+    method: 'solSignMessage',
+    description: 'Sign Message',
+    presupposes: [
+      {
+        title: 'Sign Message',
+        value: {
+          path: "m/44'/501'/0'/0'",
+          messageHex: '48656c6c6f',
+        },
+      },
+    ],
+  },
 ];
 
 export default api;
