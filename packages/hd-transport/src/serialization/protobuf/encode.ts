@@ -37,7 +37,7 @@ export function patch(Message: Type, payload: any) {
       return;
     }
     // primitive type
-    if (isPrimitiveField(field.type)) {
+    if (field && isPrimitiveField(field.type)) {
       if (field.repeated) {
         patched[key] = value.map((v: any) => transform(field.type, v));
       } else {
