@@ -9,6 +9,7 @@ import type {
   CardanoPoolMetadata,
   CardanoPoolRelay,
   CardanoPoolOwner,
+  CardanoDRep,
 } from '../../../types/api/cardano';
 import { PROTO } from '../../../constants';
 
@@ -156,6 +157,37 @@ const transformPoolParameters = (
   };
 };
 
+const transformDRep = (dRep: CardanoDRep | undefined): PROTO.CardanoDRep | undefined => {
+  if (!dRep) {
+    return undefined;
+  }
+
+  validateParams(dRep, [
+    { name: 'type', type: 'number', required: true },
+    { name: 'keyHash', type: 'string' },
+    { name: 'scriptHash', type: 'string' },
+  ]);
+
+  if (dRep.type === PROTO.CardanoDRepType.KEY_HASH && !dRep.keyHash) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.CallMethodInvalidParameter,
+      'key_hash must be supplied for key_hash type'
+    );
+  }
+
+  if (dRep.type === PROTO.CardanoDRepType.SCRIPT_HASH && !dRep.scriptHash) {
+    throw ERRORS.TypedError(
+      HardwareErrorCode.CallMethodInvalidParameter,
+      'script_hash must be supplied for script_hash type'
+    );
+  }
+  return {
+    type: dRep.type,
+    key_hash: dRep.keyHash,
+    script_hash: dRep.scriptHash,
+  };
+};
+
 export const transformCertificate = (
   certificate: CardanoCertificate
 ): CertificateWithPoolOwnersAndRelays => {
@@ -176,11 +208,24 @@ export const transformCertificate = (
     paramsToValidate.push({ name: 'poolParameters', type: 'object', required: true });
   }
 
+  if (
+    certificate.type === PROTO.CardanoCertificateType.STAKE_REGISTRATION_CONWAY ||
+    certificate.type === PROTO.CardanoCertificateType.STAKE_DEREGISTRATION_CONWAY
+  ) {
+    paramsToValidate.push({ name: 'deposit', required: true });
+  }
+
+  if (certificate.type === PROTO.CardanoCertificateType.VOTE_DELEGATION) {
+    paramsToValidate.push({ name: 'dRep', type: 'object', required: true });
+  }
+
   validateParams(certificate, paramsToValidate);
 
   const { poolParameters, poolOwners, poolRelays } = transformPoolParameters(
     certificate.poolParameters
   );
+
+  const dRep = transformDRep(certificate.dRep);
 
   return {
     certificate: {
@@ -190,6 +235,8 @@ export const transformCertificate = (
       key_hash: certificate.keyHash,
       pool: certificate.pool,
       pool_parameters: poolParameters,
+      deposit: certificate.deposit,
+      drep: dRep,
     },
     poolOwners,
     poolRelays,
