@@ -309,6 +309,14 @@ export const baseParams = {
     path: `m/44'/${COINTYPE_MARK}'/0'/0'/0'`,
     messageHex: '010203',
   },
+  solSignMessage: {
+    path: `m/44'/${COINTYPE_MARK}'/0'/0'`,
+    messageHex: '48656c6c6f',
+  },
+  solSignOffchainMessage: {
+    path: `m/44'/${COINTYPE_MARK}'/0'/0'`,
+    messageHex: '48656c6c6f',
+  },
   tronSignMessage: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0/0`,
     messageHex: '0x6578616d706c65206d657373616765',

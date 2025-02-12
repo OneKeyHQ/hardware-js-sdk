@@ -3476,28 +3476,34 @@ export type SolanaSignedTx = {
   signature?: string;
 };
 
-export enum SolanaMessageVersion {
+export enum SolanaOffChainMessageVersion {
   MESSAGE_VERSION_0 = 0,
 }
 
-export enum SolanaMessageFormat {
+export enum SolanaOffChainMessageFormat {
   V0_RESTRICTED_ASCII = 0,
   V0_LIMITED_UTF8 = 1,
 }
 
-// SolanaSignMessage
-export type SolanaSignMessage = {
+// SolanaSignOffChainMessage
+export type SolanaSignOffChainMessage = {
   address_n: number[];
   message: string;
-  message_version?: SolanaMessageVersion;
-  message_format?: SolanaMessageFormat;
+  message_version?: SolanaOffChainMessageVersion;
+  message_format?: SolanaOffChainMessageFormat;
   application_domain?: string;
 };
 
-// SolanaSignedMessage
-export type SolanaSignedMessage = {
+// SolanaSignUnsafeMessage
+export type SolanaSignUnsafeMessage = {
+  address_n: number[];
+  message: string;
+};
+
+// SolanaMessageSignature
+export type SolanaMessageSignature = {
   signature: string;
-  public_key: string;
+  public_key?: string;
 };
 
 // StarcoinGetAddress
@@ -4556,8 +4562,9 @@ export type MessageType = {
   SolanaAddress: SolanaAddress;
   SolanaSignTx: SolanaSignTx;
   SolanaSignedTx: SolanaSignedTx;
-  SolanaSignMessage: SolanaSignMessage;
-  SolanaSignedMessage: SolanaSignedMessage;
+  SolanaSignOffChainMessage: SolanaSignOffChainMessage;
+  SolanaSignUnsafeMessage: SolanaSignUnsafeMessage;
+  SolanaMessageSignature: SolanaMessageSignature;
   StarcoinGetAddress: StarcoinGetAddress;
   StarcoinAddress: StarcoinAddress;
   StarcoinGetPublicKey: StarcoinGetPublicKey;

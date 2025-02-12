@@ -9415,18 +9415,18 @@
         }
       }
     },
-    "SolanaMessageVersion": {
+    "SolanaOffChainMessageVersion": {
       "values": {
         "MESSAGE_VERSION_0": 0
       }
     },
-    "SolanaMessageFormat": {
+    "SolanaOffChainMessageFormat": {
       "values": {
         "V0_RESTRICTED_ASCII": 0,
         "V0_LIMITED_UTF8": 1
       }
     },
-    "SolanaSignMessage": {
+    "SolanaSignOffChainMessage": {
       "fields": {
         "address_n": {
           "rule": "repeated",
@@ -9442,14 +9442,14 @@
           "id": 2
         },
         "message_version": {
-          "type": "SolanaMessageVersion",
+          "type": "SolanaOffChainMessageVersion",
           "id": 3,
           "options": {
             "default": "MESSAGE_VERSION_0"
           }
         },
         "message_format": {
-          "type": "SolanaMessageFormat",
+          "type": "SolanaOffChainMessageFormat",
           "id": 4,
           "options": {
             "default": "V0_RESTRICTED_ASCII"
@@ -9461,7 +9461,24 @@
         }
       }
     },
-    "SolanaSignedMessage": {
+    "SolanaSignUnsafeMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "SolanaMessageSignature": {
       "fields": {
         "signature": {
           "rule": "required",
@@ -9469,7 +9486,6 @@
           "id": 1
         },
         "public_key": {
-          "rule": "required",
           "type": "bytes",
           "id": 2
         }
@@ -11632,8 +11648,9 @@
         "MessageType_SolanaAddress": 10101,
         "MessageType_SolanaSignTx": 10102,
         "MessageType_SolanaSignedTx": 10103,
-        "MessageType_SolanaSignMessage": 10104,
-        "MessageType_SolanaSignedMessage": 10105,
+        "MessageType_SolanaSignOffChainMessage": 10104,
+        "MessageType_SolanaMessageSignature": 10105,
+        "MessageType_SolanaSignUnsafeMessage": 10106,
         "MessageType_StarcoinGetAddress": 10300,
         "MessageType_StarcoinAddress": 10301,
         "MessageType_StarcoinGetPublicKey": 10302,

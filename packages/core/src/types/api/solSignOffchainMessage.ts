@@ -1,16 +1,16 @@
-import { SolanaMessageFormat, SolanaMessageVersion } from '@onekeyfe/hd-transport';
+import { SolanaOffChainMessageFormat, SolanaOffChainMessageVersion } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type SolSignOffchainMessageResponse = {
   signature: string;
-  publicKey: string;
+  pub?: string;
 };
 
 export type SolSignOffchainMessageParams = {
   path: string | number[];
   messageHex: string;
-  messageVersion?: SolanaMessageVersion;
-  messageFormat?: SolanaMessageFormat;
+  messageVersion?: SolanaOffChainMessageVersion;
+  messageFormat?: SolanaOffChainMessageFormat;
   applicationDomainHex?: string;
 };
 
