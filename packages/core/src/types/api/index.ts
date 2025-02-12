@@ -155,7 +155,6 @@ import { benfenGetPublicKey } from './benfenGetPublicKey';
 import { benfenSignTransaction } from './benfenSignTransaction';
 import { benfenSignMessage } from './benfenSignMessage';
 
-
 export * from './export';
 
 export type CoreApi = {
