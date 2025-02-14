@@ -384,8 +384,9 @@ export default class ReactNativeBleTransport {
         if (this.runPromise) {
           this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError));
         }
+      } catch (e) {
+        this.Log.debug('device disconnect error: ', e);
       } finally {
-        this.runPromise = null;
         this.release(uuid);
         disconnectSubscription?.remove();
       }
@@ -399,46 +400,40 @@ export default class ReactNativeBleTransport {
     let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
       if (error) {
-        try {
-          this.Log.debug(
-            `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
-              error as unknown as string
-            }`
-          );
-          if (this.runPromise) {
-            let ERROR:
-              | typeof HardwareErrorCode.BleDeviceBondError
-              | typeof HardwareErrorCode.BleCharacteristicNotifyError
-              | typeof HardwareErrorCode.BleTimeoutError =
-              HardwareErrorCode.BleCharacteristicNotifyError;
-            if (error.reason?.includes('The connection has timed out unexpectedly')) {
-              ERROR = HardwareErrorCode.BleTimeoutError;
-            }
-            if (error.reason?.includes('Encryption is insufficient')) {
-              ERROR = HardwareErrorCode.BleDeviceBondError;
-            }
-            if (
-              error.reason?.includes('Cannot write client characteristic config descriptor') ||
-              error.reason?.includes('Cannot find client characteristic config descriptor') ||
-              error.reason?.includes('The handle is invalid')
-            ) {
-              this.runPromise.reject(
-                ERRORS.TypedError(
-                  HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
-                  error.message ?? error.reason
-                )
-              );
-              this.Log.debug(
-                `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
-              );
-              return;
-            }
-            this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
-            this.Log.debug(': monitor notify error, and has unreleased Promise');
+        this.Log.debug(
+          `error monitor ${characteristic.uuid}, deviceId: ${characteristic.deviceID}: ${
+            error as unknown as string
+          }`
+        );
+        if (this.runPromise) {
+          let ERROR:
+            | typeof HardwareErrorCode.BleDeviceBondError
+            | typeof HardwareErrorCode.BleCharacteristicNotifyError
+            | typeof HardwareErrorCode.BleTimeoutError =
+            HardwareErrorCode.BleCharacteristicNotifyError;
+          if (error.reason?.includes('The connection has timed out unexpectedly')) {
+            ERROR = HardwareErrorCode.BleTimeoutError;
           }
-        } finally {
-          this.runPromise = null;
+          if (error.reason?.includes('Encryption is insufficient')) {
+            ERROR = HardwareErrorCode.BleDeviceBondError;
+          }
+          if (
+            error.reason?.includes('Cannot write client characteristic config descriptor') ||
+            error.reason?.includes('Cannot find client characteristic config descriptor') ||
+            error.reason?.includes('The handle is invalid')
+          ) {
+            this.runPromise.reject(
+              ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyChangeFailure)
+            );
+            this.Log.debug(
+              `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
+            );
+            return;
+          }
+          this.runPromise.reject(ERRORS.TypedError(ERROR));
+          this.Log.debug(': monitor notify error, and has unreleased Promise', Error);
         }
+
         return;
       }
 
@@ -470,7 +465,7 @@ export default class ReactNativeBleTransport {
         }
       } catch (error) {
         this.Log.debug('monitor data error: ', error);
-        this.runPromise?.reject(error);
+        this.runPromise?.reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError));
       }
     });
 
