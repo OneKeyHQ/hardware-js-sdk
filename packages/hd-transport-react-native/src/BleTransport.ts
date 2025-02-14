@@ -17,7 +17,7 @@ export default class BleTransport {
 
   nofitySubscription?: () => void;
 
-  static MAX_RETRIES = 10;
+  static MAX_RETRIES = 5;
 
   static RETRY_DELAY = 2000;
 
