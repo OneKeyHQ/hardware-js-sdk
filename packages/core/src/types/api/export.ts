@@ -70,6 +70,7 @@ export type {
   SolSignOffchainMessageResponse,
   SolSignOffchainMessageParams,
 } from './solSignOffchainMessage';
+export type { SolSignMessageResponse, SolSignMessageParams } from './solSignMessage';
 
 export type { StellarAddress, StellarGetAddressParams } from './stellarGetAddress';
 export type {

@@ -217,6 +217,20 @@ export default [
     },
   },
   {
+    method: 'solSignMessage',
+    expected: {
+      '501': true,
+      '60': false,
+    },
+  },
+  {
+    method: 'solSignOffchainMessage',
+    expected: {
+      '501': true,
+      '60': false,
+    },
+  },
+  {
     method: 'tronSignMessage',
     expected: {
       '195': true,
