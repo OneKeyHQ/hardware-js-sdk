@@ -145,8 +145,8 @@ const testCase: MnemonicAddressTestCase = {
       },
     },
     {
-      id: 'benfenGetaddress',
-      method: 'benfenGetaddress',
+      id: 'benfenGetAddress',
+      method: 'benfenGetAddress',
     },
   ],
 };
@@ -316,7 +316,17 @@ function ExecuteView() {
         const { method } = item;
 
         for (const variant of variantCase) {
-          const params = getRequestParams(method, variant, item.params);
+          let params;
+          try {
+            params = getRequestParams(method, variant, item.params);
+          } catch (error) {
+            context.printLog(
+              `${intl.formatMessage({ id: 'message__fetch' })} ${item.id} error: ${error}`
+            );
+            // 跳过当前迭代，继续下一个
+            break;
+          }
+
           console.log('======>>>>> passphraseStateList', params);
           try {
             // @ts-expect-error
@@ -346,7 +356,7 @@ function ExecuteView() {
               })} ${address}`
             );
           } catch (e) {
-            console.log('=====>>>>> error', e);
+            console.log('=====>>>>> error', e, params);
           }
         }
 
