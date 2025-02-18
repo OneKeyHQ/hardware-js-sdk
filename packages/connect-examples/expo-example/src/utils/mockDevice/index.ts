@@ -12,6 +12,7 @@ import nervosGetAddress from './method/nervosGetAddress';
 import nexaGetAddress from './method/nexaGetAddress';
 import xrpGetAddress from './method/xrpGetAddress';
 import cosmosGetAddress from './method/cosmosGetAddress';
+import benfenGetAddress from './method/benfenGetAddress';
 
 export default {
   btcGetAddress,
@@ -28,4 +29,5 @@ export default {
   nexaGetAddress,
   xrpGetAddress,
   cosmosGetAddress,
+  benfenGetAddress,
 };
