@@ -20,6 +20,8 @@
     "ts:check": "yarn tsc --noEmit"
   },
   "dependencies": {
+    "@onekeyfe/hd-desktop-sdk": "^1.0.20-alpha.2",
+    "@onekeyfe/hd-transport": "^1.0.20-alpha.2",
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",
     "electron-log": "^5.1.5",

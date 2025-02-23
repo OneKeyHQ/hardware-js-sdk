@@ -4,8 +4,8 @@ import isDevelopment from 'electron-is-dev';
 import { format as formatUrl } from 'url';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
-import initProcess, { restartBridge } from './process';
 import { ipcMessageKeys } from './config';
+import { initHardwareSDK, stopHardwareSDK } from './hardware';
 
 // Set log level
 log.transports.file.level = 'info';
@@ -32,8 +32,8 @@ const sdkConnectSrc = isDevelopment
   ? `file://${path.join(staticPath, 'js-sdk/')}`
   : path.join('public', 'js-sdk/');
 
-function initChildProcess() {
-  return initProcess({ isDevelopment });
+async function initHardware() {
+  return initHardwareSDK();
 }
 
 function showMainWindow() {
@@ -79,7 +79,7 @@ function createMainWindow() {
       spellcheck: false,
       webviewTag: true,
       webSecurity: !isDevelopment,
-      nativeWindowOpen: true,
+      nodeIntegration: true,
       allowRunningInsecureContent: isDevelopment,
       // webview injected js needs isolation=false, because property can not be exposeInMainWorld() when isolation enabled.
       contextIsolation: false,
@@ -201,7 +201,7 @@ const singleInstance = app.requestSingleInstanceLock();
 if (!singleInstance && !process.mas) {
   quitOrMinimizeApp();
 } else {
-  app.on('second-instance', (e, argv) => {
+  app.on('second-instance', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       showMainWindow();
@@ -209,11 +209,11 @@ if (!singleInstance && !process.mas) {
   });
 
   app.name = APP_NAME;
-  app.on('ready', () => {
+  app.on('ready', async () => {
     if (!mainWindow) {
       mainWindow = createMainWindow();
     }
-    initChildProcess();
+    await initHardware();
     showMainWindow();
   });
 }
@@ -223,8 +223,9 @@ ipcMain.on(ipcMessageKeys.UPDATE_RESTART, () => {
   autoUpdater.quitAndInstall();
 });
 
-ipcMain.on(ipcMessageKeys.APP_RELOAD_BRIDGE_PROCESS, () => {
-  restartBridge();
+ipcMain.on(ipcMessageKeys.APP_RELOAD_BRIDGE_PROCESS, async () => {
+  stopHardwareSDK();
+  await initHardware();
 });
 
 // 配置 GitHub 发布提供者
@@ -269,6 +270,7 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
+  stopHardwareSDK();
   if (mainWindow) {
     mainWindow?.removeAllListeners();
     mainWindow?.removeAllListeners('close');

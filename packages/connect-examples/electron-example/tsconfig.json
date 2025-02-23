@@ -1,5 +1,5 @@
 {
-  "extends": "../../../tsconfig.json",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "jsx": "preserve",
@@ -13,7 +13,12 @@
     "target": "esnext",
     "esModuleInterop": true,
     "module": "esnext",
-    "allowJs": true // Seems to be needed for index.js
+    "allowJs": true, // Seems to be needed for index.js
+    "baseUrl": ".",
+    "rootDir": "src",
+    "paths": {
+      "@onekeyfe/*": ["../../*/dist"]
+    }
   },
   "include": [
     "**/*.ts",

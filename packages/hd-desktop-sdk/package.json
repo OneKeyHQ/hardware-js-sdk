@@ -1,0 +1,25 @@
+{
+  "name": "@onekeyfe/hd-desktop-sdk",
+  "version": "1.0.20-alpha.2",
+  "description": "Desktop SDK for OneKey hardware wallet with USB and BLE support",
+  "author": "OneKey",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "ISC",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-shared": "^1.0.20-alpha.2",
+    "@onekeyfe/hd-transport": "^1.0.20-alpha.2",
+    "@onekeyfe/hd-transport-http": "^1.0.20-alpha.2",
+    "@onekeyfe/hd-transport-desktop-ble": "^1.0.20-alpha.2"
+  }
+}

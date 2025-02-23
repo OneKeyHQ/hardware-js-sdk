@@ -11,14 +11,20 @@ const config = [
       {
         dir: 'dist',
         format: 'cjs',
+        sourcemap: true,
+        exports: 'named',
+        preserveModules: true,
       },
     ],
     plugins: [typescript(), commonjs(), json()],
   },
   {
     input: path.resolve('./src/index.ts'),
-    output: { file: 'dist/index.d.ts', format: 'es' },
-    format: 'es',
+    output: {
+      file: 'dist/index.d.ts',
+      format: 'es',
+      sourcemap: true,
+    },
     plugins: [dts()],
   },
 ];
