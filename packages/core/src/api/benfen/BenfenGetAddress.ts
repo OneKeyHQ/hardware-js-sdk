@@ -72,7 +72,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
         if (this.shouldConfirm) {
           const addressRes = await this.device.commands.typedCall(
             'BenfenGetAddress',
-            'Address',
+            'BenfenAddress',
             param
           );
           address = addressRes.message.address;
@@ -96,7 +96,11 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
     } else {
       responses = await Promise.all(
         this.params.map(async param => {
-          const res = await this.device.commands.typedCall('BenfenGetAddress', 'Address', param);
+          const res = await this.device.commands.typedCall(
+            'BenfenGetAddress',
+            'BenfenAddress',
+            param
+          );
           const result = {
             path: serializedPath(param.address_n),
             address: hex2BfcAddress(res.message.address),
