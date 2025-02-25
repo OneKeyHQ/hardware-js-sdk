@@ -18,6 +18,10 @@ import PanelView from '../components/ui/Panel';
 /* eslint-disable global-require, @typescript-eslint/no-var-requires */
 const playgroundConfig = [
   {
+    title: 'Neo API',
+    data: require('../data/neo').default,
+  },
+  {
     title: 'Basic API',
     data: require('../data/basic').default,
   },
@@ -88,6 +92,10 @@ const playgroundConfig = [
   {
     title: 'Nem API',
     data: require('../data/nem').default,
+  },
+  {
+    title: 'Neo API',
+    data: require('../data/neo').default,
   },
   {
     title: 'Nervos API',

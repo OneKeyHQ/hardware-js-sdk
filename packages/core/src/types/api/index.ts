@@ -155,6 +155,8 @@ import { benfenGetPublicKey } from './benfenGetPublicKey';
 import { benfenSignTransaction } from './benfenSignTransaction';
 import { benfenSignMessage } from './benfenSignMessage';
 
+import { neoGetAddress } from './neoGetAddress';
+
 export * from './export';
 
 export type CoreApi = {
@@ -418,4 +420,9 @@ export type CoreApi = {
   benfenGetPublicKey: typeof benfenGetPublicKey;
   benfenSignTransaction: typeof benfenSignTransaction;
   benfenSignMessage: typeof benfenSignMessage;
+
+  /**
+   * Neo Network
+   */
+  neoGetAddress: typeof neoGetAddress;
 };

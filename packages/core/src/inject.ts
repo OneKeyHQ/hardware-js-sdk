@@ -345,4 +345,7 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'benfenSignTransaction' }),
   benfenSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'benfenSignMessage' }),
+
+  neoGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'neoGetAddress' }),
 });

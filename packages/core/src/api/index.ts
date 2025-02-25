@@ -152,3 +152,5 @@ export { default as benfenGetAddress } from './benfen/BenfenGetAddress';
 export { default as benfenGetPublicKey } from './benfen/BenfenGetPublicKey';
 export { default as benfenSignMessage } from './benfen/BenfenSignMessage';
 export { default as benfenSignTransaction } from './benfen/BenfenSignTransaction';
+
+export { default as neoGetAddress } from './neo/NeoGetAddress';
