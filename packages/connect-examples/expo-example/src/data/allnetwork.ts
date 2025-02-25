@@ -222,6 +222,11 @@ const api: PlaygroundProps[] = [
               path: "m/44'/1237'/0'/0/0",
               showOnOneKey: false,
             },
+            {
+              network: 'neo',
+              path: "m/44'/888'/0'/0/0",
+              showOnOneKey: false,
+            },
           ],
         },
       },
