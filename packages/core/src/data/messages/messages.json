@@ -5357,6 +5357,92 @@
         }
       }
     },
+    "EthereumGnosisSafeTxOperation": {
+      "values": {
+        "CALL": 0,
+        "DELEGATE_CALL": 1
+      }
+    },
+    "EthereumGnosisSafeTxRequest": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "to": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "data": {
+          "type": "bytes",
+          "id": 4
+        },
+        "operation": {
+          "rule": "required",
+          "type": "EthereumGnosisSafeTxOperation",
+          "id": 5
+        },
+        "safeTxGas": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 6
+        },
+        "baseGas": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        },
+        "gasPrice": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 8
+        },
+        "gasToken": {
+          "rule": "required",
+          "type": "string",
+          "id": 9
+        },
+        "refundReceiver": {
+          "rule": "required",
+          "type": "string",
+          "id": 10
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 11
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 12
+        },
+        "verifyingContract": {
+          "rule": "required",
+          "type": "string",
+          "id": 13
+        }
+      }
+    },
+    "EthereumGnosisSafeSignature": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "EthereumGetPublicKey": {
       "fields": {
         "address_n": {
@@ -11578,6 +11664,8 @@
         "MessageType_EthereumTypedDataValueAckOneKey": 20115,
         "MessageType_EthereumTypedDataSignatureOneKey": 20116,
         "MessageType_EthereumSignTypedHashOneKey": 20117,
+        "MessageType_EthereumGnosisSafeTxRequest": 20118,
+        "MessageType_EthereumGnosisSafeSignature": 20119,
         "MessageType_NEMGetAddress": 67,
         "MessageType_NEMAddress": 68,
         "MessageType_NEMSignTx": 69,

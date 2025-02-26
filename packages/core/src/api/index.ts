@@ -60,6 +60,7 @@ export { default as evmSignMessageEIP712 } from './evm/EVMSignMessageEIP712';
 export { default as evmSignTransaction } from './evm/EVMSignTransaction';
 export { default as evmSignTypedData } from './evm/EVMSignTypedData';
 export { default as evmVerifyMessage } from './evm/EVMVerifyMessage';
+export { default as evmSignSafeTx } from './evm/EVMSignSafeTx';
 
 export { default as starcoinGetAddress } from './starcoin/StarcoinGetAddress';
 export { default as starcoinGetPublicKey } from './starcoin/StarcoinGetPublicKey';

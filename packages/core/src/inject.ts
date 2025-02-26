@@ -160,6 +160,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'evmSignTypedData' }),
   evmVerifyMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'evmVerifyMessage' }),
+  evmSignSafeTx: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'evmSignSafeTx' }),
 
   btcGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'btcGetAddress' }),

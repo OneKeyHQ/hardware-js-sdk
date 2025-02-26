@@ -52,6 +52,7 @@ import { evmSignMessageEIP712 } from './evmSignMessageEIP712';
 import { evmSignTransaction } from './evmSignTransaction';
 import { evmSignTypedData } from './evmSignTypedData';
 import { evmVerifyMessage } from './evmVerifyMessage';
+import { evmSignSafeTx } from './evmSignSafeTx';
 
 import { btcGetAddress } from './btcGetAddress';
 import { btcGetPublicKey } from './btcGetPublicKey';
@@ -236,6 +237,7 @@ export type CoreApi = {
   evmSignTransaction: typeof evmSignTransaction;
   evmSignTypedData: typeof evmSignTypedData;
   evmVerifyMessage: typeof evmVerifyMessage;
+  evmSignSafeTx: typeof evmSignSafeTx;
 
   /**
    * BTC function

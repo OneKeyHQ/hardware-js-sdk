@@ -1958,6 +1958,33 @@ export type EthereumSignMessageEIP712 = {
   message_hash?: string;
 };
 
+export enum EthereumGnosisSafeTxOperation {
+  CALL = 0,
+  DELEGATE_CALL = 1,
+}
+
+// EthereumGnosisSafeTxRequest
+export type EthereumGnosisSafeTxRequest = {
+  address_n: number[];
+  to: string;
+  value: string;
+  data?: string;
+  operation: EthereumGnosisSafeTxOperation;
+  safeTxGas: string;
+  baseGas: string;
+  gasPrice: string;
+  gasToken: string;
+  refundReceiver: string;
+  nonce: string;
+  chain_id: number;
+  verifyingContract: string;
+};
+
+// EthereumGnosisSafeSignature
+export type EthereumGnosisSafeSignature = {
+  signature: string;
+};
+
 // EthereumGetPublicKey
 export type EthereumGetPublicKey = {
   address_n: number[];
@@ -4379,6 +4406,8 @@ export type MessageType = {
   EthereumSignTypedHashOneKey: EthereumSignTypedHashOneKey;
   EthereumTypedDataSignatureOneKey: EthereumTypedDataSignatureOneKey;
   EthereumSignMessageEIP712: EthereumSignMessageEIP712;
+  EthereumGnosisSafeTxRequest: EthereumGnosisSafeTxRequest;
+  EthereumGnosisSafeSignature: EthereumGnosisSafeSignature;
   EthereumGetPublicKey: EthereumGetPublicKey;
   EthereumPublicKey: EthereumPublicKey;
   EthereumGetAddress: EthereumGetAddress;

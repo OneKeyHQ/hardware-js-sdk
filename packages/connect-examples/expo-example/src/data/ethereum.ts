@@ -461,6 +461,91 @@ const api: PlaygroundProps[] = [
       },
     ],
   },
+  {
+    method: 'evmSignSafeTx',
+    description: 'Mock the SafeTx request',
+    presupposes: [
+      {
+        title: 'Sign SafeTx',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          data: {
+            types: {
+              SafeTx: [
+                {
+                  name: 'to',
+                  type: 'address',
+                },
+                {
+                  name: 'value',
+                  type: 'uint256',
+                },
+                {
+                  name: 'data',
+                  type: 'bytes',
+                },
+                {
+                  name: 'operation',
+                  type: 'uint8',
+                },
+                {
+                  name: 'safeTxGas',
+                  type: 'uint256',
+                },
+                {
+                  name: 'baseGas',
+                  type: 'uint256',
+                },
+                {
+                  name: 'gasPrice',
+                  type: 'uint256',
+                },
+                {
+                  name: 'gasToken',
+                  type: 'address',
+                },
+                {
+                  name: 'refundReceiver',
+                  type: 'address',
+                },
+                {
+                  name: 'nonce',
+                  type: 'uint256',
+                },
+              ],
+              EIP712Domain: [
+                {
+                  name: 'chainId',
+                  type: 'uint256',
+                },
+                {
+                  name: 'verifyingContract',
+                  type: 'address',
+                },
+              ],
+            },
+            domain: {
+              chainId: '0x1',
+              verifyingContract: '0x673f21761c5400531a37554a602fe0407addd0dd',
+            },
+            primaryType: 'SafeTx',
+            message: {
+              to: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+              value: '10000000000000',
+              data: '0x',
+              operation: '0',
+              safeTxGas: '0',
+              baseGas: '0',
+              gasPrice: '0',
+              gasToken: '0x0000000000000000000000000000000000000000',
+              refundReceiver: '0x0000000000000000000000000000000000000000',
+              nonce: '0',
+            },
+          },
+        },
+      },
+    ],
+  },
 ];
 
 export default api;
