@@ -57,6 +57,7 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
     const { data_length } = res.message;
 
     if (!data_length) {
+      // @ts-expect-error
       return res.message;
     }
 

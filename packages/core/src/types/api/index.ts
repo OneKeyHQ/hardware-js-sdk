@@ -156,6 +156,7 @@ import { benfenSignTransaction } from './benfenSignTransaction';
 import { benfenSignMessage } from './benfenSignMessage';
 
 import { neoGetAddress } from './neoGetAddress';
+import { neoSignTransaction } from './neoSignTransaction';
 
 export * from './export';
 
@@ -425,4 +426,5 @@ export type CoreApi = {
    * Neo Network
    */
   neoGetAddress: typeof neoGetAddress;
+  neoSignTransaction: typeof neoSignTransaction;
 };

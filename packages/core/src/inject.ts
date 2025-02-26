@@ -348,4 +348,6 @@ export const createCoreApi = (
 
   neoGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'neoGetAddress' }),
+  neoSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
 });
