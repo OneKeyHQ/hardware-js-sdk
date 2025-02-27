@@ -3,6 +3,7 @@ import type { CommonParams, Response } from '../params';
 export type NeoUnsignedTx = {
   path: string;
   rawTx: string;
+  magicNumber?: number;
 };
 
 export type NeoSignedTx = {

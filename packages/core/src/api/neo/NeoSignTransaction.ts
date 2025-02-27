@@ -14,14 +14,16 @@ export default class NeoSignTransaction extends BaseMethod<NeoSignTx> {
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'rawTx', type: 'hexString', required: true },
+      { name: 'magicNumber', type: 'number', required: true },
     ]);
 
-    const { path, rawTx } = this.payload;
+    const { path, rawTx, magicNumber } = this.payload;
     const addressN = validatePath(path, 3);
 
     this.params = {
       address_n: addressN,
       raw_tx: formatAnyHex(rawTx),
+      network_magic: magicNumber,
     };
   }
 
@@ -41,12 +43,16 @@ export default class NeoSignTransaction extends BaseMethod<NeoSignTx> {
     this.params = {
       address_n: this.params.address_n,
       raw_tx: this.params.raw_tx,
+      network_magic: this.params.network_magic,
     };
 
     const res = await typedCall('NeoSignTx', ['NeoSignedTx'], {
       ...this.params,
     });
 
-    return res.message;
+    return {
+      signature: res.message.signature,
+      publicKey: res.message.public_key,
+    };
   }
 }
