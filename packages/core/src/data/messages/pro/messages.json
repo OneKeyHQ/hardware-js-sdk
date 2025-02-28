@@ -345,7 +345,6 @@
     "BenfenAddress": {
       "fields": {
         "address": {
-          "rule": "required",
           "type": "string",
           "id": 1
         }
@@ -2198,7 +2197,18 @@
         "STAKE_REGISTRATION": 0,
         "STAKE_DEREGISTRATION": 1,
         "STAKE_DELEGATION": 2,
-        "STAKE_POOL_REGISTRATION": 3
+        "STAKE_POOL_REGISTRATION": 3,
+        "STAKE_REGISTRATION_CONWAY": 7,
+        "STAKE_DEREGISTRATION_CONWAY": 8,
+        "VOTE_DELEGATION": 9
+      }
+    },
+    "CardanoDRepType": {
+      "values": {
+        "KEY_HASH": 0,
+        "SCRIPT_HASH": 1,
+        "ABSTAIN": 2,
+        "NO_CONFIDENCE": 3
       }
     },
     "CardanoPoolRelayType": {
@@ -2211,10 +2221,10 @@
     "CardanoTxAuxiliaryDataSupplementType": {
       "values": {
         "NONE": 0,
-        "GOVERNANCE_REGISTRATION_SIGNATURE": 1
+        "CVOTE_REGISTRATION_SIGNATURE": 1
       }
     },
-    "CardanoGovernanceRegistrationFormat": {
+    "CardanoCVoteRegistrationFormat": {
       "values": {
         "CIP15": 0,
         "CIP36": 1
@@ -2388,6 +2398,10 @@
           "rule": "required",
           "type": "CardanoDerivationType",
           "id": 6
+        },
+        "chunkify": {
+          "type": "bool",
+          "id": 7
         }
       }
     },
@@ -2542,6 +2556,17 @@
           "id": 21,
           "options": {
             "default": 0
+          }
+        },
+        "chunkify": {
+          "type": "bool",
+          "id": 22
+        },
+        "tag_cbor_sets": {
+          "type": "bool",
+          "id": 23,
+          "options": {
+            "default": false
           }
         }
       }
@@ -2764,6 +2789,23 @@
         }
       }
     },
+    "CardanoDRep": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "CardanoDRepType",
+          "id": 1
+        },
+        "key_hash": {
+          "type": "bytes",
+          "id": 2
+        },
+        "script_hash": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
     "CardanoTxCertificate": {
       "fields": {
         "type": {
@@ -2794,6 +2836,14 @@
         "key_hash": {
           "type": "bytes",
           "id": 6
+        },
+        "deposit": {
+          "type": "uint64",
+          "id": 7
+        },
+        "drep": {
+          "type": "CardanoDRep",
+          "id": 8
         }
       }
     },
@@ -2822,9 +2872,9 @@
         }
       }
     },
-    "CardanoGovernanceRegistrationDelegation": {
+    "CardanoCVoteRegistrationDelegation": {
       "fields": {
-        "voting_public_key": {
+        "vote_public_key": {
           "rule": "required",
           "type": "bytes",
           "id": 1
@@ -2836,9 +2886,9 @@
         }
       }
     },
-    "CardanoGovernanceRegistrationParametersType": {
+    "CardanoCVoteRegistrationParametersType": {
       "fields": {
-        "voting_public_key": {
+        "vote_public_key": {
           "type": "bytes",
           "id": 1
         },
@@ -2850,8 +2900,7 @@
             "packed": false
           }
         },
-        "reward_address_parameters": {
-          "rule": "required",
+        "payment_address_parameters": {
           "type": "CardanoAddressParametersType",
           "id": 3
         },
@@ -2861,7 +2910,7 @@
           "id": 4
         },
         "format": {
-          "type": "CardanoGovernanceRegistrationFormat",
+          "type": "CardanoCVoteRegistrationFormat",
           "id": 5,
           "options": {
             "default": "CIP15"
@@ -2869,19 +2918,23 @@
         },
         "delegations": {
           "rule": "repeated",
-          "type": "CardanoGovernanceRegistrationDelegation",
+          "type": "CardanoCVoteRegistrationDelegation",
           "id": 6
         },
         "voting_purpose": {
           "type": "uint64",
           "id": 7
+        },
+        "payment_address": {
+          "type": "string",
+          "id": 8
         }
       }
     },
     "CardanoTxAuxiliaryData": {
       "fields": {
-        "governance_registration_parameters": {
-          "type": "CardanoGovernanceRegistrationParametersType",
+        "cvote_registration_parameters": {
+          "type": "CardanoCVoteRegistrationParametersType",
           "id": 1
         },
         "hash": {
@@ -2957,7 +3010,7 @@
           "type": "bytes",
           "id": 2
         },
-        "governance_signature": {
+        "cvote_registration_signature": {
           "type": "bytes",
           "id": 3
         }
@@ -9530,18 +9583,18 @@
         }
       }
     },
-    "SolanaMessageVersion": {
+    "SolanaOffChainMessageVersion": {
       "values": {
         "MESSAGE_VERSION_0": 0
       }
     },
-    "SolanaMessageFormat": {
+    "SolanaOffChainMessageFormat": {
       "values": {
         "V0_RESTRICTED_ASCII": 0,
         "V0_LIMITED_UTF8": 1
       }
     },
-    "SolanaSignMessage": {
+    "SolanaSignOffChainMessage": {
       "fields": {
         "address_n": {
           "rule": "repeated",
@@ -9557,14 +9610,14 @@
           "id": 2
         },
         "message_version": {
-          "type": "SolanaMessageVersion",
+          "type": "SolanaOffChainMessageVersion",
           "id": 3,
           "options": {
             "default": "MESSAGE_VERSION_0"
           }
         },
         "message_format": {
-          "type": "SolanaMessageFormat",
+          "type": "SolanaOffChainMessageFormat",
           "id": 4,
           "options": {
             "default": "V0_RESTRICTED_ASCII"
@@ -9576,7 +9629,24 @@
         }
       }
     },
-    "SolanaSignedMessage": {
+    "SolanaSignUnsafeMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "SolanaMessageSignature": {
       "fields": {
         "signature": {
           "rule": "required",
@@ -9584,7 +9654,6 @@
           "id": 1
         },
         "public_key": {
-          "rule": "required",
           "type": "bytes",
           "id": 2
         }
@@ -11773,8 +11842,13 @@
         "MessageType_BinanceOrderMsg": 707,
         "MessageType_BinanceCancelMsg": 708,
         "MessageType_BinanceSignedTx": 709,
-        "MessageType_SolanaSignMessage": 10104,
-        "MessageType_SolanaSignedMessage": 10105,
+        "MessageType_SolanaGetAddress": 10100,
+        "MessageType_SolanaAddress": 10101,
+        "MessageType_SolanaSignTx": 10102,
+        "MessageType_SolanaSignedTx": 10103,
+        "MessageType_SolanaSignOffChainMessage": 10104,
+        "MessageType_SolanaMessageSignature": 10105,
+        "MessageType_SolanaSignUnsafeMessage": 10106,
         "MessageType_StarcoinGetAddress": 10300,
         "MessageType_StarcoinAddress": 10301,
         "MessageType_StarcoinGetPublicKey": 10302,

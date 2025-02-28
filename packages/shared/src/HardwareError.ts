@@ -236,6 +236,11 @@ export const HardwareErrorCode = {
   DeviceNotSupportMethod: 415,
 
   /**
+   * Forbidden key path
+   */
+  ForbiddenKeyPath: 416,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -280,6 +285,7 @@ export const HardwareErrorCode = {
   BleForceCleanRunPromise: 714,
   BleDeviceBondError: 715,
   BleCharacteristicNotifyChangeFailure: 716,
+  BleTransportCallCanceled: 717,
 
   /**
    * Hardware runtiome errors
@@ -435,6 +441,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.UseDesktopToUpdateFirmware]:
     'Please use OneKey desktop client to update the firmware',
   [HardwareErrorCode.DeviceNotSupportMethod]: 'Device not support this method',
+  [HardwareErrorCode.ForbiddenKeyPath]: 'Forbidden key path',
 
   /**
    * Network Errors
@@ -470,6 +477,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleForceCleanRunPromise]: 'Force clean Bluetooth run promise',
   [HardwareErrorCode.BleDeviceBondError]: 'Bluetooth pairing failed',
   [HardwareErrorCode.BleCharacteristicNotifyChangeFailure]: 'Characteristic Notify Change Failure',
+  [HardwareErrorCode.BleTransportCallCanceled]: 'Ble Transport call canceled',
 
   /**
    * Runtime Error

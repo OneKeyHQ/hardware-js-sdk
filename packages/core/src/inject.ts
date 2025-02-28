@@ -54,7 +54,7 @@ export const inject = ({
 };
 
 export const createCoreApi = (
-  call: CoreApi['call'],
+  call: CoreApi['call']
 ): Omit<
   CoreApi,
   | 'on'
@@ -228,6 +228,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'solGetAddress' }),
   solSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'solSignTransaction' }),
+  solSignOffchainMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'solSignOffchainMessage' }),
   solSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'solSignMessage' }),
 

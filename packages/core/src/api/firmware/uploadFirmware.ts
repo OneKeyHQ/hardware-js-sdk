@@ -44,6 +44,17 @@ const postProgressMessage = (
   );
 };
 
+const postProcessingMessage = (
+  type: 'firmware' | 'ble' | 'bootloader' | 'resource',
+  postMessage: (message: CoreMessage) => void
+) => {
+  postMessage(
+    createUiMessage(UI_REQUEST.FIRMWARE_PROCESSING, {
+      type,
+    })
+  );
+};
+
 const postProgressTip = (
   device: Device,
   message: string,
@@ -301,7 +312,12 @@ const processResourceRequest = async (
 
 // Fixed size
 const INIT_DATA_CHUNK_SIZE = 16 * 1024;
-export const updateResource = async (typedCall: TypedCall, fileName: string, data: ArrayBuffer) => {
+export const updateResource = async (
+  typedCall: TypedCall,
+  fileName: string,
+  data: ArrayBuffer,
+  onConfirmAfter?: () => void
+) => {
   const chunk = new Uint8Array(data.slice(0, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength)));
   const digest = blake2s(chunk);
 
@@ -312,6 +328,7 @@ export const updateResource = async (typedCall: TypedCall, fileName: string, dat
     hash: bytesToHex(digest),
   });
 
+  onConfirmAfter?.();
   return processResourceRequest(typedCall, res, data);
 };
 
@@ -353,7 +370,9 @@ export const updateBootloader = async (
 ) => {
   postProgressTip(device, 'UpdateBootloader', postMessage);
   postProgressMessage(device, Math.floor(0), postMessage);
-  await updateResource(typedCall, 'bootloader.bin', source);
+  await updateResource(typedCall, 'bootloader.bin', source, () => {
+    postProcessingMessage('resource', postMessage);
+  });
   postProgressMessage(device, Math.floor(100), postMessage);
   postProgressTip(device, 'UpdateBootloaderSuccess', postMessage);
   return true;

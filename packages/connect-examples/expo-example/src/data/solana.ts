@@ -48,6 +48,19 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'solSignOffchainMessage',
+    description: 'Sign Offchain Message',
+    presupposes: [
+      {
+        title: 'Sign Offchain Message',
+        value: {
+          path: "m/44'/501'/0'/0'",
+          messageHex: '48656c6c6f',
+        },
+      },
+    ],
+  },
+  {
     method: 'solSignMessage',
     description: 'Sign Message',
     presupposes: [

@@ -3,6 +3,7 @@ import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { SuiGetAddressParams, SuiPublicKey } from '../../types';
+import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
 export default class SuiGetPublicKey extends BaseMethod<any> {
   hasBundle = false;
@@ -48,11 +49,7 @@ export default class SuiGetPublicKey extends BaseMethod<any> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
-      paths: this.params,
-      ecdsa_curve_name: 'ed25519',
-    });
-
+    const res = await batchGetPublickeys(this.device, this.params, 'ed25519', 784);
     const responses: SuiPublicKey[] = res.message.public_keys.map(
       (publicKey: string, index: number) => ({
         path: serializedPath((this.params as unknown as any[])[index].address_n),

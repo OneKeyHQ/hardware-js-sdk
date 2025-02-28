@@ -360,6 +360,9 @@ export default class ReactNativeBleTransport {
       );
     }
 
+    // release transport before new transport instance
+    await this.release(uuid);
+
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
     transport.nofitySubscription = this._monitorCharacteristic(transport.notifyCharacteristic);
     transportCache[uuid] = transport;
@@ -371,14 +374,22 @@ export default class ReactNativeBleTransport {
     });
 
     const disconnectSubscription = device.onDisconnected(() => {
-      this.Log.debug('device disconnect: ', device?.id);
-      this.emitter?.emit('device-disconnect', {
-        name: device?.name,
-        id: device?.id,
-        connectId: device?.id,
-      });
-      this.release(uuid);
-      disconnectSubscription?.remove();
+      try {
+        this.Log.debug('device disconnect: ', device?.id);
+        this.emitter?.emit('device-disconnect', {
+          name: device?.name,
+          id: device?.id,
+          connectId: device?.id,
+        });
+        if (this.runPromise) {
+          this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError));
+        }
+      } catch (e) {
+        this.Log.debug('device disconnect error: ', e);
+      } finally {
+        this.release(uuid);
+        disconnectSubscription?.remove();
+      }
     });
 
     return { uuid };
@@ -412,19 +423,17 @@ export default class ReactNativeBleTransport {
             error.reason?.includes('The handle is invalid')
           ) {
             this.runPromise.reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
-                error.message ?? error.reason
-              )
+              ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyChangeFailure)
             );
             this.Log.debug(
               `${HardwareErrorCode.BleCharacteristicNotifyChangeFailure} ${error.message}    ${error.reason}`
             );
             return;
           }
-          this.runPromise.reject(ERRORS.TypedError(ERROR, error.reason ?? error.message));
-          this.Log.debug(': monitor notify error, and has unreleased Promise');
+          this.runPromise.reject(ERRORS.TypedError(ERROR));
+          this.Log.debug(': monitor notify error, and has unreleased Promise', Error);
         }
+
         return;
       }
 
@@ -456,7 +465,7 @@ export default class ReactNativeBleTransport {
         }
       } catch (error) {
         this.Log.debug('monitor data error: ', error);
-        this.runPromise?.reject(error);
+        this.runPromise?.reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError));
       }
     });
 
@@ -513,30 +522,55 @@ export default class ReactNativeBleTransport {
       this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
     }
 
-    const buffers = buildBuffers(messages, name, data);
+    const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
 
-    if (name === 'FirmwareUpload' || name === 'EmmcFileWrite') {
+    async function writeChunkedData(
+      buffers: ByteBuffer[],
+      writeFunction: (data: string) => Promise<void>,
+      onError: (e: any) => void
+    ) {
       const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
       let index = 0;
       let chunk = ByteBuffer.allocate(packetCapacity);
+
       while (index < buffers.length) {
         const buffer = buffers[index].toBuffer();
         chunk.append(buffer);
         index += 1;
+
         if (chunk.offset === packetCapacity || index >= buffers.length) {
           chunk.reset();
-          // Upgrading Packet Logs, Too much content to ignore
-          // this.Log.debug('send more packet hex strting: ', chunk.toString('hex'));
           try {
-            await transport.writeCharacteristic.writeWithoutResponse(chunk.toString('base64'));
+            await writeFunction(chunk.toString('base64'));
             chunk = ByteBuffer.allocate(packetCapacity);
           } catch (e) {
-            this.runPromise = null;
-            this.Log.error('writeCharacteristic write error: ', e);
-            return;
+            onError(e);
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
         }
       }
+    }
+
+    if (name === 'EmmcFileWrite') {
+      await writeChunkedData(
+        buffers,
+        data => transport.writeWithRetry(data),
+        e => {
+          this.runPromise = null;
+          this.Log.error('writeCharacteristic write error: ', e);
+        }
+      );
+    } else if (name === 'FirmwareUpload') {
+      await writeChunkedData(
+        buffers,
+        async data => {
+          await transport.writeCharacteristic.writeWithoutResponse(data);
+        },
+        e => {
+          this.runPromise = null;
+          this.Log.error('writeCharacteristic write error: ', e);
+        }
+      );
     } else {
       for (const o of buffers) {
         const outData = o.toString('base64');
@@ -549,11 +583,11 @@ export default class ReactNativeBleTransport {
           this.runPromise = null;
           if (e.errorCode === BleErrorCode.DeviceDisconnected) {
             throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
-          }
-          if (e.errorCode === BleErrorCode.OperationStartFailed) {
+          } else if (e.errorCode === BleErrorCode.OperationStartFailed) {
             throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, e.reason);
+          } else {
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
           }
-          return;
         }
       }
     }

@@ -7,6 +7,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { hex2BfcAddress, publicKeyToAddress } from './normalize';
 import { BenfenAddress, BenfenGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
+import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
 export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddress[]> {
   hasBundle = false;
@@ -62,15 +63,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
     let responses: BenfenAddress[] = [];
 
     if (supportsBatchPublicKey) {
-      const publicKeyRes = await this.device.commands.typedCall(
-        'BatchGetPublickeys',
-        'EcdsaPublicKeys',
-        {
-          paths: this.params,
-          ecdsa_curve_name: 'ed25519',
-        }
-      );
-
+      const publicKeyRes = await batchGetPublickeys(this.device, this.params, 'ed25519', 728);
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
         const publicKey = publicKeyRes.message.public_keys[i];
@@ -79,7 +72,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
         if (this.shouldConfirm) {
           const addressRes = await this.device.commands.typedCall(
             'BenfenGetAddress',
-            'Address',
+            'BenfenAddress',
             param
           );
           address = addressRes.message.address;
@@ -103,7 +96,11 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
     } else {
       responses = await Promise.all(
         this.params.map(async param => {
-          const res = await this.device.commands.typedCall('BenfenGetAddress', 'Address', param);
+          const res = await this.device.commands.typedCall(
+            'BenfenGetAddress',
+            'BenfenAddress',
+            param
+          );
           const result = {
             path: serializedPath(param.address_n),
             address: hex2BfcAddress(res.message.address),
