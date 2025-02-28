@@ -46,6 +46,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   // By May 2021, the miniFlag is 'bixin' for all classic devices
   if (miniFlag.toLowerCase() === 'bi') return 'classic';
   if (miniFlag.toLowerCase() === 'cl') return 'classic';
+  if (miniFlag.toLowerCase() === 'cp') return 'classicPure';
   if (miniFlag.toLowerCase() === 'mi') return 'mini';
   if (miniFlag.toLowerCase() === 'tc') return 'touch';
   if (miniFlag.toLowerCase() === 'pr') return 'pro';
