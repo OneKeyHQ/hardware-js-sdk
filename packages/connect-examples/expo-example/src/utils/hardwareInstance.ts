@@ -46,8 +46,6 @@ export const getHardwareSDKInstance = memoizee(
           if (sdkConnectSrc) {
             settings.connectSrc = sdkConnectSrc;
           }
-
-          settings.connectSrc = 'https://localhost:8087/';
         }
 
         try {
