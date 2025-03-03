@@ -61,7 +61,7 @@ export default class NeoGetAddress extends BaseMethod<HardwareNeoGetAddress[]> {
       responses.push({
         path,
         address: res.message.address ?? '',
-        publicKey: res.message.public_key ?? '',
+        pub: res.message.public_key ?? '',
       });
 
       this.postPreviousAddressMessage({

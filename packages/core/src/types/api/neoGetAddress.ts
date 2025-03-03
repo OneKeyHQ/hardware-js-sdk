@@ -3,7 +3,7 @@ import type { CommonParams, Response } from '../params';
 export type NeoAddress = {
   path: string;
   address: string;
-  publicKey: string;
+  pub: string;
 };
 
 export type NeoGetAddressParams = {
