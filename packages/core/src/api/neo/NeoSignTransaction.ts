@@ -10,6 +10,7 @@ export default class NeoSignTransaction extends BaseMethod<NeoSignTx> {
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.strictCheckDeviceSupport = true;
 
     validateParams(this.payload, [
       { name: 'path', required: true },
