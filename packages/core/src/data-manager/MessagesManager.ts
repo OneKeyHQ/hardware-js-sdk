@@ -42,5 +42,8 @@ export function getCommonMessages() {
 export function getMessages(device: IDeviceType, version: MessageVersion) {
   // eslint-disable-next-line import/no-dynamic-require
   // return require(messages[device][version]) as unknown as JSON;
+  if (device === 'unknown') {
+    return messages.pro[version];
+  }
   return messages[device][version];
 }
