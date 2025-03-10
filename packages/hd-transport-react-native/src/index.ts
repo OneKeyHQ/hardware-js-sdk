@@ -48,6 +48,8 @@ export default class ReactNativeBleTransport {
 
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  name = 'ReactNativeBleTransport';
+
   configured = false;
 
   stopped = false;
@@ -492,7 +494,12 @@ export default class ReactNativeBleTransport {
     return Promise.resolve(true);
   }
 
+  async post(session: string, name: string, data: Record<string, unknown>) {
+    await this.call(session, name, data);
+  }
+
   async call(uuid: string, name: string, data: Record<string, unknown>) {
+    this.Log.debug('transport-react-native call', uuid, name, data);
     if (this.stopped) {
       // eslint-disable-next-line prefer-promise-reject-errors
       return Promise.reject(ERRORS.TypedError('Transport stopped.'));
@@ -501,7 +508,10 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    if (this.runPromise) {
+    const forceRun = name === 'Initialize' || name === 'Cancel';
+
+    this.Log.debug('transport-react-native call this.runPromise', this.runPromise);
+    if (this.runPromise && !forceRun) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
 
@@ -617,7 +627,7 @@ export default class ReactNativeBleTransport {
   }
 
   cancel() {
-    this.Log.debug('transport-react-native canceled');
+    this.Log.debug('transport-react-native transport cancel');
     if (this.runPromise) {
       // this.runPromise.reject(new Error('Transport_CallCanceled'));
     }

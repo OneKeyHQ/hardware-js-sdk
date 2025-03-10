@@ -1,0 +1,107 @@
+import { Deferred } from '@onekeyfe/hd-shared';
+import type { BaseMethod } from '../api/BaseMethod';
+import { getLogger, LoggerNames } from '../utils';
+
+const Log = getLogger(LoggerNames.Core);
+export type RequestTask = {
+  id: number;
+  method: BaseMethod;
+  callPromise?: Deferred<any> | undefined;
+  abortController?: AbortController;
+};
+
+export default class RequestQueue {
+  private requestQueue = new Map<number, RequestTask>();
+
+  // 生成唯一请求ID
+  public generateRequestId = (method?: BaseMethod) => {
+    if (method && method.responseID != null) {
+      return method.responseID;
+    }
+    return Date.now();
+  };
+
+  public createTask(method: BaseMethod): RequestTask {
+    const requestId = this.generateRequestId(method);
+    if (method && method.responseID !== requestId) {
+      method.responseID = requestId;
+    }
+    const abortController = new AbortController();
+    const task = { id: requestId, method, abortController };
+    this.requestQueue.set(requestId, task);
+    return task;
+  }
+
+  public getTask(requestId: number): RequestTask | undefined {
+    return this.requestQueue.get(requestId);
+  }
+
+  // 获取请求的AbortController
+  public getAbortController(requestId: number) {
+    return this.requestQueue.get(requestId)?.abortController;
+  }
+
+  // 取消特定请求
+  public abortRequest(requestId: number) {
+    const request = this.requestQueue.get(requestId);
+    if (request?.abortController) {
+      Log.debug(`Aborting request ${requestId}`);
+      request.abortController.abort();
+      return true;
+    }
+    return false;
+  }
+
+  // 取消与指定connectId相关的所有请求
+  public abortRequestsByConnectId(connectId: string) {
+    let count = 0;
+    this.requestQueue.forEach((request, _) => {
+      if (request.abortController && request.method.connectId === connectId) {
+        request.abortController.abort();
+        request.abortController = undefined;
+        count++;
+      }
+    });
+    return count;
+  }
+
+  // 取消所有请求
+  public abortAllRequests() {
+    let count = 0;
+    this.requestQueue.forEach(request => {
+      if (request.abortController) {
+        request.abortController.abort();
+        count++;
+      }
+    });
+    return count;
+  }
+
+  // 迭代所有请求
+  public getRequestTasksId() {
+    return Array.from(this.requestQueue.keys());
+  }
+
+  // 解析请求
+  public resolveRequest(requestId: number, response: any) {
+    const request = this.requestQueue.get(requestId);
+    if (request) {
+      request.callPromise?.resolve(response);
+    }
+    this.releaseTask(requestId);
+  }
+
+  // 拒绝请求
+  public rejectRequest(requestId: number, error: any) {
+    const request = this.requestQueue.get(requestId);
+    if (request) {
+      request.callPromise?.reject(error);
+    }
+    this.releaseTask(requestId);
+  }
+
+  // 删除请求
+  public releaseTask(requestId: number) {
+    this.requestQueue.delete(requestId);
+  }
+}

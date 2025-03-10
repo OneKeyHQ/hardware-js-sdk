@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 
-import { ListItem, Text, View, XStack } from 'tamagui';
+import { ListItem, Stack, Text, View, XStack } from 'tamagui';
 import { FlatList, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Check } from '@tamagui/lucide-icons';
@@ -98,7 +98,7 @@ function DeviceListFC(
   ref: ForwardedRef<IDeviceListInstance>
 ) {
   const intl = useIntl();
-  const { sdk, env } = useContext(HardwareSDKContext);
+  const { sdk } = useContext(HardwareSDKContext);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [connectionType, setConnectionType] = useAtom(connectionTypeAtom);
@@ -144,6 +144,12 @@ function DeviceListFC(
       selectDevice(device);
     }
   }, [intl, sdk, selectDevice, connectionType]);
+
+  const deviceCancel = useCallback(() => {
+    if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
+
+    sdk.cancel();
+  }, [intl, sdk]);
 
   const handleRemoveSelected = useCallback(() => {
     removeSelectedId();
@@ -206,10 +212,20 @@ function DeviceListFC(
           </XStack>
         </View>
       )}
-
-      <Button variant="primary" size="large" onPress={searchDevices}>
-        {intl.formatMessage({ id: 'action__search_device' })}
-      </Button>
+      <Stack flexDirection="row" gap="$2">
+        <Button width="80%" disabled={!sdk} variant="primary" size="medium" onPress={searchDevices}>
+          {intl.formatMessage({ id: 'action__search_device' })}
+        </Button>
+        <Button
+          width="20%"
+          disabled={!sdk}
+          variant="secondary"
+          size="medium"
+          onPress={deviceCancel}
+        >
+          {intl.formatMessage({ id: 'action__cancel' })}
+        </Button>
+      </Stack>
       <FlatList
         data={devices}
         renderItem={renderItem}

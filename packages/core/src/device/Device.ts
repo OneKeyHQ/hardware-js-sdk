@@ -103,6 +103,16 @@ export class Device extends EventEmitter {
   commands: DeviceCommands;
 
   /**
+   * 可取消的操作
+   */
+  private cancelableAction?: (err?: Error) => Promise<unknown>;
+
+  /**
+   * 设备是否被占用
+   */
+  private deviceAcquired = false;
+
+  /**
    * 设备信息
    */
   features: Features | undefined = undefined;
@@ -221,6 +231,7 @@ export class Device extends EventEmitter {
         );
         Log.debug('Expected session id:', this.mainId);
       }
+      this.deviceAcquired = true;
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
         await this.commands.dispose(false);
@@ -262,6 +273,7 @@ export class Device extends EventEmitter {
         this.needReloadDevice = true;
       }
     }
+    this.deviceAcquired = false;
   }
 
   getCommands() {
@@ -481,6 +493,12 @@ export class Device extends EventEmitter {
             )
           );
         }
+      } else if (env === 'react-native') {
+        // TODO: implement react-native acquire
+        // cancel input pin or passphrase on device request, then the following requests will report an error
+        if (this.commands) {
+          this.commands.disposed = false;
+        }
       }
     }
 
@@ -542,12 +560,29 @@ export class Device extends EventEmitter {
   }
 
   async interruptionFromUser() {
-    if (this.commands) {
-      await this.commands.dispose(true);
-    }
+    const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    await this.cancelableAction?.(error);
+    await this.commands?.cancel();
+
     if (this.runPromise) {
-      this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser));
+      this.runPromise.reject(error);
+      this.runPromise = null;
     }
+  }
+
+  setCancelableAction(callback: NonNullable<typeof this.cancelableAction>) {
+    this.cancelableAction = (e?: Error) =>
+      callback(e)
+        .catch(e2 => {
+          Log.debug('cancelableAction error', e2);
+        })
+        .finally(() => {
+          this.clearCancelableAction();
+        });
+  }
+
+  clearCancelableAction() {
+    this.cancelableAction = undefined;
   }
 
   getMode() {
@@ -582,6 +617,14 @@ export class Device extends EventEmitter {
 
   isUsed() {
     return typeof this.originalDescriptor.session === 'string';
+  }
+
+  hasDeviceAcquire() {
+    const env = DataManager.getSettings('env');
+    if (DataManager.isBleConnect(env)) {
+      return this.deviceAcquired;
+    }
+    return this.isUsed() && this.deviceAcquired;
   }
 
   isUsedHere() {

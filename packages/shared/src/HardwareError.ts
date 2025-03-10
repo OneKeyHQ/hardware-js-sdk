@@ -132,6 +132,11 @@ export const HardwareErrorCode = {
   NotAllowInBootloaderMode: 116,
 
   /**
+   * Device is busy
+   */
+  DeviceBusy: 117,
+
+  /**
    * Not initialized
    */
   NotInitialized: 200,
@@ -423,6 +428,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceOpenedPassphrase]: 'Device opened passphrase',
   [HardwareErrorCode.DeviceDetectInBootloaderMode]: 'Device in bootloader mode',
   [HardwareErrorCode.NotAllowInBootloaderMode]: 'Device not allow in bootloader mode',
+  [HardwareErrorCode.DeviceBusy]: 'Device is busy',
   /**
    * Node Errors
    */
