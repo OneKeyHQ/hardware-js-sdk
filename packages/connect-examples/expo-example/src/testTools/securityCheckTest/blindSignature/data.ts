@@ -69,6 +69,14 @@ export default [
     },
   },
   {
+    method: 'neoSignTransaction',
+    expected: {
+      '888': true,
+      '60': false,
+      '999': false,
+    },
+  },
+  {
     method: 'nexaSignTransaction',
     expected: {
       '29223': true,

@@ -132,4 +132,8 @@ export const baseParams = {
     path: `m/44'/728'/${INDEX_MARK}'/0'/0'`,
     showOnOneKey: false,
   },
+  neoGetAddress: {
+    path: `m/44'/888'/0'/0/${INDEX_MARK}`,
+    showOnOneKey: false,
+  },
 };
