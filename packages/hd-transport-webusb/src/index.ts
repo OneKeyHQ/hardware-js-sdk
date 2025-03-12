@@ -16,8 +16,16 @@ const ENDPOINT_ID = 1;
 const PACKET_SIZE = 64;
 const HEADER_LENGTH = 6;
 
+/**
+ * Device information with path and WebUSB device instance
+ */
+interface DeviceInfo {
+  path: string;
+  device: USBDevice;
+}
+
 export default class WebUsbTransport {
-  _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+  messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
   stopped = false;
 
@@ -27,7 +35,11 @@ export default class WebUsbTransport {
 
   usb?: USB;
 
-  _lastDevices: Array<{ path: string; device: USBDevice }> = [];
+  /**
+   * Cached list of connected devices
+   * This is essential for maintaining device references between operations
+   */
+  deviceList: Array<DeviceInfo> = [];
 
   configurationId = CONFIGURATION_ID;
 
@@ -35,6 +47,9 @@ export default class WebUsbTransport {
 
   interfaceId = INTERFACE_ID;
 
+  /**
+   * Initialize WebUSB transport
+   */
   init(logger: any) {
     this.Log = logger;
 
@@ -48,19 +63,31 @@ export default class WebUsbTransport {
     this.usb = usb;
   }
 
+  /**
+   * Configure transport protocol
+   */
   configure(signedData: any) {
     const messages = parseConfigure(signedData);
     this.configured = true;
-    this._messages = messages;
+    this.messages = messages;
   }
 
+  /**
+   * Enumerate already connected devices
+   * This method only returns devices that are already authorized by the browser
+   * It does NOT prompt the user to select a device
+   */
   async enumerate() {
-    const list = await this._getDeviceList();
-    return list;
+    await this.getConnectedDevices();
+    return this.deviceList;
   }
 
-  async _getDeviceList() {
+  /**
+   * Get list of connected devices
+   */
+  async getConnectedDevices() {
     if (!this.usb) return [];
+
     const devices = await this.usb.getDevices();
     const onekeyDevices = devices.filter(dev => {
       const isOneKey = ONEKEY_FILTER.some(
@@ -70,14 +97,17 @@ export default class WebUsbTransport {
       return isOneKey && hasSerialNumber;
     });
 
-    this._lastDevices = onekeyDevices.map(device => ({
+    this.deviceList = onekeyDevices.map(device => ({
       path: device.serialNumber as string,
       device,
     }));
 
-    return this._lastDevices;
+    return this.deviceList;
   }
 
+  /**
+   * Acquire device control
+   */
   async acquire(input: AcquireInput) {
     if (!input.path) return;
     try {
@@ -89,14 +119,20 @@ export default class WebUsbTransport {
     }
   }
 
-  _findDevice(path: string) {
-    const device = this._lastDevices.find(d => d.path === path);
+  /**
+   * Find device by path
+   */
+  findDevice(path: string) {
+    const device = this.deviceList.find(d => d.path === path);
     if (device == null) {
       throw new Error('Action was interrupted.');
     }
     return device.device;
   }
 
+  /**
+   * Connect to device with retry mechanism
+   */
   async connect(path: string, first: boolean) {
     for (let i = 0; i < 5; i++) {
       if (i > 0) {
@@ -104,9 +140,9 @@ export default class WebUsbTransport {
         await new Promise(resolve => setTimeout(() => resolve(undefined), i * 200));
       }
       try {
-        return await this._connectIn(path, first);
+        return await this.connectToDevice(path, first);
       } catch (e) {
-        // ignore
+        // ignore errors until last attempt
         if (i === 4) {
           throw e;
         }
@@ -114,8 +150,11 @@ export default class WebUsbTransport {
     }
   }
 
-  async _connectIn(path: string, first: boolean) {
-    const device: USBDevice = await this._findDevice(path);
+  /**
+   * Connect to specific device
+   */
+  async connectToDevice(path: string, first: boolean) {
+    const device: USBDevice = await this.findDevice(path);
     await device.open();
 
     if (first) {
@@ -123,24 +162,27 @@ export default class WebUsbTransport {
       try {
         await device.reset();
       } catch (error) {
-        // empty
+        // Ignore reset errors
       }
     }
 
     await device.claimInterface(this.interfaceId);
   }
 
+  /**
+   * Call device method
+   */
   async call(path: string, name: string, data: Record<string, unknown>) {
-    if (this._messages == null) {
+    if (this.messages == null) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const device = await this._findDevice(path);
+    const device = await this.findDevice(path);
     if (!device) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
     }
 
-    const messages = this._messages;
+    const { messages } = this;
     if (LogBlockCommand.has(name)) {
       this.Log.debug('call-', ' name: ', name);
     } else {
@@ -153,13 +195,14 @@ export default class WebUsbTransport {
       newArray[0] = 63;
       newArray.set(new Uint8Array(buffer), 1);
       // console.log('send packet: ', newArray);
+
       if (!device.opened) {
         await this.connect(path, false);
       }
       await device.transferOut(this.endpointId, newArray);
     }
 
-    const resData = await this._receive(path);
+    const resData = await this.receiveData(path);
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
@@ -167,18 +210,21 @@ export default class WebUsbTransport {
     return check.call(jsonData);
   }
 
-  async _receive(path: string) {
-    const device: USBDevice = await this._findDevice(path);
+  /**
+   * Receive data from device
+   */
+  async receiveData(path: string) {
+    const device: USBDevice = await this.findDevice(path);
     if (!device.opened) {
       await this.connect(path, false);
     }
 
     const firstPacket = await device.transferIn(this.endpointId, PACKET_SIZE);
-    // console.log('receive first packet: ', firstPacket);
     const firstData = firstPacket.data?.buffer.slice(1);
+    console.log('receive first packet: ', firstPacket);
     const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData as ArrayBuffer);
 
-    // console.log('chunk length: ', length);
+    console.log('chunk length: ', length);
 
     const lengthWithHeader = Number(length + HEADER_LENGTH);
     const decoded = new ByteBuffer(lengthWithHeader);
@@ -187,13 +233,10 @@ export default class WebUsbTransport {
     if (length) {
       decoded.append(restBuffer);
     }
-
-    // console.log('first decoded: ', decoded);
+    console.log('first decoded: ', decoded);
 
     while (decoded.offset < lengthWithHeader) {
       const res = await device.transferIn(this.endpointId, PACKET_SIZE);
-      // console.log('otherRes data: ', res?.data?.buffer);
-      // console.log('otherRes length: ', res?.data?.byteLength);
 
       if (!res.data) {
         throw new Error('no data');
@@ -204,30 +247,40 @@ export default class WebUsbTransport {
       }
       const buffer = res.data.buffer.slice(1);
       if (lengthWithHeader - decoded.offset >= PACKET_SIZE) {
-        decoded.append(buffer);
+        decoded.append(buffer as unknown as ArrayBuffer);
       } else {
-        decoded.append(buffer.slice(0, lengthWithHeader - decoded.offset));
+        decoded.append(
+          buffer.slice(0, lengthWithHeader - decoded.offset) as unknown as ArrayBuffer
+        );
       }
-      // console.log('current offset: ', decoded.offset);
     }
     decoded.reset();
     const result = decoded.toBuffer();
-    return Buffer.from(result).toString('hex');
+    return Buffer.from(result as unknown as ArrayBuffer).toString('hex');
   }
 
+  /**
+   * Release device
+   */
   async release(path: string) {
-    const device: USBDevice = await this._findDevice(path);
+    const device: USBDevice = await this.findDevice(path);
     await device.releaseInterface(this.interfaceId);
     await device.close();
   }
 
+  /**
+   * Request user to select a device
+   * This method must be called in response to a user action
+   * to comply with WebUSB security requirements
+   */
   async requestDevice() {
-    if (!this.usb) return;
+    if (!this.usb) return null;
     try {
       const device = await this.usb.requestDevice({ filters: ONEKEY_FILTER });
       return device;
     } catch (e) {
       this.Log.debug('requestDevice error: ', e);
+      return null;
     }
   }
 }
