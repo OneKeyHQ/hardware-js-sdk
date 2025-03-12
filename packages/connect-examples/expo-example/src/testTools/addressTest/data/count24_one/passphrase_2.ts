@@ -571,5 +571,15 @@ export default {
         '2147483647': 'BFC07d877cc034c72b678d8cb9d0f8221138b70435e6ef31bc50610e478dcd41216fcbc',
       },
     },
+    {
+      method: 'neoGetAddress',
+      expectedAddress: {
+        '0': 'NggbA72hXzwFjga8vGc6PrPTLYp7NkNNBo',
+        '1': 'NTJtmSioanZ7DcYeCfRxtg4RfpWLrbZdNf',
+        '10': 'Na34R5VHTTQdZvCHBoppSN9kL4DCYx3VT9',
+        '2147483646': 'NXtqCrCTDaX5y34LT7TxsvXVFQZnH3TNC5',
+        '2147483647': 'NL6tZahsbZGpGPzviEAaL4wLyDMf6vg6aw',
+      },
+    },
   ],
 } as AddressTestCaseData;
