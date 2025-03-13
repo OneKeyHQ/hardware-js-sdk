@@ -90,6 +90,10 @@ const playgroundConfig = [
     data: require('../data/nem').default,
   },
   {
+    title: 'Neo API',
+    data: require('../data/neo').default,
+  },
+  {
     title: 'Nervos API',
     data: require('../data/nervos').default,
   },
