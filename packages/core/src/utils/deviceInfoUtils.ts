@@ -23,6 +23,8 @@ export const getDeviceType = (features?: Features): IDeviceType => {
       return 'touch';
     case 'PRO':
       return 'pro';
+    case 'PURE':
+      return 'classicPure';
     default:
       // future And old device onekey_device_type is empty
       if (!isEmpty(features.onekey_serial_no)) {
