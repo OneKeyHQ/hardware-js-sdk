@@ -2617,6 +2617,11 @@ export type DeviceInfo = {
   pre_firmware?: string;
 };
 
+// WriteSEPrivateKey
+export type WriteSEPrivateKey = {
+  private_key: string;
+};
+
 // ReadSEPublicKey
 export type ReadSEPublicKey = {};
 
@@ -4478,6 +4483,7 @@ export type MessageType = {
   DeviceInfoSettings: DeviceInfoSettings;
   GetDeviceInfo: GetDeviceInfo;
   DeviceInfo: DeviceInfo;
+  WriteSEPrivateKey: WriteSEPrivateKey;
   ReadSEPublicKey: ReadSEPublicKey;
   SEPublicKey: SEPublicKey;
   WriteSEPublicCert: WriteSEPublicCert;

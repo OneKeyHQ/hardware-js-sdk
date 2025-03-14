@@ -155,3 +155,10 @@ export { default as benfenSignTransaction } from './benfen/BenfenSignTransaction
 
 export { default as neoGetAddress } from './neo/NeoGetAddress';
 export { default as neoSignTransaction } from './neo/NeoSignTransaction';
+
+export { default as deviceGetInfo } from './device/GetDeviceInfoSettings';
+export { default as deviceInfoSettings } from './device/DeviceInfoSettings';
+export { default as deviceReadSEPublicCert } from './device/DeviceReadSEPublicCert';
+export { default as deviceWriteSEPrivateKey } from './device/DeviceWriteSEPrivateKey';
+export { default as deviceWriteSEPublicCert } from './device/DeviceWriteSEPublicCert';
+export { default as deviceSESignMessage } from './device/DeviceSESignMessage';

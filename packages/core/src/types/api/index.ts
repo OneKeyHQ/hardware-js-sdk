@@ -158,6 +158,13 @@ import { benfenSignMessage } from './benfenSignMessage';
 import { neoGetAddress } from './neoGetAddress';
 import { neoSignTransaction } from './neoSignTransaction';
 
+import { deviceInfoSettings } from './deviceInfoSettings';
+import { deviceGetInfo } from './deviceGetInfo';
+import { deviceWriteSEPrivateKey } from './deviceWriteSEPrivateKey';
+import { deviceReadSEPublicCert } from './deviceReadSEPublicCert';
+import { deviceWriteSEPublicCert } from './deviceWriteSEPublicCert';
+import { deviceSESignMessage } from './deviceSESignMessage';
+
 export * from './export';
 
 export type CoreApi = {
@@ -427,4 +434,11 @@ export type CoreApi = {
    */
   neoGetAddress: typeof neoGetAddress;
   neoSignTransaction: typeof neoSignTransaction;
+
+  deviceInfoSettings: typeof deviceInfoSettings;
+  deviceGetInfo: typeof deviceGetInfo;
+  deviceWriteSEPrivateKey: typeof deviceWriteSEPrivateKey;
+  deviceReadSEPublicCert: typeof deviceReadSEPublicCert;
+  deviceWriteSEPublicCert: typeof deviceWriteSEPublicCert;
+  deviceSESignMessage: typeof deviceSESignMessage;
 };

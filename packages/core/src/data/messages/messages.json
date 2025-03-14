@@ -7130,6 +7130,15 @@
         }
       }
     },
+    "WriteSEPrivateKey": {
+      "fields": {
+        "private_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "ReadSEPublicKey": {
       "fields": {}
     },
@@ -11945,7 +11954,8 @@
         "MessageType_ListResDir": 10023,
         "MessageType_FileInfoList": 10024,
         "MessageType_OnekeyGetFeatures": 10025,
-        "MessageType_OnekeyFeatures": 10026
+        "MessageType_OnekeyFeatures": 10026,
+        "MessageType_WriteSEPrivateKey": 10027
       }
     },
     "google": {

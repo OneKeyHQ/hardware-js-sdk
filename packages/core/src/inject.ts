@@ -350,4 +350,16 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'neoGetAddress' }),
   neoSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
+
+  deviceInfoSettings: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceInfoSettings' }),
+  deviceGetInfo: (connectId, params) => call({ ...params, connectId, method: 'deviceGetInfo' }),
+  deviceReadSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceReadSEPublicCert' }),
+  deviceWriteSEPrivateKey: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteSEPrivateKey' }),
+  deviceWriteSEPublicCert: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceWriteSEPublicCert' }),
+  deviceSESignMessage: (connectId, params) =>
+    call({ ...params, connectId, method: 'deviceSESignMessage' }),
 });
