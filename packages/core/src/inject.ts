@@ -207,7 +207,7 @@ export const createCoreApi = (
   firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
   firmwareUpdateV2: (connectId, params) =>
     call({ ...params, connectId, method: 'firmwareUpdateV2' }),
-  requestWebUsbDevice: () => call({ method: 'requestWebUsbDevice' }),
+  promptWebDeviceAccess: () => call({ method: 'promptWebDeviceAccess' }),
 
   tronGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'tronGetAddress' }),

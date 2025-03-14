@@ -18,7 +18,7 @@ import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { firmwareUpdate, firmwareUpdateV2 } from './firmwareUpdate';
-import { requestWebUsbDevice } from './requestWebUsbDevice';
+import { promptWebDeviceAccess } from './promptWebDeviceAccess';
 
 import { deviceReset } from './deviceReset';
 import { deviceRecovery } from './deviceRecovery';
@@ -194,7 +194,7 @@ export type CoreApi = {
    * Device function
    */
   searchDevices: typeof searchDevices;
-  requestWebUsbDevice: typeof requestWebUsbDevice;
+  promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
   getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;

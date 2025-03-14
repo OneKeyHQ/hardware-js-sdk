@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 import transport, { AcquireInput, LogBlockCommand } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
 const { parseConfigure, buildEncodeBuffers, decodeProtocol, receiveOne, check } = transport;
@@ -73,6 +73,22 @@ export default class WebUsbTransport {
   }
 
   /**
+   * Request user to select a device
+   * This method must be called in response to a user action
+   * to comply with WebUSB security requirements
+   */
+  async promptDeviceAccess() {
+    if (!this.usb) return null;
+    try {
+      const device = await this.usb.requestDevice({ filters: ONEKEY_FILTER });
+      return device;
+    } catch (e) {
+      this.Log.debug('requestDevice error: ', e);
+      return null;
+    }
+  }
+
+  /**
    * Enumerate already connected devices
    * This method only returns devices that are already authorized by the browser
    * It does NOT prompt the user to select a device
@@ -122,11 +138,24 @@ export default class WebUsbTransport {
   /**
    * Find device by path
    */
-  findDevice(path: string) {
-    const device = this.deviceList.find(d => d.path === path);
-    if (device == null) {
-      throw new Error('Action was interrupted.');
+  async findDevice(path: string) {
+    // If device list is empty, refresh it first
+    if (this.deviceList.length === 0) {
+      await this.getConnectedDevices();
     }
+
+    let device = this.deviceList.find(d => d.path === path);
+
+    // If device not found after first attempt, try refreshing the list once more
+    if (device == null) {
+      await this.getConnectedDevices();
+      device = this.deviceList.find(d => d.path === path);
+
+      if (device == null) {
+        throw new Error('Action was interrupted.');
+      }
+    }
+
     return device.device;
   }
 
@@ -134,18 +163,15 @@ export default class WebUsbTransport {
    * Connect to device with retry mechanism
    */
   async connect(path: string, first: boolean) {
-    for (let i = 0; i < 5; i++) {
-      if (i > 0) {
-        // eslint-disable-next-line no-promise-executor-return
-        await new Promise(resolve => setTimeout(() => resolve(undefined), i * 200));
-      }
+    const maxRetries = 5;
+    for (let i = 0; i < maxRetries; i++) {
       try {
         return await this.connectToDevice(path, first);
       } catch (e) {
-        // ignore errors until last attempt
-        if (i === 4) {
+        if (i === maxRetries - 1) {
           throw e;
         }
+        await wait(i * 200);
       }
     }
   }
@@ -226,6 +252,7 @@ export default class WebUsbTransport {
 
     console.log('chunk length: ', length);
 
+    // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const lengthWithHeader = Number(length + HEADER_LENGTH);
     const decoded = new ByteBuffer(lengthWithHeader);
     decoded.writeUint16(typeId);
@@ -266,21 +293,5 @@ export default class WebUsbTransport {
     const device: USBDevice = await this.findDevice(path);
     await device.releaseInterface(this.interfaceId);
     await device.close();
-  }
-
-  /**
-   * Request user to select a device
-   * This method must be called in response to a user action
-   * to comply with WebUSB security requirements
-   */
-  async requestDevice() {
-    if (!this.usb) return null;
-    try {
-      const device = await this.usb.requestDevice({ filters: ONEKEY_FILTER });
-      return device;
-    } catch (e) {
-      this.Log.debug('requestDevice error: ', e);
-      return null;
-    }
   }
 }

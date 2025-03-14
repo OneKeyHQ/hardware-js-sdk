@@ -99,6 +99,13 @@ export default class DeviceConnector {
     }
   }
 
+  promptDeviceAccess(): Promise<USBDevice | BluetoothDevice | null> {
+    if (!this.transport.promptDeviceAccess) {
+      return Promise.resolve(null);
+    }
+    return this.transport.promptDeviceAccess();
+  }
+
   _reportDevicesChange() {
     DevicePool.reportDeviceChange(this.upcoming);
   }
