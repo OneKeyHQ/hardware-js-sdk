@@ -1,14 +1,9 @@
 /* eslint-disable no-undef */
 import transport, { AcquireInput, LogBlockCommand } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 
 const { parseConfigure, buildEncodeBuffers, decodeProtocol, receiveOne, check } = transport;
-
-const ONEKEY_FILTER = [
-  { vendorId: 0x1209, productId: 0x53c0 },
-  { vendorId: 0x1209, productId: 0x53c1 },
-];
 
 const CONFIGURATION_ID = 1;
 const INTERFACE_ID = 0;
@@ -80,7 +75,7 @@ export default class WebUsbTransport {
   async promptDeviceAccess() {
     if (!this.usb) return null;
     try {
-      const device = await this.usb.requestDevice({ filters: ONEKEY_FILTER });
+      const device = await this.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
       return device;
     } catch (e) {
       this.Log.debug('requestDevice error: ', e);
@@ -106,7 +101,7 @@ export default class WebUsbTransport {
 
     const devices = await this.usb.getDevices();
     const onekeyDevices = devices.filter(dev => {
-      const isOneKey = ONEKEY_FILTER.some(
+      const isOneKey = ONEKEY_WEBUSB_FILTER.some(
         desc => dev.vendorId === desc.vendorId && dev.productId === desc.productId
       );
       const hasSerialNumber = typeof dev.serialNumber === 'string' && dev.serialNumber.length > 0;

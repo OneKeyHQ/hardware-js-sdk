@@ -16,6 +16,7 @@ export default class PromptWebDeviceAccess extends BaseMethod {
   }
 
   async run() {
+    const { deviceSerialNumberFromUI } = this.payload;
     await TransportManager.configure();
     const isWebUsbEnv = DataManager.getSettings('env') === 'webusb';
     if (!isWebUsbEnv) {
@@ -25,28 +26,44 @@ export default class PromptWebDeviceAccess extends BaseMethod {
     }
 
     try {
-      const device = await this.connector?.promptDeviceAccess();
-      if (!device) {
-        return await Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.WebDevicePromptAccessError)
-        );
-      }
-      if (isWebUsbEnv) {
-        const devicesDescriptor = [
+      let device;
+      let devicesDescriptor;
+
+      // If serial number is provided, skip prompting user
+      if (deviceSerialNumberFromUI) {
+        // Manually construct device descriptor using provided serial number
+        devicesDescriptor = [
           {
-            path: (device as USBDevice).serialNumber ?? '',
-            device,
+            path: deviceSerialNumberFromUI,
+            device: { serialNumber: deviceSerialNumberFromUI },
             debug: true,
           },
         ];
-        const { deviceList } = await DevicePool.getDevices(
-          devicesDescriptor as unknown as OneKeyDeviceInfo[]
-        );
-        if (deviceList.length > 0) {
-          return { device: deviceList[0].toMessageObject() };
+      } else {
+        // Otherwise prompt user to select a device
+        device = await this.connector?.promptDeviceAccess();
+        if (!device) {
+          return await Promise.reject(
+            ERRORS.TypedError(HardwareErrorCode.WebDevicePromptAccessError)
+          );
+        }
+
+        if (isWebUsbEnv) {
+          devicesDescriptor = [
+            {
+              path: (device as USBDevice).serialNumber ?? '',
+              device,
+              debug: true,
+            },
+          ];
         }
       }
-
+      const { deviceList } = await DevicePool.getDevices(
+        devicesDescriptor as unknown as OneKeyDeviceInfo[]
+      );
+      if (deviceList.length > 0) {
+        return { device: deviceList[0].toMessageObject() };
+      }
       return { device: null };
     } catch (error) {
       Log.debug(error);

@@ -1,3 +1,4 @@
+export * from './constants';
 export * from './deferred';
 export * from './HardwareError';
 export * from './timerUtils';
