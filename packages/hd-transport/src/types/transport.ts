@@ -43,6 +43,9 @@ export type Transport = {
   read(session: string): Promise<MessageFromOneKey>;
   cancel(): Promise<void>;
 
+  // web-usb, web-bluetooth request device
+  promptDeviceAccess?: () => Promise<USBDevice | BluetoothDevice | null>;
+
   // resolves when the transport can be used; rejects when it cannot
   init: ITransportInitFn;
   stop(): void;
@@ -51,11 +54,6 @@ export type Transport = {
   version: string;
   name: string;
   activeName?: string;
-
-  // webusb has a different model, where you have to
-  // request device connection
-  requestDevice: () => Promise<void>;
-  requestNeeded: boolean;
 
   isOutdated: boolean;
 };

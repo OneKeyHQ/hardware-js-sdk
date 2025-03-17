@@ -326,4 +326,6 @@ export default class DataManager {
 
   static isBleConnect = (env: ConnectSettings['env']) =>
     env === 'react-native' || env === 'lowlevel';
+
+  static isWebUsbConnect = (env: ConnectSettings['env']) => env === 'webusb';
 }

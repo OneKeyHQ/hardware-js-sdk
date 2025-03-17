@@ -396,6 +396,11 @@ function initDevice(method: BaseMethod) {
   }
 
   if (!device) {
+    const env = DataManager.getSettings('env');
+    if (DataManager.isWebUsbConnect(env)) {
+      postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
+      throw ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission);
+    }
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
   }
 
@@ -537,6 +542,7 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
+            HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
           ].includes(error.errorCode)
         ) {
           reject(error);

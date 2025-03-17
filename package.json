@@ -37,11 +37,13 @@
     "build:example:desktop": "cd ./packages/connect-examples/electron-example && yarn make",
     "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
     "dev:ble": "cd ./packages/hd-ble-sdk && yarn dev",
+    "dev:common": "cd ./packages/hd-common-connect-sdk && yarn dev",
     "dev:core": "cd ./packages/core && yarn dev",
     "dev:transport": "cd ./packages/hd-transport && yarn dev",
     "dev:transport-http": "cd ./packages/hd-transport-web && yarn dev",
     "dev:transport-rn": "cd ./packages/hd-transport-react-native && yarn dev",
     "dev:transport-lowlevel": "cd ./packages/hd-transport-lowlevel && yarn dev",
+    "dev:transport-webusb": "cd ./packages/hd-transport-webusb && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
     "debug:watcher": "node ./scripts/monitor.js"
   },

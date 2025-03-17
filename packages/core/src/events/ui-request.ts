@@ -26,6 +26,8 @@ export const UI_REQUEST = {
   FIRMWARE_TIP: 'ui-firmware-tip',
 
   PREVIOUS_ADDRESS_RESULT: 'ui-previous_address_result',
+
+  WEB_DEVICE_PROMPT_ACCESS_PERMISSION: 'ui-web_device_prompt_access_permission',
 } as const;
 
 export interface UiRequestWithoutPayload {
@@ -35,7 +37,8 @@ export interface UiRequestWithoutPayload {
     | typeof UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE
     | typeof UI_REQUEST.LOCATION_PERMISSION
     | typeof UI_REQUEST.LOCATION_SERVICE_PERMISSION
-    | typeof UI_REQUEST.FIRMWARE_PROCESSING;
+    | typeof UI_REQUEST.FIRMWARE_PROCESSING
+    | typeof UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION;
   payload?: typeof undefined;
 }
 
