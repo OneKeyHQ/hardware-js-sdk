@@ -50,6 +50,10 @@ export default class DataManager {
       firmware: [],
       ble: [],
     },
+    classicpure: {
+      firmware: [],
+      ble: [],
+    },
   };
 
   static assets: AssetsMap | null = null;
@@ -288,6 +292,7 @@ export default class DataManager {
       this.deviceMap = {
         classic: data.classic,
         classic1s: data.classic1s,
+        classicpure: data.classicpure,
         mini: data.mini,
         touch: data.touch,
         pro: data.pro,

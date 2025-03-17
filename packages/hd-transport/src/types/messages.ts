@@ -2175,6 +2175,7 @@ export enum OneKeyDeviceType {
   MINI = 2,
   TOUCH = 3,
   PRO = 5,
+  PURE = 6,
 }
 
 export enum OneKeySeType {
