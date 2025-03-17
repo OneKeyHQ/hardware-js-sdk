@@ -24,6 +24,7 @@
     "@onekeyfe/hd-transport": "^1.0.22-alpha.3"
   },
   "devDependencies": {
-    "@types/w3c-web-usb": "^1.0.6"
+    "@types/w3c-web-usb": "^1.0.6",
+    "@types/web-bluetooth": "^0.0.17"
   }
 }
