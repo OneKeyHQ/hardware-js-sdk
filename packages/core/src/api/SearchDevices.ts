@@ -1,4 +1,3 @@
-import type { OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import { BaseMethod } from './BaseMethod';
 import DeviceConnector from '../device/DeviceConnector';
 import TransportManager from '../data-manager/TransportManager';

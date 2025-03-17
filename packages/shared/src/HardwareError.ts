@@ -384,6 +384,16 @@ export const HardwareErrorCode = {
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
+
+  /**
+   * Web USB or Web Bluetooth device not found or needs permission
+   */
+  WebDeviceNotFoundOrNeedsPermission: 901,
+
+  /**
+   * Web USB or Web Bluetooth device prompt access error
+   */
+  WebDevicePromptAccessError: 902,
 } as const;
 
 export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
@@ -506,6 +516,10 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
    * Lowlevel transport
    */
   [HardwareErrorCode.LowlevelTrasnportConnectError]: 'Lowlevel transport connect error',
+  [HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission]:
+    'Web-USB or Web-Bluetooth device not found or needs permission',
+  [HardwareErrorCode.WebDevicePromptAccessError]:
+    'Web-USB or Web-Bluetooth device prompt access error',
 } as const;
 
 export const TypedError = (
