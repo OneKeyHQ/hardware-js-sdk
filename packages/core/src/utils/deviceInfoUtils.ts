@@ -24,7 +24,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
     case 'PRO':
       return 'pro';
     case 'PURE':
-      return 'classicPure';
+      return 'classicpure';
     default:
       // future And old device onekey_device_type is empty
       if (!isEmpty(features.onekey_serial_no)) {
@@ -48,7 +48,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   // By May 2021, the miniFlag is 'bixin' for all classic devices
   if (miniFlag.toLowerCase() === 'bi') return 'classic';
   if (miniFlag.toLowerCase() === 'cl') return 'classic';
-  if (miniFlag.toLowerCase() === 'cp') return 'classicPure';
+  if (miniFlag.toLowerCase() === 'cp') return 'classicpure';
   if (miniFlag.toLowerCase() === 'mi') return 'mini';
   if (miniFlag.toLowerCase() === 'tc') return 'touch';
   if (miniFlag.toLowerCase() === 'pr') return 'pro';
