@@ -242,6 +242,7 @@ export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
     case 'classic':
     case 'classic1s':
     case 'mini':
+    case 'classicpure':
       data = getT1Data();
       break;
     case 'touch':
@@ -266,6 +267,7 @@ export const getHomeScreenDefaultList = (features: Features) => {
     case 'classic':
     case 'classic1s':
     case 'mini':
+    case 'classicpure':
       data = getT1Data();
       break;
     case 'touch':
