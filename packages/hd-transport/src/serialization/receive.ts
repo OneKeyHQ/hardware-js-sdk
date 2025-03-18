@@ -1,6 +1,5 @@
-import { Root } from 'protobufjs/light';
 import ByteBuffer from 'bytebuffer';
-
+import Root from 'protobufjs/src/root';
 import * as decodeProtobuf from './protobuf/decode';
 import * as decodeProtocol from './protocol/decode';
 import { createMessageFromType } from './protobuf/messages';

@@ -1,4 +1,4 @@
-import { Type } from 'protobufjs/light';
+import * as protobuf from 'protobufjs';
 import { Buffer } from 'buffer';
 import ByteBuffer from 'bytebuffer';
 
@@ -21,7 +21,7 @@ const transform = (fieldType: string, value: any) => {
   return value;
 };
 
-export function patch(Message: Type, payload: any) {
+export function patch(Message: protobuf.Type, payload: any) {
   const patched: any = {};
 
   if (!Message.fields) {
@@ -67,7 +67,7 @@ export function patch(Message: Type, payload: any) {
   return patched;
 }
 
-export const encode = (Message: Type, data: Record<string, unknown>) => {
+export const encode = (Message: protobuf.Type, data: Record<string, unknown>) => {
   const payload = patch(Message, data);
   const message = Message.fromObject(payload);
   // Encode a message to an Uint8Array (browser) or Buffer (node)

@@ -1,4 +1,5 @@
-const ProtoBuf = require('protobufjs/light');
+// Use full protobufjs for reflection capabilities
+const protobuf = require('protobufjs');
 
 const { encode } = require('../src/serialization/protobuf/encode');
 const { decode } = require('../src/serialization/protobuf/decode');
@@ -508,7 +509,7 @@ const fixtures = [
 describe('Real messages', () => {
   fixtures.forEach(f => {
     describe(f.name, () => {
-      const Messages = ProtoBuf.Root.fromJSON({
+      const Messages = protobuf.Root.fromJSON({
         nested: { messages: { nested: { ...f.message } } },
       });
       const Message = Messages.lookup(`messages.${f.name}`);

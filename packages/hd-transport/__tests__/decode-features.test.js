@@ -1,4 +1,5 @@
-const ProtoBuf = require('protobufjs/light');
+// Use full protobufjs for reflection capabilities
+const protobuf = require('protobufjs');
 const ByteBuffer = require('bytebuffer');
 
 const { decode } = require('../src/serialization/protobuf/decode');
@@ -49,7 +50,7 @@ const fixtures = [
 ];
 
 describe('Fix messages decode', () => {
-  const Messages = ProtoBuf.Root.fromJSON(messages);
+  const Messages = protobuf.Root.fromJSON(messages);
   const Message = Messages.lookup(`Features`);
   fixtures.forEach(f => {
     describe(f.name, () => {

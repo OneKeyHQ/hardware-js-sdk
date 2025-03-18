@@ -1,6 +1,12 @@
-import * as protobuf from 'protobufjs/light';
+// Import full protobufjs for reflection capabilities
+import * as protobuf from 'protobufjs';
 
-export function parseConfigure(data: protobuf.INamespace) {
+// Type definitions for compatibility
+interface INamespace {
+  [key: string]: any;
+}
+
+export function parseConfigure(data: INamespace | string) {
   // @ts-ignore [compatiblity]: connect is sending stringified json
   if (typeof data === 'string') {
     return protobuf.Root.fromJSON(JSON.parse(data));

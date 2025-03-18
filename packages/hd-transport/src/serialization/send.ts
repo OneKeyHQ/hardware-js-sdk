@@ -1,8 +1,8 @@
 // Logic of sending data to trezor
 //
 // Logic of "call" is broken to two parts - sending and receiving
-import { Root } from 'protobufjs/light';
 import ByteBuffer from 'bytebuffer';
+import Root from 'protobufjs/src/root';
 import { encode as encodeProtobuf } from './protobuf';
 import { encode as encodeProtocol } from './protocol';
 import { createMessageFromName } from './protobuf/messages';
