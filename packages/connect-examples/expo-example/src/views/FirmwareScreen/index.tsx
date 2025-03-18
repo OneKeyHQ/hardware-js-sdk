@@ -6,6 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import type { Device, IDeviceListInstance } from '../../components/DeviceList';
 import PageView from '../../components/ui/Page';
 import PanelView from '../../components/ui/Panel';
@@ -134,7 +135,8 @@ function FirmwareLocalFile({ title, type, onUpdate, deviceType }: FirmwareLocalF
         </Text>
         <Button onPress={selectFile}>{intl.formatMessage({ id: 'action__pick_file' })}</Button>
       </Stack>
-      {(deviceType === 'pro' || deviceType === 'touch') && type === 'firmware' ? (
+      {(deviceType === EDeviceType.Pro || deviceType === EDeviceType.Touch) &&
+      type === 'firmware' ? (
         <Stack flexDirection="row" alignItems="center">
           <Checkbox checked={reboot} onCheckedChange={checked => setReboot(!!checked)}>
             <Checkbox.Indicator>
@@ -281,7 +283,7 @@ function FirmwareUpdate({
 
       if (
         type === 'bootloader' &&
-        (deviceTypeLowerCase === 'touch' || deviceTypeLowerCase === 'pro')
+        (deviceTypeLowerCase === EDeviceType.Touch || deviceTypeLowerCase === EDeviceType.Pro)
       ) {
         setShowUpdateDialog(true);
         const res = await sdk.deviceUpdateBootloader(selectDevice.connectId, {
@@ -481,7 +483,8 @@ function FirmwareUpdate({
                   type="bootloader"
                   onUpdate={updateFirmware}
                 />
-                {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
+                {(deviceTypeLowerCase === EDeviceType.Pro ||
+                  deviceTypeLowerCase === EDeviceType.Touch) && (
                   <FirmwareLocalFile
                     deviceType={deviceTypeLowerCase}
                     title={intl.formatMessage({ id: 'label__device_update_sys_resource' })}
@@ -489,7 +492,8 @@ function FirmwareUpdate({
                     onUpdate={updateFirmware}
                   />
                 )}
-                {(deviceTypeLowerCase === 'pro' || deviceTypeLowerCase === 'touch') && (
+                {(deviceTypeLowerCase === EDeviceType.Pro ||
+                  deviceTypeLowerCase === EDeviceType.Touch) && (
                   <FirmwareActionButton
                     deviceType={deviceTypeLowerCase}
                     title={intl.formatMessage({ id: 'label__reboot_device_board_model' })}
