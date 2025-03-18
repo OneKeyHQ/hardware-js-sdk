@@ -133,56 +133,6 @@ export type AptosMessageSignature = {
   address: string;
 };
 
-// BenfenGetAddress
-export type BenfenGetAddress = {
-  address_n: number[];
-  show_display?: boolean;
-};
-
-// BenfenAddress
-export type BenfenAddress = {
-  address?: string;
-};
-
-// BenfenSignTx
-export type BenfenSignTx = {
-  address_n: number[];
-  raw_tx: string;
-  data_initial_chunk?: string;
-  coin_type?: string;
-  data_length?: number;
-};
-
-// BenfenSignedTx
-export type BenfenSignedTx = {
-  public_key: string;
-  signature: string;
-};
-
-// BenfenTxRequest
-export type BenfenTxRequest = {
-  data_length?: number;
-  public_key?: string;
-  signature?: string;
-};
-
-// BenfenTxAck
-export type BenfenTxAck = {
-  data_chunk: string;
-};
-
-// BenfenSignMessage
-export type BenfenSignMessage = {
-  address_n: number[];
-  message: string;
-};
-
-// BenfenMessageSignature
-export type BenfenMessageSignature = {
-  signature: string;
-  address: string;
-};
-
 // BinanceGetAddress
 export type BinanceGetAddress = {
   address_n: number[];
@@ -803,16 +753,6 @@ export enum CardanoCertificateType {
   STAKE_DEREGISTRATION = 1,
   STAKE_DELEGATION = 2,
   STAKE_POOL_REGISTRATION = 3,
-  STAKE_REGISTRATION_CONWAY = 7,
-  STAKE_DEREGISTRATION_CONWAY = 8,
-  VOTE_DELEGATION = 9,
-}
-
-export enum CardanoDRepType {
-  KEY_HASH = 0,
-  SCRIPT_HASH = 1,
-  ABSTAIN = 2,
-  NO_CONFIDENCE = 3,
 }
 
 export enum CardanoPoolRelayType {
@@ -823,10 +763,10 @@ export enum CardanoPoolRelayType {
 
 export enum CardanoTxAuxiliaryDataSupplementType {
   NONE = 0,
-  CVOTE_REGISTRATION_SIGNATURE = 1,
+  GOVERNANCE_REGISTRATION_SIGNATURE = 1,
 }
 
-export enum CardanoCVoteRegistrationFormat {
+export enum CardanoGovernanceRegistrationFormat {
   CIP15 = 0,
   CIP36 = 1,
 }
@@ -891,7 +831,6 @@ export type CardanoGetAddress = {
   network_id: number;
   address_parameters: CardanoAddressParametersType;
   derivation_type: CardanoDerivationType;
-  chunkify?: boolean;
 };
 
 // CardanoAddress
@@ -935,8 +874,6 @@ export type CardanoSignTxInit = {
   has_collateral_return?: boolean;
   total_collateral?: UintType;
   reference_inputs_count?: number;
-  chunkify?: boolean;
-  tag_cbor_sets?: boolean;
 };
 
 // CardanoTxInput
@@ -1015,13 +952,6 @@ export type CardanoPoolParametersType = {
   relays_count: number;
 };
 
-// CardanoDRep
-export type CardanoDRep = {
-  type: CardanoDRepType;
-  key_hash?: string;
-  script_hash?: string;
-};
-
 // CardanoTxCertificate
 export type CardanoTxCertificate = {
   type: CardanoCertificateType;
@@ -1030,8 +960,6 @@ export type CardanoTxCertificate = {
   pool_parameters?: CardanoPoolParametersType;
   script_hash?: string;
   key_hash?: string;
-  deposit?: UintType;
-  drep?: CardanoDRep;
 };
 
 // CardanoTxWithdrawal
@@ -1042,27 +970,26 @@ export type CardanoTxWithdrawal = {
   key_hash?: string;
 };
 
-// CardanoCVoteRegistrationDelegation
-export type CardanoCVoteRegistrationDelegation = {
-  vote_public_key: string;
+// CardanoGovernanceRegistrationDelegation
+export type CardanoGovernanceRegistrationDelegation = {
+  voting_public_key: string;
   weight: number;
 };
 
-// CardanoCVoteRegistrationParametersType
-export type CardanoCVoteRegistrationParametersType = {
-  vote_public_key?: string;
+// CardanoGovernanceRegistrationParametersType
+export type CardanoGovernanceRegistrationParametersType = {
+  voting_public_key?: string;
   staking_path: number[];
-  payment_address_parameters?: CardanoAddressParametersType;
+  reward_address_parameters: CardanoAddressParametersType;
   nonce: number;
-  format?: CardanoCVoteRegistrationFormat;
-  delegations: CardanoCVoteRegistrationDelegation[];
+  format?: CardanoGovernanceRegistrationFormat;
+  delegations: CardanoGovernanceRegistrationDelegation[];
   voting_purpose?: number;
-  payment_address?: string;
 };
 
 // CardanoTxAuxiliaryData
 export type CardanoTxAuxiliaryData = {
-  cvote_registration_parameters?: CardanoCVoteRegistrationParametersType;
+  governance_registration_parameters?: CardanoGovernanceRegistrationParametersType;
   hash?: string;
 };
 
@@ -1096,7 +1023,7 @@ export type CardanoTxItemAck = {};
 export type CardanoTxAuxiliaryDataSupplement = {
   type: CardanoTxAuxiliaryDataSupplementType;
   auxiliary_data_hash?: string;
-  cvote_registration_signature?: string;
+  governance_signature?: string;
 };
 
 // CardanoTxWitnessRequest
@@ -2175,7 +2102,6 @@ export enum OneKeyDeviceType {
   MINI = 2,
   TOUCH = 3,
   PRO = 5,
-  PURE = 6,
 }
 
 export enum OneKeySeType {
@@ -3500,36 +3426,6 @@ export type SolanaSignedTx = {
   signature?: string;
 };
 
-export enum SolanaOffChainMessageVersion {
-  MESSAGE_VERSION_0 = 0,
-}
-
-export enum SolanaOffChainMessageFormat {
-  V0_RESTRICTED_ASCII = 0,
-  V0_LIMITED_UTF8 = 1,
-}
-
-// SolanaSignOffChainMessage
-export type SolanaSignOffChainMessage = {
-  address_n: number[];
-  message: string;
-  message_version?: SolanaOffChainMessageVersion;
-  message_format?: SolanaOffChainMessageFormat;
-  application_domain?: string;
-};
-
-// SolanaSignUnsafeMessage
-export type SolanaSignUnsafeMessage = {
-  address_n: number[];
-  message: string;
-};
-
-// SolanaMessageSignature
-export type SolanaMessageSignature = {
-  signature: string;
-  public_key?: string;
-};
-
 // StarcoinGetAddress
 export type StarcoinGetAddress = {
   address_n: number[];
@@ -4136,31 +4032,6 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
-// NeoGetAddress
-export type NeoGetAddress = {
-  address_n: number[];
-  show_display?: boolean;
-};
-
-// NeoAddress
-export type NeoAddress = {
-  address?: string;
-  public_key?: string;
-};
-
-// NeoSignTx
-export type NeoSignTx = {
-  address_n: number[];
-  raw_tx: string;
-  network_magic?: number;
-};
-
-// NeoSignedTx
-export type NeoSignedTx = {
-  public_key: string;
-  signature: string;
-};
-
 // custom connect definitions
 export type MessageType = {
   AlephiumGetAddress: AlephiumGetAddress;
@@ -4184,14 +4055,6 @@ export type MessageType = {
   AptosMessagePayload: AptosMessagePayload;
   AptosSignMessage: AptosSignMessage;
   AptosMessageSignature: AptosMessageSignature;
-  BenfenGetAddress: BenfenGetAddress;
-  BenfenAddress: BenfenAddress;
-  BenfenSignTx: BenfenSignTx;
-  BenfenSignedTx: BenfenSignedTx;
-  BenfenTxRequest: BenfenTxRequest;
-  BenfenTxAck: BenfenTxAck;
-  BenfenSignMessage: BenfenSignMessage;
-  BenfenMessageSignature: BenfenMessageSignature;
   BinanceGetAddress: BinanceGetAddress;
   BinanceAddress: BinanceAddress;
   BinanceGetPublicKey: BinanceGetPublicKey;
@@ -4273,11 +4136,10 @@ export type MessageType = {
   CardanoPoolRelayParameters: CardanoPoolRelayParameters;
   CardanoPoolMetadataType: CardanoPoolMetadataType;
   CardanoPoolParametersType: CardanoPoolParametersType;
-  CardanoDRep: CardanoDRep;
   CardanoTxCertificate: CardanoTxCertificate;
   CardanoTxWithdrawal: CardanoTxWithdrawal;
-  CardanoCVoteRegistrationDelegation: CardanoCVoteRegistrationDelegation;
-  CardanoCVoteRegistrationParametersType: CardanoCVoteRegistrationParametersType;
+  CardanoGovernanceRegistrationDelegation: CardanoGovernanceRegistrationDelegation;
+  CardanoGovernanceRegistrationParametersType: CardanoGovernanceRegistrationParametersType;
   CardanoTxAuxiliaryData: CardanoTxAuxiliaryData;
   CardanoTxMint: CardanoTxMint;
   CardanoTxCollateralInput: CardanoTxCollateralInput;
@@ -4570,10 +4432,6 @@ export type MessageType = {
   NEMSignedTx: NEMSignedTx;
   NEMDecryptMessage: NEMDecryptMessage;
   NEMDecryptedMessage: NEMDecryptedMessage;
-  NeoGetAddress: NeoGetAddress;
-  NeoAddress: NeoAddress;
-  NeoSignTx: NeoSignTx;
-  NeoSignedTx: NeoSignedTx;
   NervosGetAddress: NervosGetAddress;
   NervosAddress: NervosAddress;
   NervosSignTx: NervosSignTx;
@@ -4616,9 +4474,6 @@ export type MessageType = {
   SolanaAddress: SolanaAddress;
   SolanaSignTx: SolanaSignTx;
   SolanaSignedTx: SolanaSignedTx;
-  SolanaSignOffChainMessage: SolanaSignOffChainMessage;
-  SolanaSignUnsafeMessage: SolanaSignUnsafeMessage;
-  SolanaMessageSignature: SolanaMessageSignature;
   StarcoinGetAddress: StarcoinGetAddress;
   StarcoinAddress: StarcoinAddress;
   StarcoinGetPublicKey: StarcoinGetPublicKey;
