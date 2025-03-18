@@ -3,7 +3,7 @@ import ByteBuffer from 'bytebuffer';
 import { isPrimitiveField } from '../../utils/protobuf';
 
 // Type definitions for compatibility
-type Message<T = any> = any;
+type Message = any;
 type Field = protobuf.Field;
 
 const transform = (field: Field, value: any) => {
@@ -32,7 +32,7 @@ const transform = (field: Field, value: any) => {
   return value;
 };
 
-function messageToJSON(Message: Message<Record<string, unknown>>, fields: protobuf.Type['fields']) {
+function messageToJSON(Message: Message, fields: protobuf.Type['fields']) {
   // get rid of Message.prototype references
   const { ...message } = Message;
   const res: { [key: string]: any } = {};
