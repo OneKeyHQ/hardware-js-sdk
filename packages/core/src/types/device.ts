@@ -81,13 +81,13 @@ export type Features = PROTO.Features;
 export type OnekeyFeatures = PROTO.OnekeyFeatures;
 
 export type IDeviceType =
-  | 'unknown'
-  | 'classic'
-  | 'classic1s'
-  | 'classicpure'
-  | 'mini'
-  | 'touch'
-  | 'pro';
+  | EDeviceType.Unknown
+  | EDeviceType.Classic
+  | EDeviceType.Classic1s
+  | EDeviceType.ClassicPure
+  | EDeviceType.Mini
+  | EDeviceType.Touch
+  | EDeviceType.Pro;
 
 /**
  * model_classic: 'classic' | 'classic1s' | 'classicpure'
