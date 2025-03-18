@@ -1,4 +1,5 @@
 import { isEmpty } from 'lodash';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import { DeviceModelToTypes } from '../types';
 
 import type { Features, IDeviceModel, IDeviceType, IVersionRange } from '../types';
@@ -14,21 +15,21 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   // classic1s 3.5.0 pro 4.6.0
   switch (features.onekey_device_type) {
     case 'CLASSIC':
-      return 'classic';
+      return EDeviceType.Classic;
     case 'CLASSIC1S':
-      return 'classic1s';
+      return EDeviceType.Classic1s;
     case 'MINI':
-      return 'mini';
+      return EDeviceType.Mini;
     case 'TOUCH':
-      return 'touch';
+      return EDeviceType.Touch;
     case 'PRO':
-      return 'pro';
+      return EDeviceType.Pro;
     case 'PURE':
-      return 'classicpure';
+      return EDeviceType.ClassicPure;
     default:
       // future And old device onekey_device_type is empty
       if (!isEmpty(features.onekey_serial_no)) {
-        return 'unknown';
+        return EDeviceType.Unknown;
       }
     // old device type
   }
@@ -39,19 +40,19 @@ export const getDeviceType = (features?: Features): IDeviceType => {
 
   // not exist serialNo, bootloader mode, model 1 is classic
   if (isEmpty(serialNo) && features.bootloader_mode === true && features.model === '1') {
-    return 'classic';
+    return EDeviceType.Classic;
   }
 
-  if (isEmpty(serialNo)) return 'unknown';
+  if (isEmpty(serialNo)) return EDeviceType.Unknown;
 
   const miniFlag = serialNo.slice(0, 2);
   // By May 2021, the miniFlag is 'bixin' for all classic devices
-  if (miniFlag.toLowerCase() === 'bi') return 'classic';
-  if (miniFlag.toLowerCase() === 'cl') return 'classic';
-  if (miniFlag.toLowerCase() === 'cp') return 'classicpure';
-  if (miniFlag.toLowerCase() === 'mi') return 'mini';
-  if (miniFlag.toLowerCase() === 'tc') return 'touch';
-  if (miniFlag.toLowerCase() === 'pr') return 'pro';
+  if (miniFlag.toLowerCase() === 'bi') return EDeviceType.Classic;
+  if (miniFlag.toLowerCase() === 'cl') return EDeviceType.Classic;
+  if (miniFlag.toLowerCase() === 'cp') return EDeviceType.ClassicPure;
+  if (miniFlag.toLowerCase() === 'mi') return EDeviceType.Mini;
+  if (miniFlag.toLowerCase() === 'tc') return EDeviceType.Touch;
+  if (miniFlag.toLowerCase() === 'pr') return EDeviceType.Pro;
 
   // unknown device
   return 'unknown';

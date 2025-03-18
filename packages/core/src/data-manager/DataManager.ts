@@ -1,5 +1,6 @@
 import axios from 'axios';
 import semver from 'semver';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
 import {
@@ -30,27 +31,27 @@ export type MessageVersion = 'latest' | 'v1';
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap = {
-    classic: {
+    [EDeviceType.Classic]: {
       firmware: [],
       ble: [],
     },
-    classic1s: {
+    [EDeviceType.Classic1s]: {
       firmware: [],
       ble: [],
     },
-    mini: {
+    [EDeviceType.Mini]: {
       firmware: [],
       ble: [],
     },
-    touch: {
+    [EDeviceType.Touch]: {
       firmware: [],
       ble: [],
     },
-    pro: {
+    [EDeviceType.Pro]: {
       firmware: [],
       ble: [],
     },
-    classicpure: {
+    [EDeviceType.ClassicPure]: {
       firmware: [],
       ble: [],
     },
@@ -290,12 +291,12 @@ export default class DataManager {
         }
       );
       this.deviceMap = {
-        classic: data.classic,
-        classic1s: data.classic1s,
-        classicpure: data.classicpure,
-        mini: data.mini,
-        touch: data.touch,
-        pro: data.pro,
+        [EDeviceType.Classic]: data.classic,
+        [EDeviceType.Classic1s]: data.classic1s,
+        [EDeviceType.ClassicPure]: data.classicpure,
+        [EDeviceType.Mini]: data.mini,
+        [EDeviceType.Touch]: data.touch,
+        [EDeviceType.Pro]: data.pro,
       };
       this.assets = {
         bridge: data.bridge,

@@ -4,6 +4,7 @@ import { isEmpty } from 'lodash';
 import type { CoreApi, Features, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 import { useSetAtom } from 'jotai';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
 import type { TestCaseDataWithKey, VerifyState } from './types';
@@ -190,9 +191,9 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
           await delay(delayTime);
         } else {
           const deviceType = getDeviceType(deviceFeatures);
-          if (deviceType === 'classic1s') {
+          if (deviceType === EDeviceType.Classic1s) {
             await delay(200);
-          } else if (deviceType === 'pro') {
+          } else if (deviceType === EDeviceType.Pro) {
             await delay(200);
           }
         }
