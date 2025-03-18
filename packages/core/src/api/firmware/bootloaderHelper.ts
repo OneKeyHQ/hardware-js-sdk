@@ -1,5 +1,5 @@
 import semver from 'semver';
-
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import { Features, IVersionArray } from '../../types';
 import { getDeviceType } from '../../utils';
 
@@ -35,10 +35,10 @@ export function shouldUpdateBootloaderForClassicAndMini({
 
 export function isEnteredManuallyBoot(features: Features, updateType: string) {
   const deviceType = getDeviceType(features);
-  const isMini = deviceType === 'mini';
+  const isMini = deviceType === EDeviceType.Mini;
   const isBoot183ClassicUpBle =
     updateType === 'firmware' &&
-    deviceType === 'classic' &&
+    deviceType === EDeviceType.Classic &&
     features.bootloader_version === '1.8.3';
   return isMini || isBoot183ClassicUpBle;
 }

@@ -9,7 +9,7 @@ import type { Features, IDeviceModel, IDeviceType, IVersionRange } from '../type
  */
 export const getDeviceType = (features?: Features): IDeviceType => {
   if (!features || typeof features !== 'object') {
-    return 'unknown';
+    return EDeviceType.Unknown;
   }
 
   // classic1s 3.5.0 pro 4.6.0
@@ -55,7 +55,7 @@ export const getDeviceType = (features?: Features): IDeviceType => {
   if (miniFlag.toLowerCase() === 'pr') return EDeviceType.Pro;
 
   // unknown device
-  return 'unknown';
+  return EDeviceType.Unknown;
 };
 
 /**
@@ -63,17 +63,17 @@ export const getDeviceType = (features?: Features): IDeviceType => {
  * @param name Ble name
  */
 export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
-  if (!name) return 'unknown';
+  if (!name) return EDeviceType.Unknown;
 
-  if (name.startsWith('BixinKey')) return 'classic';
-  if (name.startsWith('K')) return 'classic';
+  if (name.startsWith('BixinKey')) return EDeviceType.Classic;
+  if (name.startsWith('K')) return EDeviceType.Classic;
 
-  if (name.startsWith('T')) return 'touch';
-  if (name.startsWith('Touch')) return 'touch';
+  if (name.startsWith('T')) return EDeviceType.Touch;
+  if (name.startsWith('Touch')) return EDeviceType.Touch;
 
-  if (name.startsWith('Pro')) return 'pro';
+  if (name.startsWith('Pro')) return EDeviceType.Pro;
 
-  return 'unknown';
+  return EDeviceType.Unknown;
 };
 
 /**

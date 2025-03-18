@@ -70,7 +70,7 @@ export default class DataManager {
 
   static getFirmwareStatus = (features: Features): IDeviceFirmwareStatus => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return 'unknown';
+    if (deviceType === EDeviceType.Unknown) return 'unknown';
 
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
     if (features.firmware_present === false) {
@@ -95,7 +95,7 @@ export default class DataManager {
     const deviceType = getDeviceType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
-    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+    if (deviceType !== EDeviceType.Pro && deviceType !== EDeviceType.Touch) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
@@ -118,9 +118,9 @@ export default class DataManager {
    */
   static getSysFullResource = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
-    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+    if (deviceType !== EDeviceType.Pro && deviceType !== EDeviceType.Touch) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
@@ -134,9 +134,9 @@ export default class DataManager {
 
   static getBootloaderResource = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
-    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+    if (deviceType !== EDeviceType.Pro && deviceType !== EDeviceType.Touch) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
@@ -149,7 +149,7 @@ export default class DataManager {
 
   static getBootloaderTargetVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
@@ -163,7 +163,7 @@ export default class DataManager {
 
   static getBootloaderRelatedFirmwareVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
     if (!DeviceModelToTypes.model_mini.includes(deviceType)) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
@@ -180,7 +180,7 @@ export default class DataManager {
 
   static getFirmwareChangelog = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return [];
+    if (deviceType === EDeviceType.Unknown) return [];
 
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
@@ -204,7 +204,7 @@ export default class DataManager {
 
   static getFirmwareLatestRelease = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
@@ -227,7 +227,7 @@ export default class DataManager {
 
   static getBLEFirmwareStatus = (features: Features): IDeviceBLEFirmwareStatus => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return 'unknown';
+    if (deviceType === EDeviceType.Unknown) return 'unknown';
 
     const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
@@ -243,7 +243,7 @@ export default class DataManager {
 
   static getBleFirmwareChangelog = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return [];
+    if (deviceType === EDeviceType.Unknown) return [];
 
     const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
@@ -258,7 +258,7 @@ export default class DataManager {
 
   static getBleFirmwareLatestRelease = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
     return findLatestRelease(targetDeviceConfigList);
