@@ -240,9 +240,10 @@ export const getProData = (): Record<string, IScreenData> => ({
 export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
   let data: Record<string, IScreenData>;
   switch (deviceType) {
-    case EDeviceType.Classic:
-    case EDeviceType.Classic1s:
-    case EDeviceType.Mini:
+    case 'classic':
+    case 'classic1s':
+    case 'mini':
+    case 'classicpure':
       data = getT1Data();
       break;
     case EDeviceType.Touch:
@@ -264,9 +265,10 @@ export const getHomeScreenDefaultList = (features: Features) => {
   const deviceVersion = getDeviceFirmwareVersion(features).join('.');
 
   switch (deviceType) {
-    case EDeviceType.Classic:
-    case EDeviceType.Classic1s:
-    case EDeviceType.Mini:
+    case 'classic':
+    case 'classic1s':
+    case 'mini':
+    case 'classicpure':
       data = getT1Data();
       break;
     case EDeviceType.Touch:

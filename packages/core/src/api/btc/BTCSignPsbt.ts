@@ -48,7 +48,10 @@ export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
       const { message } = error;
 
       const deviceType = getDeviceType(this.device.features);
-      if (message.includes('PSBT parse failed') && deviceType === 'classic1s') {
+      if (
+        message.includes('PSBT parse failed') &&
+        (deviceType === 'classic1s' || deviceType === 'classicpure')
+      ) {
         throw TypedError(HardwareErrorCode.BTCPsbtTooManyUtxos, 'PSBT too many utxos', {
           count: 5,
         });
