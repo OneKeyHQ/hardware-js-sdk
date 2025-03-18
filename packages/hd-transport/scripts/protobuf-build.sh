@@ -44,8 +44,10 @@ grep -hv -e '^import ' -e '^syntax' -e '^package' -e 'option java_' $SRC/message
 | sed 's/^option /\/\/ option /' \
 | grep -v '    reserved '>> $DIST/messages.proto
 
-# BUILD messages.json from message.proto
+# BUILD messages.json and static module from message.proto
 npx pbjs -t json -p $DIST -o $DIST/messages.json --keep-case messages.proto
+npx pbjs -t static-module -w commonjs -o $DIST/messages.static.js messages.proto
+npx pbts -o $DIST/messages.static.d.ts $DIST/messages.static.js
 rm $DIST/messages.proto
 
 echo "generating type definitions for: $LANG"

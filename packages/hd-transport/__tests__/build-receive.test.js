@@ -1,3 +1,4 @@
+const protobuf = require('protobufjs');
 const { parseConfigure } = require('../src/serialization/protobuf/messages');
 const { buildOne } = require('../src/serialization/send');
 const { receiveOne } = require('../src/serialization/receive');
@@ -90,9 +91,19 @@ const fixtures = [
   },
 ];
 
-const parsedMessages = parseConfigure({
+// Use protobuf directly for tests
+const parsedMessages = protobuf.Root.fromJSON({
   nested: { hw: { nested: { trezor: { nested: { messages: { nested: messages } } } } } },
 });
+
+// Add the lookup method to the MessageType enum for tests
+if (parsedMessages.lookup('hw.trezor.messages.MessageType')) {
+  const MessageType = parsedMessages.lookup('hw.trezor.messages.MessageType');
+  MessageType.valuesById = {};
+  Object.keys(MessageType.values).forEach(key => {
+    MessageType.valuesById[MessageType.values[key]] = key;
+  });
+}
 
 describe('encoding json -> protobuf -> json', () => {
   fixtures.forEach(f => {

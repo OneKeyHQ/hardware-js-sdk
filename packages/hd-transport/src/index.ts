@@ -1,5 +1,5 @@
-import * as protobuf from 'protobufjs/light';
 import * as Long from 'long';
+import ProtoBuf from 'protobufjs/minimal';
 import {
   buildBuffers,
   buildEncodeBuffers,
@@ -10,8 +10,9 @@ import {
 } from './serialization';
 import * as check from './utils/highlevel-checks';
 
-protobuf.util.Long = Long;
-protobuf.configure();
+// Configure Long for protobuf
+ProtoBuf.util.Long = Long;
+ProtoBuf.configure();
 
 export type {
   Transport,

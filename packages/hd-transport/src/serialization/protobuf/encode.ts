@@ -1,7 +1,7 @@
-import { Type } from 'protobufjs/light';
+import * as protobuf from 'protobufjs/minimal';
 import { Buffer } from 'buffer';
 import ByteBuffer from 'bytebuffer';
-
+import { getMessageType, getEnum } from './static-messages';
 import { isPrimitiveField } from '../../utils/protobuf';
 
 const transform = (fieldType: string, value: any) => {
@@ -21,7 +21,7 @@ const transform = (fieldType: string, value: any) => {
   return value;
 };
 
-export function patch(Message: Type, payload: any) {
+export function patch(Message: protobuf.Type, payload: any) {
   const patched: any = {};
 
   if (!Message.fields) {
@@ -47,17 +47,20 @@ export function patch(Message: Type, payload: any) {
     }
     // repeated
     if (field.repeated) {
-      const RefMessage = Message.lookupTypeOrEnum(field.type);
+      // Use static message types instead of lookupTypeOrEnum
+      const RefMessage = getMessageType(field.type) || getEnum(field.type);
       patched[key] = value.map((v: any) => patch(RefMessage, v));
     }
     // message type
     else if (typeof value === 'object' && value !== null) {
-      const RefMessage = Message.lookupType(field.type);
+      // Use static message types instead of lookupType
+      const RefMessage = getMessageType(field.type);
       patched[key] = patch(RefMessage, value);
     }
     // enum type
     else if (typeof value === 'number') {
-      const RefMessage = Message.lookupEnum(field.type);
+      // Use static enums instead of lookupEnum
+      const RefMessage = getEnum(field.type);
       patched[key] = RefMessage.values[value];
     } else {
       patched[key] = value;
@@ -67,7 +70,7 @@ export function patch(Message: Type, payload: any) {
   return patched;
 }
 
-export const encode = (Message: Type, data: Record<string, unknown>) => {
+export const encode = (Message: protobuf.Type, data: Record<string, unknown>) => {
   const payload = patch(Message, data);
   const message = Message.fromObject(payload);
   // Encode a message to an Uint8Array (browser) or Buffer (node)

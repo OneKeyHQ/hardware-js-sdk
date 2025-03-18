@@ -4,4 +4,5 @@ module.exports = {
   modulePathIgnorePatterns: ['node_modules', '<rootDir>/lib', '<rootDir>/libDev'],
   collectCoverage: true,
   // collectCoverageFrom: ['src/**/*.ts'],
+  setupFiles: ['<rootDir>/__tests__/setup.js'],
 };

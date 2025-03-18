@@ -1,6 +1,7 @@
-const ProtoBuf = require('protobufjs/light');
+const protobuf = require('protobufjs');
 const { encode } = require('../src/serialization/protobuf/encode');
 const { decode } = require('../src/serialization/protobuf/decode');
+const { parseConfigure } = require('../src/serialization/protobuf/messages');
 
 const messages = {
   nested: {
@@ -192,7 +193,7 @@ const advancedFixtures = [
 ];
 
 describe('basic concepts', () => {
-  const Messages = ProtoBuf.Root.fromJSON(messages);
+  const Messages = protobuf.Root.fromJSON(messages);
 
   describe('primitives encode/decode', () => {
     basicFixtures.forEach(f => {
@@ -253,7 +254,7 @@ describe('basic concepts', () => {
         },
       };
 
-      const SenderMessages = ProtoBuf.Root.fromJSON(messages);
+      const SenderMessages = protobuf.Root.fromJSON(messages);
       const senderEncoded = encode(SenderMessages.lookup('messages.ButtonRequest'), {
         type: 'foo',
         pages: 123,
@@ -262,7 +263,7 @@ describe('basic concepts', () => {
       const receiverMessages = messages;
       // now change field type from uint32 to string
       receiverMessages.nested.messages.nested.ButtonRequest.fields.pages.type = 'string';
-      const ReceiverMessages = ProtoBuf.Root.fromJSON(receiverMessages);
+      const ReceiverMessages = protobuf.Root.fromJSON(receiverMessages);
 
       expect(() => {
         decode(ReceiverMessages.lookup('messages.ButtonRequest'), senderEncoded);
