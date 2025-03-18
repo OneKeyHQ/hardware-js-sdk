@@ -32,7 +32,7 @@ export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
       pro: {
         min: '4.9.3',
       },
-      classic1s: {
+      model_classic1s: {
         min: '3.10.1',
       },
     };

@@ -109,6 +109,10 @@ export const getDeviceLabel = (features?: Features) => {
   const bleName = getDeviceBleName(features);
   if (!isEmpty(bleName)) return bleName;
 
+  if (deviceType === EDeviceType.ClassicPure) {
+    return 'OneKey Classic 1S';
+  }
+
   return `OneKey ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`;
 };
 
