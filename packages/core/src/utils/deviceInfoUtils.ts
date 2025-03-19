@@ -131,7 +131,12 @@ export const getMethodVersionRange = (
     return versionRange;
   }
 
-  const modelFallbacks: IDeviceModel[] = ['model_classic', 'model_mini', 'model_touch'];
+  const modelFallbacks: IDeviceModel[] = [
+    'model_classic1s',
+    'model_classic',
+    'model_mini',
+    'model_touch',
+  ];
   for (const model of modelFallbacks) {
     if (DeviceModelToTypes[model].includes(deviceType)) {
       versionRange = getVersionRange(model);
