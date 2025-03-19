@@ -59,7 +59,7 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
       pro: {
         min: '4.10.0',
       },
-      classic1s: {
+      model_classic1s: {
         min: '3.10.0',
       },
     };
