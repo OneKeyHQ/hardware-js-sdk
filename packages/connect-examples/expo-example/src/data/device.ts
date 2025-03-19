@@ -89,17 +89,6 @@ const api: PlaygroundProps[] = [
     },
   },
   {
-    method: 'deviceLock',
-    description: 'lock device',
-    expect: {
-      common: {
-        normal: {
-          success: true,
-        },
-      },
-    },
-  },
-  {
     method: 'deviceSettings',
     description: 'Get settings of a device',
     noDeviceIdReq: true,
@@ -177,6 +166,13 @@ const api: PlaygroundProps[] = [
     method: 'deviceLock',
     description: 'lock device',
     noDeviceIdReq: true,
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+      },
+    },
   },
   {
     method: 'deviceFlags',
@@ -557,15 +553,7 @@ const api: PlaygroundProps[] = [
           skip: true,
         },
       },
-      classic: {
-        normal: {
-          requestButton: true,
-        },
-        bootloader: {
-          skip: true,
-        },
-      },
-      classic1s: {
+      common: {
         normal: {
           requestButton: true,
         },
@@ -587,6 +575,13 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+    expect: {
+      common: {
+        normal: {
+          success: true,
+        },
+      },
+    },
   },
   {
     method: 'setU2FCounter',

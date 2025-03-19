@@ -550,6 +550,11 @@ const api: PlaygroundProps[] = [
           ],
         },
         expect: {
+          classic1s: {
+            normal: {
+              unknownMessage: true,
+            },
+          },
           touch: {
             normal: {
               unknownMessage: true,
