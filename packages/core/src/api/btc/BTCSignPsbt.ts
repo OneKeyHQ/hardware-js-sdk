@@ -1,5 +1,5 @@
 import { SignPsbt } from '@onekeyfe/hd-transport';
-import { HardwareErrorCode, TypedError } from '@onekeyfe/hd-shared';
+import { HardwareErrorCode, TypedError, EDeviceType } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -32,7 +32,7 @@ export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
       pro: {
         min: '4.9.3',
       },
-      classic1s: {
+      model_classic1s: {
         min: '3.10.1',
       },
     };
@@ -48,7 +48,10 @@ export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
       const { message } = error;
 
       const deviceType = getDeviceType(this.device.features);
-      if (message.includes('PSBT parse failed') && deviceType === 'classic1s') {
+      if (
+        message.includes('PSBT parse failed') &&
+        (deviceType === EDeviceType.Classic1s || deviceType === EDeviceType.ClassicPure)
+      ) {
         throw TypedError(HardwareErrorCode.BTCPsbtTooManyUtxos, 'PSBT too many utxos', {
           count: 5,
         });

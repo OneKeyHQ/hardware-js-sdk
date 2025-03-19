@@ -18,7 +18,7 @@ import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { firmwareUpdate, firmwareUpdateV2 } from './firmwareUpdate';
-import { requestWebUsbDevice } from './requestWebUsbDevice';
+import { promptWebDeviceAccess } from './promptWebDeviceAccess';
 
 import { deviceReset } from './deviceReset';
 import { deviceRecovery } from './deviceRecovery';
@@ -242,6 +242,9 @@ import { benfenGetPublicKey } from './benfenGetPublicKey';
 import { benfenSignTransaction } from './benfenSignTransaction';
 import { benfenSignMessage } from './benfenSignMessage';
 
+import { neoGetAddress } from './neoGetAddress';
+import { neoSignTransaction } from './neoSignTransaction';
+
 export * from './export';
 
 export type CoreApi = {
@@ -278,7 +281,7 @@ export type CoreApi = {
    * Device function
    */
   searchDevices: typeof searchDevices;
-  requestWebUsbDevice: typeof requestWebUsbDevice;
+  promptWebDeviceAccess: typeof promptWebDeviceAccess;
   getFeatures: typeof getFeatures;
   getOnekeyFeatures: typeof getOnekeyFeatures;
   getPassphraseState: typeof getPassphraseState;
@@ -529,6 +532,12 @@ export type CoreApi = {
   benfenGetPublicKey: typeof benfenGetPublicKey;
   benfenSignTransaction: typeof benfenSignTransaction;
   benfenSignMessage: typeof benfenSignMessage;
+
+  /**
+   * Neo Network
+   */
+  neoGetAddress: typeof neoGetAddress;
+  neoSignTransaction: typeof neoSignTransaction;
 
   /**
    * Only use in test/api

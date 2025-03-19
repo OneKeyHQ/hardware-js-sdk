@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport",
-  "version": "1.0.21",
+  "version": "1.0.24-alpha.1",
   "description": "> TODO: description",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
@@ -19,7 +19,9 @@
     "update:protobuf": "./scripts/protobuf-build.sh"
   },
   "devDependencies": {
-    "@types/bytebuffer": "^5.0.42"
+    "@types/bytebuffer": "^5.0.42",
+    "@types/w3c-web-usb": "^1.0.10",
+    "@types/web-bluetooth": "^0.0.21"
   },
   "dependencies": {
     "bytebuffer": "^5.0.1",

@@ -22,6 +22,7 @@ export const getHardwareSDKInstance = memoizee(
       async (resolve, reject) => {
         const useLowLevelApi = false;
         if (initialized) {
+          // @ts-expect-error
           resolve({ HardwareSDK, HardwareLowLevelSDK, useLowLevelApi });
           return;
         }
@@ -31,17 +32,20 @@ export const getHardwareSDKInstance = memoizee(
           fetchConfig: true,
         };
 
-        HardwareSDK = await importSdk();
+        HardwareSDK = await importSdk({
+          useCommonSdk: true,
+        });
         // HardwareSDK = await importTopLevelSdk();
         console.log(HardwareSDK);
 
         if (Platform.OS === 'web') {
           settings.connectSrc = CONNECT_SRC;
-          settings.env = 'web';
+          settings.env = 'webusb';
           settings.preRelease = true;
           // HardwareLowLevelSDK = await importLowLevelSDK();
 
           // Override Connect src
+          // @ts-expect-error
           const { sdkConnectSrc } = window.ONEKEY_DESKTOP_GLOBALS ?? {};
           if (sdkConnectSrc) {
             settings.connectSrc = sdkConnectSrc;
@@ -54,6 +58,7 @@ export const getHardwareSDKInstance = memoizee(
           console.log('HardwareSDK initialized success');
           initialized = true;
 
+          // @ts-expect-error
           resolve({ HardwareSDK, HardwareLowLevelSDK, useLowLevelApi });
         } catch (e) {
           reject(e);

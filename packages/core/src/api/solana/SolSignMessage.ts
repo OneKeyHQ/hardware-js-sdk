@@ -34,7 +34,7 @@ export default class SolSignMessage extends BaseMethod<HardwareSolSignUnsafeMess
       touch: {
         min: '4.10.0',
       },
-      classic1s: {
+      model_classic1s: {
         min: '3.11.0',
       },
       model_mini: {

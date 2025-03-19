@@ -241,7 +241,7 @@ export const createCoreApi = (
   firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
   firmwareUpdateV2: (connectId, params) =>
     call({ ...params, connectId, method: 'firmwareUpdateV2' }),
-  requestWebUsbDevice: () => call({ method: 'requestWebUsbDevice' }),
+  promptWebDeviceAccess: params => call({ ...params, method: 'promptWebDeviceAccess' }),
 
   tronGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'tronGetAddress' }),
@@ -379,6 +379,11 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'benfenSignTransaction' }),
   benfenSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'benfenSignMessage' }),
+
+  neoGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'neoGetAddress' }),
+  neoSignTransaction: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'neoSignTransaction' }),
 
   /**
    * Only use in test/api

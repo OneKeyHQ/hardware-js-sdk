@@ -2300,6 +2300,7 @@ export enum OneKeyDeviceType {
   MINI = 2,
   TOUCH = 3,
   PRO = 5,
+  PURE = 6,
 }
 
 export enum OneKeySeType {
@@ -4360,6 +4361,31 @@ export enum CommandFlags {
   Factory_Only = 1,
 }
 
+// NeoGetAddress
+export type NeoGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// NeoAddress
+export type NeoAddress = {
+  address?: string;
+  public_key?: string;
+};
+
+// NeoSignTx
+export type NeoSignTx = {
+  address_n: number[];
+  raw_tx: string;
+  network_magic?: number;
+};
+
+// NeoSignedTx
+export type NeoSignedTx = {
+  public_key: string;
+  signature: string;
+};
+
 // custom connect definitions
 export type MessageType = {
   AlephiumGetAddress: AlephiumGetAddress;
@@ -4796,6 +4822,10 @@ export type MessageType = {
   NEMSignedTx: NEMSignedTx;
   NEMDecryptMessage: NEMDecryptMessage;
   NEMDecryptedMessage: NEMDecryptedMessage;
+  NeoGetAddress: NeoGetAddress;
+  NeoAddress: NeoAddress;
+  NeoSignTx: NeoSignTx;
+  NeoSignedTx: NeoSignedTx;
   NervosGetAddress: NervosGetAddress;
   NervosAddress: NervosAddress;
   NervosSignTx: NervosSignTx;

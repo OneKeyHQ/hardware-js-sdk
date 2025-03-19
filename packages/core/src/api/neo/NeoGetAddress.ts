@@ -1,18 +1,17 @@
+import { NeoGetAddress as HardwareNeoGetAddress } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
-import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
+import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { BenfenPublicKey, BenfenGetPublicKeyParams } from '../../types';
-import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+import { NeoAddress, NeoGetAddressParams } from '../../types/api/neoGetAddress';
 
-export default class BenfenGetPublicKey extends BaseMethod<any> {
+export default class NeoGetAddress extends BaseMethod<HardwareNeoGetAddress[]> {
   hasBundle = false;
-
-  strictCheckDeviceSupport = true;
 
   init() {
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.strictCheckDeviceSupport = true;
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -20,7 +19,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
     validateParams(payload, [{ name: 'bundle', type: 'array' }]);
 
     this.params = [];
-    payload.bundle.forEach((batch: BenfenGetPublicKeyParams) => {
+    payload.bundle.forEach((batch: NeoGetAddressParams) => {
       const addressN = validatePath(batch.path, 3);
 
       validateParams(batch, [
@@ -49,16 +48,29 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
   }
 
   async run() {
-    const res = await batchGetPublickeys(this.device, this.params, 'ed25519', 728);
+    const responses: NeoAddress[] = [];
 
-    const responses: BenfenPublicKey[] = res.message.public_keys.map(
-      (publicKey: string, index: number) => ({
-        path: serializedPath((this.params as any[])[index].address_n),
-        pub: publicKey,
-      })
-    );
+    for (let i = 0; i < this.params.length; i++) {
+      const param = this.params[i];
 
-    validateResult(responses, ['pub'], {
+      const res = await this.device.commands.typedCall('NeoGetAddress', 'NeoAddress', {
+        ...param,
+      });
+
+      const path = serializedPath(param.address_n);
+      responses.push({
+        path,
+        address: res.message.address ?? '',
+        pub: res.message.public_key ?? '',
+      });
+
+      this.postPreviousAddressMessage({
+        address: res.message.address,
+        path,
+      });
+    }
+
+    validateResult(responses, ['address'], {
       expectedLength: this.params.length,
     });
 

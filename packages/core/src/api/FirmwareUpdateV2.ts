@@ -1,6 +1,7 @@
 import {
   createDeferred,
   Deferred,
+  EDeviceType,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
@@ -103,8 +104,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     // check device goto bootloader mode
     let isFirstCheck = true;
     const isTouchOrProDevice =
-      getDeviceType(this?.device?.features) === 'touch' ||
-      getDeviceType(this?.device?.features) === 'pro';
+      getDeviceType(this?.device?.features) === EDeviceType.Touch ||
+      getDeviceType(this?.device?.features) === EDeviceType.Pro;
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
         Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
@@ -159,10 +160,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
   isEnteredManuallyBoot(features: Features) {
     const deviceType = getDeviceType(features);
-    const isMini = deviceType === 'mini';
+    const isMini = deviceType === EDeviceType.Mini;
     const isBoot183ClassicUpBle =
       this.params.updateType === 'firmware' &&
-      deviceType === 'classic' &&
+      deviceType === EDeviceType.Classic &&
       features.bootloader_version === '1.8.3';
     return isMini || isBoot183ClassicUpBle;
   }
@@ -171,7 +172,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     if (updateType !== 'firmware') return false;
 
     const deviceType = getDeviceType(features);
-    const isTouchMode = deviceType === 'touch' || deviceType === 'pro';
+    const isTouchMode = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
 
     return isTouchMode && semver.gte(currentVersion, '3.2.0');
@@ -194,7 +195,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     if (!fullResourceRange) return;
 
     const [minVersion, limitVersion] = fullResourceRange;
-    if (deviceType === 'touch' && updateType === 'firmware' && targetVersion) {
+    if (deviceType === EDeviceType.Touch && updateType === 'firmware' && targetVersion) {
       if (
         semver.lt(currentVersion, minVersion) &&
         semver.gte(targetVersion, limitVersion) &&

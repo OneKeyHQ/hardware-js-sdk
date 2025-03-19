@@ -36,7 +36,7 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
       pro: {
         min: '4.12.0',
       },
-      classic1s: {
+      model_classic1s: {
         min: '3.11.0',
       },
     };
@@ -57,6 +57,7 @@ export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {
     const { data_length } = res.message;
 
     if (!data_length) {
+      // @ts-expect-error
       return res.message;
     }
 

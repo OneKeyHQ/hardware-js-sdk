@@ -3,6 +3,7 @@ import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
   Deferred,
+  EDeviceType,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
@@ -632,7 +633,8 @@ export class Device extends EventEmitter {
 
   hasUsePassphrase() {
     const isModeT =
-      getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
+      getDeviceType(this.features) === EDeviceType.Touch ||
+      getDeviceType(this.features) === EDeviceType.Pro;
     const preCheckTouch = isModeT && this.features?.unlocked === false;
 
     return this.features && (!!this.features.passphrase_protection || preCheckTouch);

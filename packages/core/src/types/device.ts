@@ -1,3 +1,4 @@
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import type { PROTO } from '../constants';
 import { IVersionArray } from './settings';
 
@@ -79,28 +80,42 @@ export type Features = PROTO.Features;
 
 export type OnekeyFeatures = PROTO.OnekeyFeatures;
 
-export type IDeviceType = 'unknown' | 'classic' | 'classic1s' | 'mini' | 'touch' | 'pro';
+export type IDeviceType =
+  | EDeviceType.Unknown
+  | EDeviceType.Classic
+  | EDeviceType.Classic1s
+  | EDeviceType.ClassicPure
+  | EDeviceType.Mini
+  | EDeviceType.Touch
+  | EDeviceType.Pro;
 
 /**
- * model_classic: 'classic' | 'classic1s'
- * model_mini: 'classic' | 'mini'
+ * model_classic: 'classic' | 'classic1s' | 'classicpure'
+ * model_mini: 'classic' | 'classic1s' | 'classicpure' | 'mini'
  * model_touch: 'touch' | 'pro'
  */
-export type IDeviceModel = 'model_classic' | 'model_mini' | 'model_touch';
+export type IDeviceModel = 'model_classic' | 'model_mini' | 'model_touch' | 'model_classic1s';
 
 export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] } = {
-  model_mini: ['classic', 'classic1s', 'mini'],
-  model_touch: ['touch', 'pro'],
-  model_classic: ['classic', 'classic1s'],
+  model_mini: [
+    EDeviceType.Classic,
+    EDeviceType.Classic1s,
+    EDeviceType.ClassicPure,
+    EDeviceType.Mini,
+  ],
+  model_touch: [EDeviceType.Touch, EDeviceType.Pro],
+  model_classic: [EDeviceType.Classic, EDeviceType.Classic1s, EDeviceType.ClassicPure],
+  model_classic1s: [EDeviceType.Classic1s, EDeviceType.ClassicPure],
 };
 
 export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] } = {
-  classic: ['model_classic', 'model_mini'],
-  classic1s: ['model_classic', 'model_mini'],
-  mini: ['model_mini'],
-  touch: ['model_touch'],
-  pro: ['model_touch'],
-  unknown: [],
+  [EDeviceType.Classic]: ['model_classic', 'model_mini'],
+  [EDeviceType.Classic1s]: ['model_classic', 'model_mini', 'model_classic1s'],
+  [EDeviceType.ClassicPure]: ['model_classic', 'model_mini', 'model_classic1s'],
+  [EDeviceType.Mini]: ['model_mini'],
+  [EDeviceType.Touch]: ['model_touch'],
+  [EDeviceType.Pro]: ['model_touch'],
+  [EDeviceType.Unknown]: [],
 };
 
 export type IDeviceFirmwareStatus = 'valid' | 'outdated' | 'required' | 'unknown' | 'none';

@@ -1,5 +1,5 @@
 import semver from 'semver';
-import { ERRORS, HardwareError, HardwareErrorCode, serializeError } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { get } from 'lodash';
 import { serializedPath } from '../helpers/pathUtils';
@@ -225,6 +225,9 @@ const networkConfigMap: NetworkConfigMap = {
   },
   nostr: {
     methodName: 'nostrGetPublicKey',
+  },
+  neo: {
+    methodName: 'neoGetAddress',
   },
 };
 
