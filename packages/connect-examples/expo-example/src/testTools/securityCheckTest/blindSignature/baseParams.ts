@@ -255,6 +255,12 @@ export const baseParams = {
       },
     },
   },
+  neoSignTransaction: {
+    path: `m/44'/${COINTYPE_MARK}'/0'/0/0`,
+    rawTx:
+      '006108a1fd000000000000000070930000000000004d2169000120f4258023fc60fba495bcaa5d7148529734e93101005a0b02809698000c1420f4258023fc60fba495bcaa5d7148529734e9310c1420f4258023fc60fba495bcaa5d7148529734e93114c01f0c087472616e736665720c14cf76e28bd0062c4a478ee35561011319f3cfa4d241627d5b52',
+    magicNumber: 860_833_102,
+  },
 
   // ======= signMessage =======
   alephiumSignMessage: {
