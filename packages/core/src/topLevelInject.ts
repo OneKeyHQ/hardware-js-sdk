@@ -53,7 +53,7 @@ export const topLevelInject = () => {
     updateSettings: settings => lowLevelApi?.updateSettings(settings) ?? Promise.resolve(false),
 
     switchTransport: (env: ConnectSettings['env']) =>
-      lowLevelApi?.switchTransport(env) ?? Promise.resolve(false),
+      lowLevelApi?.switchTransport(env) ?? Promise.resolve({ success: false }),
   };
 
   return api;

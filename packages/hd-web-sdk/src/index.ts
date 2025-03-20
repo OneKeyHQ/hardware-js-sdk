@@ -236,6 +236,7 @@ const switchTransport = async (env: ConnectSettings['env']) => {
     });
     return response;
   }
+  throw ERRORS.TypedError(HardwareErrorCode.IFrameNotInitialized);
 };
 
 const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void) => {
