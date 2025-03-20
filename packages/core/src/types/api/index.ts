@@ -175,7 +175,7 @@ export type CoreApi = {
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
   updateSettings: typeof updateSettings;
-  switchTransport: (env: ConnectSettings['env']) => Promise<any>;
+  switchTransport: (env: ConnectSettings['env']) => Promise<{ success: boolean }>;
   getLogs: typeof getLogs;
 
   /**
