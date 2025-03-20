@@ -227,6 +227,17 @@ const updateSettings = async (settings: Partial<ConnectSettings>) => {
   return Promise.resolve(true);
 };
 
+const switchTransport = async (env: ConnectSettings['env']) => {
+  if (iframe.instance) {
+    const response = await sendMessage({
+      event: IFRAME.SWITCH_TRANSPORT,
+      type: IFRAME.SWITCH_TRANSPORT,
+      payload: { env },
+    });
+    return response;
+  }
+};
+
 const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void) => {
   [
     UI_EVENT,
@@ -264,6 +275,7 @@ const HardwareSDKLowLevel = HardwareLowLevelSdk({
   addHardwareGlobalEventListener,
   uiResponse,
   updateSettings,
+  switchTransport,
 });
 
 const HardwareSDKTopLevel = HardwareTopLevelSdk();
@@ -276,6 +288,7 @@ const HardwareWebSdk = HardwareSdk({
   dispose,
   uiResponse,
   updateSettings,
+  switchTransport,
 });
 
 export default { HardwareSDKLowLevel, HardwareSDKTopLevel, HardwareWebSdk };

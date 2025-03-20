@@ -52,6 +52,9 @@ export default function HandleSDKEvents() {
       if (!SDK) return;
 
       HardwareLowLevelSDK?.addHardwareGlobalEventListener(params => {
+        if (params.event === LOG_EVENT) {
+          console.log(params.payload.join(' '));
+        }
         SDK.emit?.(params.event, { ...params });
       });
 

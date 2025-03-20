@@ -7,6 +7,7 @@ export const IFRAME = {
   INIT_BRIDGE: 'iframe-init-bridge',
   CALL: 'iframe-call',
   CANCEL: 'iframe-cancel',
+  SWITCH_TRANSPORT: 'iframe-switch-transport',
 } as const;
 
 export interface IFrameInit {
@@ -21,7 +22,14 @@ export interface IFrameBridge {
   payload: unknown;
 }
 
-export type IFrameEvent = IFrameInit | IFrameBridge;
+export interface IFrameSwitchTransport {
+  type: typeof IFRAME.SWITCH_TRANSPORT;
+  payload: {
+    env: ConnectSettings['env'];
+  };
+}
+
+export type IFrameEvent = IFrameInit | IFrameBridge | IFrameSwitchTransport;
 export type IFrameEventMessage = IFrameEvent & { event: typeof UI_EVENT };
 
 export const createIFrameMessage: MessageFactoryFn<typeof UI_EVENT, IFrameEvent> = (

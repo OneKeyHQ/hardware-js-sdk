@@ -727,7 +727,7 @@ const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, d
 };
 
 const findUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T) =>
-  _uiPromises.find(p => p.id === promiseEvent) as UiPromise<T> | undefined;
+  _uiPromises.find(p => p.id === promiseEvent);
 
 const removeUiPromise = (promise: Deferred<any>) => {
   _uiPromises = _uiPromises.filter(p => p !== promise);
@@ -827,4 +827,21 @@ export const init = async (
   } catch (error) {
     Log.error('core init', error);
   }
+};
+
+export const switchTransport = ({
+  env,
+  Transport,
+  plugin,
+}: {
+  env: ConnectSettings['env'];
+  Transport: any;
+  plugin?: LowlevelTransportSharedPlugin;
+}) => {
+  DataManager.updateEnv(env);
+  TransportManager.setTransport(Transport, plugin);
+  _deviceList = undefined;
+  DevicePool.resetState();
+  _connector = undefined;
+  initConnector();
 };

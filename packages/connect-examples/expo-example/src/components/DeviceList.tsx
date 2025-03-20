@@ -8,15 +8,18 @@ import {
   useState,
 } from 'react';
 
-import { ListItem, Text, View } from 'tamagui';
+import { ListItem, Text, View, XStack } from 'tamagui';
 import { FlatList, Platform } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { Check } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
+import { useAtom } from 'jotai';
 import type { Features } from '@onekeyfe/hd-transport';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
 import { getItem, removeItem, setItem } from '../utils/storeUtil';
+import { connectionTypeAtom, ConnectionType } from '../atoms/deviceConnectAtoms';
 
 export type Device = {
   connectId: string;
@@ -98,6 +101,7 @@ function DeviceListFC(
   const { sdk } = useContext(HardwareSDKContext);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [connectionType, setConnectionType] = useAtom(connectionTypeAtom);
 
   useEffect(() => {
     if (disableSaveDevice) return;
@@ -124,8 +128,7 @@ function DeviceListFC(
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
     let response;
-    const env = 'webusb';
-    if (env === 'webusb') {
+    if (connectionType === 'webusb') {
       const promptResponse = await sdk.promptWebDeviceAccess();
       console.log('promptResponse:====>>>::: ', promptResponse);
       response = promptResponse.success
@@ -140,12 +143,23 @@ function DeviceListFC(
       const device = foundDevices[0];
       selectDevice(device);
     }
-  }, [intl, sdk, selectDevice]);
+  }, [intl, sdk, selectDevice, connectionType]);
 
   const handleRemoveSelected = useCallback(() => {
     removeSelectedId();
     setSelectedId(null);
   }, []);
+
+  const onSwitchConnectionType = useCallback(
+    async (value: ConnectionType) => {
+      console.log('value:====>>>::: ', value);
+      setConnectionType(value);
+      // @ts-expect-error
+      const res = await sdk?.switchTransport(value);
+      console.log('switchTransport res:====>>>::: ', res);
+    },
+    [sdk, setConnectionType]
+  );
 
   useImperativeHandle(
     ref,
@@ -186,6 +200,20 @@ function DeviceListFC(
           </Button>
         </View>
       )}
+
+      <XStack marginVertical="$2" alignItems="center" gap={12}>
+        <Text fontSize={15} marginBottom="$1">
+          {intl.formatMessage({ id: 'message__connection_type' })}
+        </Text>
+        <Picker
+          selectedValue={connectionType}
+          onValueChange={onSwitchConnectionType}
+          style={{ width: 120, height: 44 }}
+        >
+          <Picker.Item label="Bridge" value="bridge" />
+          <Picker.Item label="WebUSB" value="webusb" />
+        </Picker>
+      </XStack>
 
       <Button variant="primary" size="large" onPress={searchDevices}>
         {intl.formatMessage({ id: 'action__search_device' })}

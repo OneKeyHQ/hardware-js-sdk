@@ -247,4 +247,17 @@ export class DevicePool extends EventEmitter {
 
     this.disconnectPool.push(descriptor);
   }
+
+  static resetState() {
+    this.current = null;
+    this.upcoming = [];
+    this.connectedPool = [];
+    this.disconnectPool = [];
+    this.devicesCache = {};
+
+    // Clear all event listeners but keep the emitter instance
+    this.emitter.removeAllListeners();
+
+    Log.debug('DevicePool state has been reset');
+  }
 }
