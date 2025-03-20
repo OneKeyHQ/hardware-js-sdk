@@ -2,6 +2,7 @@ import EventEmitter from 'events';
 import { CoreApi } from './types/api';
 import { createCoreApi } from './inject';
 import type { LowLevelCoreApi } from './lowLevelInject';
+import { ConnectSettings } from './types/settings';
 
 export interface TopLevelInjectApi {
   init: CoreApi['init'];
@@ -50,6 +51,9 @@ export const topLevelInject = () => {
     cancel: (connectId?: string) => lowLevelApi?.cancel(connectId),
 
     updateSettings: settings => lowLevelApi?.updateSettings(settings) ?? Promise.resolve(false),
+
+    switchTransport: (env: ConnectSettings['env']) =>
+      lowLevelApi?.switchTransport(env) ?? Promise.resolve(false),
   };
 
   return api;
