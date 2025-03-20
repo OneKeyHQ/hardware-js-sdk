@@ -1,5 +1,167 @@
 {
   "nested": {
+    "AlephiumGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "include_public_key": {
+          "type": "bool",
+          "id": 3
+        },
+        "target_group": {
+          "type": "uint32",
+          "id": 4
+        }
+      }
+    },
+    "AlephiumAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "derived_path": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 3,
+          "options": {
+            "packed": false
+          }
+        }
+      }
+    },
+    "AlephiumSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "data_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "data_length": {
+          "type": "uint32",
+          "id": 3
+        }
+      }
+    },
+    "AlephiumSignedTx": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "AlephiumTxRequest": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "AlephiumTxAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "AlephiumBytecodeRequest": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "AlephiumBytecodeAck": {
+      "fields": {
+        "bytecode_data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "AlephiumSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "type": "bytes",
+          "id": 2
+        },
+        "message_type": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "AlephiumMessageSignature": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
     "AlgorandGetAddress": {
       "fields": {
         "address_n": {
@@ -151,6 +313,132 @@
       }
     },
     "AptosMessageSignature": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "BenfenGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "BenfenAddress": {
+      "fields": {
+        "address": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "BenfenSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_tx": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "data_initial_chunk": {
+          "type": "bytes",
+          "id": 3,
+          "options": {
+            "default": ""
+          }
+        },
+        "coin_type": {
+          "type": "bytes",
+          "id": 4
+        },
+        "data_length": {
+          "type": "uint32",
+          "id": 5
+        }
+      }
+    },
+    "BenfenSignedTx": {
+      "fields": {
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "BenfenTxRequest": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "BenfenTxAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "BenfenSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "BenfenMessageSignature": {
       "fields": {
         "signature": {
           "rule": "required",
@@ -661,6 +949,13 @@
         "no_script_type": {
           "type": "bool",
           "id": 5
+        },
+        "is_bip322_simple": {
+          "type": "bool",
+          "id": 10,
+          "options": {
+            "default": false
+          }
         }
       }
     },
@@ -1749,7 +2044,40 @@
         }
       }
     },
+    "SignPsbt": {
+      "fields": {
+        "psbt": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "coin_name": {
+          "type": "string",
+          "id": 2,
+          "options": {
+            "default": "Bitcoin"
+          }
+        }
+      }
+    },
+    "SignedPsbt": {
+      "fields": {
+        "psbt": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "FirmwareErase": {
+      "fields": {
+        "length": {
+          "type": "uint32",
+          "id": 1
+        }
+      }
+    },
+    "FirmwareErase_ex": {
       "fields": {
         "length": {
           "type": "uint32",
@@ -1790,11 +2118,32 @@
         }
       }
     },
-    "FirmwareErase_ex": {
+    "RebootType": {
+      "values": {
+        "Normal": 0,
+        "Boardloader": 1,
+        "BootLoader": 2
+      }
+    },
+    "Reboot": {
       "fields": {
-        "length": {
-          "type": "uint32",
+        "reboot_type": {
+          "rule": "required",
+          "type": "RebootType",
           "id": 1
+        }
+      }
+    },
+    "FirmwareUpdateEmmc": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "reboot_on_success": {
+          "type": "bool",
+          "id": 2
         }
       }
     },
@@ -1848,7 +2197,18 @@
         "STAKE_REGISTRATION": 0,
         "STAKE_DEREGISTRATION": 1,
         "STAKE_DELEGATION": 2,
-        "STAKE_POOL_REGISTRATION": 3
+        "STAKE_POOL_REGISTRATION": 3,
+        "STAKE_REGISTRATION_CONWAY": 7,
+        "STAKE_DEREGISTRATION_CONWAY": 8,
+        "VOTE_DELEGATION": 9
+      }
+    },
+    "CardanoDRepType": {
+      "values": {
+        "KEY_HASH": 0,
+        "SCRIPT_HASH": 1,
+        "ABSTAIN": 2,
+        "NO_CONFIDENCE": 3
       }
     },
     "CardanoPoolRelayType": {
@@ -1861,10 +2221,10 @@
     "CardanoTxAuxiliaryDataSupplementType": {
       "values": {
         "NONE": 0,
-        "GOVERNANCE_REGISTRATION_SIGNATURE": 1
+        "CVOTE_REGISTRATION_SIGNATURE": 1
       }
     },
-    "CardanoGovernanceRegistrationFormat": {
+    "CardanoCVoteRegistrationFormat": {
       "values": {
         "CIP15": 0,
         "CIP36": 1
@@ -1900,6 +2260,72 @@
           "rule": "required",
           "type": "uint32",
           "id": 3
+        }
+      }
+    },
+    "CardanoNativeScript": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "CardanoNativeScriptType",
+          "id": 1
+        },
+        "scripts": {
+          "rule": "repeated",
+          "type": "CardanoNativeScript",
+          "id": 2
+        },
+        "key_hash": {
+          "type": "bytes",
+          "id": 3
+        },
+        "key_path": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 4,
+          "options": {
+            "packed": false
+          }
+        },
+        "required_signatures_count": {
+          "type": "uint32",
+          "id": 5
+        },
+        "invalid_before": {
+          "type": "uint64",
+          "id": 6
+        },
+        "invalid_hereafter": {
+          "type": "uint64",
+          "id": 7
+        }
+      }
+    },
+    "CardanoGetNativeScriptHash": {
+      "fields": {
+        "script": {
+          "rule": "required",
+          "type": "CardanoNativeScript",
+          "id": 1
+        },
+        "display_format": {
+          "rule": "required",
+          "type": "CardanoNativeScriptHashDisplayFormat",
+          "id": 2
+        },
+        "derivation_type": {
+          "rule": "required",
+          "type": "CardanoDerivationType",
+          "id": 3
+        }
+      }
+    },
+    "CardanoNativeScriptHash": {
+      "fields": {
+        "script_hash": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -1972,6 +2398,10 @@
           "rule": "required",
           "type": "CardanoDerivationType",
           "id": 6
+        },
+        "chunkify": {
+          "type": "bool",
+          "id": 7
         }
       }
     },
@@ -2126,6 +2556,17 @@
           "id": 21,
           "options": {
             "default": 0
+          }
+        },
+        "chunkify": {
+          "type": "bool",
+          "id": 22
+        },
+        "tag_cbor_sets": {
+          "type": "bool",
+          "id": 23,
+          "options": {
+            "default": false
           }
         }
       }
@@ -2348,6 +2789,23 @@
         }
       }
     },
+    "CardanoDRep": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "CardanoDRepType",
+          "id": 1
+        },
+        "key_hash": {
+          "type": "bytes",
+          "id": 2
+        },
+        "script_hash": {
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
     "CardanoTxCertificate": {
       "fields": {
         "type": {
@@ -2378,6 +2836,14 @@
         "key_hash": {
           "type": "bytes",
           "id": 6
+        },
+        "deposit": {
+          "type": "uint64",
+          "id": 7
+        },
+        "drep": {
+          "type": "CardanoDRep",
+          "id": 8
         }
       }
     },
@@ -2406,9 +2872,9 @@
         }
       }
     },
-    "CardanoGovernanceRegistrationDelegation": {
+    "CardanoCVoteRegistrationDelegation": {
       "fields": {
-        "voting_public_key": {
+        "vote_public_key": {
           "rule": "required",
           "type": "bytes",
           "id": 1
@@ -2420,9 +2886,9 @@
         }
       }
     },
-    "CardanoGovernanceRegistrationParametersType": {
+    "CardanoCVoteRegistrationParametersType": {
       "fields": {
-        "voting_public_key": {
+        "vote_public_key": {
           "type": "bytes",
           "id": 1
         },
@@ -2434,8 +2900,7 @@
             "packed": false
           }
         },
-        "reward_address_parameters": {
-          "rule": "required",
+        "payment_address_parameters": {
           "type": "CardanoAddressParametersType",
           "id": 3
         },
@@ -2445,7 +2910,7 @@
           "id": 4
         },
         "format": {
-          "type": "CardanoGovernanceRegistrationFormat",
+          "type": "CardanoCVoteRegistrationFormat",
           "id": 5,
           "options": {
             "default": "CIP15"
@@ -2453,19 +2918,23 @@
         },
         "delegations": {
           "rule": "repeated",
-          "type": "CardanoGovernanceRegistrationDelegation",
+          "type": "CardanoCVoteRegistrationDelegation",
           "id": 6
         },
         "voting_purpose": {
           "type": "uint64",
           "id": 7
+        },
+        "payment_address": {
+          "type": "string",
+          "id": 8
         }
       }
     },
     "CardanoTxAuxiliaryData": {
       "fields": {
-        "governance_registration_parameters": {
-          "type": "CardanoGovernanceRegistrationParametersType",
+        "cvote_registration_parameters": {
+          "type": "CardanoCVoteRegistrationParametersType",
           "id": 1
         },
         "hash": {
@@ -2541,7 +3010,7 @@
           "type": "bytes",
           "id": 2
         },
-        "governance_signature": {
+        "cvote_registration_signature": {
           "type": "bytes",
           "id": 3
         }
@@ -2621,6 +3090,10 @@
           "rule": "required",
           "type": "uint32",
           "id": 4
+        },
+        "address_type": {
+          "type": "CardanoAddressType",
+          "id": 5
         }
       }
     },
@@ -2677,6 +3150,7 @@
             "Failure_PinMismatch": 12,
             "Failure_WipeCodeMismatch": 13,
             "Failure_InvalidSession": 14,
+            "Failure_BatteryLow": 30,
             "Failure_FirmwareError": 99
           }
         }
@@ -2879,44 +3353,68 @@
           }
         },
         "nonce": {
+          "rule": "required",
           "type": "bytes",
           "id": 2
         },
         "gas_price": {
+          "rule": "required",
           "type": "bytes",
           "id": 3
         },
         "gas_limit": {
+          "rule": "required",
           "type": "bytes",
           "id": 4
         },
         "to": {
           "type": "string",
-          "id": 5
+          "id": 5,
+          "options": {
+            "default": ""
+          }
         },
         "value": {
           "type": "bytes",
-          "id": 6
+          "id": 6,
+          "options": {
+            "default": ""
+          }
         },
         "epoch_height": {
           "type": "bytes",
-          "id": 7
+          "id": 7,
+          "options": {
+            "default": ""
+          }
         },
         "storage_limit": {
           "type": "bytes",
-          "id": 8
+          "id": 8,
+          "options": {
+            "default": ""
+          }
         },
         "data_initial_chunk": {
           "type": "bytes",
-          "id": 9
+          "id": 9,
+          "options": {
+            "default": ""
+          }
         },
         "data_length": {
           "type": "uint32",
-          "id": 10
+          "id": 10,
+          "options": {
+            "default": 0
+          }
         },
         "chain_id": {
           "type": "uint32",
-          "id": 11
+          "id": 11,
+          "options": {
+            "default": 1029
+          }
         }
       }
     },
@@ -3226,12 +3724,10 @@
     "CosiCommitment": {
       "fields": {
         "commitment": {
-          "rule": "required",
           "type": "bytes",
           "id": 1
         },
         "pubkey": {
-          "rule": "required",
           "type": "bytes",
           "id": 2
         }
@@ -3248,17 +3744,14 @@
           }
         },
         "data": {
-          "rule": "required",
           "type": "bytes",
           "id": 2
         },
         "global_commitment": {
-          "rule": "required",
           "type": "bytes",
           "id": 3
         },
         "global_pubkey": {
-          "rule": "required",
           "type": "bytes",
           "id": 4
         }
@@ -3534,6 +4027,351 @@
       "fields": {
         "watch": {
           "type": "bool",
+          "id": 1
+        }
+      }
+    },
+    "DnxGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "DnxAddress": {
+      "fields": {
+        "address": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "DnxSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "inputs_count": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "to_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        },
+        "amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "fee": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 5
+        },
+        "payment_id": {
+          "type": "bytes",
+          "id": 6
+        }
+      }
+    },
+    "DnxInputRequest": {
+      "fields": {
+        "request_index": {
+          "type": "uint32",
+          "id": 1
+        },
+        "tx_key": {
+          "type": "DnxTxKey",
+          "id": 2
+        },
+        "computed_key_image": {
+          "type": "DnxComputedKeyImage",
+          "id": 3
+        }
+      },
+      "nested": {
+        "DnxTxKey": {
+          "fields": {
+            "ephemeral_tx_sec_key": {
+              "type": "bytes",
+              "id": 1
+            },
+            "ephemeral_tx_pub_key": {
+              "type": "bytes",
+              "id": 2
+            }
+          }
+        },
+        "DnxComputedKeyImage": {
+          "fields": {
+            "key_image": {
+              "type": "bytes",
+              "id": 1
+            }
+          }
+        }
+      }
+    },
+    "DnxInputAck": {
+      "fields": {
+        "prev_index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "global_index": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "tx_pubkey": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "prev_out_pubkey": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 5
+        }
+      }
+    },
+    "DnxRTSigsRequest": {
+      "fields": {}
+    },
+    "DnxSignedTx": {
+      "fields": {
+        "signatures": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 1
+        },
+        "output_keys": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "EmmcFixPermission": {
+      "fields": {}
+    },
+    "EmmcPath": {
+      "fields": {
+        "exist": {
+          "rule": "required",
+          "type": "bool",
+          "id": 1
+        },
+        "size": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 2
+        },
+        "year": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "month": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "day": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 5
+        },
+        "hour": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 6
+        },
+        "minute": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 7
+        },
+        "second": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 8
+        },
+        "readonly": {
+          "rule": "required",
+          "type": "bool",
+          "id": 9
+        },
+        "hidden": {
+          "rule": "required",
+          "type": "bool",
+          "id": 10
+        },
+        "system": {
+          "rule": "required",
+          "type": "bool",
+          "id": 11
+        },
+        "archive": {
+          "rule": "required",
+          "type": "bool",
+          "id": 12
+        },
+        "directory": {
+          "rule": "required",
+          "type": "bool",
+          "id": 13
+        }
+      }
+    },
+    "EmmcPathInfo": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EmmcFile": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "offset": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "len": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 3
+        },
+        "data": {
+          "type": "bytes",
+          "id": 4
+        },
+        "data_hash": {
+          "type": "uint32",
+          "id": 5
+        },
+        "processed_byte": {
+          "type": "uint32",
+          "id": 6
+        }
+      }
+    },
+    "EmmcFileRead": {
+      "fields": {
+        "file": {
+          "rule": "required",
+          "type": "EmmcFile",
+          "id": 1
+        },
+        "ui_percentage": {
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "EmmcFileWrite": {
+      "fields": {
+        "file": {
+          "rule": "required",
+          "type": "EmmcFile",
+          "id": 1
+        },
+        "overwrite": {
+          "rule": "required",
+          "type": "bool",
+          "id": 2
+        },
+        "append": {
+          "rule": "required",
+          "type": "bool",
+          "id": 3
+        },
+        "ui_percentage": {
+          "type": "uint32",
+          "id": 4
+        }
+      }
+    },
+    "EmmcFileDelete": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EmmcDir": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "child_dirs": {
+          "type": "string",
+          "id": 2
+        },
+        "child_files": {
+          "type": "string",
+          "id": 3
+        }
+      }
+    },
+    "EmmcDirList": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EmmcDirMake": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "EmmcDirRemove": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
           "id": 1
         }
       }
@@ -5382,6 +6220,31 @@
     "GetFeatures": {
       "fields": {}
     },
+    "OnekeyGetFeatures": {
+      "fields": {}
+    },
+    "OneKeyDeviceType": {
+      "values": {
+        "CLASSIC": 0,
+        "CLASSIC1S": 1,
+        "MINI": 2,
+        "TOUCH": 3,
+        "PRO": 5,
+        "PURE": 6
+      }
+    },
+    "OneKeySeType": {
+      "values": {
+        "THD89": 0,
+        "SE608A": 1
+      }
+    },
+    "OneKeySEState": {
+      "values": {
+        "BOOT": 0,
+        "APP": 1
+      }
+    },
     "Features": {
       "fields": {
         "vendor": {
@@ -5627,8 +6490,128 @@
           "id": 517
         },
         "build_id": {
-          "type": "string",
+          "type": "bytes",
           "id": 518
+        },
+        "boardloader_version": {
+          "type": "string",
+          "id": 519
+        },
+        "battery_level": {
+          "type": "uint32",
+          "id": 520
+        },
+        "product": {
+          "type": "string",
+          "id": 521
+        },
+        "se_build_id": {
+          "type": "string",
+          "id": 530
+        },
+        "se_hash": {
+          "type": "bytes",
+          "id": 531
+        },
+        "onekey_device_type": {
+          "type": "OneKeyDeviceType",
+          "id": 600
+        },
+        "onekey_se_type": {
+          "type": "OneKeySeType",
+          "id": 601
+        },
+        "onekey_board_version": {
+          "type": "string",
+          "id": 602
+        },
+        "onekey_board_hash": {
+          "type": "bytes",
+          "id": 603
+        },
+        "onekey_boot_version": {
+          "type": "string",
+          "id": 604
+        },
+        "onekey_boot_hash": {
+          "type": "bytes",
+          "id": 605
+        },
+        "onekey_se01_version": {
+          "type": "string",
+          "id": 606
+        },
+        "onekey_se01_hash": {
+          "type": "bytes",
+          "id": 607
+        },
+        "onekey_se01_build_id": {
+          "type": "string",
+          "id": 608
+        },
+        "onekey_firmware_version": {
+          "type": "string",
+          "id": 609
+        },
+        "onekey_firmware_hash": {
+          "type": "bytes",
+          "id": 610
+        },
+        "onekey_firmware_build_id": {
+          "type": "string",
+          "id": 611
+        },
+        "onekey_serial_no": {
+          "type": "string",
+          "id": 612
+        },
+        "onekey_boot_build_id": {
+          "type": "string",
+          "id": 613
+        },
+        "onekey_ble_name": {
+          "type": "string",
+          "id": 614
+        },
+        "onekey_ble_version": {
+          "type": "string",
+          "id": 615
+        },
+        "onekey_ble_build_id": {
+          "type": "string",
+          "id": 616
+        },
+        "onekey_ble_hash": {
+          "type": "bytes",
+          "id": 617
+        },
+        "onekey_se02_version": {
+          "type": "string",
+          "id": 618
+        },
+        "onekey_se03_version": {
+          "type": "string",
+          "id": 619
+        },
+        "onekey_se04_version": {
+          "type": "string",
+          "id": 620
+        },
+        "onekey_se01_state": {
+          "type": "OneKeySEState",
+          "id": 621
+        },
+        "onekey_se02_state": {
+          "type": "OneKeySEState",
+          "id": 622
+        },
+        "onekey_se03_state": {
+          "type": "OneKeySEState",
+          "id": 623
+        },
+        "onekey_se04_state": {
+          "type": "OneKeySEState",
+          "id": 624
         }
       },
       "nested": {
@@ -5655,6 +6638,186 @@
             "Capability_ShamirGroups": 16,
             "Capability_PassphraseEntry": 17
           }
+        }
+      }
+    },
+    "OnekeyFeatures": {
+      "fields": {
+        "onekey_device_type": {
+          "type": "OneKeyDeviceType",
+          "id": 1
+        },
+        "onekey_board_version": {
+          "type": "string",
+          "id": 2
+        },
+        "onekey_boot_version": {
+          "type": "string",
+          "id": 3
+        },
+        "onekey_firmware_version": {
+          "type": "string",
+          "id": 4
+        },
+        "onekey_board_hash": {
+          "type": "bytes",
+          "id": 5
+        },
+        "onekey_boot_hash": {
+          "type": "bytes",
+          "id": 6
+        },
+        "onekey_firmware_hash": {
+          "type": "bytes",
+          "id": 7
+        },
+        "onekey_board_build_id": {
+          "type": "string",
+          "id": 8
+        },
+        "onekey_boot_build_id": {
+          "type": "string",
+          "id": 9
+        },
+        "onekey_firmware_build_id": {
+          "type": "string",
+          "id": 10
+        },
+        "onekey_serial_no": {
+          "type": "string",
+          "id": 11
+        },
+        "onekey_ble_name": {
+          "type": "string",
+          "id": 12
+        },
+        "onekey_ble_version": {
+          "type": "string",
+          "id": 13
+        },
+        "onekey_ble_build_id": {
+          "type": "string",
+          "id": 14
+        },
+        "onekey_ble_hash": {
+          "type": "bytes",
+          "id": 15
+        },
+        "onekey_se_type": {
+          "type": "OneKeySeType",
+          "id": 16
+        },
+        "onekey_se01_state": {
+          "type": "OneKeySEState",
+          "id": 17
+        },
+        "onekey_se02_state": {
+          "type": "OneKeySEState",
+          "id": 18
+        },
+        "onekey_se03_state": {
+          "type": "OneKeySEState",
+          "id": 19
+        },
+        "onekey_se04_state": {
+          "type": "OneKeySEState",
+          "id": 20
+        },
+        "onekey_se01_version": {
+          "type": "string",
+          "id": 21
+        },
+        "onekey_se02_version": {
+          "type": "string",
+          "id": 22
+        },
+        "onekey_se03_version": {
+          "type": "string",
+          "id": 23
+        },
+        "onekey_se04_version": {
+          "type": "string",
+          "id": 24
+        },
+        "onekey_se01_hash": {
+          "type": "bytes",
+          "id": 25
+        },
+        "onekey_se02_hash": {
+          "type": "bytes",
+          "id": 26
+        },
+        "onekey_se03_hash": {
+          "type": "bytes",
+          "id": 27
+        },
+        "onekey_se04_hash": {
+          "type": "bytes",
+          "id": 28
+        },
+        "onekey_se01_build_id": {
+          "type": "string",
+          "id": 29
+        },
+        "onekey_se02_build_id": {
+          "type": "string",
+          "id": 30
+        },
+        "onekey_se03_build_id": {
+          "type": "string",
+          "id": 31
+        },
+        "onekey_se04_build_id": {
+          "type": "string",
+          "id": 32
+        },
+        "onekey_se01_boot_version": {
+          "type": "string",
+          "id": 33
+        },
+        "onekey_se02_boot_version": {
+          "type": "string",
+          "id": 34
+        },
+        "onekey_se03_boot_version": {
+          "type": "string",
+          "id": 35
+        },
+        "onekey_se04_boot_version": {
+          "type": "string",
+          "id": 36
+        },
+        "onekey_se01_boot_hash": {
+          "type": "bytes",
+          "id": 37
+        },
+        "onekey_se02_boot_hash": {
+          "type": "bytes",
+          "id": 38
+        },
+        "onekey_se03_boot_hash": {
+          "type": "bytes",
+          "id": 39
+        },
+        "onekey_se04_boot_hash": {
+          "type": "bytes",
+          "id": 40
+        },
+        "onekey_se01_boot_build_id": {
+          "type": "string",
+          "id": 41
+        },
+        "onekey_se02_boot_build_id": {
+          "type": "string",
+          "id": 42
+        },
+        "onekey_se03_boot_build_id": {
+          "type": "string",
+          "id": 43
+        },
+        "onekey_se04_boot_build_id": {
+          "type": "string",
+          "id": 44
         }
       }
     },
@@ -5716,47 +6879,6 @@
         "experimental_features": {
           "type": "bool",
           "id": 10
-        },
-        "hide_passphrase_from_host": {
-          "type": "bool",
-          "id": 11
-        },
-        "use_ble": {
-          "type": "bool",
-          "id": 100
-        },
-        "use_se": {
-          "type": "bool",
-          "id": 101
-        },
-        "is_bixinapp": {
-          "type": "bool",
-          "id": 102
-        },
-        "fastpay_pin": {
-          "type": "bool",
-          "id": 103
-        },
-        "fastpay_confirm": {
-          "type": "bool",
-          "id": 104
-        },
-        "fastpay_money_limit": {
-          "type": "uint64",
-          "id": 105
-        },
-        "fastpay_times": {
-          "type": "uint32",
-          "id": 106
-        }
-      },
-      "nested": {
-        "ExportType": {
-          "values": {
-            "SeedEncExportType_NO": 0,
-            "SeedEncExportType_YES": 1,
-            "MnemonicPlainExportType_YES": 2
-          }
         }
       }
     },
@@ -6155,6 +7277,30 @@
         }
       }
     },
+    "RebootToBootloader": {
+      "fields": {}
+    },
+    "GetNonce": {
+      "options": {
+        "(experimental_message)": true
+      },
+      "fields": {}
+    },
+    "Nonce": {
+      "options": {
+        "(experimental_message)": true
+      },
+      "fields": {
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "DeviceBackToBoot": {
+      "fields": {}
+    },
     "DeviceInfoSettings": {
       "fields": {
         "serial_no": {
@@ -6202,6 +7348,15 @@
         }
       }
     },
+    "WriteSEPrivateKey": {
+      "fields": {
+        "private_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "ReadSEPublicKey": {
       "fields": {}
     },
@@ -6235,43 +7390,6 @@
         }
       }
     },
-    "SpiFlashWrite": {
-      "fields": {
-        "address": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 2
-        }
-      }
-    },
-    "SpiFlashRead": {
-      "fields": {
-        "address": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 1
-        },
-        "len": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 2
-        }
-      }
-    },
-    "SpiFlashData": {
-      "fields": {
-        "data": {
-          "rule": "required",
-          "type": "bytes",
-          "id": 1
-        }
-      }
-    },
     "SESignMessage": {
       "fields": {
         "message": {
@@ -6290,70 +7408,139 @@
         }
       }
     },
-    "NFTWriteInfo": {
+    "ResourceUpload": {
       "fields": {
-        "index": {
+        "extension": {
           "rule": "required",
-          "type": "uint32",
+          "type": "string",
           "id": 1
         },
-        "width": {
+        "data_length": {
           "rule": "required",
           "type": "uint32",
           "id": 2
         },
-        "height": {
+        "res_type": {
           "rule": "required",
-          "type": "uint32",
+          "type": "ResourceType",
           "id": 3
         },
-        "name_zh": {
-          "type": "string",
+        "nft_meta_data": {
+          "type": "bytes",
           "id": 4
         },
-        "name_en": {
-          "type": "string",
+        "zoom_data_length": {
+          "rule": "required",
+          "type": "uint32",
           "id": 5
+        },
+        "file_name_no_ext": {
+          "type": "string",
+          "id": 6
+        }
+      },
+      "nested": {
+        "ResourceType": {
+          "values": {
+            "WallPaper": 0,
+            "Nft": 1
+          }
         }
       }
     },
-    "NFTWriteData": {
+    "ZoomRequest": {
       "fields": {
-        "index": {
-          "rule": "required",
+        "offset": {
           "type": "uint32",
           "id": 1
         },
-        "data": {
+        "data_length": {
           "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "ResourceRequest": {
+      "fields": {
+        "offset": {
+          "type": "uint32",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "ResourceAck": {
+      "fields": {
+        "data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "hash": {
           "type": "bytes",
           "id": 2
-        },
-        "offset": {
-          "rule": "required",
-          "type": "uint32",
-          "id": 3
         }
       }
     },
-    "RebootToBootloader": {
-      "fields": {}
-    },
-    "GetNonce": {
-      "options": {
-        "(experimental_message)": true
-      },
-      "fields": {}
-    },
-    "Nonce": {
-      "options": {
-        "(experimental_message)": true
-      },
+    "ResourceUpdate": {
       "fields": {
-        "nonce": {
+        "file_name": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        },
+        "initial_data_chunk": {
           "rule": "required",
           "type": "bytes",
+          "id": 3
+        },
+        "hash": {
+          "type": "bytes",
+          "id": 4
+        }
+      }
+    },
+    "ListResDir": {
+      "fields": {
+        "path": {
+          "rule": "required",
+          "type": "string",
           "id": 1
+        }
+      }
+    },
+    "FileInfoList": {
+      "fields": {
+        "files": {
+          "rule": "repeated",
+          "type": "FileInfo",
+          "id": 1
+        }
+      },
+      "nested": {
+        "FileInfo": {
+          "fields": {
+            "name": {
+              "rule": "required",
+              "type": "string",
+              "id": 1
+            },
+            "size": {
+              "rule": "required",
+              "type": "uint64",
+              "id": 2
+            }
+          }
         }
       }
     },
@@ -7499,7 +8686,10 @@
             },
             "payload": {
               "type": "bytes",
-              "id": 3
+              "id": 3,
+              "options": {
+                "default": ""
+              }
             },
             "public_key": {
               "type": "bytes",
@@ -7793,6 +8983,72 @@
           "rule": "required",
           "type": "bytes",
           "id": 1
+        }
+      }
+    },
+    "NeoGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "NeoAddress": {
+      "fields": {
+        "address": {
+          "type": "string",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "NeoSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "raw_tx": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "network_magic": {
+          "type": "uint32",
+          "id": 3,
+          "options": {
+            "default": 860833102
+          }
+        }
+      }
+    },
+    "NeoSignedTx": {
+      "fields": {
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
         }
       }
     },
@@ -8319,6 +9575,141 @@
         }
       }
     },
+    "ScdoGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "ScdoAddress": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "ScdoSignTx": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "gas_price": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "gas_limit": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "to": {
+          "rule": "required",
+          "type": "string",
+          "id": 5
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 6
+        },
+        "timestamp": {
+          "type": "bytes",
+          "id": 7
+        },
+        "data_initial_chunk": {
+          "type": "bytes",
+          "id": 8,
+          "options": {
+            "default": ""
+          }
+        },
+        "data_length": {
+          "type": "uint32",
+          "id": 9,
+          "options": {
+            "default": 0
+          }
+        },
+        "tx_type": {
+          "type": "uint32",
+          "id": 10,
+          "options": {
+            "default": 0
+          }
+        }
+      }
+    },
+    "ScdoSignedTx": {
+      "fields": {
+        "data_length": {
+          "type": "uint32",
+          "id": 1
+        },
+        "signature": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ScdoTxAck": {
+      "fields": {
+        "data_chunk": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
+    "ScdoSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "ScdoSignedMessage": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
     "SolanaGetAddress": {
       "fields": {
         "address_n": {
@@ -8338,6 +9729,7 @@
     "SolanaAddress": {
       "fields": {
         "address": {
+          "rule": "required",
           "type": "string",
           "id": 1
         }
@@ -8363,8 +9755,85 @@
     "SolanaSignedTx": {
       "fields": {
         "signature": {
+          "rule": "required",
           "type": "bytes",
           "id": 1
+        }
+      }
+    },
+    "SolanaOffChainMessageVersion": {
+      "values": {
+        "MESSAGE_VERSION_0": 0
+      }
+    },
+    "SolanaOffChainMessageFormat": {
+      "values": {
+        "V0_RESTRICTED_ASCII": 0,
+        "V0_LIMITED_UTF8": 1
+      }
+    },
+    "SolanaSignOffChainMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "message_version": {
+          "type": "SolanaOffChainMessageVersion",
+          "id": 3,
+          "options": {
+            "default": "MESSAGE_VERSION_0"
+          }
+        },
+        "message_format": {
+          "type": "SolanaOffChainMessageFormat",
+          "id": 4,
+          "options": {
+            "default": "V0_RESTRICTED_ASCII"
+          }
+        },
+        "application_domain": {
+          "type": "bytes",
+          "id": 5
+        }
+      }
+    },
+    "SolanaSignUnsafeMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "message": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "SolanaMessageSignature": {
+      "fields": {
+        "signature": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "public_key": {
+          "type": "bytes",
+          "id": 2
         }
       }
     },
@@ -8428,6 +9897,7 @@
           }
         },
         "raw_tx": {
+          "rule": "required",
           "type": "bytes",
           "id": 2
         }
@@ -9521,6 +10991,289 @@
         }
       }
     },
+    "TonWalletVersion": {
+      "values": {
+        "V4R2": 3
+      }
+    },
+    "TonWorkChain": {
+      "values": {
+        "BASECHAIN": 0,
+        "MASTERCHAIN": 1
+      }
+    },
+    "TonGetAddress": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 3,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 4,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 5,
+          "options": {
+            "default": false
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 6,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 7,
+          "options": {
+            "default": 698983191
+          }
+        }
+      }
+    },
+    "TonAddress": {
+      "fields": {
+        "public_key": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        },
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
+    "TonSignMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "destination": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "jetton_master_address": {
+          "type": "string",
+          "id": 3
+        },
+        "jetton_wallet_address": {
+          "type": "string",
+          "id": 4
+        },
+        "ton_amount": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 5
+        },
+        "jetton_amount": {
+          "type": "uint64",
+          "id": 6
+        },
+        "fwd_fee": {
+          "type": "uint64",
+          "id": 7,
+          "options": {
+            "default": 0
+          }
+        },
+        "comment": {
+          "type": "string",
+          "id": 8
+        },
+        "is_raw_data": {
+          "type": "bool",
+          "id": 9,
+          "options": {
+            "default": false
+          }
+        },
+        "mode": {
+          "type": "uint32",
+          "id": 10,
+          "options": {
+            "default": 3
+          }
+        },
+        "seqno": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 11
+        },
+        "expire_at": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 12
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 13,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 14,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 15,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 16,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 17,
+          "options": {
+            "default": false
+          }
+        },
+        "ext_destination": {
+          "rule": "repeated",
+          "type": "string",
+          "id": 18
+        },
+        "ext_ton_amount": {
+          "rule": "repeated",
+          "type": "uint64",
+          "id": 19,
+          "options": {
+            "packed": false
+          }
+        },
+        "ext_payload": {
+          "rule": "repeated",
+          "type": "string",
+          "id": 20
+        },
+        "jetton_amount_bytes": {
+          "type": "bytes",
+          "id": 21
+        }
+      }
+    },
+    "TonSignedMessage": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        },
+        "signning_message": {
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
+    "TonSignProof": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "appdomain": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "comment": {
+          "type": "bytes",
+          "id": 3
+        },
+        "expire_at": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 4
+        },
+        "wallet_version": {
+          "type": "TonWalletVersion",
+          "id": 5,
+          "options": {
+            "default": "V4R2"
+          }
+        },
+        "wallet_id": {
+          "type": "uint32",
+          "id": 6,
+          "options": {
+            "default": 698983191
+          }
+        },
+        "workchain": {
+          "type": "TonWorkChain",
+          "id": 7,
+          "options": {
+            "default": "BASECHAIN"
+          }
+        },
+        "is_bounceable": {
+          "type": "bool",
+          "id": 8,
+          "options": {
+            "default": false
+          }
+        },
+        "is_testnet_only": {
+          "type": "bool",
+          "id": 9,
+          "options": {
+            "default": false
+          }
+        }
+      }
+    },
+    "TonSignedProof": {
+      "fields": {
+        "signature": {
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "TronGetAddress": {
       "fields": {
         "address_n": {
@@ -9827,6 +11580,30 @@
         }
       }
     },
+    "URCryptoHdkey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "show_display": {
+          "type": "bool",
+          "id": 2
+        }
+      }
+    },
+    "URResponse": {
+      "fields": {
+        "data": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
     "WebAuthnListResidentCredentials": {
       "fields": {}
     },
@@ -9944,11 +11721,6 @@
       "id": 50008,
       "extend": "google.protobuf.EnumValueOptions"
     },
-    "factory": {
-      "type": "bool",
-      "id": 50501,
-      "extend": "google.protobuf.EnumValueOptions"
-    },
     "bitcoin_only": {
       "type": "bool",
       "id": 60000,
@@ -9978,12 +11750,6 @@
       "type": "bool",
       "id": 60000,
       "extend": "google.protobuf.FileOptions"
-    },
-    "CommandFlags": {
-      "values": {
-        "Default": 0,
-        "Factory_Only": 1
-      }
     },
     "MessageType": {
       "options": {
@@ -10042,7 +11808,10 @@
         "MessageType_FirmwareErase_ex": 16,
         "MessageType_FirmwareUpload": 7,
         "MessageType_FirmwareRequest": 8,
+        "MessageType_FirmwareErase_ex": 16,
         "MessageType_SelfTest": 32,
+        "MessageType_Reboot": 30000,
+        "MessageType_FirmwareUpdateEmmc": 30001,
         "MessageType_GetPublicKey": 11,
         "MessageType_PublicKey": 12,
         "MessageType_SignTx": 15,
@@ -10059,6 +11828,8 @@
         "MessageType_GetOwnershipProof": 49,
         "MessageType_OwnershipProof": 50,
         "MessageType_AuthorizeCoinJoin": 51,
+        "MessageType_SignPsbt": 10052,
+        "MessageType_SignedPsbt": 10053,
         "MessageType_CipherKeyValue": 23,
         "MessageType_CipheredKeyValue": 48,
         "MessageType_SignIdentity": 53,
@@ -10085,6 +11856,17 @@
         "MessageType_DebugLinkRecordScreen": 9003,
         "MessageType_DebugLinkEraseSdCard": 9005,
         "MessageType_DebugLinkWatchLayout": 9006,
+        "MessageType_EmmcFixPermission": 30100,
+        "MessageType_EmmcPath": 30101,
+        "MessageType_EmmcPathInfo": 30102,
+        "MessageType_EmmcFile": 30103,
+        "MessageType_EmmcFileRead": 30104,
+        "MessageType_EmmcFileWrite": 30105,
+        "MessageType_EmmcFileDelete": 30106,
+        "MessageType_EmmcDir": 30107,
+        "MessageType_EmmcDirList": 30108,
+        "MessageType_EmmcDirMake": 30109,
+        "MessageType_EmmcDirRemove": 30110,
         "MessageType_EthereumGetPublicKey": 450,
         "MessageType_EthereumPublicKey": 451,
         "MessageType_EthereumGetAddress": 56,
@@ -10121,6 +11903,7 @@
         "MessageType_EthereumTypedDataValueAckOneKey": 20115,
         "MessageType_EthereumTypedDataSignatureOneKey": 20116,
         "MessageType_EthereumSignTypedHashOneKey": 20117,
+        "MessageType_EthereumSignMessageEIP712": 10200,
         "MessageType_NEMGetAddress": 67,
         "MessageType_NEMAddress": 68,
         "MessageType_NEMSignTx": 69,
@@ -10172,6 +11955,8 @@
         "MessageType_CardanoTxAuxiliaryData": 327,
         "MessageType_CardanoPoolOwner": 328,
         "MessageType_CardanoPoolRelayParameters": 329,
+        "MessageType_CardanoGetNativeScriptHash": 330,
+        "MessageType_CardanoNativeScriptHash": 331,
         "MessageType_CardanoTxMint": 332,
         "MessageType_CardanoTxCollateralInput": 333,
         "MessageType_CardanoTxRequiredSigner": 334,
@@ -10240,6 +12025,9 @@
         "MessageType_SolanaAddress": 10101,
         "MessageType_SolanaSignTx": 10102,
         "MessageType_SolanaSignedTx": 10103,
+        "MessageType_SolanaSignOffChainMessage": 10104,
+        "MessageType_SolanaMessageSignature": 10105,
+        "MessageType_SolanaSignUnsafeMessage": 10106,
         "MessageType_StarcoinGetAddress": 10300,
         "MessageType_StarcoinAddress": 10301,
         "MessageType_StarcoinGetPublicKey": 10302,
@@ -10337,12 +12125,58 @@
         "MessageType_NostrSignedSchnorr": 11509,
         "MessageType_LnurlAuth": 11600,
         "MessageType_LnurlAuthResp": 11601,
+        "MessageType_URCryptoHdkey": 21000,
+        "MessageType_URResponse": 21001,
         "MessageType_NervosGetAddress": 11701,
         "MessageType_NervosAddress": 11702,
         "MessageType_NervosSignTx": 11703,
         "MessageType_NervosSignedTx": 11704,
         "MessageType_NervosTxRequest": 11705,
         "MessageType_NervosTxAck": 11706,
+        "MessageType_DnxGetAddress": 11800,
+        "MessageType_DnxAddress": 11801,
+        "MessageType_DnxSignTx": 11802,
+        "MessageType_DnxInputRequest": 11803,
+        "MessageType_DnxInputAck": 11804,
+        "MessageType_DnxRTSigsRequest": 11805,
+        "MessageType_DnxSignedTx": 11806,
+        "MessageType_TonGetAddress": 11901,
+        "MessageType_TonAddress": 11902,
+        "MessageType_TonSignMessage": 11903,
+        "MessageType_TonSignedMessage": 11904,
+        "MessageType_TonSignProof": 11905,
+        "MessageType_TonSignedProof": 11906,
+        "MessageType_ScdoGetAddress": 12001,
+        "MessageType_ScdoAddress": 12002,
+        "MessageType_ScdoSignTx": 12003,
+        "MessageType_ScdoSignedTx": 12004,
+        "MessageType_ScdoTxAck": 12005,
+        "MessageType_ScdoSignMessage": 12006,
+        "MessageType_ScdoSignedMessage": 12007,
+        "MessageType_AlephiumGetAddress": 12101,
+        "MessageType_AlephiumAddress": 12102,
+        "MessageType_AlephiumSignTx": 12103,
+        "MessageType_AlephiumSignedTx": 12104,
+        "MessageType_AlephiumTxRequest": 12105,
+        "MessageType_AlephiumTxAck": 12106,
+        "MessageType_AlephiumBytecodeRequest": 12107,
+        "MessageType_AlephiumBytecodeAck": 12108,
+        "MessageType_AlephiumSignMessage": 12109,
+        "MessageType_AlephiumMessageSignature": 12110,
+        "MessageType_BenfenGetAddress": 12201,
+        "MessageType_BenfenAddress": 12202,
+        "MessageType_BenfenSignTx": 12203,
+        "MessageType_BenfenSignedTx": 12204,
+        "MessageType_BenfenSignMessage": 12205,
+        "MessageType_BenfenMessageSignature": 12206,
+        "MessageType_BenfenTxRequest": 12207,
+        "MessageType_BenfenTxAck": 12208,
+        "MessageType_NeoGetAddress": 12301,
+        "MessageType_NeoAddress": 12302,
+        "MessageType_NeoSignTx": 12303,
+        "MessageType_NeoSignedTx": 12304,
+        "MessageType_DeviceBackToBoot": 903,
+        "MessageType_RebootToBoardloader": 904,
         "MessageType_DeviceInfoSettings": 10001,
         "MessageType_GetDeviceInfo": 10002,
         "MessageType_DeviceInfo": 10003,
@@ -10351,13 +12185,18 @@
         "MessageType_WriteSEPublicCert": 10006,
         "MessageType_ReadSEPublicCert": 10007,
         "MessageType_SEPublicCert": 10008,
-        "MessageType_SpiFlashWrite": 10009,
-        "MessageType_SpiFlashRead": 10010,
-        "MessageType_SpiFlashData": 10011,
         "MessageType_SESignMessage": 10012,
         "MessageType_SEMessageSignature": 10013,
-        "MessageType_NFTWriteInfo": 10014,
-        "MessageType_NFTWriteData": 10015
+        "MessageType_ResourceUpload": 10018,
+        "MessageType_ZoomRequest": 10019,
+        "MessageType_ResourceRequest": 10020,
+        "MessageType_ResourceAck": 10021,
+        "MessageType_ResourceUpdate": 10022,
+        "MessageType_ListResDir": 10023,
+        "MessageType_FileInfoList": 10024,
+        "MessageType_OnekeyGetFeatures": 10025,
+        "MessageType_OnekeyFeatures": 10026,
+        "MessageType_WriteSEPrivateKey": 10027
       }
     },
     "google": {
@@ -10751,18 +12590,8 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ],
-              "reserved": [
-                [
-                  38,
-                  38
-                ]
-              ],
+              "extensions": [[1000, 536870911]],
+              "reserved": [[38, 38]],
               "nested": {
                 "OptimizeMode": {
                   "values": {
@@ -10797,18 +12626,8 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ],
-              "reserved": [
-                [
-                  8,
-                  8
-                ]
-              ]
+              "extensions": [[1000, 536870911]],
+              "reserved": [[8, 8]]
             },
             "FieldOptions": {
               "fields": {
@@ -10848,18 +12667,8 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ],
-              "reserved": [
-                [
-                  4,
-                  4
-                ]
-              ],
+              "extensions": [[1000, 536870911]],
+              "reserved": [[4, 4]],
               "nested": {
                 "CType": {
                   "values": {
@@ -10885,12 +12694,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "EnumOptions": {
               "fields": {
@@ -10908,12 +12712,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "EnumValueOptions": {
               "fields": {
@@ -10927,12 +12726,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "ServiceOptions": {
               "fields": {
@@ -10946,12 +12740,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "MethodOptions": {
               "fields": {
@@ -10965,12 +12754,7 @@
                   "id": 999
                 }
               },
-              "extensions": [
-                [
-                  1000,
-                  536870911
-                ]
-              ]
+              "extensions": [[1000, 536870911]]
             },
             "UninterpretedOption": {
               "fields": {

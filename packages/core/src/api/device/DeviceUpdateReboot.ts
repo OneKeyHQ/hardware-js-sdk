@@ -1,7 +1,5 @@
 import { DeviceBackToBoot } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
-import { DeviceModelToTypes } from '../../types';
-import { getDeviceType } from '../../utils';
 
 // Upload hint Reboot BootLoader
 export default class DeviceUpdateReboot extends BaseMethod<DeviceBackToBoot> {
@@ -11,14 +9,7 @@ export default class DeviceUpdateReboot extends BaseMethod<DeviceBackToBoot> {
   }
 
   async run() {
-    const deviceType = getDeviceType(this.device.features);
-    let res;
-    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-      // @ts-expect-error
-      res = await this.device.commands.typedCall('BixinReboot', 'Success');
-    } else {
-      res = await this.device.commands.typedCall('DeviceBackToBoot', 'Success');
-    }
+    const res = await this.device.commands.typedCall('DeviceBackToBoot', 'Success');
 
     return Promise.resolve(res.message);
   }

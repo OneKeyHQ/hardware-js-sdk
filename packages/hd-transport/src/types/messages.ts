@@ -1042,7 +1042,7 @@ export type CardanoTxWithdrawal = {
   key_hash?: string;
 };
 
-// CardanoCVoteRegistrationDelegation
+// CardanoGovernanceRegistrationDelegation
 export type CardanoCVoteRegistrationDelegation = {
   vote_public_key: string;
   weight: number;

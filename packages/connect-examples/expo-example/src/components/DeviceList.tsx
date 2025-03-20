@@ -123,17 +123,17 @@ function DeviceListFC(
     selectDevice(undefined);
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
-    let response;
-    const env = 'webusb';
-    if (env === 'webusb') {
-      const promptResponse = await sdk.promptWebDeviceAccess();
-      console.log('promptResponse:====>>>::: ', promptResponse);
-      response = promptResponse.success
-        ? { payload: [promptResponse.payload.device] }
-        : { payload: [] };
-    } else {
-      response = await sdk.searchDevices();
-    }
+    // let response;
+    // const env = 'webusb';
+    // if (env === 'webusb') {
+    //   const promptResponse = await sdk.promptWebDeviceAccess();
+    //   console.log('promptResponse:====>>>::: ', promptResponse);
+    //   response = promptResponse.success
+    //     ? { payload: [promptResponse.payload.device] }
+    //     : { payload: [] };
+    // } else {
+    const response = await sdk.searchDevices();
+    // }
     const foundDevices = (response.payload as unknown as Device[]) ?? [];
     setDevices(foundDevices);
     if (Platform.OS === 'web' && foundDevices?.length) {
