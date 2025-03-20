@@ -71,7 +71,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       pro: {
         min: '4.10.0',
       },
-      classic1s: {
+      model_classic1s: {
         min: '3.10.0',
       },
     };

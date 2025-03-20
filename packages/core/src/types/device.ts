@@ -94,7 +94,7 @@ export type IDeviceType =
  * model_mini: 'classic' | 'classic1s' | 'classicpure' | 'mini'
  * model_touch: 'touch' | 'pro'
  */
-export type IDeviceModel = 'model_classic' | 'model_mini' | 'model_touch';
+export type IDeviceModel = 'model_classic' | 'model_mini' | 'model_touch' | 'model_classic1s';
 
 export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] } = {
   model_mini: [
@@ -105,12 +105,13 @@ export const DeviceModelToTypes: { [deviceModel in IDeviceModel]: IDeviceType[] 
   ],
   model_touch: [EDeviceType.Touch, EDeviceType.Pro],
   model_classic: [EDeviceType.Classic, EDeviceType.Classic1s, EDeviceType.ClassicPure],
+  model_classic1s: [EDeviceType.Classic1s, EDeviceType.ClassicPure],
 };
 
 export const DeviceTypeToModels: { [deviceType in IDeviceType]: IDeviceModel[] } = {
   [EDeviceType.Classic]: ['model_classic', 'model_mini'],
-  [EDeviceType.Classic1s]: ['model_classic', 'model_mini'],
-  [EDeviceType.ClassicPure]: ['model_classic', 'model_mini'],
+  [EDeviceType.Classic1s]: ['model_classic', 'model_mini', 'model_classic1s'],
+  [EDeviceType.ClassicPure]: ['model_classic', 'model_mini', 'model_classic1s'],
   [EDeviceType.Mini]: ['model_mini'],
   [EDeviceType.Touch]: ['model_touch'],
   [EDeviceType.Pro]: ['model_touch'],

@@ -109,6 +109,10 @@ export const getDeviceLabel = (features?: Features) => {
   const bleName = getDeviceBleName(features);
   if (!isEmpty(bleName)) return bleName;
 
+  if (deviceType === EDeviceType.ClassicPure) {
+    return 'OneKey Classic 1S';
+  }
+
   return `OneKey ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`;
 };
 
@@ -127,7 +131,12 @@ export const getMethodVersionRange = (
     return versionRange;
   }
 
-  const modelFallbacks: IDeviceModel[] = ['model_classic', 'model_mini', 'model_touch'];
+  const modelFallbacks: IDeviceModel[] = [
+    'model_classic1s',
+    'model_classic',
+    'model_mini',
+    'model_touch',
+  ];
   for (const model of modelFallbacks) {
     if (DeviceModelToTypes[model].includes(deviceType)) {
       versionRange = getVersionRange(model);
