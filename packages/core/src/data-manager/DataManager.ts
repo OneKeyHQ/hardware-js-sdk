@@ -311,7 +311,7 @@ export default class DataManager {
       const prevEnv = this.settings.env;
       this.settings = {
         ...this.settings,
-        env: newEnv
+        env: newEnv,
       };
 
       // Log the environment change
