@@ -5,13 +5,13 @@ module.exports = function (api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      [
-        'transform-inline-environment-variables',
-        // NOTE: include is optional, you can leave this part out
-        {
-          include: ['TAMAGUI_TARGET'],
-        },
-      ],
+      // [
+      //   'transform-inline-environment-variables',
+      //   // NOTE: include is optional, you can leave this part out
+      //   {
+      //     include: ['TAMAGUI_TARGET'],
+      //   },
+      // ],
       [
         '@tamagui/babel-plugin',
         {

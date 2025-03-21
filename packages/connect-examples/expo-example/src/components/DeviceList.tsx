@@ -98,7 +98,7 @@ function DeviceListFC(
   ref: ForwardedRef<IDeviceListInstance>
 ) {
   const intl = useIntl();
-  const { sdk } = useContext(HardwareSDKContext);
+  const { sdk, env } = useContext(HardwareSDKContext);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [connectionType, setConnectionType] = useAtom(connectionTypeAtom);
@@ -195,25 +195,17 @@ function DeviceListFC(
             {intl.formatMessage({ id: 'message__current_selector_device' })}
             {selectedId || intl.formatMessage({ id: 'message__no_device' })}
           </Text>
-          <Button onPress={handleRemoveSelected}>
-            {intl.formatMessage({ id: 'action__clean_device' })}
-          </Button>
+          <XStack gap={4}>
+            <Picker selectedValue={connectionType} onValueChange={onSwitchConnectionType}>
+              <Picker.Item label="OneKey Bridge" value="bridge" />
+              <Picker.Item label="WebUSB" value="webusb" />
+            </Picker>
+            <Button onPress={handleRemoveSelected}>
+              {intl.formatMessage({ id: 'action__clean_device' })}
+            </Button>
+          </XStack>
         </View>
       )}
-
-      <XStack marginVertical="$2" alignItems="center" gap={12}>
-        <Text fontSize={15} marginBottom="$1">
-          {intl.formatMessage({ id: 'message__connection_type' })}
-        </Text>
-        <Picker
-          selectedValue={connectionType}
-          onValueChange={onSwitchConnectionType}
-          style={{ width: 120, height: 44 }}
-        >
-          <Picker.Item label="Bridge" value="bridge" />
-          <Picker.Item label="WebUSB" value="webusb" />
-        </Picker>
-      </XStack>
 
       <Button variant="primary" size="large" onPress={searchDevices}>
         {intl.formatMessage({ id: 'action__search_device' })}

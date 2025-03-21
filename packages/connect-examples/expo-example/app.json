@@ -18,6 +18,9 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "headers": {
+      "Permissions-Policy": "usb=(self)"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.onekey.dev.hardware.example"
