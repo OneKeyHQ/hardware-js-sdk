@@ -9,7 +9,13 @@ export interface PageViewProps {
 const PageView = ({ children, scrollable = true }: PageViewProps) => (
   <View flex={1} backgroundColor="bgApp">
     <HeaderView />
-    {scrollable ? <ScrollView flex={1}>{children}</ScrollView> : <View>{children}</View>}
+    {scrollable ? (
+      <ScrollView flex={1} testID="page-view-scrollable" overflow="scroll">
+        {children}
+      </ScrollView>
+    ) : (
+      <View testID="page-view-non-scrollable">{children}</View>
+    )}
   </View>
 );
 

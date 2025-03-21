@@ -4,6 +4,7 @@ import { Dialog, SizableText, Stack, Text, Unspaced, XStack, YStack } from 'tama
 import { Delete, X } from '@tamagui/lucide-icons';
 import { StyleSheet } from 'react-native';
 import { Button } from './ui/Button';
+import { useMedia } from '../provider/MediaProvider';
 
 type IReceivePinProps = {
   open: boolean;
@@ -23,6 +24,7 @@ export function ReceivePin({
   onCancel,
 }: IReceivePinProps) {
   const intl = useIntl();
+  const media = useMedia();
 
   const [val, setVal] = useState('');
   const varMask = useMemo(
@@ -34,18 +36,13 @@ export function ReceivePin({
     [val]
   );
 
+  const minWidth = media.gtXs ? 480 : '100%';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal padding="$4">
         <Dialog.Overlay key="overlay" backgroundColor="$bgBackdrop" />
-        <Dialog.Content
-          key="content"
-          minWidth="100%"
-          minHeight={320}
-          $gtXs={{
-            minWidth: 480,
-          }}
-        >
+        <Dialog.Content key="content" minWidth={minWidth} minHeight={320}>
           <Dialog.Title>{intl.formatMessage({ id: 'title__input_pin' })}</Dialog.Title>
 
           <YStack gap="$2">

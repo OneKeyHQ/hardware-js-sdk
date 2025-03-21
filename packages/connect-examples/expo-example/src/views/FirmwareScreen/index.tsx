@@ -21,6 +21,7 @@ import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
 import { ExportDeviceInfo, formatCurrentTime } from './ExportDeviceInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
+import { useMedia } from '../../provider/MediaProvider';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
 type UpdateState = {
@@ -37,7 +38,10 @@ interface FirmwareActionButtonProps {
 function FirmwareActionButton({ title, onUpdate, deviceType }: FirmwareActionButtonProps) {
   const intl = useIntl();
   const [updateState, setUpdateState] = useState<UpdateState | undefined>();
+  const media = useMedia();
 
+  // eslint-disable-next-line no-nested-ternary
+  const width = media.gtLg ? '30%' : media.gtSm ? '48%' : '100%';
   return (
     <Stack
       padding="$2"
@@ -45,10 +49,8 @@ function FirmwareActionButton({ title, onUpdate, deviceType }: FirmwareActionBut
       borderColor="$border"
       borderWidth="$px"
       borderRadius="$3"
-      width="100%"
+      width={width}
       flex={1}
-      $gtSm={{ width: '48%' }}
-      $gtLg={{ width: '30%' }}
     >
       <H5>{title}</H5>
       <Button
@@ -89,6 +91,10 @@ function FirmwareLocalFile({ title, type, onUpdate, deviceType }: FirmwareLocalF
   const [fileAsset, setFileAsset] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState | undefined>();
   const [reboot, setReboot] = useState<boolean>(true);
+  const media = useMedia();
+
+  // eslint-disable-next-line no-nested-ternary
+  const width = media.gtLg ? '30%' : media.gtSm ? '48%' : '100%';
 
   const selectFile = () => {
     // source -> .zip
@@ -113,10 +119,8 @@ function FirmwareLocalFile({ title, type, onUpdate, deviceType }: FirmwareLocalF
       borderColor="$border"
       borderWidth="$px"
       borderRadius="$3"
-      width="100%"
+      width={width}
       flex={1}
-      $gtSm={{ width: '48%' }}
-      $gtLg={{ width: '30%' }}
     >
       <H5>{title}</H5>
       <Stack

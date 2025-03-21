@@ -1,8 +1,8 @@
 import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect, useMemo, useState } from 'react';
-import { FolderSync, RefreshCw, Usb } from '@tamagui/lucide-icons';
+import { Usb } from '@tamagui/lucide-icons';
 import { LowLevelCoreApi } from '@onekeyfe/hd-core/dist/lowLevelInject';
-import { Button, Stack, Text } from 'tamagui';
+import { Stack, Text } from 'tamagui';
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
 
@@ -51,7 +51,6 @@ export default function USB({ children }: { children: React.ReactNode }) {
           justifyContent="flex-end"
           backgroundColor={showContent ? '$bgApp' : '$bgCritical'}
           gap="$2"
-          padding="$2"
           style={{
             // @ts-expect-error
             WebkitAppRegion: 'drag',
@@ -59,8 +58,10 @@ export default function USB({ children }: { children: React.ReactNode }) {
             cursor: 'default',
           }}
         >
-          <Usb size={20} />
-          <Text>{showContent ? 'SDK Ready' : 'SDK Loading...'}</Text>
+          <Stack flexDirection="row" gap="$2" padding="$1">
+            <Usb size={20} />
+            <Text>{showContent ? 'SDK Ready' : 'SDK Loading...'}</Text>
+          </Stack>
         </Stack>
         {children}
       </Stack>
