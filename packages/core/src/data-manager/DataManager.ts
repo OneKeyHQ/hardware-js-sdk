@@ -306,6 +306,19 @@ export default class DataManager {
     }
   }
 
+  static updateEnv(newEnv: ConnectSettings['env']) {
+    if (this.settings) {
+      const prevEnv = this.settings.env;
+      this.settings = {
+        ...this.settings,
+        env: newEnv,
+      };
+
+      // Log the environment change
+      console.debug(`DataManager env updated: ${prevEnv} -> ${newEnv}`);
+    }
+  }
+
   static async checkAndReloadData() {
     if (getTimeStamp() - this.lastCheckTimestamp > 1000 * 60 * 60 * 3) {
       await this.load(this.settings).then(() => {

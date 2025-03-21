@@ -159,6 +159,7 @@ const call = async (params: any) => {
 };
 
 const updateSettings = () => Promise.resolve(true);
+const switchTransport = () => Promise.resolve({ success: true });
 
 const HardwareCommonConnectSdk = HardwareSdk({
   eventEmitter,
@@ -168,6 +169,7 @@ const HardwareCommonConnectSdk = HardwareSdk({
   dispose,
   uiResponse,
   updateSettings,
+  switchTransport,
 });
 
 export default HardwareCommonConnectSdk;
