@@ -1749,6 +1749,30 @@ export type EthereumSignTypedDataOneKey = {
   chain_id?: number;
 };
 
+export enum EthereumGnosisSafeTxOperation {
+  CALL = 0,
+  DELEGATE_CALL = 1,
+}
+
+// EthereumGnosisSafeTxRequest
+export type EthereumGnosisSafeTxRequest = {};
+
+// EthereumGnosisSafeTxAck
+export type EthereumGnosisSafeTxAck = {
+  to: string;
+  value: string;
+  data?: string;
+  operation: EthereumGnosisSafeTxOperation;
+  safeTxGas: string;
+  baseGas: string;
+  gasPrice: string;
+  gasToken: string;
+  refundReceiver: string;
+  nonce: string;
+  chain_id: number;
+  verifyingContract: string;
+};
+
 // EthereumTypedDataStructRequestOneKey
 export type EthereumTypedDataStructRequestOneKey = {
   name: string;
@@ -4386,6 +4410,8 @@ export type MessageType = {
   EthereumTokenInfo: EthereumTokenInfo;
   EthereumDefinitions: EthereumDefinitions;
   EthereumSignTypedDataOneKey: EthereumSignTypedDataOneKey;
+  EthereumGnosisSafeTxRequest: EthereumGnosisSafeTxRequest;
+  EthereumGnosisSafeTxAck: EthereumGnosisSafeTxAck;
   EthereumTypedDataStructRequestOneKey: EthereumTypedDataStructRequestOneKey;
   EthereumStructMemberOneKey: EthereumStructMemberOneKey;
   EthereumFieldTypeOneKey: EthereumFieldTypeOneKey;

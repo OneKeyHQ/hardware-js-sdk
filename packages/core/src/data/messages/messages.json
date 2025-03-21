@@ -4790,6 +4790,78 @@
         }
       }
     },
+    "EthereumGnosisSafeTxOperation": {
+      "values": {
+        "CALL": 0,
+        "DELEGATE_CALL": 1
+      }
+    },
+    "EthereumGnosisSafeTxRequest": {
+      "fields": {}
+    },
+    "EthereumGnosisSafeTxAck": {
+      "fields": {
+        "to": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "data": {
+          "type": "bytes",
+          "id": 3
+        },
+        "operation": {
+          "rule": "required",
+          "type": "EthereumGnosisSafeTxOperation",
+          "id": 4
+        },
+        "safeTxGas": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "baseGas": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 6
+        },
+        "gasPrice": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        },
+        "gasToken": {
+          "rule": "required",
+          "type": "string",
+          "id": 8
+        },
+        "refundReceiver": {
+          "rule": "required",
+          "type": "string",
+          "id": 9
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 10
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 11
+        },
+        "verifyingContract": {
+          "rule": "required",
+          "type": "string",
+          "id": 12
+        }
+      }
+    },
     "EthereumTypedDataStructRequestOneKey": {
       "fields": {
         "name": {
@@ -11670,6 +11742,8 @@
         "MessageType_EthereumTypedDataValueAckOneKey": 20115,
         "MessageType_EthereumTypedDataSignatureOneKey": 20116,
         "MessageType_EthereumSignTypedHashOneKey": 20117,
+        "MessageType_EthereumGnosisSafeTxAck": 20118,
+        "MessageType_EthereumGnosisSafeTxRequest": 20119,
         "MessageType_NEMGetAddress": 67,
         "MessageType_NEMAddress": 68,
         "MessageType_NEMSignTx": 69,
