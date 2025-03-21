@@ -56,10 +56,14 @@ export default function CommonParamsView() {
           onToggle={value => handleSetParam('useEmptyPassphrase', value)}
         />
         <SwitchInput
-          // TODO: i18n
           label="detectBootloaderDevice"
           value={!!commonParams.detectBootloaderDevice}
           onToggle={value => handleSetParam('detectBootloaderDevice', value)}
+        />
+        <SwitchInput
+          label="skipWebDevicePrompt"
+          value={!!commonParams.skipWebDevicePrompt}
+          onToggle={value => handleSetParam('skipWebDevicePrompt', value)}
         />
       </Stack>
     </PanelView>
