@@ -63,6 +63,10 @@ export interface DeviceEvents {
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
   [DEVICE.PASSPHRASE]: [Device, (response: PassphrasePromptResponse, error?: Error) => void];
+  [DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE]: [
+    Device,
+    (err: any, deviceId: string) => void
+  ];
 }
 
 export interface Device {
