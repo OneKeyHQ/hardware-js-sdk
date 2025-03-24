@@ -149,7 +149,14 @@ export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
       //     );
       //   }
       // }
-      await enterBootloaderMode(this.device, this.postMessage, this.payload.connectId);
+      const bootloaderRes = await enterBootloaderMode(
+        this.device,
+        this.postMessage,
+        this.payload.connectId
+      );
+      if (!bootloaderRes) {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'enter bootloader mode error');
+      }
       await this.device.acquire();
       // TODO： emmc接口实现的resource 更新
       const resourceUrl = DataManager.getSysResourcesLatestRelease(
@@ -241,6 +248,13 @@ export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
       }
 
       // TODO: 触发升级的逻辑，待确定
+      const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
+        path: '0:/updates/',
+        reboot_on_success: bootloaderRes,
+      });
+      if (response.type !== 'Success') {
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware update error');
+      }
 
       // TODO： 轮询，获取硬件当前状态，返回给前端
     }
