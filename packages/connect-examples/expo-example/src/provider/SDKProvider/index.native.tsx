@@ -75,6 +75,7 @@ export default function Bluetooth({ children }: { children: React.ReactNode }) {
       sdk,
       type: 'Bluetooth' as const,
       lowLevelSDK: undefined,
+      env: 'react-native' as const,
     }),
     [sdk]
   );

@@ -1,13 +1,14 @@
-import { Stack, Group, H3, YGroup, ListItem, useMedia, Sheet, XStack } from 'tamagui';
+import { Stack, Group, H3, YGroup, ListItem, Sheet, XStack } from 'tamagui';
 import { useNavigation, useRoute } from '@react-navigation/core';
 import { Menu } from '@tamagui/lucide-icons';
 
-import { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, memo } from 'react';
 import { useIntl } from 'react-intl';
 import { Routes } from '../../route';
 import { Button } from './Button';
 import LocaleToggleButton from './LocaleToggleButton';
 import { MenuItem, MenuListItem } from './MenuListItem';
+import { useMedia } from '../../provider/MediaProvider';
 
 // 菜单项数组
 const menuItems: MenuItem[] = [
@@ -20,34 +21,78 @@ const menuItems: MenuItem[] = [
 ];
 
 // 菜单按钮组件
-const MenuButtons = ({
-  visibleItems,
-  currentRoute,
-  navigate,
-}: {
-  visibleItems: MenuItem[];
-  currentRoute: string;
-  navigate: (route: string) => void;
-}) => {
-  const intl = useIntl();
+const MenuButtons = memo(
+  ({
+    visibleItems,
+    currentRoute,
+    navigate,
+  }: {
+    visibleItems: MenuItem[];
+    currentRoute: string;
+    navigate: (route: string) => void;
+  }) => {
+    const intl = useIntl();
 
-  return (
-    visibleItems?.length > 0 && (
-      <Group orientation="horizontal">
-        {visibleItems.map(item => (
-          <Group.Item>
-            <Button
-              variant={currentRoute === item.route ? 'primary' : 'secondary'}
-              onPress={() => navigate(item.route)}
-            >
-              {intl.formatMessage({ id: item.labelId })}
-            </Button>
-          </Group.Item>
-        ))}
-      </Group>
-    )
-  );
-};
+    return (
+      visibleItems?.length > 0 && (
+        <Group orientation="horizontal">
+          {visibleItems.map(item => (
+            <Group.Item key={item.route}>
+              <Button
+                variant={currentRoute === item.route ? 'primary' : 'secondary'}
+                onPress={() => navigate(item.route)}
+              >
+                {intl.formatMessage({ id: item.labelId })}
+              </Button>
+            </Group.Item>
+          ))}
+        </Group>
+      )
+    );
+  }
+);
+MenuButtons.displayName = 'MenuButtons';
+
+const SheetContent = memo(
+  ({
+    dropdownItems,
+    navigate,
+    open,
+    setOpen,
+  }: {
+    dropdownItems: MenuItem[];
+    navigate: (route: string) => void;
+    open: boolean;
+    setOpen: (open: boolean) => void;
+  }) => (
+    <Sheet
+      forceRemoveScrollEnabled={open}
+      modal
+      open={open}
+      onOpenChange={setOpen}
+      snapPointsMode="fit"
+      dismissOnSnapToBottom
+      zIndex={100_000}
+      animation="quick"
+    >
+      <Sheet.Overlay
+        animation="quick"
+        enterStyle={{ opacity: 0 }}
+        exitStyle={{ opacity: 0 }}
+        backgroundColor="$bgBackdrop"
+      />
+      <Sheet.Handle />
+      <Sheet.Frame padding="$4" justifyContent="center" alignItems="center">
+        <YGroup alignSelf="center">
+          {dropdownItems.map(item => (
+            <MenuListItem key={item.route} item={item} onPress={navigate} />
+          ))}
+        </YGroup>
+      </Sheet.Frame>
+    </Sheet>
+  )
+);
+SheetContent.displayName = 'SheetContent';
 
 const HeaderView = () => {
   const media = useMedia();
@@ -65,19 +110,23 @@ const HeaderView = () => {
   );
 
   const { visibleItems, dropdownItems } = useMemo(() => {
-    if (media.gtXxl)
-      return { visibleItems: menuItems.slice(0, 10), dropdownItems: menuItems.slice(10) };
-    if (media.gtXl)
-      return { visibleItems: menuItems.slice(0, 9), dropdownItems: menuItems.slice(9) };
-    if (media.gtLg)
-      return { visibleItems: menuItems.slice(0, 7), dropdownItems: menuItems.slice(7) };
-    if (media.gtMd)
-      return { visibleItems: menuItems.slice(0, 5), dropdownItems: menuItems.slice(5) };
-    if (media.gtSm)
-      return { visibleItems: menuItems.slice(0, 3), dropdownItems: menuItems.slice(3) };
-    if (media.gtXs)
-      return { visibleItems: menuItems.slice(0, 2), dropdownItems: menuItems.slice(2) };
-    return { visibleItems: [], dropdownItems: menuItems };
+    const breakpoints = {
+      lg: 7,
+      md: 5,
+      sm: 3,
+      xs: 2,
+    };
+
+    let visibleCount = 0;
+    if (media.gtLg) visibleCount = breakpoints.lg;
+    else if (media.gtMd) visibleCount = breakpoints.md;
+    else if (media.gtSm) visibleCount = breakpoints.sm;
+    else if (media.gtXs) visibleCount = breakpoints.xs;
+
+    return {
+      visibleItems: menuItems.slice(0, visibleCount),
+      dropdownItems: menuItems.slice(visibleCount),
+    };
   }, [media]);
 
   return (
@@ -98,31 +147,12 @@ const HeaderView = () => {
             <Button onPress={() => setOpen(!open)}>
               <Menu size="$4" />
             </Button>
-            <Sheet
-              forceRemoveScrollEnabled={open}
-              modal
+            <SheetContent
+              dropdownItems={dropdownItems}
+              navigate={navigate}
               open={open}
-              onOpenChange={setOpen}
-              snapPointsMode="fit"
-              dismissOnSnapToBottom
-              zIndex={100_000}
-              animation="quick"
-            >
-              <Sheet.Overlay
-                animation="quick"
-                enterStyle={{ opacity: 0 }}
-                exitStyle={{ opacity: 0 }}
-                backgroundColor="$bgBackdrop"
-              />
-              <Sheet.Handle />
-              <Sheet.Frame padding="$4" justifyContent="center" alignItems="center">
-                <YGroup alignSelf="center">
-                  {dropdownItems.map(item => (
-                    <MenuListItem key={item.route} item={item} onPress={navigate} />
-                  ))}
-                </YGroup>
-              </Sheet.Frame>
-            </Sheet>
+              setOpen={setOpen}
+            />
           </>
         )}
         <LocaleToggleButton />

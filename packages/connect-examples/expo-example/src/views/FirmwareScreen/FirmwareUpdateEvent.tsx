@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { Button } from '../../components/ui/Button';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import { useMedia } from '../../provider/MediaProvider';
 
 let registerListener = false;
 function FirmwareUpdateEventView({
@@ -19,6 +20,7 @@ function FirmwareUpdateEventView({
   const intl = useIntl();
   const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK, type } = useContext(HardwareSDKContext);
   const { openDialog } = useHardwareInputPinDialog();
+  const media = useMedia();
 
   const [updateState, setUpdateState] = useState<{
     progress: number;
@@ -129,18 +131,13 @@ function FirmwareUpdateEventView({
     }, [SDK, getMessage, openDialog])
   );
 
+  const minWidth = media.gtXs ? 480 : '100%';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal padding="$4">
         <Dialog.Overlay key="overlay" backgroundColor="$bgBackdrop" />
-        <Dialog.Content
-          key="content"
-          minWidth="100%"
-          minHeight={320}
-          $gtXs={{
-            minWidth: 480,
-          }}
-        >
+        <Dialog.Content key="content" minWidth={minWidth} minHeight={320}>
           <Dialog.Title>{intl.formatMessage({ id: 'title__updating' })}</Dialog.Title>
 
           <Stack flexDirection="column" flex={1} justifyContent="center" alignItems="center">

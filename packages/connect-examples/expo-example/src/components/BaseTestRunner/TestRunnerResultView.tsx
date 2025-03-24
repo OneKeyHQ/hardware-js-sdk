@@ -1,7 +1,8 @@
-import { memo, useContext, useEffect, useMemo } from 'react';
+import { memo, useContext, useEffect, useMemo, useCallback } from 'react';
 
 import { Stack, Text, XStack } from 'tamagui';
 import { useAtomValue } from 'jotai';
+import { FlatList } from 'react-native';
 
 import { TestCaseDataWithKey } from './types';
 import {
@@ -79,19 +80,24 @@ const TestItemViewMemo = memo(TestItemView);
 
 export type TestRunnerResultViewProps = Omit<TestItemViewProps, 'item'>;
 
+// eslint-disable-next-line react/prop-types
 export function TestRunnerResultView({ renderResultView }: TestRunnerResultViewProps) {
   const { itemValues } = useContext(TestRunnerContext);
 
-  const resultViewMemo = useMemo(
-    () => (
-      <Stack width="100%">
-        {itemValues.map(item => (
-          <TestItemViewMemo renderResultView={renderResultView} key={item.$key} item={item} />
-        ))}
-      </Stack>
+  const renderItem = useCallback(
+    // eslint-disable-next-line react/no-unused-prop-types
+    ({ item }: { item: TestCaseDataWithKey }) => (
+      <TestItemViewMemo renderResultView={renderResultView} item={item} />
     ),
-    [itemValues, renderResultView]
+    [renderResultView]
   );
 
-  return resultViewMemo;
+  return (
+    <FlatList<TestCaseDataWithKey>
+      data={itemValues}
+      renderItem={renderItem}
+      keyExtractor={item => item.$key}
+      contentContainerStyle={{ width: '100%' }}
+    />
+  );
 }

@@ -23,6 +23,7 @@ export const signTypedData = async ({
       'EthereumTypedDataStructRequest',
       'EthereumTypedDataValueRequest',
       'EthereumTypedDataSignature',
+      'EthereumGnosisSafeTxRequest',
     ],
     {
       address_n: addressN,
