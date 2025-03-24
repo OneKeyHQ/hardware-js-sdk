@@ -78,7 +78,7 @@ export default function HandleSDKEvents() {
         SDK.emit?.(params.event, { ...params });
       });
 
-      const uiEventCallback = async (message: CoreMessage) => {
+      const uiEventCallback = (message: CoreMessage) => {
         console.log('TopLEVEL EVENT (Api Payload)===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           if (supportInputPinOnSoftware(message.payload.device.features).support) {
