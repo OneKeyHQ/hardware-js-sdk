@@ -25,7 +25,7 @@ import type {
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5';
+export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5' | 'firmware-v6';
 
 export type MessageVersion = 'latest' | 'v1';
 
@@ -134,7 +134,7 @@ export default class DataManager {
 
   static getBootloaderResource = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === EDeviceType.Unknown) return undefined;
+    if (deviceType === EDeviceType.Unknown) throw new Error('Device type is unknown');
 
     if (deviceType !== EDeviceType.Pro && deviceType !== EDeviceType.Touch) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
@@ -142,6 +142,11 @@ export default class DataManager {
       updateType: 'firmware',
     }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
+    if (targetDeviceConfigList.length === 0) {
+      throw new Error(
+        `Could not found bootloader resource with deviceType:${deviceType} firmwareUpdateField:${firmwareUpdateField}`
+      );
+    }
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
     return findLatestRelease(targetDeviceConfig)?.bootloaderResource;

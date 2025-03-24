@@ -1,13 +1,12 @@
 import { Deferred, EDeviceType } from '@onekeyfe/hd-shared';
 import semver from 'semver';
-import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
-import { getSysResourceBinary } from '../firmware/getBinary';
-import { updateResources } from '../firmware/uploadFirmware';
+import { getSysResourceBinary } from '../firmware/utils/getBinary';
+import { updateResources } from '../firmware/uploadResource';
 import { getDeviceType, getDeviceFirmwareVersion } from '../../utils';
-import { createUiMessage } from '../../events/ui-request';
-import type { KnownDevice, Features } from '../../types';
+import type { Features } from '../../types';
 import { DataManager } from '../../data-manager';
+import { postProgressTip } from '../firmware/utils/uiHelper';
 
 export default class DeviceFullyUploadResource extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
@@ -17,17 +16,6 @@ export default class DeviceFullyUploadResource extends BaseMethod {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
   }
-
-  postTipMessage = (message: string) => {
-    this.postMessage(
-      createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
-        device: this.device.toMessageObject() as KnownDevice,
-        data: {
-          message,
-        },
-      })
-    );
-  };
 
   isSupportResourceUpdate(features: Features, updateType: string) {
     if (updateType !== 'firmware') return false;
@@ -48,12 +36,12 @@ export default class DeviceFullyUploadResource extends BaseMethod {
       if (features) {
         let { binary } = this.payload;
         if (!binary) {
-          this.postTipMessage('CheckLatestUiResource');
+          postProgressTip(device, 'CheckLatestUiResource', this.postMessage);
           const resourceUrl = DataManager.getSysFullResource(features);
           if (resourceUrl) {
-            this.postTipMessage('DownloadLatestUiResource');
+            postProgressTip(device, 'DownloadLatestUiResource', this.postMessage);
             const resource = await getSysResourceBinary(resourceUrl);
-            this.postTipMessage('DownloadLatestUiResourceSuccess');
+            postProgressTip(device, 'DownloadLatestUiResourceSuccess', this.postMessage);
             if (resource) {
               binary = resource.binary;
             }

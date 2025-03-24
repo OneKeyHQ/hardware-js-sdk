@@ -78,6 +78,13 @@ export interface UiRequestPassphraseOnDevice {
   };
 }
 
+export interface FirmwareProcessing {
+  type: typeof UI_REQUEST.FIRMWARE_PROCESSING;
+  payload: {
+    type: 'firmware' | 'ble' | 'bootloader' | 'resource';
+  };
+}
+
 export interface FirmwareProgress {
   type: typeof UI_REQUEST.FIRMWARE_PROGRESS;
   payload: {
@@ -118,6 +125,7 @@ export type UiEvent =
   | UiRequestButton
   | UiRequestPassphraseOnDevice
   | UiRequestPassphrase
+  | FirmwareProcessing
   | FirmwareProgress
   | FirmwareTip
   | DeviceProgress

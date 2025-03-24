@@ -1,3 +1,5 @@
+// Helpers utils
+export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
 export * from './assets';
 export * from './versionUtils';
 export * from './patch';
@@ -16,14 +18,15 @@ export {
   getDeviceFirmwareVersion,
   getDeviceBLEFirmwareVersion,
 } from './deviceVersionUtils';
-export { getFirmwareUpdateField, supportInputPinOnSoftware } from './deviceFeaturesUtils';
+export {
+  getFirmwareUpdateField,
+  supportInputPinOnSoftware,
+  getFirmwareUpdateFieldArray,
+} from './deviceFeaturesUtils';
 export {
   checkNeedUpdateBootForTouch,
   checkNeedUpdateBootForClassicAndMini,
-} from '../api/firmware/updateBootloader';
-
-// Helpers utils
-export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from './logger';
+} from '../api/firmware/utils/bootloaderHelper';
 
 export { getHDPath, getScriptType, getOutputScriptType } from '../api/helpers/pathUtils';
 

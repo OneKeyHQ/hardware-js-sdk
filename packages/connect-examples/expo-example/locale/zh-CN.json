@@ -107,6 +107,7 @@
   "label__device_info_refresh": "刷新设备信息",
   "label__device_info_export": "导出设备信息到文本",
 
+  "label__device_update_all": "更新所有资源",
   "label__device_update_firmware": "更新固件",
   "label__device_update_ble_firmware": "更新蓝牙固件",
   "label__device_update_bootloader": "更新 Bootloader",

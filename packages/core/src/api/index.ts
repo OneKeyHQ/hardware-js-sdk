@@ -35,6 +35,7 @@ export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
 
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
+export { default as updateAll } from './firmware/updateAll';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 
 export { default as cipherKeyValue } from './CipherKeyValue';

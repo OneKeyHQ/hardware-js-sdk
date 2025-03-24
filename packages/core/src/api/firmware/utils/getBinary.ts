@@ -1,15 +1,15 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Features } from '../../types';
-import { getDeviceType, httpRequest } from '../../utils';
-import { DataManager } from '../../data-manager';
-import { findLatestRelease } from '../../utils/release';
-import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
-import { FirmwareField } from '../../data-manager/DataManager';
+import { Features } from '../../../types';
+import { getDeviceType, httpRequest } from '../../../utils';
+import { DataManager } from '../../../data-manager';
+import { findLatestRelease } from '../../../utils/release';
+import { getFirmwareUpdateField } from '../../../utils/deviceFeaturesUtils';
+import { FirmwareField } from '../../../data-manager/DataManager';
 
 export interface GetInfoProps {
   features: Features;
-  updateType: 'firmware' | 'ble';
+  updateType: 'firmware' | 'ble' | 'mcu';
   isUpdateBootloader?: boolean;
   targetVersion?: string;
 }
@@ -37,14 +37,32 @@ export const getBinary = async ({
     }
   }
 
-  const url =
-    // eslint-disable-next-line no-nested-ternary
-    updateType === 'ble'
-      ? // @ts-expect-error
-        releaseInfo.webUpdate
-      : isUpdateBootloader
-      ? releaseInfo.bootloaderResource
-      : releaseInfo.url;
+  // const url =
+  //   // eslint-disable-next-line no-nested-ternary
+  //   updateType === 'ble'
+  //     ? // @ts-expect-error
+  //       releaseInfo.webUpdate
+  //     : isUpdateBootloader
+  //     ? releaseInfo.bootloaderResource
+  //     : releaseInfo.url;
+
+  let url = '';
+  switch (updateType) {
+    case 'ble': {
+      // @ts-expect-error
+      url = releaseInfo.webUpdate;
+      break;
+    }
+    case 'firmware': {
+      url = releaseInfo.url;
+      break;
+    }
+    // case 'mcu': {
+    // }
+    default: {
+      break;
+    }
+  }
   let fw;
   try {
     fw = await httpRequest(url, 'binary');
@@ -73,6 +91,9 @@ export const getSysResourceBinary = async (url: string) => {
 
 export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
+  if (deviceType === 'unknown') {
+    return null;
+  }
   const { deviceMap } = DataManager;
 
   const firmwareUpdateField: 'ble' | FirmwareField = getFirmwareUpdateField({

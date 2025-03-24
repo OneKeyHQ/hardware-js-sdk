@@ -9,7 +9,8 @@ import DataManager, { FirmwareField, MessageVersion } from '../data-manager/Data
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
-import { getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { getDeviceBootloaderVersion, getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { NEW_BOOT_UPRATE_FIRMWARE_VERSION } from '../api/firmware/utils/const';
 
 export const getSupportMessageVersion = (
   features: Features | undefined
@@ -149,7 +150,7 @@ export const getFirmwareUpdateField = ({
   targetVersion,
 }: {
   features: Features;
-  updateType: 'firmware' | 'ble';
+  updateType: 'firmware' | 'ble' | 'mcu';
   targetVersion?: string;
 }): 'ble' | FirmwareField => {
   const deviceType = getDeviceType(features);
@@ -173,9 +174,48 @@ export const getFirmwareUpdateField = ({
     return 'firmware-v5';
   }
   if (deviceType === EDeviceType.Pro) {
+    // emmc need bootloader version >= 2.4.4
+    const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+    if (semver.gte(bootloaderVersion, NEW_BOOT_UPRATE_FIRMWARE_VERSION)) return 'firmware-v6';
     return 'firmware-v5';
   }
   return 'firmware';
+};
+/**
+ * Returns the optional firmware version
+ */
+export const getFirmwareUpdateFieldArray = (
+  features: Features,
+  updateType: 'firmware' | 'ble' | 'bootloader'
+): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v5')[] => {
+  const deviceType = getDeviceType(features);
+  if (updateType === 'ble') {
+    return ['ble'];
+  }
+
+  if (deviceType === 'classic' || deviceType === 'classic1s' || deviceType === 'mini') {
+    return ['firmware-v5'];
+  }
+
+  if (deviceType === 'touch') {
+    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    if (semver.gt(currentVersion, '4.0.0')) {
+      return ['firmware-v5', 'firmware'];
+    }
+    if (semver.gte(currentVersion, '4.0.0')) {
+      return ['firmware-v2', 'firmware'];
+    }
+    if (!currentVersion || semver.lt(currentVersion, '3.0.0')) {
+      return ['firmware-v5', 'firmware-v2', 'firmware'];
+    }
+    return ['firmware'];
+  }
+
+  if (deviceType === 'pro') {
+    return ['firmware-v5'];
+  }
+
+  return ['firmware'];
 };
 
 export function fixVersion(version: string) {

@@ -5,7 +5,7 @@ import {
   getBleFirmwareReleaseInfo,
   getBootloaderReleaseInfo,
   getFirmwareReleaseInfo,
-} from './firmware/releaseHelper';
+} from './firmware/utils/releaseHelper';
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 import {
   AllFirmwareRelease,

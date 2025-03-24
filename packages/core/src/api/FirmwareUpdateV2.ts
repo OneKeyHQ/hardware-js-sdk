@@ -1,31 +1,17 @@
-import {
-  createDeferred,
-  Deferred,
-  EDeviceType,
-  ERRORS,
-  HardwareError,
-  HardwareErrorCode,
-} from '@onekeyfe/hd-shared';
+import { Deferred, ERRORS, HardwareErrorCode, EDeviceType } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { DevicePool } from '../device/DevicePool';
-import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
-import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
-import {
-  getDeviceType,
-  getDeviceUUID,
-  wait,
-  getLogger,
-  LoggerNames,
-  getDeviceFirmwareVersion,
-} from '../utils';
-import { createUiMessage } from '../events/ui-request';
-import { DeviceModelToTypes } from '../types';
+import { getBinary, getInfo, getSysResourceBinary } from './firmware/utils/getBinary';
+import { uploadFirmware } from './firmware/uploadFirmware';
+import { updateResources } from './firmware/uploadResource';
+import { getDeviceType, getDeviceFirmwareVersion } from '../utils';
 import { DataManager } from '../data-manager';
-
-import type { KnownDevice, Features } from '../types';
+import { enterBootloaderMode } from './firmware/utils/bootloaderHelper';
+import { postProgressTip } from './firmware/utils/uiHelper';
+import type { Features } from '../types';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -35,8 +21,12 @@ type Params = {
   isUpdateBootloader?: boolean;
 };
 
-const Log = getLogger(LoggerNames.Method);
-
+/**
+ * @description
+ * While device is "pro" or "touch", Update "Firmware" and "Resources" with "emmc" methods.
+ *
+ * while device is "mini" or "classic". Update "Firmware" Only.
+ */
 export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
@@ -83,81 +73,6 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     }
   }
 
-  postTipMessage = (message: string) => {
-    this.postMessage(
-      createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
-        device: this.device.toMessageObject() as KnownDevice,
-        data: {
-          message,
-        },
-      })
-    );
-  };
-
-  checkDeviceToBootloader(connectId: string | undefined) {
-    this.checkPromise = createDeferred();
-    const env = DataManager.getSettings('env');
-    const isBleReconnect = connectId && DataManager.isBleConnect(env);
-
-    Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
-
-    // check device goto bootloader mode
-    let isFirstCheck = true;
-    const isTouchOrProDevice =
-      getDeviceType(this?.device?.features) === EDeviceType.Touch ||
-      getDeviceType(this?.device?.features) === EDeviceType.Pro;
-    const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
-      async () => {
-        Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
-        if (isTouchOrProDevice && isFirstCheck) {
-          isFirstCheck = false;
-          Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
-          await wait(3000);
-        }
-        if (isBleReconnect) {
-          try {
-            await this.device.deviceConnector?.acquire(
-              this.device.originalDescriptor.id,
-              null,
-              true
-            );
-            await this.device.initialize();
-            if (this.device.features?.bootloader_mode) {
-              clearInterval(intervalTimer);
-              this.checkPromise?.resolve(true);
-            }
-          } catch (e) {
-            // ignore error because of device is not connected
-            Log.log('catch Bluetooth error when device is restarting: ', e);
-          }
-        } else {
-          const deviceDiff = await this.device.deviceConnector?.enumerate();
-          const devicesDescriptor = deviceDiff?.descriptors ?? [];
-          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
-
-          if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
-            // should update current device from cache
-            // because device was reboot and had some new requests
-            this.device.updateFromCache(deviceList[0]);
-            this.device.commands.disposed = false;
-
-            clearInterval(intervalTimer);
-            this.checkPromise?.resolve(true);
-          }
-        }
-      },
-      isBleReconnect ? 3000 : 2000
-    );
-
-    // check goto bootloader mode timeout and throw error
-    setTimeout(() => {
-      if (this.checkPromise) {
-        clearInterval(intervalTimer);
-        this.checkPromise.reject(new Error());
-      }
-    }, 30000);
-  }
-
   isEnteredManuallyBoot(features: Features) {
     const deviceType = getDeviceType(features);
     const isMini = deviceType === EDeviceType.Mini;
@@ -168,14 +83,15 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     return isMini || isBoot183ClassicUpBle;
   }
 
+  // only support resource update with touch and pro device
   isSupportResourceUpdate(features: Features, updateType: string) {
     if (updateType !== 'firmware') return false;
 
     const deviceType = getDeviceType(features);
     const isTouchMode = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
-    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    const currentFirmwareVersion = getDeviceFirmwareVersion(features).join('.');
 
-    return isTouchMode && semver.gte(currentVersion, '3.2.0');
+    return isTouchMode && semver.gte(currentFirmwareVersion, '3.2.0');
   }
 
   /**
@@ -208,108 +124,83 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
   async run() {
     const { device, params } = this;
-    const { features, commands } = device;
-    const deviceType = getDeviceType(features);
+    const { features } = device;
 
     this.checkVersionForCopyTouchResource(features);
 
+    // reject while isMini || isBoot183ClassicUpBle
     if (!features?.bootloader_mode && features) {
-      const uuid = getDeviceUUID(features);
       // should go to bootloader mode manually
       if (this.isEnteredManuallyBoot(features)) {
         return Promise.reject(ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateManuallyEnterBoot));
       }
-
-      // check & upgrade firmware resource
-      if (features && this.isSupportResourceUpdate(features, params.updateType)) {
-        this.postTipMessage('CheckLatestUiResource');
-        const resourceUrl = DataManager.getSysResourcesLatestRelease(
-          features,
-          params.forcedUpdateRes
-        );
-        if (resourceUrl) {
-          this.postTipMessage('DownloadLatestUiResource');
-          const resource = await getSysResourceBinary(resourceUrl);
-          this.postTipMessage('DownloadLatestUiResourceSuccess');
-          if (resource) {
-            await updateResources(
-              this.device.getCommands().typedCall.bind(this.device.getCommands()),
-              this.postMessage,
-              device,
-              resource.binary
-            );
-          }
-        }
-      }
-
-      // auto go to bootloader mode
-      try {
-        this.postTipMessage('AutoRebootToBootloader');
-        const bootRes = await commands.typedCall('DeviceBackToBoot', 'Success');
-        // @ts-expect-error
-        if (bootRes.type === 'CallMethodError') {
-          throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
-        }
-        this.postTipMessage('GoToBootloaderSuccess');
-        this.checkDeviceToBootloader(this.payload.connectId);
-
-        // force clean classic device cache so that the device can initialize again
-        if (DeviceModelToTypes.model_classic.includes(deviceType)) {
-          DevicePool.clearDeviceCache(uuid);
-        }
-        delete DevicePool.devicesCache[''];
-        await this.checkPromise?.promise;
-        this.checkPromise = null;
-        /**
-         * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
-         */
-        const isTouch = DeviceModelToTypes.model_touch.includes(deviceType);
-        await wait(isTouch ? 3000 : 1500);
-      } catch (e) {
-        if (e instanceof HardwareError) {
-          return Promise.reject(e);
-        }
-        console.log('auto go to bootloader mode failed: ', e);
-        return Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
-        );
-      }
     }
 
-    let binary;
+    // png, font ... resource
+    let resource;
 
-    try {
-      if (params.binary) {
-        binary = this.params.binary;
-      } else {
-        if (!device.features) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.RuntimeError,
-            'no features found for this device'
+    // download firmware
+    let firmwareBinary;
+
+    if (features && this.isSupportResourceUpdate(features, params.updateType)) {
+      postProgressTip(device, 'CheckLatestUiResource', this.postMessage);
+      const resourceUrl = DataManager.getSysResourcesLatestRelease(
+        features,
+        params.forcedUpdateRes
+      );
+      if (resourceUrl) {
+        postProgressTip(device, 'DownloadLatestUiResource', this.postMessage);
+        resource = await getSysResourceBinary(resourceUrl);
+        postProgressTip(device, 'DownloadLatestUiResourceSuccess', this.postMessage);
+        if (resource) {
+          await updateResources(
+            this.device.getCommands().typedCall.bind(this.device.getCommands()),
+            this.postMessage,
+            device,
+            resource.binary
           );
         }
-        this.postTipMessage('DownloadFirmware');
-        const firmware = await getBinary({
-          features: device.features,
-          version: params.version,
-          updateType: params.updateType,
-          isUpdateBootloader: params.isUpdateBootloader,
-        });
-        binary = firmware.binary;
-        this.postTipMessage('DownloadFirmwareSuccess');
       }
-    } catch (err) {
-      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+
+      try {
+        if (params.binary) {
+          firmwareBinary = this.params.binary;
+        } else {
+          if (!device.features) {
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              'no features found for this device'
+            );
+          }
+          postProgressTip(device, 'DownloadFirmware', this.postMessage);
+          const firmware = await getBinary({
+            features: device.features,
+            version: params.version,
+            updateType: params.updateType,
+            isUpdateBootloader: params.isUpdateBootloader,
+          });
+          firmwareBinary = firmware.binary;
+          postProgressTip(device, 'DownloadFirmwareSuccess', this.postMessage);
+        }
+      } catch (err) {
+        throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+      }
     }
 
+    await enterBootloaderMode(this.device, this.postMessage, this.payload.connectId);
+
     await this.device.acquire();
+
+    // Handle resource updates if needed
+    // Only support resource update with touch and pro device
+    // update resource
 
     const response = await uploadFirmware(
       params.updateType,
       this.device.getCommands().typedCall.bind(this.device.getCommands()),
       this.postMessage,
       device,
-      { payload: binary, rebootOnSuccess: true }
+      { payload: firmwareBinary, rebootOnSuccess: true }
     );
 
     if (this.connectId) {

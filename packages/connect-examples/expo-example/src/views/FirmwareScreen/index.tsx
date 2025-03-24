@@ -249,6 +249,25 @@ function FirmwareUpdate({
     onDisconnectDevice?.();
   }, [onDisconnectDevice]);
 
+  const updateAll = useCallback(
+    async ({ file }: { file: DocumentPicker.DocumentPickerAsset }) => {
+      if (!sdk)
+        return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
+      if (!features) return { payload: 'features is not ready', success: false };
+      if (!features) return { payload: 'features is not ready', success: false };
+      if (!selectDevice) return { payload: 'need connect device', success: false };
+
+      const res = await sdk.updateAll(selectDevice.connectId, {
+        binary: file,
+      });
+
+      return {
+        success: res.success,
+      };
+    },
+    [features, intl, sdk, selectDevice]
+  );
+
   const updateFirmware = useCallback(
     async ({
       type,
@@ -463,13 +482,21 @@ function FirmwareUpdate({
 
             <PanelView title={intl.formatMessage({ id: 'title__device_firmware_update' })}>
               <XStack flexWrap="wrap" gap="$2">
+                {deviceTypeLowerCase === EDeviceType.Pro && (
+                  <FirmwareLocalFile
+                    deviceType={deviceTypeLowerCase}
+                    title={intl.formatMessage({ id: 'label__device_update_all' })}
+                    type="firmware"
+                    onUpdate={updateAll}
+                  />
+                )}
                 <FirmwareLocalFile
                   deviceType={deviceTypeLowerCase}
                   title={intl.formatMessage({ id: 'label__device_update_firmware' })}
                   type="firmware"
                   onUpdate={updateFirmware}
                 />
-                {deviceTypeLowerCase !== 'mini' && (
+                {deviceTypeLowerCase !== EDeviceType.Mini && (
                   <FirmwareLocalFile
                     deviceType={deviceTypeLowerCase}
                     title={intl.formatMessage({ id: 'label__device_update_ble_firmware' })}

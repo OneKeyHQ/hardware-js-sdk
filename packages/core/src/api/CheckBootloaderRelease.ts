@@ -1,7 +1,7 @@
 import { BaseMethod } from './BaseMethod';
 
 import { UI_REQUEST } from '../constants/ui-request';
-import { getBootloaderReleaseInfo } from './firmware/releaseHelper';
+import { getBootloaderReleaseInfo } from './firmware/utils/releaseHelper';
 
 export default class CheckBootloaderRelease extends BaseMethod {
   init() {

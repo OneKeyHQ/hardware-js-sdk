@@ -1,16 +1,16 @@
 import { Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
-import { getSysResourceBinary } from '../firmware/getBinary';
-import { updateBootloader } from '../firmware/uploadFirmware';
-import { createUiMessage } from '../../events/ui-request';
+import { getSysResourceBinary } from '../firmware/utils/getBinary';
+import { updateBootloader } from '../firmware/uploadBootloader';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
-import { checkBootloaderLength, checkNeedUpdateBootForTouch } from '../firmware/updateBootloader';
+import { checkBootloaderLength } from '../firmware/utils/bootloaderHelper';
 import { getDeviceType } from '../../utils';
 
 import type { Device } from '../../device/Device';
-import type { Features, KnownDevice } from '../../types';
+import type { Features } from '../../types';
+import { postProgressTip } from '../firmware/utils/uiHelper';
 
 export default class DeviceUpdateBootloader extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
@@ -22,30 +22,21 @@ export default class DeviceUpdateBootloader extends BaseMethod {
     this.skipForceUpdateCheck = true;
   }
 
-  postTipMessage = (message: string) => {
-    this.postMessage(
-      createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
-        device: this.device.toMessageObject() as KnownDevice,
-        data: {
-          message,
-        },
-      })
-    );
-  };
-
   async updateTouchBootloader(device: Device, features?: Features) {
     if (features && !features.bootloader_mode) {
       let { binary } = this.payload;
       if (!binary) {
-        this.postTipMessage('CheckLatestUiResource');
+        postProgressTip(device, 'CheckLatestUiResource', this.postMessage);
         const resourceUrl = DataManager.getBootloaderResource(features);
         if (resourceUrl) {
-          this.postTipMessage('DownloadLatestBootloaderResource');
+          postProgressTip(device, 'DownloadLatestBootloaderResource', this.postMessage);
           const resource = await getSysResourceBinary(resourceUrl);
-          this.postTipMessage('DownloadLatestBootloaderResourceSuccess');
+          postProgressTip(device, 'DownloadLatestBootloaderResourceSuccess', this.postMessage);
           if (resource) {
             binary = resource.binary;
           }
+        } else {
+          throw new Error(`Could not found bootloader resource`);
         }
       }
 
