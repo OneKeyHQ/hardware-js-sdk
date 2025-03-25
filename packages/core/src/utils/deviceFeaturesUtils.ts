@@ -150,7 +150,7 @@ export const getFirmwareUpdateField = ({
   targetVersion,
 }: {
   features: Features;
-  updateType: 'firmware' | 'ble' | 'mcu';
+  updateType: 'firmware' | 'ble';
   targetVersion?: string;
 }): 'ble' | FirmwareField => {
   const deviceType = getDeviceType(features);
@@ -176,7 +176,7 @@ export const getFirmwareUpdateField = ({
   if (deviceType === EDeviceType.Pro) {
     // emmc need bootloader version >= 2.4.4
     const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
-    if (semver.gte(bootloaderVersion, NEW_BOOT_UPRATE_FIRMWARE_VERSION)) return 'firmware-v6';
+    if (semver.gte(bootloaderVersion, NEW_BOOT_UPRATE_FIRMWARE_VERSION)) return 'firmware-v5';
     return 'firmware-v5';
   }
   return 'firmware';

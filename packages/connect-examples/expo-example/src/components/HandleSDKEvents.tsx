@@ -12,14 +12,17 @@ import {
 
 import { useFocusEffect } from '@react-navigation/native';
 import { View } from 'tamagui';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { ReceivePin } from './ReceivePin';
+import { WebUsbAuthorize } from './WebUsbAuthorize';
 
 let registerListener = false;
 
 export default function HandleSDKEvents() {
   const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK, type } = useContext(HardwareSDKContext);
   const [showPinInput, setShowPinInput] = useState(false);
+  const [showWebUsbAuthorize, setShowWebUsbAuthorize] = useState(false);
 
   // 输入 pin 码的确认回调
   const onConfirmPin = useCallback(
@@ -43,6 +46,23 @@ export default function HandleSDKEvents() {
     });
   }, [SDK]);
 
+  const onWebUsbSuccess = useCallback(
+    (device: USBDevice) => {
+      console.log('webUsbSuccess: ', device);
+      SDK?.uiResponse({
+        type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+        payload: {
+          deviceId: device.serialNumber ?? '',
+        },
+      });
+    },
+    [SDK]
+  );
+
+  const onWebUsbCancel = useCallback(() => {
+    console.log('webUsbCancel');
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       // 监听 SDK 事件
@@ -52,6 +72,9 @@ export default function HandleSDKEvents() {
       if (!SDK) return;
 
       HardwareLowLevelSDK?.addHardwareGlobalEventListener(params => {
+        if (params.event === LOG_EVENT) {
+          console.log(params.payload.join(' '));
+        }
         SDK.emit?.(params.event, { ...params });
       });
 
@@ -75,6 +98,9 @@ export default function HandleSDKEvents() {
               },
             });
           }, 2000);
+        }
+        if (message.type === UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) {
+          setShowWebUsbAuthorize(true);
         }
       };
       SDK.on(UI_EVENT, uiEventCallback);
@@ -122,6 +148,12 @@ export default function HandleSDKEvents() {
         onConfirm={val => onConfirmPin(val)}
         onSwitchDevice={onInputPinOnDeviceCallback}
         onCancel={onPinCancelCallback}
+      />
+      <WebUsbAuthorize
+        open={showWebUsbAuthorize}
+        onOpenChange={setShowWebUsbAuthorize}
+        onSuccess={onWebUsbSuccess}
+        onCancel={onWebUsbCancel}
       />
     </View>
   );

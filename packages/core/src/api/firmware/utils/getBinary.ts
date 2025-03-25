@@ -9,7 +9,7 @@ import { FirmwareField } from '../../../data-manager/DataManager';
 
 export interface GetInfoProps {
   features: Features;
-  updateType: 'firmware' | 'ble' | 'mcu';
+  updateType: 'firmware' | 'ble';
   isUpdateBootloader?: boolean;
   targetVersion?: string;
 }
@@ -57,8 +57,6 @@ export const getBinary = async ({
       url = releaseInfo.url;
       break;
     }
-    // case 'mcu': {
-    // }
     default: {
       break;
     }

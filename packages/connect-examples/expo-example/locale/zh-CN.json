@@ -124,6 +124,8 @@
   "message__no_device": "未连接设备",
   "message__current_selector_device": "当前选择的设备：",
   "message__search_device_and_connect_device": "搜索设备并连接设备",
+  "message__connection_type": "连接方式",
+  "message__use_webusb": "使用 WebUSB",
 
   "message__check_latest_ui_resource": "检查最新 UI 资源...",
   "message__download_latest_ui_resource": "下载最新 UI 资源中...",

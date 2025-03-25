@@ -22,9 +22,9 @@ import { emmcCommonUpdateProcess, createFolder } from './utils/typedCallHelper';
 import { getBinary, getSysResourceBinary } from './utils/getBinary';
 // import { updateResources } from './uploadResource';
 import { DataManager } from '../../data-manager';
-import { UpdateAllBinaryParams } from '../../types/api/updateAll';
+import { FirmwareUpdateV3Params } from '../../types/api/firmwareUpdate';
 
-export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
+export default class FirmwareUpdateV3 extends BaseMethod<FirmwareUpdateV3Params> {
   checkPromise: Deferred<any> | null = null;
 
   init() {
@@ -36,21 +36,21 @@ export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
     const { payload } = this;
 
     validateParams(payload, [
-      { name: 'binary', type: 'buffer' },
-      { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bleVersion', type: 'array' },
-      { name: 'bootloaderVersion', type: 'array' },
+      { name: 'bleBinary', type: 'buffer' },
       { name: 'firmwareVersion', type: 'array' },
-      { name: 'mcuVersion', type: 'array' },
+      { name: 'firmwareBinary', type: 'buffer' },
+      { name: 'forcedUpdateRes', type: 'boolean' },
+      { name: 'bootloaderVersion', type: 'array' },
     ]);
 
     this.params = {
-      binary: payload.binary,
+      bleBinary: payload.bleBinary,
+      firmwareBinary: payload.firmwareBinary,
       forcedUpdateRes: payload.forcedUpdateRes,
       bleVersion: payload.bleVersion,
       bootloaderVersion: payload.bootloaderVersion,
       firmwareVersion: payload.firmwareVersion,
-      mcuVersion: payload.mcuVersion,
     };
   }
 
@@ -86,30 +86,26 @@ export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
       // download all resource
       if (params.firmwareVersion) {
         postProgressTip(device, 'DownloadFirmware', this.postMessage);
-        const firmwareBinary = await getBinary({
-          features,
-          version: params.firmwareVersion,
-          updateType: 'firmware',
-          isUpdateBootloader: false,
-        });
+        const firmwareBinary = (
+          await getBinary({
+            features,
+            version: params.firmwareVersion,
+            updateType: 'firmware',
+            isUpdateBootloader: false,
+          })
+        ).binary;
         allBinaryMap.push({
           fileName: 'firmware.bin',
-          binary: firmwareBinary.binary,
+          binary: firmwareBinary,
         });
         postProgressTip(device, 'DownloadFirmwareSuccess', this.postMessage);
-      }
-      if (params.mcuVersion) {
-        postProgressTip(device, 'DownloadMcu', this.postMessage);
-        const mcuBinary = await getBinary({
-          features,
-          version: params.mcuVersion,
-          updateType: 'mcu',
-        });
+      } else if (params.firmwareBinary) {
         allBinaryMap.push({
-          fileName: 'mcu-firmware.bin',
-          binary: mcuBinary.binary,
+          fileName: 'firmware.bin',
+          binary: params.firmwareBinary,
         });
       }
+
       if (params.bleVersion) {
         postProgressTip(device, 'DownloadBle', this.postMessage);
         const bleBinary = await getBinary({
@@ -121,6 +117,11 @@ export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
           fileName: 'ble-firmware.bin',
           binary: bleBinary.binary,
         });
+      } else if (params.bleBinary) {
+        allBinaryMap.push({
+          fileName: 'ble-firmware.bin',
+          binary: params.bleBinary,
+        });
       }
       if (params.bootloaderVersion) {
         const bootResourceUrl = DataManager.getBootloaderResource(features);
@@ -130,25 +131,6 @@ export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
           postProgressTip(device, 'DownloadBootloaderSuccess', this.postMessage);
         }
       }
-      // TODO： 原来资源更新逻辑
-      // postProgressTip(device, 'CheckLatestUiResource', this.postMessage);
-      // const resourceUrl = DataManager.getSysResourcesLatestRelease(
-      //   features,
-      //   params.forcedUpdateRes
-      // );
-      // if (resourceUrl) {
-      //   postProgressTip(device, 'DownloadLatestUiResource', this.postMessage);
-      //   resource = await getSysResourceBinary(resourceUrl);
-      //   postProgressTip(device, 'DownloadLatestUiResourceSuccess', this.postMessage);
-      //   if (resource) {
-      //     await updateResources(
-      //       this.device.getCommands().typedCall.bind(this.device.getCommands()),
-      //       this.postMessage,
-      //       device,
-      //       resource.binary
-      //     );
-      //   }
-      // }
       const bootloaderRes = await enterBootloaderMode(
         this.device,
         this.postMessage,
@@ -158,7 +140,6 @@ export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
         throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'enter bootloader mode error');
       }
       await this.device.acquire();
-      // TODO： emmc接口实现的resource 更新
       const resourceUrl = DataManager.getSysResourcesLatestRelease(
         features,
         params.forcedUpdateRes
@@ -197,53 +178,25 @@ export default class UpdateAll extends BaseMethod<UpdateAllBinaryParams> {
         );
       }
       await createFolder(device, `0:/updates`);
-      if (params.binary) {
-        // TODO: 包含fw三个文件（ble、se、mcu）和boot
-        const zipData = await JSZip.loadAsync(params.binary);
-        const files = Object.entries(zipData.files);
-        for (const [fileName, file] of files) {
-          if (!file.dir) {
-            const data = await file.async('arraybuffer');
-            await emmcCommonUpdateProcess(
-              this.device,
-              {
-                payload: data,
-                filePath: `0:/updates/${fileName}`,
-              },
-              this.postMessage
-            );
-          }
+      if (params.firmwareVersion || params.bleVersion) {
+        const eraseCommand = 'FirmwareErase';
+        const eraseRes = await typedCall(eraseCommand as unknown as any, 'Success', {});
+        postProgressTip(device, 'FirmwareEraseSuccess', this.postMessage);
+        if (eraseRes.type !== 'Success') {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
         }
-      } else {
-        if (params.firmwareVersion) {
-          const eraseCommand = 'FirmwareErase';
-          const eraseRes = await typedCall(eraseCommand as unknown as any, 'Success', {});
-          postProgressTip(device, 'FirmwareEraseSuccess', this.postMessage);
-          if (eraseRes.type !== 'Success') {
-            throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
-          }
-        }
+      }
 
-        if (params.bleVersion) {
-          const eraseCommand = 'FirmwareErase_ex';
-          const eraseRes = await typedCall(eraseCommand as unknown as any, 'Success', {});
-          postProgressTip(device, 'FirmwareEraseSuccess', this.postMessage);
-          if (eraseRes.type !== 'Success') {
-            throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
-          }
-        }
-
-        for (const resource of allBinaryMap) {
-          if (resource) {
-            await emmcCommonUpdateProcess(
-              this.device,
-              {
-                payload: resource.binary,
-                filePath: `0:/updates/${resource.fileName}`,
-              },
-              this.postMessage
-            );
-          }
+      for (const resource of allBinaryMap) {
+        if (resource) {
+          await emmcCommonUpdateProcess(
+            this.device,
+            {
+              payload: resource.binary,
+              filePath: `0:/updates/${resource.fileName}`,
+            },
+            this.postMessage
+          );
         }
       }
 

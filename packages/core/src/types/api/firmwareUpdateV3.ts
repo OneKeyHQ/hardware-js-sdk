@@ -4,16 +4,14 @@ import type { Params, Response } from '../params';
 export type IUpdateType = 'firmware' | 'ble';
 
 export interface UpdateAllBinaryParams {
-  // TODO: 包含所有firmware资源的updates压缩包? 三个文件
-  binary?: ArrayBuffer;
   // 蓝牙固件版本
   bleVersion?: number[];
-  // 引导程序固件版本
-  bootloaderVersion?: number[];
+  bleBinary?: ArrayBuffer;
   // 主控固件版本
   firmwareVersion?: number[];
-  // MCU固件版本
-  mcuVersion?: number[];
+  firmwareBinary?: ArrayBuffer;
+  // 引导程序固件版本
+  bootloaderVersion?: number[];
   // 是否强制更新资源
   forcedUpdateRes?: boolean;
 }
@@ -26,10 +24,7 @@ export interface FirmwareUpdateParams {
   isUpdateBootloader?: boolean;
 }
 
-type IPlatform = 'native' | 'desktop' | 'ext' | 'web' | 'webEmbed';
-type Platform = { platform: IPlatform };
-
-export declare function updateAll(
+export declare function firmwareUpdateV3(
   connectId: string | undefined,
-  params: Params<UpdateAllBinaryParams & Platform>
+  params: Params<UpdateAllBinaryParams>
 ): Response<PROTO.Success>;

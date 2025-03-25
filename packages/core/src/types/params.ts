@@ -32,6 +32,11 @@ export interface CommonParams {
 
   // Detect hardware that is in bootloader mode and return an error
   detectBootloaderDevice?: boolean;
+
+  /**
+   * Skip web device prompt
+   */
+  skipWebDevicePrompt?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

@@ -10,6 +10,7 @@ export interface InjectApi {
   dispose: CoreApi['dispose'];
   uiResponse: CoreApi['uiResponse'];
   cancel: CoreApi['cancel'];
+  switchTransport: CoreApi['switchTransport'];
 }
 
 export const inject = ({
@@ -19,6 +20,7 @@ export const inject = ({
   eventEmitter,
   init,
   updateSettings,
+  switchTransport,
   uiResponse,
 }: InjectApi): CoreApi => {
   const api: CoreApi = {
@@ -48,6 +50,8 @@ export const inject = ({
 
     updateSettings,
 
+    switchTransport,
+
     ...createCoreApi(call),
   };
   return api;
@@ -67,6 +71,7 @@ export const createCoreApi = (
   | 'uiResponse'
   | 'cancel'
   | 'updateSettings'
+  | 'switchTransport'
 > => ({
   getLogs: () => call({ method: 'getLogs' }),
   /**
@@ -207,6 +212,8 @@ export const createCoreApi = (
   firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
   firmwareUpdateV2: (connectId, params) =>
     call({ ...params, connectId, method: 'firmwareUpdateV2' }),
+  firmwareUpdateV3: (connectId, params) =>
+    call({ ...params, connectId, method: 'firmwareUpdateV3' }),
   promptWebDeviceAccess: params => call({ ...params, method: 'promptWebDeviceAccess' }),
 
   tronGetAddress: (connectId, deviceId, params) =>

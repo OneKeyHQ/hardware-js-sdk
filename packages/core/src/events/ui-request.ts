@@ -11,6 +11,8 @@ export const UI_REQUEST = {
   REQUEST_BUTTON: 'ui-button',
   REQUEST_PASSPHRASE: 'ui-request_passphrase',
   REQUEST_PASSPHRASE_ON_DEVICE: 'ui-request_passphrase_on_device',
+  REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
+    'ui-request_select_device_in_bootloader_for_web_device',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
   DEVICE_PROGRESS: 'ui-device_progress',
@@ -85,6 +87,13 @@ export interface FirmwareProcessing {
   };
 }
 
+export interface UiRequestSelectDeviceInBootloaderForWebDevice {
+  type: typeof UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE;
+  payload: {
+    device: Device;
+  };
+}
+
 export interface FirmwareProgress {
   type: typeof UI_REQUEST.FIRMWARE_PROGRESS;
   payload: {
@@ -126,6 +135,7 @@ export type UiEvent =
   | UiRequestPassphraseOnDevice
   | UiRequestPassphrase
   | FirmwareProcessing
+  | UiRequestSelectDeviceInBootloaderForWebDevice
   | FirmwareProgress
   | FirmwareTip
   | DeviceProgress

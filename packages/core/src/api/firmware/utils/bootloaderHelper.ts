@@ -17,7 +17,7 @@ import {
   getLogger,
   LoggerNames,
 } from '../../../utils';
-import { CoreMessage } from '../../../events';
+import { CoreMessage, DEVICE } from '../../../events';
 import type { Device } from '../../../device/Device';
 import { DataManager } from '../../../data-manager';
 import { DevicePool } from '../../../device/DevicePool';
@@ -27,8 +27,48 @@ import { postProgressTip } from './uiHelper';
 
 const Log = getLogger(LoggerNames.Method);
 
+async function _promptDeviceInBootloaderForWebDevice({ device }: { device: Device }) {
+  return new Promise((resolve, reject) => {
+    if (device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0) {
+      device.emit(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE, device, (err, deviceId) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(deviceId);
+        }
+      });
+    }
+  });
+}
+
 async function checkDeviceToBootloader(device: any, connectId?: string) {
   let isFirstCheck = true;
+  let checkCount = 0;
+  // eslint-disable-next-line prefer-const
+  let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+  async function _checkDeviceInBootloaderMode(
+    device: Device,
+    connectId: string | undefined,
+    intervalTimer?: ReturnType<typeof setInterval>,
+    timeoutTimer?: ReturnType<typeof setTimeout>
+  ) {
+    const deviceDiff = await device.deviceConnector?.enumerate();
+    const devicesDescriptor = deviceDiff?.descriptors ?? [];
+    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
+
+    if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+      // should update current device from cache
+      // because device was reboot and had some new requests
+      device.updateFromCache(deviceList[0]);
+      device.commands.disposed = false;
+
+      if (intervalTimer) clearInterval(intervalTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      checkPromise?.resolve(true);
+      return true;
+    }
+    return false;
+  }
   const isTouchOrProDevice =
     getDeviceType(device?.features) === EDeviceType.Touch ||
     getDeviceType(device?.features) === EDeviceType.Pro;
@@ -37,11 +77,38 @@ async function checkDeviceToBootloader(device: any, connectId?: string) {
   const isBleReconnect = connectId && DataManager.isBleConnect(env);
   const intervalTimer = setInterval(
     async () => {
+      checkCount += 1;
       Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
       if (isTouchOrProDevice && isFirstCheck) {
         isFirstCheck = false;
         Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 2000ms');
         await wait(2000);
+      }
+
+      console.log('checkCount: ', checkCount);
+      console.log(
+        'DataManager.isWebUsbConnect(DataManager.getSettings("env")): ',
+        DataManager.isWebUsbConnect(DataManager.getSettings('env'))
+      );
+      if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
+        clearInterval(intervalTimer);
+        clearTimeout(timeoutTimer);
+
+        try {
+          const confirmed = await _promptDeviceInBootloaderForWebDevice({
+            device,
+          });
+          if (confirmed) {
+            await _checkDeviceInBootloaderMode(device, connectId, intervalTimer, timeoutTimer);
+          }
+        } catch (e) {
+          Log.log(
+            'FirmwareUpdateV2 [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
+            e
+          );
+          checkPromise?.reject(e);
+        }
+        return;
       }
       if (isBleReconnect) {
         try {
@@ -68,7 +135,8 @@ async function checkDeviceToBootloader(device: any, connectId?: string) {
     },
     isBleReconnect ? 3000 : 2000
   );
-  setTimeout(() => {
+  // check goto bootloader mode timeout and throw error
+  timeoutTimer = setTimeout(() => {
     if (checkPromise) {
       clearInterval(intervalTimer);
       checkPromise.reject(new Error());
@@ -113,7 +181,6 @@ export async function enterBootloaderMode(
        */
       const isTouch = DeviceModelToTypes.model_touch.includes(deviceType);
       await wait(isTouch ? 3000 : 1500);
-      return true;
     } catch (e) {
       if (e instanceof HardwareError) {
         throw e;

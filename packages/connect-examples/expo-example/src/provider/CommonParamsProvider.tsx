@@ -9,6 +9,7 @@ const defaultParams: CommonParams = {
   passphraseState: '',
   initSession: false,
   detectBootloaderDevice: false,
+  skipWebDevicePrompt: false,
 };
 
 const CommonParamsContext = createContext<{

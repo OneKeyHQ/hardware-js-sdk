@@ -7,7 +7,16 @@ export interface PanelViewProps {
 }
 
 const PanelView = ({ title, children, renderRight }: PanelViewProps) => (
-  <Card flex={1} elevate size="$4" bordered padding="$2" marginTop="$2" backgroundColor="$bgApp">
+  <Card
+    flex={1}
+    elevate
+    size="$4"
+    bordered
+    padding="$2"
+    marginTop="$2"
+    backgroundColor="$bgApp"
+    testID={`panel-view-${title}`}
+  >
     {!!title && (
       <Card.Header padded flexDirection="row" justifyContent="space-between">
         <Text fontWeight="bold">{title}</Text>

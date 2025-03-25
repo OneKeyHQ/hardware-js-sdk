@@ -18,7 +18,7 @@ import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { firmwareUpdate, firmwareUpdateV2 } from './firmwareUpdate';
-import { updateAll } from './updateAll';
+import { firmwareUpdateV3 } from './firmwareUpdateV3';
 import { promptWebDeviceAccess } from './promptWebDeviceAccess';
 
 import { deviceReset } from './deviceReset';
@@ -158,6 +158,7 @@ import { benfenSignMessage } from './benfenSignMessage';
 
 import { neoGetAddress } from './neoGetAddress';
 import { neoSignTransaction } from './neoSignTransaction';
+import { ConnectSettings } from '../settings';
 
 export * from './export';
 
@@ -175,6 +176,7 @@ export type CoreApi = {
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
   updateSettings: typeof updateSettings;
+  switchTransport: (env: ConnectSettings['env']) => Promise<{ success: boolean }>;
   getLogs: typeof getLogs;
 
   /**
@@ -222,7 +224,7 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdateV2;
-  updateAll: typeof updateAll;
+  firmwareUpdateV3: typeof firmwareUpdateV3;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**

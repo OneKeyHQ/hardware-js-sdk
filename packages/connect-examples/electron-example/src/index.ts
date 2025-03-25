@@ -1,4 +1,13 @@
-import { screen, app, BrowserWindow, session, ipcMain } from 'electron';
+import {
+  screen,
+  app,
+  BrowserWindow,
+  session,
+  ipcMain,
+  USBDevice,
+  SerialPort,
+  HIDDevice,
+} from 'electron';
 import path from 'path';
 import isDevelopment from 'electron-is-dev';
 import { format as formatUrl } from 'url';
@@ -144,6 +153,67 @@ function createMainWindow() {
     callback({ cancel: false, requestHeaders: details.requestHeaders });
   });
 
+  // 记录已授权的设备
+  let grantedDeviceThroughPermHandler = null;
+
+  browserWindow.webContents.session.setPermissionCheckHandler(
+    (webContents, permission, requestingOrigin, details) => {
+      log.debug('WebUSB: 权限检查被调用:', {
+        permission,
+        requestingOrigin,
+        details: JSON.stringify(details, null, 2),
+      });
+
+      // 允许所有 USB 权限请求
+      if (permission === 'usb') {
+        return true;
+      }
+      return false;
+    }
+  );
+
+  browserWindow.webContents.session.setDevicePermissionHandler(details => {
+    log.debug('WebUSB: 设备权限请求被调用:', {
+      deviceType: details.deviceType,
+      origin: details.origin,
+      device: JSON.stringify(details, null, 2),
+    });
+
+    // 允许所有 USB 设备请求
+    if (details.deviceType === 'usb') {
+      log.debug('WebUSB: 记录已授权的设备');
+      grantedDeviceThroughPermHandler = details.device;
+      return true;
+    }
+    return false;
+  });
+
+  browserWindow.webContents.session.setUSBProtectedClassesHandler(details =>
+    details.protectedClasses.filter(
+      usbClass =>
+        // Exclude classes except for audio classes
+        usbClass.indexOf('audio') === -1
+    )
+  );
+
+  // 添加设备选择处理程序
+  browserWindow.webContents.session.on('select-usb-device', (event, details, callback) => {
+    log.debug('WebUSB: select-usb-device 事件触发');
+    log.debug('WebUSB: 可用设备列表:', JSON.stringify(details.deviceList, null, 2));
+
+    // 阻止默认行为，以便我们可以自定义设备选择
+    event.preventDefault();
+
+    // 直接选择第一个设备
+    if (details.deviceList && details.deviceList.length > 0) {
+      console.debug(`WebUSB: 选择了第一个设备:`, JSON.stringify(details.deviceList[0], null, 2));
+      callback(details.deviceList[0].deviceId);
+    } else {
+      console.debug('WebUSB: 没有设备可选择，返回空');
+      callback();
+    }
+  });
+
   if (!isDevelopment) {
     const PROTOCOL = 'file';
     session.defaultSession.protocol.interceptFileProtocol(PROTOCOL, (request, callback) => {
@@ -215,6 +285,7 @@ if (!singleInstance && !process.mas) {
     }
     initChildProcess();
     showMainWindow();
+    console.log('日志文件位置:', log.transports.file.getFile().path);
   });
 }
 

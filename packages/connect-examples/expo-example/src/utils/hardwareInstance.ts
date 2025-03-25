@@ -1,14 +1,14 @@
 import memoizee from 'memoizee';
 import { Platform } from 'react-native';
 import { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
-import { importSdk } from './importSdk';
+import { importSdk, importLowLevelSDK } from './importSdk';
 import { CONNECT_SRC } from '../constants/connect';
+import { type HardwareSDKEnv } from '../provider/HardwareSDKContext';
 
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;
 let HardwareLowLevelSDK: LowLevelCoreApi;
 let initialized = false;
-const isNodeEnvironments = false;
 
 export const getHardwareSDKInstance = memoizee(
   async () =>
@@ -22,7 +22,6 @@ export const getHardwareSDKInstance = memoizee(
       async (resolve, reject) => {
         const useLowLevelApi = false;
         if (initialized) {
-          // @ts-expect-error
           resolve({ HardwareSDK, HardwareLowLevelSDK, useLowLevelApi });
           return;
         }
@@ -32,17 +31,14 @@ export const getHardwareSDKInstance = memoizee(
           fetchConfig: true,
         };
 
-        HardwareSDK = await importSdk({
-          useCommonSdk: true,
-        });
-        // HardwareSDK = await importTopLevelSdk();
+        HardwareSDK = await importSdk();
         console.log(HardwareSDK);
 
         if (Platform.OS === 'web') {
           settings.connectSrc = CONNECT_SRC;
-          settings.env = 'webusb';
+          settings.env = 'web';
           settings.preRelease = false;
-          // HardwareLowLevelSDK = await importLowLevelSDK();
+          HardwareLowLevelSDK = await importLowLevelSDK();
 
           // Override Connect src
           // @ts-expect-error
@@ -58,7 +54,6 @@ export const getHardwareSDKInstance = memoizee(
           console.log('HardwareSDK initialized success');
           initialized = true;
 
-          // @ts-expect-error
           resolve({ HardwareSDK, HardwareLowLevelSDK, useLowLevelApi });
         } catch (e) {
           reject(e);

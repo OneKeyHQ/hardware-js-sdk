@@ -25,7 +25,7 @@ import type {
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5' | 'firmware-v6';
+export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5';
 
 export type MessageVersion = 'latest' | 'v1';
 
@@ -308,6 +308,19 @@ export default class DataManager {
       };
     } catch (e) {
       // ignore
+    }
+  }
+
+  static updateEnv(newEnv: ConnectSettings['env']) {
+    if (this.settings) {
+      const prevEnv = this.settings.env;
+      this.settings = {
+        ...this.settings,
+        env: newEnv,
+      };
+
+      // Log the environment change
+      console.debug(`DataManager env updated: ${prevEnv} -> ${newEnv}`);
     }
   }
 

@@ -10,11 +10,13 @@ import {
   createIFrameMessage,
   createErrorMessage,
   initCore,
+  switchTransport,
   Core,
   CORE_EVENT,
   getLogger,
   LoggerNames,
   LogBlockEvent,
+  ConnectSettings,
 } from '@onekeyfe/hd-core';
 import { get } from 'lodash';
 import { getOrigin } from '../utils/urlUtils';
@@ -87,6 +89,11 @@ export async function init(payload: IFrameInit['payload']) {
         Log.debug('Frame Bridge Receive message: ', message);
       }
 
+      if (message.event === IFRAME.SWITCH_TRANSPORT) {
+        switchCoreTransport(message.payload.env);
+        return { success: true, payload: {} };
+      }
+
       const response = await _core?.handleMessage(message);
       if (blockLog) {
         Log.debug('Frame Bridge response message: ', blockLog);
@@ -99,5 +106,15 @@ export async function init(payload: IFrameInit['payload']) {
 
   await sendMessage(createIFrameMessage(IFRAME.INIT_BRIDGE, {}), false);
 }
+
+export const switchCoreTransport = (env: ConnectSettings['env']) => {
+  if (_core) {
+    const Transport = env === 'webusb' ? WebusbTransport : HttpTransport;
+    switchTransport({
+      env,
+      Transport,
+    });
+  }
+};
 
 window.addEventListener('message', handleMessage, false);
