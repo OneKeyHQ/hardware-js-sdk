@@ -181,6 +181,7 @@ export async function enterBootloaderMode(
        */
       const isTouch = DeviceModelToTypes.model_touch.includes(deviceType);
       await wait(isTouch ? 3000 : 1500);
+      return true;
     } catch (e) {
       if (e instanceof HardwareError) {
         throw e;

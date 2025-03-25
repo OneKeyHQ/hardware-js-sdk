@@ -17,8 +17,7 @@ import { getOnekeyFeatures } from './getOnekeyFeatures';
 import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
-import { firmwareUpdate, firmwareUpdateV2 } from './firmwareUpdate';
-import { firmwareUpdateV3 } from './firmwareUpdateV3';
+import { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
 import { promptWebDeviceAccess } from './promptWebDeviceAccess';
 
 import { deviceReset } from './deviceReset';

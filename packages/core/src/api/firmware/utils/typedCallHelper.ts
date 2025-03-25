@@ -67,8 +67,8 @@ export const emmcCommonUpdateProcess = async (
   }: PROTO.FirmwareUpload & { filePath: string; manulProgress?: number },
   postMessage: (message: CoreMessage) => void
 ) => {
-  if (!filePath.startsWith('0:/')) {
-    filePath = `0:${filePath}`;
+  if (!filePath.startsWith('0:')) {
+    throw new Error('filePath must start with 0:');
   }
   const env = DataManager.getSettings('env');
   const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;

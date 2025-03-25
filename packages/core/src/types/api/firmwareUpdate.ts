@@ -36,3 +36,21 @@ export declare function firmwareUpdateV2(
   connectId: string | undefined,
   params: Params<FirmwareUpdateBinaryParams & Platform>
 ): Response<PROTO.Success>;
+
+export interface FirmwareUpdateV3Params {
+  // 蓝牙固件版本
+  bleVersion?: number[];
+  bleBinary?: ArrayBuffer;
+  // 主控固件版本
+  firmwareVersion?: number[];
+  firmwareBinary?: ArrayBuffer;
+  // 引导程序固件版本
+  bootloaderVersion?: number[];
+  // 是否强制更新资源
+  forcedUpdateRes?: boolean;
+}
+
+export declare function firmwareUpdateV3(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateV3Params>
+): Response<PROTO.Success>;
