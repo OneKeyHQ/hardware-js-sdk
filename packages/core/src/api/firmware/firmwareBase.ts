@@ -1,0 +1,378 @@
+import {
+  createDeferred,
+  Deferred,
+  EDeviceType,
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+} from '@onekeyfe/hd-shared';
+import type { KnownDevice } from '../../types';
+
+import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
+import { DevicePool } from '../../device/DevicePool';
+import { getDeviceType, wait, getLogger, LoggerNames, getDeviceUUID } from '../../utils';
+import { DeviceModelToTypes } from '../../types';
+import { DataManager } from '../../data-manager';
+
+import { BaseMethod } from '../BaseMethod';
+import { DEVICE } from '../../events';
+import { PROTO } from '../../constants';
+import { FirmwareUpdateTipMessage, TFirmwareUpdateTipMessage } from '../../constants/ui-request';
+
+const Log = getLogger(LoggerNames.Method);
+const SESSION_ERROR = 'session not found';
+
+export class FirmwareBase<Params> extends BaseMethod<Params> {
+  checkPromise: Deferred<any> | null = null;
+
+  init(): void {}
+
+  run(): Promise<any> {
+    return Promise.resolve();
+  }
+
+  /**
+   * @description Post the tip message
+   * @param message The message to be posted, defined in TTipMessage
+   */
+  postTipMessage = (message: TFirmwareUpdateTipMessage) => {
+    this.postMessage(
+      createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
+        device: this.device.toMessageObject() as KnownDevice,
+        data: {
+          message,
+        },
+      })
+    );
+  };
+
+  /**
+   * @description Post the processing message
+   * @param type
+   */
+  postProcessingMessage = (type: 'firmware' | 'ble' | 'bootloader' | 'resource') => {
+    this.postMessage(
+      createUiMessage(UI_REQUEST.FIRMWARE_PROCESSING, {
+        type,
+      })
+    );
+  };
+
+  /**
+   * @description Post the progress message
+   * @param progress Post the percentage of the progress
+   */
+  postProgressMessage = (progress: number) => {
+    this.postMessage(
+      createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
+        device: this.device.toMessageObject() as KnownDevice,
+        progress,
+      })
+    );
+  };
+
+  private async _promptDeviceInBootloaderForWebDevice() {
+    return new Promise((resolve, reject) => {
+      if (this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0) {
+        this.device.emit(
+          DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+          this.device,
+          (err, deviceId) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(deviceId);
+            }
+          }
+        );
+      }
+    });
+  }
+
+  checkDeviceToBootloader(connectId: string | undefined) {
+    this.checkPromise = createDeferred();
+    const env = DataManager.getSettings('env');
+    const isBleReconnect = connectId && DataManager.isBleConnect(env);
+
+    Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
+
+    // check device goto bootloader mode
+    let isFirstCheck = true;
+    let checkCount = 0;
+    // eslint-disable-next-line prefer-const
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const isTouchOrProDevice =
+      getDeviceType(this?.device?.features) === EDeviceType.Touch ||
+      getDeviceType(this?.device?.features) === EDeviceType.Pro;
+
+    const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
+      async () => {
+        checkCount += 1;
+        Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
+        if (isTouchOrProDevice && isFirstCheck) {
+          isFirstCheck = false;
+          Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
+          await wait(3000);
+        }
+
+        console.log('checkCount: ', checkCount);
+        console.log(
+          'DataManager.isWebUsbConnect(DataManager.getSettings("env")): ',
+          DataManager.isWebUsbConnect(DataManager.getSettings('env'))
+        );
+        if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
+          clearInterval(intervalTimer);
+          clearTimeout(timeoutTimer);
+
+          try {
+            const confirmed = await this._promptDeviceInBootloaderForWebDevice();
+            if (confirmed) {
+              await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
+            }
+          } catch (e) {
+            Log.log(
+              'FirmwareUpdateV2 [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
+              e
+            );
+            this.checkPromise?.reject(e);
+          }
+          return;
+        }
+
+        if (isBleReconnect) {
+          try {
+            await this.device.deviceConnector?.acquire(
+              this.device.originalDescriptor.id,
+              null,
+              true
+            );
+            await this.device.initialize();
+            if (this.device.features?.bootloader_mode) {
+              clearInterval(intervalTimer);
+              this.checkPromise?.resolve(true);
+            }
+          } catch (e) {
+            // ignore error because of device is not connected
+            Log.log('catch Bluetooth error when device is restarting: ', e);
+          }
+        } else {
+          await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
+        }
+      },
+      isBleReconnect ? 3000 : 2000
+    );
+
+    // check goto bootloader mode timeout and throw error
+    timeoutTimer = setTimeout(() => {
+      if (this.checkPromise) {
+        clearInterval(intervalTimer);
+        this.checkPromise.reject(new Error());
+      }
+    }, 30000);
+  }
+
+  private async _checkDeviceInBootloaderMode(
+    connectId: string | undefined,
+    intervalTimer?: ReturnType<typeof setInterval>,
+    timeoutTimer?: ReturnType<typeof setTimeout>
+  ) {
+    const deviceDiff = await this.device.deviceConnector?.enumerate();
+    const devicesDescriptor = deviceDiff?.descriptors ?? [];
+    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
+
+    if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+      // should update current device from cache
+      // because device was reboot and had some new requests
+      this.device.updateFromCache(deviceList[0]);
+      this.device.commands.disposed = false;
+
+      if (intervalTimer) clearInterval(intervalTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      this.checkPromise?.resolve(true);
+      return true;
+    }
+    return false;
+  }
+
+  async enterBootloaderMode() {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    if (this.device.features) {
+      const uuid = getDeviceUUID(this.device.features);
+      const deviceType = getDeviceType(this.device.features);
+      // auto go to bootloader mode
+      try {
+        this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
+        const bootRes = await typedCall('DeviceBackToBoot', 'Success');
+        // @ts-expect-error
+        if (bootRes.type === 'CallMethodError') {
+          throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
+        }
+        this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
+        this.checkDeviceToBootloader(this.payload.connectId);
+
+        // force clean classic device cache so that the device can initialize again
+        if (DeviceModelToTypes.model_classic.includes(deviceType)) {
+          DevicePool.clearDeviceCache(uuid);
+        }
+        delete DevicePool.devicesCache[''];
+        await this.checkPromise?.promise;
+        this.checkPromise = null;
+        /**
+         * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
+         */
+        const isTouch = DeviceModelToTypes.model_touch.includes(deviceType);
+        await wait(isTouch ? 3000 : 1500);
+        await this.device.acquire();
+        return true;
+      } catch (e) {
+        if (e instanceof HardwareError) {
+          return Promise.reject(e);
+        }
+        console.log('auto go to bootloader mode failed: ', e);
+        return Promise.reject(
+          ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
+        );
+      }
+    }
+  }
+
+  async firmwareErase() {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const eraseRes = await typedCall('FirmwareErase', 'Success', {});
+    if (eraseRes.type !== 'Success') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
+    }
+    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareEraseSuccess);
+  }
+
+  /**
+   * @description The instruction that triggers the update process
+   * @param path The path of the file to be updated
+   */
+  async triggerFirmwareUpdateEmmc({ path }: { path: string }) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const updaeteResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
+      path,
+    });
+    if (updaeteResponse.type !== 'Success') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware update error');
+    }
+    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
+  }
+
+  /**
+   * @description Create the updates folder if it does not exist
+   * @param path The path of the folder to be created
+   */
+  async createUpdatesFolderIfNotExists(path: string) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    await typedCall('EmmcDirMake', 'Success', {
+      path,
+    });
+  }
+
+  /**
+   * @param payload The payload of the file to be updated
+   * @param filePath The path of the file to be updated
+   * @param manulProgress The manual progress of the file to be updated
+   */
+  async emmcCommonUpdateProcess({
+    payload,
+    filePath,
+    manulProgress,
+  }: PROTO.FirmwareUpload & { filePath: string; manulProgress?: number }) {
+    if (!filePath.startsWith('0:')) {
+      throw new Error('filePath must start with 0:');
+    }
+    const env = DataManager.getSettings('env');
+    const perPackageSize = DataManager.isBleConnect(env) ? 16 : 128;
+    const chunkSize = 1024 * perPackageSize;
+    const totalChunks = Math.ceil(payload.byteLength / chunkSize);
+    let offset = 0;
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkStart = i * chunkSize;
+      const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
+      const chunkLength = chunkEnd - chunkStart;
+      const chunk = payload.slice(chunkStart, chunkEnd);
+      const overwrite = i === 0;
+      const progress = Math.round(((i + 1) / totalChunks) * 100);
+      const writeRes = await this.emmcFileWriteWithRetry(
+        filePath,
+        chunkLength,
+        offset,
+        chunk,
+        overwrite,
+        manulProgress ?? progress
+      );
+      // @ts-expect-error
+      offset += writeRes.message.processed_byte;
+      this.postProgressMessage(manulProgress ?? progress);
+    }
+  }
+
+  async emmcFileWriteWithRetry(
+    filePath: string,
+    chunkLength: number,
+    offset: number,
+    chunk: ArrayBuffer | Buffer,
+    overwrite: boolean,
+    progress: number | null
+  ) {
+    const writeFunc = async () => {
+      const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+      // @ts-expect-error
+      const writeRes = await typedCall('EmmcFileWrite', 'EmmcFile', {
+        file: {
+          path: filePath,
+          len: chunkLength,
+          offset,
+          data: chunk,
+        },
+        overwrite,
+        append: offset !== 0,
+        ui_percentage: progress,
+      });
+      if (writeRes.type !== 'EmmcFile') {
+        // @ts-expect-error
+        if (writeRes.type === 'CallMethodError') {
+          if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
+            throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
+          }
+        }
+        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write chunk once error');
+      }
+      return writeRes;
+    };
+
+    let retryCount = 10;
+    while (retryCount > 0) {
+      try {
+        const result = await writeFunc();
+        return result;
+      } catch (error) {
+        Log.error(`emmcWrite error: `, error);
+        retryCount--;
+        if (retryCount === 0) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
+        }
+        const env = DataManager.getSettings('env');
+        if (DataManager.isBleConnect(env)) {
+          await wait(3000);
+          await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
+          await this.device.initialize();
+        } else if (error.message.indexOf(SESSION_ERROR) > -1) {
+          const deviceDiff = await this.device.deviceConnector?.enumerate();
+          const devicesDescriptor = deviceDiff?.descriptors ?? [];
+          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
+          if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+            this.device.updateFromCache(deviceList[0]);
+            await this.device.acquire();
+            this.device.getCommands().mainId = this.device.mainId ?? '';
+          }
+        }
+        await wait(3000);
+      }
+    }
+  }
+}

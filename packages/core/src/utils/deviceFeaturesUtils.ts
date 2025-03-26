@@ -177,6 +177,42 @@ export const getFirmwareUpdateField = ({
   }
   return 'firmware';
 };
+/**
+ * Returns the optional firmware version
+ */
+export const getFirmwareUpdateFieldArray = (
+  features: Features,
+  updateType: 'firmware' | 'ble' | 'bootloader'
+): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v5')[] => {
+  const deviceType = getDeviceType(features);
+  if (updateType === 'ble') {
+    return ['ble'];
+  }
+
+  if (deviceType === 'classic' || deviceType === 'classic1s' || deviceType === 'mini') {
+    return ['firmware-v5'];
+  }
+
+  if (deviceType === 'touch') {
+    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    if (semver.gt(currentVersion, '4.0.0')) {
+      return ['firmware-v5', 'firmware'];
+    }
+    if (semver.gte(currentVersion, '4.0.0')) {
+      return ['firmware-v2', 'firmware'];
+    }
+    if (!currentVersion || semver.lt(currentVersion, '3.0.0')) {
+      return ['firmware-v5', 'firmware-v2', 'firmware'];
+    }
+    return ['firmware'];
+  }
+
+  if (deviceType === 'pro') {
+    return ['firmware-v5'];
+  }
+
+  return ['firmware'];
+};
 
 export function fixVersion(version: string) {
   let parts = version.split('.');
