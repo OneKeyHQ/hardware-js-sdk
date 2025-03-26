@@ -162,6 +162,10 @@ export const callAPI = async (message: CoreMessage) => {
   );
   device.on(DEVICE.PASSPHRASE_ON_DEVICE, onEnterPassphraseOnDeviceHandler);
   device.on(DEVICE.FEATURES, onDeviceFeaturesHandler);
+  device.on(
+    DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+    onSelectDeviceInBootloaderForWebDeviceHandler
+  );
 
   try {
     const inner = async (): Promise<void> => {
@@ -398,7 +402,9 @@ function initDevice(method: BaseMethod) {
   if (!device) {
     const env = DataManager.getSettings('env');
     if (DataManager.isWebUsbConnect(env)) {
-      postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
+      if (!method.payload.skipWebDevicePrompt) {
+        postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
+      }
       throw ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission);
     }
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
@@ -708,6 +714,20 @@ const onEnterPassphraseOnDeviceHandler = (
   );
 };
 
+const onSelectDeviceInBootloaderForWebDeviceHandler = async (
+  ...[device, callback]: [...DeviceEvents['select_device_in_bootloader_for_web_device']]
+) => {
+  Log.debug('onSelectDeviceInBootloaderForWebDeviceHandler');
+  const uiPromise = createUiPromise(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE, device);
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE, {
+      device: device.toMessageObject() as KnownDevice,
+    })
+  );
+  const uiResp = await uiPromise.promise;
+  callback(null, uiResp.payload.deviceId);
+};
+
 /**
  * Emit message to listener (parent).
  * Clear method reference from _callMethods
@@ -727,7 +747,7 @@ const createUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T, d
 };
 
 const findUiPromise = <T extends UiPromiseResponse['type']>(promiseEvent: T) =>
-  _uiPromises.find(p => p.id === promiseEvent) as UiPromise<T> | undefined;
+  _uiPromises.find(p => p.id === promiseEvent);
 
 const removeUiPromise = (promise: Deferred<any>) => {
   _uiPromises = _uiPromises.filter(p => p !== promise);
@@ -737,7 +757,8 @@ export default class Core extends EventEmitter {
   async handleMessage(message: CoreMessage) {
     switch (message.type) {
       case UI_RESPONSE.RECEIVE_PIN:
-      case UI_RESPONSE.RECEIVE_PASSPHRASE: {
+      case UI_RESPONSE.RECEIVE_PASSPHRASE:
+      case UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: {
         const uiPromise = findUiPromise(message.type);
         if (uiPromise) {
           Log.log('receive UI Response: ', message.type);
@@ -827,4 +848,21 @@ export const init = async (
   } catch (error) {
     Log.error('core init', error);
   }
+};
+
+export const switchTransport = ({
+  env,
+  Transport,
+  plugin,
+}: {
+  env: ConnectSettings['env'];
+  Transport: any;
+  plugin?: LowlevelTransportSharedPlugin;
+}) => {
+  DataManager.updateEnv(env);
+  TransportManager.setTransport(Transport, plugin);
+  _deviceList = undefined;
+  DevicePool.resetState();
+  _connector = undefined;
+  initConnector();
 };

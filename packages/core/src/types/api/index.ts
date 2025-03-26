@@ -244,6 +244,7 @@ import { benfenSignMessage } from './benfenSignMessage';
 
 import { neoGetAddress } from './neoGetAddress';
 import { neoSignTransaction } from './neoSignTransaction';
+import { ConnectSettings } from '../settings';
 
 export * from './export';
 
@@ -261,6 +262,7 @@ export type CoreApi = {
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
   updateSettings: typeof updateSettings;
+  switchTransport: (env: ConnectSettings['env']) => Promise<{ success: boolean }>;
   getLogs: typeof getLogs;
 
   /**

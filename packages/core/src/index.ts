@@ -6,7 +6,7 @@ import { CoreApi } from './types/api';
 export type { LowLevelCoreApi, LowLevelInjectApi } from './lowLevelInject';
 export type { TopLevelInjectApi } from './topLevelInject';
 
-export { default as Core, init as initCore } from './core';
+export { default as Core, init as initCore, switchTransport } from './core';
 
 export * from './constants';
 export * from './utils';
@@ -23,6 +23,7 @@ const HardwareSdk = ({
   uiResponse,
   cancel,
   updateSettings,
+  switchTransport,
 }: InjectApi): CoreApi =>
   inject({
     init,
@@ -32,6 +33,7 @@ const HardwareSdk = ({
     uiResponse,
     cancel,
     updateSettings,
+    switchTransport,
   });
 
 const HardwareSDKLowLevel = ({
@@ -43,6 +45,7 @@ const HardwareSDKLowLevel = ({
   uiResponse,
   cancel,
   updateSettings,
+  switchTransport,
 }: LowLevelInjectApi): LowLevelCoreApi =>
   lowLevelInject({
     init,
@@ -53,6 +56,7 @@ const HardwareSDKLowLevel = ({
     uiResponse,
     cancel,
     updateSettings,
+    switchTransport,
   });
 
 const HardwareTopLevelSdk = (): CoreApi => topLevelInject();

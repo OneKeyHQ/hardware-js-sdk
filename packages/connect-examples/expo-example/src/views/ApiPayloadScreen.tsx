@@ -1,5 +1,5 @@
-import React from 'react';
-import { FlatList } from 'react-native';
+import React, { memo, useMemo, useEffect, useState } from 'react';
+import { VirtualizedList } from 'react-native';
 import { Stack, YStack } from 'tamagui';
 
 import { useIntl } from 'react-intl';
@@ -14,6 +14,7 @@ import { ExpandModeProvider } from '../provider/ExpandModeProvider';
 import { CollapsibleSection } from '../components/CollapsibleSection';
 import Playground, { PlaygroundProps as ApiPayloadProps } from '../components/Playground';
 import PanelView from '../components/ui/Panel';
+import { useMedia } from '../provider/MediaProvider';
 
 /* eslint-disable global-require, @typescript-eslint/no-var-requires */
 const playgroundConfig = [
@@ -167,26 +168,61 @@ const playgroundConfig = [
   },
 ];
 
-function renderItem({ item }: { item: { title: string; data: any } }) {
-  console.log();
+interface ApiPayloadItem {
+  title: string;
+  data: Array<React.JSX.IntrinsicAttributes & ApiPayloadProps>;
+}
+
+interface ApiPayloadItemProps {
+  item: ApiPayloadItem;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+const ApiPayloadItem = memo(({ item }: ApiPayloadItemProps) => {
+  const media = useMedia();
+  const flexDirection = media.gtSm ? 'row' : 'column';
+
+  const renderedItems = useMemo(
+    () =>
+      item.data.map((data: React.JSX.IntrinsicAttributes & ApiPayloadProps) => (
+        <PayloadStack key={data.method} data={data} />
+      )),
+    [item.data]
+  );
+
   return (
     <CollapsibleSection title={item.title}>
-      <YStack flexDirection="column" $gtSm={{ flexDirection: 'row' }} flexWrap="wrap" gap="$2">
-        {item.data.map((data: React.JSX.IntrinsicAttributes & ApiPayloadProps) => (
-          <Stack
-            flex={1}
-            key={`stack-${data.method}`}
-            width="100%"
-            $gtSm={{ width: '48%' }}
-            $gtLg={{ width: '30%' }}
-          >
-            <Playground key={`payload-${data.method}`} {...data} />
-          </Stack>
-        ))}
+      <YStack flexDirection={flexDirection} flexWrap="wrap" gap="$2">
+        {renderedItems}
       </YStack>
     </CollapsibleSection>
   );
-}
+});
+ApiPayloadItem.displayName = 'ApiPayloadItem';
+
+const PayloadStack = memo(({ data }: { data: React.JSX.IntrinsicAttributes & ApiPayloadProps }) => {
+  const media = useMedia();
+  // eslint-disable-next-line no-nested-ternary
+  const width = media.gtLg ? '30%' : media.gtSm ? '48%' : '100%';
+
+  return (
+    <Stack flex={1} width={width}>
+      <Playground key={data.method} {...data} />
+    </Stack>
+  );
+});
+PayloadStack.displayName = 'PayloadStack';
+
+const ApiPayloadList = ({ data }: { data: ApiPayloadItem[] }) => (
+  <VirtualizedList<ApiPayloadItem>
+    data={data}
+    // eslint-disable-next-line react/no-unused-prop-types
+    renderItem={({ item }: { item: ApiPayloadItem }) => <ApiPayloadItem item={item} />}
+    keyExtractor={(item: ApiPayloadItem) => item.title}
+    getItemCount={data => data.length}
+    getItem={(data, index) => data[index]}
+  />
+);
 
 const ApiPayload = () => {
   const intl = useIntl();
@@ -199,11 +235,7 @@ const ApiPayload = () => {
           <CommonParamsView />
           <ExpandModeProvider>
             <PanelView title={intl.formatMessage({ id: 'title__hardware_api_test' })}>
-              <FlatList
-                data={playgroundConfig}
-                keyExtractor={item => `playground-${item.title}`}
-                renderItem={renderItem}
-              />
+              <ApiPayloadList data={playgroundConfig} />
             </PanelView>
           </ExpandModeProvider>
           <UploadScreen />
@@ -216,7 +248,7 @@ const ApiPayload = () => {
 
 export default function ApiPayloadScreen() {
   return (
-    <PageView>
+    <PageView scrollable={false}>
       <ApiPayload />
     </PageView>
   );

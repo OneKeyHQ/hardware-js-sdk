@@ -27,6 +27,8 @@ export type TonSignMessageParams = {
   extDestination?: string[];
   extTonAmount?: UintType[];
   extPayload?: string[];
+  initState?: string;
+  signingMessageRepr?: string;
 };
 
 export type TonSignedMessageResponse = {

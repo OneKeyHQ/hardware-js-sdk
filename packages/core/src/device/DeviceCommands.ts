@@ -273,14 +273,7 @@ export class DeviceCommands {
       // TODO: EntropyRequest
     }
 
-    // const isWebusbEnv = DataManager.getSettings('env') === 'webusb';
-
     if (res.type === 'PinMatrixRequest') {
-      // if (isWebusbEnv) {
-      //   return Promise.reject(
-      //     ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Please unlock your device')
-      //   );
-      // }
       return this._promptPin(res.message.type).then(
         pin => {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {

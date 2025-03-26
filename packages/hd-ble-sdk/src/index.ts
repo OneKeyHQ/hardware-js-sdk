@@ -168,6 +168,7 @@ const call = async (params: any) => {
 };
 
 const updateSettings = () => Promise.resolve(true);
+const switchTransport = () => Promise.resolve({ success: true });
 
 const HardwareBleSdk = HardwareSdk({
   eventEmitter,
@@ -177,6 +178,7 @@ const HardwareBleSdk = HardwareSdk({
   dispose,
   uiResponse,
   updateSettings,
+  switchTransport,
 });
 
 export default HardwareBleSdk;

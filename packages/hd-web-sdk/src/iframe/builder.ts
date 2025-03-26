@@ -24,9 +24,7 @@ export const init = async (settings: any) => {
     instance.style.width = '0px';
     instance.style.height = '0px';
     instance.id = 'onekey-connect';
-    if (settings.env === 'webusb') {
-      instance.allow = 'usb';
-    }
+    instance.allow = 'usb';
   }
 
   // const manifest = `version=${settings.version as string}`;

@@ -1874,6 +1874,30 @@ export type EthereumSignTypedDataOneKey = {
   chain_id?: number;
 };
 
+export enum EthereumGnosisSafeTxOperation {
+  CALL = 0,
+  DELEGATE_CALL = 1,
+}
+
+// EthereumGnosisSafeTxRequest
+export type EthereumGnosisSafeTxRequest = {};
+
+// EthereumGnosisSafeTxAck
+export type EthereumGnosisSafeTxAck = {
+  to: string;
+  value: string;
+  data?: string;
+  operation: EthereumGnosisSafeTxOperation;
+  safeTxGas: string;
+  baseGas: string;
+  gasPrice: string;
+  gasToken: string;
+  refundReceiver: string;
+  nonce: string;
+  chain_id: number;
+  verifyingContract: string;
+};
+
 // EthereumTypedDataStructRequestOneKey
 export type EthereumTypedDataStructRequestOneKey = {
   name: string;
@@ -3426,6 +3450,31 @@ export type NEMDecryptedMessage = {
   payload: string;
 };
 
+// NeoGetAddress
+export type NeoGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// NeoAddress
+export type NeoAddress = {
+  address?: string;
+  public_key?: string;
+};
+
+// NeoSignTx
+export type NeoSignTx = {
+  address_n: number[];
+  raw_tx: string;
+  network_magic?: number;
+};
+
+// NeoSignedTx
+export type NeoSignedTx = {
+  public_key: string;
+  signature: string;
+};
+
 // NervosGetAddress
 export type NervosGetAddress = {
   address_n: number[];
@@ -4181,12 +4230,21 @@ export type TonSignMessage = {
   ext_ton_amount: UintType[];
   ext_payload: string[];
   jetton_amount_bytes?: string;
+  init_data_initial_chunk?: string;
+  init_data_length?: number;
+  signing_message_repr?: string;
+};
+
+// TonTxAck
+export type TonTxAck = {
+  init_data_chunk: string;
 };
 
 // TonSignedMessage
 export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
+  init_data_length?: number;
 };
 
 // TonSignProof
@@ -4360,31 +4418,6 @@ export enum CommandFlags {
   Default = 0,
   Factory_Only = 1,
 }
-
-// NeoGetAddress
-export type NeoGetAddress = {
-  address_n: number[];
-  show_display?: boolean;
-};
-
-// NeoAddress
-export type NeoAddress = {
-  address?: string;
-  public_key?: string;
-};
-
-// NeoSignTx
-export type NeoSignTx = {
-  address_n: number[];
-  raw_tx: string;
-  network_magic?: number;
-};
-
-// NeoSignedTx
-export type NeoSignedTx = {
-  public_key: string;
-  signature: string;
-};
 
 // custom connect definitions
 export type MessageType = {
@@ -4620,6 +4653,8 @@ export type MessageType = {
   EthereumTokenInfo: EthereumTokenInfo;
   EthereumDefinitions: EthereumDefinitions;
   EthereumSignTypedDataOneKey: EthereumSignTypedDataOneKey;
+  EthereumGnosisSafeTxRequest: EthereumGnosisSafeTxRequest;
+  EthereumGnosisSafeTxAck: EthereumGnosisSafeTxAck;
   EthereumTypedDataStructRequestOneKey: EthereumTypedDataStructRequestOneKey;
   EthereumStructMemberOneKey: EthereumStructMemberOneKey;
   EthereumFieldTypeOneKey: EthereumFieldTypeOneKey;
@@ -4925,6 +4960,7 @@ export type MessageType = {
   TonGetAddress: TonGetAddress;
   TonAddress: TonAddress;
   TonSignMessage: TonSignMessage;
+  TonTxAck: TonTxAck;
   TonSignedMessage: TonSignedMessage;
   TonSignProof: TonSignProof;
   TonSignedProof: TonSignedProof;
