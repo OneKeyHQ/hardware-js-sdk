@@ -153,6 +153,7 @@
   "message__sys_resource_update": "系统资源更新中...",
   "message__sys_resource_update_success": "系统资源更新成功",
   "message__firmware_updating": "固件更新中...",
+  "message__firmware_update_completed": "固件更新完成",
 
   "message__scan_device_doing": "搜索设备中...",
   "message__begin_test": "开始测试",

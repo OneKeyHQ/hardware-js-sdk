@@ -151,7 +151,7 @@
   "message__sys_resource_update": "Sys resource update...",
   "message__sys_resource_update_success": "Sys resource update success",
   "message__firmware_updating": "Firmware updating...",
-
+  "message__firmware_update_completed": "Firmware update completed",
   "message__scan_device_doing": "Scan device doing...",
   "message__begin_test": "Begin test",
   "message__stop_test": "Stop test",

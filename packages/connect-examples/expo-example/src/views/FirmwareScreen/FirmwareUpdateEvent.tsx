@@ -84,6 +84,10 @@ function FirmwareUpdateEventView({
         case 'FirmwareUpdating':
           newMessage = intl.formatMessage({ id: 'message__firmware_updating' });
           break;
+
+        case 'FirmwareUpdateCompleted':
+          newMessage = intl.formatMessage({ id: 'message__firmware_update_completed' });
+          break;
         default:
           newMessage = tip;
           break;

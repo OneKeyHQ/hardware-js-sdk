@@ -26,6 +26,7 @@ export enum FirmwareUpdateTipMessage {
   UpdateSysResource = 'UpdateSysResource',
   UpdateSysResourceSuccess = 'UpdateSysResourceSuccess',
   FirmwareUpdating = 'FirmwareUpdating',
+  FirmwareUpdateCompleted = 'FirmwareUpdateCompleted',
 }
 
 export type TFirmwareUpdateTipMessage = `${FirmwareUpdateTipMessage}`;

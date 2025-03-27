@@ -197,7 +197,7 @@ export class FirmwareBase<Params> extends BaseMethod<Params> {
 
   async enterBootloaderMode() {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    if (this.device.features) {
+    if (this.device.features && !this.device.features.bootloader_mode) {
       const uuid = getDeviceUUID(this.device.features);
       const deviceType = getDeviceType(this.device.features);
       // auto go to bootloader mode
@@ -254,6 +254,7 @@ export class FirmwareBase<Params> extends BaseMethod<Params> {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     const updaeteResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
       path,
+      reboot_on_success: true,
     });
     if (updaeteResponse.type !== 'Success') {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware update error');
@@ -275,13 +276,17 @@ export class FirmwareBase<Params> extends BaseMethod<Params> {
   /**
    * @param payload The payload of the file to be updated
    * @param filePath The path of the file to be updated
-   * @param manulProgress The manual progress of the file to be updated
    */
   async emmcCommonUpdateProcess({
     payload,
     filePath,
-    manulProgress,
-  }: PROTO.FirmwareUpload & { filePath: string; manulProgress?: number }) {
+    processedSize,
+    totalSize,
+  }: PROTO.FirmwareUpload & {
+    filePath: string;
+    processedSize?: number;
+    totalSize?: number;
+  }) {
     if (!filePath.startsWith('0:')) {
       throw new Error('filePath must start with 0:');
     }
@@ -290,25 +295,39 @@ export class FirmwareBase<Params> extends BaseMethod<Params> {
     const chunkSize = 1024 * perPackageSize;
     const totalChunks = Math.ceil(payload.byteLength / chunkSize);
     let offset = 0;
+    let currentFileProcessed = 0;
+
     for (let i = 0; i < totalChunks; i++) {
       const chunkStart = i * chunkSize;
       const chunkEnd = Math.min(chunkStart + chunkSize, payload.byteLength);
       const chunkLength = chunkEnd - chunkStart;
       const chunk = payload.slice(chunkStart, chunkEnd);
       const overwrite = i === 0;
-      const progress = Math.round(((i + 1) / totalChunks) * 100);
+
+      // Calculate progress based on whether we're tracking overall progress or single file progress
+      let progress: number;
+      if (totalSize !== undefined && processedSize !== undefined) {
+        currentFileProcessed = processedSize + chunkEnd;
+        progress = Math.floor((currentFileProcessed / totalSize) * 100);
+      } else {
+        progress = Math.round(((i + 1) / totalChunks) * 100);
+      }
+
       const writeRes = await this.emmcFileWriteWithRetry(
         filePath,
         chunkLength,
         offset,
         chunk,
         overwrite,
-        manulProgress ?? progress
+        progress
       );
       // @ts-expect-error
       offset += writeRes.message.processed_byte;
-      this.postProgressMessage(manulProgress ?? progress);
+      this.postProgressMessage(progress);
     }
+
+    // Return processed size only if we're tracking overall progress
+    return totalSize !== undefined ? (processedSize ?? 0) + payload.byteLength : 0;
   }
 
   async emmcFileWriteWithRetry(
@@ -371,7 +390,7 @@ export class FirmwareBase<Params> extends BaseMethod<Params> {
             this.device.getCommands().mainId = this.device.mainId ?? '';
           }
         }
-        await wait(3000);
+        await wait(2000);
       }
     }
   }

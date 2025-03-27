@@ -1,4 +1,4 @@
-import { Deferred, ERRORS, HardwareErrorCode, EDeviceType } from '@onekeyfe/hd-shared';
+import { Deferred, ERRORS, HardwareErrorCode, EDeviceType, wait } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import JSZip from 'jszip';
 import { Features } from '@onekeyfe/hd-transport';
@@ -11,6 +11,7 @@ import { DataManager } from '../data-manager';
 import { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
 import { FirmwareBase } from './firmware/firmwareBase';
 import { FirmwareUpdateTipMessage } from '../constants/ui-request';
+import { DevicePool } from '../device/DevicePool';
 
 export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Params> {
   checkPromise: Deferred<any> | null = null;
@@ -194,6 +195,7 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
       totalSize += bootloaderBinary.byteLength;
     }
 
+    this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
     // 处理资源文件
     if (resourceBinary) {
       const file = await JSZip.loadAsync(resourceBinary);
@@ -202,23 +204,23 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
         const name = fileName.split('/').pop();
         if (!file.dir && fileName.indexOf('__MACOSX') === -1 && name) {
           const data = await file.async('arraybuffer');
-          await this.emmcCommonUpdateProcess({
+          processedSize = await this.emmcCommonUpdateProcess({
             payload: data,
             filePath: `0:res/${name}`,
-            manulProgress: Math.floor((processedSize / totalSize) * 100),
+            processedSize,
+            totalSize,
           });
-          processedSize += data.byteLength;
         }
       }
     }
 
     if (bootloaderBinary) {
-      await this.emmcCommonUpdateProcess({
+      processedSize = await this.emmcCommonUpdateProcess({
         payload: bootloaderBinary,
         filePath: `0:boot/bootloader.bin`,
-        manulProgress: Math.floor((processedSize / totalSize) * 100),
+        processedSize,
+        totalSize,
       });
-      processedSize += bootloaderBinary.byteLength;
     }
 
     await this.createUpdatesFolderIfNotExists(`0:updates/`);
@@ -228,18 +230,113 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
 
     for (const fwbinary of fwBinaryMap) {
       if (fwbinary) {
-        await this.emmcCommonUpdateProcess({
+        processedSize = await this.emmcCommonUpdateProcess({
           payload: fwbinary.binary,
           filePath: `0:updates/${fwbinary.fileName}`,
-          manulProgress: Math.floor((processedSize / totalSize) * 100),
+          processedSize,
+          totalSize,
         });
-        processedSize += fwbinary.binary.byteLength;
       }
     }
 
     // trigger firmware update, support folder update
-    await this.triggerFirmwareUpdateEmmc({
-      path: '0:updates',
-    });
+    try {
+      this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
+      await this.triggerFirmwareUpdateEmmc({
+        path: '0:updates',
+      });
+    } catch (error) {
+      console.error('triggerFirmwareUpdateEmmc error: ', error);
+    }
+
+    // Needs to success immediately case:
+    // only bootloader update
+    // include ble update in isBleConnected
+    const env = DataManager.getSettings('env');
+    const isBleReconnect = this.connectId && DataManager.isBleConnect(env);
+    if (
+      (bootloaderBinary && fwBinaryMap.length === 0) ||
+      ((this.params.bleBinary || this.params.bleVersion) && isBleReconnect)
+    ) {
+      this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+      return;
+    }
+    await wait(500);
+    // 每三秒轮询一次，直到更新完成
+    await this.pollFirmwareUpdateStatus();
+  }
+
+  /**
+   * @description Reconnect device - While update with bootloader, it will reconnect device
+   * @param maxAttempts - Maximum number of attempts
+   * @returns {Promise<boolean>} - Returns true if the device is successfully reconnected, otherwise throws an error
+   */
+  async reconnectDevice(maxAttempts = 10) {
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      const deviceDiff = await this.device.deviceConnector?.enumerate();
+      const devicesDescriptor = deviceDiff?.descriptors ?? [];
+      const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
+
+      if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+        this.device.updateFromCache(deviceList[0]);
+        await this.device.acquire();
+        this.device.commands.disposed = false;
+        return true;
+      }
+
+      await wait(3000);
+      attempts++;
+    }
+
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Failed to reconnect device after maximum attempts'
+    );
+  }
+
+  private async pollFirmwareUpdateStatus(maxAttempts = 30): Promise<boolean> {
+    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
+    await this.reconnectDevice();
+
+    for (let attempts = 0; attempts < maxAttempts; attempts++) {
+      try {
+        const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+        await wait(1000);
+        let timeoutId: NodeJS.Timeout | undefined;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Device reboot timeout'));
+          }, 3000);
+        });
+
+        try {
+          const res = await Promise.race([
+            typedCall('GetFeatures', 'Features', {}),
+            timeoutPromise,
+          ]);
+          clearTimeout(timeoutId);
+          console.log('res: ', res);
+        } catch (error) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+      } catch (error) {
+        if (error.message.includes('Update mode')) {
+          const progress = parseInt(error.message.split('Update mode ')[1]) || 0;
+          this.postProgressMessage(progress);
+        } else {
+          // TODO: 这里最后一个请求会一直处在等待中状态，需要cancel。
+          this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+          return true;
+        }
+      }
+    }
+
+    throw ERRORS.TypedError(
+      HardwareErrorCode.RuntimeError,
+      'Firmware update status check exceeded maximum attempts'
+    );
   }
 }
