@@ -197,7 +197,6 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
   const [loading, setLoading] = useState<boolean>(false);
   const media = useMedia();
 
-  // 存储固件文件
   const [firmwareFile, setFirmwareFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [bleFile, setBleFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [bootloaderFile, setBootloaderFile] = useState<DocumentPicker.DocumentPickerAsset | null>(
@@ -208,7 +207,6 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
   // eslint-disable-next-line no-nested-ternary
   const width = media.gtLg ? '48%' : media.gtSm ? '100%' : '100%';
 
-  // 选择文件
   const selectFile = (type: string) => {
     // source -> .zip
     // ble & firmware & bootloader -> .bin
@@ -222,7 +220,6 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
         return;
       }
 
-      // 根据类型存储文件
       if (type === 'firmware') {
         setFirmwareFile(res.assets[0]);
       } else if (type === 'ble') {
@@ -245,7 +242,6 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
     setLoading(true);
 
     try {
-      // 读取所有选中的文件内容
       const firmwareBinary = firmwareFile ? await firmwareFile.file?.arrayBuffer() : undefined;
       const bleBinary = bleFile ? await bleFile.file?.arrayBuffer() : undefined;
       const bootloaderBinary = bootloaderFile
@@ -253,7 +249,6 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
         : undefined;
       const resourceBinary = resourceFile ? await resourceFile.file?.arrayBuffer() : undefined;
 
-      // 调用更新函数
       const res = await onUpdate({
         firmwareBinary,
         bleBinary,
@@ -474,15 +469,14 @@ function FirmwareUpdate({
         return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
       if (!features) return { payload: 'features is not ready', success: false };
       if (!selectDevice) return { payload: 'need connect device', success: false };
-      // 设置更新对话框
       setShowUpdateDialog(true);
       try {
-        // 处理固件和蓝牙固件更新
         const res = await sdk.firmwareUpdateV3(selectDevice.connectId, {
           firmwareBinary,
           bleBinary,
           bootloaderBinary,
           resourceBinary,
+          platform: 'web',
         });
         setShowUpdateDialog(false);
         return {
