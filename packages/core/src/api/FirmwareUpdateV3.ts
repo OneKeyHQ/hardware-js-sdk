@@ -72,11 +72,8 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
 
-    if (!bootloaderBinary && fwBinaryMap.length === 0) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.FirmwareUpdateDownloadFailed,
-        'No firmware to update'
-      );
+    if (fwBinaryMap.length === 0) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'no firmware found for this device');
     }
 
     await this.enterBootloaderMode();
