@@ -180,7 +180,7 @@ export enum FirmwareUpdateTipMessage {
   FirmwareUpdateCompleted = 'FirmwareUpdateCompleted',
 }
 
-export type TFirmwareUpdateTipMessage = `${FirmwareUpdateTipMessage}`;
+export type IFirmwareUpdateTipMessage = `${FirmwareUpdateTipMessage}`;
 
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
 

@@ -12,7 +12,7 @@ import {
   UI_REQUEST,
   createUiMessage,
   FirmwareUpdateTipMessage,
-  TFirmwareUpdateTipMessage,
+  IFirmwareUpdateTipMessage,
 } from '../../events/ui-request';
 import { DevicePool } from '../../device/DevicePool';
 import { getDeviceType, wait, getLogger, LoggerNames, getDeviceUUID } from '../../utils';
@@ -42,9 +42,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
 
   /**
    * @description Post the tip message
-   * @param message The message to be posted, defined in TTipMessage
+   * @param message The message to be posted, defined in IFirmwareUpdateTipMessage
    */
-  postTipMessage = (message: TFirmwareUpdateTipMessage) => {
+  postTipMessage = (message: IFirmwareUpdateTipMessage) => {
     this.postMessage(
       createUiMessage(UI_REQUEST.FIRMWARE_TIP, {
         device: this.device.toMessageObject() as KnownDevice,
