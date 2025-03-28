@@ -263,9 +263,14 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
     }
 
-    // Needs to success immediately case:
-    // only bootloader update
-    // include ble update in isBleConnected
+    // TODO: Is this necessary?
+    this.postProcessingMessage('firmware');
+
+    /**
+     * Needs to success immediately case:
+     * 1. only bootloader update
+     * 2. include ble update in isBleConnected
+     */
     const isBleReconnect = this.isBleReconnect();
     if (
       (bootloaderBinary && fwBinaryMap.length === 0) ||
