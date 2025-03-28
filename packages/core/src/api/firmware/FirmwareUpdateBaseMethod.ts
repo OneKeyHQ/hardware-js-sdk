@@ -8,7 +8,12 @@ import {
 } from '@onekeyfe/hd-shared';
 import type { KnownDevice } from '../../types';
 
-import { UI_REQUEST, createUiMessage } from '../../events/ui-request';
+import {
+  UI_REQUEST,
+  createUiMessage,
+  FirmwareUpdateTipMessage,
+  TFirmwareUpdateTipMessage,
+} from '../../events/ui-request';
 import { DevicePool } from '../../device/DevicePool';
 import { getDeviceType, wait, getLogger, LoggerNames, getDeviceUUID } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
@@ -17,18 +22,22 @@ import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 import { PROTO } from '../../constants';
-import { FirmwareUpdateTipMessage, TFirmwareUpdateTipMessage } from '../../constants/ui-request';
 
 const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
 
-export class FirmwareBase<Params> extends BaseMethod<Params> {
+export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
   init(): void {}
 
   run(): Promise<any> {
     return Promise.resolve();
+  }
+
+  isBleReconnect(): boolean {
+    const env = DataManager.getSettings('env');
+    return this.payload.connectId && DataManager.isBleConnect(env);
   }
 
   /**
@@ -237,20 +246,11 @@ export class FirmwareBase<Params> extends BaseMethod<Params> {
     }
   }
 
-  async firmwareErase() {
-    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const eraseRes = await typedCall('FirmwareErase', 'Success', {});
-    if (eraseRes.type !== 'Success') {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
-    }
-    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareEraseSuccess);
-  }
-
   /**
    * @description The instruction that triggers the update process
    * @param path The path of the file to be updated
    */
-  async triggerFirmwareUpdateEmmc({ path }: { path: string }) {
+  async startEmmcFirmwareUpdate({ path }: { path: string }) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     const updaeteResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
       path,

@@ -17,12 +17,7 @@ import { getOnekeyFeatures } from './getOnekeyFeatures';
 import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
-import {
-  firmwareUpdate,
-  firmwareUpdateV2,
-  firmwareUpdateV3,
-  firmwareUpdateEmmc,
-} from './firmwareUpdate';
+import { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
 import { promptWebDeviceAccess } from './promptWebDeviceAccess';
 
 import { deviceReset } from './deviceReset';
@@ -229,7 +224,6 @@ export type CoreApi = {
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdateV2;
   firmwareUpdateV3: typeof firmwareUpdateV3;
-  firmwareUpdateEmmc: typeof firmwareUpdateEmmc;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**

@@ -55,12 +55,3 @@ export declare function firmwareUpdateV3(
   connectId: string | undefined,
   params: Params<FirmwareUpdateV3Params>
 ): Response<PROTO.Success>;
-
-export interface FirmwareUpdateEmmcParams {
-  path: string;
-}
-
-export declare function firmwareUpdateEmmc(
-  connectId: string | undefined,
-  params: Params<FirmwareUpdateEmmcParams>
-): Response<PROTO.Success>;

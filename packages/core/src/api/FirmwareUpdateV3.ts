@@ -1,19 +1,20 @@
 import { Deferred, ERRORS, HardwareErrorCode, EDeviceType, wait } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import JSZip from 'jszip';
-import { Features } from '@onekeyfe/hd-transport';
-import { UI_REQUEST } from '../events/ui-request';
+import { UI_REQUEST, FirmwareUpdateTipMessage } from '../events/ui-request';
 import { validateParams } from './helpers/paramsValidator';
 
-import { getDeviceType, getDeviceBootloaderVersion } from '../utils';
+import { getDeviceType, getDeviceBootloaderVersion, LoggerNames, getLogger } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
-import { FirmwareBase } from './firmware/firmwareBase';
-import { FirmwareUpdateTipMessage } from '../constants/ui-request';
+import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
 
-export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Params> {
+const Log = getLogger(LoggerNames.Method);
+
+export const MIN_UPDATE_V3_BOOTLOADER_VERSION = '2.8.0';
+export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareUpdateV3Params> {
   checkPromise: Deferred<any> | null = null;
 
   init() {
@@ -60,16 +61,21 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
     }
 
-    const _resourceBinary = await this.prepareResourceBinary(features);
-
-    const fwBinaryMap = await this.prepareFirmwareAndBleBinary(features);
-
-    const bootloaderBinary = await this.prepareBootloaderBinary(features);
+    let resourceBinary: ArrayBuffer | null = null;
+    let fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
+    let bootloaderBinary: ArrayBuffer | null = null;
+    try {
+      resourceBinary = await this.prepareResourceBinary();
+      fwBinaryMap = await this.prepareFirmwareAndBleBinary();
+      bootloaderBinary = await this.prepareBootloaderBinary();
+    } catch (err) {
+      throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
+    }
 
     await this.enterBootloaderMode();
 
     await this.executeUpdate({
-      resourceBinary: _resourceBinary,
+      resourceBinary,
       fwBinaryMap,
       bootloaderBinary,
     });
@@ -84,7 +90,7 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'only pro device is supported');
     }
 
-    if (semver.lt(bootloaderVersion, '2.8.0')) {
+    if (semver.lt(bootloaderVersion, MIN_UPDATE_V3_BOOTLOADER_VERSION)) {
       throw ERRORS.TypedError(
         HardwareErrorCode.RuntimeError,
         'bootloader version needs to be updated'
@@ -92,10 +98,12 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
     }
   }
 
-  private async prepareResourceBinary(features: Features) {
+  private async prepareResourceBinary() {
     if (this.params.resourceBinary) {
       return this.params.resourceBinary;
     }
+    const { features } = this.device;
+    if (!features) return null;
     this.postTipMessage(FirmwareUpdateTipMessage.CheckLatestUiResource);
     const resourceUrl = DataManager.getSysResourcesLatestRelease(
       features,
@@ -108,13 +116,17 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
       this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestUiResourceSuccess);
       return resource;
     }
+    Log.warn('No resource url found');
     return null;
   }
 
-  private async prepareBootloaderBinary(features: Features): Promise<ArrayBuffer | null> {
+  private async prepareBootloaderBinary(): Promise<ArrayBuffer | null> {
     if (this.params.bootloaderBinary) {
       return this.params.bootloaderBinary;
     }
+    const { features } = this.device;
+    if (!features) return null;
+
     if (this.params.bootloaderVersion) {
       this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestBootloaderResource);
       const bootResourceUrl = DataManager.getBootloaderResource(features);
@@ -127,7 +139,7 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
     return null;
   }
 
-  private async prepareFirmwareAndBleBinary(features: Features) {
+  private async prepareFirmwareAndBleBinary() {
     const fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
     if (this.params.firmwareBinary) {
       fwBinaryMap.push({
@@ -135,20 +147,23 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
         binary: this.params.firmwareBinary,
       });
     } else if (this.params.firmwareVersion) {
-      this.postTipMessage(FirmwareUpdateTipMessage.DownloadFirmware);
-      const firmwareBinary = (
-        await getBinary({
-          features,
-          version: this.params.firmwareVersion,
-          updateType: 'firmware',
-          isUpdateBootloader: false,
-        })
-      ).binary;
-      this.postTipMessage(FirmwareUpdateTipMessage.DownloadFirmwareSuccess);
-      fwBinaryMap.push({
-        fileName: 'firmware.bin',
-        binary: firmwareBinary,
-      });
+      const { features } = this.device;
+      if (features) {
+        this.postTipMessage(FirmwareUpdateTipMessage.DownloadFirmware);
+        const firmwareBinary = (
+          await getBinary({
+            features,
+            version: this.params.firmwareVersion,
+            updateType: 'firmware',
+            isUpdateBootloader: false,
+          })
+        ).binary;
+        this.postTipMessage(FirmwareUpdateTipMessage.DownloadFirmwareSuccess);
+        fwBinaryMap.push({
+          fileName: 'firmware.bin',
+          binary: firmwareBinary,
+        });
+      }
     }
 
     if (this.params.bleBinary) {
@@ -157,17 +172,20 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
         binary: this.params.bleBinary,
       });
     } else if (this.params.bleVersion) {
-      this.postTipMessage(FirmwareUpdateTipMessage.DownloadBleFirmware);
-      const bleBinary = await getBinary({
-        features,
-        version: this.params.bleVersion,
-        updateType: 'ble',
-      });
-      this.postTipMessage(FirmwareUpdateTipMessage.DownloadBleFirmwareSuccess);
-      fwBinaryMap.push({
-        fileName: 'ble-firmware.bin',
-        binary: bleBinary.binary,
-      });
+      const { features } = this.device;
+      if (features) {
+        this.postTipMessage(FirmwareUpdateTipMessage.DownloadBleFirmware);
+        const bleBinary = await getBinary({
+          features,
+          version: this.params.bleVersion,
+          updateType: 'ble',
+        });
+        this.postTipMessage(FirmwareUpdateTipMessage.DownloadBleFirmwareSuccess);
+        fwBinaryMap.push({
+          fileName: 'ble-firmware.bin',
+          binary: bleBinary.binary,
+        });
+      }
     }
     return fwBinaryMap;
   }
@@ -181,7 +199,6 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
     fwBinaryMap: { fileName: string; binary: ArrayBuffer }[];
     bootloaderBinary: ArrayBuffer | null;
   }) {
-    // 计算所有文件的总大小
     let totalSize = 0;
     let processedSize = 0;
 
@@ -224,9 +241,6 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
     }
 
     await this.createUpdatesFolderIfNotExists(`0:updates/`);
-    if (this.params.firmwareVersion || this.params.bleVersion) {
-      await this.firmwareErase();
-    }
 
     for (const fwbinary of fwBinaryMap) {
       if (fwbinary) {
@@ -242,18 +256,17 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
     // trigger firmware update, support folder update
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
-      await this.triggerFirmwareUpdateEmmc({
+      await this.startEmmcFirmwareUpdate({
         path: '0:updates',
       });
     } catch (error) {
-      console.error('triggerFirmwareUpdateEmmc error: ', error);
+      Log.error('triggerFirmwareUpdateEmmc error: ', error);
     }
 
     // Needs to success immediately case:
     // only bootloader update
     // include ble update in isBleConnected
-    const env = DataManager.getSettings('env');
-    const isBleReconnect = this.connectId && DataManager.isBleConnect(env);
+    const isBleReconnect = this.isBleReconnect();
     if (
       (bootloaderBinary && fwBinaryMap.length === 0) ||
       ((this.params.bleBinary || this.params.bleVersion) && isBleReconnect)
@@ -268,22 +281,36 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
 
   /**
    * @description Reconnect device - While update with bootloader, it will reconnect device
+   * @param isBleReconnect - Whether the device is connected via BLE
    * @param maxAttempts - Maximum number of attempts
    * @returns {Promise<boolean>} - Returns true if the device is successfully reconnected, otherwise throws an error
    */
   async reconnectDevice(maxAttempts = 10) {
+    const isBleReconnect = this.isBleReconnect();
     let attempts = 0;
-
     while (attempts < maxAttempts) {
-      const deviceDiff = await this.device.deviceConnector?.enumerate();
-      const devicesDescriptor = deviceDiff?.descriptors ?? [];
-      const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
+      if (isBleReconnect) {
+        try {
+          await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
+          await this.device.initialize();
+          if (this.device.features?.bootloader_mode) {
+            return true;
+          }
+        } catch (e) {
+          // ignore error because of device is not connected
+          Log.log('catch Bluetooth error when device is restarting: ', e);
+        }
+      } else {
+        const deviceDiff = await this.device.deviceConnector?.enumerate();
+        const devicesDescriptor = deviceDiff?.descriptors ?? [];
+        const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
 
-      if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
-        this.device.updateFromCache(deviceList[0]);
-        await this.device.acquire();
-        this.device.commands.disposed = false;
-        return true;
+        if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+          this.device.updateFromCache(deviceList[0]);
+          await this.device.acquire();
+          this.device.commands.disposed = false;
+          return true;
+        }
       }
 
       await wait(3000);
@@ -312,19 +339,17 @@ export default class FirmwareUpdateV3 extends FirmwareBase<FirmwareUpdateV3Param
         });
 
         try {
-          const res = await Promise.race([
-            typedCall('GetFeatures', 'Features', {}),
-            timeoutPromise,
-          ]);
+          await Promise.race([typedCall('GetFeatures', 'Features', {}), timeoutPromise]);
           clearTimeout(timeoutId);
-          console.log('res: ', res);
         } catch (error) {
           clearTimeout(timeoutId);
           throw error;
         }
       } catch (error) {
         if (error.message.includes('Update mode')) {
-          const progress = parseInt(error.message.split('Update mode ')[1]) || 0;
+          const updateParts = error.message.split('Update mode ');
+          const progressValue = updateParts[1] ?? '0';
+          const progress = parseInt(progressValue, 10) || 0;
           this.postProgressMessage(progress);
         } else {
           // TODO: 这里最后一个请求会一直处在等待中状态，需要cancel。

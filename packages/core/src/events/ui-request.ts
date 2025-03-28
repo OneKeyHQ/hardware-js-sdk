@@ -153,6 +153,35 @@ export type UiEvent =
   | DeviceProgress
   | PreviousAddressResult;
 
+export enum FirmwareUpdateTipMessage {
+  CheckLatestUiResource = 'CheckLatestUiResource',
+
+  DownloadLatestUiResource = 'DownloadLatestUiResource',
+  DownloadFirmware = 'DownloadFirmware',
+  DownloadBleFirmware = 'DownloadBleFirmware',
+  DownloadLatestBootloaderResource = 'DownloadLatestBootloaderResource',
+
+  DownloadLatestUiResourceSuccess = 'DownloadLatestUiResourceSuccess',
+  DownloadFirmwareSuccess = 'DownloadFirmwareSuccess',
+  DownloadBleFirmwareSuccess = 'DownloadBleFirmwareSuccess',
+  DownloadLatestBootloaderResourceSuccess = 'DownloadLatestBootloaderResourceSuccess',
+
+  AutoRebootToBootloader = 'AutoRebootToBootloader',
+  GoToBootloaderSuccess = 'GoToBootloaderSuccess',
+  ConfirmOnDevice = 'ConfirmOnDevice',
+  FirmwareEraseSuccess = 'FirmwareEraseSuccess',
+  StartTransferData = 'StartTransferData',
+  InstallingFirmware = 'InstallingFirmware',
+  UpdateBootloader = 'UpdateBootloader',
+  UpdateBootloaderSuccess = 'UpdateBootloaderSuccess',
+  UpdateSysResource = 'UpdateSysResource',
+  UpdateSysResourceSuccess = 'UpdateSysResourceSuccess',
+  FirmwareUpdating = 'FirmwareUpdating',
+  FirmwareUpdateCompleted = 'FirmwareUpdateCompleted',
+}
+
+export type TFirmwareUpdateTipMessage = `${FirmwareUpdateTipMessage}`;
+
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
 
 export const createUiMessage: MessageFactoryFn<typeof UI_EVENT, UiEvent> = (type, payload) =>

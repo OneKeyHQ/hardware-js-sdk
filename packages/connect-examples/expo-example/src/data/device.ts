@@ -180,10 +180,6 @@ const api: PlaygroundProps[] = [
     description: 'getNextU2FCounter',
     noDeviceIdReq: true,
   },
-  {
-    method: 'firmwareUpdateEmmc',
-    description: 'firmwareUpdateEmmc',
-  },
 ];
 
 export default api;
