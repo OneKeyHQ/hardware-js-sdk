@@ -65,9 +65,11 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     let fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     try {
+      this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
       resourceBinary = await this.prepareResourceBinary();
       fwBinaryMap = await this.prepareFirmwareAndBleBinary();
       bootloaderBinary = await this.prepareBootloaderBinary();
+      this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
@@ -362,7 +364,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           const updateParts = error.message.split('Update mode ');
           const progressValue = updateParts[1] ?? '0';
           const progress = parseInt(progressValue, 10) || 0;
-          this.postProgressMessage(progress);
+          this.postProgressMessage(progress, 'installingFirmware');
         } else {
           // TODO: 这里最后一个请求会一直处在等待中状态，需要cancel。
           this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);

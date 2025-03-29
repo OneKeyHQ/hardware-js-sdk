@@ -13,6 +13,7 @@ import {
   createUiMessage,
   FirmwareUpdateTipMessage,
   IFirmwareUpdateTipMessage,
+  IFirmwareUpdateProgressType,
 } from '../../events/ui-request';
 import { DevicePool } from '../../device/DevicePool';
 import { getDeviceType, wait, getLogger, LoggerNames, getDeviceUUID } from '../../utils';
@@ -71,11 +72,12 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    * @description Post the progress message
    * @param progress Post the percentage of the progress
    */
-  postProgressMessage = (progress: number) => {
+  postProgressMessage = (progress: number, progressType: IFirmwareUpdateProgressType) => {
     this.postMessage(
       createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
         device: this.device.toMessageObject() as KnownDevice,
         progress,
+        progressType,
       })
     );
   };
@@ -323,7 +325,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       );
       // @ts-expect-error
       offset += writeRes.message.processed_byte;
-      this.postProgressMessage(progress);
+      this.postProgressMessage(progress, 'transferData');
     }
 
     // Return processed size only if we're tracking overall progress

@@ -10,7 +10,13 @@ import {
   LoggerNames,
   getLogger,
 } from '../../utils';
-import { DEVICE, CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
+import {
+  DEVICE,
+  CoreMessage,
+  createUiMessage,
+  UI_REQUEST,
+  IFirmwareUpdateProgressType,
+} from '../../events';
 import { PROTO } from '../../constants';
 import type { Device } from '../../device/Device';
 import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
@@ -34,12 +40,14 @@ const postConfirmationMessage = (device: Device) => {
 const postProgressMessage = (
   device: Device,
   progress: number,
+  progressType: IFirmwareUpdateProgressType,
   postMessage: (message: CoreMessage) => void
 ) => {
   postMessage(
     createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
       device: device.toMessageObject() as KnownDevice,
       progress,
+      progressType,
     })
   );
 };
@@ -99,11 +107,11 @@ export const uploadFirmware = async (
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
     }
     postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
-    postProgressMessage(device, 0, postMessage);
+    postProgressMessage(device, 0, 'installingFirmware', postMessage);
     const { message, type } = await typedCall('FirmwareUpload', 'Success', {
       payload,
     });
-    postProgressMessage(device, 100, postMessage);
+    postProgressMessage(device, 100, 'installingFirmware', postMessage);
 
     await waitBleInstall(updateType);
     if (type !== 'Success') {
@@ -143,7 +151,12 @@ export const uploadFirmware = async (
       const chunk = payload.slice(start, end);
 
       if (start > 0) {
-        postProgressMessage(device, Math.round((start / length) * 100), postMessage);
+        postProgressMessage(
+          device,
+          Math.round((start / length) * 100),
+          'transferData',
+          postMessage
+        );
       }
 
       response = await typedCall('FirmwareUpload', ['FirmwareRequest', 'Success'], {
@@ -155,7 +168,7 @@ export const uploadFirmware = async (
       }
     }
 
-    postProgressMessage(device, 100, postMessage);
+    postProgressMessage(device, 100, 'transferData', postMessage);
 
     await waitBleInstall(updateType);
     return response.message;
@@ -198,7 +211,7 @@ const newTouchUpdateProcess = async (
     );
     // @ts-expect-error
     offset += writeRes.message.processed_byte;
-    postProgressMessage(device, progress, postMessage);
+    postProgressMessage(device, progress, 'transferData', postMessage);
   }
 
   postConfirmationMessage(device);
@@ -354,10 +367,10 @@ export const updateResources = async (
     }
 
     progress += stepProgress;
-    postProgressMessage(device, Math.floor(progress), postMessage);
+    postProgressMessage(device, Math.floor(progress), 'installingFirmware', postMessage);
   }
 
-  postProgressMessage(device, 100, postMessage);
+  postProgressMessage(device, 100, 'installingFirmware', postMessage);
   postProgressTip(device, 'UpdateSysResourceSuccess', postMessage);
   return true;
 };
@@ -369,11 +382,11 @@ export const updateBootloader = async (
   source: ArrayBuffer
 ) => {
   postProgressTip(device, 'UpdateBootloader', postMessage);
-  postProgressMessage(device, Math.floor(0), postMessage);
+  postProgressMessage(device, Math.floor(0), 'installingFirmware', postMessage);
   await updateResource(typedCall, 'bootloader.bin', source, () => {
     postProcessingMessage('resource', postMessage);
   });
-  postProgressMessage(device, Math.floor(100), postMessage);
+  postProgressMessage(device, Math.floor(100), 'installingFirmware', postMessage);
   postProgressTip(device, 'UpdateBootloaderSuccess', postMessage);
   return true;
 };

@@ -105,11 +105,13 @@ export interface FirmwareProcessing {
   };
 }
 
+export type IFirmwareUpdateProgressType = 'transferData' | 'installingFirmware';
 export interface FirmwareProgress {
   type: typeof UI_REQUEST.FIRMWARE_PROGRESS;
   payload: {
     device: Device;
     progress: number;
+    progressType: IFirmwareUpdateProgressType;
   };
 }
 
@@ -156,6 +158,8 @@ export type UiEvent =
 export enum FirmwareUpdateTipMessage {
   CheckLatestUiResource = 'CheckLatestUiResource',
 
+  StartDownloadFirmware = 'StartDownloadFirmware',
+  FinishDownloadFirmware = 'FinishDownloadFirmware',
   DownloadLatestUiResource = 'DownloadLatestUiResource',
   DownloadFirmware = 'DownloadFirmware',
   DownloadBleFirmware = 'DownloadBleFirmware',
