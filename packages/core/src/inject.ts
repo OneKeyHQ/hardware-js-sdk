@@ -97,11 +97,6 @@ export const createCoreApi = (
   checkBLEFirmwareRelease: connectId => call({ connectId, method: 'checkBLEFirmwareRelease' }),
 
   /**
-   * 检查 bridge 版本
-   */
-  checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
-
-  /**
    * 检查 Bridge 是否安装
    */
   checkBridgeStatus: () => call({ method: 'checkBridgeStatus' }),

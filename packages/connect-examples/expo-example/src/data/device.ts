@@ -86,8 +86,8 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
-    method: 'checkTransportRelease',
-    description: 'Check transport release of a device',
+    method: 'checkBridgeRelease',
+    description: 'Check bridge release of a device',
     noDeviceIdReq: true,
   },
   {
@@ -157,7 +157,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'checkAllFirmwareRelease',
         value: {
-          platform: 'web',
+          checkBridgeRelease: true,
         },
       },
     ],

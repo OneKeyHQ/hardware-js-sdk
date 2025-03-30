@@ -19,10 +19,8 @@ export type AllFirmwareRelease = {
   bridge?: FirmwareRelease;
 };
 
-type IPlatform = 'native' | 'desktop' | 'ext' | 'web' | 'webEmbed';
-
 export type CheckAllFirmwareReleaseParams = {
-  platform?: IPlatform;
+  checkBridgeRelease?: boolean;
 };
 
 export declare function checkAllFirmwareRelease(

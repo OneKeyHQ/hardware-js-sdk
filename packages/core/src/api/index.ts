@@ -7,7 +7,6 @@ export { default as getPassphraseState } from './GetPassphraseState';
 export { default as getLogs } from './GetLogs';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
-export { default as checkTransportRelease } from './CheckTransportRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';
 export { default as checkBridgeRelease } from './CheckBridgeRelease';
 export { default as checkBootloaderRelease } from './CheckBootloaderRelease';
