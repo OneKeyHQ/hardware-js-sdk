@@ -14,6 +14,18 @@ import { DevicePool } from '../device/DevicePool';
 const Log = getLogger(LoggerNames.Method);
 
 export const MIN_UPDATE_V3_BOOTLOADER_VERSION = '2.8.0';
+
+/**
+ * FirmwareUpdateV3 flow
+   1. StartDownloadFirmware
+   2. FinishDownloadFirmware
+   3. AutoRebootToBootloader
+   4. GoToBootloaderSuccess
+   5. StartTransferData
+   6. ConfirmOnDevice
+   7. FirmwareUpdating
+   8. FirmwareUpdateCompleted
+ */
 export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareUpdateV3Params> {
   checkPromise: Deferred<any> | null = null;
 
@@ -113,16 +125,13 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     const { features } = this.device;
     if (!features) return null;
-    this.postTipMessage(FirmwareUpdateTipMessage.CheckLatestUiResource);
     const resourceUrl = DataManager.getSysResourcesLatestRelease(
       features,
       this.params.forcedUpdateRes
     );
 
     if (resourceUrl) {
-      this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestUiResource);
       const resource = (await getSysResourceBinary(resourceUrl)).binary;
-      this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestUiResourceSuccess);
       return resource;
     }
     Log.warn('No resource url found');
@@ -137,11 +146,9 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     if (!features) return null;
 
     if (this.params.bootloaderVersion) {
-      this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestBootloaderResource);
       const bootResourceUrl = DataManager.getBootloaderResource(features);
       if (bootResourceUrl) {
         const bootBinary = (await getSysResourceBinary(bootResourceUrl)).binary;
-        this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestBootloaderResourceSuccess);
         return bootBinary;
       }
     }
@@ -158,7 +165,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     } else if (this.params.firmwareVersion) {
       const { features } = this.device;
       if (features) {
-        this.postTipMessage(FirmwareUpdateTipMessage.DownloadFirmware);
         const firmwareBinary = (
           await getBinary({
             features,
@@ -167,7 +173,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             isUpdateBootloader: false,
           })
         ).binary;
-        this.postTipMessage(FirmwareUpdateTipMessage.DownloadFirmwareSuccess);
         fwBinaryMap.push({
           fileName: 'firmware.bin',
           binary: firmwareBinary,
@@ -183,13 +188,11 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     } else if (this.params.bleVersion) {
       const { features } = this.device;
       if (features) {
-        this.postTipMessage(FirmwareUpdateTipMessage.DownloadBleFirmware);
         const bleBinary = await getBinary({
           features,
           version: this.params.bleVersion,
           updateType: 'ble',
         });
-        this.postTipMessage(FirmwareUpdateTipMessage.DownloadBleFirmwareSuccess);
         fwBinaryMap.push({
           fileName: 'ble-firmware.bin',
           binary: bleBinary.binary,
@@ -338,7 +341,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   private async pollFirmwareUpdateStatus(maxAttempts = 30): Promise<boolean> {
-    this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
     await this.reconnectDevice();
 
     for (let attempts = 0; attempts < maxAttempts; attempts++) {
