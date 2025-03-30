@@ -3,6 +3,7 @@ import type { IDeviceBLEFirmwareStatus, IDeviceFirmwareStatus } from '../device'
 import { IBLEFirmwareReleaseInfo } from '../settings';
 
 export type FirmwareRelease = {
+  shouldUpdate?: boolean;
   status: IDeviceFirmwareStatus;
   changelog?: {
     'zh-CN': string;

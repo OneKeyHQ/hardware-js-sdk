@@ -35,7 +35,10 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
     const deviceType = getDeviceType(features);
 
     let bridgeReleaseInfo = null;
-    if (checkBridgeRelease) {
+    if (
+      checkBridgeRelease &&
+      (firmwareRelease.status === 'required' || firmwareRelease.status === 'outdated')
+    ) {
       bridgeReleaseInfo = await getBridgeReleaseInfo({
         deviceType,
         currentFirmwareVersion,
@@ -51,6 +54,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       ble: bleFirmwareReleaseInfo,
       bridge: bridgeReleaseInfo
         ? {
+            shouldUpdate: bridgeReleaseInfo.shouldUpdate,
             status: bridgeReleaseInfo.shouldUpdate ? 'outdated' : 'valid',
             changelog: bridgeReleaseInfo.changelog,
             release: bridgeReleaseInfo.releaseVersion,
