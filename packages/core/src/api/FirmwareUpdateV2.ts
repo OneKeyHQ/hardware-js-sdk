@@ -151,6 +151,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           clearTimeout(timeoutTimer);
 
           try {
+            this.postTipMessage('SelectDeviceInBootloaderForWebDevice');
             const confirmed = await this._promptDeviceInBootloaderForWebDevice({
               device: this.device,
             });
