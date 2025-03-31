@@ -5,7 +5,6 @@ import { init, updateSettings } from './init';
 import { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
 
 import { getLogs } from './getLogs';
-import { checkTransportRelease } from './checkTransportRelease';
 import { checkBridgeStatus } from './checkBridgeStatus';
 import { checkBridgeRelease } from './checkBridgeRelease';
 import { checkBootloaderRelease } from './checkBootloaderRelease';
@@ -187,7 +186,6 @@ export type CoreApi = {
    * Core function
    */
   checkAllFirmwareRelease: typeof checkAllFirmwareRelease;
-  checkTransportRelease: typeof checkTransportRelease;
   checkBridgeStatus: typeof checkBridgeStatus;
   checkBridgeRelease: typeof checkBridgeRelease;
   checkBootloaderRelease: typeof checkBootloaderRelease;
