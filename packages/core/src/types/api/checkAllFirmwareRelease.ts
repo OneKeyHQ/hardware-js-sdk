@@ -3,6 +3,7 @@ import type { IDeviceBLEFirmwareStatus, IDeviceFirmwareStatus } from '../device'
 import { IBLEFirmwareReleaseInfo } from '../settings';
 
 export type FirmwareRelease = {
+  shouldUpdate?: boolean;
   status: IDeviceFirmwareStatus;
   changelog?: {
     'zh-CN': string;
@@ -19,10 +20,8 @@ export type AllFirmwareRelease = {
   bridge?: FirmwareRelease;
 };
 
-type IPlatform = 'native' | 'desktop' | 'ext' | 'web' | 'webEmbed';
-
 export type CheckAllFirmwareReleaseParams = {
-  platform?: IPlatform;
+  checkBridgeRelease?: boolean;
 };
 
 export declare function checkAllFirmwareRelease(
