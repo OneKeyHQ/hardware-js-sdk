@@ -172,6 +172,7 @@ export enum FirmwareUpdateTipMessage {
 
   AutoRebootToBootloader = 'AutoRebootToBootloader',
   GoToBootloaderSuccess = 'GoToBootloaderSuccess',
+  SelectDeviceInBootloaderForWebDevice = 'SelectDeviceInBootloaderForWebDevice',
   ConfirmOnDevice = 'ConfirmOnDevice',
   FirmwareEraseSuccess = 'FirmwareEraseSuccess',
   StartTransferData = 'StartTransferData',

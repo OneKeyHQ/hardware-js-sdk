@@ -127,16 +127,12 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
           await wait(3000);
         }
 
-        console.log('checkCount: ', checkCount);
-        console.log(
-          'DataManager.isWebUsbConnect(DataManager.getSettings("env")): ',
-          DataManager.isWebUsbConnect(DataManager.getSettings('env'))
-        );
         if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
           clearInterval(intervalTimer);
           clearTimeout(timeoutTimer);
 
           try {
+            this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
             const confirmed = await this._promptDeviceInBootloaderForWebDevice();
             if (confirmed) {
               await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
