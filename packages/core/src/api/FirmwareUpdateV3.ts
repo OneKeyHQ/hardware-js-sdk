@@ -4,7 +4,14 @@ import JSZip from 'jszip';
 import { UI_REQUEST, FirmwareUpdateTipMessage } from '../events/ui-request';
 import { validateParams } from './helpers/paramsValidator';
 
-import { getDeviceType, getDeviceBootloaderVersion, LoggerNames, getLogger } from '../utils';
+import {
+  getDeviceType,
+  getDeviceBootloaderVersion,
+  getDeviceBLEFirmwareVersion,
+  getDeviceFirmwareVersion,
+  LoggerNames,
+  getLogger,
+} from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
@@ -265,7 +272,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       }
     }
 
-    // trigger firmware update, support folder update
+    // trigger firmware update, support folder updates
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
       await this.startEmmcFirmwareUpdate({
@@ -275,109 +282,94 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
     }
 
-    // TODO: Is this necessary?
     this.postProcessingMessage('firmware');
-
-    /**
-     * Needs to success immediately case:
-     * 1. only bootloader update
-     * 2. include ble update in isBleConnected
-     */
-    const isBleReconnect = this.isBleReconnect();
-    if (
-      (bootloaderBinary && fwBinaryMap.length === 0) ||
-      ((this.params.bleBinary || this.params.bleVersion) && isBleReconnect)
-    ) {
-      this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
-      return;
-    }
-    await wait(500);
-    // 每三秒轮询一次，直到更新完成
-    await this.pollFirmwareUpdateStatus();
-  }
-
-  /**
-   * @description Reconnect device - While update with bootloader, it will reconnect device
-   * @param isBleReconnect - Whether the device is connected via BLE
-   * @param maxAttempts - Maximum number of attempts
-   * @returns {Promise<boolean>} - Returns true if the device is successfully reconnected, otherwise throws an error
-   */
-  async reconnectDevice(maxAttempts = 10) {
-    const isBleReconnect = this.isBleReconnect();
-    let attempts = 0;
-    while (attempts < maxAttempts) {
-      if (isBleReconnect) {
-        try {
-          await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
-          await this.device.initialize();
-          if (this.device.features?.bootloader_mode) {
-            return true;
-          }
-        } catch (e) {
-          // ignore error because of device is not connected
-          Log.log('catch Bluetooth error when device is restarting: ', e);
-        }
-      } else {
-        const deviceDiff = await this.device.deviceConnector?.enumerate();
-        const devicesDescriptor = deviceDiff?.descriptors ?? [];
-        const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
-
-        if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
-          this.device.updateFromCache(deviceList[0]);
-          await this.device.acquire();
-          this.device.commands.disposed = false;
-          return true;
-        }
-      }
-
-      await wait(3000);
-      attempts++;
-    }
-
-    throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'Failed to reconnect device after maximum attempts'
-    );
-  }
-
-  private async pollFirmwareUpdateStatus(maxAttempts = 30): Promise<boolean> {
-    await this.reconnectDevice();
-
-    for (let attempts = 0; attempts < maxAttempts; attempts++) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
       try {
-        const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-        await wait(1000);
-        let timeoutId: NodeJS.Timeout | undefined;
-        const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new Error('Device reboot timeout'));
-          }, 3000);
-        });
-
-        try {
-          await Promise.race([typedCall('GetFeatures', 'Features', {}), timeoutPromise]);
-          clearTimeout(timeoutId);
-        } catch (error) {
-          clearTimeout(timeoutId);
-          throw error;
-        }
+        const featuresRes = await Promise.race<any>([
+          typedCall('GetFeatures', 'Features', {}),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('GetFeatures timeout after 3 seconds')), 3000);
+          }),
+        ]);
+        const features = featuresRes.message;
+        this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+        return {
+          bootloaderVersion: getDeviceBootloaderVersion(features).join('.'),
+          bleVersion: getDeviceBLEFirmwareVersion(features).join('.'),
+          firmwareVersion: getDeviceFirmwareVersion(features).join('.'),
+        };
       } catch (error) {
-        if (error.message.includes('Update mode')) {
+        if (error.message && error.message.includes('Update mode')) {
           const updateParts = error.message.split('Update mode ');
           const progressValue = updateParts[1] ?? '0';
           const progress = parseInt(progressValue, 10) || 0;
           this.postProgressMessage(progress, 'installingFirmware');
+          await wait(1000);
         } else {
-          // TODO: 这里最后一个请求会一直处在等待中状态，需要cancel。
-          this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
-          return true;
+          /**
+           * Needs second reconnect case:
+           * 1. While including 'Ble firmwware' in ble connect type
+           * 2. While including bootloader upgrade
+           */
+          if (this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)) {
+            this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+            return;
+          }
+          await this.waitForDeviceReconnect(60 * 1000);
         }
+      }
+    }
+  }
+
+  /**
+   * @description Reconnect device - While update with bootloader, it will reconnect device
+   * @param {number} timeout - The timeout for the reconnection
+   */
+  async waitForDeviceReconnect(timeout: number) {
+    const startTime = Date.now();
+    const isBleReconnect = this.isBleReconnect();
+    while (Date.now() - startTime < timeout) {
+      try {
+        if (isBleReconnect) {
+          try {
+            // TODO： 待确认
+            await this.device.deviceConnector?.acquire(
+              this.device.originalDescriptor.id,
+              null,
+              true
+            );
+            await this.device.initialize();
+            return;
+          } catch (e) {
+            // ignore error because of device is not connected
+            Log.log('catch Bluetooth error when device is restarting: ', e);
+          }
+        } else {
+          const deviceDiff = await this.device.deviceConnector?.enumerate();
+          const devicesDescriptor = deviceDiff?.descriptors ?? [];
+          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
+
+          if (deviceList.length === 1) {
+            this.device.updateFromCache(deviceList[0]);
+            await this.device.acquire();
+            this.device.commands.disposed = false;
+            this.device.getCommands().mainId = this.device.mainId ?? '';
+            return;
+          }
+        }
+        await wait(1000);
+      } catch (error) {
+        console.error('Device reconnect failed: ', error);
+        Log.error('Device reconnect failed:', error);
+        await wait(1000);
       }
     }
 
     throw ERRORS.TypedError(
-      HardwareErrorCode.RuntimeError,
-      'Firmware update status check exceeded maximum attempts'
+      HardwareErrorCode.DeviceNotFound,
+      `Device not reconnected within ${timeout / 1000}s`
     );
   }
 }

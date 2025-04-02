@@ -21,18 +21,21 @@ export const getDeviceFirmwareVersion = (features: Features | undefined): IVersi
 /**
  * Get Connected Device bluetooth firmware version by features
  */
-export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray | null => {
+export const getDeviceBLEFirmwareVersion = (features: Features): IVersionArray => {
   const bleVer = features?.onekey_ble_version || features?.ble_ver;
 
   if (!bleVer) {
-    return null;
+    return [0, 0, 0];
   }
 
   if (!semver.valid(bleVer)) {
-    return null;
+    return [0, 0, 0];
   }
 
-  return bleVer.split('.') as unknown as IVersionArray;
+  if (bleVer) {
+    return bleVer.split('.').map(Number) as IVersionArray;
+  }
+  return [0, 0, 0];
 };
 
 /**
