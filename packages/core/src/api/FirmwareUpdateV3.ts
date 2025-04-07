@@ -314,7 +314,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
            * 2. While including bootloader upgrade
            */
           if (this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)) {
-            this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+            await this.waitForDeviceReconnect(3 * 60 * 1000);
             return;
           }
           await this.waitForDeviceReconnect(60 * 1000);
@@ -330,17 +330,24 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   async waitForDeviceReconnect(timeout: number) {
     const startTime = Date.now();
     const isBleReconnect = this.isBleReconnect();
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     while (Date.now() - startTime < timeout) {
       try {
         if (isBleReconnect) {
           try {
-            // TODO： 待确认
             await this.device.deviceConnector?.acquire(
               this.device.originalDescriptor.id,
               null,
               true
             );
-            await this.device.initialize();
+            await Promise.race([
+              typedCall('Initialize', 'Features', {}),
+              new Promise((_, reject) => {
+                setTimeout(() => {
+                  reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
+                }, 3000);
+              }),
+            ]);
             return;
           } catch (e) {
             // ignore error because of device is not connected
