@@ -313,11 +313,12 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
            * 1. While including 'Ble firmwware' in ble connect type
            * 2. While including bootloader upgrade
            */
-          if (this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)) {
-            await this.waitForDeviceReconnect(3 * 60 * 1000);
-            return;
-          }
-          await this.waitForDeviceReconnect(60 * 1000);
+          const reconnectTimeout =
+            this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)
+              ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
+              : 60 * 1000; // 1 minute for normal reconnect
+
+          await this.waitForDeviceReconnect(reconnectTimeout);
         }
       }
     }
