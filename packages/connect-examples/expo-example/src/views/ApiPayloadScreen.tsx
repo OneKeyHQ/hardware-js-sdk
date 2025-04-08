@@ -1,5 +1,5 @@
 import React, { memo, useMemo, useEffect, useState } from 'react';
-import { VirtualizedList } from 'react-native';
+import { FlatList, Platform } from 'react-native';
 import { Stack, YStack } from 'tamagui';
 
 import { useIntl } from 'react-intl';
@@ -161,14 +161,14 @@ const ApiPayloadItem = memo(({ item }: ApiPayloadItemProps) => {
   const renderedItems = useMemo(
     () =>
       item.data.map((data: React.JSX.IntrinsicAttributes & ApiPayloadProps) => (
-        <PayloadStack key={data.method} data={data} />
+        <PayloadStack key={`${data.method}-${data.description}`} data={data} />
       )),
     [item.data]
   );
 
   return (
     <CollapsibleSection title={item.title}>
-      <YStack flexDirection={flexDirection} flexWrap="wrap" gap="$2">
+      <YStack flexDirection={flexDirection} flexWrap="wrap" gap="$1" padding="$2">
         {renderedItems}
       </YStack>
     </CollapsibleSection>
@@ -182,49 +182,40 @@ const PayloadStack = memo(({ data }: { data: React.JSX.IntrinsicAttributes & Api
   const width = media.gtLg ? '30%' : media.gtSm ? '48%' : '100%';
 
   return (
-    <Stack flex={1} width={width}>
-      <Playground key={data.method} {...data} />
+    <Stack width={width}>
+      <Playground {...data} />
     </Stack>
   );
 });
 PayloadStack.displayName = 'PayloadStack';
 
-const ApiPayloadList = ({ data }: { data: ApiPayloadItem[] }) => (
-  <VirtualizedList<ApiPayloadItem>
-    data={data}
-    // eslint-disable-next-line react/no-unused-prop-types
-    renderItem={({ item }: { item: ApiPayloadItem }) => <ApiPayloadItem item={item} />}
-    keyExtractor={(item: ApiPayloadItem) => item.title}
-    getItemCount={data => data.length}
-    getItem={(data, index) => data[index]}
-  />
+const ApiPayload = () => (
+  <Stack>
+    <HandleSDKEvents />
+    <DeviceProvider>
+      <CommonParamsProvider>
+        <CommonParamsView />
+        <ExpandModeProvider>
+          <PanelView title="API Payload">
+            <FlatList
+              data={playgroundConfig}
+              renderItem={({ item }) => <ApiPayloadItem item={item} />}
+              keyExtractor={item => item.title}
+              initialNumToRender={5}
+              maxToRenderPerBatch={3}
+            />
+          </PanelView>
+        </ExpandModeProvider>
+        <UploadScreen />
+        <ChangeScreenComponent />
+      </CommonParamsProvider>
+    </DeviceProvider>
+  </Stack>
 );
-
-const ApiPayload = () => {
-  const intl = useIntl();
-
-  return (
-    <Stack>
-      <HandleSDKEvents />
-      <DeviceProvider>
-        <CommonParamsProvider>
-          <CommonParamsView />
-          <ExpandModeProvider>
-            <PanelView title={intl.formatMessage({ id: 'title__hardware_api_test' })}>
-              <ApiPayloadList data={playgroundConfig} />
-            </PanelView>
-          </ExpandModeProvider>
-          <UploadScreen />
-          <ChangeScreenComponent />
-        </CommonParamsProvider>
-      </DeviceProvider>
-    </Stack>
-  );
-};
 
 export default function ApiPayloadScreen() {
   return (
-    <PageView scrollable={false}>
+    <PageView scrollable={!!(Platform.OS === 'ios' || Platform.OS === 'android')}>
       <ApiPayload />
     </PageView>
   );

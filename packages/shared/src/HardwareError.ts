@@ -291,6 +291,9 @@ export const HardwareErrorCode = {
   BleDeviceBondError: 715,
   BleCharacteristicNotifyChangeFailure: 716,
   BleTransportCallCanceled: 717,
+  BleDeviceBondedCanceled: 718,
+  BlePeerRemovedPairingInformation: 719,
+  BleDeviceDisconnected: 720,
 
   /**
    * Hardware runtiome errors
@@ -487,6 +490,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleRequiredUUID]: 'uuid is required',
   [HardwareErrorCode.BleConnectedError]: 'connected error is always runtime error',
   [HardwareErrorCode.BleDeviceNotBonded]: 'device is not bonded',
+  [HardwareErrorCode.BleDeviceBondedCanceled]: 'device is canceled bonding',
+  [HardwareErrorCode.BlePeerRemovedPairingInformation]: 'need to delete pairing information',
   [HardwareErrorCode.BleServiceNotFound]: 'BLEServiceNotFound: service not found',
   [HardwareErrorCode.BleCharacteristicNotFound]: 'BLEServiceNotFound: service not found',
   [HardwareErrorCode.BleMonitorError]: 'Monitor Error: characteristic not found',
@@ -499,6 +504,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleDeviceBondError]: 'Bluetooth pairing failed',
   [HardwareErrorCode.BleCharacteristicNotifyChangeFailure]: 'Characteristic Notify Change Failure',
   [HardwareErrorCode.BleTransportCallCanceled]: 'Ble Transport call canceled',
+  [HardwareErrorCode.BleDeviceDisconnected]: 'Device disconnected',
 
   /**
    * Runtime Error

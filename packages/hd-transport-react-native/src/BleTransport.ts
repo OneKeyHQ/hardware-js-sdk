@@ -1,4 +1,4 @@
-import { Device, Characteristic, BleErrorCode } from '@onekeyfe/react-native-ble-plx';
+import { Device, Characteristic, BleErrorCode } from 'react-native-ble-plx';
 import { getLogger, LoggerNames, wait } from '@onekeyfe/hd-core';
 // import { wait } from '@onekeyfe/hd-core/src/utils';
 

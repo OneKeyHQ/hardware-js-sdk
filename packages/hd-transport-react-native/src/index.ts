@@ -6,12 +6,14 @@ import {
   BleErrorCode,
   Characteristic,
   ScanMode,
-} from '@onekeyfe/react-native-ble-plx';
+  BleATTErrorCode,
+  BleError,
+} from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
 import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type EventEmitter from 'events';
-import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
+import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
   isOnekeyDevice,
@@ -42,6 +44,36 @@ const tryToGetConfiguration = (device: Device) => {
   if (!infos) return null;
   return infos;
 };
+
+type IOBleErrorRemap = Error | BleError | null | undefined;
+
+function remapError(error: IOBleErrorRemap) {
+  if (!error || !error.message) return error;
+
+  if (error instanceof BleError) {
+    if (
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      error.iosErrorCode === BleATTErrorCode.UnlikelyError ||
+      error.reason === 'Peer removed pairing information'
+    ) {
+      return ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore It's not documented but seems to match a refusal on Android pairing
+    if (error?.attErrorCode === 22) {
+      return ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
+    }
+  }
+
+  if (error.message.includes('was disconnected') || error.message.includes('not found')) {
+    return ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+  }
+
+  // @ts-expect-error
+  return ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.reason ?? error);
+}
 
 export default class ReactNativeBleTransport {
   blePlxManager: BlePlxManager | undefined;
@@ -84,7 +116,6 @@ export default class ReactNativeBleTransport {
   getPlxManager(): Promise<BlePlxManager> {
     if (this.blePlxManager) return Promise.resolve(this.blePlxManager);
     this.blePlxManager = new BlePlxManager();
-    initializeBleManager();
     return Promise.resolve(this.blePlxManager);
   }
 
@@ -220,6 +251,14 @@ export default class ReactNativeBleTransport {
       throw error;
     }
 
+    // check device is bonded
+    if (Platform.OS === 'android') {
+      const bondState = await pairDevice(uuid);
+      if (bondState.bonding) {
+        await onDeviceBondState(uuid);
+      }
+    }
+
     if (!device) {
       const devices = await blePlxManager.devices([uuid]);
       [device] = devices;
@@ -249,7 +288,7 @@ export default class ReactNativeBleTransport {
           this.Log.debug('device already connected');
           throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
-          throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
+          throw remapError(e);
         }
       }
     }
@@ -284,17 +323,8 @@ export default class ReactNativeBleTransport {
             }
           }
         } else {
-          throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
+          throw remapError(e);
         }
-      }
-    }
-
-    // check device is bonded
-    if (Platform.OS === 'android') {
-      const bondedDevices = await getBondedDevices();
-      const hasBonded = !!bondedDevices.find(bondedDevice => bondedDevice.id === device?.id);
-      if (!hasBonded) {
-        throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
       }
     }
 
