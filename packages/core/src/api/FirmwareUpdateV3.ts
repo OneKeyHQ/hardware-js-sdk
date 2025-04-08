@@ -295,6 +295,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         ]);
         const features = featuresRes.message;
         this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+        DevicePool.resetState();
         return {
           bootloaderVersion: getDeviceBootloaderVersion(features).join('.'),
           bleVersion: getDeviceBLEFirmwareVersion(features).join('.'),
