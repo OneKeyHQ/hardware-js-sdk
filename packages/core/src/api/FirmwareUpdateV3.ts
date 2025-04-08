@@ -283,10 +283,10 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.postProcessingMessage('firmware');
-    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     // eslint-disable-next-line no-constant-condition
     while (true) {
       try {
+        const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
         const featuresRes = await Promise.race<any>([
           typedCall('GetFeatures', 'Features', {}),
           new Promise<never>((_, reject) => {
@@ -331,7 +331,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   async waitForDeviceReconnect(timeout: number) {
     const startTime = Date.now();
     const isBleReconnect = this.isBleReconnect();
-    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
     while (Date.now() - startTime < timeout) {
       try {
         if (isBleReconnect) {
@@ -341,6 +340,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
               null,
               true
             );
+            const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
             await Promise.race([
               typedCall('Initialize', 'Features', {}),
               new Promise((_, reject) => {
