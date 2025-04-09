@@ -280,6 +280,9 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         path: '0:updates',
       });
     } catch (error) {
+      if (error.errorCode && error.errorCode === HardwareErrorCode.ActionCancelled) {
+        throw error;
+      }
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
     }
 
