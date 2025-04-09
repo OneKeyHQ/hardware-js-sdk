@@ -33,8 +33,7 @@ import {
   type Features,
   type UnavailableCapabilities,
 } from '../types';
-import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
-import { UI_REQUEST } from '../constants/ui-request';
+import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload, UI_REQUEST } from '../events';
 import { PROTO } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';

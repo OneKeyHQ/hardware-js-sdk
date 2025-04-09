@@ -3,7 +3,6 @@ import { Platform } from 'react-native';
 import { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
 import { importSdk, importLowLevelSDK } from './importSdk';
 import { CONNECT_SRC } from '../constants/connect';
-import { type HardwareSDKEnv } from '../provider/HardwareSDKContext';
 
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;

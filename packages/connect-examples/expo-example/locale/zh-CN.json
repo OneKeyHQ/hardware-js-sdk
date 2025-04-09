@@ -107,12 +107,25 @@
   "label__device_info_refresh": "刷新设备信息",
   "label__device_info_export": "导出设备信息到文本",
 
+  "label__device_update_firmware_v3": "更新所有资源",
   "label__device_update_firmware": "更新固件",
   "label__device_update_ble_firmware": "更新蓝牙固件",
   "label__device_update_bootloader": "更新 Bootloader",
   "label__device_update_sys_resource": "更新系统资源",
   "label__reboot_device_after_update": "升级成功后重启设备（仅限 Pro、Touch）",
   "label__reboot_device_board_model": "重启到 Board 模式",
+
+  "label__device_select_firmware": "选择固件",
+  "label__device_select_ble_firmware": "选择蓝牙固件",
+  "label__device_select_bootloader": "选择 Bootloader",
+  "label__device_select_sys_resource": "选择系统资源",
+
+  "tip__no_select_firmware_file": "未选择固件文件",
+  "tip__no_select_ble_file": "未选择蓝牙固件文件",
+  "tip__no_select_bootloader_file": "未选择 Bootloader 文件",
+  "tip__no_select_resource_file": "未选择系统资源文件",
+  "tip__need_select_at_least_one_file": "需要至少选择一个文件",
+  "tip__updating": "更新中",
 
   "label__wallet_count": "测试钱包数量",
   "label__wallet_change_count": "测试切换次数",
@@ -139,6 +152,8 @@
   "message__bootloader_update_success": "Bootloader 更新成功",
   "message__sys_resource_update": "系统资源更新中...",
   "message__sys_resource_update_success": "系统资源更新成功",
+  "message__firmware_updating": "固件更新中...",
+  "message__firmware_update_completed": "固件更新完成",
 
   "message__scan_device_doing": "搜索设备中...",
   "message__begin_test": "开始测试",

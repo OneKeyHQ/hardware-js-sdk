@@ -1,5 +1,5 @@
 import { memo, useCallback, useContext, useEffect, useState } from 'react';
-import { CoreMessage, UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
+import { CoreMessage, IFirmwareUpdateTipMessage, UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
 import { Dialog, Stack, Text, Unspaced } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
@@ -38,7 +38,7 @@ function FirmwareUpdateEventView({
   }, [open]);
 
   const getMessage = useCallback(
-    (tip: string) => {
+    (tip: IFirmwareUpdateTipMessage) => {
       let newMessage = '';
       switch (tip) {
         case 'CheckLatestUiResource':
@@ -80,6 +80,14 @@ function FirmwareUpdateEventView({
         case 'UpdateSysResourceSuccess':
           newMessage = intl.formatMessage({ id: 'message__sys_resource_update_success' });
           break;
+
+        case 'FirmwareUpdating':
+          newMessage = intl.formatMessage({ id: 'message__firmware_updating' });
+          break;
+
+        case 'FirmwareUpdateCompleted':
+          newMessage = intl.formatMessage({ id: 'message__firmware_update_completed' });
+          break;
         default:
           newMessage = tip;
           break;
@@ -104,7 +112,7 @@ function FirmwareUpdateEventView({
           openDialog(SDK, message.payload.device.features);
         }
         if (message.type === UI_REQUEST.FIRMWARE_TIP) {
-          const tip = message.payload.data.message;
+          const tip = message.payload.data.message as IFirmwareUpdateTipMessage;
 
           setUpdateState({
             progress: 0,

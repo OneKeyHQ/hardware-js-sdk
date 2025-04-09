@@ -21,7 +21,7 @@ import {
   LoggerNames,
   getDeviceFirmwareVersion,
 } from '../utils';
-import { createUiMessage } from '../events/ui-request';
+import { createUiMessage, FirmwareUpdateTipMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
 
@@ -141,17 +141,12 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           await wait(3000);
         }
 
-        console.log('checkCount: ', checkCount);
-        console.log(
-          'DataManager.isWebUsbConnect(DataManager.getSettings("env")): ',
-          DataManager.isWebUsbConnect(DataManager.getSettings('env'))
-        );
         if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
           clearInterval(intervalTimer);
           clearTimeout(timeoutTimer);
 
           try {
-            this.postTipMessage('SelectDeviceInBootloaderForWebDevice');
+            this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
             const confirmed = await this._promptDeviceInBootloaderForWebDevice({
               device: this.device,
             });

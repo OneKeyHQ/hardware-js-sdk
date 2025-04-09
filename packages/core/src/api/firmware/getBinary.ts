@@ -73,6 +73,9 @@ export const getSysResourceBinary = async (url: string) => {
 
 export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
+  if (deviceType === 'unknown') {
+    return null;
+  }
   const { deviceMap } = DataManager;
 
   const firmwareUpdateField: 'ble' | FirmwareField = getFirmwareUpdateField({
