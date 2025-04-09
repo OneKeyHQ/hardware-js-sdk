@@ -102,11 +102,12 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
     await this.enterBootloaderMode();
 
-    await this.executeUpdate({
+    const updateResult = await this.executeUpdate({
       resourceBinary,
       fwBinaryMap,
       bootloaderBinary,
     });
+    return updateResult;
   }
 
   private validateDeviceAndVersion(deviceType: EDeviceType, bootloaderVersion: string) {
