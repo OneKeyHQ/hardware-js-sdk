@@ -105,7 +105,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     const env = DataManager.getSettings('env');
     const isBleReconnect = connectId && DataManager.isBleConnect(env);
 
-    Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
+    Log.log('FirmwareUpdateBaseMethod [checkDeviceToBootloader] isBleReconnect: ', isBleReconnect);
 
     // check device goto bootloader mode
     let isFirstCheck = true;
@@ -120,10 +120,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
         checkCount += 1;
-        Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
+        Log.log('FirmwareUpdateBaseMethod [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
         if (isTouchOrProDevice && isFirstCheck) {
           isFirstCheck = false;
-          Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
+          Log.log('FirmwareUpdateBaseMethod [checkDeviceToBootloader] wait 3000ms');
           await wait(3000);
         }
 
@@ -139,7 +139,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
             }
           } catch (e) {
             Log.log(
-              'FirmwareUpdateV2 [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
+              'FirmwareUpdateBaseMethod [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
               e
             );
             this.checkPromise?.reject(e);
@@ -255,7 +255,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       reboot_on_success: true,
     });
     if (updaeteResponse.type !== 'Success') {
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'firmware update error');
+      throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, 'firmware update error');
     }
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);
   }
@@ -357,7 +357,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
             throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
           }
         }
-        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write chunk once error');
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          'emmc file write chunk once error'
+        );
       }
       return writeRes;
     };
@@ -371,7 +374,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         Log.error(`emmcWrite error: `, error);
         retryCount--;
         if (retryCount === 0) {
-          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
+          throw ERRORS.TypedError(
+            HardwareErrorCode.EmmcFileWriteFirmwareError,
+            'emmc file write firmware error'
+          );
         }
         const env = DataManager.getSettings('env');
         if (DataManager.isBleConnect(env)) {
