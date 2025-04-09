@@ -4143,8 +4143,19 @@ export type TronUnDelegateResourceContract = {
   receiver_address?: string;
 };
 
+export type Vote = {
+  vote_address: string;
+  vote_count: number;
+};
+
+export type TronVoteWitnessContract = {
+  votes: Vote[];
+  support?: boolean;
+};
+
 export type TronContract = {
   transfer_contract?: TronTransferContract;
+  vote_witness_contract?: TronVoteWitnessContract;
   freeze_balance_contract?: TronFreezeBalanceContract;
   unfreeze_balance_contract?: TronUnfreezeBalanceContract;
   withdraw_balance_contract?: TronWithdrawBalanceContract;
@@ -4724,6 +4735,8 @@ export type MessageType = {
   TronWithdrawExpireUnfreezeContract: TronWithdrawExpireUnfreezeContract;
   TronDelegateResourceContract: TronDelegateResourceContract;
   TronUnDelegateResourceContract: TronUnDelegateResourceContract;
+  Vote: Vote;
+  TronVoteWitnessContract: TronVoteWitnessContract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;
