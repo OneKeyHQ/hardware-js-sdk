@@ -92,6 +92,18 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
           },
         };
       }
+
+      if (tx.contract.voteWitnessContract) {
+        unSignTx.contract = {
+          vote_witness_contract: {
+            votes: tx.contract.voteWitnessContract.votes?.map(vote => ({
+              vote_address: vote.voteAddress,
+              vote_count: vote.voteCount,
+            })),
+            support: tx.contract.voteWitnessContract.support,
+          },
+        };
+      }
     }
 
     return unSignTx;

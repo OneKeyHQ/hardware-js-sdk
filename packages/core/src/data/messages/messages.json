@@ -11211,6 +11211,10 @@
               "type": "TronTransferContract",
               "id": 2
             },
+            "vote_witness_contract": {
+              "type": "TronVoteWitnessContract",
+              "id": 4
+            },
             "freeze_balance_contract": {
               "type": "TronFreezeBalanceContract",
               "id": 11
@@ -11391,6 +11395,35 @@
                 "receiver_address": {
                   "type": "string",
                   "id": 4
+                }
+              }
+            },
+            "TronVoteWitnessContract": {
+              "fields": {
+                "votes": {
+                  "rule": "repeated",
+                  "type": "Vote",
+                  "id": 2
+                },
+                "support": {
+                  "type": "bool",
+                  "id": 3
+                }
+              },
+              "nested": {
+                "Vote": {
+                  "fields": {
+                    "vote_address": {
+                      "rule": "required",
+                      "type": "string",
+                      "id": 1
+                    },
+                    "vote_count": {
+                      "rule": "required",
+                      "type": "uint32",
+                      "id": 2
+                    }
+                  }
                 }
               }
             }
