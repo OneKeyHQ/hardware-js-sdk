@@ -54,4 +54,8 @@ export interface FirmwareUpdateV3Params {
 export declare function firmwareUpdateV3(
   connectId: string | undefined,
   params: Params<FirmwareUpdateV3Params & Platform>
-): Response<PROTO.Success>;
+): Response<{
+  bleVersion: string;
+  firmwareVersion: string;
+  bootloaderVersion: string;
+}>;
