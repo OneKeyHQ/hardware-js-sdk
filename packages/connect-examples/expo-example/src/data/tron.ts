@@ -130,6 +130,30 @@ const api: PlaygroundProps[] = [
           },
         },
       },
+      {
+        title: 'Sign Transaction Vote',
+        value: {
+          path: "m/44'/195'/0'/0/0",
+          transaction: {
+            refBlockBytes: 'f37c',
+            refBlockHash: 'aadfb347dabb84de',
+            data: '0x0',
+            feeLimit: 1000000,
+            expiration: 1657770198000,
+            timestamp: 1657770139291,
+            contract: {
+              voteWitnessContract: {
+                votes: [
+                  {
+                    voteAddress: 'TXrs7yxQLNzig7J9EbKhoEiUp6kWpdWKnD',
+                    voteCount: 100,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
     ],
   },
 ];
