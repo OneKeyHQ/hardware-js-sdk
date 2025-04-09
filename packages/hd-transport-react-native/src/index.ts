@@ -48,8 +48,6 @@ const tryToGetConfiguration = (device: Device) => {
 type IOBleErrorRemap = Error | BleError | null | undefined;
 
 function remapError(error: IOBleErrorRemap) {
-  if (!error || !error.message) return error;
-
   if (error instanceof BleError) {
     if (
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -57,22 +55,26 @@ function remapError(error: IOBleErrorRemap) {
       error.iosErrorCode === BleATTErrorCode.UnlikelyError ||
       error.reason === 'Peer removed pairing information'
     ) {
-      return ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
+      throw ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
     }
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore It's not documented but seems to match a refusal on Android pairing
     if (error?.attErrorCode === 22) {
-      return ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
+      throw ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
     }
   }
 
-  if (error.message.includes('was disconnected') || error.message.includes('not found')) {
-    return ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+  if (
+    error instanceof Error &&
+    error.message &&
+    (error.message.includes('was disconnected') || error.message.includes('not found'))
+  ) {
+    throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
   }
 
   // @ts-expect-error
-  return ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.reason ?? error);
+  throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.reason ?? error);
 }
 
 export default class ReactNativeBleTransport {
@@ -288,7 +290,7 @@ export default class ReactNativeBleTransport {
           this.Log.debug('device already connected');
           throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
-          throw remapError(e);
+          remapError(e);
         }
       }
     }
@@ -323,7 +325,7 @@ export default class ReactNativeBleTransport {
             }
           }
         } else {
-          throw remapError(e);
+          remapError(e);
         }
       }
     }
@@ -529,7 +531,6 @@ export default class ReactNativeBleTransport {
   }
 
   async call(uuid: string, name: string, data: Record<string, unknown>) {
-    this.Log.debug('transport-react-native call', uuid, name, data);
     if (this.stopped) {
       // eslint-disable-next-line prefer-promise-reject-errors
       return Promise.reject(ERRORS.TypedError('Transport stopped.'));

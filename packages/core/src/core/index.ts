@@ -151,6 +151,15 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   return onCallDevice(context, message, method);
 };
 
+const waitForPendingPromise = async (getPrePendingCallPromise: () => Promise<void> | undefined) => {
+  const pendingPromise = getPrePendingCallPromise();
+  if (pendingPromise) {
+    Log.debug('pre pending call promise before call method, wait for it');
+    await pendingPromise;
+    Log.debug('pre pending call promise before call method done');
+  }
+};
+
 const onCallDevice = async (
   context: CoreContext,
   message: CoreMessage,
@@ -171,11 +180,7 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
-  if (getPrePendingCallPromise()) {
-    Log.debug('pre pending call promise, wait for it');
-    await getPrePendingCallPromise();
-    Log.debug('pre pending call promise done');
-  }
+  await waitForPendingPromise(getPrePendingCallPromise);
 
   const task = requestQueue.createTask(method);
 
@@ -220,11 +225,7 @@ const onCallDevice = async (
   );
 
   try {
-    if (getPrePendingCallPromise()) {
-      Log.debug('pre pending call promise before call method, wait for it');
-      await getPrePendingCallPromise();
-      Log.debug('pre pending call promise before call method done');
-    }
+    await waitForPendingPromise(getPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
       // check firmware version
@@ -735,7 +736,6 @@ export const cancel = (context: CoreContext, connectId?: string) => {
         }
       }
     } else {
-      Log.debug('Cancel Api all _deviceList: ', _deviceList?.allDevices());
       _deviceList?.allDevices().forEach(device => {
         Log.debug('device: ', device, ' device.hasDeviceAcquire: ', device.hasDeviceAcquire());
         if (device.hasDeviceAcquire()) {
