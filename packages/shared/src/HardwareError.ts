@@ -381,6 +381,11 @@ export const HardwareErrorCode = {
   BTCPsbtTooManyUtxos: 818,
 
   /**
+   * EMMC file write firmware error
+   */
+  EmmcFileWriteFirmwareError: 819,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -511,6 +516,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.NotInSigningMode]: 'not in signing mode',
   [HardwareErrorCode.DataOverload]: 'Params data overload',
   [HardwareErrorCode.BTCPsbtTooManyUtxos]: 'PSBT too many utxos',
+  [HardwareErrorCode.EmmcFileWriteFirmwareError]: 'EMMC file write firmware error',
 
   /**
    * Lowlevel transport

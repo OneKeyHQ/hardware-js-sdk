@@ -280,6 +280,23 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         path: '0:updates',
       });
     } catch (error) {
+      if (error.errorCode) {
+        const unexpectedError = [
+          HardwareErrorCode.ActionCancelled,
+          HardwareErrorCode.BleDeviceNotBonded,
+          HardwareErrorCode.BleServiceNotFound,
+          HardwareErrorCode.BlePermissionError,
+          HardwareErrorCode.BleLocationError,
+          HardwareErrorCode.BleDeviceBondError,
+          HardwareErrorCode.BleCharacteristicNotifyError,
+          HardwareErrorCode.BleTimeoutError,
+          HardwareErrorCode.BleWriteCharacteristicError,
+          HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
+        ];
+        if (unexpectedError.includes(error.errorCode)) {
+          throw error;
+        }
+      }
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
     }
 
