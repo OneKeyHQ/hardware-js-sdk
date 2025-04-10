@@ -21,7 +21,11 @@ export type { DeviceSettingsParams } from './deviceSettings';
 export type { DeviceVerifyParams, DeviceVerifySignature } from './deviceVerify';
 export type { DeviceSupportFeatures } from './deviceSupportFeatures';
 export type { DeviceUploadResourceParams } from './deviceUploadResource';
-export type { FirmwareUpdateParams, FirmwareUpdateBinaryParams } from './firmwareUpdate';
+export type {
+  FirmwareUpdateParams,
+  FirmwareUpdateBinaryParams,
+  FirmwareUpdateV3Params,
+} from './firmwareUpdate';
 
 export type { AllNetworkAddressParams, AllNetworkGetAddressParams } from './allNetworkGetAddress';
 
