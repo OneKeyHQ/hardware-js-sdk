@@ -309,7 +309,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     // eslint-disable-next-line no-constant-condition
     while (true) {
       // Check if timeout exceeded
-      if (Date.now() - installStartTime > maxWaitTimeForInstall) {
+      if (Date.now() - installStartTime > maxWaitTimeForInstallingFirmware) {
         throw ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
           'Firmware update process timeout after 5 minutes'

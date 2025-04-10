@@ -49,11 +49,13 @@ export interface FirmwareUpdateV3Params {
 
   resourceBinary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
+
+  platform: IPlatform;
 }
 
 export declare function firmwareUpdateV3(
   connectId: string | undefined,
-  params: Params<FirmwareUpdateV3Params & Platform>
+  params: Params<FirmwareUpdateV3Params>
 ): Response<{
   bleVersion: string;
   firmwareVersion: string;
