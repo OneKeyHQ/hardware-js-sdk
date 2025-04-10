@@ -301,8 +301,21 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.postProcessingMessage('firmware');
+    this.postProgressMessage(0, 'installingFirmware');
+    // Add timeout of 5 minutes
+    const installStartTime = Date.now();
+    const maxWaitTimeForInstallingFirmware = 5 * 60 * 1000; // 5 minutes in milliseconds
+
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      // Check if timeout exceeded
+      if (Date.now() - installStartTime > maxWaitTimeForInstall) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          'Firmware update process timeout after 5 minutes'
+        );
+      }
+
       try {
         const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
         const featuresRes = await Promise.race<any>([
