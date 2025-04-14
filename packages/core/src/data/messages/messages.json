@@ -11186,7 +11186,7 @@
           "id": 4
         },
         "data": {
-          "type": "string",
+          "type": "bytes",
           "id": 5
         },
         "contract": {
@@ -11211,9 +11211,21 @@
               "type": "TronTransferContract",
               "id": 2
             },
+            "provider": {
+              "type": "bytes",
+              "id": 3
+            },
             "vote_witness_contract": {
               "type": "TronVoteWitnessContract",
               "id": 4
+            },
+            "contract_name": {
+              "type": "bytes",
+              "id": 5
+            },
+            "permission_id": {
+              "type": "uint32",
+              "id": 6
             },
             "freeze_balance_contract": {
               "type": "TronFreezeBalanceContract",
@@ -11250,6 +11262,10 @@
             "undelegate_resource_contract": {
               "type": "TronUnDelegateResourceContract",
               "id": 58
+            },
+            "cancel_all_unfreeze_v2_contract": {
+              "type": "TronCancelAllUnfreezeV2Contract",
+              "id": 59
             }
           },
           "nested": {
@@ -11292,7 +11308,8 @@
             "TronResourceCode": {
               "values": {
                 "BANDWIDTH": 0,
-                "ENERGY": 1
+                "ENERGY": 1,
+                "TRON_POWER": 2
               }
             },
             "TronFreezeBalanceContract": {
@@ -11426,6 +11443,9 @@
                   }
                 }
               }
+            },
+            "TronCancelAllUnfreezeV2Contract": {
+              "fields": {}
             }
           }
         }

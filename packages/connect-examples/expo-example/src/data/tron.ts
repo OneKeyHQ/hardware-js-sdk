@@ -137,7 +137,6 @@ const api: PlaygroundProps[] = [
           transaction: {
             refBlockBytes: 'f37c',
             refBlockHash: 'aadfb347dabb84de',
-            data: '0x0',
             feeLimit: 1000000,
             expiration: 1657770198000,
             timestamp: 1657770139291,
@@ -150,6 +149,22 @@ const api: PlaygroundProps[] = [
                   },
                 ],
               },
+            },
+          },
+        },
+      },
+      {
+        title: 'Sign Transaction Cancel AllUnfreeze V2',
+        value: {
+          path: "m/44'/195'/0'/0/0",
+          transaction: {
+            refBlockBytes: 'f37c',
+            refBlockHash: 'aadfb347dabb84de',
+            feeLimit: 1000000,
+            expiration: 1657770198000,
+            timestamp: 1657770139291,
+            contract: {
+              cancelAllUnfreezeV2Contract: {},
             },
           },
         },
