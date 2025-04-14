@@ -100,6 +100,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       pro: {
         min: '4.10.2',
       },
+      model_classic1s: {
+        min: '3.10.0',
+      },
     };
   }
 
@@ -125,6 +128,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     return {
       pro: {
         min: '4.10.1',
+      },
+      model_classic1s: {
+        min: '3.10.0',
       },
     };
   }
@@ -165,6 +171,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     return {
       pro: {
         min: '4.13.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
       },
     };
   }
