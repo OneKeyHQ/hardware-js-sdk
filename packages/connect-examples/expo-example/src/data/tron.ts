@@ -137,7 +137,6 @@ const api: PlaygroundProps[] = [
           transaction: {
             refBlockBytes: 'f37c',
             refBlockHash: 'aadfb347dabb84de',
-            data: '0x0',
             feeLimit: 1000000,
             expiration: 1657770198000,
             timestamp: 1657770139291,

@@ -51,11 +51,14 @@ export type TronVoteWitnessContract = {
   support?: boolean;
 };
 
+export type TronCancelAllUnfreezeV2Contract = undefined;
+
 export type TronTransactionContract = {
   transferContract?: TronTransferContract;
   triggerSmartContract?: TronTriggerSmartContract;
   freezeBalanceV2Contract?: TronFreezeBalanceV2Contract;
   unfreezeBalanceV2Contract?: TronUnfreezeBalanceV2Contract;
+  cancelAllUnfreezeV2Contract?: TronCancelAllUnfreezeV2Contract;
   delegateResourceContract?: TronDelegateResourceContract;
   unDelegateResourceContract?: TronUnDelegateResourceContract;
   withdrawBalanceContract?: TronWithdrawBalanceContract;

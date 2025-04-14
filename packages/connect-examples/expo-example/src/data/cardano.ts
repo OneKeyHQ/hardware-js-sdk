@@ -206,6 +206,12 @@ const api: PlaygroundProps[] = [
               address:
                 'addr1qxfzjswzujgvn70cwpkxdal5dddtasjrljmx8upgzlaehqa2vx9039emchclmwwfmwtar32lp4x558nr8wa3f26rkn7qwne3ad',
               amount: '2613231',
+              tokenBundle: [
+                {
+                  policyId: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6',
+                  tokenAmounts: [{ assetNameBytes: '4d494e', amount: '27828472' }],
+                },
+              ],
             },
             {
               addressParameters: {
@@ -214,12 +220,6 @@ const api: PlaygroundProps[] = [
                 stakingPath: "m/1852'/1815'/0'/2/0",
               },
               amount: '1222487',
-              tokenBundle: [
-                {
-                  policyId: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6',
-                  tokenAmounts: [{ assetNameBytes: '4d494e', amount: '27828472' }],
-                },
-              ],
             },
           ],
           fee: '177513',

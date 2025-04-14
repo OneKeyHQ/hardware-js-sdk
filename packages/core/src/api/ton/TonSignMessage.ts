@@ -135,33 +135,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     };
   }
 
-  private checkFirmwareVersion(
-    checkCondition: () => boolean,
-    getVersionRange: () => DeviceFirmwareRange
-  ) {
-    if (!checkCondition()) {
-      return;
-    }
-
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.device.features,
-      type => getVersionRange()[type]
-    );
-
-    if (!versionRange) {
-      // Equipment that does not need to be repaired
-      return;
-    }
-
-    if (semver.valid(firmwareVersion) && semver.lt(firmwareVersion, versionRange.min)) {
-      throw createNeedUpgradeFirmwareHardwareError(firmwareVersion, versionRange.min);
-    }
-  }
-
   checkFixCommentError() {
     const { comment, jettonAmount } = this.payload;
-    this.checkFirmwareVersion(
+    this.checkFeatureVersionLimit(
       () => !isEmpty(comment) && jettonAmount !== null && jettonAmount !== undefined,
       () => this.getFixCommentErrorVersionRange()
     );
@@ -180,7 +156,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
 
   checkFixInitStateError() {
     const { initState, signingMessageRepr } = this.payload;
-    this.checkFirmwareVersion(
+    this.checkFeatureVersionLimit(
       () => !isEmpty(initState) && !isEmpty(signingMessageRepr),
       () => this.getFixInitStateErrorVersionRange()
     );

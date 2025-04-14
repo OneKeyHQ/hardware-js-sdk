@@ -4100,6 +4100,7 @@ export type TronTriggerSmartContract = {
 export enum TronResourceCode {
   BANDWIDTH = 0,
   ENERGY = 1,
+  TRON_POWER = 2,
 }
 
 export type TronFreezeBalanceContract = {
@@ -4153,9 +4154,14 @@ export type TronVoteWitnessContract = {
   support?: boolean;
 };
 
+export type TronCancelAllUnfreezeV2Contract = {};
+
 export type TronContract = {
   transfer_contract?: TronTransferContract;
+  provider?: string;
   vote_witness_contract?: TronVoteWitnessContract;
+  contract_name?: string;
+  permission_id?: number;
   freeze_balance_contract?: TronFreezeBalanceContract;
   unfreeze_balance_contract?: TronUnfreezeBalanceContract;
   withdraw_balance_contract?: TronWithdrawBalanceContract;
@@ -4165,6 +4171,7 @@ export type TronContract = {
   withdraw_expire_unfreeze_contract?: TronWithdrawExpireUnfreezeContract;
   delegate_resource_contract?: TronDelegateResourceContract;
   undelegate_resource_contract?: TronUnDelegateResourceContract;
+  cancel_all_unfreeze_v2_contract?: TronCancelAllUnfreezeV2Contract;
 };
 
 // TronSignTx
@@ -4737,6 +4744,7 @@ export type MessageType = {
   TronUnDelegateResourceContract: TronUnDelegateResourceContract;
   Vote: Vote;
   TronVoteWitnessContract: TronVoteWitnessContract;
+  TronCancelAllUnfreezeV2Contract: TronCancelAllUnfreezeV2Contract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;

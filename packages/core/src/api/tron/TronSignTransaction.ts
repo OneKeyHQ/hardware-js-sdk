@@ -1,10 +1,12 @@
 import { TronSignTx } from '@onekeyfe/hd-transport';
+import { isEmpty } from 'lodash';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { TronTransaction } from '../../types/api/tronSignTransaction';
 import { formatAnyHex } from '../helpers/hexUtils';
+import { DeviceFirmwareRange } from '../../types';
 
 export default class TronSignTransaction extends BaseMethod<TronSignTx> {
   parseTx(tx: TronTransaction, address_n: number[]): TronSignTx {
@@ -104,6 +106,12 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
           },
         };
       }
+
+      if (tx.contract.cancelAllUnfreezeV2Contract) {
+        unSignTx.contract = {
+          cancel_all_unfreeze_v2_contract: {},
+        };
+      }
     }
 
     return unSignTx;
@@ -140,6 +148,25 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
         min: '2.5.0',
       },
     };
+  }
+
+  getFixDataTypeVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.13.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
+      },
+    };
+  }
+
+  checkFixInitStateError() {
+    const { data } = this.payload;
+    this.checkFeatureVersionLimit(
+      () => !isEmpty(data),
+      () => this.getFixDataTypeVersionRange()
+    );
   }
 
   async run() {
