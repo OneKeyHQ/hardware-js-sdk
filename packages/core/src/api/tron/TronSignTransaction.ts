@@ -161,15 +161,18 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
     };
   }
 
-  checkFixInitStateError() {
+  checkFixDataTypeSupportVoteWitnessError() {
     const { data } = this.payload;
+    const { cancel_all_unfreeze_v2_contract, vote_witness_contract } = this.params.contract;
     this.checkFeatureVersionLimit(
-      () => !isEmpty(data),
+      () => !isEmpty(data) || !!cancel_all_unfreeze_v2_contract || !!vote_witness_contract,
       () => this.getFixDataTypeVersionRange()
     );
   }
 
   async run() {
+    this.checkFixDataTypeSupportVoteWitnessError();
+
     const response = await this.device.commands.typedCall('TronSignTx', 'TronSignedTx', {
       ...this.params,
     });
