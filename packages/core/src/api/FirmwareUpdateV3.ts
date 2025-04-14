@@ -17,6 +17,7 @@ import { DataManager } from '../data-manager';
 import { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
+import { TypedResponseMessage } from '../device/DeviceCommands';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -53,6 +54,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderVersion', type: 'array' },
       { name: 'bootloaderBinary', type: 'buffer' },
+      { name: 'platform', type: 'string' },
     ]);
 
     this.params = {
@@ -64,6 +66,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       bootloaderBinary: payload.bootloaderBinary,
       firmwareVersion: payload.firmwareVersion,
       resourceBinary: payload.resourceBinary,
+      platform: payload.platform,
     };
   }
 
@@ -280,6 +283,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         path: '0:updates',
       });
     } catch (error) {
+      console.error('triggerFirmwareUpdateEmmc error: ', error);
       if (error.errorCode) {
         const unexpectedError = [
           HardwareErrorCode.ActionCancelled,
@@ -300,6 +304,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
     }
 
+    await wait(1500);
     this.postProcessingMessage('firmware');
     this.postProgressMessage(0, 'installingFirmware');
     // Add timeout of 5 minutes
@@ -318,27 +323,36 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
       try {
         const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-        const featuresRes = await Promise.race<any>([
+        const featuresRes = await Promise.race<TypedResponseMessage<'Features'>>([
           typedCall('GetFeatures', 'Features', {}),
           new Promise<never>((_, reject) => {
             setTimeout(() => reject(new Error('GetFeatures timeout after 3 seconds')), 3000);
           }),
         ]);
         const features = featuresRes.message;
-        this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
-        DevicePool.resetState();
-        return {
-          bootloaderVersion: getDeviceBootloaderVersion(features).join('.'),
-          bleVersion: getDeviceBLEFirmwareVersion(features).join('.'),
-          firmwareVersion: getDeviceFirmwareVersion(features).join('.'),
-        };
+        const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
+        const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
+        const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
+        if (
+          bootloaderVersion !== '0.0.0' &&
+          bleVersion !== '0.0.0' &&
+          firmwareVersion !== '0.0.0'
+        ) {
+          this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+          DevicePool.resetState();
+          return {
+            bootloaderVersion,
+            bleVersion,
+            firmwareVersion,
+          };
+        }
       } catch (error) {
+        await wait(1000);
         if (error.message && error.message.includes('Update mode')) {
           const updateParts = error.message.split('Update mode ');
           const progressValue = updateParts[1] ?? '0';
           const progress = parseInt(progressValue, 10) || 0;
           this.postProgressMessage(progress, 'installingFirmware');
-          await wait(1000);
         } else {
           /**
            * Needs second reconnect case:

@@ -277,7 +277,10 @@ const emmcFileWriteWithRetry = async (
         await wait(3000);
         await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
         await device.initialize();
-      } else if (error.message.indexOf(SESSION_ERROR) > -1) {
+      } else if (
+        error.message.indexOf(SESSION_ERROR) > -1 ||
+        error.response.data.indexOf(SESSION_ERROR) > -1
+      ) {
         const deviceDiff = await device.deviceConnector?.enumerate();
         const devicesDescriptor = deviceDiff?.descriptors ?? [];
         const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
@@ -291,6 +294,8 @@ const emmcFileWriteWithRetry = async (
     }
   }
 };
+
+const INIT_DATA_CHUNK_SIZE = 10 * 1024;
 
 const processResourceRequest = async (
   typedCall: TypedCall,
@@ -308,7 +313,7 @@ const processResourceRequest = async (
   }
 
   const payload = new Uint8Array(
-    data.slice(offset, Math.min(offset + data_length, data.byteLength))
+    data.slice(offset, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength))
   );
   const digest = blake2s(payload);
 
@@ -324,7 +329,6 @@ const processResourceRequest = async (
 };
 
 // Fixed size
-const INIT_DATA_CHUNK_SIZE = 16 * 1024;
 export const updateResource = async (
   typedCall: TypedCall,
   fileName: string,
