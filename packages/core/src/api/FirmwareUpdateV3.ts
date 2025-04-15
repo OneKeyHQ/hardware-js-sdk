@@ -304,6 +304,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       Log.error('triggerFirmwareUpdateEmmc error: ', error);
     }
 
+    // wait for 1.5s to ensure the device is in update mode
     await wait(1500);
     this.postProcessingMessage('firmware');
     this.postProgressMessage(0, 'installingFirmware');
