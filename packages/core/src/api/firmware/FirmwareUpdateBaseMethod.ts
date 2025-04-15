@@ -384,7 +384,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
           await wait(3000);
           await this.device.deviceConnector?.acquire(this.device.originalDescriptor.id, null, true);
           await this.device.initialize();
-        } else if (error.message.indexOf(SESSION_ERROR) > -1) {
+        } else if (
+          error.message.indexOf(SESSION_ERROR) > -1 ||
+          error.response.data.indexOf(SESSION_ERROR) > -1
+        ) {
           const deviceDiff = await this.device.deviceConnector?.enumerate();
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
           const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);

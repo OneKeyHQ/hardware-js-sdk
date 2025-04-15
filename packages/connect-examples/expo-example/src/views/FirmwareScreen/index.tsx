@@ -544,17 +544,16 @@ function FirmwareUpdate({
         };
       }
 
-      if (type === 'ble' || type === 'firmware' || type === 'bootloader') {
+      if (type === 'ble' || type === 'firmware') {
         setShowUpdateDialog(true);
-        const res = await sdk.firmwareUpdate(
+        const res = await sdk.firmwareUpdateV2(
           Platform.OS === 'web' ? undefined : selectDevice.connectId,
           {
-            updateType: type === 'bootloader' ? 'firmware' : type,
             binary: fileData,
-            rebootOnSuccess: reboot,
+            updateType: type,
+            platform: 'web',
           }
         );
-
         setShowUpdateDialog(false);
         if (!res.success) {
           return {
@@ -567,6 +566,22 @@ function FirmwareUpdate({
         };
       }
 
+      if (type === 'bootloader') {
+        setShowUpdateDialog(true);
+        const res = await sdk.deviceUpdateBootloader(selectDevice.connectId, {
+          binary: fileData,
+        });
+        setShowUpdateDialog(false);
+        if (!res.success) {
+          return {
+            success: false,
+            payload: res.payload.error,
+          };
+        }
+        return {
+          success: true,
+        };
+      }
       if (type === 'source') {
         setShowUpdateDialog(true);
         const res = await sdk.deviceFullyUploadResource(selectDevice.connectId, {
@@ -722,7 +737,7 @@ function FirmwareUpdate({
                   <FirmwareLocalFile
                     deviceType={deviceTypeLowerCase}
                     title={intl.formatMessage({ id: 'label__device_update_ble_firmware' })}
-                    type="firmware"
+                    type="ble"
                     onUpdate={updateFirmware}
                   />
                 )}
