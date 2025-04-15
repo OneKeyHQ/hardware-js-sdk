@@ -334,63 +334,13 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
         const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
         const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
-        if (
-          bootloaderVersion !== '0.0.0' &&
-          bleVersion !== '0.0.0' &&
-          firmwareVersion !== '0.0.0'
-        ) {
-          // Verify versions match the expected versions from parameters
-          // Only validate versions for components that were included in the update
-          let versionMismatch = false;
-          const expected: Record<string, string> = {};
-          const actual: Record<string, string> = {};
-
-          // Check bootloader version if bootloader binary was provided
-          if (Array.isArray(this.params.bootloaderVersion)) {
-            const expectedVersion = this.params.bootloaderVersion.join('.');
-            expected.bootloader = expectedVersion;
-            actual.bootloader = bootloaderVersion;
-            if (bootloaderVersion !== expectedVersion) {
-              versionMismatch = true;
-            }
-          }
-
-          // Check BLE version if BLE binary was provided
-          if (Array.isArray(this.params.bleVersion)) {
-            const expectedVersion = this.params.bleVersion.join('.');
-            expected.ble = expectedVersion;
-            actual.ble = bleVersion;
-            if (bleVersion !== expectedVersion) {
-              versionMismatch = true;
-            }
-          }
-
-          // Check firmware version if firmware binary was provided
-          if (Array.isArray(this.params.firmwareVersion)) {
-            const expectedVersion = this.params.firmwareVersion.join('.');
-            expected.firmware = expectedVersion;
-            actual.firmware = firmwareVersion;
-            if (firmwareVersion !== expectedVersion) {
-              versionMismatch = true;
-            }
-          }
-
-          if (versionMismatch) {
-            Log.error('Version mismatch after firmware update', { expected, actual });
-            throw ERRORS.TypedError(
-              HardwareErrorCode.FirmwareError,
-              'Version mismatch after firmware update'
-            );
-          }
-
-          this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
-          DevicePool.resetState();
-          return {
-            bootloaderVersion,
-            bleVersion,
-            firmwareVersion,
-          };
-        }
+        this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+        DevicePool.resetState();
+        return {
+          bootloaderVersion,
+          bleVersion,
+          firmwareVersion,
+        };
       } catch (error) {
         await wait(1000);
         if (error.message === 'Version mismatch after firmware update') {
