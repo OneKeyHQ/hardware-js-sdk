@@ -419,8 +419,10 @@ export default class ReactNativeBleTransport {
           }
           if (
             error.reason?.includes('Cannot write client characteristic config descriptor') ||
-            error.reason?.includes('Cannot find client characteristic config descriptor') ||
-            error.reason?.includes('The handle is invalid')
+            error.reason?.includes('Cannot find client characteristic config descriptor') || // pro firmware 2.3.0 upgrade
+            error.reason?.includes('The handle is invalid') ||
+            error.reason?.includes('Writing is not permitted') || // pro firmware 2.3.4 upgrade
+            error.reason?.includes('notify change failed for device')
           ) {
             this.runPromise.reject(
               ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyChangeFailure)

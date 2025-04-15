@@ -535,6 +535,9 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         }
       } catch (error) {
         Log.debug('device error: ', error);
+        if ([HardwareErrorCode.BleCharacteristicNotifyChangeFailure].includes(error.errorCode)) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE));
+        }
         if (
           [
             HardwareErrorCode.BlePermissionError,
