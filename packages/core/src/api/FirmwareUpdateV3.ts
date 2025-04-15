@@ -343,9 +343,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         };
       } catch (error) {
         await wait(1000);
-        if (error.message === 'Version mismatch after firmware update') {
-          throw error;
-        }
         if (error.message && error.message.includes('Update mode')) {
           const updateParts = error.message.split('Update mode ');
           const progressValue = updateParts[1] ?? '0';
