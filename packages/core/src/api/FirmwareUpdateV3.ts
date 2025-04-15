@@ -342,13 +342,14 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           firmwareVersion,
         };
       } catch (error) {
-        await wait(1000);
         if (error.message && error.message.includes('Update mode')) {
           const updateParts = error.message.split('Update mode ');
           const progressValue = updateParts[1] ?? '0';
           const progress = parseInt(progressValue, 10) || 0;
           this.postProgressMessage(progress, 'installingFirmware');
+          await wait(1000);
         } else {
+          await wait(1000);
           /**
            * Needs second reconnect case:
            * 1. While including 'Ble firmwware' in ble connect type
