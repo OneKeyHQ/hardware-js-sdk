@@ -295,7 +295,7 @@ const emmcFileWriteWithRetry = async (
   }
 };
 
-const INIT_DATA_CHUNK_SIZE = 10 * 1024;
+const INIT_DATA_CHUNK_SIZE = 16 * 1024;
 
 const processResourceRequest = async (
   typedCall: TypedCall,
@@ -313,7 +313,7 @@ const processResourceRequest = async (
   }
 
   const payload = new Uint8Array(
-    data.slice(offset, Math.min(INIT_DATA_CHUNK_SIZE, data.byteLength))
+    data.slice(offset, Math.min(offset + data_length, data.byteLength))
   );
   const digest = blake2s(payload);
 
