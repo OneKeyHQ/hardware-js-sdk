@@ -154,7 +154,6 @@ export const getFirmwareUpdateField = ({
 }): 'ble' | FirmwareField => {
   const deviceType = getDeviceType(features);
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
-  const deviceBootloaderVersion = getDeviceBootloaderVersion(features);
   if (updateType === 'ble') {
     return 'ble';
   }
@@ -174,7 +173,6 @@ export const getFirmwareUpdateField = ({
     return 'firmware-v6';
   }
   if (deviceType === EDeviceType.Pro) {
-    if (semver.lte(deviceBootloaderVersion.join('.'), '2.7.0')) return 'firmware-v5';
     return 'firmware-v6';
   }
   return 'firmware';
@@ -187,7 +185,7 @@ export const getFirmwareUpdateField = ({
 export const getFirmwareUpdateFieldArray = (
   features: Features,
   updateType: 'firmware' | 'ble' | 'bootloader',
-): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v5' | 'firmware-v6')[] => {
+): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v6')[] => {
   const deviceType = getDeviceType(features);
   if (updateType === 'ble') {
     return ['ble'];
