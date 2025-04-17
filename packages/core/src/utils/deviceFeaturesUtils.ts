@@ -12,7 +12,7 @@ import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 
 export const getSupportMessageVersion = (
-  features: Features | undefined,
+  features: Features | undefined
 ): { messages: JSON; messageVersion: MessageVersion } => {
   if (!features)
     return {
@@ -98,7 +98,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) =>
 
 export const getPassphraseState = async (
   features: Features | undefined,
-  commands: DeviceCommands,
+  commands: DeviceCommands
 ) => {
   if (!features) return false;
   const { message, type } = await commands.typedCall('GetAddress', 'Address', {
@@ -184,7 +184,7 @@ export const getFirmwareUpdateField = ({
  */
 export const getFirmwareUpdateFieldArray = (
   features: Features,
-  updateType: 'firmware' | 'ble' | 'bootloader',
+  updateType: 'firmware' | 'ble' | 'bootloader'
 ): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v6')[] => {
   const deviceType = getDeviceType(features);
   if (updateType === 'ble') {
