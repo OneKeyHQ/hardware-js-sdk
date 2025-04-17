@@ -27,6 +27,7 @@ import { DevicePool } from '../../device/DevicePool';
 
 const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
+const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
 
 const Log = getLogger(LoggerNames.Core);
 
@@ -223,6 +224,59 @@ const newTouchUpdateProcess = async (
     path: filePath,
     reboot_on_success: rebootOnSuccess,
   });
+
+  if (
+    response.type === 'Success' &&
+    (response as any)?.message?.message === FIRMWARE_UPDATE_CONFIRM
+  ) {
+    const timeout = 2 * 60 * 1000;
+    // eslint-disable-next-line no-constant-condition
+    // Check if timeout exceeded
+    const startTime = Date.now();
+    const isBleReconnect = DataManager.isBleConnect(env);
+    while (Date.now() - startTime < timeout) {
+      try {
+        if (isBleReconnect) {
+          try {
+            await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
+            const typedCall = device.getCommands().typedCall.bind(device.getCommands());
+            await Promise.race([
+              typedCall('Initialize', 'Features', {}),
+              new Promise((_, reject) => {
+                setTimeout(() => {
+                  reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
+                }, 3000);
+              }),
+            ]);
+          } catch (e) {
+            // ignore error because of device is not connected
+            Log.log('catch Bluetooth error when device is restarting: ', e);
+          }
+        } else {
+          const deviceDiff = await device.deviceConnector?.enumerate();
+          const devicesDescriptor = deviceDiff?.descriptors ?? [];
+          const { deviceList } = await DevicePool.getDevices(
+            devicesDescriptor,
+            device.originalDescriptor.id
+          );
+          if (deviceList.length === 1) {
+            device.updateFromCache(deviceList[0]);
+            await device.acquire();
+            device.commands.disposed = false;
+            device.getCommands().mainId = device.mainId ?? '';
+          }
+        }
+        const typedCall = device.getCommands().typedCall.bind(device.getCommands());
+        await typedCall('GetFeatures', 'Features', {});
+        DevicePool.resetState();
+        break;
+      } catch (error) {
+        console.error('Device reconnect failed: ', error);
+        Log.error('Device reconnect failed:', error);
+        await wait(1000);
+      }
+    }
+  }
   return response;
 };
 
