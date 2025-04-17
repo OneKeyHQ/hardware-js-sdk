@@ -9,10 +9,10 @@ import DataManager, { FirmwareField, MessageVersion } from '../data-manager/Data
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
-import { getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { getDeviceBootloaderVersion, getDeviceFirmwareVersion } from './deviceVersionUtils';
 
 export const getSupportMessageVersion = (
-  features: Features | undefined
+  features: Features | undefined,
 ): { messages: JSON; messageVersion: MessageVersion } => {
   if (!features)
     return {
@@ -98,7 +98,7 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) =>
 
 export const getPassphraseState = async (
   features: Features | undefined,
-  commands: DeviceCommands
+  commands: DeviceCommands,
 ) => {
   if (!features) return false;
   const { message, type } = await commands.typedCall('GetAddress', 'Address', {
@@ -154,36 +154,40 @@ export const getFirmwareUpdateField = ({
 }): 'ble' | FirmwareField => {
   const deviceType = getDeviceType(features);
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
+  const deviceBootloaderVersion = getDeviceBootloaderVersion(features);
   if (updateType === 'ble') {
     return 'ble';
   }
 
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-    return 'firmware-v5';
+    return 'firmware-v6';
   }
 
   if (deviceType === EDeviceType.Touch) {
     if (targetVersion) {
       if (semver.eq(targetVersion, '4.0.0')) return 'firmware-v2';
-      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v5';
+      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v6';
     }
 
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
 
-    return 'firmware-v5';
+    return 'firmware-v6';
   }
   if (deviceType === EDeviceType.Pro) {
-    return 'firmware-v5';
+    if (semver.lte(deviceBootloaderVersion.join('.'), '2.7.0')) return 'firmware-v5';
+    return 'firmware-v6';
   }
   return 'firmware';
 };
 /**
  * Returns the optional firmware version
+ * Used in firmware web update
+ * https://firmware.onekey.so/
  */
 export const getFirmwareUpdateFieldArray = (
   features: Features,
-  updateType: 'firmware' | 'ble' | 'bootloader'
-): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v5')[] => {
+  updateType: 'firmware' | 'ble' | 'bootloader',
+): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v5' | 'firmware-v6')[] => {
   const deviceType = getDeviceType(features);
   if (updateType === 'ble') {
     return ['ble'];
@@ -195,25 +199,25 @@ export const getFirmwareUpdateFieldArray = (
     deviceType === 'mini' ||
     deviceType === 'classicpure'
   ) {
-    return ['firmware-v5'];
+    return ['firmware-v6'];
   }
 
   if (deviceType === 'touch') {
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
     if (semver.gt(currentVersion, '4.0.0')) {
-      return ['firmware-v5', 'firmware'];
+      return ['firmware-v6', 'firmware'];
     }
     if (semver.gte(currentVersion, '4.0.0')) {
       return ['firmware-v2', 'firmware'];
     }
     if (!currentVersion || semver.lt(currentVersion, '3.0.0')) {
-      return ['firmware-v5', 'firmware-v2', 'firmware'];
+      return ['firmware-v6', 'firmware-v2', 'firmware'];
     }
     return ['firmware'];
   }
 
   if (deviceType === 'pro') {
-    return ['firmware-v5'];
+    return ['firmware-v6'];
   }
 
   return ['firmware'];

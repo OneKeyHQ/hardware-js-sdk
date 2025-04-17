@@ -25,7 +25,7 @@ import type {
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5';
+export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5' | 'firmware-v6';
 
 export type MessageVersion = 'latest' | 'v1';
 
@@ -106,7 +106,7 @@ export default class DataManager {
     const targetDeviceConfig = targetDeviceConfigList.filter(item =>
       forcedUpdateRes
         ? !!item.resource
-        : semver.gt(item.version.join('.'), currentVersion) && !!item.resource
+        : semver.gt(item.version.join('.'), currentVersion) && !!item.resource,
     );
 
     return findLatestRelease(targetDeviceConfig)?.resource;
@@ -144,7 +144,7 @@ export default class DataManager {
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     if (targetDeviceConfigList.length === 0) {
       throw new Error(
-        `Could not found bootloader resource with deviceType:${deviceType} firmwareUpdateField:${firmwareUpdateField}`
+        `Could not found bootloader resource with deviceType:${deviceType} firmwareUpdateField:${firmwareUpdateField}`,
       );
     }
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
@@ -177,7 +177,7 @@ export default class DataManager {
     }) as FirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(
-      item => !!item.bootloaderRelatedFirmwareVersion
+      item => !!item.bootloaderRelatedFirmwareVersion,
     );
 
     return targetDeviceConfig?.[0]?.bootloaderRelatedFirmwareVersion ?? undefined;
@@ -293,7 +293,7 @@ export default class DataManager {
         // because of iframe timeout is 10000
         {
           timeout: 7000,
-        }
+        },
       );
       this.deviceMap = {
         [EDeviceType.Classic]: data.classic,
