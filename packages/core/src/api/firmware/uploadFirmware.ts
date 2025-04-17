@@ -278,8 +278,8 @@ const emmcFileWriteWithRetry = async (
         await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
         await device.initialize();
       } else if (
-        error.message.indexOf(SESSION_ERROR) > -1 ||
-        error.response.data.indexOf(SESSION_ERROR) > -1
+        error?.message?.indexOf(SESSION_ERROR) > -1 ||
+        error?.response?.data?.indexOf(SESSION_ERROR) > -1
       ) {
         const deviceDiff = await device.deviceConnector?.enumerate();
         const devicesDescriptor = deviceDiff?.descriptors ?? [];
