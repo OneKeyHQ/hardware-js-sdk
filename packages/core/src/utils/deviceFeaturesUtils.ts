@@ -9,7 +9,7 @@ import DataManager, { FirmwareField, MessageVersion } from '../data-manager/Data
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
-import { getDeviceBootloaderVersion, getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 
 export const getSupportMessageVersion = (
   features: Features | undefined,
