@@ -22,7 +22,7 @@
   "dependencies": {
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",
-    "electron-log": "^5.1.5",
+    "electron-log": "^5.3.3",
     "electron-updater": "^6.2.1",
     "fs-extra": "^11.2.0",
     "node-fetch": "^2.6.7"
