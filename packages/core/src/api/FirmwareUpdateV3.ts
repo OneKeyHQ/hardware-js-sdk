@@ -228,8 +228,8 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     if (resourceBinary) {
       totalSize += resourceBinary.byteLength;
     }
-    for (const resource of fwBinaryMap) {
-      totalSize += resource.binary.byteLength;
+    for (const fwbinary of fwBinaryMap) {
+      totalSize += fwbinary.binary.byteLength;
     }
     if (bootloaderBinary) {
       totalSize += bootloaderBinary.byteLength;

@@ -136,7 +136,10 @@
   "message__search_device_and_connect_device": "Search device and connect device",
   "message__connection_type": "Connection Type",
   "message__use_webusb": "Use WebUSB",
-
+  "message__authorize_usb_device": "Authorize USB Device",
+  "action__authorize_device": "Authorize Device",
+  "title__authorize_usb_device": "Authorize USB Device",
+  "content__authorize_usb_device_description": "Please connect and authorize your USB device to continue",
   "message__check_latest_ui_resource": "Check latest Ui resource...",
   "message__download_latest_ui_resource": "Download latest Ui resource...",
   "message__download_latest_ui_resource_success": "Download latest Ui resource success",

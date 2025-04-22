@@ -306,9 +306,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       let progress: number;
       if (totalSize !== undefined && processedSize !== undefined) {
         currentFileProcessed = processedSize + chunkEnd;
-        progress = Math.floor((currentFileProcessed / totalSize) * 100);
+        progress = Math.min(Math.floor((currentFileProcessed / totalSize) * 100), 100);
       } else {
-        progress = Math.round(((i + 1) / totalChunks) * 100);
+        progress = Math.min(Math.round(((i + 1) / totalChunks) * 100), 100);
       }
 
       const writeRes = await this.emmcFileWriteWithRetry(
@@ -359,7 +359,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         }
         throw ERRORS.TypedError(
           HardwareErrorCode.EmmcFileWriteFirmwareError,
-          'emmc file write chunk once error'
+          'transfer data error'
         );
       }
       return writeRes;
@@ -374,10 +374,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         Log.error(`emmcWrite error: `, error);
         retryCount--;
         if (retryCount === 0) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.EmmcFileWriteFirmwareError,
-            'emmc file write firmware error'
-          );
+          throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, error);
         }
         const env = DataManager.getSettings('env');
         if (DataManager.isBleConnect(env)) {
