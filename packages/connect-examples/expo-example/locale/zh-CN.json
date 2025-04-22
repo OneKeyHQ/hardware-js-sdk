@@ -138,7 +138,10 @@
   "message__search_device_and_connect_device": "搜索设备并连接设备",
   "message__connection_type": "连接方式",
   "message__use_webusb": "使用 WebUSB",
-
+  "message__authorize_usb_device": "授权 USB 设备",
+  "action__authorize_device": "授权设备",
+  "title__authorize_usb_device": "授权 USB 设备",
+  "content__authorize_usb_device_description": "请连接并授权您的 USB 设备以继续",
   "message__check_latest_ui_resource": "检查最新 UI 资源...",
   "message__download_latest_ui_resource": "下载最新 UI 资源中...",
   "message__download_latest_ui_resource_success": "下载最新 UI 资源成功",
