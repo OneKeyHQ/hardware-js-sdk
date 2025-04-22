@@ -359,7 +359,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         }
         throw ERRORS.TypedError(
           HardwareErrorCode.EmmcFileWriteFirmwareError,
-          'emmc file write chunk once error'
+          'transfer data error'
         );
       }
       return writeRes;
@@ -376,7 +376,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         if (retryCount === 0) {
           throw ERRORS.TypedError(
             HardwareErrorCode.EmmcFileWriteFirmwareError,
-            'emmc file write firmware error'
+            'transfer data error'
           );
         }
         const env = DataManager.getSettings('env');

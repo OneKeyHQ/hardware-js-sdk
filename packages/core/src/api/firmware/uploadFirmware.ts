@@ -310,7 +310,7 @@ const emmcFileWriteWithRetry = async (
           throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
         }
       }
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write chunk once error');
+      throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, 'transfer data error');
     }
     return writeRes;
   };
@@ -324,7 +324,10 @@ const emmcFileWriteWithRetry = async (
       Log.error(`emmcWrite error: `, error);
       retryCount--;
       if (retryCount === 0) {
-        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          'transfer data error'
+        );
       }
       const env = DataManager.getSettings('env');
       if (DataManager.isBleConnect(env)) {

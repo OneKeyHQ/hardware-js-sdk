@@ -25,7 +25,7 @@ import type {
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v6';
+export type IFirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v6';
 
 export type MessageVersion = 'latest' | 'v1';
 
@@ -100,7 +100,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
     const targetDeviceConfig = targetDeviceConfigList.filter(item =>
@@ -125,7 +125,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.fullResource);
 
@@ -140,7 +140,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     if (targetDeviceConfigList.length === 0) {
       throw new Error(
@@ -159,7 +159,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
@@ -174,7 +174,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(
       item => !!item.bootloaderRelatedFirmwareVersion
@@ -192,7 +192,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     if (
@@ -214,7 +214,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     const target = findLatestRelease(targetDeviceConfigList);
