@@ -250,6 +250,21 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "tx_type": {
+          "type": "AptosTransactionType",
+          "id": 3,
+          "options": {
+            "default": "STANDARD"
+          }
+        }
+      },
+      "nested": {
+        "AptosTransactionType": {
+          "values": {
+            "STANDARD": 0,
+            "WITH_DATA": 1
+          }
         }
       }
     },
@@ -3569,6 +3584,13 @@
           "rule": "repeated",
           "type": "Path",
           "id": 2
+        },
+        "include_node": {
+          "type": "bool",
+          "id": 3,
+          "options": {
+            "default": false
+          }
         }
       },
       "nested": {
@@ -3592,6 +3614,15 @@
           "rule": "repeated",
           "type": "bytes",
           "id": 1
+        },
+        "hd_nodes": {
+          "rule": "repeated",
+          "type": "HDNodeType",
+          "id": 2
+        },
+        "root_fingerprint": {
+          "type": "uint32",
+          "id": 3
         }
       }
     },

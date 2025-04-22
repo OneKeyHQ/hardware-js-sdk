@@ -101,10 +101,16 @@ export type AptosAddress = {
   address?: string;
 };
 
+export enum AptosTransactionType {
+  STANDARD = 0,
+  WITH_DATA = 1,
+}
+
 // AptosSignTx
 export type AptosSignTx = {
   address_n: number[];
   raw_tx: string;
+  tx_type?: AptosTransactionType;
 };
 
 // AptosSignedTx
@@ -1389,11 +1395,14 @@ export type Path = {
 export type BatchGetPublickeys = {
   ecdsa_curve_name?: string;
   paths: Path[];
+  include_node?: boolean;
 };
 
 // EcdsaPublicKeys
 export type EcdsaPublicKeys = {
   public_keys: string[];
+  hd_nodes: HDNodeType[];
+  root_fingerprint?: number;
 };
 
 // DnxGetAddress

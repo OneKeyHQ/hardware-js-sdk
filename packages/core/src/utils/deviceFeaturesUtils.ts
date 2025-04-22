@@ -116,11 +116,25 @@ export const getPassphraseState = async (
   return message.address;
 };
 
-export const supportBatchPublicKey = (features?: Features): boolean => {
+export const supportBatchPublicKey = (
+  features?: Features,
+  options?: {
+    includeNode?: boolean;
+  }
+): boolean => {
   if (!features) return false;
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
 
   const deviceType = getDeviceType(features);
+  // btc batch get public key
+  if (!!options?.includeNode && deviceType === EDeviceType.Pro) {
+    return semver.gte(currentVersion, '4.14.0');
+  }
+  if (!!options?.includeNode && DeviceModelToTypes.model_classic1s.includes(deviceType)) {
+    return semver.gte(currentVersion, '3.12.0');
+  }
+
+  // support batch get public key
   if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
     return semver.gte(currentVersion, '3.1.0');
   }
