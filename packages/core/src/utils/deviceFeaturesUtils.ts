@@ -5,7 +5,7 @@ import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
 import type { Features, SupportFeatureType } from '../types';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
-import DataManager, { FirmwareField, MessageVersion } from '../data-manager/DataManager';
+import DataManager, { IFirmwareField, MessageVersion } from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
@@ -151,7 +151,7 @@ export const getFirmwareUpdateField = ({
   features: Features;
   updateType: 'firmware' | 'ble';
   targetVersion?: string;
-}): 'ble' | FirmwareField => {
+}): 'ble' | IFirmwareField => {
   const deviceType = getDeviceType(features);
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
   if (updateType === 'ble') {
