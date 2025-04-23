@@ -79,7 +79,7 @@ export default function HandleSDKEvents() {
       });
 
       const uiEventCallback = (message: CoreMessage) => {
-        console.log('TopLEVEL EVENT (Api Payload)===>>>>: ', message);
+        // console.log('TopLEVEL EVENT (Api Payload)===>>>>: ', message);
         if (message.type === UI_REQUEST.REQUEST_PIN) {
           if (supportInputPinOnSoftware(message.payload.device.features).support) {
             setShowPinInput(true);
@@ -113,19 +113,19 @@ export default function HandleSDKEvents() {
       // });
 
       SDK.on(FIRMWARE_EVENT, (message: CoreMessage) => {
-        console.log('example get firmware event: ', message);
+        // console.log('example get firmware event: ', message);
       });
 
       SDK.on(DEVICE.FEATURES, (message: CoreMessage) => {
-        console.log('example get features event: ', message);
+        // console.log('example get features event: ', message);
       });
 
       SDK.on(DEVICE.CONNECT, (message: CoreMessage) => {
-        console.log('example get connect event: ', message);
+        // console.log('example get connect event: ', message);
       });
 
       SDK.on(DEVICE.DISCONNECT, (message: CoreMessage) => {
-        console.log('example get disconnect event: ', message);
+        // console.log('example get disconnect event: ', message);
       });
 
       registerListener = true;

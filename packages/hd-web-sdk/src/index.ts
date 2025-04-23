@@ -126,7 +126,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         const message = parseMessage(messageEvent);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
-            Log.debug('Host Bridge Receive message: ', message);
+            // Log.debug('Host Bridge Receive message: ', message);
           } else {
             Log.debug('Host Bridge Receive message: ', message);
           }
@@ -134,7 +134,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         const response = await handleMessage(message);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
-            Log.debug('Host Bridge response: ', message);
+            // Log.debug('Host Bridge response: ', message);
           } else {
             Log.debug('Host Bridge response: ', message);
           }

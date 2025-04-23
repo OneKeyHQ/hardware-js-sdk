@@ -6,12 +6,14 @@ import {
   BleErrorCode,
   Characteristic,
   ScanMode,
-} from '@onekeyfe/react-native-ble-plx';
+  BleATTErrorCode,
+  BleError,
+} from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
 import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-transport';
 import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type EventEmitter from 'events';
-import { initializeBleManager, getConnectedDeviceIds, getBondedDevices } from './BleManager';
+import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
   isOnekeyDevice,
@@ -43,10 +45,44 @@ const tryToGetConfiguration = (device: Device) => {
   return infos;
 };
 
+type IOBleErrorRemap = Error | BleError | null | undefined;
+
+function remapError(error: IOBleErrorRemap) {
+  if (error instanceof BleError) {
+    if (
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
+      error.iosErrorCode === BleATTErrorCode.UnlikelyError ||
+      error.reason === 'Peer removed pairing information'
+    ) {
+      throw ERRORS.TypedError(HardwareErrorCode.BlePeerRemovedPairingInformation);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore It's not documented but seems to match a refusal on Android pairing
+    if (error?.attErrorCode === 22) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleDeviceBondError);
+    }
+  }
+
+  if (
+    error instanceof Error &&
+    error.message &&
+    (error.message.includes('was disconnected') || error.message.includes('not found'))
+  ) {
+    throw ERRORS.TypedError(HardwareErrorCode.BleDeviceDisconnected);
+  }
+
+  // @ts-expect-error
+  throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.reason ?? error);
+}
+
 export default class ReactNativeBleTransport {
   blePlxManager: BlePlxManager | undefined;
 
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
+
+  name = 'ReactNativeBleTransport';
 
   configured = false;
 
@@ -82,7 +118,6 @@ export default class ReactNativeBleTransport {
   getPlxManager(): Promise<BlePlxManager> {
     if (this.blePlxManager) return Promise.resolve(this.blePlxManager);
     this.blePlxManager = new BlePlxManager();
-    initializeBleManager();
     return Promise.resolve(this.blePlxManager);
   }
 
@@ -218,6 +253,14 @@ export default class ReactNativeBleTransport {
       throw error;
     }
 
+    // check device is bonded
+    if (Platform.OS === 'android') {
+      const bondState = await pairDevice(uuid);
+      if (bondState.bonding) {
+        await onDeviceBondState(uuid);
+      }
+    }
+
     if (!device) {
       const devices = await blePlxManager.devices([uuid]);
       [device] = devices;
@@ -247,7 +290,7 @@ export default class ReactNativeBleTransport {
           this.Log.debug('device already connected');
           throw ERRORS.TypedError(HardwareErrorCode.BleAlreadyConnected);
         } else {
-          throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
+          remapError(e);
         }
       }
     }
@@ -282,17 +325,8 @@ export default class ReactNativeBleTransport {
             }
           }
         } else {
-          throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.reason ?? e);
+          remapError(e);
         }
-      }
-    }
-
-    // check device is bonded
-    if (Platform.OS === 'android') {
-      const bondedDevices = await getBondedDevices();
-      const hasBonded = !!bondedDevices.find(bondedDevice => bondedDevice.id === device?.id);
-      if (!hasBonded) {
-        throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded, 'device is not bonded');
       }
     }
 
@@ -492,6 +526,10 @@ export default class ReactNativeBleTransport {
     return Promise.resolve(true);
   }
 
+  async post(session: string, name: string, data: Record<string, unknown>) {
+    await this.call(session, name, data);
+  }
+
   async call(uuid: string, name: string, data: Record<string, unknown>) {
     if (this.stopped) {
       // eslint-disable-next-line prefer-promise-reject-errors
@@ -501,7 +539,10 @@ export default class ReactNativeBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    if (this.runPromise) {
+    const forceRun = name === 'Initialize' || name === 'Cancel';
+
+    this.Log.debug('transport-react-native call this.runPromise', this.runPromise);
+    if (this.runPromise && !forceRun) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
 
@@ -617,7 +658,7 @@ export default class ReactNativeBleTransport {
   }
 
   cancel() {
-    this.Log.debug('transport-react-native canceled');
+    this.Log.debug('transport-react-native transport cancel');
     if (this.runPromise) {
       // this.runPromise.reject(new Error('Transport_CallCanceled'));
     }

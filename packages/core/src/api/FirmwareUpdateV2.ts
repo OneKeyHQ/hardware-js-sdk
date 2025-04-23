@@ -302,6 +302,9 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         }
       }
 
+      // check if the device commands has been disposed
+      this.device?.commands?.checkDisposed();
+
       // auto go to bootloader mode
       try {
         this.postTipMessage('AutoRebootToBootloader');
@@ -320,6 +323,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;
         this.checkPromise = null;
+
+        // check if the device commands has been disposed
+        this.device?.commands?.checkDisposed();
+
         /**
          * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
          */
@@ -361,6 +368,9 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
+
+    // check if the device commands has been disposed
+    this.device?.commands?.checkDisposed();
 
     await this.device.acquire();
 

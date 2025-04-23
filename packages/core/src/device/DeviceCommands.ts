@@ -2,9 +2,16 @@ import type { Transport, Messages, FailureType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
-import { patchFeatures, getLogger, LoggerNames } from '../utils';
+import { patchFeatures, getLogger, LoggerNames, getDeviceType } from '../utils';
 import type { Device } from './Device';
 import { DEVICE } from '../events';
+import { DeviceModelToTypes } from '../types';
+
+export type PassphrasePromptResponse = {
+  passphrase?: string;
+  passphraseOnDevice?: boolean;
+  cache?: boolean;
+};
 
 type MessageType = Messages.MessageType;
 type MessageKey = keyof MessageType;
@@ -17,12 +24,6 @@ type TypedCallResponseMap = {
 };
 export type DefaultMessageResponse = TypedCallResponseMap[keyof MessageType];
 
-export type PassphrasePromptResponse = {
-  passphrase?: string;
-  passphraseOnDevice?: boolean;
-  cache?: boolean;
-};
-
 const assertType = (res: DefaultMessageResponse, resType: string | string[]) => {
   const splitResTypes = Array.isArray(resType) ? resType : resType.split('|');
   if (!splitResTypes.includes(res.type)) {
@@ -33,8 +34,90 @@ const assertType = (res: DefaultMessageResponse, resType: string | string[]) => 
   }
 };
 
+export const cancelDeviceInPrompt = (device: Device, expectResponse = true) => {
+  const session = device.hasDeviceAcquire() ? device.mainId : undefined;
+
+  if (!session) {
+    // device disconnected or acquired by someone else
+    return Promise.resolve({
+      success: false,
+      error: HardwareErrorCode.RuntimeError,
+      payload: {
+        message: 'Device disconnected or acquired by someone else',
+      },
+    } as const);
+  }
+
+  const transport = device.commands?.transport;
+
+  if (expectResponse) {
+    return transport
+      ?.call(session, 'Cancel', {})
+      .then(() => ({
+        success: true,
+        error: null,
+        payload: {
+          message: 'Cancel request sent',
+        },
+      }))
+      .catch((error: HardwareError) => ({
+        success: false,
+        error: error.errorCode,
+        payload: {
+          message: error.message,
+        },
+      }));
+  }
+
+  return transport?.post(session, 'Cancel', {}).then(() => ({
+    success: true,
+    error: HardwareErrorCode.RuntimeError,
+    payload: {
+      message: 'Cancel request sent',
+    },
+  }));
+};
+
+export const cancelDeviceWithInitialize = (device: Device) => {
+  const session = device.hasDeviceAcquire() ? device.mainId : undefined;
+
+  if (!session) {
+    // device disconnected or acquired by someone else
+    return Promise.resolve({
+      success: false,
+      error: HardwareErrorCode.RuntimeError,
+      payload: {
+        message: 'Device disconnected or acquired by someone else',
+      },
+    } as const);
+  }
+
+  const transport = device.commands?.transport;
+
+  return transport
+    ?.call(session, 'Initialize', {})
+    .then(() => ({
+      success: true,
+      error: null,
+      payload: {
+        message: 'Cancel request sent',
+      },
+    }))
+    .catch((error: HardwareError) => ({
+      success: false,
+      error: error.errorCode,
+      payload: {
+        message: error.message,
+      },
+    }));
+};
+
 const Log = getLogger(LoggerNames.DeviceCommands);
 
+/**
+ * The life cycle begins with the acquisition of the device and ends with the disposal device commands
+ * acquire device -> create DeviceCommands -> release device -> dispose DeviceCommands
+ */
 export class DeviceCommands {
   device: Device;
 
@@ -46,8 +129,6 @@ export class DeviceCommands {
 
   callPromise?: Promise<DefaultMessageResponse>;
 
-  _cancelableRequest?: (error?: any) => void;
-
   constructor(device: Device, mainId: string) {
     this.device = device;
     this.mainId = mainId;
@@ -55,13 +136,73 @@ export class DeviceCommands {
     this.disposed = false;
   }
 
-  async dispose(cancelRequest: boolean) {
+  async dispose(_cancelRequest: boolean) {
     this.disposed = true;
-    if (cancelRequest && this._cancelableRequest) {
-      this._cancelableRequest();
-    }
-    this._cancelableRequest = undefined;
     await this.transport.cancel?.();
+  }
+
+  checkDisposed() {
+    if (this.disposed) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'DeviceCommands already disposed');
+    }
+  }
+
+  // on device input pin or passphrase, cancel the request with initialize
+  async cancelDeviceOnOneKeyDevice() {
+    const { name } = this.transport;
+    if (name === 'HttpTransport') {
+      /**
+       * Bridge throws "other call in progress" error.
+       * as workaround takeover transportSession (acquire) before sending Cancel, this will resolve previous pending call.
+       */
+      try {
+        await this.device.acquire();
+        await cancelDeviceWithInitialize(this.device);
+      } catch {
+        // ignore whatever happens
+      }
+    } else {
+      return cancelDeviceWithInitialize(this.device);
+    }
+  }
+
+  async cancelDevice() {
+    const { name } = this.transport;
+    if (name === 'HttpTransport') {
+      /**
+       * Bridge throws "other call in progress" error.
+       * as workaround takeover transportSession (acquire) before sending Cancel, this will resolve previous pending call.
+       */
+      try {
+        await this.device.acquire();
+        await cancelDeviceInPrompt(this.device, false);
+      } catch {
+        // ignore whatever happens
+      }
+    } else {
+      return cancelDeviceInPrompt(this.device, false);
+    }
+  }
+
+  async cancel() {
+    if (this.disposed) {
+      return;
+    }
+    this.dispose(true);
+    if (this.callPromise) {
+      try {
+        await Promise.all([
+          new Promise((_resolve, reject) =>
+            // eslint-disable-next-line no-promise-executor-return
+            setTimeout(() => reject(new Error('cancel timeout')), 10 * 1000)
+          ),
+          await this.callPromise,
+        ]);
+      } catch {
+        // device error
+        this.callPromise = undefined;
+      }
+    }
   }
 
   // Sends an async message to the opened device.
@@ -199,6 +340,7 @@ export class DeviceCommands {
       // ignore
     }
 
+    this.device.clearCancelableAction();
     if (res.type === 'Failure') {
       const { code, message } = res.message as {
         code?: string | FailureType;
@@ -261,6 +403,12 @@ export class DeviceCommands {
     }
 
     if (res.type === 'ButtonRequest') {
+      const deviceType = getDeviceType(this.device.features);
+      if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+        this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
+      } else {
+        this.device.setCancelableAction(() => this.cancelDevice());
+      }
       if (res.message.code === 'ButtonRequest_PassphraseEntry') {
         this.device.emit(DEVICE.PASSPHRASE_ON_DEVICE, this.device);
       } else {
@@ -277,11 +425,15 @@ export class DeviceCommands {
       return this._promptPin(res.message.type).then(
         pin => {
           if (pin === '@@ONEKEY_INPUT_PIN_IN_DEVICE') {
-            return this._commonCall('BixinPinInputOnDevice');
+            // only classic\1s\mini\pure
+            this.device.setCancelableAction(() => this.cancelDeviceOnOneKeyDevice());
+            return this._commonCall('BixinPinInputOnDevice').finally(() => {
+              this.device.clearCancelableAction();
+            });
           }
           return this._commonCall('PinMatrixAck', { pin });
         },
-        () => this._commonCall('Cancel', {})
+        error => Promise.reject(error)
       );
     }
 
@@ -308,12 +460,31 @@ export class DeviceCommands {
 
   _promptPin(type?: Messages.PinMatrixRequestType) {
     return new Promise<string>((resolve, reject) => {
+      const cancelAndReject = (_error?: Error) =>
+        cancelDeviceInPrompt(this.device, false)
+          .then(onCancel => {
+            const error = ERRORS.TypedError(
+              HardwareErrorCode.ActionCancelled,
+              `${DEVICE.PIN} canceled`
+            );
+            // onCancel not void
+            if (onCancel) {
+              const { payload } = onCancel || {};
+              reject(error || new Error(payload?.message));
+            } else {
+              reject(error);
+            }
+          })
+          .catch(error => {
+            reject(error);
+          });
+
       if (this.device.listenerCount(DEVICE.PIN) > 0) {
-        this._cancelableRequest = reject;
+        this.device.setCancelableAction(cancelAndReject);
         this.device.emit(DEVICE.PIN, this.device, type, (err, pin) => {
-          this._cancelableRequest = undefined;
+          this.device.clearCancelableAction();
           if (err) {
-            reject(err);
+            cancelAndReject(err);
           } else {
             resolve(pin);
           }
@@ -332,15 +503,34 @@ export class DeviceCommands {
 
   _promptPassphrase() {
     return new Promise<PassphrasePromptResponse>((resolve, reject) => {
+      const cancelAndReject = (_error?: Error) =>
+        cancelDeviceInPrompt(this.device, false)
+          .then(onCancel => {
+            const error = ERRORS.TypedError(
+              HardwareErrorCode.ActionCancelled,
+              `${DEVICE.PASSPHRASE} canceled`
+            );
+            // onCancel not void
+            if (onCancel) {
+              const { payload } = onCancel || {};
+              reject(error || new Error(payload?.message));
+            } else {
+              reject(error);
+            }
+          })
+          .catch(error => {
+            reject(error);
+          });
+
       if (this.device.listenerCount(DEVICE.PASSPHRASE) > 0) {
-        this._cancelableRequest = reject;
+        this.device.setCancelableAction(cancelAndReject);
         this.device.emit(
           DEVICE.PASSPHRASE,
           this.device,
           (response: PassphrasePromptResponse, error?: Error) => {
-            this._cancelableRequest = undefined;
+            this.device.clearCancelableAction();
             if (error) {
-              reject(error);
+              cancelAndReject(error);
             } else {
               resolve(response);
             }

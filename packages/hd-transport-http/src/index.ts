@@ -15,6 +15,8 @@ type IncompleteRequestOptions = {
 export default class HttpTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  name = 'HttpTransport';
+
   configured = false;
 
   stopped = false;

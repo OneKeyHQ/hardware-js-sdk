@@ -115,7 +115,7 @@ export abstract class BaseMethod<Params = undefined> {
 
   setDevice(device: Device) {
     this.device = device;
-    this.connectId = device.originalDescriptor.path;
+    // this.connectId = device.originalDescriptor.path;
   }
 
   checkFirmwareRelease() {

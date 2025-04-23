@@ -1,4 +1,4 @@
-export type { BleManager as BlePlxManager } from '@onekeyfe/react-native-ble-plx';
+export type { BleManager as BlePlxManager } from 'react-native-ble-plx';
 
 export type TransportOptions = {
   scanTimeout?: number;

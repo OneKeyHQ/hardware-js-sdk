@@ -200,7 +200,7 @@ const api: PlaygroundProps[] = [
           coin: 'btc',
           inputs: [
             {
-              prev_index: 0,
+              prev_index: 60000,
               prev_hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
               amount: '150000',
               address_n: [2147483697, 2147483648, 2147483648, 0, 0],
@@ -231,6 +231,14 @@ const api: PlaygroundProps[] = [
                   sequence: 4294967295,
                 },
               ],
+              // bin_outputs: [
+              //   { amount: 150000, script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87' },
+              //   {
+              //     amount: 116300,
+              //     script_pubkey:
+              //       '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
+              //   },
+              // ],
               bin_outputs: [
                 { amount: 150000, script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87' },
                 {
@@ -238,6 +246,10 @@ const api: PlaygroundProps[] = [
                   script_pubkey:
                     '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
                 },
+                ...Array.from({ length: 80_000 }, (_, i) => ({
+                  amount: '100000000',
+                  script_pubkey: `76a914${i.toString(16).padStart(40, '0')}88ac`, // P2PKH 脚本
+                })),
               ],
               lock_time: 0,
             },

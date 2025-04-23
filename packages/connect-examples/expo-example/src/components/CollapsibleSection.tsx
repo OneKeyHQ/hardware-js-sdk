@@ -26,6 +26,7 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, c
       <Stack
         backgroundColor="$bgApp"
         height="$16"
+        paddingHorizontal="$2"
         onPress={() => setIsCollapsed(!isCollapsed)}
         flexDirection="row"
         justifyContent="space-between"
