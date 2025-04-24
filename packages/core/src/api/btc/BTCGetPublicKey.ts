@@ -66,7 +66,7 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   }
 
   async run() {
-    const responses: BTCPublicKey[] = [];
+    let responses: BTCPublicKey[] = [];
 
     try {
       const existsShowDisplay = this.params.some(param => param.show_display);
@@ -111,9 +111,10 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
           xpubSegwit,
         });
       }
-
-      return responses;
     } catch (error) {
+      // clear responses
+      responses = [];
+
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
 
