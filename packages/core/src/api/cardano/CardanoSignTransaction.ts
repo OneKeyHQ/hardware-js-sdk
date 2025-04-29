@@ -228,6 +228,9 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
     touch: {
       min: '4.10.0',
     },
+    classic: {
+      min: '3.10.0',
+    },
   });
 
   checkSupportConway = () => {
