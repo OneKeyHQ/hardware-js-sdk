@@ -45,6 +45,9 @@ export default class AptosSignTransaction extends BaseMethod<HardwareAptosSignTx
       model_classic1s: {
         min: '3.12.0',
       },
+      classic: {
+        min: '3.10.0',
+      },
     };
   }
 

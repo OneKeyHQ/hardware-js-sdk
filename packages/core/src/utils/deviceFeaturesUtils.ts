@@ -133,6 +133,9 @@ export const supportBatchPublicKey = (
   if (!!options?.includeNode && DeviceModelToTypes.model_classic1s.includes(deviceType)) {
     return semver.gte(currentVersion, '3.12.0');
   }
+  if (!!options?.includeNode && deviceType === EDeviceType.Classic) {
+    return semver.gte(currentVersion, '3.10.0');
+  }
 
   // support batch get public key
   if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
