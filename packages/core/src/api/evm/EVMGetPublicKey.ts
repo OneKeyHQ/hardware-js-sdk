@@ -19,7 +19,9 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
-    this.useBatch = !!this.payload?.useBatch;
+    this.useBatch = this.payload?.bundle?.every(
+      (item: EVMGetPublicKeyParams) => item.showOnOneKey !== true
+    );
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
     // check payload
@@ -74,7 +76,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
         publicKey,
       }));
 
-      validateResult(responses, ['pub'], {
+      validateResult(result, ['pub'], {
         expectedLength: this.params.length,
       });
       return Promise.resolve(result);
