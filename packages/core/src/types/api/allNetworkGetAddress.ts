@@ -36,7 +36,7 @@ export type INetwork =
   | 'neo';
 
 export type CommonResponseParams = {
-  path: string;
+  path: string | number[];
   network: INetwork;
   chainName?: string;
   prefix?: string;

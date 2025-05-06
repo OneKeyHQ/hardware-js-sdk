@@ -248,7 +248,7 @@ const api: PlaygroundProps[] = [
         },
       },
       {
-        title: 'Batch Bitcoin Get Address',
+        title: 'Batch Bitcoin Variant Get Address',
         value: {
           bundle: [
             {
@@ -318,6 +318,30 @@ const api: PlaygroundProps[] = [
               path: "m/44'/3'/0'/0/0",
               showOnOneKey: false,
             },
+          ],
+        },
+      },
+      {
+        title: 'Batch Bitcoin Get Address',
+        value: {
+          bundle: [
+            ...Array.from({ length: 10 }, (_, i) => ({
+              network: 'btc',
+              path: `m/44'/0'/0'/0/${i}`,
+              showOnOneKey: false,
+            })),
+          ],
+        },
+      },
+      {
+        title: 'Batch Ethereum Get Address',
+        value: {
+          bundle: [
+            ...Array.from({ length: 10 }, (_, i) => ({
+              network: 'evm',
+              path: `m/44'/60'/0'/0/${i}`,
+              showOnOneKey: false,
+            })),
           ],
         },
       },
