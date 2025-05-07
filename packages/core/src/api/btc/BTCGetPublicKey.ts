@@ -89,7 +89,7 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
 
         const path = serializedPath(param.address_n);
 
-        const xpub = createExtendedPublicKey(node, param.script_type);
+        const xpub = createExtendedPublicKey(node, param.coin_name, param.script_type);
 
         const rootFingerprint = res.message.root_fingerprint;
 

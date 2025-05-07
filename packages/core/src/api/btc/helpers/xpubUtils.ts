@@ -11,18 +11,31 @@ const VERSION_BYTES = {
   ZPUB: 0x04b24746,
 };
 
-function getVersionBytes(scriptType?: InputScriptType): number {
-  switch (scriptType) {
-    case 'SPENDADDRESS':
-    case 'SPENDMULTISIG':
-      return VERSION_BYTES.XPUB;
-    case 'SPENDP2SHWITNESS':
-      return VERSION_BYTES.YPUB;
-    case 'SPENDWITNESS':
-      return VERSION_BYTES.ZPUB;
-    default:
-      return VERSION_BYTES.XPUB;
+function getVersionBytes(coinName: string, scriptType?: InputScriptType): number {
+  if (coinName.toLowerCase() === 'bitcoin') {
+    switch (scriptType) {
+      case 'SPENDADDRESS':
+      case 'SPENDMULTISIG':
+        return VERSION_BYTES.XPUB;
+      case 'SPENDP2SHWITNESS':
+        return VERSION_BYTES.YPUB;
+      case 'SPENDWITNESS':
+        return VERSION_BYTES.ZPUB;
+      default:
+        return VERSION_BYTES.XPUB;
+    }
+  } else if (coinName.toLowerCase() === 'testnet') {
+    return 0x043587cf;
+  } else if (coinName.toLowerCase() === 'regtest') {
+    return 0x043587cf;
+  } else if (coinName.toLowerCase() === 'litecoin') {
+    return 0x019da462;
+  } else if (coinName.toLowerCase() === 'dogecoin') {
+    return 0x02facafd;
+  } else if (coinName.toLowerCase() === 'dash') {
+    return 0x02fe52cc;
   }
+  return VERSION_BYTES.XPUB;
 }
 
 function base58Check(data: Buffer): string {
@@ -53,6 +66,7 @@ function base58Check(data: Buffer): string {
 }
 
 function generateExtendedPublicKey(
+  coinName: string,
   depth: number,
   fingerprint: number,
   childNum: number,
@@ -60,7 +74,7 @@ function generateExtendedPublicKey(
   publicKey: string,
   scriptType?: InputScriptType
 ): string {
-  const versionBytes = getVersionBytes(scriptType);
+  const versionBytes = getVersionBytes(coinName, scriptType);
 
   const buffer = Buffer.alloc(78);
   buffer.writeUInt32BE(versionBytes, 0);
@@ -73,8 +87,13 @@ function generateExtendedPublicKey(
   return base58Check(buffer);
 }
 
-export function createExtendedPublicKey(node: HDNodeType, scriptType?: InputScriptType): string {
+export function createExtendedPublicKey(
+  node: HDNodeType,
+  coinName: string,
+  scriptType?: InputScriptType
+): string {
   return generateExtendedPublicKey(
+    coinName,
     node.depth,
     node.fingerprint,
     node.child_num,

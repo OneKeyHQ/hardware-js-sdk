@@ -61,8 +61,9 @@ export default class XrpGetAddress extends BaseMethod<
       const res = await batchGetPublickeys(this.device, this.params, 'secp256k1', 144);
       const result = res.message.public_keys.map((publicKey: string, index: number) => ({
         path: serializedPath((this.params as unknown as any[])[index].address_n),
-        publicKey,
         address: deriveAddress(publicKey),
+        publicKey,
+        pub: publicKey,
       }));
 
       validateResult(result, ['address', 'publicKey'], {
