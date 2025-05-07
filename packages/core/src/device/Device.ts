@@ -570,7 +570,7 @@ export class Device extends EventEmitter {
     }
   }
 
-  setCancelableAction(callback: NonNullable<typeof this.cancelableAction>) {
+  setCancelableAction(callback: (err?: Error) => Promise<unknown>) {
     this.cancelableAction = (e?: Error) =>
       callback(e)
         .catch(e2 => {

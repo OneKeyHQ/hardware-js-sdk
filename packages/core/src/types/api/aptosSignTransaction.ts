@@ -1,17 +1,15 @@
-import {
-  AptosSignedTx as HardwareAptosSignedTx,
-  AptosTransactionType,
-} from '@onekeyfe/hd-transport';
+import { AptosSignedTx as HardwareAptosSignedTx } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
+import { PROTO } from '../../constants';
 
 export type AptosSignedTx = {
   path: string;
 } & HardwareAptosSignedTx;
 
 export type AptosSignTransactionParams = {
-  path: string | number[];
+  path: string;
   rawTx?: string;
-  transactionType?: AptosTransactionType;
+  transactionType?: PROTO.AptosTransactionType;
 };
 
 export declare function aptosSignTransaction(
