@@ -3,10 +3,8 @@ import {
   Deferred,
   EDeviceType,
   ERRORS,
-  HardwareError,
   HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
-import { OneKeyRebootType } from '@onekeyfe/hd-transport';
 import semver from 'semver';
 import { UI_REQUEST } from '../constants/ui-request';
 import { validateParams } from './helpers/paramsValidator';
@@ -15,7 +13,6 @@ import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
 import {
   getDeviceType,
-  getDeviceUUID,
   wait,
   getLogger,
   LoggerNames,
@@ -23,7 +20,6 @@ import {
   getDeviceBootloaderVersion,
 } from '../utils';
 import { createUiMessage, FirmwareUpdateTipMessage } from '../events/ui-request';
-import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
 
 import type { KnownDevice, Features } from '../types';

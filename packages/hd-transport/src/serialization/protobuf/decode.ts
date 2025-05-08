@@ -63,6 +63,7 @@ function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['
     else if (field.resolvedType && 'fields' in field.resolvedType) {
       res[key] = messageToJSON(value, field.resolvedType.fields);
     } else if (field.resolvedType === null) {
+      // TODO: for lastest message protocol,multi layer organization. key words: "ok_dev_info_resp"
       res[key] = null;
     } else {
       throw new Error(`case not handled: ${key}`);

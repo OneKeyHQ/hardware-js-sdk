@@ -241,9 +241,14 @@ const newTouchUpdateProcess = async (
           try {
             await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
             const typedCall = device.getCommands().typedCall.bind(device.getCommands());
-            await typedCall('StartSession', 'Features', {
-              ok_dev_info_req: cherryPickFeaturesParams({ factory: true, normal: true }),
-            });
+            await Promise.race([
+              typedCall('StartSession', 'Features', {}),
+              new Promise((_, reject) => {
+                setTimeout(() => {
+                  reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
+                }, 3000);
+              }),
+            ]);
           } catch (e) {
             // ignore error because of device is not connected
             Log.log('catch Bluetooth error when device is restarting: ', e);

@@ -123,11 +123,10 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (semver.lt(bootloaderVersion, MIN_UPDATE_V3_BOOTLOADER_VERSION)) {
-      // throw ERRORS.TypedError(
-      //   HardwareErrorCode.RuntimeError,
-      //   'bootloader version needs to be updated'
-      // );
-      console.log(bootloaderVersion);
+      throw ERRORS.TypedError(
+        HardwareErrorCode.RuntimeError,
+        'bootloader version needs to be updated'
+      );
     }
   }
 

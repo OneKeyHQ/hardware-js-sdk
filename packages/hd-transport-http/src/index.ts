@@ -57,7 +57,7 @@ export default class HttpTransport {
   }
 
   configure(signedData: any) {
-    console.error('caikaisheng configure!!!!!!!');
+    this.Log.debug('http-transport configure');
     const messages = parseConfigure(signedData);
     this.configured = true;
     this._messages = messages;
@@ -114,7 +114,6 @@ export default class HttpTransport {
       this.Log.debug('call-', ' name: ', name, ' data: ', data);
     }
 
-    console.error('caikaisheng call', name, data);
     const o = buildOne(messages, name, data);
     const outData = o.toString('hex');
     const resData = await this._post({
@@ -126,7 +125,6 @@ export default class HttpTransport {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
     const jsonData = receiveOne(messages, resData);
-    console.error('caikaisheng call resData', jsonData);
     return check.call(jsonData);
   }
 

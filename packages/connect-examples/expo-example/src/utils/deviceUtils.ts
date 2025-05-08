@@ -106,7 +106,6 @@ export function getDeviceInfo(features: Features | undefined, onekeyFeatures: an
     ...features,
     ...onekeyFeatures,
   };
-  console.error('caikaisheng _features', _features);
   const {
     deviceType,
     serialNumber,
@@ -114,11 +113,10 @@ export function getDeviceInfo(features: Features | undefined, onekeyFeatures: an
     bootloaderVersion,
     boardloaderVersion,
     firmwareVersion,
-  } = getDeviceBasicInfo(_features as Features);
+  } = getDeviceBasicInfo(_features);
 
-  const { firmwareHash, bootloaderHash, boardloaderHash, bleHash } = getFirmwareInfoFromFeatures(
-    _features as Features
-  );
+  const { firmwareHash, bootloaderHash, boardloaderHash, bleHash } =
+    getFirmwareInfoFromFeatures(_features);
 
   const {
     se01Version,
@@ -129,7 +127,7 @@ export function getDeviceInfo(features: Features | undefined, onekeyFeatures: an
     se03Hash,
     se04Version,
     se04Hash,
-  } = getSeInfoFromFeatures(_features as Features);
+  } = getSeInfoFromFeatures(_features);
 
   return {
     deviceType,
