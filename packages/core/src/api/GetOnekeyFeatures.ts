@@ -1,7 +1,8 @@
-import semver from 'semver';
+import { Features, MessageKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../constants/ui-request';
-import { fixVersion } from '../utils/deviceFeaturesUtils';
+import { getSupportMessageVersion } from '../utils/deviceFeaturesUtils';
 import { BaseMethod } from './BaseMethod';
+import { cherryPickFeaturesParams } from '../device/utils';
 
 export default class GetOnekeyFeatures extends BaseMethod {
   init() {
@@ -15,9 +16,19 @@ export default class GetOnekeyFeatures extends BaseMethod {
   }
 
   async run() {
-    const { message } = await this.device.commands.typedCall('OnekeyGetFeatures', 'OnekeyFeatures');
-    if (!!message.onekey_firmware_version && !semver.valid(message.onekey_firmware_version)) {
-      message.onekey_firmware_version = fixVersion(message.onekey_firmware_version);
+    const { messageVersion } = getSupportMessageVersion(this.device.features);
+    let message: Features;
+    if (messageVersion === 'latest') {
+      const v2Res = await this.device.commands.typedCall('GetFeatures', 'Features', {
+        ok_dev_info_req: cherryPickFeaturesParams({ factory: true, normal: true }),
+      });
+      message = v2Res.message;
+    } else {
+      const v1Res = (await this.device.commands.typedCall(
+        'OnekeyGetFeatures' as MessageKey,
+        'OnekeyFeatures' as MessageKey
+      )) as any;
+      message = v1Res.message;
     }
     return Promise.resolve(message);
   }

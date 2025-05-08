@@ -45,9 +45,9 @@ function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['
         res[key] = value.map((v: any) => transform(field, v));
       }
       // [compatibility]: keep array enums as array of numbers.
-      else if ('valuesById' in field.resolvedType!) {
+      else if (field.resolvedType && 'valuesById' in field.resolvedType) {
         res[key] = value;
-      } else if ('fields' in field.resolvedType!) {
+      } else if (field.resolvedType && 'fields' in field.resolvedType) {
         res[key] = value.map((v: any) => messageToJSON(v, (field.resolvedType as Type).fields));
       } else {
         throw new Error(`case not handled for repeated key: ${key}`);
@@ -56,12 +56,14 @@ function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['
       res[key] = transform(field, value);
     }
     // enum type
-    else if ('valuesById' in field.resolvedType!) {
+    else if (field.resolvedType && 'valuesById' in field.resolvedType) {
       res[key] = field.resolvedType.valuesById[value];
     }
     // message type
-    else if (field.resolvedType!.fields) {
-      res[key] = messageToJSON(value, field.resolvedType!.fields);
+    else if (field.resolvedType && 'fields' in field.resolvedType) {
+      res[key] = messageToJSON(value, field.resolvedType.fields);
+    } else if (field.resolvedType === null) {
+      res[key] = null;
     } else {
       throw new Error(`case not handled: ${key}`);
     }

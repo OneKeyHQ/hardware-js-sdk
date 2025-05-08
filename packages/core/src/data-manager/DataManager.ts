@@ -3,6 +3,7 @@ import semver from 'semver';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
+import MessagesLegacyV2JSON from '../data/messages/messages_legacy_v2.json';
 import {
   getTimeStamp,
   getDeviceBLEFirmwareVersion,
@@ -27,7 +28,7 @@ import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../uti
 
 export type IFirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v6';
 
-export type MessageVersion = 'latest' | 'v1';
+export type MessageVersion = 'latest' | 'v1' | 'v2';
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap = {
@@ -64,6 +65,7 @@ export default class DataManager {
   static messages: { [version in MessageVersion]: JSON } = {
     latest: MessagesJSON as unknown as JSON,
     v1: MessagesLegacyV1JSON as unknown as JSON,
+    v2: MessagesLegacyV2JSON as unknown as JSON,
   };
 
   static lastCheckTimestamp = 0;

@@ -4828,7 +4828,7 @@
         "PromptTemporarily": 2
       }
     },
-    "Initialize": {
+    "StartSession": {
       "fields": {
         "session_id": {
           "type": "bytes",
@@ -9232,7 +9232,7 @@
         "(has_bitcoin_only_values)": true
       },
       "values": {
-        "MessageType_Initialize": 0,
+        "MessageType_StartSession": 0,
         "MessageType_Ping": 1,
         "MessageType_Success": 2,
         "MessageType_Failure": 3,

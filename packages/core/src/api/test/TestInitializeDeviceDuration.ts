@@ -1,4 +1,5 @@
 import { UI_REQUEST } from '../../constants/ui-request';
+import { getSupportMessageVersion } from '../../utils/deviceFeaturesUtils';
 import { BaseMethod } from '../BaseMethod';
 
 export default class TestInitializeDeviceDuration extends BaseMethod {
@@ -14,7 +15,7 @@ export default class TestInitializeDeviceDuration extends BaseMethod {
 
   async run() {
     const beginTime = Date.now();
-    await this.device.commands.typedCall('Initialize', 'Features');
+    await this.device.commands.typedCall('StartSession', 'Features', {});
     const endTime = Date.now();
     const duration = endTime - beginTime;
     return Promise.resolve(duration);

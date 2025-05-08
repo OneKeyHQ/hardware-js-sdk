@@ -21,6 +21,7 @@ const FIELD_TYPES = {
   sint64: 'number',
   bool: 'boolean',
   bytes: 'string',
+  float: 'number',
   // 'bytes': 'Uint8Array | number[] | Buffer | string', // protobuf will handle conversion
 };
 

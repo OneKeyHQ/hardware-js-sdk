@@ -7,7 +7,7 @@ const {
 
 const json = {
   nested: {
-    Initialize: {
+    StartSession: {
       fields: {
         session_id: {
           type: 'bytes',
@@ -51,7 +51,7 @@ const json = {
     },
     MessageType: {
       values: {
-        MessageType_Initialize: 0,
+        MessageType_StartSession: 0,
       },
     },
   },
@@ -60,7 +60,7 @@ const json = {
 describe('messages', () => {
   test('createMessageFromName (common case)', () => {
     const messages = parseConfigure(json);
-    const name = 'Initialize';
+    const name = 'StartSession';
 
     expect(() => createMessageFromName(messages, name)).not.toThrow();
   });

@@ -123,10 +123,11 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     if (semver.lt(bootloaderVersion, MIN_UPDATE_V3_BOOTLOADER_VERSION)) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.RuntimeError,
-        'bootloader version needs to be updated'
-      );
+      // throw ERRORS.TypedError(
+      //   HardwareErrorCode.RuntimeError,
+      //   'bootloader version needs to be updated'
+      // );
+      console.log(bootloaderVersion);
     }
   }
 
@@ -280,7 +281,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.ConfirmOnDevice);
       await this.startEmmcFirmwareUpdate({
-        path: '0:updates',
+        path: '0:updates/firmware.bin',
       });
     } catch (error) {
       console.error('triggerFirmwareUpdateEmmc error: ', error);
@@ -384,7 +385,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             );
             const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
             await Promise.race([
-              typedCall('Initialize', 'Features', {}),
+              typedCall('StartSession', 'Features', {}),
               new Promise((_, reject) => {
                 setTimeout(() => {
                   reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));

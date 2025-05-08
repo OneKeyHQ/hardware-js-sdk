@@ -24,6 +24,7 @@ import { DeviceModelToTypes, KnownDevice } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
 import { DataManager } from '../../data-manager';
 import { DevicePool } from '../../device/DevicePool';
+import { cherryPickFeaturesParams } from '../../device/utils';
 
 const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
@@ -240,14 +241,9 @@ const newTouchUpdateProcess = async (
           try {
             await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
             const typedCall = device.getCommands().typedCall.bind(device.getCommands());
-            await Promise.race([
-              typedCall('Initialize', 'Features', {}),
-              new Promise((_, reject) => {
-                setTimeout(() => {
-                  reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
-                }, 3000);
-              }),
-            ]);
+            await typedCall('StartSession', 'Features', {
+              ok_dev_info_req: cherryPickFeaturesParams({ factory: true, normal: true }),
+            });
           } catch (e) {
             // ignore error because of device is not connected
             Log.log('catch Bluetooth error when device is restarting: ', e);

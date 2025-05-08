@@ -6,6 +6,7 @@ import {
   HardwareError,
   HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
+import { OneKeyRebootType } from '@onekeyfe/hd-transport';
 import type { KnownDevice } from '../../types';
 
 import {
@@ -23,6 +24,7 @@ import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 import { PROTO } from '../../constants';
+import { getSupportMessageVersion } from '../../utils/deviceFeaturesUtils';
 
 const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
@@ -82,7 +84,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     );
   };
 
-  private async _promptDeviceInBootloaderForWebDevice() {
+  async _promptDeviceInBootloaderForWebDevice() {
     return new Promise((resolve, reject) => {
       if (this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0) {
         this.device.emit(
@@ -179,7 +181,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     }, 30000);
   }
 
-  private async _checkDeviceInBootloaderMode(
+  async _checkDeviceInBootloaderMode(
     connectId: string | undefined,
     intervalTimer?: ReturnType<typeof setInterval>,
     timeoutTimer?: ReturnType<typeof setTimeout>
@@ -202,18 +204,66 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     return false;
   }
 
-  async enterBootloaderMode() {
+  async reboot(rebootType: OneKeyRebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const { messageVersion } = getSupportMessageVersion(this.device.features);
+    // TODO: fix it
+    if (messageVersion === 'latest') {
+      try {
+        return await typedCall('OneKeyReboot', 'Success', {
+          reboot_type: rebootType,
+        });
+      } catch (e) {
+        Log.error('FirmwareUpdateBaseMethod [reboot] OneKeyReboot failed: ', e);
+        return {
+          type: 'Success',
+          message: 'reboot success',
+        };
+      }
+    }
+
+    switch (rebootType) {
+      case OneKeyRebootType.BootLoader:
+        return typedCall('DeviceBackToBoot', 'Success', {
+          reboot_type: OneKeyRebootType.BootLoader,
+        });
+      // On Touch devices, messsage code 904 is RebootToBoardloader
+      // so BininOutMessageSE message code 904 is used here
+      case OneKeyRebootType.Boardloader:
+        return typedCall('BixinOutMessageSE', 'Success');
+      case OneKeyRebootType.Normal: {
+        try {
+          return await typedCall('OneKeyReboot', 'Success', {
+            reboot_type: OneKeyRebootType.Normal,
+          });
+        } catch (e) {
+          Log.error('FirmwareUpdateBaseMethod [reboot] OneKeyReboot failed: ', e);
+          return {
+            type: 'Success',
+            message: 'reboot success',
+          };
+        }
+      }
+      default:
+        throw new Error('Invalid reboot type');
+    }
+  }
+
+  async enterBootloaderMode() {
     if (this.device.features && !this.device.features.bootloader_mode) {
       const uuid = getDeviceUUID(this.device.features);
       const deviceType = getDeviceType(this.device.features);
       // auto go to bootloader mode
       try {
         this.postTipMessage(FirmwareUpdateTipMessage.AutoRebootToBootloader);
-        const bootRes = await typedCall('DeviceBackToBoot', 'Success');
-        // @ts-expect-error
-        if (bootRes.type === 'CallMethodError') {
-          throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
+        try {
+          // TODO: fix it
+          const bootRes = await this.reboot(OneKeyRebootType.BootLoader);
+          if (bootRes.type === 'CallMethodError') {
+            throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure);
+          }
+        } catch (e) {
+          Log.error('FirmwareUpdateBaseMethod [enterBootloaderMode] OneKeyReboot failed: ', e);
         }
         this.postTipMessage(FirmwareUpdateTipMessage.GoToBootloaderSuccess);
         this.checkDeviceToBootloader(this.payload.connectId);
@@ -225,6 +275,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;
         this.checkPromise = null;
+
+        // check if the device commands has been disposed
+        this.device?.commands?.checkDisposed();
         /**
          * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
          */

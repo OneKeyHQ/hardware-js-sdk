@@ -1,8 +1,8 @@
-import { RebootToBootloader } from '@onekeyfe/hd-transport';
-import { BaseMethod } from '../BaseMethod';
+import { OneKeyRebootType, RebootToBootloader } from '@onekeyfe/hd-transport';
+import { FirmwareUpdateBaseMethod } from '../firmware/FirmwareUpdateBaseMethod';
 
 // Reboot BootLoader
-export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloader> {
+export default class DeviceRebootToBootloader extends FirmwareUpdateBaseMethod<RebootToBootloader> {
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
@@ -20,7 +20,7 @@ export default class DeviceRebootToBootloader extends BaseMethod<RebootToBootloa
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('RebootToBootloader', 'Success');
+    const res = await this.reboot(OneKeyRebootType.BootLoader);
 
     return Promise.resolve(res.message);
   }

@@ -153,7 +153,6 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
 
       try {
         const onekeyFeatures = await SDK.getOnekeyFeatures(connectId);
-        // @ts-expect-error
         setRunningOneKeyDeviceFeatures?.(onekeyFeatures.payload);
       } catch (error) {
         // ignore

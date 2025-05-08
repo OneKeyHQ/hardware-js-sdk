@@ -91,9 +91,9 @@ const MultisigRedeemScriptType = {
 
 const fixtures = [
   {
-    name: 'Initialize',
+    name: 'StartSession',
     message: {
-      Initialize: {
+      StartSession: {
         fields: {
           session_id: {
             type: 'bytes',

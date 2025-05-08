@@ -78,7 +78,8 @@ export type Device = KnownDevice;
 
 export type Features = PROTO.Features;
 
-export type OnekeyFeatures = PROTO.OnekeyFeatures;
+// TODO: 打补丁
+export type OnekeyFeatures = PROTO.Features;
 
 export type IDeviceType =
   | EDeviceType.Unknown

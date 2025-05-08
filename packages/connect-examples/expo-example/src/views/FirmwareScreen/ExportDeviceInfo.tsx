@@ -1,11 +1,12 @@
 import { useIntl } from 'react-intl';
+import type { Features } from '@onekeyfe/hd-core';
 import { Button } from '../../components/ui/Button';
 import { downloadFile } from '../../utils/downloadUtils';
 import { useDeviceFieldContext } from './DeviceFieldContext';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 
 export const deviceInfoKeys = [
-  //   ['device_id', 'label'],
+  ['device_id', 'label'],
   ['onekey_device_type', 'onekey_serial_no', 'onekey_se_type'],
   ['onekey_board_version', 'onekey_board_hash', 'onekey_board_build_id'],
   ['onekey_boot_version', 'onekey_boot_hash', 'onekey_boot_build_id', 'onekey_boot_url'],
@@ -25,16 +26,40 @@ export const deviceInfoKeys = [
 ];
 
 export const deviceSEInfoKeys = [
-  ['onekey_se01_version', 'onekey_se01_hash', 'onekey_se01_build_id', 'onekey_se01_state'],
+  [
+    'onekey_se01_version',
+    'onekey_se01_hash',
+    'onekey_se01_build_id',
+    'onekey_se01_state',
+    'onekey_se01_type',
+  ],
   ['onekey_se01_boot_version', 'onekey_se01_boot_hash', 'onekey_se01_boot_build_id'],
 
-  ['onekey_se02_version', 'onekey_se02_hash', 'onekey_se02_build_id', 'onekey_se02_state'],
+  [
+    'onekey_se02_version',
+    'onekey_se02_hash',
+    'onekey_se02_build_id',
+    'onekey_se02_state',
+    'onekey_se02_type',
+  ],
   ['onekey_se02_boot_version', 'onekey_se02_boot_hash', 'onekey_se02_boot_build_id'],
 
-  ['onekey_se03_version', 'onekey_se03_hash', 'onekey_se03_build_id', 'onekey_se03_state'],
+  [
+    'onekey_se03_version',
+    'onekey_se03_hash',
+    'onekey_se03_build_id',
+    'onekey_se03_state',
+    'onekey_se03_type',
+  ],
   ['onekey_se03_boot_version', 'onekey_se03_boot_hash', 'onekey_se03_boot_build_id'],
 
-  ['onekey_se04_version', 'onekey_se04_hash', 'onekey_se04_build_id', 'onekey_se04_state'],
+  [
+    'onekey_se04_version',
+    'onekey_se04_hash',
+    'onekey_se04_build_id',
+    'onekey_se04_state',
+    'onekey_se04_type',
+  ],
   ['onekey_se04_boot_version', 'onekey_se04_boot_hash', 'onekey_se04_boot_build_id'],
 ];
 
@@ -54,9 +79,9 @@ export function formatCurrentTime(timestamp: number) {
 
 export function ExportDeviceInfo() {
   const intl = useIntl();
-  const { features, onekeyFeatures } = useDeviceFieldContext();
+  const { features } = useDeviceFieldContext();
 
-  const getFieldValue = (field: string) => onekeyFeatures?.[field] ?? features?.[field] ?? '';
+  const getFieldValue = (field: keyof Features) => features?.[field] ?? '';
 
   const exportInfo = () => {
     const markdown = [];
@@ -68,7 +93,7 @@ export function ExportDeviceInfo() {
       bootloaderVersion,
       boardloaderVersion,
       firmwareVersion,
-    } = getDeviceBasicInfo(features, onekeyFeatures);
+    } = getDeviceBasicInfo(features);
 
     const bootloaderMode = intl.formatMessage({
       id:
@@ -106,7 +131,7 @@ export function ExportDeviceInfo() {
     // markdown.push(`| --- | --- |`);
     deviceInfoKeys.forEach(keys => {
       keys.forEach(key => {
-        const value = getFieldValue(key);
+        const value = getFieldValue(key as keyof Features);
         markdown.push(`${key}:    ${value}`);
       });
       markdown.push(``);
@@ -119,7 +144,7 @@ export function ExportDeviceInfo() {
     // markdown.push(`| --- | --- |`);
     deviceSEInfoKeys.forEach(keys => {
       keys.forEach(key => {
-        const value = getFieldValue(key);
+        const value = getFieldValue(key as keyof Features);
         markdown.push(`${key}:    ${value}`);
       });
       markdown.push(``);

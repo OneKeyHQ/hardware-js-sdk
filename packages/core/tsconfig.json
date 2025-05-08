@@ -7,5 +7,5 @@
       "web-bluetooth"
     ]
   },
-  "include": ["./src",]
+  "include": ["./src", "../shared/src/onekeyInfoUtils.ts",]
 }

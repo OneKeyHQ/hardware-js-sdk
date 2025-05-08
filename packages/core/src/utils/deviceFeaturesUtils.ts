@@ -20,9 +20,18 @@ export const getSupportMessageVersion = (
       messageVersion: 'latest',
     };
 
+  if (features?.ok_dev_info_resp?.protocol_version) {
+    return {
+      messages: DataManager.messages.latest,
+      messageVersion: 'latest',
+    };
+  }
+
   const currentDeviceVersion = getDeviceFirmwareVersion(features).join('.');
   const deviceType = getDeviceType(features);
 
+  console.error('caikaisheng currentDeviceVersion', currentDeviceVersion);
+  console.error('caikaisheng deviceType', deviceType);
   const deviceVersionConfigs =
     PROTOBUF_MESSAGE_CONFIG[deviceType] ||
     (DeviceTypeToModels[deviceType] &&
@@ -238,7 +247,8 @@ export const getFirmwareUpdateFieldArray = (
   return ['firmware'];
 };
 
-export function fixVersion(version: string) {
+export function fixVersion(version: string | undefined) {
+  if (!version) return '0.0.0';
   let parts = version.split('.');
 
   while (parts.length < 3) {
@@ -254,12 +264,17 @@ export const fixFeaturesFirmwareVersion = (features: Features): Features => {
   // fix Touch、Pro device when bootloader version is lower than 2.5.2, the features returned do not have firmware_version error
   const tempFeatures = { ...features };
 
-  if (tempFeatures.onekey_firmware_version && !semver.valid(tempFeatures.onekey_firmware_version)) {
-    tempFeatures.onekey_firmware_version = fixVersion(tempFeatures.onekey_firmware_version);
+  if (
+    (tempFeatures as any).onekey_firmware_version &&
+    !semver.valid((tempFeatures as any).onekey_firmware_version)
+  ) {
+    (tempFeatures as any).onekey_firmware_version = fixVersion(
+      (tempFeatures as any).onekey_firmware_version
+    );
   }
 
-  if (tempFeatures.onekey_version && !semver.valid(tempFeatures.onekey_version)) {
-    tempFeatures.onekey_version = fixVersion(tempFeatures.onekey_version);
+  if ((tempFeatures as any).onekey_version && !semver.valid((tempFeatures as any).onekey_version)) {
+    (tempFeatures as any).onekey_version = fixVersion((tempFeatures as any).onekey_version);
   }
 
   return tempFeatures;

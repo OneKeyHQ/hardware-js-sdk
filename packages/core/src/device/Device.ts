@@ -21,6 +21,7 @@ import {
 import {
   fixFeaturesFirmwareVersion,
   getPassphraseStateWithRefreshDeviceInfo,
+  getSupportMessageVersion,
 } from '../utils/deviceFeaturesUtils';
 
 import type DeviceConnector from './DeviceConnector';
@@ -37,6 +38,7 @@ import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload, UI_REQUEST }
 import { PROTO } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
+import { cherryPickFeaturesParams } from './utils';
 
 export type InitOptions = {
   initSession?: boolean;
@@ -48,6 +50,11 @@ export type InitOptions = {
 export type RunOptions = {
   keepSession?: boolean;
 } & InitOptions;
+
+export interface IFeaturesType {
+  factory?: boolean;
+  normal?: boolean;
+}
 
 const parseRunOptions = (options?: RunOptions): RunOptions => {
   if (!options) options = {};
@@ -362,6 +369,7 @@ export class Device extends EventEmitter {
 
   async initialize(options?: InitOptions) {
     Log.debug('initialize param:', options);
+    console.error('======> StartSession', options);
 
     this.passphraseState = options?.passphraseState;
 
@@ -382,9 +390,14 @@ export class Device extends EventEmitter {
     Log.debug('initialize payload:', payload);
 
     try {
+      const { messageVersion } = getSupportMessageVersion(this.features);
+      console.error('caikaisheng messageVersion', messageVersion);
       // @ts-expect-error
       const { message } = await Promise.race([
-        this.commands.typedCall('Initialize', 'Features', payload),
+        this.commands.typedCall('StartSession', 'Features', {
+          ...payload,
+          ok_dev_info_req: cherryPickFeaturesParams({ factory: true }),
+        }),
         new Promise((_, reject) => {
           setTimeout(() => {
             reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
@@ -392,6 +405,7 @@ export class Device extends EventEmitter {
           }, 25 * 1000);
         }),
       ]);
+      console.error('caikaisheng message', message);
 
       this._updateFeatures(message, options?.initSession);
       await TransportManager.reconfigure(this.features);
@@ -402,11 +416,13 @@ export class Device extends EventEmitter {
   }
 
   async getFeatures() {
-    const { message } = await this.commands.typedCall('GetFeatures', 'Features', {});
+    const { message } = await this.commands.typedCall('GetFeatures', 'Features', {
+      ok_dev_info_req: cherryPickFeaturesParams({ factory: true, normal: true }),
+    });
     this._updateFeatures(message);
   }
 
-  _updateFeatures(feat: Features, initSession?: boolean) {
+  _updateFeatures(feat: any, initSession?: boolean) {
     // GetFeatures doesn't return 'session_id'
     if (this.features && this.features.session_id && !feat.session_id) {
       feat.session_id = this.features.session_id;
@@ -415,6 +431,7 @@ export class Device extends EventEmitter {
       this.setInternalState(feat.session_id, initSession);
     }
     feat.unlocked = feat.unlocked ?? true;
+    feat.initialized = feat?.ok_dev_info_resp?.status?.init_states ?? feat?.initialized;
 
     feat = fixFeaturesFirmwareVersion(feat);
 

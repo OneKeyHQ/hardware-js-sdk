@@ -399,15 +399,23 @@ function FirmwareUpdate({
 
   const [showUpdateDialog, setShowUpdateDialog] = useState<boolean>(false);
 
+  const _features = {
+    ...(features || {}),
+    ...(onekeyFeatures || {}),
+  };
   const {
     deviceType,
     serialNumber,
     bleVersion,
     bootloaderVersion,
     boardloaderVersion,
+    boardloaderBuildId,
+    bootloaderBuildId,
+    firmwareBuildId,
+    bleBuildId,
     firmwareVersion,
-  } = getDeviceBasicInfo(features, onekeyFeatures);
-  const deviceTypeLowerCase = deviceType.toLowerCase();
+  } = getDeviceBasicInfo(_features as Features);
+  const deviceTypeLowerCase = deviceType?.toLowerCase() || '';
 
   const loadOnekeyFeatures = useCallback(() => {
     if (!sdk) return;
@@ -670,19 +678,19 @@ function FirmwareUpdate({
                 />
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_boardloader_version' })}
-                  value={boardloaderVersion}
+                  value={`${boardloaderVersion}-${boardloaderBuildId}`}
                 />
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_bootloader_version' })}
-                  value={bootloaderVersion}
+                  value={`${bootloaderVersion}-${bootloaderBuildId}`}
                 />
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_firmware_version' })}
-                  value={firmwareVersion}
+                  value={`${firmwareVersion}-${firmwareBuildId}`}
                 />
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_bluetooth_version' })}
-                  value={bleVersion}
+                  value={`${bleVersion}-${bleBuildId}`}
                 />
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_device_statue' })}

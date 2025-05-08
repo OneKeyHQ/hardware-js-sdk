@@ -1,8 +1,9 @@
-import { BaseMethod } from '../BaseMethod';
+import { OneKeyRebootType } from '@onekeyfe/hd-transport';
 import type { RebootToBoardloaderParams } from '../../types/api/deviceRebootToBoardloader';
+import { FirmwareUpdateBaseMethod } from '../firmware/FirmwareUpdateBaseMethod';
 
 // Reboot BoardLoader
-export default class DeviceRebootToBoardloader extends BaseMethod<RebootToBoardloaderParams> {
+export default class DeviceRebootToBoardloader extends FirmwareUpdateBaseMethod<RebootToBoardloaderParams> {
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
@@ -20,10 +21,7 @@ export default class DeviceRebootToBoardloader extends BaseMethod<RebootToBoardl
   }
 
   async run() {
-    // On Touch devices, messsage code 904 is RebootToBoardloader
-    // so BininOutMessageSE message code 904 is used here
-    const res = await this.device.commands.typedCall('BixinOutMessageSE', 'Success');
-
+    const res = await this.reboot(OneKeyRebootType.Boardloader);
     return Promise.resolve(res.message);
   }
 }

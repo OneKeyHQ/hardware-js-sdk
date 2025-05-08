@@ -155,7 +155,7 @@ export interface CardanoCVoteRegistrationParameters {
   stakingPath: string | number[];
   paymentAddressParameters: CardanoAddressParameters;
   nonce: string;
-  format?: PROTO.CardanoCVoteRegistrationFormat;
+  format?: PROTO.CardanoGovernanceRegistrationFormat;
   delegations?: CardanoCVoteRegistrationDelegation[];
   votingPurpose?: number;
   paymentAddress?: string;

@@ -1,5 +1,9 @@
 import { isEmpty } from 'lodash';
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import {
+  getFirmwareInfoFromFeatures,
+  getHardwareInfoFromFeatures,
+  EDeviceType,
+} from '@onekeyfe/hd-shared';
 import { DeviceModelToTypes } from '../types';
 
 import type { Features, IDeviceModel, IDeviceType, IVersionRange } from '../types';
@@ -12,19 +16,21 @@ export const getDeviceType = (features?: Features): IDeviceType => {
     return EDeviceType.Unknown;
   }
 
+  const { deviceType } = getHardwareInfoFromFeatures(features);
+
   // classic1s 3.5.0 pro 4.6.0
-  switch (features.onekey_device_type) {
-    case 'CLASSIC':
+  switch (deviceType) {
+    case EDeviceType.Classic:
       return EDeviceType.Classic;
-    case 'CLASSIC1S':
+    case EDeviceType.Classic1s:
       return EDeviceType.Classic1s;
-    case 'MINI':
+    case EDeviceType.Mini:
       return EDeviceType.Mini;
-    case 'TOUCH':
+    case EDeviceType.Touch:
       return EDeviceType.Touch;
-    case 'PRO':
+    case EDeviceType.Pro:
       return EDeviceType.Pro;
-    case 'PURE':
+    case EDeviceType.ClassicPure:
       return EDeviceType.ClassicPure;
     default:
       // future And old device onekey_device_type is empty
@@ -80,17 +86,17 @@ export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
  * Get Connected Device ble name by features
  * @returns
  */
-export const getDeviceBleName = (features?: Features): string | null => {
-  if (features == null) return null;
-  return features.onekey_ble_name || features.ble_name || null;
+export const getDeviceBleName = (features: Features): string => {
+  const { bleName } = getFirmwareInfoFromFeatures(features);
+  return bleName;
 };
 
 /**
  * Get Connected Device UUID by features
  */
 export const getDeviceUUID = (features: Features) => {
-  const serialNo = features.onekey_serial_no || features.onekey_serial || features.serial_no;
-  return serialNo ?? '';
+  const { serialNumber } = getHardwareInfoFromFeatures(features);
+  return serialNumber;
 };
 
 /**

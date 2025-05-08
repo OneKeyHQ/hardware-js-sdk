@@ -1,6 +1,6 @@
 import { createContext, useMemo, useState } from 'react';
 
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
+import type { Features } from '@onekeyfe/hd-transport';
 import type { TestCaseDataWithKey } from '../types';
 
 export const TestRunnerContext = createContext<{
@@ -13,8 +13,8 @@ export const TestRunnerContext = createContext<{
   runningDeviceFeatures?: Features;
   setRunningDeviceFeatures?: React.Dispatch<React.SetStateAction<Features>>;
 
-  runningOneKeyDeviceFeatures?: OnekeyFeatures;
-  setRunningOneKeyDeviceFeatures?: React.Dispatch<React.SetStateAction<OnekeyFeatures>>;
+  runningOneKeyDeviceFeatures?: any;
+  setRunningOneKeyDeviceFeatures?: React.Dispatch<React.SetStateAction<any>>;
 
   timestampBeginTest?: number;
   setTimestampBeginTest?: React.Dispatch<React.SetStateAction<number>>;
@@ -37,7 +37,7 @@ export function TestRunnerProvider({ children }: { children: React.ReactNode }) 
   const [runnerTestCaseTitle, setRunnerTestCaseTitle] = useState<string>();
   const [runnerDone, setRunnerDone] = useState<boolean>();
   const [runningDeviceFeatures, setRunningDeviceFeatures] = useState<Features>();
-  const [runningOneKeyDeviceFeatures, setRunningOneKeyDeviceFeatures] = useState<OnekeyFeatures>();
+  const [runningOneKeyDeviceFeatures, setRunningOneKeyDeviceFeatures] = useState<any>();
   const [timestampBeginTest, setTimestampBeginTest] = useState<number>();
   const [timestampEndTest, setTimestampEndTest] = useState<number>();
 

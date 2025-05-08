@@ -139,6 +139,25 @@ export type AptosMessageSignature = {
   address: string;
 };
 
+// BenchmarkListNames
+export type BenchmarkListNames = {};
+
+// BenchmarkNames
+export type BenchmarkNames = {
+  names: string[];
+};
+
+// BenchmarkRun
+export type BenchmarkRun = {
+  name?: string;
+};
+
+// BenchmarkResult
+export type BenchmarkResult = {
+  value?: string;
+  unit?: string;
+};
+
 // BenfenGetAddress
 export type BenfenGetAddress = {
   address_n: number[];
@@ -214,24 +233,24 @@ export type BinancePublicKey = {
 // BinanceSignTx
 export type BinanceSignTx = {
   address_n: number[];
-  msg_count?: number;
-  account_number?: number;
+  msg_count: number;
+  account_number: number;
   chain_id?: string;
   memo?: string;
-  sequence?: number;
-  source?: number;
+  sequence: number;
+  source: number;
 };
 
 // BinanceTxRequest
 export type BinanceTxRequest = {};
 
 export type BinanceCoin = {
-  amount?: UintType;
-  denom?: string;
+  amount: UintType;
+  denom: string;
 };
 
 export type BinanceInputOutput = {
-  address?: string;
+  address: string;
   coins: BinanceCoin[];
 };
 
@@ -264,13 +283,13 @@ export enum BinanceTimeInForce {
 // BinanceOrderMsg
 export type BinanceOrderMsg = {
   id?: string;
-  ordertype?: BinanceOrderType;
-  price?: number;
-  quantity?: number;
+  ordertype: BinanceOrderType;
+  price: number;
+  quantity: number;
   sender?: string;
-  side?: BinanceOrderSide;
+  side: BinanceOrderSide;
   symbol?: string;
-  timeinforce?: BinanceTimeInForce;
+  timeinforce: BinanceTimeInForce;
 };
 
 // BinanceCancelMsg
@@ -358,6 +377,7 @@ export type PublicKey = {
   node: HDNodeType;
   xpub: string;
   root_fingerprint?: number;
+  descriptor?: string;
 };
 
 // GetAddress
@@ -373,6 +393,7 @@ export type GetAddress = {
 // Address
 export type Address = {
   address: string;
+  mac?: string;
 };
 
 // GetOwnershipId
@@ -412,6 +433,14 @@ export type VerifyMessage = {
   coin_name?: string;
 };
 
+export type CoinJoinRequest = {
+  fee_rate: number;
+  no_fee_threshold: number;
+  min_registrable_amount: number;
+  mask_public_key: string;
+  signature: string;
+};
+
 // SignTx
 export type SignTx = {
   outputs_count: number;
@@ -426,6 +455,8 @@ export type SignTx = {
   branch_id?: number;
   amount_unit?: AmountUnit;
   decred_staking_ticket?: boolean;
+  serialize?: boolean;
+  coinjoin_request?: CoinJoinRequest;
 };
 
 export enum Enum_RequestType {
@@ -436,6 +467,7 @@ export enum Enum_RequestType {
   TXEXTRADATA = 4,
   TXORIGINPUT = 5,
   TXORIGOUTPUT = 6,
+  TXPAYMENTREQ = 7,
 }
 export type RequestType = keyof typeof Enum_RequestType;
 
@@ -574,6 +606,37 @@ export type PrevOutput = {
   decred_script_version?: number;
 };
 
+export type TextMemo = {
+  text: string;
+};
+
+export type RefundMemo = {
+  address: string;
+  mac: string;
+};
+
+export type CoinPurchaseMemo = {
+  coin_type: number;
+  amount: UintType;
+  address: string;
+  mac: string;
+};
+
+export type PaymentRequestMemo = {
+  text_memo?: TextMemo;
+  refund_memo?: RefundMemo;
+  coin_purchase_memo?: CoinPurchaseMemo;
+};
+
+// TxAckPaymentRequest
+export type TxAckPaymentRequest = {
+  nonce?: string;
+  recipient_name: string;
+  memos?: PaymentRequestMemo[];
+  amount?: UintType;
+  signature: string;
+};
+
 // TxAck
 
 // TxAck replacement
@@ -682,8 +745,9 @@ export type OwnershipProof = {
 // AuthorizeCoinJoin
 export type AuthorizeCoinJoin = {
   coordinator: string;
-  max_total_fee: number;
-  fee_per_anonymity?: number;
+  max_rounds: number;
+  max_coordinator_fee_rate: number;
+  max_fee_per_kvbyte: number;
   address_n: number[];
   coin_name?: string;
   script_type?: InputScriptType;
@@ -720,8 +784,120 @@ export type SignedPsbt = {
   psbt: string;
 };
 
+// BixinPinInputOnDevice
+export type BixinPinInputOnDevice = {};
+
+// ApplySettingsBixin
+export type ApplySettingsBixin = {
+  use_ble?: boolean;
+  use_se?: boolean;
+  is_bixinapp?: boolean;
+  fastpay_pin?: boolean;
+  fastpay_confirm?: boolean;
+  fastpay_money_limit?: number;
+  fastpay_times?: number;
+};
+
+export enum SeedRequestType {
+  SeedRequestType_Gen = 0,
+  SeedRequestType_EncExport = 1,
+  SeedRequestType_EncImport = 2,
+}
+
+// BixinSeedOperate
+export type BixinSeedOperate = {
+  type: SeedRequestType;
+  seed_importData?: string;
+};
+
+// BixinMessageSE
+export type BixinMessageSE = {
+  inputmessage: string;
+};
+
+// BixinOutMessageSE
+export type BixinOutMessageSE = {
+  outmessage?: string;
+};
+
+// BixinReboot
+export type BixinReboot = {};
+
+// DeviceBackToBoot
+export type DeviceBackToBoot = {};
+
+// BixinBackupRequest
+export type BixinBackupRequest = {};
+
+// BixinBackupAck
+export type BixinBackupAck = {
+  data: string;
+};
+
+// BixinRestoreRequest
+export type BixinRestoreRequest = {
+  data: string;
+  language?: string;
+  label?: string;
+  passphrase_protection?: boolean;
+};
+
+// BixinRestoreAck
+export type BixinRestoreAck = {
+  data: string;
+};
+
+// BixinVerifyDeviceRequest
+export type BixinVerifyDeviceRequest = {
+  data: string;
+};
+
+// BixinVerifyDeviceAck
+export type BixinVerifyDeviceAck = {
+  cert: string;
+  signature: string;
+};
+
+export enum WL_OperationType {
+  WL_OperationType_Add = 0,
+  WL_OperationType_Delete = 1,
+  WL_OperationType_Inquire = 2,
+}
+
+// BixinWhiteListRequest
+export type BixinWhiteListRequest = {
+  type: WL_OperationType;
+  addr_in?: string;
+};
+
+// BixinWhiteListAck
+export type BixinWhiteListAck = {
+  address: string[];
+};
+
+// BixinLoadDevice
+export type BixinLoadDevice = {
+  mnemonics: string;
+  language?: string;
+  label?: string;
+  skip_checksum?: boolean;
+};
+
+// BixinBackupDevice
+export type BixinBackupDevice = {};
+
+// BixinBackupDeviceAck
+export type BixinBackupDeviceAck = {
+  mnemonics: string;
+};
+
 // FirmwareErase
 export type FirmwareErase = {
+  length?: number;
+};
+
+// FirmwareErase_ex
+export type FirmwareErase_ex = {
   length?: number;
 };
 
@@ -740,22 +916,6 @@ export type FirmwareUpload = {
 // SelfTest
 export type SelfTest = {
   payload?: string;
-};
-
-// FirmwareErase_ex
-export type FirmwareErase_ex = {
-  length?: number;
-};
-
-export enum RebootType {
-  Normal = 0,
-  Boardloader = 1,
-  BootLoader = 2,
-}
-
-// Reboot
-export type Reboot = {
-  reboot_type: RebootType;
 };
 
 // FirmwareUpdateEmmc
@@ -829,10 +989,10 @@ export enum CardanoPoolRelayType {
 
 export enum CardanoTxAuxiliaryDataSupplementType {
   NONE = 0,
-  CVOTE_REGISTRATION_SIGNATURE = 1,
+  GOVERNANCE_REGISTRATION_SIGNATURE = 1,
 }
 
-export enum CardanoCVoteRegistrationFormat {
+export enum CardanoGovernanceRegistrationFormat {
   CIP15 = 0,
   CIP36 = 1,
 }
@@ -1048,27 +1208,27 @@ export type CardanoTxWithdrawal = {
   key_hash?: string;
 };
 
-// CardanoCVoteRegistrationDelegation
-export type CardanoCVoteRegistrationDelegation = {
-  vote_public_key: string;
+// CardanoGovernanceRegistrationDelegation
+export type CardanoGovernanceRegistrationDelegation = {
+  voting_public_key: string;
   weight: number;
 };
 
-// CardanoCVoteRegistrationParametersType
-export type CardanoCVoteRegistrationParametersType = {
-  vote_public_key?: string;
+// CardanoGovernanceRegistrationParametersType
+export type CardanoGovernanceRegistrationParametersType = {
+  voting_public_key?: string;
   staking_path: number[];
-  payment_address_parameters?: CardanoAddressParametersType;
+  payment_address_parameters: CardanoAddressParametersType;
   nonce: number;
-  format?: CardanoCVoteRegistrationFormat;
-  delegations: CardanoCVoteRegistrationDelegation[];
+  format?: CardanoGovernanceRegistrationFormat;
+  delegations: CardanoGovernanceRegistrationDelegation[];
   voting_purpose?: number;
   payment_address?: string;
 };
 
 // CardanoTxAuxiliaryData
 export type CardanoTxAuxiliaryData = {
-  cvote_registration_parameters?: CardanoCVoteRegistrationParametersType;
+  governance_registration_parameters?: CardanoGovernanceRegistrationParametersType;
   hash?: string;
 };
 
@@ -1102,7 +1262,7 @@ export type CardanoTxItemAck = {};
 export type CardanoTxAuxiliaryDataSupplement = {
   type: CardanoTxAuxiliaryDataSupplementType;
   auxiliary_data_hash?: string;
-  cvote_registration_signature?: string;
+  governance_signature?: string;
 };
 
 // CardanoTxWitnessRequest
@@ -1164,6 +1324,7 @@ export enum FailureType {
   Failure_PinMismatch = 12,
   Failure_WipeCodeMismatch = 13,
   Failure_InvalidSession = 14,
+  Failure_BatteryLow = 30,
   Failure_FirmwareError = 99,
 }
 
@@ -1201,6 +1362,7 @@ export type ButtonRequestType = keyof typeof Enum_ButtonRequestType;
 export type ButtonRequest = {
   code?: ButtonRequestType;
   pages?: number;
+  name?: string;
 };
 
 // ButtonAck
@@ -1248,9 +1410,6 @@ export type Deprecated_PassphraseStateRequest = {
 // Deprecated_PassphraseStateAck
 export type Deprecated_PassphraseStateAck = {};
 
-// BixinPinInputOnDevice
-export type BixinPinInputOnDevice = {};
-
 // ConfluxGetAddress
 export type ConfluxGetAddress = {
   address_n: number[];
@@ -1266,9 +1425,9 @@ export type ConfluxAddress = {
 // ConfluxSignTx
 export type ConfluxSignTx = {
   address_n: number[];
-  nonce?: string;
-  gas_price?: string;
-  gas_limit?: string;
+  nonce: string;
+  gas_price: string;
+  gas_limit: string;
   to?: string;
   value?: string;
   epoch_height?: string;
@@ -1404,6 +1563,30 @@ export type EcdsaPublicKeys = {
   hd_nodes: HDNodeType[];
   root_fingerprint?: number;
 };
+
+export enum DebugButton {
+  NO = 0,
+  YES = 1,
+  INFO = 2,
+}
+
+export enum DebugPhysicalButton {
+  LEFT_BTN = 0,
+  MIDDLE_BTN = 1,
+  RIGHT_BTN = 2,
+}
+
+export enum DebugWaitType {
+  IMMEDIATE = 0,
+  NEXT_LAYOUT = 1,
+  CURRENT_LAYOUT = 2,
+}
+
+// DebugLinkResetDebugEvents
+export type DebugLinkResetDebugEvents = {};
+
+// DebugLinkOptigaSetSecMax
+export type DebugLinkOptigaSetSecMax = {};
 
 // DnxGetAddress
 export type DnxGetAddress = {
@@ -1560,9 +1743,9 @@ export type EosTxHeader = {
 // EosSignTx
 export type EosSignTx = {
   address_n: number[];
-  chain_id?: string;
-  header?: EosTxHeader;
-  num_actions?: number;
+  chain_id: string;
+  header: EosTxHeader;
+  num_actions: number;
 };
 
 // EosTxActionRequest
@@ -1571,13 +1754,13 @@ export type EosTxActionRequest = {
 };
 
 export type EosAsset = {
-  amount?: UintType;
-  symbol?: string;
+  amount: UintType;
+  symbol: string;
 };
 
 export type EosPermissionLevel = {
-  actor?: string;
-  permission?: string;
+  actor: string;
+  permission: string;
 };
 
 export type EosAuthorizationKey = {
@@ -1588,117 +1771,117 @@ export type EosAuthorizationKey = {
 };
 
 export type EosAuthorizationAccount = {
-  account?: EosPermissionLevel;
-  weight?: number;
+  account: EosPermissionLevel;
+  weight: number;
 };
 
 export type EosAuthorizationWait = {
-  wait_sec?: number;
-  weight?: number;
+  wait_sec: number;
+  weight: number;
 };
 
 export type EosAuthorization = {
-  threshold?: number;
+  threshold: number;
   keys: EosAuthorizationKey[];
   accounts: EosAuthorizationAccount[];
   waits: EosAuthorizationWait[];
 };
 
 export type EosActionCommon = {
-  account?: string;
-  name?: string;
+  account: string;
+  name: string;
   authorization: EosPermissionLevel[];
 };
 
 export type EosActionTransfer = {
-  sender?: string;
-  receiver?: string;
-  quantity?: EosAsset;
-  memo?: string;
+  sender: string;
+  receiver: string;
+  quantity: EosAsset;
+  memo: string;
 };
 
 export type EosActionDelegate = {
-  sender?: string;
-  receiver?: string;
-  net_quantity?: EosAsset;
-  cpu_quantity?: EosAsset;
-  transfer?: boolean;
+  sender: string;
+  receiver: string;
+  net_quantity: EosAsset;
+  cpu_quantity: EosAsset;
+  transfer: boolean;
 };
 
 export type EosActionUndelegate = {
-  sender?: string;
-  receiver?: string;
-  net_quantity?: EosAsset;
-  cpu_quantity?: EosAsset;
+  sender: string;
+  receiver: string;
+  net_quantity: EosAsset;
+  cpu_quantity: EosAsset;
 };
 
 export type EosActionRefund = {
-  owner?: string;
+  owner: string;
 };
 
 export type EosActionBuyRam = {
-  payer?: string;
-  receiver?: string;
-  quantity?: EosAsset;
+  payer: string;
+  receiver: string;
+  quantity: EosAsset;
 };
 
 export type EosActionBuyRamBytes = {
-  payer?: string;
-  receiver?: string;
-  bytes?: number;
+  payer: string;
+  receiver: string;
+  bytes: number;
 };
 
 export type EosActionSellRam = {
-  account?: string;
-  bytes?: number;
+  account: string;
+  bytes: number;
 };
 
 export type EosActionVoteProducer = {
-  voter?: string;
-  proxy?: string;
+  voter: string;
+  proxy: string;
   producers: string[];
 };
 
 export type EosActionUpdateAuth = {
-  account?: string;
-  permission?: string;
-  parent?: string;
-  auth?: EosAuthorization;
+  account: string;
+  permission: string;
+  parent: string;
+  auth: EosAuthorization;
 };
 
 export type EosActionDeleteAuth = {
-  account?: string;
-  permission?: string;
+  account: string;
+  permission: string;
 };
 
 export type EosActionLinkAuth = {
-  account?: string;
-  code?: string;
-  type?: string;
-  requirement?: string;
+  account: string;
+  code: string;
+  type: string;
+  requirement: string;
 };
 
 export type EosActionUnlinkAuth = {
-  account?: string;
-  code?: string;
-  type?: string;
+  account: string;
+  code: string;
+  type: string;
 };
 
 export type EosActionNewAccount = {
-  creator?: string;
-  name?: string;
-  owner?: EosAuthorization;
-  active?: EosAuthorization;
+  creator: string;
+  name: string;
+  owner: EosAuthorization;
+  active: EosAuthorization;
 };
 
 export type EosActionUnknown = {
   data_size: number;
-  data_chunk?: string;
+  data_chunk: string;
 };
 
 // EosTxActionAck
 export type EosTxActionAck = {
-  common?: EosActionCommon;
+  common: EosActionCommon;
   transfer?: EosActionTransfer;
   delegate?: EosActionDelegate;
   undelegate?: EosActionUndelegate;
@@ -1756,30 +1939,6 @@ export type EthereumSignTypedDataOneKey = {
   primary_type: string;
   metamask_v4_compat?: boolean;
   chain_id?: number;
-};
-
-export enum EthereumGnosisSafeTxOperation {
-  CALL = 0,
-  DELEGATE_CALL = 1,
-}
-
-// EthereumGnosisSafeTxRequest
-export type EthereumGnosisSafeTxRequest = {};
-
-// EthereumGnosisSafeTxAck
-export type EthereumGnosisSafeTxAck = {
-  to: string;
-  value: string;
-  data?: string;
-  operation: EthereumGnosisSafeTxOperation;
-  safeTxGas: string;
-  baseGas: string;
-  gasPrice: string;
-  gasToken: string;
-  refundReceiver: string;
-  nonce: string;
-  chain_id: number;
-  verifyingContract: string;
 };
 
 // EthereumTypedDataStructRequestOneKey
@@ -2179,6 +2338,9 @@ export enum Enum_BackupType {
   Bip39 = 0,
   Slip39_Basic = 1,
   Slip39_Advanced = 2,
+  Slip39_Single_Extendable = 3,
+  Slip39_Basic_Extendable = 4,
+  Slip39_Advanced_Extendable = 5,
 }
 export type BackupType = keyof typeof Enum_BackupType;
 
@@ -2189,36 +2351,34 @@ export enum Enum_SafetyCheckLevel {
 }
 export type SafetyCheckLevel = keyof typeof Enum_SafetyCheckLevel;
 
-// Initialize
-export type Initialize = {
-  session_id?: string;
-  _skip_passphrase?: boolean;
-  derive_cardano?: boolean;
-};
+export enum DisplayRotation {
+  North = 0,
+  East = 90,
+  South = 180,
+  West = 270,
+}
+
+export enum HomescreenFormat {
+  Toif = 1,
+  Jpeg = 2,
+  ToiG = 3,
+}
 
 // GetFeatures
-export type GetFeatures = {};
+export type GetFeatures = {
+  ok_dev_info_req?: OneKeyInfoReq;
+};
 
-// OnekeyGetFeatures
-export type OnekeyGetFeatures = {};
-
-export enum OneKeyDeviceType {
-  CLASSIC = 0,
-  CLASSIC1S = 1,
-  MINI = 2,
-  TOUCH = 3,
-  PRO = 5,
-  PURE = 6,
+export enum BackupAvailability {
+  NotAvailable = 0,
+  Required = 1,
+  Available = 2,
 }
 
-export enum OneKeySeType {
-  THD89 = 0,
-  SE608A = 1,
-}
-
-export enum OneKeySEState {
-  BOOT = 0,
-  APP = 1,
+export enum RecoveryStatus {
+  Nothing = 0,
+  Recovery = 1,
+  Backup = 2,
 }
 
 export enum Enum_Capability {
@@ -2226,7 +2386,6 @@ export enum Enum_Capability {
   Capability_Bitcoin_like = 2,
   Capability_Binance = 3,
   Capability_Cardano = 4,
-  Capability_Crypto = 5,
   Capability_EOS = 6,
   Capability_Ethereum = 7,
   Capability_Lisk = 8,
@@ -2239,6 +2398,7 @@ export enum Enum_Capability {
   Capability_Shamir = 15,
   Capability_ShamirGroups = 16,
   Capability_PassphraseEntry = 17,
+  Capability_Solana = 18,
 }
 export type Capability = keyof typeof Enum_Capability;
 
@@ -2261,7 +2421,7 @@ export type Features = {
   unlocked: boolean | null;
   _passphrase_cached?: boolean;
   firmware_present: boolean | null;
-  needs_backup: boolean | null;
+  backup_availability?: BackupAvailability;
   flags: number | null;
   model: string;
   fw_major: number | null;
@@ -2270,7 +2430,7 @@ export type Features = {
   fw_vendor: string | null;
   unfinished_backup: boolean | null;
   no_backup: boolean | null;
-  recovery_mode: boolean | null;
+  recovery_status?: RecoveryStatus;
   capabilities: Capability[];
   backup_type: BackupType | null;
   sd_card_present: boolean | null;
@@ -2283,112 +2443,43 @@ export type Features = {
   display_rotation: number | null;
   experimental_features: boolean | null;
   busy?: boolean;
-  offset?: number;
-  ble_name?: string;
-  ble_ver?: string;
-  ble_enable?: boolean;
-  se_enable?: boolean;
-  se_ver?: string;
-  backup_only?: boolean;
-  onekey_version?: string;
-  onekey_serial?: string;
-  bootloader_version?: string;
-  serial_no?: string;
-  spi_flash?: string;
-  initstates?: number;
-  NFT_voucher?: string;
-  cpu_info?: string;
-  pre_firmware?: string;
-  coin_switch?: number;
-  build_id?: string;
-  boardloader_version?: string;
-  battery_level?: number;
+  homescreen_format?: HomescreenFormat;
+  hide_passphrase_from_host?: boolean;
+  internal_model?: string;
+  unit_color?: number;
+  unit_btconly?: boolean;
+  homescreen_width?: number;
+  homescreen_height?: number;
+  bootloader_locked?: boolean;
+  language_version_matches?: boolean;
+  unit_packaging?: number;
+  haptic_feedback?: boolean;
+  recovery_type?: RecoveryType;
+  optiga_sec?: number;
+  ok_dev_info_resp?: OneKeyInfoResp;
+  ok_factory_status?: OneKeyFactoryStatus;
   onekey_device_type?: string | null;
-  onekey_se_type?: string | null;
-  onekey_board_version?: string;
-  onekey_board_hash?: string;
-  onekey_boot_version?: string;
-  onekey_boot_hash?: string;
-  onekey_se01_version?: string;
-  onekey_se01_hash?: string;
-  onekey_se01_build_id?: string;
-  onekey_firmware_version?: string;
-  onekey_firmware_hash?: string;
-  onekey_firmware_build_id?: string;
   onekey_serial_no?: string;
-  onekey_boot_build_id?: string;
-  onekey_ble_name?: string;
-  onekey_ble_version?: string;
-  onekey_ble_build_id?: string;
-  onekey_ble_hash?: string;
-  onekey_se02_version?: string;
-  onekey_se03_version?: string;
-  onekey_se04_version?: string;
-  onekey_se01_state?: string | null;
-  onekey_se02_state?: string | null;
-  onekey_se03_state?: string | null;
-  onekey_se04_state?: string | null;
-};
-
-// OnekeyFeatures
-export type OnekeyFeatures = {
-  onekey_device_type?: OneKeyDeviceType;
-  onekey_board_version?: string;
-  onekey_boot_version?: string;
-  onekey_firmware_version?: string;
-  onekey_board_hash?: string;
-  onekey_boot_hash?: string;
-  onekey_firmware_hash?: string;
-  onekey_board_build_id?: string;
-  onekey_boot_build_id?: string;
-  onekey_firmware_build_id?: string;
-  onekey_serial_no?: string;
-  onekey_ble_name?: string;
-  onekey_ble_version?: string;
-  onekey_ble_build_id?: string;
-  onekey_ble_hash?: string;
-  onekey_se_type?: OneKeySeType;
-  onekey_se01_state?: OneKeySEState;
-  onekey_se02_state?: OneKeySEState;
-  onekey_se03_state?: OneKeySEState;
-  onekey_se04_state?: OneKeySEState;
-  onekey_se01_version?: string;
-  onekey_se02_version?: string;
-  onekey_se03_version?: string;
-  onekey_se04_version?: string;
-  onekey_se01_hash?: string;
-  onekey_se02_hash?: string;
-  onekey_se03_hash?: string;
-  onekey_se04_hash?: string;
-  onekey_se01_build_id?: string;
-  onekey_se02_build_id?: string;
-  onekey_se03_build_id?: string;
-  onekey_se04_build_id?: string;
-  onekey_se01_boot_version?: string;
-  onekey_se02_boot_version?: string;
-  onekey_se03_boot_version?: string;
-  onekey_se04_boot_version?: string;
-  onekey_se01_boot_hash?: string;
-  onekey_se02_boot_hash?: string;
-  onekey_se03_boot_hash?: string;
-  onekey_se04_boot_hash?: string;
-  onekey_se01_boot_build_id?: string;
-  onekey_se02_boot_build_id?: string;
-  onekey_se03_boot_build_id?: string;
-  onekey_se04_boot_build_id?: string;
 };
 
 // LockDevice
 export type LockDevice = {};
 
+// SetBusy
+export type SetBusy = {
+  expiry_ms?: number;
+};
+
+// StartSession
+export type StartSession = {
+  session_id?: string;
+  _skip_passphrase?: boolean;
+  derive_cardano?: boolean;
+  ok_dev_info_req?: OneKeyInfoReq;
+};
+
 // EndSession
 export type EndSession = {};
-
-export enum ExportType {
-  SeedEncExportType_NO = 0,
-  SeedEncExportType_YES = 1,
-  MnemonicPlainExportType_YES = 2,
-}
 
 // ApplySettings
 export type ApplySettings = {
@@ -2398,17 +2489,29 @@ export type ApplySettings = {
   homescreen?: string;
   _passphrase_source?: number;
   auto_lock_delay_ms?: number;
-  display_rotation?: number;
+  display_rotation?: DisplayRotation;
   passphrase_always_on_device?: boolean;
   safety_checks?: SafetyCheckLevel;
   experimental_features?: boolean;
-  use_ble?: boolean;
-  use_se?: boolean;
-  is_bixinapp?: boolean;
-  fastpay_pin?: boolean;
-  fastpay_confirm?: boolean;
-  fastpay_money_limit?: number;
-  fastpay_times?: number;
+  hide_passphrase_from_host?: boolean;
+  haptic_feedback?: boolean;
+};
+
+// ChangeLanguage
+export type ChangeLanguage = {
+  data_length: number;
+  show_display?: boolean;
+};
+
+// TranslationDataRequest
+export type TranslationDataRequest = {
+  data_length: number;
+  data_offset: number;
+};
+
+// TranslationDataAck
+export type TranslationDataAck = {
+  data_chunk: string;
 };
 
 // ApplyFlags
@@ -2456,6 +2559,27 @@ export type Entropy = {
   entropy: string;
 };
 
+// GetFirmwareHash
+export type GetFirmwareHash = {
+  challenge?: string;
+};
+
+// FirmwareHash
+export type FirmwareHash = {
+  hash: string;
+};
+
+// AuthenticateDevice
+export type AuthenticateDevice = {
+  challenge: string;
+};
+
+// AuthenticityProof
+export type AuthenticityProof = {
+  certificates: string[];
+  signature: string;
+};
+
 // WipeDevice
 export type WipeDevice = {};
 
@@ -2473,8 +2597,16 @@ export type ResetDevice = {
   backup_type?: string | number;
 };
 
+export type Slip39Group = {
+  member_threshold: number;
+  member_count: number;
+};
+
 // BackupDevice
-export type BackupDevice = {};
+export type BackupDevice = {
+  group_threshold?: number;
+  groups: Slip39Group[];
+};
 
 // EntropyRequest
 export type EntropyRequest = {};
@@ -2484,9 +2616,9 @@ export type EntropyAck = {
   entropy: string;
 };
 
-export enum RecoveryDeviceType {
-  RecoveryDeviceType_ScrambledWords = 0,
-  RecoveryDeviceType_Matrix = 1,
+export enum RecoveryDeviceInputMethod {
+  ScrambledWords = 0,
+  Matrix = 1,
 }
 
 // RecoveryDevice
@@ -2497,10 +2629,16 @@ export type RecoveryDevice = {
   language?: string;
   label?: string;
   enforce_wordlist?: boolean;
-  type?: RecoveryDeviceType;
+  input_method?: RecoveryDeviceInputMethod;
   u2f_counter?: number;
-  dry_run?: boolean;
+  type?: RecoveryType;
 };
+
+export enum RecoveryType {
+  NormalRecovery = 0,
+  DryRun = 1,
+  UnlockRepeatedBackup = 2,
+}
 
 export enum Enum_WordRequestType {
   WordRequestType_Plain = 0,
@@ -2541,94 +2679,46 @@ export type PreauthorizedRequest = {};
 // CancelAuthorization
 export type CancelAuthorization = {};
 
-export enum SeedRequestType {
-  SeedRequestType_Gen = 0,
-  SeedRequestType_EncExport = 1,
-  SeedRequestType_EncImport = 2,
+export enum BootCommand {
+  STOP_AND_WAIT = 0,
+  INSTALL_UPGRADE = 1,
 }
 
-// BixinSeedOperate
-export type BixinSeedOperate = {
-  type: SeedRequestType;
-  seed_importData?: string;
+// RebootToBootloader
+export type RebootToBootloader = {
+  boot_command?: BootCommand;
+  firmware_header?: string;
+  language_data_length?: number;
 };
 
-// BixinMessageSE
-export type BixinMessageSE = {
-  inputmessage: string;
+// GetNonce
+export type GetNonce = {};
+
+// Nonce
+export type Nonce = {
+  nonce: string;
 };
 
-// BixinOutMessageSE
-export type BixinOutMessageSE = {
-  outmessage?: string;
+// UnlockPath
+export type UnlockPath = {
+  address_n: number[];
+  mac?: string;
 };
 
-// DeviceBackToBoot
-export type DeviceBackToBoot = {};
-
-// BixinBackupRequest
-export type BixinBackupRequest = {};
-
-// BixinBackupAck
-export type BixinBackupAck = {
-  data: string;
+// UnlockedPathRequest
+export type UnlockedPathRequest = {
+  mac?: string;
 };
 
-// BixinRestoreRequest
-export type BixinRestoreRequest = {
-  data: string;
-  language?: string;
-  label?: string;
-  passphrase_protection?: boolean;
-};
+// ShowDeviceTutorial
+export type ShowDeviceTutorial = {};
 
-// BixinRestoreAck
-export type BixinRestoreAck = {
-  data: string;
-};
+// UnlockBootloader
+export type UnlockBootloader = {};
 
-// BixinVerifyDeviceRequest
-export type BixinVerifyDeviceRequest = {
-  data: string;
-};
-
-// BixinVerifyDeviceAck
-export type BixinVerifyDeviceAck = {
-  cert: string;
-  signature: string;
-};
-
-export enum WL_OperationType {
-  WL_OperationType_Add = 0,
-  WL_OperationType_Delete = 1,
-  WL_OperationType_Inquire = 2,
-}
-
-// BixinWhiteListRequest
-export type BixinWhiteListRequest = {
-  type: WL_OperationType;
-  addr_in?: string;
-};
-
-// BixinWhiteListAck
-export type BixinWhiteListAck = {
-  address: string[];
-};
-
-// BixinLoadDevice
-export type BixinLoadDevice = {
-  mnemonics: string;
-  language?: string;
-  label?: string;
-  skip_checksum?: boolean;
-};
-
-// BixinBackupDevice
-export type BixinBackupDevice = {};
-
-// BixinBackupDeviceAck
-export type BixinBackupDeviceAck = {
-  mnemonics: string;
+// SetBrightness
+export type SetBrightness = {
+  value?: number;
 };
 
 // DeviceInfoSettings
@@ -2649,6 +2739,11 @@ export type DeviceInfo = {
   NFT_voucher?: string;
   cpu_info?: string;
   pre_firmware?: string;
+};
+
+// WriteSEPrivateKey
+export type WriteSEPrivateKey = {
+  private_key: string;
 };
 
 // ReadSEPublicKey
@@ -2756,12 +2851,6 @@ export type NFTWriteData = {
   offset: number;
 };
 
-// RebootToBootloader
-export type RebootToBootloader = {};
-
-// RebootToBoardloader
-export type RebootToBoardloader = {};
-
 // ListResDir
 export type ListResDir = {
   path: string;
@@ -2778,13 +2867,18 @@ export type FileInfoList = {
 };
 
 // DeviceEraseSector
-export type DeviceEraseSector = {
-  sector: number;
-};
+export type DeviceEraseSector = {};
+
+export enum MoneroNetworkType {
+  MAINNET = 0,
+  TESTNET = 1,
+  STAGENET = 2,
+  FAKECHAIN = 3,
+}
 
 export type MoneroRctKeyPublic = {
-  dest?: string;
-  commitment?: string;
+  dest: string;
+  commitment: string;
 };
 
 export type MoneroOutputEntry = {
@@ -2842,7 +2936,7 @@ export type MoneroTransactionRsigData = {
 export type MoneroGetAddress = {
   address_n: number[];
   show_display?: boolean;
-  network_type?: number;
+  network_type?: MoneroNetworkType;
   account?: number;
   minor?: number;
   payment_id?: string;
@@ -2856,7 +2950,7 @@ export type MoneroAddress = {
 // MoneroGetWatchKey
 export type MoneroGetWatchKey = {
   address_n: number[];
-  network_type?: number;
+  network_type?: MoneroNetworkType;
 };
 
 // MoneroWatchKey
@@ -2887,7 +2981,7 @@ export type MoneroTransactionData = {
 export type MoneroTransactionInitRequest = {
   version?: number;
   address_n: number[];
-  network_type?: number;
+  network_type?: MoneroNetworkType;
   tsx_data?: MoneroTransactionData;
 };
 
@@ -3008,16 +3102,16 @@ export type MoneroTransactionFinalAck = {
 };
 
 export type MoneroSubAddressIndicesList = {
-  account?: number;
+  account: number;
   minor_indices: number[];
 };
 
 // MoneroKeyImageExportInitRequest
 export type MoneroKeyImageExportInitRequest = {
-  num?: number;
-  hash?: string;
+  num: number;
+  hash: string;
   address_n: number[];
-  network_type?: number;
+  network_type?: MoneroNetworkType;
   subs: MoneroSubAddressIndicesList[];
 };
 
@@ -3025,10 +3119,10 @@ export type MoneroKeyImageExportInitRequest = {
 export type MoneroKeyImageExportInitAck = {};
 
 export type MoneroTransferDetails = {
-  out_key?: string;
-  tx_pub_key?: string;
+  out_key: string;
+  tx_pub_key: string;
   additional_tx_pub_keys: string[];
-  internal_output_index?: number;
+  internal_output_index: number;
   sub_addr_major?: number;
   sub_addr_minor?: number;
 };
@@ -3059,11 +3153,11 @@ export type MoneroKeyImageSyncFinalAck = {
 // MoneroGetTxKeyRequest
 export type MoneroGetTxKeyRequest = {
   address_n: number[];
-  network_type?: number;
-  salt1?: string;
-  salt2?: string;
-  tx_enc_keys?: string;
-  tx_prefix_hash?: string;
+  network_type?: MoneroNetworkType;
+  salt1: string;
+  salt2: string;
+  tx_enc_keys: string;
+  tx_prefix_hash: string;
   reason?: number;
   view_public_key?: string;
 };
@@ -3078,7 +3172,7 @@ export type MoneroGetTxKeyAck = {
 // MoneroLiveRefreshStartRequest
 export type MoneroLiveRefreshStartRequest = {
   address_n: number[];
-  network_type?: number;
+  network_type?: MoneroNetworkType;
 };
 
 // MoneroLiveRefreshStartAck
@@ -3086,11 +3180,11 @@ export type MoneroLiveRefreshStartAck = {};
 
 // MoneroLiveRefreshStepRequest
 export type MoneroLiveRefreshStepRequest = {
-  out_key?: string;
-  recv_deriv?: string;
-  real_out_idx?: number;
-  sub_addr_major?: number;
-  sub_addr_minor?: number;
+  out_key: string;
+  recv_deriv: string;
+  real_out_idx: number;
+  sub_addr_major: number;
+  sub_addr_minor: number;
 };
 
 // MoneroLiveRefreshStepAck
@@ -3142,31 +3236,31 @@ export type NEMAddress = {
 export type NEMTransactionCommon = {
   address_n?: number[];
   network?: number;
-  timestamp?: number;
-  fee?: UintType;
-  deadline?: number;
+  timestamp: number;
+  fee: UintType;
+  deadline: number;
   signer?: string;
 };
 
 export type NEMMosaic = {
-  namespace?: string;
-  mosaic?: string;
-  quantity?: number;
+  namespace: string;
+  mosaic: string;
+  quantity: number;
 };
 
 export type NEMTransfer = {
-  recipient?: string;
-  amount?: UintType;
+  recipient: string;
+  amount: UintType;
   payload?: string;
   public_key?: string;
   mosaics?: NEMMosaic[];
 };
 
 export type NEMProvisionNamespace = {
-  namespace?: string;
+  namespace: string;
   parent?: string;
-  sink?: string;
-  fee?: UintType;
+  sink: string;
+  fee: UintType;
 };
 
 export enum NEMMosaicLevy {
@@ -3177,8 +3271,8 @@ export enum NEMMosaicLevy {
 export type NEMMosaicDefinition = {
   name?: string;
   ticker?: string;
-  namespace?: string;
-  mosaic?: string;
+  namespace: string;
+  mosaic: string;
   divisibility?: number;
   levy?: NEMMosaicLevy;
   fee?: UintType;
@@ -3188,14 +3282,14 @@ export type NEMMosaicDefinition = {
   supply?: number;
   mutable_supply?: boolean;
   transferable?: boolean;
-  description?: string;
+  description: string;
   networks?: number[];
 };
 
 export type NEMMosaicCreation = {
-  definition?: NEMMosaicDefinition;
-  sink?: string;
-  fee?: UintType;
+  definition: NEMMosaicDefinition;
+  sink: string;
+  fee: UintType;
 };
 
 export enum NEMSupplyChangeType {
@@ -3204,10 +3298,10 @@ export enum NEMSupplyChangeType {
 }
 
 export type NEMMosaicSupplyChange = {
-  namespace?: string;
-  mosaic?: string;
-  type?: NEMSupplyChangeType;
-  delta?: number;
+  namespace: string;
+  mosaic: string;
+  type: NEMSupplyChangeType;
+  delta: number;
 };
 
 export enum NEMModificationType {
@@ -3216,8 +3310,8 @@ export enum NEMModificationType {
 }
 
 export type NEMCosignatoryModification = {
-  type?: NEMModificationType;
-  public_key?: string;
+  type: NEMModificationType;
+  public_key: string;
 };
 
 export type NEMAggregateModification = {
@@ -3231,13 +3325,13 @@ export enum NEMImportanceTransferMode {
 }
 
 export type NEMImportanceTransfer = {
-  mode?: NEMImportanceTransferMode;
-  public_key?: string;
+  mode: NEMImportanceTransferMode;
+  public_key: string;
 };
 
 // NEMSignTx
 export type NEMSignTx = {
-  transaction?: NEMTransactionCommon;
+  transaction: NEMTransactionCommon;
   multisig?: NEMTransactionCommon;
   transfer?: NEMTransfer;
   cosigning?: boolean;
@@ -3429,6 +3523,130 @@ export type NostrDecryptedMessage = {
   msg: string;
 };
 
+export enum OneKeyRebootType {
+  Normal = 0,
+  Boardloader = 1,
+  BootLoader = 2,
+}
+
+// OneKeyReboot
+export type OneKeyReboot = {
+  reboot_type: OneKeyRebootType;
+};
+
+// OneKeyFactoryStatus
+export type OneKeyFactoryStatus = {
+  device_sn_set?: boolean;
+  se_cert_set?: boolean;
+};
+
+// OneKeyStatus
+export type OneKeyStatus = {
+  language?: string;
+  bt_enable?: boolean;
+  init_states?: boolean;
+  backup_required?: boolean;
+  passphrase_protection?: boolean;
+  lable?: string;
+};
+
+export enum OneKeyDeviceType {
+  CLASSIC1 = 0,
+  CLASSIC1S = 1,
+  MINI = 2,
+  TOUCH = 3,
+  PRO = 5,
+  CLASSIC1S_PURE = 6,
+}
+
+export enum OneKeySeType {
+  THD89 = 0,
+  SE608A = 1,
+}
+
+export enum OneKeySEState {
+  BOOT = 0,
+  APP_FACTORY = 51,
+  APP = 85,
+}
+
+// OneKeyFwImgInfo
+export type OneKeyFwImgInfo = {
+  version?: string;
+  build_id?: string;
+  hash?: string;
+};
+
+// OneKeyHardwareInfo
+export type OneKeyHardwareInfo = {
+  device_type?: OneKeyDeviceType;
+  serial_no?: string;
+  hardware_version?: string;
+  hardware_version_raw_adc?: number;
+};
+
+// OneKeyMainMcuInfo
+export type OneKeyMainMcuInfo = {
+  board?: OneKeyFwImgInfo;
+  boot?: OneKeyFwImgInfo;
+  app?: OneKeyFwImgInfo;
+};
+
+// OneKeyBluetoothInfo
+export type OneKeyBluetoothInfo = {
+  boot?: OneKeyFwImgInfo;
+  app?: OneKeyFwImgInfo;
+  adv_name?: string;
+  mac?: string;
+};
+
+// OneKeySEInfo
+export type OneKeySEInfo = {
+  boot?: OneKeyFwImgInfo;
+  app?: OneKeyFwImgInfo;
+  type?: OneKeySeType;
+  state?: OneKeySEState;
+};
+
+// OneKeyInfoTargets
+export type OneKeyInfoTargets = {
+  hw?: boolean;
+  fw?: boolean;
+  bt?: boolean;
+  se1?: boolean;
+  se2?: boolean;
+  se3?: boolean;
+  se4?: boolean;
+  status?: boolean;
+};
+
+// OneKeyInfoTypes
+export type OneKeyInfoTypes = {
+  version?: boolean;
+  build_id?: boolean;
+  hash?: boolean;
+  specific?: boolean;
+};
+
+// OneKeyInfoReq
+export type OneKeyInfoReq = {
+  targets?: OneKeyInfoTargets;
+  types?: OneKeyInfoTypes;
+};
+
+// OneKeyInfoResp
+export type OneKeyInfoResp = {
+  protocol_version: number;
+  hw?: OneKeyHardwareInfo;
+  fw?: OneKeyMainMcuInfo;
+  bt?: OneKeyBluetoothInfo;
+  se1?: OneKeySEInfo;
+  se2?: OneKeySEInfo;
+  se3?: OneKeySEInfo;
+  se4?: OneKeySEInfo;
+  status?: OneKeyStatus;
+};
+
 // PolkadotGetAddress
 export type PolkadotGetAddress = {
   address_n: number[];
@@ -3475,11 +3693,11 @@ export type RipplePayment = {
 // RippleSignTx
 export type RippleSignTx = {
   address_n: number[];
-  fee?: UintType;
+  fee: UintType;
   flags?: number;
-  sequence?: number;
+  sequence: number;
   last_ledger_sequence?: number;
-  payment?: RipplePayment;
+  payment: RipplePayment;
 };
 
 // RippleSignedTx
@@ -3507,7 +3725,7 @@ export type ScdoSignTx = {
   gas_limit: string;
   to: string;
   value: string;
-  timestamp?: string;
+  timestamp: string;
   data_initial_chunk?: string;
   data_length?: number;
   tx_type?: number;
@@ -3536,6 +3754,15 @@ export type ScdoSignedMessage = {
   address?: string;
 };
 
+export enum SolanaOffChainMessageVersion {
+  MESSAGE_VERSION_0 = 0,
+}
+
+export enum SolanaOffChainMessageFormat {
+  V0_RESTRICTED_ASCII = 0,
+  V0_LIMITED_UTF8 = 1,
+}
+
 // SolanaGetAddress
 export type SolanaGetAddress = {
   address_n: number[];
@@ -3544,7 +3771,7 @@ export type SolanaGetAddress = {
 
 // SolanaAddress
 export type SolanaAddress = {
-  address?: string;
+  address: string;
 };
 
 // SolanaSignTx
@@ -3555,17 +3782,8 @@ export type SolanaSignTx = {
 
 // SolanaSignedTx
 export type SolanaSignedTx = {
-  signature?: string;
+  signature: string;
 };
-
-export enum SolanaOffChainMessageVersion {
-  MESSAGE_VERSION_0 = 0,
-}
-
-export enum SolanaOffChainMessageFormat {
-  V0_RESTRICTED_ASCII = 0,
-  V0_LIMITED_UTF8 = 1,
-}
 
 // SolanaSignOffChainMessage
 export type SolanaSignOffChainMessage = {
@@ -3613,7 +3831,7 @@ export type StarcoinPublicKey = {
 // StarcoinSignTx
 export type StarcoinSignTx = {
   address_n: number[];
-  raw_tx?: string;
+  raw_tx: string;
 };
 
 // StarcoinSignedTx
@@ -3818,6 +4036,12 @@ export type StellarBumpSequenceOp = {
   bump_to: UintType;
 };
 
+// StellarClaimClaimableBalanceOp
+export type StellarClaimClaimableBalanceOp = {
+  source_account?: string;
+  balance_id: string;
+};
+
 // StellarSignedTx
 export type StellarSignedTx = {
   public_key: string;
@@ -3915,8 +4139,8 @@ export type TezosRevealOp = {
 };
 
 export type TezosManagerTransfer = {
-  destination?: TezosContractID;
-  amount?: UintType;
+  destination: TezosContractID;
+  amount: UintType;
 };
 
 export type TezosParametersManager = {
@@ -3961,8 +4185,8 @@ export type TezosDelegationOp = {
 };
 
 export type TezosProposalOp = {
-  source?: string;
-  period?: number;
+  source: string;
+  period: number;
   proposals: string[];
 };
 
@@ -3973,10 +4197,10 @@ export enum TezosBallotType {
 }
 
 export type TezosBallotOp = {
-  source?: string;
-  period?: number;
-  proposal?: string;
-  ballot?: TezosBallotType;
+  source: string;
+  period: number;
+  proposal: string;
+  ballot: TezosBallotType;
 };
 
 // TezosSignTx
@@ -3996,6 +4220,23 @@ export type TezosSignedTx = {
   signature: string;
   sig_op_contents: string;
   operation_hash: string;
+};
+
+// ThpCredentialMetadata
+export type ThpCredentialMetadata = {
+  host_name?: string;
+};
+
+// ThpPairingCredential
+export type ThpPairingCredential = {
+  cred_metadata?: ThpCredentialMetadata;
+  mac?: string;
+};
+
+// ThpAuthenticatedCredentialData
+export type ThpAuthenticatedCredentialData = {
+  host_static_pubkey?: string;
+  cred_metadata?: ThpCredentialMetadata;
 };
 
 export enum TonWalletVersion {
@@ -4047,21 +4288,12 @@ export type TonSignMessage = {
   ext_ton_amount: UintType[];
   ext_payload: string[];
   jetton_amount_bytes?: string;
-  init_data_initial_chunk?: string;
-  init_data_length?: number;
-  signing_message_repr?: string;
-};
-
-// TonTxAck
-export type TonTxAck = {
-  init_data_chunk: string;
 };
 
 // TonSignedMessage
 export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
-  init_data_length?: number;
 };
 
 // TonSignProof
@@ -4153,6 +4385,8 @@ export type TronUnDelegateResourceContract = {
   receiver_address?: string;
 };
 
+export type TronCancelAllUnfreezeV2Contract = {};
+
 export type Vote = {
   vote_address: string;
   vote_count: number;
@@ -4163,14 +4397,9 @@ export type TronVoteWitnessContract = {
   support?: boolean;
 };
 
-export type TronCancelAllUnfreezeV2Contract = {};
-
 export type TronContract = {
   transfer_contract?: TronTransferContract;
-  provider?: string;
   vote_witness_contract?: TronVoteWitnessContract;
-  contract_name?: string;
-  permission_id?: number;
   freeze_balance_contract?: TronFreezeBalanceContract;
   unfreeze_balance_contract?: TronUnfreezeBalanceContract;
   withdraw_balance_contract?: TronWithdrawBalanceContract;
@@ -4181,6 +4410,9 @@ export type TronContract = {
   delegate_resource_contract?: TronDelegateResourceContract;
   undelegate_resource_contract?: TronUnDelegateResourceContract;
   cancel_all_unfreeze_v2_contract?: TronCancelAllUnfreezeV2Contract;
+  provider?: string;
+  contract_name?: string;
+  permission_id?: number;
 };
 
 // TronSignTx
@@ -4213,14 +4445,6 @@ export type TronMessageSignature = {
   signature: string;
 };
 
-// facotry
-export type facotry = {};
-
-export enum CommandFlags {
-  Default = 0,
-  Factory_Only = 1,
-}
-
 // custom connect definitions
 export type MessageType = {
   AlephiumGetAddress: AlephiumGetAddress;
@@ -4244,6 +4468,10 @@ export type MessageType = {
   AptosMessagePayload: AptosMessagePayload;
   AptosSignMessage: AptosSignMessage;
   AptosMessageSignature: AptosMessageSignature;
+  BenchmarkListNames: BenchmarkListNames;
+  BenchmarkNames: BenchmarkNames;
+  BenchmarkRun: BenchmarkRun;
+  BenchmarkResult: BenchmarkResult;
   BenfenGetAddress: BenfenGetAddress;
   BenfenAddress: BenfenAddress;
   BenfenSignTx: BenfenSignTx;
@@ -4276,6 +4504,7 @@ export type MessageType = {
   SignMessage: SignMessage;
   MessageSignature: MessageSignature;
   VerifyMessage: VerifyMessage;
+  CoinJoinRequest: CoinJoinRequest;
   SignTx: SignTx;
   TxRequestDetailsType: TxRequestDetailsType;
   TxRequestSerializedType: TxRequestSerializedType;
@@ -4286,6 +4515,11 @@ export type MessageType = {
   PrevTx: PrevTx;
   PrevInput: PrevInput;
   PrevOutput: PrevOutput;
+  TextMemo: TextMemo;
+  RefundMemo: RefundMemo;
+  CoinPurchaseMemo: CoinPurchaseMemo;
+  PaymentRequestMemo: PaymentRequestMemo;
+  TxAckPaymentRequest: TxAckPaymentRequest;
   TxAck: TxAck;
   TxAckInputWrapper: TxAckInputWrapper;
   TxAckInput: TxAckInput;
@@ -4306,12 +4540,29 @@ export type MessageType = {
   PublicKeyMultiple: PublicKeyMultiple;
   SignPsbt: SignPsbt;
   SignedPsbt: SignedPsbt;
+  BixinPinInputOnDevice: BixinPinInputOnDevice;
+  ApplySettingsBixin: ApplySettingsBixin;
+  BixinSeedOperate: BixinSeedOperate;
+  BixinMessageSE: BixinMessageSE;
+  BixinOutMessageSE: BixinOutMessageSE;
+  BixinReboot: BixinReboot;
+  DeviceBackToBoot: DeviceBackToBoot;
+  BixinBackupRequest: BixinBackupRequest;
+  BixinBackupAck: BixinBackupAck;
+  BixinRestoreRequest: BixinRestoreRequest;
+  BixinRestoreAck: BixinRestoreAck;
+  BixinVerifyDeviceRequest: BixinVerifyDeviceRequest;
+  BixinVerifyDeviceAck: BixinVerifyDeviceAck;
+  BixinWhiteListRequest: BixinWhiteListRequest;
+  BixinWhiteListAck: BixinWhiteListAck;
+  BixinLoadDevice: BixinLoadDevice;
+  BixinBackupDevice: BixinBackupDevice;
+  BixinBackupDeviceAck: BixinBackupDeviceAck;
   FirmwareErase: FirmwareErase;
+  FirmwareErase_ex: FirmwareErase_ex;
   FirmwareRequest: FirmwareRequest;
   FirmwareUpload: FirmwareUpload;
   SelfTest: SelfTest;
-  FirmwareErase_ex: FirmwareErase_ex;
-  Reboot: Reboot;
   FirmwareUpdateEmmc: FirmwareUpdateEmmc;
   CardanoBlockchainPointerType: CardanoBlockchainPointerType;
   CardanoNativeScript: CardanoNativeScript;
@@ -4336,8 +4587,8 @@ export type MessageType = {
   CardanoDRep: CardanoDRep;
   CardanoTxCertificate: CardanoTxCertificate;
   CardanoTxWithdrawal: CardanoTxWithdrawal;
-  CardanoCVoteRegistrationDelegation: CardanoCVoteRegistrationDelegation;
-  CardanoCVoteRegistrationParametersType: CardanoCVoteRegistrationParametersType;
+  CardanoGovernanceRegistrationDelegation: CardanoGovernanceRegistrationDelegation;
+  CardanoGovernanceRegistrationParametersType: CardanoGovernanceRegistrationParametersType;
   CardanoTxAuxiliaryData: CardanoTxAuxiliaryData;
   CardanoTxMint: CardanoTxMint;
   CardanoTxCollateralInput: CardanoTxCollateralInput;
@@ -4362,7 +4613,6 @@ export type MessageType = {
   PassphraseAck: PassphraseAck;
   Deprecated_PassphraseStateRequest: Deprecated_PassphraseStateRequest;
   Deprecated_PassphraseStateAck: Deprecated_PassphraseStateAck;
-  BixinPinInputOnDevice: BixinPinInputOnDevice;
   ConfluxGetAddress: ConfluxGetAddress;
   ConfluxAddress: ConfluxAddress;
   ConfluxSignTx: ConfluxSignTx;
@@ -4385,6 +4635,8 @@ export type MessageType = {
   Path: Path;
   BatchGetPublickeys: BatchGetPublickeys;
   EcdsaPublicKeys: EcdsaPublicKeys;
+  DebugLinkResetDebugEvents: DebugLinkResetDebugEvents;
+  DebugLinkOptigaSetSecMax: DebugLinkOptigaSetSecMax;
   DnxGetAddress: DnxGetAddress;
   DnxAddress: DnxAddress;
   DnxSignTx: DnxSignTx;
@@ -4437,8 +4689,6 @@ export type MessageType = {
   EthereumTokenInfo: EthereumTokenInfo;
   EthereumDefinitions: EthereumDefinitions;
   EthereumSignTypedDataOneKey: EthereumSignTypedDataOneKey;
-  EthereumGnosisSafeTxRequest: EthereumGnosisSafeTxRequest;
-  EthereumGnosisSafeTxAck: EthereumGnosisSafeTxAck;
   EthereumTypedDataStructRequestOneKey: EthereumTypedDataStructRequestOneKey;
   EthereumStructMemberOneKey: EthereumStructMemberOneKey;
   EthereumFieldTypeOneKey: EthereumFieldTypeOneKey;
@@ -4493,14 +4743,16 @@ export type MessageType = {
   KaspaSignedTx: KaspaSignedTx;
   LnurlAuth: LnurlAuth;
   LnurlAuthResp: LnurlAuthResp;
-  Initialize: Initialize;
   GetFeatures: GetFeatures;
-  OnekeyGetFeatures: OnekeyGetFeatures;
   Features: Features;
-  OnekeyFeatures: OnekeyFeatures;
   LockDevice: LockDevice;
+  SetBusy: SetBusy;
+  StartSession: StartSession;
   EndSession: EndSession;
   ApplySettings: ApplySettings;
+  ChangeLanguage: ChangeLanguage;
+  TranslationDataRequest: TranslationDataRequest;
+  TranslationDataAck: TranslationDataAck;
   ApplyFlags: ApplyFlags;
   ChangePin: ChangePin;
   ChangeWipeCode: ChangeWipeCode;
@@ -4509,8 +4761,13 @@ export type MessageType = {
   Cancel: Cancel;
   GetEntropy: GetEntropy;
   Entropy: Entropy;
+  GetFirmwareHash: GetFirmwareHash;
+  FirmwareHash: FirmwareHash;
+  AuthenticateDevice: AuthenticateDevice;
+  AuthenticityProof: AuthenticityProof;
   WipeDevice: WipeDevice;
   ResetDevice: ResetDevice;
+  Slip39Group: Slip39Group;
   BackupDevice: BackupDevice;
   EntropyRequest: EntropyRequest;
   EntropyAck: EntropyAck;
@@ -4523,24 +4780,18 @@ export type MessageType = {
   DoPreauthorized: DoPreauthorized;
   PreauthorizedRequest: PreauthorizedRequest;
   CancelAuthorization: CancelAuthorization;
-  BixinSeedOperate: BixinSeedOperate;
-  BixinMessageSE: BixinMessageSE;
-  BixinOutMessageSE: BixinOutMessageSE;
-  DeviceBackToBoot: DeviceBackToBoot;
-  BixinBackupRequest: BixinBackupRequest;
-  BixinBackupAck: BixinBackupAck;
-  BixinRestoreRequest: BixinRestoreRequest;
-  BixinRestoreAck: BixinRestoreAck;
-  BixinVerifyDeviceRequest: BixinVerifyDeviceRequest;
-  BixinVerifyDeviceAck: BixinVerifyDeviceAck;
-  BixinWhiteListRequest: BixinWhiteListRequest;
-  BixinWhiteListAck: BixinWhiteListAck;
-  BixinLoadDevice: BixinLoadDevice;
-  BixinBackupDevice: BixinBackupDevice;
-  BixinBackupDeviceAck: BixinBackupDeviceAck;
+  RebootToBootloader: RebootToBootloader;
+  GetNonce: GetNonce;
+  Nonce: Nonce;
+  UnlockPath: UnlockPath;
+  UnlockedPathRequest: UnlockedPathRequest;
+  ShowDeviceTutorial: ShowDeviceTutorial;
+  UnlockBootloader: UnlockBootloader;
+  SetBrightness: SetBrightness;
   DeviceInfoSettings: DeviceInfoSettings;
   GetDeviceInfo: GetDeviceInfo;
   DeviceInfo: DeviceInfo;
+  WriteSEPrivateKey: WriteSEPrivateKey;
   ReadSEPublicKey: ReadSEPublicKey;
   SEPublicKey: SEPublicKey;
   WriteSEPublicCert: WriteSEPublicCert;
@@ -4558,8 +4809,6 @@ export type MessageType = {
   ResourceUpdate: ResourceUpdate;
   NFTWriteInfo: NFTWriteInfo;
   NFTWriteData: NFTWriteData;
-  RebootToBootloader: RebootToBootloader;
-  RebootToBoardloader: RebootToBoardloader;
   ListResDir: ListResDir;
   FileInfo: FileInfo;
   FileInfoList: FileInfoList;
@@ -4658,6 +4907,18 @@ export type MessageType = {
   NostrEncryptedMessage: NostrEncryptedMessage;
   NostrDecryptMessage: NostrDecryptMessage;
   NostrDecryptedMessage: NostrDecryptedMessage;
+  OneKeyReboot: OneKeyReboot;
+  OneKeyFactoryStatus: OneKeyFactoryStatus;
+  OneKeyStatus: OneKeyStatus;
+  OneKeyFwImgInfo: OneKeyFwImgInfo;
+  OneKeyHardwareInfo: OneKeyHardwareInfo;
+  OneKeyMainMcuInfo: OneKeyMainMcuInfo;
+  OneKeyBluetoothInfo: OneKeyBluetoothInfo;
+  OneKeySEInfo: OneKeySEInfo;
+  OneKeyInfoTargets: OneKeyInfoTargets;
+  OneKeyInfoTypes: OneKeyInfoTypes;
+  OneKeyInfoReq: OneKeyInfoReq;
+  OneKeyInfoResp: OneKeyInfoResp;
   PolkadotGetAddress: PolkadotGetAddress;
   PolkadotAddress: PolkadotAddress;
   PolkadotSignTx: PolkadotSignTx;
@@ -4708,6 +4969,7 @@ export type MessageType = {
   StellarAccountMergeOp: StellarAccountMergeOp;
   StellarManageDataOp: StellarManageDataOp;
   StellarBumpSequenceOp: StellarBumpSequenceOp;
+  StellarClaimClaimableBalanceOp: StellarClaimClaimableBalanceOp;
   StellarSignedTx: StellarSignedTx;
   SuiGetAddress: SuiGetAddress;
   SuiAddress: SuiAddress;
@@ -4732,10 +4994,12 @@ export type MessageType = {
   TezosBallotOp: TezosBallotOp;
   TezosSignTx: TezosSignTx;
   TezosSignedTx: TezosSignedTx;
+  ThpCredentialMetadata: ThpCredentialMetadata;
+  ThpPairingCredential: ThpPairingCredential;
+  ThpAuthenticatedCredentialData: ThpAuthenticatedCredentialData;
   TonGetAddress: TonGetAddress;
   TonAddress: TonAddress;
   TonSignMessage: TonSignMessage;
-  TonTxAck: TonTxAck;
   TonSignedMessage: TonSignedMessage;
   TonSignProof: TonSignProof;
   TonSignedProof: TonSignedProof;
@@ -4751,15 +5015,14 @@ export type MessageType = {
   TronWithdrawExpireUnfreezeContract: TronWithdrawExpireUnfreezeContract;
   TronDelegateResourceContract: TronDelegateResourceContract;
   TronUnDelegateResourceContract: TronUnDelegateResourceContract;
+  TronCancelAllUnfreezeV2Contract: TronCancelAllUnfreezeV2Contract;
   Vote: Vote;
   TronVoteWitnessContract: TronVoteWitnessContract;
-  TronCancelAllUnfreezeV2Contract: TronCancelAllUnfreezeV2Contract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;
   TronSignMessage: TronSignMessage;
   TronMessageSignature: TronMessageSignature;
-  facotry: facotry;
 };
 
 export type MessageKey = keyof MessageType;

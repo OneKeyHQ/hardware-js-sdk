@@ -1,4 +1,4 @@
-import { RecoveryDeviceType, Success } from '@onekeyfe/hd-transport';
+import { RecoveryType, Success } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type DeviceRecoveryParams = {
@@ -8,7 +8,7 @@ export type DeviceRecoveryParams = {
   language?: string;
   label?: string;
   enforceWordlist?: boolean;
-  type?: RecoveryDeviceType;
+  type?: RecoveryType;
   u2fCounter?: number;
   dryRun?: boolean;
 };

@@ -59,7 +59,9 @@ export default class TransportManager {
       } else {
         await this.transport.init(HttpLogger);
       }
-      Log.debug('Configuring transports');
+      Log.debug('Configuring transports', this.messageVersion);
+      this.currentMessages = this.defaultMessages;
+      this.messageVersion = 'latest';
       await this.transport.configure(JSON.stringify(this.defaultMessages));
       Log.debug('Configuring transports done');
     } catch (error) {
@@ -74,6 +76,7 @@ export default class TransportManager {
     Log.debug(`Begin reconfiguring transports`);
     const { messageVersion, messages } = getSupportMessageVersion(features);
 
+    console.error('caikaisheng reconfigure', messageVersion);
     if (this.currentMessages === messages || !messages) {
       return;
     }

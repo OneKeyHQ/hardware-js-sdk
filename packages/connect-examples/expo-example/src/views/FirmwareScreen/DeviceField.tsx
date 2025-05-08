@@ -1,7 +1,8 @@
+import { Features } from '@onekeyfe/hd-core';
 import { memo } from 'react';
 import { Stack, Text, XStack } from 'tamagui';
 import { useDeviceFieldContext } from './DeviceFieldContext';
-import { getReleaseUrl } from '../../utils/deviceUtils';
+import { getFeaturesBetweenProtocol, getReleaseUrl } from '../../utils/deviceUtils';
 import { useMedia } from '../../provider/MediaProvider';
 
 interface DeviceFieldProps {
@@ -10,15 +11,23 @@ interface DeviceFieldProps {
 }
 
 function isNil(value: string | undefined | null): value is string {
-  return value == null || value.trim() === '' || value.trim() === 'unknown';
+  return (
+    value === undefined ||
+    value == null ||
+    (value.trim && (value.trim() === '' || value.trim() === 'unknown'))
+  );
 }
 
 function DeviceFieldView({ field, value }: DeviceFieldProps) {
   const { features, onekeyFeatures } = useDeviceFieldContext();
   const media = useMedia();
   const fieldValue =
-    (onekeyFeatures as Record<string, string>)?.[field] ??
-    (features as Record<string, any>)?.[field] ??
+    (
+      getFeaturesBetweenProtocol({
+        ...features,
+        ...onekeyFeatures,
+      } as Features) as Record<string, string>
+    )?.[field] ??
     (
       getReleaseUrl({
         features,
@@ -38,7 +47,7 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
         {`${field}: `}
       </Text>
       <Stack flex={1} paddingStart={4}>
-        {fieldValue?.startsWith('http') ? (
+        {fieldValue && fieldValue.startsWith && fieldValue?.startsWith('http') ? (
           <Text
             flex={1}
             flexWrap="wrap"
@@ -51,7 +60,7 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
               window.open(fieldValue, '_blank');
             }}
           >
-            {fieldValue}
+            {fieldValue ?? ''}
           </Text>
         ) : (
           <Text
