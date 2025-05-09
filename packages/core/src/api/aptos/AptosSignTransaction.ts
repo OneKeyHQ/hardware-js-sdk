@@ -14,9 +14,10 @@ export default class AptosSignTransaction extends BaseMethod<HardwareAptosSignTx
     validateParams(this.payload, [
       { name: 'path', required: true },
       { name: 'rawTx', type: 'hexString', required: true },
+      { name: 'transactionType', type: 'number', required: false },
     ]);
 
-    const { path, rawTx } = this.payload;
+    const { path, rawTx, transactionType } = this.payload;
 
     const addressN = validatePath(path, 3);
 
@@ -24,6 +25,7 @@ export default class AptosSignTransaction extends BaseMethod<HardwareAptosSignTx
     this.params = {
       address_n: addressN,
       raw_tx: formatAnyHex(rawTx),
+      tx_type: transactionType,
     };
   }
 
@@ -35,7 +37,31 @@ export default class AptosSignTransaction extends BaseMethod<HardwareAptosSignTx
     };
   }
 
+  getWithDataVersionRange() {
+    return {
+      pro: {
+        min: '4.14.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
+      },
+      classic: {
+        min: '3.10.0',
+      },
+    };
+  }
+
+  checkWithDataError() {
+    const { transactionType } = this.payload;
+    this.checkFeatureVersionLimit(
+      () => transactionType === 1,
+      () => this.getWithDataVersionRange()
+    );
+  }
+
   async run() {
+    this.checkWithDataError();
+
     const res = await this.device.commands.typedCall('AptosSignTx', 'AptosSignedTx', {
       ...this.params,
     });

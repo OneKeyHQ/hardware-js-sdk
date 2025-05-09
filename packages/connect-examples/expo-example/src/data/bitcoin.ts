@@ -17,31 +17,47 @@ const api: PlaygroundProps[] = [
         title: 'Batch Get Address',
         value: {
           bundle: [
-            {
-              path: "m/44'/0'/0'/0/0",
+            ...Array.from({ length: 10 }, (_, i) => ({
+              path: `m/44'/0'/0'/0/${i}`,
               coin: 'btc',
               showOnOneKey: false,
-            },
-            {
-              path: "m/44'/0'/0'/0/1",
+            })),
+          ],
+        },
+      },
+      {
+        title: 'Batch Get Address segwit_p2sh',
+        value: {
+          bundle: [
+            ...Array.from({ length: 10 }, (_, i) => ({
+              path: `m/49'/0'/0'/0/${i}`,
               coin: 'btc',
               showOnOneKey: false,
-            },
-            {
-              path: "m/44'/0'/0'/0/2",
+            })),
+          ],
+        },
+      },
+      {
+        title: 'Batch Get Address segwit_native',
+        value: {
+          bundle: [
+            ...Array.from({ length: 10 }, (_, i) => ({
+              path: `m/84'/0'/0'/0/${i}`,
               coin: 'btc',
               showOnOneKey: false,
-            },
-            {
-              path: "m/44'/0'/0'/0/3",
+            })),
+          ],
+        },
+      },
+      {
+        title: 'Batch Get Address taproot',
+        value: {
+          bundle: [
+            ...Array.from({ length: 10 }, (_, i) => ({
+              path: `m/86'/0'/0'/0/${i}`,
               coin: 'btc',
               showOnOneKey: false,
-            },
-            {
-              path: "m/44'/0'/0'/0/4",
-              coin: 'btc',
-              showOnOneKey: false,
-            },
+            })),
           ],
         },
       },
@@ -63,21 +79,47 @@ const api: PlaygroundProps[] = [
         title: 'Batch Get Public Key',
         value: {
           bundle: [
-            {
-              path: "m/44'/0'/0'/0/0",
+            ...Array.from({ length: 10 }, (_, i) => ({
+              path: `m/44'/0'/0'/0/${i}`,
               coin: 'btc',
               showOnOneKey: false,
-            },
-            {
-              path: "m/44'/0'/0'/0/2",
+            })),
+          ],
+        },
+      },
+      {
+        title: 'Batch Get Public Key segwit_p2sh',
+        value: {
+          bundle: [
+            ...Array.from({ length: 10 }, (_, i) => ({
+              path: `m/49'/0'/0'/0/${i}`,
               coin: 'btc',
               showOnOneKey: false,
-            },
-            {
-              path: "m/44'/0'/0'/0/3",
+            })),
+          ],
+        },
+      },
+      {
+        title: 'Batch Get Public Key segwit_native',
+        value: {
+          bundle: [
+            ...Array.from({ length: 10 }, (_, i) => ({
+              path: `m/84'/0'/0'/0/${i}`,
               coin: 'btc',
               showOnOneKey: false,
-            },
+            })),
+          ],
+        },
+      },
+      {
+        title: 'Batch Get Public Key taproot',
+        value: {
+          bundle: [
+            ...Array.from({ length: 10 }, (_, i) => ({
+              path: `m/86'/0'/0'/0/${i}`,
+              coin: 'btc',
+              showOnOneKey: false,
+            })),
           ],
         },
       },

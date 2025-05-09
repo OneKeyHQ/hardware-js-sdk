@@ -3626,6 +3626,11 @@
   resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-utils/-/react-native-ble-utils-0.1.3.tgz#5b6b669c53e11b960b77554529d08ef0be2cbf71"
   integrity sha512-zzLpkjtHZ+GoafJst3gTbvEvPsqeEV3l5FIsmB7Z16MEMSJwkBmH9me/dHvo9qlIcLfttpewAyFQjSfEnrrvOg==
 
+"@onekeyfe/react-native-ble-utils@^0.1.4":
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/@onekeyfe/react-native-ble-utils/-/react-native-ble-utils-0.1.4.tgz#4a262d30cd226e94f1c697c08a3a85a44310690c"
+  integrity sha512-DTKjjFKdkGktx/qqdu7STFAjpD6ZI3Rdfcyvv/a1Ho4GBs9F/nOJyxEhqiUNbY4XZoVHSwYy2cxYrdX4zGY6eA==
+
 "@peculiar/asn1-schema@^2.3.8":
   version "2.3.13"
   resolved "https://registry.yarnpkg.com/@peculiar/asn1-schema/-/asn1-schema-2.3.13.tgz#ec8509cdcbc0da3abe73fd7e690556b57a61b8f4"
