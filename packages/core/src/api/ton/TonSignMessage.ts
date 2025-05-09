@@ -6,11 +6,6 @@ import {
 import semver from 'semver';
 import BigNumber from 'bignumber.js';
 import { isEmpty } from 'lodash';
-import {
-  createNeedUpgradeFirmwareHardwareError,
-  ERRORS,
-  HardwareErrorCode,
-} from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -25,6 +20,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   initState: string | null = null;
 
   init() {
+    this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
@@ -86,7 +82,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
 
   getVersionRange() {
     return {
-      pro: {
+      model_touch: {
         min: '4.10.0',
       },
       model_classic1s: {
