@@ -24,7 +24,7 @@ import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 import { PROTO } from '../../constants';
 
-const Log = getLogger(LoggerNames.Core);
+const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
 
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
