@@ -62,6 +62,6 @@ export const getBootloaderReleaseInfo = (
     changelog,
     release,
     bootloaderMode,
-    shouldUpdate
+    shouldUpdate,
   };
 };
