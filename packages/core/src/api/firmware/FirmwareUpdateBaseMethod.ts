@@ -24,7 +24,7 @@ import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 import { PROTO } from '../../constants';
 
-const Log = getLogger(LoggerNames.Method);
+const Log = getLogger(LoggerNames.Core);
 const SESSION_ERROR = 'session not found';
 
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
@@ -374,7 +374,10 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         Log.error(`emmcWrite error: `, error);
         retryCount--;
         if (retryCount === 0) {
-          throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, error);
+          throw ERRORS.TypedError(
+            HardwareErrorCode.EmmcFileWriteFirmwareError,
+            'transfer data error'
+          );
         }
         const env = DataManager.getSettings('env');
         if (DataManager.isBleConnect(env)) {
