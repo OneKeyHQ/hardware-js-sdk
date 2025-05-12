@@ -29,7 +29,7 @@ const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
 const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
 
-const Log = getLogger(LoggerNames.Core);
+const Log = getLogger(LoggerNames.Method);
 
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
