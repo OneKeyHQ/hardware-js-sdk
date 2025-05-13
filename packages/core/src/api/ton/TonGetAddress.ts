@@ -12,6 +12,7 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
   shouldConfirm = false;
 
   init() {
+    this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
@@ -56,7 +57,7 @@ export default class TonGetAddress extends BaseMethod<HardwareTonGetAddress[]> {
 
   getVersionRange() {
     return {
-      pro: {
+      model_touch: {
         min: '4.10.0',
       },
       model_classic1s: {

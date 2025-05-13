@@ -273,14 +273,56 @@ const api: PlaygroundProps[] = [
                   sequence: 4294967295,
                 },
               ],
-              // bin_outputs: [
-              //   { amount: 150000, script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87' },
-              //   {
-              //     amount: 116300,
-              //     script_pubkey:
-              //       '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
-              //   },
-              // ],
+              bin_outputs: [
+                { amount: 150000, script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87' },
+                {
+                  amount: 116300,
+                  script_pubkey:
+                    '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
+                },
+              ],
+              lock_time: 0,
+            },
+          ],
+        },
+      },
+      {
+        title: 'Sign Transaction(Big Ref Txs)',
+        value: {
+          coin: 'btc',
+          inputs: [
+            {
+              prev_index: 60000,
+              prev_hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
+              amount: '150000',
+              address_n: [2147483697, 2147483648, 2147483648, 0, 0],
+              script_type: 'SPENDP2SHWITNESS',
+            },
+          ],
+          outputs: [
+            {
+              script_type: 'PAYTOADDRESS',
+              address: '3F6g14r5Z37at7HTvMN5Mmf8QJxLJp2p3U',
+              amount: '10000',
+            },
+            {
+              script_type: 'PAYTOP2SHWITNESS',
+              address_n: [2147483697, 2147483648, 2147483648, 0, 0],
+              amount: '128474',
+            },
+          ],
+          refTxs: [
+            {
+              hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
+              version: 2,
+              inputs: [
+                {
+                  prev_hash: '141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9',
+                  prev_index: 1,
+                  script_sig: '',
+                  sequence: 4294967295,
+                },
+              ],
               bin_outputs: [
                 { amount: 150000, script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87' },
                 {
