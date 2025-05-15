@@ -4,9 +4,9 @@ import { BaseMethod } from './BaseMethod';
 
 export default class GetFeatures extends BaseMethod {
   init() {
-    this.notAllowDeviceMode = [
-      ...this.notAllowDeviceMode,
-      UI_REQUEST.INITIALIZE,
+    this.allowDeviceMode = [
+      ...this.allowDeviceMode,
+      UI_REQUEST.NOT_INITIALIZE,
       UI_REQUEST.BOOTLOADER,
     ];
     this.useDevicePassphraseState = false;

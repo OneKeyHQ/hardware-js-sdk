@@ -270,7 +270,7 @@ const onCallDevice = async (
 
       // check call method mode
       const unexpectedMode = device.hasUnexpectedMode(
-        method.notAllowDeviceMode,
+        method.allowDeviceMode,
         method.requireDeviceMode
       );
       if (unexpectedMode) {

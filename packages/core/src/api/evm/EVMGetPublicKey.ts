@@ -16,7 +16,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     this.useBatch = this.payload?.bundle?.every(

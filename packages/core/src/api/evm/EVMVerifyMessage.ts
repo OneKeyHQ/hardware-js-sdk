@@ -10,7 +10,7 @@ import verifyMessage from './latest/verifyMessage';
 export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessageOneKey> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'address', type: 'string', required: true },

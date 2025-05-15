@@ -10,7 +10,7 @@ import { getDeviceType } from '../../utils';
 export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'psbt', type: 'hexString', required: true },
