@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Stack, Text, XStack } from 'tamagui';
 import { useDeviceFieldContext } from './DeviceFieldContext';
 import { getReleaseUrl } from '../../utils/deviceUtils';
+import { useMedia } from '../../provider/MediaProvider';
 
 interface DeviceFieldProps {
   field: string;
@@ -14,6 +15,7 @@ function isNil(value: string | undefined | null): value is string {
 
 function DeviceFieldView({ field, value }: DeviceFieldProps) {
   const { features, onekeyFeatures } = useDeviceFieldContext();
+  const media = useMedia();
   const fieldValue =
     (onekeyFeatures as Record<string, string>)?.[field] ??
     (features as Record<string, any>)?.[field] ??
@@ -24,14 +26,9 @@ function DeviceFieldView({ field, value }: DeviceFieldProps) {
     )?.[field] ??
     value;
 
+  const width = media.gtLg ? '49%' : '100%';
   return (
-    <XStack
-      flexWrap="wrap"
-      width="100%"
-      $gtLg={{
-        width: '49%',
-      }}
-    >
+    <XStack flexWrap="wrap" width={width}>
       <Text
         minWidth={260}
         color={isNil(fieldValue) ? '$textCritical' : '$text'}

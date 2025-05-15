@@ -5,7 +5,7 @@ import { getDeviceType, httpRequest } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { findLatestRelease } from '../../utils/release';
 import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
-import { FirmwareField } from '../../data-manager/DataManager';
+import { IFirmwareField } from '../../data-manager/DataManager';
 
 export interface GetInfoProps {
   features: Features;
@@ -73,14 +73,16 @@ export const getSysResourceBinary = async (url: string) => {
 
 export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
+  if (deviceType === 'unknown') {
+    return null;
+  }
   const { deviceMap } = DataManager;
 
-  const firmwareUpdateField: 'ble' | FirmwareField = getFirmwareUpdateField({
+  const firmwareUpdateField: 'ble' | IFirmwareField = getFirmwareUpdateField({
     features,
     updateType,
     targetVersion,
   });
-
   const releaseInfo = deviceMap?.[deviceType]?.[firmwareUpdateField] ?? [];
   return findLatestRelease(releaseInfo);
 };

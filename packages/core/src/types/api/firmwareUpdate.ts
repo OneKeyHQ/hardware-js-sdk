@@ -36,3 +36,28 @@ export declare function firmwareUpdateV2(
   connectId: string | undefined,
   params: Params<FirmwareUpdateBinaryParams & Platform>
 ): Response<PROTO.Success>;
+
+export interface FirmwareUpdateV3Params {
+  bleVersion?: number[];
+  bleBinary?: ArrayBuffer;
+
+  firmwareVersion?: number[];
+  firmwareBinary?: ArrayBuffer;
+
+  bootloaderVersion?: number[];
+  bootloaderBinary?: ArrayBuffer;
+
+  resourceBinary?: ArrayBuffer;
+  forcedUpdateRes?: boolean;
+
+  platform: IPlatform;
+}
+
+export declare function firmwareUpdateV3(
+  connectId: string | undefined,
+  params: Params<FirmwareUpdateV3Params>
+): Response<{
+  bleVersion: string;
+  firmwareVersion: string;
+  bootloaderVersion: string;
+}>;

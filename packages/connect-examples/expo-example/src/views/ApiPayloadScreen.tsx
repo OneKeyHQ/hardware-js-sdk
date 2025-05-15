@@ -1,5 +1,5 @@
-import React from 'react';
-import { FlatList } from 'react-native';
+import React, { memo, useMemo, useEffect, useState } from 'react';
+import { FlatList, Platform } from 'react-native';
 import { Stack, YStack } from 'tamagui';
 
 import { useIntl } from 'react-intl';
@@ -14,6 +14,7 @@ import { ExpandModeProvider } from '../provider/ExpandModeProvider';
 import { CollapsibleSection } from '../components/CollapsibleSection';
 import Playground, { PlaygroundProps as ApiPayloadProps } from '../components/Playground';
 import PanelView from '../components/ui/Panel';
+import { useMedia } from '../provider/MediaProvider';
 
 /* eslint-disable global-require, @typescript-eslint/no-var-requires */
 const playgroundConfig = [
@@ -143,56 +144,78 @@ const playgroundConfig = [
   },
 ];
 
-function renderItem({ item }: { item: { title: string; data: any } }) {
-  console.log();
+interface ApiPayloadItem {
+  title: string;
+  data: Array<React.JSX.IntrinsicAttributes & ApiPayloadProps>;
+}
+
+interface ApiPayloadItemProps {
+  item: ApiPayloadItem;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+const ApiPayloadItem = memo(({ item }: ApiPayloadItemProps) => {
+  const media = useMedia();
+  const flexDirection = media.gtSm ? 'row' : 'column';
+
+  const renderedItems = useMemo(
+    () =>
+      item.data.map((data: React.JSX.IntrinsicAttributes & ApiPayloadProps) => (
+        <PayloadStack key={`${data.method}-${data.description}`} data={data} />
+      )),
+    [item.data]
+  );
+
   return (
     <CollapsibleSection title={item.title}>
-      <YStack flexDirection="column" $gtSm={{ flexDirection: 'row' }} flexWrap="wrap" gap="$2">
-        {item.data.map((data: React.JSX.IntrinsicAttributes & ApiPayloadProps) => (
-          <Stack
-            flex={1}
-            key={`stack-${data.method}`}
-            width="100%"
-            $gtSm={{ width: '48%' }}
-            $gtLg={{ width: '30%' }}
-          >
-            <Playground key={`payload-${data.method}`} {...data} />
-          </Stack>
-        ))}
+      <YStack flexDirection={flexDirection} flexWrap="wrap" gap="$1" padding="$2">
+        {renderedItems}
       </YStack>
     </CollapsibleSection>
   );
-}
+});
+ApiPayloadItem.displayName = 'ApiPayloadItem';
 
-const ApiPayload = () => {
-  const intl = useIntl();
+const PayloadStack = memo(({ data }: { data: React.JSX.IntrinsicAttributes & ApiPayloadProps }) => {
+  const media = useMedia();
+  // eslint-disable-next-line no-nested-ternary
+  const width = media.gtLg ? '30%' : media.gtSm ? '48%' : '100%';
 
   return (
-    <Stack>
-      <HandleSDKEvents />
-      <DeviceProvider>
-        <CommonParamsProvider>
-          <CommonParamsView />
-          <ExpandModeProvider>
-            <PanelView title={intl.formatMessage({ id: 'title__hardware_api_test' })}>
-              <FlatList
-                data={playgroundConfig}
-                keyExtractor={item => `playground-${item.title}`}
-                renderItem={renderItem}
-              />
-            </PanelView>
-          </ExpandModeProvider>
-          <UploadScreen />
-          <ChangeScreenComponent />
-        </CommonParamsProvider>
-      </DeviceProvider>
+    <Stack width={width}>
+      <Playground {...data} />
     </Stack>
   );
-};
+});
+PayloadStack.displayName = 'PayloadStack';
+
+const ApiPayload = () => (
+  <Stack>
+    <HandleSDKEvents />
+    <DeviceProvider>
+      <CommonParamsProvider>
+        <CommonParamsView />
+        <ExpandModeProvider>
+          <PanelView title="API Payload">
+            <FlatList
+              data={playgroundConfig}
+              renderItem={({ item }) => <ApiPayloadItem item={item} />}
+              keyExtractor={item => item.title}
+              initialNumToRender={5}
+              maxToRenderPerBatch={3}
+            />
+          </PanelView>
+        </ExpandModeProvider>
+        <UploadScreen />
+        <ChangeScreenComponent />
+      </CommonParamsProvider>
+    </DeviceProvider>
+  </Stack>
+);
 
 export default function ApiPayloadScreen() {
   return (
-    <PageView>
+    <PageView scrollable={!!(Platform.OS === 'ios' || Platform.OS === 'android')}>
       <ApiPayload />
     </PageView>
   );

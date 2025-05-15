@@ -190,6 +190,10 @@ export default class WebUsbTransport {
     await device.claimInterface(this.interfaceId);
   }
 
+  async post(session: string, name: string, data: Record<string, unknown>) {
+    await this.call(session, name, data);
+  }
+
   /**
    * Call device method
    */

@@ -1,4 +1,5 @@
 import { isEmpty } from 'lodash';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import { DeviceModelToTypes } from '../types';
 
 import type { Features, IDeviceModel, IDeviceType, IVersionRange } from '../types';
@@ -8,27 +9,27 @@ import type { Features, IDeviceModel, IDeviceType, IVersionRange } from '../type
  */
 export const getDeviceType = (features?: Features): IDeviceType => {
   if (!features || typeof features !== 'object') {
-    return 'unknown';
+    return EDeviceType.Unknown;
   }
 
   // classic1s 3.5.0 pro 4.6.0
   switch (features.onekey_device_type) {
     case 'CLASSIC':
-      return 'classic';
+      return EDeviceType.Classic;
     case 'CLASSIC1S':
-      return 'classic1s';
+      return EDeviceType.Classic1s;
     case 'MINI':
-      return 'mini';
+      return EDeviceType.Mini;
     case 'TOUCH':
-      return 'touch';
+      return EDeviceType.Touch;
     case 'PRO':
-      return 'pro';
+      return EDeviceType.Pro;
     case 'PURE':
-      return 'classicpure';
+      return EDeviceType.ClassicPure;
     default:
       // future And old device onekey_device_type is empty
       if (!isEmpty(features.onekey_serial_no)) {
-        return 'unknown';
+        return EDeviceType.Unknown;
       }
     // old device type
   }
@@ -39,22 +40,22 @@ export const getDeviceType = (features?: Features): IDeviceType => {
 
   // not exist serialNo, bootloader mode, model 1 is classic
   if (isEmpty(serialNo) && features.bootloader_mode === true && features.model === '1') {
-    return 'classic';
+    return EDeviceType.Classic;
   }
 
-  if (isEmpty(serialNo)) return 'unknown';
+  if (isEmpty(serialNo)) return EDeviceType.Unknown;
 
   const miniFlag = serialNo.slice(0, 2);
   // By May 2021, the miniFlag is 'bixin' for all classic devices
-  if (miniFlag.toLowerCase() === 'bi') return 'classic';
-  if (miniFlag.toLowerCase() === 'cl') return 'classic';
-  if (miniFlag.toLowerCase() === 'cp') return 'classicpure';
-  if (miniFlag.toLowerCase() === 'mi') return 'mini';
-  if (miniFlag.toLowerCase() === 'tc') return 'touch';
-  if (miniFlag.toLowerCase() === 'pr') return 'pro';
+  if (miniFlag.toLowerCase() === 'bi') return EDeviceType.Classic;
+  if (miniFlag.toLowerCase() === 'cl') return EDeviceType.Classic;
+  if (miniFlag.toLowerCase() === 'cp') return EDeviceType.ClassicPure;
+  if (miniFlag.toLowerCase() === 'mi') return EDeviceType.Mini;
+  if (miniFlag.toLowerCase() === 'tc') return EDeviceType.Touch;
+  if (miniFlag.toLowerCase() === 'pr') return EDeviceType.Pro;
 
   // unknown device
-  return 'unknown';
+  return EDeviceType.Unknown;
 };
 
 /**
@@ -62,17 +63,17 @@ export const getDeviceType = (features?: Features): IDeviceType => {
  * @param name Ble name
  */
 export const getDeviceTypeByBleName = (name?: string): IDeviceType => {
-  if (!name) return 'unknown';
+  if (!name) return EDeviceType.Unknown;
 
-  if (name.startsWith('BixinKey')) return 'classic';
-  if (name.startsWith('K')) return 'classic';
+  if (name.startsWith('BixinKey')) return EDeviceType.Classic;
+  if (name.startsWith('K')) return EDeviceType.Classic;
 
-  if (name.startsWith('T')) return 'touch';
-  if (name.startsWith('Touch')) return 'touch';
+  if (name.startsWith('T')) return EDeviceType.Touch;
+  if (name.startsWith('Touch')) return EDeviceType.Touch;
 
-  if (name.startsWith('Pro')) return 'pro';
+  if (name.startsWith('Pro')) return EDeviceType.Pro;
 
-  return 'unknown';
+  return EDeviceType.Unknown;
 };
 
 /**
@@ -108,6 +109,10 @@ export const getDeviceLabel = (features?: Features) => {
   const bleName = getDeviceBleName(features);
   if (!isEmpty(bleName)) return bleName;
 
+  if (deviceType === EDeviceType.ClassicPure) {
+    return 'OneKey Classic 1S';
+  }
+
   return `OneKey ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`;
 };
 
@@ -126,7 +131,12 @@ export const getMethodVersionRange = (
     return versionRange;
   }
 
-  const modelFallbacks: IDeviceModel[] = ['model_classic', 'model_mini', 'model_touch'];
+  const modelFallbacks: IDeviceModel[] = [
+    'model_classic1s',
+    'model_classic',
+    'model_mini',
+    'model_touch',
+  ];
   for (const model of modelFallbacks) {
     if (DeviceModelToTypes[model].includes(deviceType)) {
       versionRange = getVersionRange(model);

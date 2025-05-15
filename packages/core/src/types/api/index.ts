@@ -5,7 +5,6 @@ import { init, updateSettings } from './init';
 import { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
 
 import { getLogs } from './getLogs';
-import { checkTransportRelease } from './checkTransportRelease';
 import { checkBridgeStatus } from './checkBridgeStatus';
 import { checkBridgeRelease } from './checkBridgeRelease';
 import { checkBootloaderRelease } from './checkBootloaderRelease';
@@ -17,7 +16,7 @@ import { getOnekeyFeatures } from './getOnekeyFeatures';
 import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
-import { firmwareUpdate, firmwareUpdateV2 } from './firmwareUpdate';
+import { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
 import { promptWebDeviceAccess } from './promptWebDeviceAccess';
 
 import { deviceReset } from './deviceReset';
@@ -157,6 +156,7 @@ import { benfenSignMessage } from './benfenSignMessage';
 
 import { neoGetAddress } from './neoGetAddress';
 import { neoSignTransaction } from './neoSignTransaction';
+import { ConnectSettings } from '../settings';
 
 import { deviceInfoSettings } from './deviceInfoSettings';
 import { deviceGetInfo } from './deviceGetInfo';
@@ -181,6 +181,7 @@ export type CoreApi = {
   uiResponse: typeof uiResponse;
   cancel: (connectId?: string) => void;
   updateSettings: typeof updateSettings;
+  switchTransport: (env: ConnectSettings['env']) => Promise<{ success: boolean }>;
   getLogs: typeof getLogs;
 
   /**
@@ -192,7 +193,6 @@ export type CoreApi = {
    * Core function
    */
   checkAllFirmwareRelease: typeof checkAllFirmwareRelease;
-  checkTransportRelease: typeof checkTransportRelease;
   checkBridgeStatus: typeof checkBridgeStatus;
   checkBridgeRelease: typeof checkBridgeRelease;
   checkBootloaderRelease: typeof checkBootloaderRelease;
@@ -228,7 +228,7 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdateV2;
-
+  firmwareUpdateV3: typeof firmwareUpdateV3;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**

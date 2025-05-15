@@ -17,10 +17,16 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, c
   }, [isExpandMode]);
 
   return (
-    <Stack overflow="hidden" borderBottomColor="$border" borderBottomWidth="$px">
+    <Stack
+      overflow="hidden"
+      borderBottomColor="$border"
+      borderBottomWidth="$px"
+      testID={`collapsible-section-${title}`}
+    >
       <Stack
         backgroundColor="$bgApp"
         height="$16"
+        paddingHorizontal="$2"
         onPress={() => setIsCollapsed(!isCollapsed)}
         flexDirection="row"
         justifyContent="space-between"

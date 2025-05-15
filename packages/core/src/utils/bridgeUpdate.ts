@@ -1,56 +1,77 @@
 import axios from 'axios';
 import semver from 'semver';
-import { Features } from '@onekeyfe/hd-transport';
-import { getDeviceType } from './deviceInfoUtils';
-import { getDeviceFirmwareVersion } from './deviceVersionUtils';
-import { DeviceModelToTypes } from '../types';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { DeviceModelToTypes, IDeviceType } from '../types';
 import { DataManager } from '../data-manager';
 
-const BridgeVersion = '2.2.0';
-const TouchNeedUpdateVersion = '4.3.0';
-const ClassicAndMiniNeedUpdateVersion = '3.1.0';
+const REQUIRED_BRIDGE_VERSION = '2.2.0';
+const TOUCH_NEED_UPDATE_BRIDGE_VERSION = '4.3.0';
+const CLASSIC_MINI_NEED_UPDATE_BRIDGE_VERSION = '3.1.0';
 
-export async function getBridgeReleaseInfo(features: Features, willUpdateFirmwareVersion: string) {
-  const { data } = await axios.request({
-    url: 'http://localhost:21320',
-    method: 'POST',
-    withCredentials: false,
-    timeout: 3000,
-  });
-  const { version = '0.0.0' } = data;
+export async function getBridgeReleaseInfo({
+  deviceType,
+  currentFirmwareVersion,
+  willUpdateFirmwareVersion,
+}: {
+  deviceType: IDeviceType;
+  currentFirmwareVersion: string;
+  willUpdateFirmwareVersion?: string;
+}) {
+  try {
+    const { data } = await axios.request({
+      url: 'http://localhost:21320',
+      method: 'POST',
+      withCredentials: false,
+      timeout: 3000,
+    });
+    const { version = '0.0.0' } = data;
+    const isOldVersionBridge = semver.lt(version, REQUIRED_BRIDGE_VERSION);
 
-  const deviceType = getDeviceType(features);
-  const currentFirmwareVersion = getDeviceFirmwareVersion(features).join('.');
-  const isOldVersionBridge = semver.lt(version, BridgeVersion);
-
-  let shouldUpdate = false;
-  if (DeviceModelToTypes.model_touch.includes(deviceType)) {
-    if (semver.gte(willUpdateFirmwareVersion, TouchNeedUpdateVersion) && isOldVersionBridge) {
-      shouldUpdate = true;
+    let shouldUpdate = false;
+    if (DeviceModelToTypes.model_touch.includes(deviceType)) {
+      if (
+        willUpdateFirmwareVersion &&
+        semver.gte(willUpdateFirmwareVersion, TOUCH_NEED_UPDATE_BRIDGE_VERSION) &&
+        isOldVersionBridge
+      ) {
+        shouldUpdate = true;
+      }
+      if (
+        semver.gte(currentFirmwareVersion, TOUCH_NEED_UPDATE_BRIDGE_VERSION) &&
+        isOldVersionBridge
+      ) {
+        shouldUpdate = true;
+      }
     }
-    if (semver.gte(currentFirmwareVersion, TouchNeedUpdateVersion) && isOldVersionBridge) {
-      shouldUpdate = true;
+
+    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+      if (
+        willUpdateFirmwareVersion &&
+        semver.gte(willUpdateFirmwareVersion, CLASSIC_MINI_NEED_UPDATE_BRIDGE_VERSION) &&
+        isOldVersionBridge
+      ) {
+        shouldUpdate = true;
+      }
+      if (
+        semver.gte(currentFirmwareVersion, CLASSIC_MINI_NEED_UPDATE_BRIDGE_VERSION) &&
+        isOldVersionBridge
+      ) {
+        shouldUpdate = true;
+      }
     }
+
+    const changelog = DataManager.getBridgeChangelog();
+
+    return {
+      shouldUpdate,
+      status: shouldUpdate ? 'outdated' : 'valid',
+      releaseVersion: REQUIRED_BRIDGE_VERSION,
+      changelog,
+    };
+  } catch (e) {
+    if (e.code === 'ECONNABORTED') {
+      throw ERRORS.TypedError(HardwareErrorCode.BridgeTimeoutError);
+    }
+    throw ERRORS.TypedError(HardwareErrorCode.BridgeNotInstalled);
   }
-  // classic mini classic1s
-  if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-    if (
-      semver.gte(willUpdateFirmwareVersion, ClassicAndMiniNeedUpdateVersion) &&
-      isOldVersionBridge
-    ) {
-      shouldUpdate = true;
-    }
-    if (semver.gte(currentFirmwareVersion, ClassicAndMiniNeedUpdateVersion) && isOldVersionBridge) {
-      shouldUpdate = true;
-    }
-  }
-
-  const changelog = DataManager.getBridgeChangelog();
-
-  return {
-    shouldUpdate,
-    status: shouldUpdate ? 'outdated' : 'valid',
-    releaseVersion: BridgeVersion,
-    changelog,
-  };
 }

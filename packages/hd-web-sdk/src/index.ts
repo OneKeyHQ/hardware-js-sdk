@@ -126,7 +126,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         const message = parseMessage(messageEvent);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
-            Log.debug('Host Bridge Receive message: ', message);
+            // Log.debug('Host Bridge Receive message: ', message);
           } else {
             Log.debug('Host Bridge Receive message: ', message);
           }
@@ -134,7 +134,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         const response = await handleMessage(message);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
-            Log.debug('Host Bridge response: ', message);
+            // Log.debug('Host Bridge response: ', message);
           } else {
             Log.debug('Host Bridge response: ', message);
           }
@@ -227,6 +227,18 @@ const updateSettings = async (settings: Partial<ConnectSettings>) => {
   return Promise.resolve(true);
 };
 
+const switchTransport = async (env: ConnectSettings['env']) => {
+  if (iframe.instance) {
+    const response = await sendMessage({
+      event: IFRAME.SWITCH_TRANSPORT,
+      type: IFRAME.SWITCH_TRANSPORT,
+      payload: { env },
+    });
+    return response;
+  }
+  throw ERRORS.TypedError(HardwareErrorCode.IFrameNotInitialized);
+};
+
 const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void) => {
   [
     UI_EVENT,
@@ -264,6 +276,7 @@ const HardwareSDKLowLevel = HardwareLowLevelSdk({
   addHardwareGlobalEventListener,
   uiResponse,
   updateSettings,
+  switchTransport,
 });
 
 const HardwareSDKTopLevel = HardwareTopLevelSdk();
@@ -276,6 +289,7 @@ const HardwareWebSdk = HardwareSdk({
   dispose,
   uiResponse,
   updateSettings,
+  switchTransport,
 });
 
 export default { HardwareSDKLowLevel, HardwareSDKTopLevel, HardwareWebSdk };

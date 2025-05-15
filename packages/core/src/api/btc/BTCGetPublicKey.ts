@@ -1,4 +1,4 @@
-import { GetPublicKey } from '@onekeyfe/hd-transport';
+import type { GetPublicKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getScriptType, isTaprootPath, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -7,6 +7,8 @@ import { BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 import { BTCPublicKey } from '../../types/api/btcGetPublicKey';
 import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+import { createExtendedPublicKey } from './helpers/xpubUtils';
 
 export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   hasBundle = false;
@@ -64,31 +66,79 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   }
 
   async run() {
-    const responses: BTCPublicKey[] = [];
+    let responses: BTCPublicKey[] = [];
 
-    for (let i = 0; i < this.params.length; i++) {
-      const param = this.params[i];
-
-      const res = await this.device.commands.typedCall('GetPublicKey', 'PublicKey', {
-        ...param,
-      });
-
-      const response = {
-        path: serializedPath(param.address_n),
-        ...res.message,
-        xpubSegwit: res.message.xpub,
-      };
-
-      if (this.isBtcNetwork(param) && isTaprootPath(param.address_n)) {
-        // wrap regular xpub into bitcoind native descriptor
-        const fingerprint = Number(response.root_fingerprint || 0)
-          .toString(16)
-          .padStart(8, '0');
-        const descriptorPath = `${fingerprint}${response.path.substring(1)}`;
-        response.xpubSegwit = `tr([${descriptorPath}]${response.xpub}/<0;1>/*)`;
+    try {
+      const existsShowDisplay = this.params.some(param => param.show_display);
+      if (existsShowDisplay || !this.hasBundle) {
+        throw new Error('Goto getPublickey');
       }
 
-      responses.push(response);
+      const res = await batchGetPublickeys(this.device, this.params, 'secp256k1', 0, {
+        includeNode: true,
+        ignoreCoinType: true,
+      });
+
+      if (!res.message?.hd_nodes || this.params.length !== res.message.hd_nodes.length) {
+        throw new Error('Invalid response from Publickeys');
+      }
+
+      for (let i = 0; i < this.params.length; i++) {
+        const param = this.params[i];
+        const node = res.message.hd_nodes[i];
+
+        const path = serializedPath(param.address_n);
+
+        const xpub = createExtendedPublicKey(node, param.coin_name, param.script_type);
+
+        const rootFingerprint = res.message.root_fingerprint;
+
+        let xpubSegwit = xpub;
+        if (this.isBtcNetwork(param) && isTaprootPath(param.address_n)) {
+          // wrap regular xpub into bitcoind native descriptor
+          const fingerprint = Number(rootFingerprint || 0)
+            .toString(16)
+            .padStart(8, '0');
+          const descriptorPath = `${fingerprint}${path.substring(1)}`;
+          xpubSegwit = `tr([${descriptorPath}]${xpub}/<0;1>/*)`;
+        }
+
+        responses.push({
+          path,
+          node,
+          xpub,
+          root_fingerprint: rootFingerprint,
+          xpubSegwit,
+        });
+      }
+    } catch (error) {
+      // clear responses
+      responses = [];
+
+      for (let i = 0; i < this.params.length; i++) {
+        const param = this.params[i];
+
+        const res = await this.device.commands.typedCall('GetPublicKey', 'PublicKey', {
+          ...param,
+        });
+
+        const response = {
+          path: serializedPath(param.address_n),
+          ...res.message,
+          xpubSegwit: res.message.xpub,
+        };
+
+        if (this.isBtcNetwork(param) && isTaprootPath(param.address_n)) {
+          // wrap regular xpub into bitcoind native descriptor
+          const fingerprint = Number(response.root_fingerprint || 0)
+            .toString(16)
+            .padStart(8, '0');
+          const descriptorPath = `${fingerprint}${response.path.substring(1)}`;
+          response.xpubSegwit = `tr([${descriptorPath}]${response.xpub}/<0;1>/*)`;
+        }
+
+        responses.push(response);
+      }
     }
 
     validateResult(responses, ['xpub'], {

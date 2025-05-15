@@ -101,10 +101,16 @@ export type AptosAddress = {
   address?: string;
 };
 
+export enum AptosTransactionType {
+  STANDARD = 0,
+  WITH_DATA = 1,
+}
+
 // AptosSignTx
 export type AptosSignTx = {
   address_n: number[];
   raw_tx: string;
+  tx_type?: AptosTransactionType;
 };
 
 // AptosSignedTx
@@ -1389,11 +1395,14 @@ export type Path = {
 export type BatchGetPublickeys = {
   ecdsa_curve_name?: string;
   paths: Path[];
+  include_node?: boolean;
 };
 
 // EcdsaPublicKeys
 export type EcdsaPublicKeys = {
   public_keys: string[];
+  hd_nodes: HDNodeType[];
+  root_fingerprint?: number;
 };
 
 // DnxGetAddress
@@ -1747,6 +1756,30 @@ export type EthereumSignTypedDataOneKey = {
   primary_type: string;
   metamask_v4_compat?: boolean;
   chain_id?: number;
+};
+
+export enum EthereumGnosisSafeTxOperation {
+  CALL = 0,
+  DELEGATE_CALL = 1,
+}
+
+// EthereumGnosisSafeTxRequest
+export type EthereumGnosisSafeTxRequest = {};
+
+// EthereumGnosisSafeTxAck
+export type EthereumGnosisSafeTxAck = {
+  to: string;
+  value: string;
+  data?: string;
+  operation: EthereumGnosisSafeTxOperation;
+  safeTxGas: string;
+  baseGas: string;
+  gasPrice: string;
+  gasToken: string;
+  refundReceiver: string;
+  nonce: string;
+  chain_id: number;
+  verifyingContract: string;
 };
 
 // EthereumTypedDataStructRequestOneKey
@@ -3239,6 +3272,31 @@ export type NEMDecryptedMessage = {
   payload: string;
 };
 
+// NeoGetAddress
+export type NeoGetAddress = {
+  address_n: number[];
+  show_display?: boolean;
+};
+
+// NeoAddress
+export type NeoAddress = {
+  address?: string;
+  public_key?: string;
+};
+
+// NeoSignTx
+export type NeoSignTx = {
+  address_n: number[];
+  raw_tx: string;
+  network_magic?: number;
+};
+
+// NeoSignedTx
+export type NeoSignedTx = {
+  public_key: string;
+  signature: string;
+};
+
 // NervosGetAddress
 export type NervosGetAddress = {
   address_n: number[];
@@ -3994,12 +4052,21 @@ export type TonSignMessage = {
   ext_ton_amount: UintType[];
   ext_payload: string[];
   jetton_amount_bytes?: string;
+  init_data_initial_chunk?: string;
+  init_data_length?: number;
+  signing_message_repr?: string;
+};
+
+// TonTxAck
+export type TonTxAck = {
+  init_data_chunk: string;
 };
 
 // TonSignedMessage
 export type TonSignedMessage = {
   signature?: string;
   signning_message?: string;
+  init_data_length?: number;
 };
 
 // TonSignProof
@@ -4047,6 +4114,7 @@ export type TronTriggerSmartContract = {
 export enum TronResourceCode {
   BANDWIDTH = 0,
   ENERGY = 1,
+  TRON_POWER = 2,
 }
 
 export type TronFreezeBalanceContract = {
@@ -4090,8 +4158,24 @@ export type TronUnDelegateResourceContract = {
   receiver_address?: string;
 };
 
+export type Vote = {
+  vote_address: string;
+  vote_count: number;
+};
+
+export type TronVoteWitnessContract = {
+  votes: Vote[];
+  support?: boolean;
+};
+
+export type TronCancelAllUnfreezeV2Contract = {};
+
 export type TronContract = {
   transfer_contract?: TronTransferContract;
+  provider?: string;
+  vote_witness_contract?: TronVoteWitnessContract;
+  contract_name?: string;
+  permission_id?: number;
   freeze_balance_contract?: TronFreezeBalanceContract;
   unfreeze_balance_contract?: TronUnfreezeBalanceContract;
   withdraw_balance_contract?: TronWithdrawBalanceContract;
@@ -4101,6 +4185,7 @@ export type TronContract = {
   withdraw_expire_unfreeze_contract?: TronWithdrawExpireUnfreezeContract;
   delegate_resource_contract?: TronDelegateResourceContract;
   undelegate_resource_contract?: TronUnDelegateResourceContract;
+  cancel_all_unfreeze_v2_contract?: TronCancelAllUnfreezeV2Contract;
 };
 
 // TronSignTx
@@ -4140,31 +4225,6 @@ export enum CommandFlags {
   Default = 0,
   Factory_Only = 1,
 }
-
-// NeoGetAddress
-export type NeoGetAddress = {
-  address_n: number[];
-  show_display?: boolean;
-};
-
-// NeoAddress
-export type NeoAddress = {
-  address?: string;
-  public_key?: string;
-};
-
-// NeoSignTx
-export type NeoSignTx = {
-  address_n: number[];
-  raw_tx: string;
-  network_magic?: number;
-};
-
-// NeoSignedTx
-export type NeoSignedTx = {
-  public_key: string;
-  signature: string;
-};
 
 // custom connect definitions
 export type MessageType = {
@@ -4382,6 +4442,8 @@ export type MessageType = {
   EthereumTokenInfo: EthereumTokenInfo;
   EthereumDefinitions: EthereumDefinitions;
   EthereumSignTypedDataOneKey: EthereumSignTypedDataOneKey;
+  EthereumGnosisSafeTxRequest: EthereumGnosisSafeTxRequest;
+  EthereumGnosisSafeTxAck: EthereumGnosisSafeTxAck;
   EthereumTypedDataStructRequestOneKey: EthereumTypedDataStructRequestOneKey;
   EthereumStructMemberOneKey: EthereumStructMemberOneKey;
   EthereumFieldTypeOneKey: EthereumFieldTypeOneKey;
@@ -4679,6 +4741,7 @@ export type MessageType = {
   TonGetAddress: TonGetAddress;
   TonAddress: TonAddress;
   TonSignMessage: TonSignMessage;
+  TonTxAck: TonTxAck;
   TonSignedMessage: TonSignedMessage;
   TonSignProof: TonSignProof;
   TonSignedProof: TonSignedProof;
@@ -4694,6 +4757,9 @@ export type MessageType = {
   TronWithdrawExpireUnfreezeContract: TronWithdrawExpireUnfreezeContract;
   TronDelegateResourceContract: TronDelegateResourceContract;
   TronUnDelegateResourceContract: TronUnDelegateResourceContract;
+  Vote: Vote;
+  TronVoteWitnessContract: TronVoteWitnessContract;
+  TronCancelAllUnfreezeV2Contract: TronCancelAllUnfreezeV2Contract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;

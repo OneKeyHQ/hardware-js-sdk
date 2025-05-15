@@ -1,5 +1,5 @@
 import { memo, useCallback, useContext, useEffect, useState } from 'react';
-import { CoreMessage, UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
+import { CoreMessage, IFirmwareUpdateTipMessage, UI_EVENT, UI_REQUEST } from '@onekeyfe/hd-core';
 import { Dialog, Stack, Text, Unspaced } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { Button } from '../../components/ui/Button';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import { useMedia } from '../../provider/MediaProvider';
 
 let registerListener = false;
 function FirmwareUpdateEventView({
@@ -19,6 +20,7 @@ function FirmwareUpdateEventView({
   const intl = useIntl();
   const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK, type } = useContext(HardwareSDKContext);
   const { openDialog } = useHardwareInputPinDialog();
+  const media = useMedia();
 
   const [updateState, setUpdateState] = useState<{
     progress: number;
@@ -36,7 +38,7 @@ function FirmwareUpdateEventView({
   }, [open]);
 
   const getMessage = useCallback(
-    (tip: string) => {
+    (tip: IFirmwareUpdateTipMessage) => {
       let newMessage = '';
       switch (tip) {
         case 'CheckLatestUiResource':
@@ -78,6 +80,14 @@ function FirmwareUpdateEventView({
         case 'UpdateSysResourceSuccess':
           newMessage = intl.formatMessage({ id: 'message__sys_resource_update_success' });
           break;
+
+        case 'FirmwareUpdating':
+          newMessage = intl.formatMessage({ id: 'message__firmware_updating' });
+          break;
+
+        case 'FirmwareUpdateCompleted':
+          newMessage = intl.formatMessage({ id: 'message__firmware_update_completed' });
+          break;
         default:
           newMessage = tip;
           break;
@@ -102,7 +112,7 @@ function FirmwareUpdateEventView({
           openDialog(SDK, message.payload.device.features);
         }
         if (message.type === UI_REQUEST.FIRMWARE_TIP) {
-          const tip = message.payload.data.message;
+          const tip = message.payload.data.message as IFirmwareUpdateTipMessage;
 
           setUpdateState({
             progress: 0,
@@ -129,18 +139,13 @@ function FirmwareUpdateEventView({
     }, [SDK, getMessage, openDialog])
   );
 
+  const minWidth = media.gtXs ? 480 : '100%';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal padding="$4">
         <Dialog.Overlay key="overlay" backgroundColor="$bgBackdrop" />
-        <Dialog.Content
-          key="content"
-          minWidth="100%"
-          minHeight={320}
-          $gtXs={{
-            minWidth: 480,
-          }}
-        >
+        <Dialog.Content key="content" minWidth={minWidth} minHeight={320}>
           <Dialog.Title>{intl.formatMessage({ id: 'title__updating' })}</Dialog.Title>
 
           <Stack flexDirection="column" flex={1} justifyContent="center" alignItems="center">

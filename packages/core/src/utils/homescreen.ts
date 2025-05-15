@@ -1,4 +1,5 @@
 import semver from 'semver';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import type { Features, IDeviceType } from '../types';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
@@ -239,15 +240,16 @@ export const getProData = (): Record<string, IScreenData> => ({
 export const getHomeScreenHex = (deviceType: IDeviceType, name: string) => {
   let data: Record<string, IScreenData>;
   switch (deviceType) {
-    case 'classic':
-    case 'classic1s':
-    case 'mini':
+    case EDeviceType.Classic:
+    case EDeviceType.Classic1s:
+    case EDeviceType.Mini:
+    case EDeviceType.ClassicPure:
       data = getT1Data();
       break;
-    case 'touch':
+    case EDeviceType.Touch:
       data = getTouchData();
       break;
-    case 'pro':
+    case EDeviceType.Pro:
       data = getProData();
       break;
     default:
@@ -263,15 +265,16 @@ export const getHomeScreenDefaultList = (features: Features) => {
   const deviceVersion = getDeviceFirmwareVersion(features).join('.');
 
   switch (deviceType) {
-    case 'classic':
-    case 'classic1s':
-    case 'mini':
+    case EDeviceType.Classic:
+    case EDeviceType.Classic1s:
+    case EDeviceType.Mini:
+    case EDeviceType.ClassicPure:
       data = getT1Data();
       break;
-    case 'touch':
+    case EDeviceType.Touch:
       data = getTouchData();
       break;
-    case 'pro':
+    case EDeviceType.Pro:
       if (semver.gte(deviceVersion, '4.10.0')) {
         data = getProData();
       } else {

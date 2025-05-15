@@ -1,4 +1,4 @@
-import { Deferred } from '@onekeyfe/hd-shared';
+import { Deferred, EDeviceType } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
@@ -33,7 +33,7 @@ export default class DeviceFullyUploadResource extends BaseMethod {
     if (updateType !== 'firmware') return false;
 
     const deviceType = getDeviceType(features);
-    const isTouchMode = deviceType === 'touch' || deviceType === 'pro';
+    const isTouchMode = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
 
     return isTouchMode && semver.gte(currentVersion, '3.4.0');

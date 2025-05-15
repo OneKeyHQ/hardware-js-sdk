@@ -1,6 +1,6 @@
 import { serializeError } from '@onekeyfe/hd-shared';
 import { IFRAME } from './iframe';
-import { CommonParams, CoreApi } from '../types';
+import { CommonParams, CoreApi, ConnectSettings } from '../types';
 
 type UnwrappedResponse<T> = T extends Promise<infer R>
   ? R extends { success: true; payload: infer P }
@@ -50,6 +50,12 @@ export interface IFrameCancelMessage {
   event: typeof IFRAME.CANCEL;
   type: typeof IFRAME.CANCEL;
   payload: { connectId?: string };
+}
+
+export interface IFrameSwitchTransportMessage {
+  event: typeof IFRAME.SWITCH_TRANSPORT;
+  type: typeof IFRAME.SWITCH_TRANSPORT;
+  payload: { env: ConnectSettings['env'] };
 }
 
 export const RESPONSE_EVENT = 'RESPONSE_EVENT';

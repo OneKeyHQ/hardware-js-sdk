@@ -327,7 +327,6 @@ function ExecuteView() {
             break;
           }
 
-          console.log('======>>>>> passphraseStateList', params);
           try {
             // @ts-expect-error
             const mockRes = await mockDevice?.[method]?.('', '', {
@@ -356,7 +355,7 @@ function ExecuteView() {
               })} ${address}`
             );
           } catch (e) {
-            console.log('=====>>>>> error', e, params);
+            // ignore error
           }
         }
 

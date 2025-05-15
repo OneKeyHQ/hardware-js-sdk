@@ -8,11 +8,12 @@ import {
   TypedCall,
 } from '@onekeyfe/hd-transport';
 import { get } from 'lodash';
+import BigNumber from 'bignumber.js';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { formatAnyHex } from '../helpers/hexUtils';
+import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
 import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
 import {
   DeviceModelToTypes,
@@ -201,6 +202,30 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
           }
         );
       }
+    }
+
+    if (response.type === 'EthereumGnosisSafeTxRequest') {
+      const { data } = this.params;
+      const param = {
+        to: data.message.to,
+        value: formatAnyHex(new BigNumber(data.message.value).toString(16)),
+        data: stripHexStartZeroes(formatAnyHex(data.message.data)),
+        operation: parseInt(data.message.operation),
+        safeTxGas: formatAnyHex(new BigNumber(data.message.safeTxGas).toString(16)),
+        baseGas: formatAnyHex(new BigNumber(data.message.baseGas).toString(16)),
+        gasPrice: formatAnyHex(new BigNumber(data.message.gasPrice).toString(16)),
+        gasToken: data.message.gasToken,
+        refundReceiver: data.message.refundReceiver,
+        nonce: formatAnyHex(new BigNumber(data.message.nonce).toString(16)),
+        chain_id: new BigNumber(data.domain.chainId ?? '0x', 16).toNumber(),
+        verifyingContract: data.domain.verifyingContract,
+      };
+      response = await typedCall(
+        'EthereumGnosisSafeTxAck',
+        // @ts-ignore
+        ['EthereumTypedDataSignature', 'EthereumTypedDataSignatureOneKey'],
+        param
+      );
     }
 
     if (

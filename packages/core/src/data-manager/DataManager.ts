@@ -1,5 +1,6 @@
 import axios from 'axios';
 import semver from 'semver';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
 import {
@@ -24,33 +25,33 @@ import type {
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5';
+export type IFirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v6';
 
 export type MessageVersion = 'latest' | 'v1';
 
 export default class DataManager {
   static deviceMap: DeviceTypeMap = {
-    classic: {
+    [EDeviceType.Classic]: {
       firmware: [],
       ble: [],
     },
-    classic1s: {
+    [EDeviceType.Classic1s]: {
       firmware: [],
       ble: [],
     },
-    mini: {
+    [EDeviceType.Mini]: {
       firmware: [],
       ble: [],
     },
-    touch: {
+    [EDeviceType.Touch]: {
       firmware: [],
       ble: [],
     },
-    pro: {
+    [EDeviceType.Pro]: {
       firmware: [],
       ble: [],
     },
-    classicpure: {
+    [EDeviceType.ClassicPure]: {
       firmware: [],
       ble: [],
     },
@@ -69,7 +70,7 @@ export default class DataManager {
 
   static getFirmwareStatus = (features: Features): IDeviceFirmwareStatus => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return 'unknown';
+    if (deviceType === EDeviceType.Unknown) return 'unknown';
 
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
     if (features.firmware_present === false) {
@@ -94,12 +95,12 @@ export default class DataManager {
     const deviceType = getDeviceType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
-    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+    if (deviceType !== EDeviceType.Pro && deviceType !== EDeviceType.Touch) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
     const targetDeviceConfig = targetDeviceConfigList.filter(item =>
@@ -117,14 +118,14 @@ export default class DataManager {
    */
   static getSysFullResource = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
-    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+    if (deviceType !== EDeviceType.Pro && deviceType !== EDeviceType.Touch) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.fullResource);
 
@@ -133,14 +134,19 @@ export default class DataManager {
 
   static getBootloaderResource = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) throw new Error('Device type is unknown');
 
-    if (deviceType !== 'pro' && deviceType !== 'touch') return undefined;
+    if (deviceType !== EDeviceType.Pro && deviceType !== EDeviceType.Touch) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
+    if (targetDeviceConfigList.length === 0) {
+      throw new Error(
+        `Could not found bootloader resource with deviceType:${deviceType} firmwareUpdateField:${firmwareUpdateField}`
+      );
+    }
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
     return findLatestRelease(targetDeviceConfig)?.bootloaderResource;
@@ -148,12 +154,12 @@ export default class DataManager {
 
   static getBootloaderTargetVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
@@ -162,13 +168,13 @@ export default class DataManager {
 
   static getBootloaderRelatedFirmwareVersion = (features: Features): IVersionArray | undefined => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
     if (!DeviceModelToTypes.model_mini.includes(deviceType)) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(
       item => !!item.bootloaderRelatedFirmwareVersion
@@ -179,14 +185,14 @@ export default class DataManager {
 
   static getFirmwareChangelog = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return [];
+    if (deviceType === EDeviceType.Unknown) return [];
 
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     if (
@@ -203,12 +209,12 @@ export default class DataManager {
 
   static getFirmwareLatestRelease = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     const target = findLatestRelease(targetDeviceConfigList);
@@ -226,7 +232,7 @@ export default class DataManager {
 
   static getBLEFirmwareStatus = (features: Features): IDeviceBLEFirmwareStatus => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return 'unknown';
+    if (deviceType === EDeviceType.Unknown) return 'unknown';
 
     const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
@@ -242,7 +248,7 @@ export default class DataManager {
 
   static getBleFirmwareChangelog = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return [];
+    if (deviceType === EDeviceType.Unknown) return [];
 
     const deviceBLEFirmwareVersion = getDeviceBLEFirmwareVersion(features);
 
@@ -257,7 +263,7 @@ export default class DataManager {
 
   static getBleFirmwareLatestRelease = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === 'unknown') return undefined;
+    if (deviceType === EDeviceType.Unknown) return undefined;
 
     const targetDeviceConfigList = this.deviceMap[deviceType]?.ble ?? [];
     return findLatestRelease(targetDeviceConfigList);
@@ -290,18 +296,31 @@ export default class DataManager {
         }
       );
       this.deviceMap = {
-        classic: data.classic,
-        classic1s: data.classic1s,
-        classicpure: data.classicpure,
-        mini: data.mini,
-        touch: data.touch,
-        pro: data.pro,
+        [EDeviceType.Classic]: data.classic,
+        [EDeviceType.Classic1s]: data.classic1s,
+        [EDeviceType.ClassicPure]: data.classicpure,
+        [EDeviceType.Mini]: data.mini,
+        [EDeviceType.Touch]: data.touch,
+        [EDeviceType.Pro]: data.pro,
       };
       this.assets = {
         bridge: data.bridge,
       };
     } catch (e) {
       // ignore
+    }
+  }
+
+  static updateEnv(newEnv: ConnectSettings['env']) {
+    if (this.settings) {
+      const prevEnv = this.settings.env;
+      this.settings = {
+        ...this.settings,
+        env: newEnv,
+      };
+
+      // Log the environment change
+      console.debug(`DataManager env updated: ${prevEnv} -> ${newEnv}`);
     }
   }
 

@@ -3,6 +3,7 @@ import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
   Deferred,
+  EDeviceType,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
@@ -32,8 +33,7 @@ import {
   type Features,
   type UnavailableCapabilities,
 } from '../types';
-import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload } from '../events';
-import { UI_REQUEST } from '../constants/ui-request';
+import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload, UI_REQUEST } from '../events';
 import { PROTO } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
@@ -62,6 +62,10 @@ export interface DeviceEvents {
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
   [DEVICE.PASSPHRASE]: [Device, (response: PassphrasePromptResponse, error?: Error) => void];
+  [DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE]: [
+    Device,
+    (err: any, deviceId: string) => void
+  ];
 }
 
 export interface Device {
@@ -97,6 +101,16 @@ export class Device extends EventEmitter {
    */
   // @ts-expect-error: strictPropertyInitialization
   commands: DeviceCommands;
+
+  /**
+   * 可取消的操作
+   */
+  private cancelableAction?: (err?: Error) => Promise<unknown>;
+
+  /**
+   * 设备是否被占用
+   */
+  private deviceAcquired = false;
 
   /**
    * 设备信息
@@ -217,6 +231,7 @@ export class Device extends EventEmitter {
         );
         Log.debug('Expected session id:', this.mainId);
       }
+      this.deviceAcquired = true;
       this.updateDescriptor({ [mainIdKey]: this.mainId } as unknown as DeviceDescriptor);
       if (this.commands) {
         await this.commands.dispose(false);
@@ -258,6 +273,7 @@ export class Device extends EventEmitter {
         this.needReloadDevice = true;
       }
     }
+    this.deviceAcquired = false;
   }
 
   getCommands() {
@@ -477,6 +493,12 @@ export class Device extends EventEmitter {
             )
           );
         }
+      } else if (env === 'react-native') {
+        // TODO: implement react-native acquire
+        // cancel input pin or passphrase on device request, then the following requests will report an error
+        if (this.commands) {
+          this.commands.disposed = false;
+        }
       }
     }
 
@@ -538,12 +560,29 @@ export class Device extends EventEmitter {
   }
 
   async interruptionFromUser() {
-    if (this.commands) {
-      await this.commands.dispose(true);
-    }
+    const error = ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser);
+    await this.cancelableAction?.(error);
+    await this.commands?.cancel();
+
     if (this.runPromise) {
-      this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromUser));
+      this.runPromise.reject(error);
+      this.runPromise = null;
     }
+  }
+
+  setCancelableAction(callback: (err?: Error) => Promise<unknown>) {
+    this.cancelableAction = (e?: Error) =>
+      callback(e)
+        .catch(e2 => {
+          Log.debug('cancelableAction error', e2);
+        })
+        .finally(() => {
+          this.clearCancelableAction();
+        });
+  }
+
+  clearCancelableAction() {
+    this.cancelableAction = undefined;
   }
 
   getMode() {
@@ -578,6 +617,14 @@ export class Device extends EventEmitter {
 
   isUsed() {
     return typeof this.originalDescriptor.session === 'string';
+  }
+
+  hasDeviceAcquire() {
+    const env = DataManager.getSettings('env');
+    if (DataManager.isBleConnect(env)) {
+      return this.deviceAcquired;
+    }
+    return this.isUsed() && this.deviceAcquired;
   }
 
   isUsedHere() {
@@ -632,7 +679,8 @@ export class Device extends EventEmitter {
 
   hasUsePassphrase() {
     const isModeT =
-      getDeviceType(this.features) === 'touch' || getDeviceType(this.features) === 'pro';
+      getDeviceType(this.features) === EDeviceType.Touch ||
+      getDeviceType(this.features) === EDeviceType.Pro;
     const preCheckTouch = isModeT && this.features?.unlocked === false;
 
     return this.features && (!!this.features.passphrase_protection || preCheckTouch);

@@ -1,6 +1,7 @@
 import {
   createDeferred,
   Deferred,
+  EDeviceType,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
@@ -20,11 +21,13 @@ import {
   LoggerNames,
   getDeviceFirmwareVersion,
 } from '../utils';
-import { createUiMessage } from '../events/ui-request';
+import { createUiMessage, FirmwareUpdateTipMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
 
 import type { KnownDevice, Features } from '../types';
+import type { Device } from '../device/Device';
+import { DEVICE } from '../events';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -93,6 +96,24 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     );
   };
 
+  private async _promptDeviceInBootloaderForWebDevice({ device }: { device: Device }) {
+    return new Promise((resolve, reject) => {
+      if (this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0) {
+        this.device.emit(
+          DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+          this.device,
+          (err, deviceId) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(deviceId);
+            }
+          }
+        );
+      }
+    });
+  }
+
   checkDeviceToBootloader(connectId: string | undefined) {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');
@@ -102,17 +123,46 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
 
     // check device goto bootloader mode
     let isFirstCheck = true;
+    let checkCount = 0;
+    // eslint-disable-next-line prefer-const
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+
     const isTouchOrProDevice =
-      getDeviceType(this?.device?.features) === 'touch' ||
-      getDeviceType(this?.device?.features) === 'pro';
+      getDeviceType(this?.device?.features) === EDeviceType.Touch ||
+      getDeviceType(this?.device?.features) === EDeviceType.Pro;
+
     const intervalTimer: ReturnType<typeof setInterval> | undefined = setInterval(
       async () => {
+        checkCount += 1;
         Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] isFirstCheck: ', isFirstCheck);
         if (isTouchOrProDevice && isFirstCheck) {
           isFirstCheck = false;
           Log.log('FirmwareUpdateV2 [checkDeviceToBootloader] wait 3000ms');
           await wait(3000);
         }
+
+        if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
+          clearInterval(intervalTimer);
+          clearTimeout(timeoutTimer);
+
+          try {
+            this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
+            const confirmed = await this._promptDeviceInBootloaderForWebDevice({
+              device: this.device,
+            });
+            if (confirmed) {
+              await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
+            }
+          } catch (e) {
+            Log.log(
+              'FirmwareUpdateV2 [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
+              e
+            );
+            this.checkPromise?.reject(e);
+          }
+          return;
+        }
+
         if (isBleReconnect) {
           try {
             await this.device.deviceConnector?.acquire(
@@ -130,26 +180,14 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
             Log.log('catch Bluetooth error when device is restarting: ', e);
           }
         } else {
-          const deviceDiff = await this.device.deviceConnector?.enumerate();
-          const devicesDescriptor = deviceDiff?.descriptors ?? [];
-          const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
-
-          if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
-            // should update current device from cache
-            // because device was reboot and had some new requests
-            this.device.updateFromCache(deviceList[0]);
-            this.device.commands.disposed = false;
-
-            clearInterval(intervalTimer);
-            this.checkPromise?.resolve(true);
-          }
+          await this._checkDeviceInBootloaderMode(connectId, intervalTimer, timeoutTimer);
         }
       },
       isBleReconnect ? 3000 : 2000
     );
 
     // check goto bootloader mode timeout and throw error
-    setTimeout(() => {
+    timeoutTimer = setTimeout(() => {
       if (this.checkPromise) {
         clearInterval(intervalTimer);
         this.checkPromise.reject(new Error());
@@ -157,12 +195,35 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     }, 30000);
   }
 
+  private async _checkDeviceInBootloaderMode(
+    connectId: string | undefined,
+    intervalTimer?: ReturnType<typeof setInterval>,
+    timeoutTimer?: ReturnType<typeof setTimeout>
+  ) {
+    const deviceDiff = await this.device.deviceConnector?.enumerate();
+    const devicesDescriptor = deviceDiff?.descriptors ?? [];
+    const { deviceList } = await DevicePool.getDevices(devicesDescriptor, connectId);
+
+    if (deviceList.length === 1 && deviceList[0]?.features?.bootloader_mode) {
+      // should update current device from cache
+      // because device was reboot and had some new requests
+      this.device.updateFromCache(deviceList[0]);
+      this.device.commands.disposed = false;
+
+      if (intervalTimer) clearInterval(intervalTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      this.checkPromise?.resolve(true);
+      return true;
+    }
+    return false;
+  }
+
   isEnteredManuallyBoot(features: Features) {
     const deviceType = getDeviceType(features);
-    const isMini = deviceType === 'mini';
+    const isMini = deviceType === EDeviceType.Mini;
     const isBoot183ClassicUpBle =
       this.params.updateType === 'firmware' &&
-      deviceType === 'classic' &&
+      deviceType === EDeviceType.Classic &&
       features.bootloader_version === '1.8.3';
     return isMini || isBoot183ClassicUpBle;
   }
@@ -171,7 +232,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     if (updateType !== 'firmware') return false;
 
     const deviceType = getDeviceType(features);
-    const isTouchMode = deviceType === 'touch' || deviceType === 'pro';
+    const isTouchMode = deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro;
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
 
     return isTouchMode && semver.gte(currentVersion, '3.2.0');
@@ -194,7 +255,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     if (!fullResourceRange) return;
 
     const [minVersion, limitVersion] = fullResourceRange;
-    if (deviceType === 'touch' && updateType === 'firmware' && targetVersion) {
+    if (deviceType === EDeviceType.Touch && updateType === 'firmware' && targetVersion) {
       if (
         semver.lt(currentVersion, minVersion) &&
         semver.gte(targetVersion, limitVersion) &&
@@ -241,6 +302,9 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         }
       }
 
+      // check if the device commands has been disposed
+      this.device?.commands?.checkDisposed();
+
       // auto go to bootloader mode
       try {
         this.postTipMessage('AutoRebootToBootloader');
@@ -259,6 +323,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;
         this.checkPromise = null;
+
+        // check if the device commands has been disposed
+        this.device?.commands?.checkDisposed();
+
         /**
          * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
          */
@@ -300,6 +368,9 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
+
+    // check if the device commands has been disposed
+    this.device?.commands?.checkDisposed();
 
     await this.device.acquire();
 

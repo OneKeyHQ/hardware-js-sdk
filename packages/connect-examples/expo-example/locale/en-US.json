@@ -106,12 +106,24 @@
   "label__device_info_refresh": "Refreshing Device Information",
   "label__device_info_export": "Example Export device information",
 
+  "label__device_update_firmware_v3": "Update All Resources",
   "label__device_update_firmware": "Update Firmware",
   "label__device_update_ble_firmware": "Update Bluetooth Firmware",
   "label__device_update_bootloader": "Update Bootloader",
   "label__device_update_sys_resource": "Update Sys Resource",
   "label__reboot_device_after_update": "Reboot device after successful upgrade (Pro, Touch only)",
   "label__reboot_device_board_model": "Reboot to Board Mode",
+
+  "label__device_select_firmware": "Select Firmware",
+  "label__device_select_ble_firmware": "Select Bluetooth Firmware",
+  "label__device_select_bootloader": "Select Bootloader",
+  "label__device_select_sys_resource": "Select System Resource",
+
+  "tip__no_select_firmware_file": "No firmware file selected",
+  "tip__no_select_ble_file": "No Bluetooth firmware file selected",
+  "tip__no_select_bootloader_file": "No bootloader file selected",
+  "tip__no_select_resource_file": "No system resource file selected",
+  "tip__need_select_at_least_one_file": "Need to select at least one file",
 
   "label__wallet_count": "Wallet Count",
   "label__wallet_change_count": "Wallet Change Count",
@@ -122,7 +134,12 @@
   "message__no_device": "No device",
   "message__current_selector_device": "Current selector device: ",
   "message__search_device_and_connect_device": "Search device and connect device",
-
+  "message__connection_type": "Connection Type",
+  "message__use_webusb": "Use WebUSB",
+  "message__authorize_usb_device": "Authorize USB Device",
+  "action__authorize_device": "Authorize Device",
+  "title__authorize_usb_device": "Authorize USB Device",
+  "content__authorize_usb_device_description": "Please connect and authorize your USB device to continue",
   "message__check_latest_ui_resource": "Check latest Ui resource...",
   "message__download_latest_ui_resource": "Download latest Ui resource...",
   "message__download_latest_ui_resource_success": "Download latest Ui resource success",
@@ -136,7 +153,8 @@
   "message__bootloader_update_success": "Bootloader update success",
   "message__sys_resource_update": "Sys resource update...",
   "message__sys_resource_update_success": "Sys resource update success",
-
+  "message__firmware_updating": "Firmware updating...",
+  "message__firmware_update_completed": "Firmware update completed",
   "message__scan_device_doing": "Scan device doing...",
   "message__begin_test": "Begin test",
   "message__stop_test": "Stop test",

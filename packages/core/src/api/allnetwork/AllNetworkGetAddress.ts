@@ -1,7 +1,6 @@
 import semver from 'semver';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
-import { get } from 'lodash';
 import { serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -10,6 +9,7 @@ import { CoreApi } from '../../types';
 import type {
   AllNetworkAddress,
   AllNetworkAddressParams,
+  AllNetworkGetAddressParams,
   CommonResponseParams,
   INetwork,
 } from '../../types/api/allNetworkGetAddress';
@@ -231,6 +231,12 @@ const networkConfigMap: NetworkConfigMap = {
   },
 };
 
+type MethodParams = {
+  methodName: keyof CoreApi;
+  params: Parameters<CoreApi[keyof CoreApi]>[0];
+  _originRequestParams: AllNetworkAddressParams;
+};
+
 export default class AllNetworkGetAddress extends BaseMethod<
   {
     address_n: number[];
@@ -263,16 +269,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
   }: {
     network: INetwork;
     payload: AllNetworkAddressParams;
-  }): {
-    methodName: keyof CoreApi;
-    params: Parameters<CoreApi[keyof CoreApi]>[0] & { originPayload: AllNetworkAddressParams };
-    dependOnMethods:
-      | {
-          methodName: keyof CoreApi;
-          params: Parameters<CoreApi[keyof CoreApi]>[0];
-        }[]
-      | undefined;
-  } {
+  }): MethodParams {
     const { name: networkName, coin } = networkAliases[network] || {
       name: network,
       coin: payload?.chainName,
@@ -282,22 +279,22 @@ export default class AllNetworkGetAddress extends BaseMethod<
       throw new Error(`Unsupported network: ${network}`);
     }
 
-    const dependOnMethods = config.dependOnMethodName?.map(dependOnMethodName => ({
-      methodName: dependOnMethodName,
-      params: config?.getParams?.(payload, coin, dependOnMethodName),
-    }));
-
     return {
       methodName: config.methodName,
       params: {
         ...(config?.getParams?.(payload, coin, config.methodName) ?? payload),
         originPayload: payload,
       },
-      dependOnMethods,
+      _originRequestParams: payload,
     };
   }
 
-  async callMethod(methodName: keyof CoreApi, params: any, baseParams: CommonResponseParams) {
+  async callMethod(
+    methodName: keyof CoreApi,
+    params: any & {
+      bundle: (any & { _originRequestParams: CommonResponseParams })[];
+    }
+  ) {
     const method: BaseMethod = findMethod({
       event: IFRAME.CALL,
       type: IFRAME.CALL,
@@ -312,7 +309,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
     method.connector = this.connector;
     method.postMessage = this.postMessage;
 
-    let result: AllNetworkAddress;
+    let result: AllNetworkAddress[];
     try {
       method.init();
       method.setDevice?.(this.device);
@@ -320,17 +317,22 @@ export default class AllNetworkGetAddress extends BaseMethod<
       preCheckDeviceSupport(this.device, method);
 
       const response = await method.run();
-      result = {
-        ...baseParams,
+
+      if (!Array.isArray(response) || response.length === 0) {
+        throw new Error('No response');
+      }
+
+      result = response.map((item, index) => ({
+        ...params.bundle[index]._originRequestParams,
         success: true,
-        payload: response,
-      };
+        payload: item,
+      }));
     } catch (e: any) {
       const error = handleSkippableHardwareError(e, this.device, method);
 
       if (error) {
-        result = {
-          ...baseParams,
+        result = params.bundle.map((item: { _originRequestParams: any }) => ({
+          ...item._originRequestParams,
           success: false,
           payload: {
             error: error.message,
@@ -339,7 +341,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
             connectId: method.connectId,
             deviceId: method.deviceId,
           },
-        };
+        }));
       } else {
         throw e;
       }
@@ -350,53 +352,59 @@ export default class AllNetworkGetAddress extends BaseMethod<
 
   async run() {
     const responses: AllNetworkAddress[] = [];
-    for (let i = 0; i < this.payload.bundle.length; i++) {
-      const param = this.payload.bundle[i];
-      const { methodName, params, dependOnMethods } = this.generateMethodName({
-        network: param.network as INetwork,
-        payload: param,
-      });
+    const resultMap: Record<string, AllNetworkAddress> = {};
+    const { bundle } = this.payload as AllNetworkGetAddressParams;
+    const methodReduceParams = bundle
+      .map(param =>
+        this.generateMethodName({
+          network: param.network,
+          payload: param,
+        })
+      )
+      .reduce((acc, cur) => {
+        if (!acc[cur.methodName]) {
+          acc[cur.methodName] = [];
+        }
+        acc[cur.methodName].push(cur);
+        return acc;
+      }, {} as Record<keyof CoreApi, MethodParams[]>);
 
-      // run depend on methods
-      const dependOnMethodResults: AllNetworkAddress[] = [];
-      for (const dependOnMethod of dependOnMethods ?? []) {
-        const response = await this.callMethod(
-          dependOnMethod.methodName,
-          dependOnMethod.params,
-          param
-        );
-        dependOnMethodResults.push(response);
-      }
+    const methodParamsArray = Object.values(methodReduceParams);
 
-      // if any depend on method failed, return the error
-      if (dependOnMethodResults.some(result => !result.success)) {
-        responses.push({
-          ...param,
-          success: false,
-          payload: dependOnMethodResults.find(result => !result.success)?.payload,
-        });
-        return Promise.resolve(responses);
-      }
+    const generateResponseKey = (payload: CommonResponseParams) =>
+      `${payload.path}-${payload.network}-${payload.chainName}-${payload.prefix}`;
+
+    for (let i = 0; i < methodParamsArray.length; i++) {
+      const methodParams = methodParamsArray[i];
+      const { methodName } = methodParams[0];
+
+      const params = {
+        bundle: methodParams.map(param => ({
+          ...param.params,
+        })),
+      };
 
       // call method
-      const response = await this.callMethod(methodName, params, param);
+      const response = await this.callMethod(methodName, params);
 
-      const dependOnPayloads = dependOnMethodResults.reduce(
-        (acc, cur) => Object.assign(acc, get(cur, 'payload', {})),
-        {}
-      );
+      for (let i = 0; i < methodParams.length; i++) {
+        const { _originRequestParams } = methodParams[i];
+        const responseKey = generateResponseKey(_originRequestParams);
+        resultMap[responseKey] = {
+          ..._originRequestParams,
+          ...response[i],
+        };
+      }
 
-      const result: AllNetworkAddress = {
-        ...response,
-        // @ts-expect-error
-        payload: { ...response.payload, ...dependOnPayloads },
-      };
-      responses.push(result);
       if (this.payload?.bundle?.length > 1) {
         const progress = Math.round(((i + 1) / this.payload.bundle.length) * 100);
         this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, { progress }));
       }
-      this.postPreviousAddressMessage(result);
+    }
+
+    for (const param of bundle) {
+      const responseKey = generateResponseKey(param);
+      responses.push(resultMap[responseKey]);
     }
 
     return Promise.resolve(responses);

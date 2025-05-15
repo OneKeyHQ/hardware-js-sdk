@@ -1,3 +1,5 @@
+import semver from 'semver';
+import { createNeedUpgradeFirmwareHardwareError } from '@onekeyfe/hd-shared';
 import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
@@ -6,7 +8,7 @@ import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange, KnownDevice } from '../types';
 import { CoreMessage, createFirmwareMessage, createUiMessage, DEVICE, FIRMWARE } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
-import { getLogger, LoggerNames } from '../utils';
+import { getDeviceFirmwareVersion, getLogger, getMethodVersionRange, LoggerNames } from '../utils';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -113,7 +115,7 @@ export abstract class BaseMethod<Params = undefined> {
 
   setDevice(device: Device) {
     this.device = device;
-    this.connectId = device.originalDescriptor.path;
+    // this.connectId = device.originalDescriptor.path;
   }
 
   checkFirmwareRelease() {
@@ -146,6 +148,30 @@ export abstract class BaseMethod<Params = undefined> {
         device: this.device.toMessageObject(),
       })
     );
+  }
+
+  protected checkFeatureVersionLimit(
+    checkCondition: () => boolean,
+    getVersionRange: () => DeviceFirmwareRange
+  ) {
+    if (!checkCondition()) {
+      return;
+    }
+
+    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
+    const versionRange = getMethodVersionRange(
+      this.device.features,
+      type => getVersionRange()[type]
+    );
+
+    if (!versionRange) {
+      // Equipment that does not need to be repaired
+      return;
+    }
+
+    if (semver.valid(firmwareVersion) && semver.lt(firmwareVersion, versionRange.min)) {
+      throw createNeedUpgradeFirmwareHardwareError(firmwareVersion, versionRange.min);
+    }
   }
 
   /**

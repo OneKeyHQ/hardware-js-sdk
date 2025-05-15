@@ -4,15 +4,15 @@ interface ISdkImportOptions {
   useCommonSdk?: boolean;
 }
 
-export const importSdk = async (options: ISdkImportOptions) => {
-  if (options.useCommonSdk) {
+export const importSdk = async (options?: ISdkImportOptions) => {
+  if (options?.useCommonSdk) {
     return (await import('@onekeyfe/hd-common-connect-sdk')).default as unknown as CoreApi;
   }
   return (await import('@onekeyfe/hd-web-sdk')).default.HardwareWebSdk as unknown as CoreApi;
 };
 
-export const importTopLevelSdk = async (options: ISdkImportOptions) => {
-  if (options.useCommonSdk) {
+export const importTopLevelSdk = async (options?: ISdkImportOptions) => {
+  if (options?.useCommonSdk) {
     return (await import('@onekeyfe/hd-common-connect-sdk')).default as unknown as CoreApi;
   }
   return (await import('@onekeyfe/hd-web-sdk')).default.HardwareSDKTopLevel as unknown as CoreApi;

@@ -33,7 +33,7 @@ export default class NeoSignTransaction extends BaseMethod<NeoSignTx> {
       pro: {
         min: '4.12.0',
       },
-      classic1s: {
+      model_classic1s: {
         min: '3.11.0',
       },
     };

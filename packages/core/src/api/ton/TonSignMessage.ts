@@ -1,8 +1,11 @@
-import { TonSignMessage as HardwareTonSignMessage } from '@onekeyfe/hd-transport';
+import {
+  TonSignMessage as HardwareTonSignMessage,
+  TonSignedMessage,
+  TonTxAck,
+} from '@onekeyfe/hd-transport';
 import semver from 'semver';
 import BigNumber from 'bignumber.js';
 import { isEmpty } from 'lodash';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -10,9 +13,14 @@ import { validateParams } from '../helpers/paramsValidator';
 import { DeviceFirmwareRange, DeviceModelToTypes, TonSignMessageParams } from '../../types';
 import { getDeviceFirmwareVersion, getDeviceType, getMethodVersionRange } from '../../utils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
+import type { TonSignedMessageResponse } from '../../types/api/tonSignMessage';
+import { cutString } from '../helpers/stringUtils';
 
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
+  initState: string | null = null;
+
   init() {
+    this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
     this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
 
@@ -38,11 +46,15 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       { name: 'extDestination', type: 'array' },
       { name: 'extTonAmount', type: 'array' },
       { name: 'extPayload', type: 'array' },
+      { name: 'initState', type: 'hexString' },
+      { name: 'signingMessageRepr', type: 'hexString' },
     ]);
 
     const { path } = this.payload as TonSignMessageParams;
     const addressN = validatePath(path, 3);
 
+    this.initState = stripHexStartZeroes(formatAnyHex(this.payload.initState));
+    const initStateLength = this.initState == null ? 0 : this.initState.length / 2;
     this.params = {
       address_n: addressN,
       destination: this.payload.destination,
@@ -63,15 +75,17 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       ext_destination: this.payload.extDestination,
       ext_ton_amount: this.payload.extTonAmount,
       ext_payload: this.payload.extPayload,
+      init_data_length: initStateLength,
+      signing_message_repr: stripHexStartZeroes(formatAnyHex(this.payload.signingMessageRepr)),
     };
   }
 
   getVersionRange() {
     return {
-      pro: {
+      model_touch: {
         min: '4.10.0',
       },
-      classic1s: {
+      model_classic1s: {
         min: '3.10.0',
       },
     };
@@ -81,6 +95,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     return {
       pro: {
         min: '4.10.2',
+      },
+      model_classic1s: {
+        min: '3.10.0',
       },
     };
   }
@@ -108,40 +125,67 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       pro: {
         min: '4.10.1',
       },
+      model_classic1s: {
+        min: '3.10.0',
+      },
     };
   }
 
   checkFixCommentError() {
-    // The issue of missing comments when transferring tokens.
     const { comment, jettonAmount } = this.payload;
-
-    if (isEmpty(comment) || jettonAmount === null || jettonAmount === undefined) {
-      return;
-    }
-
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.device.features,
-      type => this.getFixCommentErrorVersionRange()[type]
+    this.checkFeatureVersionLimit(
+      () => !isEmpty(comment) && jettonAmount !== null && jettonAmount !== undefined,
+      () => this.getFixCommentErrorVersionRange()
     );
-
-    if (!versionRange) {
-      // Equipment that does not need to be repaired
-      return;
-    }
-
-    if (semver.valid(firmwareVersion) && semver.lt(firmwareVersion, versionRange.min)) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-        `Device firmware version is too low, please update to ${versionRange.min}`,
-        { current: firmwareVersion, require: versionRange.min }
-      );
-    }
   }
+
+  getFixInitStateErrorVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.13.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
+      },
+    };
+  }
+
+  checkFixInitStateError() {
+    const { initState, signingMessageRepr } = this.payload;
+    this.checkFeatureVersionLimit(
+      () => !isEmpty(initState) && !isEmpty(signingMessageRepr),
+      () => this.getFixInitStateErrorVersionRange()
+    );
+  }
+
+  processTxRequest = async (
+    request: TonSignedMessage,
+    data: string
+  ): Promise<TonTxAck | TonSignedMessageResponse> => {
+    if (!request.init_data_length) {
+      const deviceType = getDeviceType(this.device.features);
+      const hasClassic = DeviceModelToTypes.model_classic1s.includes(deviceType);
+      // use signing_message_repr sign, not exists signning_message, skip validate
+      const hasSigningMessageRepr = request.signning_message == null;
+
+      return Promise.resolve({
+        ...request,
+        skip_validate: hasClassic || hasSigningMessageRepr,
+      });
+    }
+
+    const [first, rest] = cutString(data, request.init_data_length * 2);
+    const response = await this.device.commands.typedCall('TonTxAck', 'TonSignedMessage', {
+      init_data_chunk: first,
+    });
+
+    return this.processTxRequest(response.message, rest);
+  };
 
   async run() {
     // checkFixCommentError
     this.checkFixCommentError();
+    this.checkFixInitStateError();
 
     // check jettonAmount
     const { jettonAmount } = this.payload;
@@ -155,13 +199,16 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       }
     }
 
-    const deviceType = getDeviceType(this.device.features);
-    const res = await this.device.commands.typedCall('TonSignMessage', 'TonSignedMessage', {
+    let data = this.initState ?? '';
+    if (this.initState) {
+      const [first, rest] = cutString(data, 1024 * 2);
+      this.params.init_data_initial_chunk = first;
+      data = rest;
+    }
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const res = await typedCall('TonSignMessage', 'TonSignedMessage', {
       ...this.params,
     });
-    return Promise.resolve({
-      ...res.message,
-      skip_validate: DeviceModelToTypes.model_mini.includes(deviceType),
-    });
+    return this.processTxRequest(res.message, data);
   }
 }

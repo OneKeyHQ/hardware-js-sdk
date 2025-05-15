@@ -6,8 +6,9 @@ export type AptosSignedTx = {
 } & HardwareAptosSignedTx;
 
 export type AptosSignTransactionParams = {
-  path: string | number[];
+  path: string;
   rawTx?: string;
+  transactionType?: number; // Messages.AptosTransactionType
 };
 
 export declare function aptosSignTransaction(

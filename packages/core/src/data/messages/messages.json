@@ -250,6 +250,21 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "tx_type": {
+          "type": "AptosTransactionType",
+          "id": 3,
+          "options": {
+            "default": "STANDARD"
+          }
+        }
+      },
+      "nested": {
+        "AptosTransactionType": {
+          "values": {
+            "STANDARD": 0,
+            "WITH_DATA": 1
+          }
         }
       }
     },
@@ -3569,6 +3584,13 @@
           "rule": "repeated",
           "type": "Path",
           "id": 2
+        },
+        "include_node": {
+          "type": "bool",
+          "id": 3,
+          "options": {
+            "default": false
+          }
         }
       },
       "nested": {
@@ -3592,6 +3614,15 @@
           "rule": "repeated",
           "type": "bytes",
           "id": 1
+        },
+        "hd_nodes": {
+          "rule": "repeated",
+          "type": "HDNodeType",
+          "id": 2
+        },
+        "root_fingerprint": {
+          "type": "uint32",
+          "id": 3
         }
       }
     },
@@ -4787,6 +4818,78 @@
         "chain_id": {
           "type": "uint64",
           "id": 4
+        }
+      }
+    },
+    "EthereumGnosisSafeTxOperation": {
+      "values": {
+        "CALL": 0,
+        "DELEGATE_CALL": 1
+      }
+    },
+    "EthereumGnosisSafeTxRequest": {
+      "fields": {}
+    },
+    "EthereumGnosisSafeTxAck": {
+      "fields": {
+        "to": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "data": {
+          "type": "bytes",
+          "id": 3
+        },
+        "operation": {
+          "rule": "required",
+          "type": "EthereumGnosisSafeTxOperation",
+          "id": 4
+        },
+        "safeTxGas": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "baseGas": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 6
+        },
+        "gasPrice": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        },
+        "gasToken": {
+          "rule": "required",
+          "type": "string",
+          "id": 8
+        },
+        "refundReceiver": {
+          "rule": "required",
+          "type": "string",
+          "id": 9
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 10
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 11
+        },
+        "verifyingContract": {
+          "rule": "required",
+          "type": "string",
+          "id": 12
         }
       }
     },
@@ -10964,6 +11067,27 @@
         "jetton_amount_bytes": {
           "type": "bytes",
           "id": 21
+        },
+        "init_data_initial_chunk": {
+          "type": "bytes",
+          "id": 22
+        },
+        "init_data_length": {
+          "type": "uint32",
+          "id": 23
+        },
+        "signing_message_repr": {
+          "type": "bytes",
+          "id": 24
+        }
+      }
+    },
+    "TonTxAck": {
+      "fields": {
+        "init_data_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -10976,6 +11100,10 @@
         "signning_message": {
           "type": "bytes",
           "id": 2
+        },
+        "init_data_length": {
+          "type": "uint32",
+          "id": 3
         }
       }
     },
@@ -11098,7 +11226,7 @@
           "id": 4
         },
         "data": {
-          "type": "string",
+          "type": "bytes",
           "id": 5
         },
         "contract": {
@@ -11122,6 +11250,22 @@
             "transfer_contract": {
               "type": "TronTransferContract",
               "id": 2
+            },
+            "provider": {
+              "type": "bytes",
+              "id": 3
+            },
+            "vote_witness_contract": {
+              "type": "TronVoteWitnessContract",
+              "id": 4
+            },
+            "contract_name": {
+              "type": "bytes",
+              "id": 5
+            },
+            "permission_id": {
+              "type": "uint32",
+              "id": 6
             },
             "freeze_balance_contract": {
               "type": "TronFreezeBalanceContract",
@@ -11158,6 +11302,10 @@
             "undelegate_resource_contract": {
               "type": "TronUnDelegateResourceContract",
               "id": 58
+            },
+            "cancel_all_unfreeze_v2_contract": {
+              "type": "TronCancelAllUnfreezeV2Contract",
+              "id": 59
             }
           },
           "nested": {
@@ -11200,7 +11348,8 @@
             "TronResourceCode": {
               "values": {
                 "BANDWIDTH": 0,
-                "ENERGY": 1
+                "ENERGY": 1,
+                "TRON_POWER": 2
               }
             },
             "TronFreezeBalanceContract": {
@@ -11305,6 +11454,38 @@
                   "id": 4
                 }
               }
+            },
+            "TronVoteWitnessContract": {
+              "fields": {
+                "votes": {
+                  "rule": "repeated",
+                  "type": "Vote",
+                  "id": 2
+                },
+                "support": {
+                  "type": "bool",
+                  "id": 3
+                }
+              },
+              "nested": {
+                "Vote": {
+                  "fields": {
+                    "vote_address": {
+                      "rule": "required",
+                      "type": "string",
+                      "id": 1
+                    },
+                    "vote_count": {
+                      "rule": "required",
+                      "type": "uint32",
+                      "id": 2
+                    }
+                  }
+                }
+              }
+            },
+            "TronCancelAllUnfreezeV2Contract": {
+              "fields": {}
             }
           }
         }
@@ -11654,6 +11835,8 @@
         "MessageType_EthereumTypedDataValueAckOneKey": 20115,
         "MessageType_EthereumTypedDataSignatureOneKey": 20116,
         "MessageType_EthereumSignTypedHashOneKey": 20117,
+        "MessageType_EthereumGnosisSafeTxAck": 20118,
+        "MessageType_EthereumGnosisSafeTxRequest": 20119,
         "MessageType_NEMGetAddress": 67,
         "MessageType_NEMAddress": 68,
         "MessageType_NEMSignTx": 69,
@@ -11902,6 +12085,7 @@
         "MessageType_TonSignedMessage": 11904,
         "MessageType_TonSignProof": 11905,
         "MessageType_TonSignedProof": 11906,
+        "MessageType_TonTxAck": 11907,
         "MessageType_ScdoGetAddress": 12001,
         "MessageType_ScdoAddress": 12002,
         "MessageType_ScdoSignTx": 12003,
