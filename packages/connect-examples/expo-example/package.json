@@ -72,7 +72,7 @@
     "react-native-screens": "~3.29.0",
     "react-native-svg": "^14.1.0",
     "react-native-web": "~0.19.10",
-    "ripple-keypairs": "^1.1.4",
+    "ripple-keypairs": "^2.0.0",
     "rlp": "^3.0.0",
     "stream-browserify": "^3.0.0",
     "tamagui": "^1.90.2",
