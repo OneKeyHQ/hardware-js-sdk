@@ -242,7 +242,7 @@ const api: PlaygroundProps[] = [
           coin: 'btc',
           inputs: [
             {
-              prev_index: 60000,
+              prev_index: 0,
               prev_hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
               amount: '150000',
               address_n: [2147483697, 2147483648, 2147483648, 0, 0],
