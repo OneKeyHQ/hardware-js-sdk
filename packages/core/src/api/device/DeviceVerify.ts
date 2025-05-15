@@ -8,10 +8,12 @@ import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { getDeviceType } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 import type { DeviceVerifySignature } from '../../types';
+import { UI_REQUEST } from '../../events';
 
 export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
   init() {
     this.useDevicePassphraseState = false;
+    this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
 
     // check payload
     validateParams(this.payload, [{ name: 'dataHex', type: 'hexString' }]);
