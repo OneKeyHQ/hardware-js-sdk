@@ -1,5 +1,6 @@
 import axios, { AxiosRequestConfig } from 'axios';
 import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import secureJSON from 'secure-json-parse';
 
 export type HttpRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;
@@ -24,7 +25,7 @@ function wrapBody(body: any) {
 
 function parseResult(text: string) {
   try {
-    const result = JSON.parse(text);
+    const result = secureJSON.parse(text);
     if (typeof result !== 'object') {
       throw new Error('Invalid response');
     }
