@@ -138,6 +138,13 @@ const api: PlaygroundProps[] = [
         },
       },
     ],
+    expect: {
+      common: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+    },
   },
   {
     method: 'deviceWriteSEPublicCert',

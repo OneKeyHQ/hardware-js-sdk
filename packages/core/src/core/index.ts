@@ -209,22 +209,23 @@ export const callAPI = async (message: CoreMessage) => {
         }
       }
 
+      // Test/Api 模式下，不进行设备模式检查
       // check call method mode
-      const unexpectedMode = device.hasUnexpectedMode(
-        method.notAllowDeviceMode,
-        method.requireDeviceMode
-      );
-      if (unexpectedMode) {
-        if (unexpectedMode === UI_REQUEST_CONST.NOT_IN_BOOTLOADER) {
-          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.RequiredButInBootloaderMode));
-        }
-        if (unexpectedMode === UI_REQUEST_CONST.BOOTLOADER) {
-          return Promise.reject(ERRORS.TypedError(HardwareErrorCode.NotAllowInBootloaderMode));
-        }
-        return Promise.reject(
-          ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
-        );
-      }
+      // const unexpectedMode = device.hasUnexpectedMode(
+      //   method.notAllowDeviceMode,
+      //   method.requireDeviceMode
+      // );
+      // if (unexpectedMode) {
+      //   if (unexpectedMode === UI_REQUEST_CONST.NOT_IN_BOOTLOADER) {
+      //     return Promise.reject(ERRORS.TypedError(HardwareErrorCode.RequiredButInBootloaderMode));
+      //   }
+      //   if (unexpectedMode === UI_REQUEST_CONST.BOOTLOADER) {
+      //     return Promise.reject(ERRORS.TypedError(HardwareErrorCode.NotAllowInBootloaderMode));
+      //   }
+      //   return Promise.reject(
+      //     ERRORS.TypedError(HardwareErrorCode.DeviceUnexpectedMode, unexpectedMode)
+      //   );
+      // }
 
       if (method.deviceId && method.checkDeviceId) {
         const isSameDeviceID = device.checkDeviceId(method.deviceId);
