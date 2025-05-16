@@ -36,6 +36,7 @@ export const UI_REQUEST = {
   REQUIRE_MODE: 'ui-device_require_mode',
   NOT_INITIALIZE: 'ui-device_not_initialized',
   SEEDLESS: 'ui-device_seedless',
+  FACTORY: 'ui-device_factory_mode',
   FIRMWARE_OLD: 'ui-device_firmware_old',
   FIRMWARE_NOT_SUPPORTED: 'ui-device_firmware_unsupported',
   FIRMWARE_NOT_COMPATIBLE: 'ui-device_firmware_not_compatible',

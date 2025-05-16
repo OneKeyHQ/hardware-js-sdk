@@ -13,7 +13,7 @@ import { UI_REQUEST } from '../../events';
 export default class DeviceVerify extends BaseMethod<BixinVerifyDeviceRequest> {
   init() {
     this.useDevicePassphraseState = false;
-    this.allowDeviceMode = [UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [UI_REQUEST.FACTORY];
 
     // check payload
     validateParams(this.payload, [{ name: 'dataHex', type: 'hexString' }]);
