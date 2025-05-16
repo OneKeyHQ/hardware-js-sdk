@@ -1194,6 +1194,7 @@ export enum Enum_ButtonRequestType {
   ButtonRequest_Warning = 18,
   ButtonRequest_PassphraseEntry = 19,
   ButtonRequest_PinEntry = 20,
+  ButtonRequest_AttachPin = 8000,
 }
 export type ButtonRequestType = keyof typeof Enum_ButtonRequestType;
 
@@ -1231,6 +1232,7 @@ export type PinMatrixAck = {
 // PassphraseRequest
 export type PassphraseRequest = {
   _on_device?: boolean;
+  exists_attach_pin_user?: boolean;
 };
 
 // PassphraseAck
@@ -1238,6 +1240,7 @@ export type PassphraseAck = {
   passphrase?: string;
   _state?: string;
   on_device?: boolean;
+  on_device_attach_pin?: boolean;
 };
 
 // Deprecated_PassphraseStateRequest
@@ -2196,6 +2199,7 @@ export type Initialize = {
   session_id?: string;
   _skip_passphrase?: boolean;
   derive_cardano?: boolean;
+  btc_test?: string;
 };
 
 // GetFeatures
@@ -2782,6 +2786,20 @@ export type FileInfoList = {
 // DeviceEraseSector
 export type DeviceEraseSector = {
   sector: number;
+};
+
+// GetPassphraseState
+export type GetPassphraseState = {
+  passphrase_state?: string;
+  _only_main_pin?: boolean;
+  allow_create_attach_pin?: boolean;
+};
+
+// PassphraseState
+export type PassphraseState = {
+  passphrase_state?: string;
+  session_id?: string;
+  unlocked_attach_pin?: boolean;
 };
 
 export type MoneroRctKeyPublic = {
@@ -4566,6 +4584,8 @@ export type MessageType = {
   FileInfo: FileInfo;
   FileInfoList: FileInfoList;
   DeviceEraseSector: DeviceEraseSector;
+  GetPassphraseState: GetPassphraseState;
+  PassphraseState: PassphraseState;
   MoneroRctKeyPublic: MoneroRctKeyPublic;
   MoneroOutputEntry: MoneroOutputEntry;
   MoneroMultisigKLRki: MoneroMultisigKLRki;

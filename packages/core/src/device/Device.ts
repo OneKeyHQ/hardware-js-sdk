@@ -33,7 +33,13 @@ import {
   type Features,
   type UnavailableCapabilities,
 } from '../types';
-import { DEVICE, DeviceButtonRequestPayload, DeviceFeaturesPayload, UI_REQUEST } from '../events';
+import {
+  DEVICE,
+  DeviceButtonRequestPayload,
+  DeviceFeaturesPayload,
+  PassphraseRequestPayload,
+  UI_REQUEST,
+} from '../events';
 import { PROTO } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
@@ -61,7 +67,11 @@ export interface DeviceEvents {
   [DEVICE.PASSPHRASE_ON_DEVICE]: [Device, ((response: any) => void)?];
   [DEVICE.BUTTON]: [Device, DeviceButtonRequestPayload];
   [DEVICE.FEATURES]: [Device, DeviceFeaturesPayload];
-  [DEVICE.PASSPHRASE]: [Device, (response: PassphrasePromptResponse, error?: Error) => void];
+  [DEVICE.PASSPHRASE]: [
+    Device,
+    PassphraseRequestPayload,
+    (response: PassphrasePromptResponse, error?: Error) => void
+  ];
   [DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE]: [
     Device,
     (err: any, deviceId: string) => void
@@ -323,6 +333,26 @@ export class Device extends EventEmitter {
     Log.debug('tryFixInternalState session cache: ', deviceSessionCache);
   }
 
+  // attach to pin to fix internal state
+  updateInternalState(state: string, deviceId: string, sessionId: string | null = null) {
+    Log.debug(
+      'updateInternalState session param: ',
+      `device_id: ${deviceId}`,
+      `passphraseState: ${state}`,
+      `sessionId: ${sessionId}`
+    );
+
+    if (sessionId) {
+      deviceSessionCache[this.generateStateKey(deviceId, state)] = sessionId;
+      // delete the old sessionId
+      const oldKey = `${deviceId}`;
+      if (deviceSessionCache[oldKey]) {
+        delete deviceSessionCache[oldKey];
+      }
+    }
+    Log.debug('updateInternalState session cache: ', deviceSessionCache);
+  }
+
   private setInternalState(state: string, initSession?: boolean) {
     Log.debug(
       'setInternalState session param: ',
@@ -361,7 +391,7 @@ export class Device extends EventEmitter {
   }
 
   async initialize(options?: InitOptions) {
-    Log.debug('initialize param:', options);
+    // Log.debug('initialize param:', options);
 
     this.passphraseState = options?.passphraseState;
 
@@ -378,8 +408,14 @@ export class Device extends EventEmitter {
     if (options?.deriveCardano) {
       payload.derive_cardano = true;
     }
+    payload.passphrase_state = options?.passphraseState;
 
-    Log.debug('initialize payload:', payload);
+    // Log.debug('initialize payload:', payload);
+    console.log('=====>>>>>> initialize device begin: ', payload, {
+      deviceId: options?.deviceId,
+      passphraseState: options?.passphraseState,
+      initSession: options?.initSession,
+    });
 
     try {
       // @ts-expect-error
@@ -393,6 +429,7 @@ export class Device extends EventEmitter {
         }),
       ]);
 
+      console.log('=====>>>>>> initialize device end: ', message);
       this._updateFeatures(message, options?.initSession);
       await TransportManager.reconfigure(this.features);
     } catch (error) {
@@ -693,12 +730,22 @@ export class Device extends EventEmitter {
     return false;
   }
 
-  async checkPassphraseStateSafety(passphraseState?: string) {
+  async checkPassphraseStateSafety(passphraseState?: string, useEmptyPassphraseState?: boolean) {
     if (!this.features) return false;
-    const newState = await getPassphraseStateWithRefreshDeviceInfo(this);
+    const { passphraseState: newPassphraseState, unlockedAttachPin } =
+      await getPassphraseStateWithRefreshDeviceInfo(this, {
+        expectPassphraseState: passphraseState,
+        onlyMainPin: useEmptyPassphraseState,
+      });
+
+    // Main wallet and unlock Attach Pin, throw safe error
+    if (unlockedAttachPin && useEmptyPassphraseState) {
+      this.clearInternalState();
+      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError));
+    }
 
     // When exists passphraseState, check passphraseState
-    if (passphraseState && passphraseState !== newState) {
+    if (passphraseState && passphraseState !== newPassphraseState) {
       this.clearInternalState();
       return false;
     }

@@ -5,8 +5,10 @@
   "tab__address_test": "Address Test",
   "tab__security_check": "Security Check",
   "tab__functional_testing": "Functional testing",
+  "tab__attach_to_pin_testing": "Attach to Pin Testing",
 
   "action__search_device": "Search Device",
+  "action__search_device_webusb": "Search Device WebUSB",
   "action__clean_device": "Disconnect Device",
   "action__connect_device": "Connect Device",
   "action__confirm": "Confirm",

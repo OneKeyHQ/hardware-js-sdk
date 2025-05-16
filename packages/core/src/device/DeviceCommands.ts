@@ -4,12 +4,13 @@ import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
 import { patchFeatures, getLogger, LoggerNames, getDeviceType } from '../utils';
 import type { Device } from './Device';
-import { DEVICE } from '../events';
+import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
 
 export type PassphrasePromptResponse = {
   passphrase?: string;
   passphraseOnDevice?: boolean;
+  attachPinOnDevice?: boolean;
   cache?: boolean;
 };
 
@@ -438,8 +439,17 @@ export class DeviceCommands {
     }
 
     if (res.type === 'PassphraseRequest') {
-      return this._promptPassphrase().then(response => {
-        const { passphrase, passphraseOnDevice } = response;
+      const existsAttachPinUser = res.message.exists_attach_pin_user;
+      return this._promptPassphrase({
+        existsAttachPinUser,
+      }).then(response => {
+        const { passphrase, passphraseOnDevice, attachPinOnDevice } = response;
+
+        // Attach PIN on device
+        if (attachPinOnDevice && existsAttachPinUser) {
+          return this._commonCall('PassphraseAck', { on_device_attach_pin: true });
+        }
+
         return !passphraseOnDevice
           ? this._commonCall('PassphraseAck', { passphrase })
           : this._commonCall('PassphraseAck', { on_device: true });
@@ -501,7 +511,7 @@ export class DeviceCommands {
     });
   }
 
-  _promptPassphrase() {
+  _promptPassphrase(options: PassphraseRequestPayload) {
     return new Promise<PassphrasePromptResponse>((resolve, reject) => {
       const cancelAndReject = (_error?: Error) =>
         cancelDeviceInPrompt(this.device, false)
@@ -527,6 +537,7 @@ export class DeviceCommands {
         this.device.emit(
           DEVICE.PASSPHRASE,
           this.device,
+          options,
           (response: PassphrasePromptResponse, error?: Error) => {
             this.device.clearCancelableAction();
             if (error) {

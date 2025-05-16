@@ -342,7 +342,8 @@ const onCallDevice = async (
 
         // Check Device passphrase State
         const passphraseStateSafety = await device.checkPassphraseStateSafety(
-          method.payload?.passphraseState
+          method.payload?.passphraseState,
+          method.payload?.useEmptyPassphrase
         );
 
         // Double check, handles the special case of Touch/Pro
@@ -836,12 +837,12 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
 const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
   postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
 
-  if (request.code === 'ButtonRequest_PinEntry') {
-    Log.log('request Confirm Input PIN');
+  if (request.code === 'ButtonRequest_PinEntry' || request.code === 'ButtonRequest_AttachPin') {
+    Log.log('request Confirm Input PIN or Attach PIN');
     postMessage(
       createUiMessage(UI_REQUEST.REQUEST_PIN, {
         device: device.toMessageObject() as KnownDevice,
-        type: 'ButtonRequest_PinEntry',
+        type: request.code,
       })
     );
   } else {
@@ -854,27 +855,31 @@ const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]
   postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
 };
 
-const onDevicePassphraseHandler = async (...[device, callback]: DeviceEvents['passphrase']) => {
+const onDevicePassphraseHandler = async (
+  ...[device, requestPayload, callback]: DeviceEvents['passphrase']
+) => {
   Log.debug('onDevicePassphraseHandler');
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PASSPHRASE, device);
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
+      existsAttachPinUser: requestPayload.existsAttachPinUser,
     })
   );
   // wait for passphrase
   const uiResp = await uiPromise.promise;
-  const { value, passphraseOnDevice, save } = uiResp.payload;
+  const { value, passphraseOnDevice, save, attachPinOnDevice } = uiResp.payload;
   // send as PassphrasePromptResponse
   callback({
     passphrase: value.normalize('NFKD'),
     passphraseOnDevice,
+    attachPinOnDevice,
     cache: save,
   });
 };
 
-const onEmptyPassphraseHandler = (...[_, callback]: DeviceEvents['passphrase']) => {
+const onEmptyPassphraseHandler = (...[_, , callback]: DeviceEvents['passphrase']) => {
   Log.debug('onEmptyPassphraseHandler');
   // send as PassphrasePromptResponse
   callback({ passphrase: '' });

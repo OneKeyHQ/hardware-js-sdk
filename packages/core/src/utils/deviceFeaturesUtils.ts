@@ -73,11 +73,30 @@ export const supportNewPassphrase = (features?: Features): SupportFeatureType =>
   return { support: semver.gte(currentVersion, '2.4.0'), require: '2.4.0' };
 };
 
-export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) => {
+export const getPassphraseStateWithRefreshDeviceInfo = async (
+  device: Device,
+  options?: {
+    expectPassphraseState?: string;
+    onlyMainPin?: boolean;
+  }
+) => {
   const { features, commands } = device;
   const locked = features?.unlocked === false;
 
-  const passphraseState = await getPassphraseState(features, commands);
+  const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(
+    features,
+    commands,
+    {
+      ...options,
+    }
+  );
+
+  // Attach to pin try to fix internal state
+  if (newSession && passphraseState && features?.device_id) {
+    console.log('=====>>>>>> run updateInternalState newSession:', newSession);
+    device.updateInternalState(passphraseState, features.device_id, newSession);
+  }
+
   const isModeT =
     getDeviceType(features) === EDeviceType.Touch || getDeviceType(features) === EDeviceType.Pro;
 
@@ -93,14 +112,55 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) =>
     await device.getFeatures();
   }
 
-  return passphraseState;
+  return { passphraseState, newSession, unlockedAttachPin };
 };
 
 export const getPassphraseState = async (
   features: Features | undefined,
-  commands: DeviceCommands
-) => {
-  if (!features) return false;
+  commands: DeviceCommands,
+  options?: {
+    expectPassphraseState?: string;
+    onlyMainPin?: boolean;
+    // createAttachPinWallet?: boolean;
+  }
+): Promise<{
+  passphraseState: string | undefined;
+  newSession: string | undefined;
+  unlockedAttachPin: boolean | undefined;
+}> => {
+  if (!features)
+    return { passphraseState: undefined, newSession: undefined, unlockedAttachPin: undefined };
+
+  const firmwareVersion = getDeviceFirmwareVersion(features);
+  const deviceType = getDeviceType(features);
+
+  if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.13.2')) {
+    console.log(
+      '=====>>>>>> getPassphraseState begin: ',
+      options?.onlyMainPin,
+      options?.expectPassphraseState
+    );
+
+    const { message, type } = await commands.typedCall('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: options?.onlyMainPin ? undefined : options?.expectPassphraseState,
+      // allow_create_attach_pin: options?.createAttachPinWallet,
+      // _only_main_pin: options?.onlyMainPin,
+    });
+
+    console.log('=====>>>>>> getPassphraseState end: result ', message);
+
+    // @ts-expect-error
+    if (type === 'CallMethodError') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Get the passphrase state error');
+    }
+
+    return {
+      passphraseState: message.passphrase_state,
+      newSession: message.session_id,
+      unlockedAttachPin: message.unlocked_attach_pin,
+    };
+  }
+
   const { message, type } = await commands.typedCall('GetAddress', 'Address', {
     address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
     coin_name: 'Testnet',
@@ -113,7 +173,11 @@ export const getPassphraseState = async (
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Get the passphrase state error');
   }
 
-  return message.address;
+  return {
+    passphraseState: message.address,
+    newSession: undefined,
+    unlockedAttachPin: undefined,
+  };
 };
 
 export const supportBatchPublicKey = (

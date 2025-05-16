@@ -36,6 +36,7 @@
     "@tamagui/babel-plugin": "1.90.2",
     "@tamagui/config": "1.90.2",
     "@tamagui/lucide-icons": "1.90.2",
+    "@tamagui/toast": "1.90.2",
     "@ton/core": "^0.57.0",
     "asyncstorage-down": "^4.2.0",
     "bitcoinjs-lib": "^6.1.5",

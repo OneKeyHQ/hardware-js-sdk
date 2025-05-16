@@ -1,7 +1,9 @@
-import { atom } from 'jotai';
+import { atomWithStorage } from 'jotai/utils';
 
 // Connection type atom: 'bridge' | 'webusb'
 export type ConnectionType = 'bridge' | 'webusb';
 
-// Create an atom to store the connection type
-export const connectionTypeAtom = atom<ConnectionType>('bridge');
+export const connectionTypeAtom = atomWithStorage<ConnectionType>(
+  'onekey-connectionType',
+  'bridge'
+);
