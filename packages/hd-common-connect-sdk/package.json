@@ -24,6 +24,6 @@
     "@onekeyfe/hd-shared": "^1.0.39-alpha.3",
     "@onekeyfe/hd-transport-http": "^1.0.39-alpha.3",
     "@onekeyfe/hd-transport-lowlevel": "^1.0.39-alpha.3",
-    "@onekeyfe/hd-transport-webusb": "^1.0.39-alpha.3"
+    "@onekeyfe/hd-transport-web-device": "^1.0.39-alpha.3"
   }
 }

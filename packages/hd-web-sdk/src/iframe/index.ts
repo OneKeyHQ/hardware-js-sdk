@@ -1,6 +1,6 @@
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import WebusbTransport from '@onekeyfe/hd-transport-webusb';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
+import { WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import {
   PostMessageEvent,
   IFRAME,
@@ -70,7 +70,7 @@ export async function init(payload: IFrameInit['payload']) {
     let Transport;
     switch (settings.env) {
       case 'webusb':
-        Transport = WebusbTransport;
+        Transport = WebUsbTransport;
         break;
       case 'emulator':
         Transport = EmulatorTransport;
@@ -124,7 +124,7 @@ export const switchCoreTransport = (env: ConnectSettings['env']) => {
     let Transport;
     switch (env) {
       case 'webusb':
-        Transport = WebusbTransport;
+        Transport = WebUsbTransport;
         break;
       case 'emulator':
         Transport = EmulatorTransport;

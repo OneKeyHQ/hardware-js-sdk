@@ -23,7 +23,7 @@ import HardwareSdk, {
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import WebusbTransport from '@onekeyfe/hd-transport-webusb';
+import { WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 
@@ -121,7 +121,7 @@ const init = async (
     let Transport: any;
     switch (_settings.env) {
       case 'webusb':
-        Transport = WebusbTransport;
+        Transport = WebUsbTransport;
         break;
       case 'lowlevel':
         Transport = LowlevelTransport;

@@ -1,5 +1,5 @@
 {
-  "name": "@onekeyfe/hd-transport-webusb",
+  "name": "@onekeyfe/hd-transport-web-device",
   "version": "1.0.39-alpha.3",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
