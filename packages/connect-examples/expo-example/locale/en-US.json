@@ -98,6 +98,7 @@
   "label__device_bluetooth_version": "Bluetooth Version",
   "label__device_device_statue": "Device Mode",
 
+  "label__device_factory_status": "Factory Mode",
   "label__device_bootloader_statue": "Bootloader",
   "label__device_firmware_status": "Firmware",
 

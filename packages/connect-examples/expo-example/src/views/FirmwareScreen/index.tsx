@@ -18,7 +18,7 @@ import { MessageBox } from './MessageBox';
 import { FirmwareUpdateEvent } from './FirmwareUpdateEvent';
 import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
-import { ExportDeviceInfo, formatCurrentTime } from './ExportDeviceInfo';
+import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDeviceInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
@@ -687,10 +687,7 @@ function FirmwareUpdate({
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_device_statue' })}
                   value={intl.formatMessage({
-                    id:
-                      features.bootloader_mode === true
-                        ? 'label__device_bootloader_statue'
-                        : 'label__device_firmware_status',
+                    id: getDeviceMode(features),
                   })}
                 />
               </Stack>

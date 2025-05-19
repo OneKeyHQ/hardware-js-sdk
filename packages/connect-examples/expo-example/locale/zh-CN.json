@@ -98,7 +98,8 @@
   "label__device_boardloader_version": "Boardloader 版本",
   "label__device_bluetooth_version": "蓝牙版本",
   "label__device_device_statue": "设备模式",
-
+  
+  "label__device_factory_status": "工厂模式",
   "label__device_bootloader_statue": "Bootloader 状态",
   "label__device_firmware_status": "开机状态",
 
