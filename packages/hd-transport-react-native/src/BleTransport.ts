@@ -7,6 +7,8 @@ const Log = getLogger(LoggerNames.HdBleTransport);
 export default class BleTransport {
   id: string;
 
+  name = 'ReactNativeBleTransport';
+
   device: Device;
 
   mtuSize = 20;

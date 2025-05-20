@@ -21,8 +21,9 @@ export type ConnectSettings = {
     | 'electron'
     | 'react-native'
     | 'webusb'
-    | 'lowlevel'
-    | 'emulator';
+    | 'emulator'
+    | 'desktop-web-ble'
+    | 'lowlevel';
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;

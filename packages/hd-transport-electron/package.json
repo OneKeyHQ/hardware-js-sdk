@@ -1,0 +1,35 @@
+{
+  "name": "@onekeyfe/hd-transport-electron",
+  "version": "1.0.28",
+  "author": "OneKey",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "sideEffects": false,
+  "peerDependencies": {
+    "@onekeyfe/hd-transport-web-device": "^1.0.28",
+    "electron": ">=25.0.0"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-shared": "^1.0.28"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "electron": "^25.0.0",
+    "@types/web-bluetooth": "^0.0.17"
+  }
+}

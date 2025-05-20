@@ -3,9 +3,9 @@
   "compilerOptions": {
     "outDir": "./dist",
     "types": [
-      "w3c-web-usb",
+      "node",
       "web-bluetooth"
     ]
   },
-  "include": ["./src"]
+  "include": ["./src", "../hd-transport-web-device/src/electron-ble-transport.ts"]
 }

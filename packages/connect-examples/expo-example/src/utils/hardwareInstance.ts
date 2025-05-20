@@ -30,12 +30,14 @@ export const getHardwareSDKInstance = memoizee(
           fetchConfig: true,
         };
 
-        HardwareSDK = await importSdk();
+        HardwareSDK = await importSdk({
+          useCommonSdk: true,
+        });
         console.log(HardwareSDK);
 
         if (Platform.OS === 'web') {
           settings.connectSrc = CONNECT_SRC;
-          settings.env = 'web';
+          settings.env = 'desktop-web-ble';
           settings.preRelease = true;
           HardwareLowLevelSDK = await importLowLevelSDK();
 

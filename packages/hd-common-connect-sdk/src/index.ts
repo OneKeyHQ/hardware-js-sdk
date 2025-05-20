@@ -23,12 +23,20 @@ import HardwareSdk, {
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import { WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
+import { WebUsbTransport, ElectronBleTransport } from '@onekeyfe/hd-transport-web-device';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
+
+const getTransport = (env: ConnectSettings['env']) => {
+  if (env === 'desktop-web-ble') return ElectronBleTransport;
+  if (env === 'webusb') return WebUsbTransport;
+  if (env === 'lowlevel') return LowlevelTransport;
+  if (env === 'emulator') return EmulatorTransport;
+  return HttpTransport;
+};
 
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
@@ -116,22 +124,7 @@ const init = async (
   Log.debug('init');
 
   try {
-    console.log(_settings.env);
-    // const Transport = _settings.env === 'webusb' ? WebusbTransport : HttpTransport;
-    let Transport: any;
-    switch (_settings.env) {
-      case 'webusb':
-        Transport = WebUsbTransport;
-        break;
-      case 'lowlevel':
-        Transport = LowlevelTransport;
-        break;
-      case 'emulator':
-        Transport = EmulatorTransport;
-        break;
-      default:
-        Transport = HttpTransport;
-    }
+    const Transport = getTransport(_settings.env);
     _core = await initCore(_settings, Transport, plugin);
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);

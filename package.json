@@ -38,6 +38,7 @@
     "example:desktop": "cd ./packages/connect-examples/electron-example && yarn dev",
     "build:example:desktop": "cd ./packages/connect-examples/electron-example && yarn make",
     "example:v2": "cd ./packages/connect-examples/expo-playground && yarn start",
+    "dev:all": "lerna run dev --parallel --ignore expo-example --ignore hardware-example",
     "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
     "dev:ble": "cd ./packages/hd-ble-sdk && yarn dev",
     "dev:common": "cd ./packages/hd-common-connect-sdk && yarn dev",
@@ -46,8 +47,8 @@
     "dev:transport-http": "cd ./packages/hd-transport-http && yarn dev",
     "dev:transport-rn": "cd ./packages/hd-transport-react-native && yarn dev",
     "dev:transport-lowlevel": "cd ./packages/hd-transport-lowlevel && yarn dev",
-    "dev:transport-webusb": "cd ./packages/hd-transport-webusb && yarn dev",
     "dev:transport-emulator": "cd ./packages/hd-transport-emulator && yarn dev",
+    "dev:transport-web-device": "cd ./packages/hd-transport-web-device && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
     "debug:watcher": "node ./scripts/monitor.js"
   },

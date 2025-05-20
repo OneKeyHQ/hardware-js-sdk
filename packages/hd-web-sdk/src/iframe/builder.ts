@@ -24,7 +24,7 @@ export const init = async (settings: any) => {
     instance.style.width = '0px';
     instance.style.height = '0px';
     instance.id = 'onekey-connect';
-    instance.allow = 'usb';
+    instance.allow = 'usb; bluetooth';
   }
 
   // const manifest = `version=${settings.version as string}`;
