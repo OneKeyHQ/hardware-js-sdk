@@ -349,7 +349,7 @@ export default class DataManager {
   }
 
   static isBleConnect = (env: ConnectSettings['env']) =>
-    env === 'react-native' || env === 'lowlevel';
+    env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
 
   static isWebUsbConnect = (env: ConnectSettings['env']) => env === 'webusb';
 }

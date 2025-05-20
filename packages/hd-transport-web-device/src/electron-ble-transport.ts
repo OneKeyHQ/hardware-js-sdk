@@ -18,9 +18,15 @@ declare global {
   interface Window {
     desktopApi?: {
       onBleSelect: (callback: (devices: Array<{ id: string; name: string }>) => void) => () => void;
+      stopBleScan: () => void;
     };
   }
 }
+
+export type BleAcquireInput = {
+  uuid: string;
+  forceCleanRunPromise?: boolean;
+};
 
 export default class ElectronBleTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
@@ -63,14 +69,7 @@ export default class ElectronBleTransport {
       // 触发蓝牙设备搜索
       navigator.bluetooth
         .requestDevice({
-          filters: [
-            { services: [ONEKEY_SERVICE_UUID] },
-            // { namePrefix: 'BixinKey' },
-            // { namePrefix: 'K' },
-            // { namePrefix: 'T' },
-            // { namePrefix: 'Touch' },
-            // { namePrefix: 'Pro' },
-          ],
+          filters: [{ services: [ONEKEY_SERVICE_UUID] }],
           optionalServices: [ONEKEY_SERVICE_UUID],
         })
         .catch(error => {
@@ -97,6 +96,8 @@ export default class ElectronBleTransport {
           console.log('[Transport] Cleaning up resources');
           clearTimeout(timeoutId);
           cleanup?.();
+          // Stop BLE scanning through desktopApi
+          window.desktopApi?.stopBleScan();
         };
 
         // 设置 3 秒超时
@@ -122,8 +123,22 @@ export default class ElectronBleTransport {
         });
       });
     } catch (error) {
+      // Make sure to stop scanning even if there's an error
+      window.desktopApi?.stopBleScan();
       console.error('[Transport] Error in enumerate:', error);
       throw error;
     }
+  }
+
+  async acquire(input: BleAcquireInput) {
+    const { uuid, forceCleanRunPromise } = input;
+
+    if (!uuid) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
+    }
+
+    console.log('[Transport] Acquiring device:', uuid);
+
+    return Promise.resolve({ uuid });
   }
 }

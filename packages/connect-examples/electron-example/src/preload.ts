@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unused-vars,@typescript-eslint/require-await */
 import { ipcRenderer } from 'electron';
+import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
 import type {
   ElectronBleAPI,
   BluetoothPairingDetails,
@@ -74,30 +75,36 @@ const desktopApi = {
       console.log('[Preload] Received pairing request:', details);
       callback(details);
     };
-    ipcRenderer.on('bluetooth-pairing-request', subscription);
+    ipcRenderer.on(EOneKeyBleMessageKeys.BLE_PAIRING_REQUEST, subscription);
     return () => {
       console.log('[Preload] Removing onBlePairingRequest listener');
-      ipcRenderer.removeListener('bluetooth-pairing-request', subscription);
+      ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_PAIRING_REQUEST, subscription);
     };
   },
   respondToPairing: (response: BluetoothPairingResponse) => {
     console.log('[Preload] Sending pairing response:', response);
-    ipcRenderer.send('bluetooth-pairing-response', response);
+    ipcRenderer.send(EOneKeyBleMessageKeys.BLE_PAIRING_RESPONSE, response);
+  },
+
+  // Add method to stop BLE scanning
+  stopBleScan: () => {
+    console.log('[Preload] Sending stop BLE scan request');
+    ipcRenderer.send(EOneKeyBleMessageKeys.BLE_STOP_SCAN);
   },
 
   enumerate: () =>
     new Promise(resolve => {
       // 1. 监听结果
       const handleResult = (_: any, devices: Array<{ id: string; name: string }>) => {
-        ipcRenderer.removeListener('ble-enumerate-result', handleResult);
+        ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_ENUMERATE_RESULT, handleResult);
         resolve(devices);
       };
 
       // 2. 注册一次性监听
-      ipcRenderer.once('ble-enumerate-result', handleResult);
+      ipcRenderer.once(EOneKeyBleMessageKeys.BLE_ENUMERATE_RESULT, handleResult);
 
       // 3. 发送枚举请求
-      ipcRenderer.send('ble-enumerate');
+      ipcRenderer.send(EOneKeyBleMessageKeys.BLE_ENUMERATE);
     }),
 };
 

@@ -6,7 +6,7 @@
 
 /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/ban-ts-comment, import/no-extraneous-dependencies, global-require, import/no-unresolved */
 
-import { isOnekeyDevice } from '@onekeyfe/hd-shared';
+import { isOnekeyDevice, EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
 import type { WebContents, IpcMainEvent, Event } from 'electron';
 
 // 导出所有类型定义
@@ -48,6 +48,9 @@ export function initElectronBleBridge(webContents: WebContents) {
       console.log('[Main] select-bluetooth-device event triggered');
       console.log('[Main] Raw device list:', deviceList);
 
+      // 保存回调以供后续使用
+      selectBluetoothCallback = callback;
+
       // 如果设备列表为空，等待下一次事件
       if (!deviceList.length) {
         console.log('[Main] Empty device list, waiting for more devices...');
@@ -61,10 +64,8 @@ export function initElectronBleBridge(webContents: WebContents) {
 
       if (filteredDevices.length > 0) {
         console.log('[Main] Found OneKey devices:', filteredDevices);
-        // 保存回调以供后续使用
-        selectBluetoothCallback = callback;
         // 持续发送新发现的设备
-        webContents.send('ble-select', filteredDevices);
+        webContents.send(EOneKeyBleMessageKeys.BLE_SELECT, filteredDevices);
       } else {
         console.log('[Main] No OneKey devices in this batch, continue scanning...');
       }
@@ -72,7 +73,7 @@ export function initElectronBleBridge(webContents: WebContents) {
   );
 
   // 渲染进程返回选择结果
-  ipcMain.on('ble-select-result', (_event: IpcMainEvent, deviceId?: string) => {
+  ipcMain.on(EOneKeyBleMessageKeys.BLE_SELECT_RESULT, (_event: IpcMainEvent, deviceId?: string) => {
     console.log('[Main] Received ble-select-result:', deviceId);
     if (selectBluetoothCallback) {
       selectBluetoothCallback(deviceId || '');
@@ -81,8 +82,17 @@ export function initElectronBleBridge(webContents: WebContents) {
   });
 
   // 允许用户取消
-  ipcMain.on('cancel-bluetooth-request', () => {
+  ipcMain.on(EOneKeyBleMessageKeys.BLE_CANCEL_REQUEST, () => {
     console.log('[Main] Received cancel-bluetooth-request');
+    if (selectBluetoothCallback) {
+      selectBluetoothCallback('');
+      selectBluetoothCallback = null;
+    }
+  });
+
+  // 处理停止扫描请求
+  ipcMain.on(EOneKeyBleMessageKeys.BLE_STOP_SCAN, () => {
+    console.log('[Main] Received stop BLE scan request');
     if (selectBluetoothCallback) {
       selectBluetoothCallback('');
       selectBluetoothCallback = null;
@@ -94,12 +104,12 @@ export function initElectronBleBridge(webContents: WebContents) {
     (details: BluetoothPairingDetails, callback: (response: BluetoothPairingResponse) => void) => {
       console.log('[Main] Bluetooth pairing request:', details);
       bluetoothPinCallback = callback;
-      webContents.send('bluetooth-pairing-request', details);
+      webContents.send(EOneKeyBleMessageKeys.BLE_PAIRING_REQUEST, details);
     }
   );
 
   ipcMain.on(
-    'bluetooth-pairing-response',
+    EOneKeyBleMessageKeys.BLE_PAIRING_RESPONSE,
     (_event: IpcMainEvent, response: BluetoothPairingResponse) => {
       console.log('[Main] Received pairing response:', response);
       if (bluetoothPinCallback) {
