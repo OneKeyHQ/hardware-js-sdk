@@ -2129,6 +2129,7 @@ export type KaspaGetAddress = {
   show_display?: boolean;
   prefix?: string;
   scheme?: string;
+  use_tweak?: boolean;
 };
 
 // KaspaAddress
@@ -2143,6 +2144,7 @@ export type KaspaSignTx = {
   scheme?: string;
   prefix?: string;
   input_count?: number;
+  use_tweak?: boolean;
 };
 
 // KaspaTxInputRequest
