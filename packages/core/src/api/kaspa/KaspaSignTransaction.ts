@@ -148,8 +148,8 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
 
   async run() {
     this.checkFeatureVersionLimit(
-      // exists use_tweak is true
-      () => !!this.params.useTweak,
+      // exists use_tweak is false check firmware version
+      () => this.params.useTweak === false,
       () => this.getUseTweakVersionRange()
     );
 

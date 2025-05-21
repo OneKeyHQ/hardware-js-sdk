@@ -1,5 +1,4 @@
 import { KaspaGetAddress as HardwareKaspaGetAddress } from '@onekeyfe/hd-transport';
-import { support } from 'jszip';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -68,8 +67,8 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
 
   async run() {
     this.checkFeatureVersionLimit(
-      // exists use_tweak is true
-      () => this.params.some(param => !!param.use_tweak),
+      // exists use_tweak is false check firmware version
+      () => this.params.some(param => param.use_tweak === false),
       () => this.getUseTweakVersionRange()
     );
 
