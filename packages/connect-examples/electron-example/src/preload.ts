@@ -53,15 +53,15 @@ const desktopApi = {
       console.log('[Preload] Received devices in onBleSelect:', devices);
       callback(devices);
     };
-    ipcRenderer.on('ble-select', subscription);
+    ipcRenderer.on(EOneKeyBleMessageKeys.BLE_SELECT, subscription);
     return () => {
       console.log('[Preload] Removing onBleSelect listener');
-      ipcRenderer.removeListener('ble-select', subscription);
+      ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_SELECT, subscription);
     };
   },
   selectBleDevice: (deviceId: string) => {
     console.log('[Preload] Sending selectBleDevice:', deviceId);
-    ipcRenderer.send('ble-select-result', deviceId);
+    ipcRenderer.send(EOneKeyBleMessageKeys.BLE_SELECT_RESULT, deviceId);
   },
   cancelBleRequest: () => {
     console.log('[Preload] Sending cancel-bluetooth-request');
@@ -92,6 +92,17 @@ const desktopApi = {
     ipcRenderer.send(EOneKeyBleMessageKeys.BLE_STOP_SCAN);
   },
 
+  // 设备预选相关
+  preSelectDevice: (uuid: string) => {
+    console.log('[Preload] Pre-selecting device:', uuid);
+    ipcRenderer.send(EOneKeyBleMessageKeys.BLE_PRE_SELECT, uuid);
+  },
+
+  clearPreSelect: () => {
+    console.log('[Preload] Clearing pre-selected device');
+    ipcRenderer.send(EOneKeyBleMessageKeys.BLE_CLEAR_PRE_SELECT);
+  },
+
   enumerate: () =>
     new Promise(resolve => {
       // 1. 监听结果
@@ -106,6 +117,20 @@ const desktopApi = {
       // 3. 发送枚举请求
       ipcRenderer.send(EOneKeyBleMessageKeys.BLE_ENUMERATE);
     }),
+
+  // 设备断开连接处理
+  onBleDeviceDisconnected: (callback: (device: { id: string; name: string | null }) => void) => {
+    console.log('[Preload] Setting up onBleDeviceDisconnected listener');
+    const subscription = (_: unknown, device: { id: string; name: string | null }) => {
+      console.log('[Preload] Device disconnected:', device);
+      callback(device);
+    };
+    ipcRenderer.on(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, subscription);
+    return () => {
+      console.log('[Preload] Removing onBleDeviceDisconnected listener');
+      ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, subscription);
+    };
+  },
 };
 
 window.desktopApi = desktopApi;

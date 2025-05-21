@@ -14,6 +14,8 @@ export enum EOneKeyBleMessageKeys {
   BLE_SELECT_RESULT = '$onekey-ble-select-result',
   BLE_STOP_SCAN = '$onekey-ble-stop-scan',
   BLE_CANCEL_REQUEST = '$onekey-ble-cancel-request',
+  BLE_PRE_SELECT = '$onekey-ble-pre-select',
+  BLE_CLEAR_PRE_SELECT = '$onekey-ble-clear-pre-select',
 
   // BLE 配对相关
   BLE_PAIRING_REQUEST = '$onekey-ble-pairing-request',
@@ -22,6 +24,9 @@ export enum EOneKeyBleMessageKeys {
   // BLE 枚举相关
   BLE_ENUMERATE = '$onekey-ble-enumerate',
   BLE_ENUMERATE_RESULT = '$onekey-ble-enumerate-result',
+
+  // BLE 连接状态相关
+  BLE_DEVICE_DISCONNECTED = '$onekey-ble-device-disconnected',
 }
 
 export const ONEKEY_SERVICE_UUID = '00000001-0000-1000-8000-00805f9b34fb';

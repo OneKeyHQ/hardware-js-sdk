@@ -9,6 +9,11 @@ export interface BluetoothPairingResponse {
   pin?: string;
 }
 
+export interface BluetoothDevice {
+  deviceId: string;
+  deviceName: string | null;
+}
+
 export interface BleDevice {
   id: string;
   name: string;
@@ -38,6 +43,11 @@ export interface ElectronBleAPI {
   // Device pairing
   onBlePairingRequest(callback: (details: BluetoothPairingDetails) => void): () => void;
   respondToPairing(response: BluetoothPairingResponse): void;
+
+  // Device disconnection
+  onBleDeviceDisconnected(
+    callback: (device: { id: string; name: string | null }) => void
+  ): () => void;
 }
 
 // IPC Channel Names

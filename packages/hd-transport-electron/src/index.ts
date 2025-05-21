@@ -38,6 +38,7 @@ export function initElectronBleBridge(webContents: WebContents) {
 
   let selectBluetoothCallback: ((deviceId: string) => void) | null = null;
   let bluetoothPinCallback: ((response: BluetoothPairingResponse) => void) | null = null;
+  let preSelectedDeviceId: string | null = null;
 
   // 1️⃣ 设备选择事件
   webContents.on(
@@ -47,6 +48,7 @@ export function initElectronBleBridge(webContents: WebContents) {
 
       console.log('[Main] select-bluetooth-device event triggered');
       console.log('[Main] Raw device list:', deviceList);
+      console.log('[Main] Pre-selected device:', preSelectedDeviceId);
 
       // 保存回调以供后续使用
       selectBluetoothCallback = callback;
@@ -64,6 +66,18 @@ export function initElectronBleBridge(webContents: WebContents) {
 
       if (filteredDevices.length > 0) {
         console.log('[Main] Found OneKey devices:', filteredDevices);
+
+        // 如果有预选设备，直接选择它
+        // if (preSelectedDeviceId) {
+        //   const targetDevice = filteredDevices.find(d => d.id === preSelectedDeviceId);
+        //   if (targetDevice) {
+        //     console.log('[Main] Found pre-selected device:', targetDevice);
+        //     callback(targetDevice.id);
+        //     selectBluetoothCallback = null;
+        //     return;
+        //   }
+        // }
+
         // 持续发送新发现的设备
         webContents.send(EOneKeyBleMessageKeys.BLE_SELECT, filteredDevices);
       } else {
@@ -71,6 +85,17 @@ export function initElectronBleBridge(webContents: WebContents) {
       }
     }
   );
+
+  // 设备预选相关
+  ipcMain.on(EOneKeyBleMessageKeys.BLE_PRE_SELECT, (_event: IpcMainEvent, deviceId: string) => {
+    console.log('[Main] Pre-selecting device:', deviceId);
+    preSelectedDeviceId = deviceId;
+  });
+
+  ipcMain.on(EOneKeyBleMessageKeys.BLE_CLEAR_PRE_SELECT, () => {
+    console.log('[Main] Clearing pre-selected device');
+    preSelectedDeviceId = null;
+  });
 
   // 渲染进程返回选择结果
   ipcMain.on(EOneKeyBleMessageKeys.BLE_SELECT_RESULT, (_event: IpcMainEvent, deviceId?: string) => {
@@ -107,6 +132,15 @@ export function initElectronBleBridge(webContents: WebContents) {
       webContents.send(EOneKeyBleMessageKeys.BLE_PAIRING_REQUEST, details);
     }
   );
+
+  // 3️⃣ 设备断开连接处理
+  session.on('bluetooth-device-disconnected', (event: Event, device: BluetoothDevice) => {
+    console.log('[Main] Device disconnected:', device);
+    webContents.send(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
+      id: device.deviceId,
+      name: device.deviceName,
+    });
+  });
 
   ipcMain.on(
     EOneKeyBleMessageKeys.BLE_PAIRING_RESPONSE,
