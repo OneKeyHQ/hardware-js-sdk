@@ -1,4 +1,5 @@
 import { KaspaGetAddress as HardwareKaspaGetAddress } from '@onekeyfe/hd-transport';
+import { support } from 'jszip';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -28,6 +29,7 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
         { name: 'showOnOneKey', type: 'boolean' },
         { name: 'prefix', type: 'string' },
         { name: 'scheme', type: 'string' },
+        { name: 'useTweak', type: 'boolean' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
@@ -37,6 +39,7 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
         show_display: showOnOneKey,
         prefix: batch.prefix,
         scheme: batch.scheme,
+        use_tweak: batch.useTweak,
       });
     });
   }
@@ -52,12 +55,28 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
     };
   }
 
+  getUseTweakVersionRange() {
+    return {
+      pro: {
+        min: '4.14.0',
+      },
+      model_classic: {
+        min: '3.13.0',
+      },
+    };
+  }
+
   async run() {
+    this.checkFeatureVersionLimit(
+      // exists use_tweak is true
+      () => this.params.some(param => !!param.use_tweak),
+      () => this.getUseTweakVersionRange()
+    );
+
     const responses: KaspaAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
-
       const res = await this.device.commands.typedCall('KaspaGetAddress', 'KaspaAddress', {
         ...param,
       });

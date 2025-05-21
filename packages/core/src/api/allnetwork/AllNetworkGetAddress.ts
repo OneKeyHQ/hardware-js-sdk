@@ -179,12 +179,13 @@ const networkConfigMap: NetworkConfigMap = {
   kaspa: {
     methodName: 'kaspaGetAddress',
     getParams: (baseParams: AllNetworkAddressParams) => {
-      const { path, prefix, showOnOneKey } = baseParams;
+      const { path, prefix, showOnOneKey, useTweak } = baseParams;
       return {
         scheme: 'schnorr',
         prefix,
         path,
         showOnOneKey,
+        useTweak,
       };
     },
   },

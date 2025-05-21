@@ -10,6 +10,7 @@ export type KaspaGetAddressParams = {
   prefix?: string;
   scheme?: string;
   showOnOneKey?: boolean;
+  useTweak?: boolean;
 };
 
 export declare function kaspaGetAddress(
