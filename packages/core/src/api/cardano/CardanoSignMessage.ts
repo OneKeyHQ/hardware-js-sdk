@@ -20,6 +20,7 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
       { name: 'message', type: 'string', required: true },
       { name: 'derivationType', type: 'number' },
       { name: 'networkId', type: 'number', required: true },
+      { name: 'addressType', type: 'number' },
     ]);
 
     const addressN = validatePath(payload.path, 3);
@@ -32,6 +33,7 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
           ? payload.derivationType
           : PROTO.CardanoDerivationType.ICARUS,
       network_id: payload.networkId,
+      address_type: payload.addressType,
     };
   }
 
@@ -43,7 +45,20 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
     };
   }
 
+  getAddressTypeVersionRange() {
+    return {
+      pro: {
+        min: '4.9.3',
+      },
+    };
+  }
+
   async run() {
+    this.checkFeatureVersionLimit(
+      () => this.params.address_type !== null && this.params.address_type !== undefined,
+      () => this.getAddressTypeVersionRange()
+    );
+
     const res = await this.device.commands.typedCall(
       'CardanoSignMessage',
       'CardanoMessageSignature',
