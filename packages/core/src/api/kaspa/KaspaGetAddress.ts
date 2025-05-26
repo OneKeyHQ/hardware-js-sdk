@@ -59,8 +59,8 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
       pro: {
         min: '4.14.0',
       },
-      model_classic: {
-        min: '3.13.0',
+      model_classic1s: {
+        min: '3.12.0',
       },
     };
   }
@@ -69,7 +69,10 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
     this.checkFeatureVersionLimit(
       // exists use_tweak is false check firmware version
       () => this.params.some(param => param.use_tweak === false),
-      () => this.getUseTweakVersionRange()
+      () => this.getUseTweakVersionRange(),
+      {
+        strictCheckDeviceSupport: true,
+      }
     );
 
     const responses: KaspaAddress[] = [];

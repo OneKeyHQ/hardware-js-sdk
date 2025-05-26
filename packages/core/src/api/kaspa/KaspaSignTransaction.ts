@@ -97,8 +97,8 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       pro: {
         min: '4.14.0',
       },
-      model_classic: {
-        min: '3.13.0',
+      model_classic1s: {
+        min: '3.12.0',
       },
     };
   }
@@ -150,7 +150,10 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
     this.checkFeatureVersionLimit(
       // exists use_tweak is false check firmware version
       () => this.params.useTweak === false,
-      () => this.getUseTweakVersionRange()
+      () => this.getUseTweakVersionRange(),
+      {
+        strictCheckDeviceSupport: true,
+      }
     );
 
     const { raw: rawMessage } = serialize(this.params, 0);

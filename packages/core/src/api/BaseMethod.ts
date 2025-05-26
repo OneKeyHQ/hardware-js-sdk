@@ -1,5 +1,9 @@
 import semver from 'semver';
-import { createNeedUpgradeFirmwareHardwareError } from '@onekeyfe/hd-shared';
+import {
+  createNeedUpgradeFirmwareHardwareError,
+  ERRORS,
+  HardwareErrorCode,
+} from '@onekeyfe/hd-shared';
 import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
@@ -152,7 +156,10 @@ export abstract class BaseMethod<Params = undefined> {
 
   protected checkFeatureVersionLimit(
     checkCondition: () => boolean,
-    getVersionRange: () => DeviceFirmwareRange
+    getVersionRange: () => DeviceFirmwareRange,
+    options?: {
+      strictCheckDeviceSupport?: boolean;
+    }
   ) {
     if (!checkCondition()) {
       return;
@@ -165,6 +172,12 @@ export abstract class BaseMethod<Params = undefined> {
     );
 
     if (!versionRange) {
+      if (options?.strictCheckDeviceSupport) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotSupportMethod,
+          'Device does not support this method'
+        );
+      }
       // Equipment that does not need to be repaired
       return;
     }
