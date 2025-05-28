@@ -51,7 +51,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
   async run() {
     const res = await batchGetPublickeys(this.device, this.params, 'ed25519', 728);
 
-    const responses: BenfenPublicKey[] = res.message.public_keys.map(
+    const responses: BenfenPublicKey[] = res.public_keys.map(
       (publicKey: string, index: number) => ({
         path: serializedPath((this.params as any[])[index].address_n),
         pub: publicKey,

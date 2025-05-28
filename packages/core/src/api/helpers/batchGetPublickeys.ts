@@ -1,11 +1,14 @@
-import { Path } from '@onekeyfe/hd-transport';
+import { EcdsaPublicKeys, Path } from '@onekeyfe/hd-transport';
 
 import { TypedError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Device } from '../../device/Device';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { isEqualBip44CoinType } from './pathUtils';
+import { splitArray } from '../../utils/arrayUtils';
+import { getDeviceType } from '../../utils';
+import { DeviceModelToTypes } from '../../types';
 
-export function batchGetPublickeys(
+export async function batchGetPublickeys(
   device: Device,
   paths: Path[],
   ecdsaCurveName: string,
@@ -30,9 +33,32 @@ export function batchGetPublickeys(
     throw TypedError(HardwareErrorCode.ForbiddenKeyPath);
   }
 
-  return device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
-    paths,
-    ecdsa_curve_name: ecdsaCurveName,
-    include_node: options?.includeNode ?? false,
-  });
+  let batchSize = 10;
+  const deviceType = getDeviceType(device.features);
+  if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+    batchSize = 10;
+  } else if (DeviceModelToTypes.model_touch.includes(deviceType)) {
+    batchSize = 20;
+  }
+
+  const result: EcdsaPublicKeys = {
+    public_keys: [],
+    hd_nodes: [],
+  };
+  const splitPaths = splitArray(paths, batchSize);
+  for (const paths of splitPaths) {
+    const res = await device.commands.typedCall('BatchGetPublickeys', 'EcdsaPublicKeys', {
+      paths,
+      ecdsa_curve_name: ecdsaCurveName,
+      include_node: options?.includeNode ?? false,
+    });
+    if (res.type !== 'EcdsaPublicKeys') {
+      throw TypedError(HardwareErrorCode.DeviceNotSupportMethod, 'BatchGetPublickeys failed');
+    } else {
+      result.root_fingerprint = res.message.root_fingerprint;
+      result.public_keys.push(...res.message.public_keys);
+      result.hd_nodes.push(...res.message.hd_nodes);
+    }
+  }
+  return result;
 }

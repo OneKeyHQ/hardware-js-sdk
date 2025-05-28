@@ -66,7 +66,7 @@ export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddres
       const publicKeyRes = await batchGetPublickeys(this.device, this.params, 'ed25519', 728);
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
-        const publicKey = publicKeyRes.message.public_keys[i];
+        const publicKey = publicKeyRes.public_keys[i];
         let address: string;
 
         if (this.shouldConfirm) {
