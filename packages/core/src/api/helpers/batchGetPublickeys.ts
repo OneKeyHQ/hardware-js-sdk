@@ -60,5 +60,17 @@ export async function batchGetPublickeys(
       result.hd_nodes.push(...res.message.hd_nodes);
     }
   }
+  if (result.hd_nodes.length !== paths.length && options?.includeNode) {
+    throw TypedError(
+      HardwareErrorCode.CallMethodError,
+      'BatchGetPublickeys failed, hd_nodes length not match'
+    );
+  }
+  if (result.public_keys.length !== paths.length && !options?.includeNode) {
+    throw TypedError(
+      HardwareErrorCode.CallMethodError,
+      'BatchGetPublickeys failed, public_keys length not match'
+    );
+  }
   return result;
 }
