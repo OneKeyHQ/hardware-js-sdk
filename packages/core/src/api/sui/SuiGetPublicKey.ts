@@ -50,13 +50,11 @@ export default class SuiGetPublicKey extends BaseMethod<any> {
 
   async run() {
     const res = await batchGetPublickeys(this.device, this.params, 'ed25519', 784);
-    const responses: SuiPublicKey[] = res.message.public_keys.map(
-      (publicKey: string, index: number) => ({
-        path: serializedPath((this.params as unknown as any[])[index].address_n),
-        publicKey,
-        pub: publicKey,
-      })
-    );
+    const responses: SuiPublicKey[] = res.public_keys.map((publicKey: string, index: number) => ({
+      path: serializedPath((this.params as unknown as any[])[index].address_n),
+      publicKey,
+      pub: publicKey,
+    }));
 
     validateResult(responses, ['pub'], {
       expectedLength: this.params.length,
