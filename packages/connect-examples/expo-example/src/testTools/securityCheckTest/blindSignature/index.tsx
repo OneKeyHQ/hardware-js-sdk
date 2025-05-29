@@ -178,17 +178,29 @@ function ExecuteView() {
         }
       };
 
-      const result = await withTimeout(sdkPromise(), 45 * 1000);
+      const result = await withTimeout(sdkPromise(), 25 * 1000);
 
       if (result === 'timeout') {
         // clean up device
         sdk.cancel(connectId);
-        await sdk.getFeatures(connectId, {
-          retryCount: 1,
-        });
-        await sdk.getFeatures(connectId, {
-          retryCount: 1,
-        });
+        await withTimeout(
+          sdk.getFeatures(connectId, {
+            retryCount: 0,
+          }),
+          5 * 1000
+        );
+        await withTimeout(
+          sdk.getFeatures(connectId, {
+            retryCount: 0,
+          }),
+          5 * 1000
+        );
+        await withTimeout(
+          sdk.getFeatures(connectId, {
+            retryCount: 0,
+          }),
+          5 * 1000
+        );
         return {
           payload: {
             success: false,

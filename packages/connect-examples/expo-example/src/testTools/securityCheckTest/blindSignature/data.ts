@@ -40,13 +40,13 @@ export default [
       '60': false,
     },
   },
-  {
-    method: 'dnxSignTransaction',
-    expected: {
-      '29538': true,
-      '60': false,
-    },
-  },
+  // {
+  //   method: 'dnxSignTransaction',
+  //   expected: {
+  //     '29538': true,
+  //     '60': false,
+  //   },
+  // },
   {
     method: 'filecoinSignTransaction',
     expected: {

@@ -151,11 +151,22 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   return onCallDevice(context, message, method);
 };
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
+  let timeoutHandle: any;
+  const timeoutPromise = new Promise<'timeout'>(resolve => {
+    timeoutHandle = setTimeout(() => resolve('timeout'), timeoutMs);
+  });
+
+  const result = await Promise.race([promise, timeoutPromise]);
+  clearTimeout(timeoutHandle);
+  return result;
+}
+
 const waitForPendingPromise = async (getPrePendingCallPromise: () => Promise<void> | undefined) => {
   const pendingPromise = getPrePendingCallPromise();
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
-    await pendingPromise;
+    await withTimeout(pendingPromise, 10 * 1000);
     Log.debug('pre pending call promise before call method done');
   }
 };
