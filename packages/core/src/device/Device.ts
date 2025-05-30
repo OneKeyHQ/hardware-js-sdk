@@ -643,10 +643,6 @@ export class Device extends EventEmitter {
     return this.features && !!this.features.bootloader_mode && this.features.model !== 'factory';
   }
 
-  isFactory() {
-    return this.features && !!this.features.bootloader_mode && this.features.model === 'factory';
-  }
-
   isInitialized() {
     return this.features && !!this.features.initialized;
   }

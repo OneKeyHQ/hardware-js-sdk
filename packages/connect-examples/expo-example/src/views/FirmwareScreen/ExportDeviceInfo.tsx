@@ -55,9 +55,6 @@ export function formatCurrentTime(timestamp: number) {
 
 export function getDeviceMode(features: Features | undefined) {
   if (features?.bootloader_mode === true) {
-    if (features?.model === 'factory') {
-      return 'label__device_factory_status';
-    }
     return 'label__device_bootloader_statue';
   }
   return 'label__device_firmware_status';
