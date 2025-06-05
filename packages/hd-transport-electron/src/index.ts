@@ -68,15 +68,16 @@ export function initElectronBleBridge(webContents: WebContents) {
         console.log('[Main] Found OneKey devices:', filteredDevices);
 
         // 如果有预选设备，直接选择它
-        // if (preSelectedDeviceId) {
-        //   const targetDevice = filteredDevices.find(d => d.id === preSelectedDeviceId);
-        //   if (targetDevice) {
-        //     console.log('[Main] Found pre-selected device:', targetDevice);
-        //     callback(targetDevice.id);
-        //     selectBluetoothCallback = null;
-        //     return;
-        //   }
-        // }
+        if (preSelectedDeviceId) {
+          console.log('[Main] Set Pre-selected device:', preSelectedDeviceId);
+          const targetDevice = filteredDevices.find(d => d.id === preSelectedDeviceId);
+          if (targetDevice) {
+            console.log('[Main] Found pre-selected device:', targetDevice);
+            callback(targetDevice.id);
+            selectBluetoothCallback = null;
+            return;
+          }
+        }
 
         // 持续发送新发现的设备
         webContents.send(EOneKeyBleMessageKeys.BLE_SELECT, filteredDevices);
@@ -134,13 +135,8 @@ export function initElectronBleBridge(webContents: WebContents) {
   );
 
   // 3️⃣ 设备断开连接处理
-  session.on('bluetooth-device-disconnected', (event: Event, device: BluetoothDevice) => {
-    console.log('[Main] Device disconnected:', device);
-    webContents.send(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
-      id: device.deviceId,
-      name: device.deviceName,
-    });
-  });
+  // Note: Electron doesn't provide a direct bluetooth-device-disconnected event
+  // Device disconnection should be handled at the Web Bluetooth API level in the renderer process
 
   ipcMain.on(
     EOneKeyBleMessageKeys.BLE_PAIRING_RESPONSE,

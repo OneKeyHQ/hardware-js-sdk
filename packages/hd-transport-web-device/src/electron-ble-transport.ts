@@ -98,7 +98,7 @@ export default class ElectronBleTransport {
       const deviceSet = new Set<string>();
       const devices: Array<{ id: string; name: string }> = [];
 
-      return await new Promise((resolve, reject) => {
+      return await new Promise(resolve => {
         console.log('[Transport] Setting up device scanning with 3s timeout');
 
         // 清理函数
@@ -153,6 +153,7 @@ export default class ElectronBleTransport {
 
   // 添加设备断开连接的监听器
   private addDisconnectListener(device: BluetoothDevice) {
+    console.log('[Transport] Adding disconnect listener for device:', device.id);
     device.addEventListener('gattserverdisconnected', () => {
       console.log('[Transport] Device disconnected:', device.id);
       // 清理缓存
@@ -226,68 +227,93 @@ export default class ElectronBleTransport {
         }
 
         deviceInfo = await new Promise((resolve, reject) => {
-          let device: BluetoothDevice | null = null;
+          let resolved = false;
+          let targetDeviceName: string | null = null;
 
           // 先预选设备
           window.desktopApi?.preSelectDevice?.(uuid);
 
-          // 监听设备选择事件
+          // 清理函数
+          const cleanupAndResolve = (deviceInfo: any) => {
+            if (resolved) return;
+            resolved = true;
+            cleanup?.();
+            clearTimeout(timeoutId);
+            window.desktopApi?.clearPreSelect?.();
+            resolve(deviceInfo);
+          };
+
+          const cleanupAndReject = (error: any) => {
+            if (resolved) return;
+            resolved = true;
+            cleanup?.();
+            clearTimeout(timeoutId);
+            window.desktopApi?.stopBleScan();
+            window.desktopApi?.clearPreSelect?.();
+            reject(error);
+          };
+
+          // 监听设备选择事件 - 获取目标设备名称用于匹配
           const cleanup = window.desktopApi?.onBleSelect(devices => {
             console.log('[Transport] Received devices in acquire:', devices);
-
-            // 查找指定 uuid 的设备
-            const targetDevice = devices.find(d => d.id === uuid);
+            // Find the target device by UUID to get its name
+            const targetDevice = devices.find(device => device.id === uuid);
             if (targetDevice) {
-              console.log('[Transport] Found target device:', targetDevice);
-
-              // 如果已经获取到了 device，直接返回
-              if (device) {
-                cleanup?.();
-                clearTimeout(timeoutId);
-                resolve({
-                  id: targetDevice.id,
-                  name: targetDevice.name,
-                  device,
-                });
-              }
+              targetDeviceName = targetDevice.name;
+              console.log('[Transport] Target device name for matching:', targetDeviceName);
             }
           });
 
-          // 请求设备连接
+          // 直接等待浏览器的 requestDevice 被触发（由主进程自动选择预选设备）
           navigator.bluetooth
             .requestDevice({
               filters: [{ services: [ONEKEY_SERVICE_UUID] }],
               optionalServices: [ONEKEY_SERVICE_UUID],
             })
             .then(selectedDevice => {
-              device = selectedDevice;
-              // 如果已经找到了目标设备，可以立即解析
-              const targetDevice = this.findDevice(uuid);
-              if (targetDevice) {
-                cleanup?.();
-                clearTimeout(timeoutId);
-                resolve({
-                  id: targetDevice.id,
-                  name: targetDevice.name,
-                  device,
-                });
+              console.log(
+                '[Transport] Device selected from browser:',
+                selectedDevice.id,
+                selectedDevice.name,
+                'Target UUID:',
+                uuid,
+                'Target name:',
+                targetDeviceName
+              );
+
+              // Verify the selected device matches by name
+              if (targetDeviceName && selectedDevice.name !== targetDeviceName) {
+                console.log(
+                  '[Transport] Selected device name does not match target:',
+                  selectedDevice.name,
+                  'vs',
+                  targetDeviceName
+                );
+                cleanupAndReject(
+                  new Error(
+                    `Selected device name "${selectedDevice.name}" does not match target name "${targetDeviceName}"`
+                  )
+                );
+                return;
               }
+
+              // Device name matches or no target name available, proceed
+              cleanupAndResolve({
+                id: selectedDevice.id,
+                name: selectedDevice.name || 'Unknown Device',
+                device: selectedDevice,
+                originalUuid: uuid, // Keep track of the original UUID for reference
+              });
             })
             .catch(error => {
               console.error('[Transport] RequestDevice error:', error);
-              cleanup?.();
-              clearTimeout(timeoutId);
-              window.desktopApi?.clearPreSelect?.();
-              reject(error);
+              // cleanupAndReject(error);
             });
 
           // 设置超时
           const timeoutId = setTimeout(() => {
-            console.log('[Transport] Acquire timeout');
-            cleanup?.();
-            window.desktopApi?.stopBleScan();
-            window.desktopApi?.clearPreSelect?.();
-            reject(new Error('Acquire device timeout'));
+            console.log('[Transport] Acquire timeout - v2 - waiting for device selection');
+            cleanupAndReject(new Error('Acquire device timeout'));
           }, 5000);
         });
 
@@ -307,7 +333,9 @@ export default class ElectronBleTransport {
       // 3. 连接到设备
       let server;
       try {
+        console.log('[Transport] Start connecting to device:', device.id);
         server = await device.gatt?.connect();
+        console.log('[Transport] Connected to device:', server);
       } catch (e: any) {
         console.log('[Transport] Connect to device error:', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.message || e);
@@ -320,7 +348,9 @@ export default class ElectronBleTransport {
       // 4. 获取服务
       let service;
       try {
+        console.log('[Transport] Start getting service:', ONEKEY_SERVICE_UUID);
         service = await server.getPrimaryService(ONEKEY_SERVICE_UUID);
+        console.log('[Transport] Got service:', service);
       } catch (e: any) {
         console.log('[Transport] Get service error:', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
@@ -330,8 +360,18 @@ export default class ElectronBleTransport {
       let writeCharacteristic;
       let notifyCharacteristic;
       try {
+        console.log(
+          '[Transport] Start getting write characteristic:',
+          ONEKEY_WRITE_CHARACTERISTIC_UUID
+        );
         writeCharacteristic = await service.getCharacteristic(ONEKEY_WRITE_CHARACTERISTIC_UUID);
+        console.log('[Transport] Got write characteristic:', writeCharacteristic);
+        console.log(
+          '[Transport] Start getting notify characteristic:',
+          ONEKEY_NOTIFY_CHARACTERISTIC_UUID
+        );
         notifyCharacteristic = await service.getCharacteristic(ONEKEY_NOTIFY_CHARACTERISTIC_UUID);
+        console.log('[Transport] Got notify characteristic:', notifyCharacteristic);
       } catch (e: any) {
         console.log('[Transport] Get characteristic error:', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound);
@@ -354,16 +394,20 @@ export default class ElectronBleTransport {
       // 7. 创建传输对象
       const transport: BleTransport = {
         device,
-        server: null as any,
-        service: null as any,
-        writeCharacteristic: null as any,
-        notifyCharacteristic: null as any,
+        server,
+        service,
+        writeCharacteristic,
+        notifyCharacteristic,
         notifySubscription: null,
       };
 
+      console.log('[Transport] Created transport:', transport);
+
       // 8. 启动通知
       try {
+        console.log('[Transport] Start notifications:', notifyCharacteristic);
         await notifyCharacteristic.startNotifications();
+        console.log('[Transport] Started notifications:', notifyCharacteristic);
         transport.notifySubscription = this._monitorCharacteristic(notifyCharacteristic, uuid);
       } catch (e: any) {
         console.log('[Transport] Start notifications error:', e);
@@ -396,7 +440,7 @@ export default class ElectronBleTransport {
     const transport = this.transportCache[id];
     if (!transport) return;
 
-    const { device, server, notifyCharacteristic, notifySubscription } = transport;
+    const { server, notifyCharacteristic, notifySubscription } = transport;
 
     try {
       // 停止通知
