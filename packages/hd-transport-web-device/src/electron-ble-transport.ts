@@ -239,10 +239,22 @@ export default class ElectronBleTransport {
 
     console.log('[Transport] Acquiring device:', uuid);
 
-    // 如果传输未释放，先释放
-    if (this.transportCache[uuid]) {
-      console.log('[Transport] Transport not released, will release:', uuid);
-      await this.release(uuid);
+    // 检查现有连接状态并清理无效连接
+    const existingTransport = this.transportCache[uuid];
+    if (existingTransport) {
+      const { server, device } = existingTransport;
+      console.log('[Transport] Found existing transport, checking connection status');
+      console.log('[Transport] Device GATT connected:', device.gatt?.connected);
+      console.log('[Transport] Server connected:', server?.connected);
+
+      // 如果连接已断开，清理缓存
+      if (!device.gatt?.connected || !server?.connected) {
+        console.log('[Transport] Connection is stale, cleaning up...');
+        await this.release(uuid);
+      } else {
+        console.log('[Transport] Connection is still active, reusing existing transport');
+        return { uuid, path: uuid };
+      }
     }
 
     // 强制清理运行中的 Promise
@@ -479,27 +491,28 @@ export default class ElectronBleTransport {
     const transport = this.transportCache[id];
     if (!transport) return;
 
-    const { server, notifyCharacteristic, notifySubscription } = transport;
+    const { notifyCharacteristic, notifySubscription } = transport;
 
     try {
-      // 停止通知
+      // 停止通知订阅
       if (notifyCharacteristic && notifySubscription) {
+        console.log('[Transport] Removing notification listener for device:', id);
         notifyCharacteristic.removeEventListener('characteristicvaluechanged', notifySubscription);
-        await notifyCharacteristic.stopNotifications();
+        try {
+          await notifyCharacteristic.stopNotifications();
+        } catch (e) {
+          console.log('[Transport] Stop notifications error (ignored):', e);
+        }
       }
 
-      // 断开连接
-      if (server?.connected) {
-        server.disconnect();
-      }
-
-      // 清理缓存
+      // 清理缓存 - 不主动断开连接，让系统管理连接状态
       delete this.transportCache[id];
 
-      console.log('[Transport] Device released:', id);
+      console.log('[Transport] Device released (connection kept alive):', id);
     } catch (error) {
       console.error('[Transport] Error releasing device:', error);
-      throw error;
+      // 即使出错也要清理缓存
+      delete this.transportCache[id];
     }
   }
 
@@ -518,6 +531,16 @@ export default class ElectronBleTransport {
     const transport = this.transportCache[uuid];
     if (!transport) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
+    }
+
+    // 检查连接状态
+    const { device, server } = transport;
+    if (!device.gatt?.connected || !server?.connected) {
+      console.log('[Transport] Connection lost during call, device needs to be re-acquired');
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleDeviceNotBonded,
+        'Device connection lost, please re-acquire device'
+      );
     }
 
     this.runPromise = createDeferred();
