@@ -4,16 +4,18 @@ import {
   HardwareErrorCode,
   // createDeferred,
   Deferred,
+  createDeferred,
   // isOnekeyDevice,
   // isHeaderChunk,
   ONEKEY_SERVICE_UUID,
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
+  isHeaderChunk,
 } from '@onekeyfe/hd-shared';
-// import ByteBuffer from 'bytebuffer';
+import ByteBuffer from 'bytebuffer';
 import type EventEmitter from 'events';
 
-const { parseConfigure } = transport;
+const { parseConfigure, buildBuffers, receiveOne, check } = transport;
 
 // Add type declaration for desktopApi
 declare global {
@@ -172,16 +174,51 @@ export default class ElectronBleTransport {
     characteristic: BluetoothRemoteGATTCharacteristic,
     deviceId: string
   ) {
+    let bufferLength = 0;
+    let buffer: number[] = [];
+
     const subscription = (event: Event) => {
       const { value } = event.target as BluetoothRemoteGATTCharacteristic;
       if (!value) return;
 
       console.log('[Transport] Received notification from device:', deviceId, value);
-      // 触发数据接收事件
-      this.emitter?.emit('device-data-receive', {
-        id: deviceId,
-        data: value,
-      });
+
+      try {
+        // Convert DataView to Buffer-like Uint8Array
+        const data = new Uint8Array(value.buffer);
+        console.log('[Transport] Received a packet, buffer:', data);
+
+        if (isHeaderChunk(data)) {
+          // Read buffer length from header (big-endian 32-bit integer at offset 5)
+          const dataView = new DataView(value.buffer);
+          bufferLength = dataView.getInt32(5, false); // false = big-endian
+          buffer = [...data.subarray(3)];
+        } else {
+          buffer = buffer.concat([...data]);
+        }
+
+        if (buffer.length - 6 >= bufferLength) {
+          // 6 is COMMON_HEADER_SIZE
+          const completeBuffer = new Uint8Array(buffer);
+          console.log('[Transport] Received complete packet, resolving Promise');
+          bufferLength = 0;
+          buffer = [];
+
+          // Convert to hex string for processing
+          const hexString = Array.from(completeBuffer)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+
+          if (this.runPromise) {
+            this.runPromise.resolve(hexString);
+          }
+        }
+      } catch (error) {
+        console.error('[Transport] Monitor data error:', error);
+        if (this.runPromise) {
+          this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError));
+        }
+      }
     };
 
     characteristic.addEventListener('characteristicvaluechanged', subscription);
@@ -463,6 +500,146 @@ export default class ElectronBleTransport {
     } catch (error) {
       console.error('[Transport] Error releasing device:', error);
       throw error;
+    }
+  }
+
+  async call(uuid: string, name: string, data: Record<string, unknown>) {
+    if (this._messages == null) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+
+    const forceRun = name === 'Initialize' || name === 'Cancel';
+
+    console.log('electron-ble-transport call this.runPromise', this.runPromise);
+    if (this.runPromise && !forceRun) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
+    }
+
+    const transport = this.transportCache[uuid];
+    if (!transport) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
+    }
+
+    this.runPromise = createDeferred();
+    const messages = this._messages;
+
+    // Log different types of commands appropriately
+    if (name === 'ResourceUpdate' || name === 'ResourceAck') {
+      console.log('electron-ble-transport', 'call-', ' name: ', name, ' data: ', {
+        file_name: data?.file_name,
+        hash: data?.hash,
+      });
+    } else {
+      console.log('electron-ble-transport', 'call-', ' name: ', name, ' data: ', data);
+    }
+
+    const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
+
+    // Helper function to write chunked data
+    async function writeChunkedData(
+      buffers: ByteBuffer[],
+      writeFunction: (data: ArrayBuffer) => Promise<void>,
+      onError: (e: any) => void
+    ) {
+      // Web Bluetooth typically supports larger packets than mobile
+      const packetCapacity = 512; // Adjust based on your device's MTU
+      let index = 0;
+      let chunk = ByteBuffer.allocate(packetCapacity);
+
+      while (index < buffers.length) {
+        const buffer = buffers[index].toBuffer();
+        chunk.append(buffer);
+        index += 1;
+
+        if (chunk.offset === packetCapacity || index >= buffers.length) {
+          chunk.reset();
+          try {
+            // Convert ByteBuffer to ArrayBuffer for Web Bluetooth
+            const arrayBuffer = chunk.toArrayBuffer();
+            await writeFunction(arrayBuffer);
+            chunk = ByteBuffer.allocate(packetCapacity);
+          } catch (e) {
+            onError(e);
+            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
+          }
+        }
+      }
+    }
+
+    try {
+      if (name === 'EmmcFileWrite') {
+        // For file write operations, use chunked writing with retry
+        await writeChunkedData(
+          buffers,
+          async (data: ArrayBuffer) => {
+            // Implement retry logic for file writes
+            let retries = 3;
+            while (retries > 0) {
+              try {
+                await transport.writeCharacteristic.writeValueWithoutResponse(data);
+                break;
+              } catch (e) {
+                retries--;
+                if (retries === 0) throw e;
+                // eslint-disable-next-line no-promise-executor-return
+                await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms before retry
+              }
+            }
+          },
+          e => {
+            this.runPromise = null;
+            console.log('writeCharacteristic write error: ', e);
+          }
+        );
+      } else if (name === 'FirmwareUpload') {
+        // For firmware upload, use writeWithoutResponse for better performance
+        await writeChunkedData(
+          buffers,
+          async (data: ArrayBuffer) => {
+            await transport.writeCharacteristic.writeValueWithoutResponse(data);
+          },
+          e => {
+            this.runPromise = null;
+            console.log('writeCharacteristic write error: ', e);
+          }
+        );
+      } else {
+        // For regular commands, write each buffer directly
+        for (const buffer of buffers) {
+          const arrayBuffer = buffer.toArrayBuffer();
+          try {
+            await transport.writeCharacteristic.writeValueWithoutResponse(arrayBuffer);
+          } catch (e: any) {
+            console.log('writeCharacteristic write error: ', e);
+            this.runPromise = null;
+
+            // Map Web Bluetooth errors to our error codes
+            if (e.name === 'NetworkError' || e.message?.includes('disconnected')) {
+              throw ERRORS.TypedError(HardwareErrorCode.BleDeviceNotBonded);
+            } else if (e.name === 'NotSupportedError') {
+              throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, e.message);
+            } else {
+              throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
+            }
+          }
+        }
+      }
+
+      // Wait for response
+      const response = await this.runPromise.promise;
+
+      if (typeof response !== 'string') {
+        throw new Error('Returning data is not string.');
+      }
+
+      console.log('receive data: ', response);
+      const jsonData = receiveOne(messages, response);
+      return check.call(jsonData);
+    } catch (e) {
+      console.log('call error: ', e);
+      throw e;
+    } finally {
+      this.runPromise = null;
     }
   }
 }
