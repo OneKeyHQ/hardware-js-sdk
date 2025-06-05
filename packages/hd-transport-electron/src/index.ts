@@ -128,11 +128,14 @@ export function initElectronBleBridge(webContents: WebContents) {
   // 2️⃣ PIN / Confirm 处理
   session.setBluetoothPairingHandler(
     (details: BluetoothPairingDetails, callback: (response: BluetoothPairingResponse) => void) => {
-      console.log('[Main] Bluetooth pairing request:', details);
+      console.log('[Main] Bluetooth pairing request received:', details);
+      console.log('[Main] Pairing device ID:', details.deviceId);
+      console.log('[Main] Pairing type:', details.pairingKind);
       bluetoothPinCallback = callback;
       webContents.send(EOneKeyBleMessageKeys.BLE_PAIRING_REQUEST, details);
     }
   );
+  console.log('[Main] Bluetooth pairing handler registered');
 
   // 3️⃣ 设备断开连接处理
   // Note: Electron doesn't provide a direct bluetooth-device-disconnected event

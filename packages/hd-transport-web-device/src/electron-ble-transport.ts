@@ -335,6 +335,8 @@ export default class ElectronBleTransport {
       try {
         console.log('[Transport] Start connecting to device:', device.id);
         server = await device.gatt?.connect();
+        console.log('[Transport] Device gatt available:', !!device.gatt);
+        console.log('[Transport] Device gatt connected:', device.gatt?.connected);
         console.log('[Transport] Connected to device:', server);
       } catch (e: any) {
         console.log('[Transport] Connect to device error:', e);
