@@ -151,11 +151,26 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   return onCallDevice(context, message, method);
 };
 
-const waitForPendingPromise = async (getPrePendingCallPromise: () => Promise<void> | undefined) => {
+const waitWithTimeout = async (promise: Promise<any>, timeout: number) => {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Request timeout')), timeout);
+  });
+  return Promise.race([promise, timeoutPromise]);
+};
+
+const waitForPendingPromise = async (
+  getPrePendingCallPromise: () => Promise<void> | undefined,
+  removePrePendingCallPromise?: (promise: Promise<void> | undefined) => void
+) => {
   const pendingPromise = getPrePendingCallPromise();
   if (pendingPromise) {
     Log.debug('pre pending call promise before call method, wait for it');
-    await pendingPromise;
+    try {
+      await waitWithTimeout(pendingPromise, 5 * 1000);
+    } catch (error) {
+      // ignore timeout error
+    }
+    removePrePendingCallPromise?.(pendingPromise);
     Log.debug('pre pending call promise before call method done');
   }
 };
@@ -167,7 +182,7 @@ const onCallDevice = async (
 ): Promise<any> => {
   let messageResponse: any;
 
-  const { requestQueue, getPrePendingCallPromise } = context;
+  const { requestQueue, getPrePendingCallPromise, setPrePendingCallPromise } = context;
 
   const connectStateChange = preConnectCache.passphraseState !== method.payload.passphraseState;
 
@@ -180,7 +195,7 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
-  await waitForPendingPromise(getPrePendingCallPromise);
+  await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
   const task = requestQueue.createTask(method);
 
@@ -225,7 +240,7 @@ const onCallDevice = async (
   );
 
   try {
-    await waitForPendingPromise(getPrePendingCallPromise);
+    await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
       // check firmware version
@@ -928,7 +943,7 @@ export default class Core extends EventEmitter {
       requestQueue: this.requestQueue,
       methodSynchronize: this.methodSynchronize,
       getPrePendingCallPromise: () => this.prePendingCallPromise,
-      setPrePendingCallPromise: (promise: Promise<void>) => {
+      setPrePendingCallPromise: (promise: Promise<void> | undefined) => {
         this.prePendingCallPromise = promise;
       },
     };
