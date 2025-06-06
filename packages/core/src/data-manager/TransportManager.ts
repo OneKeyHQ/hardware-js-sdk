@@ -11,6 +11,7 @@ const Log = getLogger(LoggerNames.Transport);
 const BleLogger = getLogger(LoggerNames.HdBleTransport);
 const HttpLogger = getLogger(LoggerNames.HdTransportHttp);
 const LowLevelLogger = getLogger(LoggerNames.HdTransportLowLevel);
+const WebBleLogger = getLogger(LoggerNames.HdWebBleTransport);
 
 /**
  * transport 在同一个环境中只会存在一个
@@ -56,6 +57,8 @@ export default class TransportManager {
           );
         }
         await this.transport.init(LowLevelLogger, DevicePool.emitter, this.plugin);
+      } else if (env === 'desktop-web-ble') {
+        await this.transport.init(WebBleLogger);
       } else {
         await this.transport.init(HttpLogger);
       }

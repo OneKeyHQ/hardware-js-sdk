@@ -1,12 +1,9 @@
-import transport from '@onekeyfe/hd-transport'; // COMMON_HEADER_SIZE, // LogBlockCommand, // AcquireInput,
+import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-transport'; // COMMON_HEADER_SIZE, // LogBlockCommand, // AcquireInput,
 import {
   ERRORS,
   HardwareErrorCode,
-  // createDeferred,
   Deferred,
   createDeferred,
-  // isOnekeyDevice,
-  // isHeaderChunk,
   ONEKEY_SERVICE_UUID,
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
@@ -57,10 +54,13 @@ export default class ElectronBleTransport {
 
   emitter?: EventEmitter;
 
-  // 缓存已发现的设备和传输对象
+  // Cache discovered devices and transport objects
   private deviceList: Array<{ id: string; name: string; device: BluetoothDevice }> = [];
 
   private transportCache: Record<string, BleTransport> = {};
+
+  // Track last logged device list to avoid duplicate logs
+  private lastLoggedDevices = '';
 
   init(logger: any, emitter?: EventEmitter) {
     this.Log = logger;
@@ -82,67 +82,101 @@ export default class ElectronBleTransport {
 
   listen() {}
 
+  // Helper function to handle onBleSelect logging with deduplication
+  private logDeviceListIfChanged(
+    devices: Array<{ id: string; name: string }>,
+    scenario: 'enumerate' | 'acquire',
+    additionalInfo?: string
+  ): boolean {
+    // Sort devices by id to ensure consistent comparison regardless of order
+    const sortedDevices = [...devices].sort((a, b) => a.id.localeCompare(b.id));
+    const deviceListString = JSON.stringify(sortedDevices.map(d => ({ id: d.id, name: d.name })));
+
+    // Only log if the device list has changed
+    if (deviceListString !== this.lastLoggedDevices) {
+      const prefix =
+        scenario === 'enumerate'
+          ? '[Transport] Received new devices'
+          : '[Transport] Received devices in acquire';
+
+      const message = additionalInfo ? `${prefix} (${additionalInfo}):` : `${prefix}:`;
+
+      this.Log?.debug(message, devices);
+
+      // Update the last logged devices string
+      this.lastLoggedDevices = deviceListString;
+
+      return true; // Logged
+    }
+
+    return false; // Not logged (duplicate)
+  }
+
   async enumerate(): Promise<{ id: string; name: string }[]> {
-    console.log('[Transport] Starting enumerate');
+    this.Log?.debug('[Transport] Starting enumerate');
 
     try {
-      // 检查 window.desktopApi
-      console.log('[Transport] Checking desktopApi:', window.desktopApi);
+      // Check window.desktopApi
+      this.Log?.debug('[Transport] Checking desktopApi:', window.desktopApi);
       if (!window.desktopApi?.onBleSelect) {
         console.error('[Transport] desktopApi.onBleSelect not available');
         throw new Error('desktopApi.onBleSelect not available');
       }
 
-      // 清除之前的预选状态
+      // Clear previous pre-selection state
       window.desktopApi?.clearPreSelect?.();
 
-      // 使用 Set 去重，存储搜索到的设备
+      // Use Set for deduplication, store discovered devices
       const deviceSet = new Set<string>();
       const devices: Array<{ id: string; name: string }> = [];
 
-      return await new Promise(resolve => {
-        console.log('[Transport] Setting up device scanning with 3s timeout');
+      // Reset last logged devices for this operation
+      this.lastLoggedDevices = '';
 
-        // 清理函数
+      return await new Promise(resolve => {
+        this.Log?.debug('[Transport] Setting up device scanning with 3s timeout');
+
+        // Cleanup function
         const cleanupAll = () => {
-          console.log('[Transport] Cleaning up resources');
+          this.Log?.debug('[Transport] Cleaning up resources');
           clearTimeout(timeoutId);
           cleanup?.();
           // Stop BLE scanning through desktopApi
           window.desktopApi?.stopBleScan();
         };
 
-        // 设置 3 秒超时
+        // Set 3 second timeout
         const timeoutId = setTimeout(() => {
-          console.log('[Transport] Scan timeout, returning devices:', devices);
+          this.Log?.debug('[Transport] Scan timeout, returning devices:', devices);
           cleanupAll();
           resolve(devices);
         }, 3000);
 
-        // 监听设备发现事件
+        // Listen for device discovery events
         const cleanup = window.desktopApi?.onBleSelect(newDevices => {
-          console.log('[Transport] Received new devices:', newDevices);
+          // Use helper function to log only if device list changed
+          this.logDeviceListIfChanged(newDevices, 'enumerate');
 
-          // 将新设备添加到列表中（去重）
+          // Add new devices to list (with deduplication)
           newDevices.forEach(device => {
             const deviceKey = `${device.id}-${device.name}`;
             if (!deviceSet.has(deviceKey)) {
               deviceSet.add(deviceKey);
               devices.push(device);
-              console.log('[Transport] Added new device:', device);
+              this.Log?.debug('[Transport] Added new device:', device);
             }
           });
         });
 
-        // 触发设备搜索
+        // Trigger device search
         navigator.bluetooth
           .requestDevice({
             filters: [{ services: [ONEKEY_SERVICE_UUID] }],
             optionalServices: [ONEKEY_SERVICE_UUID],
           })
           .catch(error => {
-            // 忽略用户取消的错误
-            console.log('[Transport] RequestDevice error (expected):', error);
+            // Ignore user cancellation errors
+            this.Log?.debug('[Transport] RequestDevice error (expected):', error);
           });
       });
     } catch (error) {
@@ -153,14 +187,14 @@ export default class ElectronBleTransport {
     }
   }
 
-  // 添加设备断开连接的监听器
+  // Add device disconnect listener
   private addDisconnectListener(device: BluetoothDevice) {
-    console.log('[Transport] Adding disconnect listener for device:', device.id);
+    this.Log?.debug('[Transport] Adding disconnect listener for device:', device.id);
     device.addEventListener('gattserverdisconnected', () => {
-      console.log('[Transport] Device disconnected:', device.id);
-      // 清理缓存
+      this.Log?.debug('[Transport] Device disconnected:', device.id);
+      // Clean up cache
       delete this.transportCache[device.id];
-      // 触发断开连接事件
+      // Trigger disconnect event
       this.emitter?.emit('device-disconnect', {
         name: device.name,
         id: device.id,
@@ -169,7 +203,7 @@ export default class ElectronBleTransport {
     });
   }
 
-  // 监听特征值变化
+  // Monitor characteristic value changes
   private _monitorCharacteristic(
     characteristic: BluetoothRemoteGATTCharacteristic,
     deviceId: string
@@ -181,12 +215,12 @@ export default class ElectronBleTransport {
       const { value } = event.target as BluetoothRemoteGATTCharacteristic;
       if (!value) return;
 
-      console.log('[Transport] Received notification from device:', deviceId, value);
+      this.Log?.debug('[Transport] Received notification from device:', deviceId, value);
 
       try {
         // Convert DataView to Buffer-like Uint8Array
         const data = new Uint8Array(value.buffer);
-        console.log('[Transport] Received a packet, buffer:', data);
+        this.Log?.debug('[Transport] Received a packet, buffer:', data);
 
         if (isHeaderChunk(data)) {
           // Read buffer length from header (big-endian 32-bit integer at offset 5)
@@ -197,10 +231,10 @@ export default class ElectronBleTransport {
           buffer = buffer.concat([...data]);
         }
 
-        if (buffer.length - 6 >= bufferLength) {
+        if (buffer.length - COMMON_HEADER_SIZE >= bufferLength) {
           // 6 is COMMON_HEADER_SIZE
           const completeBuffer = new Uint8Array(buffer);
-          console.log('[Transport] Received complete packet, resolving Promise');
+          this.Log?.debug('[Transport] Received complete packet, resolving Promise');
           bufferLength = 0;
           buffer = [];
 
@@ -225,7 +259,7 @@ export default class ElectronBleTransport {
     return subscription;
   }
 
-  // 查找已缓存的设备
+  // Find cached device
   private findDevice(id: string) {
     return this.deviceList.find(d => d.id === id);
   }
@@ -237,40 +271,43 @@ export default class ElectronBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
-    console.log('[Transport] Acquiring device:', uuid);
+    this.Log?.debug('[Transport] Acquiring device:', uuid);
 
-    // 检查现有连接状态并清理无效连接
+    // Reset last logged devices for this operation
+    this.lastLoggedDevices = '';
+
+    // Check existing connection status and clean up invalid connections
     const existingTransport = this.transportCache[uuid];
     if (existingTransport) {
       const { server, device } = existingTransport;
-      console.log('[Transport] Found existing transport, checking connection status');
-      console.log('[Transport] Device GATT connected:', device.gatt?.connected);
-      console.log('[Transport] Server connected:', server?.connected);
+      this.Log?.debug('[Transport] Found existing transport, checking connection status');
+      this.Log?.debug('[Transport] Device GATT connected:', device.gatt?.connected);
+      this.Log?.debug('[Transport] Server connected:', server?.connected);
 
-      // 如果连接已断开，清理缓存
+      // If connection is disconnected, clean up cache
       if (!device.gatt?.connected || !server?.connected) {
-        console.log('[Transport] Connection is stale, cleaning up...');
+        this.Log?.debug('[Transport] Connection is stale, cleaning up...');
         await this.release(uuid);
       } else {
-        console.log('[Transport] Connection is still active, reusing existing transport');
+        this.Log?.debug('[Transport] Connection is still active, reusing existing transport');
         return { uuid, path: uuid };
       }
     }
 
-    // 强制清理运行中的 Promise
+    // Force clean running Promise
     if (forceCleanRunPromise && this.runPromise) {
       this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise));
-      console.log('[Transport] Force clean Bluetooth run promise:', forceCleanRunPromise);
+      this.Log?.debug('[Transport] Force clean Bluetooth run promise:', forceCleanRunPromise);
     }
 
     try {
-      // 1. 查找设备或触发设备选择流程
+      // 1. Find device or trigger device selection process
       let deviceInfo = this.findDevice(uuid);
 
       if (!deviceInfo) {
-        console.log('[Transport] Device not found in cache, requesting user to select device');
+        this.Log?.debug('[Transport] Device not found in cache, requesting user to select device');
 
-        // 检查 window.desktopApi
+        // Check window.desktopApi
         if (!window.desktopApi?.onBleSelect) {
           throw new Error('desktopApi.onBleSelect not available');
         }
@@ -279,10 +316,10 @@ export default class ElectronBleTransport {
           let resolved = false;
           let targetDeviceName: string | null = null;
 
-          // 先预选设备
+          // Pre-select device first
           window.desktopApi?.preSelectDevice?.(uuid);
 
-          // 清理函数
+          // Cleanup functions
           const cleanupAndResolve = (deviceInfo: any) => {
             if (resolved) return;
             resolved = true;
@@ -302,25 +339,27 @@ export default class ElectronBleTransport {
             reject(error);
           };
 
-          // 监听设备选择事件 - 获取目标设备名称用于匹配
+          // Listen for device selection events - get target device name for matching
           const cleanup = window.desktopApi?.onBleSelect(devices => {
-            console.log('[Transport] Received devices in acquire:', devices);
+            // Use helper function to log only if device list changed
+            this.logDeviceListIfChanged(devices, 'acquire', `target: ${uuid}`);
+
             // Find the target device by UUID to get its name
             const targetDevice = devices.find(device => device.id === uuid);
             if (targetDevice) {
               targetDeviceName = targetDevice.name;
-              console.log('[Transport] Target device name for matching:', targetDeviceName);
+              this.Log?.debug('[Transport] Target device name for matching:', targetDeviceName);
             }
           });
 
-          // 直接等待浏览器的 requestDevice 被触发（由主进程自动选择预选设备）
+          // Wait for browser's requestDevice to be triggered (automatically selected by main process)
           navigator.bluetooth
             .requestDevice({
               filters: [{ services: [ONEKEY_SERVICE_UUID] }],
               optionalServices: [ONEKEY_SERVICE_UUID],
             })
             .then(selectedDevice => {
-              console.log(
+              this.Log?.debug(
                 '[Transport] Device selected from browser:',
                 selectedDevice.id,
                 selectedDevice.name,
@@ -332,7 +371,7 @@ export default class ElectronBleTransport {
 
               // Verify the selected device matches by name
               if (targetDeviceName && selectedDevice.name !== targetDeviceName) {
-                console.log(
+                this.Log?.debug(
                   '[Transport] Selected device name does not match target:',
                   selectedDevice.name,
                   'vs',
@@ -359,9 +398,9 @@ export default class ElectronBleTransport {
               // cleanupAndReject(error);
             });
 
-          // 设置超时
+          // Set timeout
           const timeoutId = setTimeout(() => {
-            console.log('[Transport] Acquire timeout - v2 - waiting for device selection');
+            this.Log?.debug('[Transport] Acquire timeout - v2 - waiting for device selection');
             cleanupAndReject(new Error('Acquire device timeout'));
           }, 5000);
         });
@@ -370,25 +409,25 @@ export default class ElectronBleTransport {
           throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
         }
 
-        // 清理预选状态
+        // Clear pre-selection state
         window.desktopApi?.clearPreSelect?.();
       }
 
       const { device } = deviceInfo;
 
-      // 2. 为设备添加断开连接的监听器
+      // 2. Add disconnect listener for device
       this.addDisconnectListener(device);
 
-      // 3. 连接到设备
+      // 3. Connect to device
       let server;
       try {
-        console.log('[Transport] Start connecting to device:', device.id);
+        this.Log?.debug('[Transport] Start connecting to device:', device.id);
         server = await device.gatt?.connect();
-        console.log('[Transport] Device gatt available:', !!device.gatt);
-        console.log('[Transport] Device gatt connected:', device.gatt?.connected);
-        console.log('[Transport] Connected to device:', server);
+        this.Log?.debug('[Transport] Device gatt available:', !!device.gatt);
+        this.Log?.debug('[Transport] Device gatt connected:', device.gatt?.connected);
+        this.Log?.debug('[Transport] Connected to device:', server);
       } catch (e: any) {
-        console.log('[Transport] Connect to device error:', e);
+        this.Log?.debug('[Transport] Connect to device error:', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, e.message || e);
       }
 
@@ -396,39 +435,39 @@ export default class ElectronBleTransport {
         throw ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'Unable to connect to device');
       }
 
-      // 4. 获取服务
+      // 4. Get service
       let service;
       try {
-        console.log('[Transport] Start getting service:', ONEKEY_SERVICE_UUID);
+        this.Log?.debug('[Transport] Start getting service:', ONEKEY_SERVICE_UUID);
         service = await server.getPrimaryService(ONEKEY_SERVICE_UUID);
-        console.log('[Transport] Got service:', service);
+        this.Log?.debug('[Transport] Got service:', service);
       } catch (e: any) {
-        console.log('[Transport] Get service error:', e);
+        this.Log?.debug('[Transport] Get service error:', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound);
       }
 
-      // 5. 获取特征值
+      // 5. Get characteristics
       let writeCharacteristic;
       let notifyCharacteristic;
       try {
-        console.log(
+        this.Log?.debug(
           '[Transport] Start getting write characteristic:',
           ONEKEY_WRITE_CHARACTERISTIC_UUID
         );
         writeCharacteristic = await service.getCharacteristic(ONEKEY_WRITE_CHARACTERISTIC_UUID);
-        console.log('[Transport] Got write characteristic:', writeCharacteristic);
-        console.log(
+        this.Log?.debug('[Transport] Got write characteristic:', writeCharacteristic);
+        this.Log?.debug(
           '[Transport] Start getting notify characteristic:',
           ONEKEY_NOTIFY_CHARACTERISTIC_UUID
         );
         notifyCharacteristic = await service.getCharacteristic(ONEKEY_NOTIFY_CHARACTERISTIC_UUID);
-        console.log('[Transport] Got notify characteristic:', notifyCharacteristic);
+        this.Log?.debug('[Transport] Got notify characteristic:', notifyCharacteristic);
       } catch (e: any) {
-        console.log('[Transport] Get characteristic error:', e);
+        this.Log?.debug('[Transport] Get characteristic error:', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound);
       }
 
-      // 6. 检查特征值是否支持写入和通知
+      // 6. Check if characteristics support write and notify
       if (
         !writeCharacteristic.properties.write &&
         !writeCharacteristic.properties.writeWithoutResponse
@@ -442,7 +481,7 @@ export default class ElectronBleTransport {
         );
       }
 
-      // 7. 创建传输对象
+      // 7. Create transport object
       const transport: BleTransport = {
         device,
         server,
@@ -452,26 +491,26 @@ export default class ElectronBleTransport {
         notifySubscription: null,
       };
 
-      console.log('[Transport] Created transport:', transport);
+      this.Log?.debug('[Transport] Created transport:', transport);
 
-      // 8. 启动通知
+      // 8. Start notifications
       try {
-        console.log('[Transport] Start notifications:', notifyCharacteristic);
+        this.Log?.debug('[Transport] Start notifications:', notifyCharacteristic);
         await notifyCharacteristic.startNotifications();
-        console.log('[Transport] Started notifications:', notifyCharacteristic);
+        this.Log?.debug('[Transport] Started notifications:', notifyCharacteristic);
         transport.notifySubscription = this._monitorCharacteristic(notifyCharacteristic, uuid);
       } catch (e: any) {
-        console.log('[Transport] Start notifications error:', e);
+        this.Log?.debug('[Transport] Start notifications error:', e);
         throw ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyError);
       }
 
-      // 9. 缓存传输对象和设备信息
+      // 9. Cache transport object and device info
       this.transportCache[uuid] = transport;
       if (!this.findDevice(uuid)) {
         this.deviceList.push(deviceInfo);
       }
 
-      // 10. 触发设备连接事件
+      // 10. Trigger device connect event
       this.emitter?.emit('device-connect', {
         name: device.name,
         id: device.id,
@@ -481,7 +520,7 @@ export default class ElectronBleTransport {
       return { uuid, path: uuid };
     } catch (error) {
       console.error('[Transport] Error acquiring device:', error);
-      // 确保停止扫描
+      // Make sure to stop scanning
       window.desktopApi?.stopBleScan();
       throw error;
     }
@@ -494,24 +533,24 @@ export default class ElectronBleTransport {
     const { notifyCharacteristic, notifySubscription } = transport;
 
     try {
-      // 停止通知订阅
+      // Stop notification subscription
       if (notifyCharacteristic && notifySubscription) {
-        console.log('[Transport] Removing notification listener for device:', id);
+        this.Log?.debug('[Transport] Removing notification listener for device:', id);
         notifyCharacteristic.removeEventListener('characteristicvaluechanged', notifySubscription);
         try {
           await notifyCharacteristic.stopNotifications();
         } catch (e) {
-          console.log('[Transport] Stop notifications error (ignored):', e);
+          this.Log?.debug('[Transport] Stop notifications error (ignored):', e);
         }
       }
 
-      // 清理缓存 - 不主动断开连接，让系统管理连接状态
+      // Clean up cache - don't actively disconnect, let system manage connection state
       delete this.transportCache[id];
 
-      console.log('[Transport] Device released (connection kept alive):', id);
+      this.Log?.debug('[Transport] Device released (connection kept alive):', id);
     } catch (error) {
       console.error('[Transport] Error releasing device:', error);
-      // 即使出错也要清理缓存
+      // Clean up cache even if error occurs
       delete this.transportCache[id];
     }
   }
@@ -523,7 +562,7 @@ export default class ElectronBleTransport {
 
     const forceRun = name === 'Initialize' || name === 'Cancel';
 
-    console.log('electron-ble-transport call this.runPromise', this.runPromise);
+    this.Log?.debug('electron-ble-transport call this.runPromise', this.runPromise);
     if (this.runPromise && !forceRun) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
@@ -533,10 +572,10 @@ export default class ElectronBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound);
     }
 
-    // 检查连接状态
+    // Check connection status
     const { device, server } = transport;
     if (!device.gatt?.connected || !server?.connected) {
-      console.log('[Transport] Connection lost during call, device needs to be re-acquired');
+      this.Log?.debug('[Transport] Connection lost during call, device needs to be re-acquired');
       throw ERRORS.TypedError(
         HardwareErrorCode.BleDeviceNotBonded,
         'Device connection lost, please re-acquire device'
@@ -548,12 +587,14 @@ export default class ElectronBleTransport {
 
     // Log different types of commands appropriately
     if (name === 'ResourceUpdate' || name === 'ResourceAck') {
-      console.log('electron-ble-transport', 'call-', ' name: ', name, ' data: ', {
+      this.Log?.debug('electron-ble-transport', 'call-', ' name: ', name, ' data: ', {
         file_name: data?.file_name,
         hash: data?.hash,
       });
+    } else if (LogBlockCommand.has(name)) {
+      this.Log?.debug('electron-ble-transport', 'call-', ' name: ', name);
     } else {
-      console.log('electron-ble-transport', 'call-', ' name: ', name, ' data: ', data);
+      this.Log?.debug('electron-ble-transport', 'call-', ' name: ', name, ' data: ', data);
     }
 
     const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
@@ -611,7 +652,7 @@ export default class ElectronBleTransport {
           },
           e => {
             this.runPromise = null;
-            console.log('writeCharacteristic write error: ', e);
+            this.Log?.debug('writeCharacteristic write error: ', e);
           }
         );
       } else if (name === 'FirmwareUpload') {
@@ -623,7 +664,7 @@ export default class ElectronBleTransport {
           },
           e => {
             this.runPromise = null;
-            console.log('writeCharacteristic write error: ', e);
+            this.Log?.debug('writeCharacteristic write error: ', e);
           }
         );
       } else {
@@ -633,7 +674,7 @@ export default class ElectronBleTransport {
           try {
             await transport.writeCharacteristic.writeValueWithoutResponse(arrayBuffer);
           } catch (e: any) {
-            console.log('writeCharacteristic write error: ', e);
+            this.Log?.debug('writeCharacteristic write error: ', e);
             this.runPromise = null;
 
             // Map Web Bluetooth errors to our error codes
@@ -655,11 +696,11 @@ export default class ElectronBleTransport {
         throw new Error('Returning data is not string.');
       }
 
-      console.log('receive data: ', response);
+      this.Log?.debug('receive data: ', response);
       const jsonData = receiveOne(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      console.log('call error: ', e);
+      this.Log?.debug('call error: ', e);
       throw e;
     } finally {
       this.runPromise = null;

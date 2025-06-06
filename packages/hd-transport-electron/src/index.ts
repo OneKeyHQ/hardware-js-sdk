@@ -9,10 +9,10 @@
 import { isOnekeyDevice, EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
 import type { WebContents, IpcMainEvent, Event } from 'electron';
 
-// 导出所有类型定义
+// Export all type definitions
 export * from './types';
 
-// 内部使用的接口定义
+// Internal interface definitions
 interface BluetoothDevice {
   deviceId: string;
   deviceName: string;
@@ -34,119 +34,161 @@ export function initElectronBleBridge(webContents: WebContents) {
   const electron = require('electron');
   const { ipcMain } = electron;
 
+  // @ts-ignore – electron-log is only available at runtime within an Electron app
+  const logger = require('electron-log');
+
   const { session } = webContents;
 
   let selectBluetoothCallback: ((deviceId: string) => void) | null = null;
-  let bluetoothPinCallback: ((response: BluetoothPairingResponse) => void) | null = null;
+  let bluetoothPairingCallback: ((response: BluetoothPairingResponse) => void) | null = null;
   let preSelectedDeviceId: string | null = null;
 
-  // 1️⃣ 设备选择事件
+  // Track last logged device list to avoid duplicate logs
+  let lastLoggedDeviceList = '';
+
+  // Helper function to log device list only if changed
+  const logDeviceListIfChanged = (deviceList: BluetoothDevice[]): boolean => {
+    // Sort devices by deviceId to ensure consistent comparison regardless of order
+    const sortedDevices = [...deviceList].sort((a, b) => a.deviceId.localeCompare(b.deviceId));
+    const deviceListString = JSON.stringify(
+      sortedDevices.map(d => ({
+        deviceId: d.deviceId,
+        deviceName: d.deviceName,
+      }))
+    );
+
+    // Only log if the device list has changed
+    if (deviceListString !== lastLoggedDeviceList) {
+      logger.info('[Main] Raw device list:', deviceList);
+      lastLoggedDeviceList = deviceListString;
+      return true; // Logged
+    }
+
+    return false; // Not logged (duplicate)
+  };
+
+  // 1️⃣ Device selection events
   webContents.on(
     'select-bluetooth-device',
     (event: Event, deviceList: BluetoothDevice[], callback: (deviceId: string) => void) => {
       event.preventDefault();
 
-      console.log('[Main] select-bluetooth-device event triggered');
-      console.log('[Main] Raw device list:', deviceList);
-      console.log('[Main] Pre-selected device:', preSelectedDeviceId);
+      logger.info('[Main] select-bluetooth-device event triggered');
 
-      // 保存回调以供后续使用
+      // Use helper function to log device list only if changed
+      const deviceListChanged = logDeviceListIfChanged(deviceList);
+
+      if (!deviceListChanged) {
+        // If device list hasn't changed, just log a simple message
+        logger.info('[Main] Device list unchanged, continuing...');
+      }
+
+      logger.info('[Main] Pre-selected device:', preSelectedDeviceId);
+
+      // Save callback for later use
       selectBluetoothCallback = callback;
 
-      // 如果设备列表为空，等待下一次事件
+      // If device list is empty, wait for next event
       if (!deviceList.length) {
-        console.log('[Main] Empty device list, waiting for more devices...');
+        logger.info('[Main] Empty device list, waiting for more devices...');
         return;
       }
 
-      // 过滤 OneKey 设备并发送给渲染进程
+      // Filter OneKey devices and send to renderer process
       const filteredDevices = deviceList
         .filter(d => isOnekeyDevice(d.deviceName))
         .map(d => ({ id: d.deviceId, name: d.deviceName }));
 
       if (filteredDevices.length > 0) {
-        console.log('[Main] Found OneKey devices:', filteredDevices);
+        // Only log found devices if the device list actually changed
+        if (deviceListChanged) {
+          logger.info('[Main] Found OneKey devices:', filteredDevices);
+        }
 
-        // 如果有预选设备，直接选择它
+        // If there's a pre-selected device, select it directly
         if (preSelectedDeviceId) {
-          console.log('[Main] Set Pre-selected device:', preSelectedDeviceId);
+          logger.info('[Main] Set Pre-selected device:', preSelectedDeviceId);
           const targetDevice = filteredDevices.find(d => d.id === preSelectedDeviceId);
           if (targetDevice) {
-            console.log('[Main] Found pre-selected device:', targetDevice);
+            logger.info('[Main] Found pre-selected device:', targetDevice);
             callback(targetDevice.id);
             selectBluetoothCallback = null;
             return;
           }
         }
 
-        // 持续发送新发现的设备
+        // Continuously send newly discovered devices
         webContents.send(EOneKeyBleMessageKeys.BLE_SELECT, filteredDevices);
-      } else {
-        console.log('[Main] No OneKey devices in this batch, continue scanning...');
+      } else if (deviceListChanged) {
+        logger.info('[Main] No OneKey devices in this batch, continue scanning...');
       }
     }
   );
 
-  // 设备预选相关
+  // Device pre-selection related
   ipcMain.on(EOneKeyBleMessageKeys.BLE_PRE_SELECT, (_event: IpcMainEvent, deviceId: string) => {
-    console.log('[Main] Pre-selecting device:', deviceId);
+    logger.info('[Main] Pre-selecting device:', deviceId);
     preSelectedDeviceId = deviceId;
+    // Reset device list tracking when pre-selecting
+    lastLoggedDeviceList = '';
   });
 
   ipcMain.on(EOneKeyBleMessageKeys.BLE_CLEAR_PRE_SELECT, () => {
-    console.log('[Main] Clearing pre-selected device');
+    logger.info('[Main] Clearing pre-selected device');
     preSelectedDeviceId = null;
+    // Reset device list tracking when clearing pre-selection
+    lastLoggedDeviceList = '';
   });
 
-  // 渲染进程返回选择结果
+  // Renderer process returns selection result
   ipcMain.on(EOneKeyBleMessageKeys.BLE_SELECT_RESULT, (_event: IpcMainEvent, deviceId?: string) => {
-    console.log('[Main] Received ble-select-result:', deviceId);
+    logger.info('[Main] Received ble-select-result:', deviceId);
     if (selectBluetoothCallback) {
       selectBluetoothCallback(deviceId || '');
       selectBluetoothCallback = null;
     }
   });
 
-  // 允许用户取消
+  // Allow user to cancel
   ipcMain.on(EOneKeyBleMessageKeys.BLE_CANCEL_REQUEST, () => {
-    console.log('[Main] Received cancel-bluetooth-request');
+    logger.info('[Main] Received cancel-bluetooth-request');
     if (selectBluetoothCallback) {
       selectBluetoothCallback('');
       selectBluetoothCallback = null;
     }
   });
 
-  // 处理停止扫描请求
+  // Handle stop scan requests
   ipcMain.on(EOneKeyBleMessageKeys.BLE_STOP_SCAN, () => {
-    console.log('[Main] Received stop BLE scan request');
+    logger.info('[Main] Received stop BLE scan request');
     if (selectBluetoothCallback) {
       selectBluetoothCallback('');
       selectBluetoothCallback = null;
     }
   });
 
-  // 2️⃣ PIN / Confirm 处理
+  // 2️⃣ PIN / Confirm handling
   session.setBluetoothPairingHandler(
     (details: BluetoothPairingDetails, callback: (response: BluetoothPairingResponse) => void) => {
-      console.log('[Main] Bluetooth pairing request received:', details);
-      console.log('[Main] Pairing device ID:', details.deviceId);
-      console.log('[Main] Pairing type:', details.pairingKind);
-      bluetoothPinCallback = callback;
+      logger.info('[Main] Bluetooth pairing request received:', details);
+      logger.info('[Main] Pairing device ID:', details.deviceId);
+      logger.info('[Main] Pairing type:', details.pairingKind);
+      bluetoothPairingCallback = callback;
       webContents.send(EOneKeyBleMessageKeys.BLE_PAIRING_REQUEST, details);
     }
   );
-  console.log('[Main] Bluetooth pairing handler registered');
+  logger.info('[Main] Bluetooth pairing handler registered');
 
-  // 3️⃣ 设备断开连接处理
+  // 3️⃣ Device disconnect handling
   // Note: Electron doesn't provide a direct bluetooth-device-disconnected event
   // Device disconnection should be handled at the Web Bluetooth API level in the renderer process
 
   ipcMain.on(
     EOneKeyBleMessageKeys.BLE_PAIRING_RESPONSE,
     (_event: IpcMainEvent, response: BluetoothPairingResponse) => {
-      console.log('[Main] Received pairing response:', response);
-      if (bluetoothPinCallback) {
-        bluetoothPinCallback(response);
+      logger.info('[Main] Received pairing response:', response);
+      if (bluetoothPairingCallback) {
+        bluetoothPairingCallback(response);
       }
     }
   );

@@ -48,58 +48,58 @@ const desktopApi = {
 
   // Bluetooth api
   onBleSelect: (callback: (devices: Array<{ id: string; name: string }>) => void) => {
-    console.log('[Preload] Setting up onBleSelect listener');
+    // console.log('[Preload] Setting up onBleSelect listener');
     const subscription = (_: unknown, devices: Array<{ id: string; name: string }>) => {
-      console.log('[Preload] Received devices in onBleSelect:', devices);
+      // console.log('[Preload] Received devices in onBleSelect:', devices);
       callback(devices);
     };
     ipcRenderer.on(EOneKeyBleMessageKeys.BLE_SELECT, subscription);
     return () => {
-      console.log('[Preload] Removing onBleSelect listener');
+      // console.log('[Preload] Removing onBleSelect listener');
       ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_SELECT, subscription);
     };
   },
   selectBleDevice: (deviceId: string) => {
-    console.log('[Preload] Sending selectBleDevice:', deviceId);
+    // console.log('[Preload] Sending selectBleDevice:', deviceId);
     ipcRenderer.send(EOneKeyBleMessageKeys.BLE_SELECT_RESULT, deviceId);
   },
   cancelBleRequest: () => {
-    console.log('[Preload] Sending cancel-bluetooth-request');
+    // console.log('[Preload] Sending cancel-bluetooth-request');
     ipcRenderer.send('cancel-bluetooth-request');
   },
 
   // 配对相关
   onBlePairingRequest: (callback: (details: BluetoothPairingDetails) => void) => {
-    console.log('[Preload] Setting up onBlePairingRequest listener');
+    // console.log('[Preload] Setting up onBlePairingRequest listener');
     const subscription = (_: unknown, details: BluetoothPairingDetails) => {
-      console.log('[Preload] Received pairing request:', details);
+      // console.log('[Preload] Received pairing request:', details);
       callback(details);
     };
     ipcRenderer.on(EOneKeyBleMessageKeys.BLE_PAIRING_REQUEST, subscription);
     return () => {
-      console.log('[Preload] Removing onBlePairingRequest listener');
+      // console.log('[Preload] Removing onBlePairingRequest listener');
       ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_PAIRING_REQUEST, subscription);
     };
   },
   respondToPairing: (response: BluetoothPairingResponse) => {
-    console.log('[Preload] Sending pairing response:', response);
+    // console.log('[Preload] Sending pairing response:', response);
     ipcRenderer.send(EOneKeyBleMessageKeys.BLE_PAIRING_RESPONSE, response);
   },
 
   // Add method to stop BLE scanning
   stopBleScan: () => {
-    console.log('[Preload] Sending stop BLE scan request');
+    // console.log('[Preload] Sending stop BLE scan request');
     ipcRenderer.send(EOneKeyBleMessageKeys.BLE_STOP_SCAN);
   },
 
   // 设备预选相关
   preSelectDevice: (uuid: string) => {
-    console.log('[Preload] Pre-selecting device:', uuid);
+    // console.log('[Preload] Pre-selecting device:', uuid);
     ipcRenderer.send(EOneKeyBleMessageKeys.BLE_PRE_SELECT, uuid);
   },
 
   clearPreSelect: () => {
-    console.log('[Preload] Clearing pre-selected device');
+    // console.log('[Preload] Clearing pre-selected device');
     ipcRenderer.send(EOneKeyBleMessageKeys.BLE_CLEAR_PRE_SELECT);
   },
 
@@ -120,14 +120,14 @@ const desktopApi = {
 
   // 设备断开连接处理
   onBleDeviceDisconnected: (callback: (device: { id: string; name: string | null }) => void) => {
-    console.log('[Preload] Setting up onBleDeviceDisconnected listener');
+    // console.log('[Preload] Setting up onBleDeviceDisconnected listener');
     const subscription = (_: unknown, device: { id: string; name: string | null }) => {
-      console.log('[Preload] Device disconnected:', device);
+      // console.log('[Preload] Device disconnected:', device);
       callback(device);
     };
     ipcRenderer.on(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, subscription);
     return () => {
-      console.log('[Preload] Removing onBleDeviceDisconnected listener');
+      // console.log('[Preload] Removing onBleDeviceDisconnected listener');
       ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, subscription);
     };
   },

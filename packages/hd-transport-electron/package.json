@@ -22,7 +22,8 @@
   "sideEffects": false,
   "peerDependencies": {
     "@onekeyfe/hd-transport-web-device": "^1.0.28",
-    "electron": ">=25.0.0"
+    "electron": ">=25.0.0",
+    "electron-log": ">=4.0.0"
   },
   "dependencies": {
     "@onekeyfe/hd-shared": "^1.0.28"
