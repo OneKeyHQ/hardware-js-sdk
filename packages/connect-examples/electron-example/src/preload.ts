@@ -10,6 +10,7 @@ import type {
 import { ipcMessageKeys } from './config';
 
 export type DesktopAPI = {
+  restart: () => void;
   reloadBridgeProcess: () => void;
 };
 
@@ -38,6 +39,9 @@ const desktopApi = {
     if (validChannels.includes(channel)) {
       ipcRenderer.on(channel, (_, ...args) => func(...args));
     }
+  },
+  restart: () => {
+    ipcRenderer.send(ipcMessageKeys.APP_RESTART);
   },
   updateReload: () => {
     ipcRenderer.send(ipcMessageKeys.UPDATE_RESTART);

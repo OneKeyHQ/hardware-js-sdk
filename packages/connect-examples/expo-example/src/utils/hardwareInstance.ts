@@ -3,11 +3,25 @@ import { Platform } from 'react-native';
 import { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
 import { importSdk, importLowLevelSDK } from './importSdk';
 import { CONNECT_SRC } from '../constants/connect';
+import { getItem } from './storeUtil';
+import type { ConnectionType } from '../atoms/deviceConnectAtoms';
 
 // eslint-disable-next-line import/no-mutable-exports
 let HardwareSDK: CoreApi;
 let HardwareLowLevelSDK: LowLevelCoreApi;
 let initialized = false;
+
+const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
+
+const getStoredConnectionType = async (): Promise<ConnectionType | null> => {
+  try {
+    const value = await getItem(CONNECTION_TYPE_STORE_KEY);
+    return value as ConnectionType | null;
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+};
 
 export const getHardwareSDKInstance = memoizee(
   async () =>
@@ -30,8 +44,12 @@ export const getHardwareSDKInstance = memoizee(
           fetchConfig: true,
         };
 
+        // Get stored connection type to determine useCommonSdk
+        const storedConnectionType = await getStoredConnectionType();
+        const useCommonSdk = storedConnectionType === 'desktop-web-ble';
+
         HardwareSDK = await importSdk({
-          useCommonSdk: true,
+          useCommonSdk,
         });
         console.log(HardwareSDK);
 

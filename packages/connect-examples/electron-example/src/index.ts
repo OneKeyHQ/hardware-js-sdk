@@ -258,6 +258,10 @@ function createMainWindow() {
 
   initElectronBleBridge(browserWindow.webContents);
 
+  ipcMain.on(ipcMessageKeys.APP_RESTART, () => {
+    browserWindow?.reload();
+  });
+
   return browserWindow;
 }
 
