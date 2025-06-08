@@ -7,9 +7,9 @@ export const ONEKEY_WEBUSB_FILTER = [
   // { vendorId: 0x1209, productId: 0x4f50 }, // Touch Board
 ];
 
-// BLE IPC 通信的消息类型
+// BLE IPC communication message types
 export enum EOneKeyBleMessageKeys {
-  // BLE 设备选择相关
+  // BLE device selection related
   BLE_SELECT = '$onekey-ble-select',
   BLE_SELECT_RESULT = '$onekey-ble-select-result',
   BLE_STOP_SCAN = '$onekey-ble-stop-scan',
@@ -17,15 +17,15 @@ export enum EOneKeyBleMessageKeys {
   BLE_PRE_SELECT = '$onekey-ble-pre-select',
   BLE_CLEAR_PRE_SELECT = '$onekey-ble-clear-pre-select',
 
-  // BLE 配对相关
+  // BLE pairing related
   BLE_PAIRING_REQUEST = '$onekey-ble-pairing-request',
   BLE_PAIRING_RESPONSE = '$onekey-ble-pairing-response',
 
-  // BLE 枚举相关
+  // BLE enumeration related
   BLE_ENUMERATE = '$onekey-ble-enumerate',
   BLE_ENUMERATE_RESULT = '$onekey-ble-enumerate-result',
 
-  // BLE 连接状态相关
+  // BLE connection status related
   BLE_DEVICE_DISCONNECTED = '$onekey-ble-device-disconnected',
 }
 
