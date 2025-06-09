@@ -46,16 +46,16 @@ export const getHardwareSDKInstance = memoizee(
 
         // Get stored connection type to determine useCommonSdk
         const storedConnectionType = await getStoredConnectionType();
-        const useCommonSdk = storedConnectionType === 'desktop-web-ble';
+        const isDesktopWebBleEnv = storedConnectionType === 'desktop-web-ble';
 
         HardwareSDK = await importSdk({
-          useCommonSdk,
+          useCommonSdk: isDesktopWebBleEnv,
         });
         console.log(HardwareSDK);
 
         if (Platform.OS === 'web') {
           settings.connectSrc = CONNECT_SRC;
-          settings.env = 'desktop-web-ble';
+          settings.env = isDesktopWebBleEnv ? 'desktop-web-ble' : 'web';
           settings.preRelease = true;
           HardwareLowLevelSDK = await importLowLevelSDK();
 
