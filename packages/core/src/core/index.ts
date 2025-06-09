@@ -28,7 +28,7 @@ import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
 
-import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
+// import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
 import {
   CORE_EVENT,
   CoreMessage,
