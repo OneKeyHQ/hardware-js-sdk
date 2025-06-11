@@ -205,6 +205,7 @@ function DeviceListFC(
             <Picker selectedValue={connectionType} onValueChange={onSwitchConnectionType}>
               <Picker.Item label="OneKey Bridge" value="bridge" />
               <Picker.Item label="WebUSB" value="webusb" />
+              <Picker.Item label="Emulator" value="emulator" />
             </Picker>
             <Button onPress={handleRemoveSelected}>
               {intl.formatMessage({ id: 'action__clean_device' })}

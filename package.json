@@ -11,7 +11,8 @@
     "packages": [
       "packages/*",
       "packages/connect-examples/expo-example",
-      "packages/connect-examples/electron-example"
+      "packages/connect-examples/electron-example",
+      "packages/connect-examples/new-example"
     ],
     "nohoist": [
       "**/electron",
@@ -45,6 +46,7 @@
     "dev:transport-rn": "cd ./packages/hd-transport-react-native && yarn dev",
     "dev:transport-lowlevel": "cd ./packages/hd-transport-lowlevel && yarn dev",
     "dev:transport-webusb": "cd ./packages/hd-transport-webusb && yarn dev",
+    "dev:transport-emulator": "cd ./packages/hd-transport-emulator && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
     "debug:watcher": "node ./scripts/monitor.js"
   },

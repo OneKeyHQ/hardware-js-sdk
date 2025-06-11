@@ -25,6 +25,7 @@ import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 import HttpTransport from '@onekeyfe/hd-transport-http';
 import WebusbTransport from '@onekeyfe/hd-transport-webusb';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
+import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
@@ -124,6 +125,9 @@ const init = async (
         break;
       case 'lowlevel':
         Transport = LowlevelTransport;
+        break;
+      case 'emulator':
+        Transport = EmulatorTransport;
         break;
       default:
         Transport = HttpTransport;

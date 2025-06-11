@@ -1,0 +1,176 @@
+/* OneKey 官网字体导入 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  @apply bg-background text-foreground;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer base {
+  :root {
+    /* OneKey Brand Colors */
+    --ok-green: 110 81% 69%; /* #82f072 */
+    --ok-green-secondary: 108 63% 61%; /* #6fd85a */
+    --ok-green-accent: 105 48% 40%; /* #4a9635 */
+
+    /* Light Mode - Refined with Grays */
+    --background: 0 0% 99%; /* gray-50 adjusted slightly for off-white */
+    --foreground: 224 10% 13%; /* gray-900 adjusted */
+    
+    --card: 0 0% 100%; /* white */
+    --card-foreground: 224 10% 13%; /* gray-900 adjusted */
+    
+    --popover: 0 0% 100%; /* white */
+    --popover-foreground: 224 10% 13%; /* gray-900 adjusted */
+    
+    --primary: var(--ok-green);
+    --primary-foreground: 224 10% 13%; /* Dark text on light green */
+    
+    --secondary: 220 14% 96%; /* gray-100 */
+    --secondary-foreground: 224 8% 26%; /* gray-700 adjusted */
+    
+    --muted: 220 13% 91%; /* gray-200 */
+    --muted-foreground: 220 9% 46%; /* gray-500 */
+    
+    --accent: var(--ok-green-accent);
+    --accent-foreground: 0 0% 98%; /* Light text on dark green */
+    
+    --destructive: 220 9% 46%; /* gray-600 */
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 220 13% 88%; /* gray-300 adjusted */
+    --input: 220 13% 88%; /* gray-300 adjusted */
+    --ring: var(--ok-green);
+    
+    --chart-1: var(--ok-green);
+    --chart-2: 217 91% 60%;
+    --chart-3: 262 83% 58%;
+    --chart-4: 43 96% 56%;
+    --chart-5: 27 96% 61%;
+    
+    --radius: 0.5rem;
+    
+    /* Sidebar - Light Mode */
+    --sidebar-background: 0 0% 100%; /* White or very light gray */
+    --sidebar-foreground: 224 10% 13%; /* gray-900 */
+    --sidebar-primary: var(--ok-green);
+    --sidebar-primary-foreground: 224 10% 13%; /* Dark text */
+    --sidebar-accent: 220 14% 96%; /* gray-100 */
+    --sidebar-accent-foreground: 224 10% 13%; /* gray-900 */
+    --sidebar-border: 220 13% 91%; /* gray-200 */
+    --sidebar-ring: var(--ok-green);
+  }
+  
+  .dark {
+    /* OneKey Brand Colors (same as light) */
+    --ok-green: 110 81% 69%; /* #82f072 */
+    --ok-green-secondary: 108 63% 61%; /* #6fd85a */
+    --ok-green-accent: 105 48% 40%; /* #4a9635 */
+
+    /* Dark Mode - Refined with Grays */
+    --background: 224 10% 13%;    /* gray-900 adjusted */
+    --foreground: 0 0% 98%;     /* 거의 흰색 (gray-50) */
+    
+    --card: 224 11% 17%;       /* gray-800 adjusted (darker than popover) */
+    --card-foreground: 0 0% 98%; /* gray-50 */
+    
+    --popover: 224 12% 20%;    /* Slightly lighter than card for elevation (between gray-800 and gray-700) */
+    --popover-foreground: 0 0% 98%; /* gray-50 */
+    
+    --primary: var(--ok-green);
+    --primary-foreground: 224 10% 13%;    /* Dark text on light green */
+    
+    --secondary: 224 9% 25%;      /* gray-700 adjusted */
+    --secondary-foreground: 0 0% 98%; /* gray-50 */
+    
+    --muted: 224 9% 25%;          /* gray-700 adjusted */
+    --muted-foreground: 215 10% 65%; /* gray-400 */
+    
+    --accent: var(--ok-green-accent);
+    --accent-foreground: 0 0% 98%;    /* Light text on dark green */
+    
+    --destructive: 220 13% 41%; /* gray-600 adjusted for dark mode */
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 224 8% 30%;      /* gray-700 slightly lighter for borders */
+    --input: 224 8% 30%;       /* gray-700 slightly lighter for input */
+    --ring: var(--ok-green);
+    
+    /* Charts (can remain same or adjust for dark bg) */
+    --chart-1: var(--ok-green);
+    --chart-2: 217 91% 60%;
+    --chart-3: 262 83% 58%;
+    --chart-4: 43 96% 56%;
+    --chart-5: 27 96% 61%;
+
+    /* Sidebar - Dark Mode */
+    --sidebar-background: 224 10% 13%; /* gray-900 */
+    --sidebar-foreground: 0 0% 98%; /* gray-50 */
+    --sidebar-primary: var(--ok-green);
+    --sidebar-primary-foreground: 224 10% 13%; /* Dark text */
+    --sidebar-accent: 224 11% 17%; /* gray-800 */
+    --sidebar-accent-foreground: 0 0% 98%; /* gray-50 */
+    --sidebar-border: 224 8% 30%; /* gray-700 slightly lighter */
+    --sidebar-ring: var(--ok-green);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-normal;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-foreground;
+  }
+  
+  /* OneKey 按钮样式增强 */
+  .onekey-btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/95;
+    @apply transition-all duration-200 ease-in-out;
+    @apply shadow-sm hover:shadow-md;
+  }
+  
+  .onekey-btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+    @apply border border-border;
+  }
+  
+  /* OneKey 卡片样式 */
+  .onekey-card {
+    @apply bg-card text-card-foreground rounded-lg border border-border shadow-sm;
+  }
+  
+  /* 代码块样式 */
+  code {
+    @apply relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold;
+  }
+  
+  /* 滚动条美化 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-border/80;
+  }
+}

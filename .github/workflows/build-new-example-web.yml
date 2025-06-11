@@ -1,0 +1,53 @@
+name: build-deploy-new-sdk-example
+
+on: workflow_dispatch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      TEST_ENDPOINT: example.onekey-test.com
+      PROJECT_PATH: packages/connect-examples/new-example
+      COMMIT_SHA: ${{ github.sha }}
+      COMMIT_SHORT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+        
+      - name: Setup Environment
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Package
+        run: |
+          yarn
+
+      - name: Build Target
+        run: |
+          VITE_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn build
+        working-directory: ${{ env.PROJECT_PATH }}
+
+      - name: Add commit info to build output
+        run: |
+          # 创建带有 commit id 的子目录
+          mkdir -p dist/commits/${{ env.COMMIT_SHORT_SHA }}
+          # 复制构建产物到带有 commit id 的目录
+          cp -r dist/* dist/commits/${{ env.COMMIT_SHORT_SHA }}/
+          # 创建一个 commit 信息文件
+          echo '{"commit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ env.COMMIT_SHA }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > dist/commits/${{ env.COMMIT_SHORT_SHA }}/commit-info.json
+          # 创建一个主要的 commit 信息文件
+          echo '{"latestCommit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ env.COMMIT_SHA }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > dist/latest-commit.json
+        working-directory: ${{ env.PROJECT_PATH }}
+
+      - name: Deploy Github Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_branch: new-example-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./${{ env.PROJECT_PATH }}/dist
+          cname: ${{ env.TEST_ENDPOINT }}
+          force_orphan: true

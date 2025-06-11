@@ -10,7 +10,7 @@ export default class NeoGetAddress extends BaseMethod<HardwareNeoGetAddress[]> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.strictCheckDeviceSupport = true;
 
     this.hasBundle = !!this.payload?.bundle;

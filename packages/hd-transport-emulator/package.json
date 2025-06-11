@@ -1,0 +1,32 @@
+{
+  "name": "@onekeyfe/hd-transport-emulator",
+  "version": "1.0.33-alpha.0",
+  "description": "hardware emulator transport",
+  "author": "OneKey",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "ISC",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "bugs": {
+    "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-shared": "^1.0.33-alpha.0",
+    "@onekeyfe/hd-transport": "^1.0.33-alpha.0",
+    "axios": "^0.27.2",
+    "secure-json-parse": "^4.0.0"
+  }
+}

@@ -662,8 +662,8 @@ export class Device extends EventEmitter {
       if (this.isBootloader() && !allow.includes(UI_REQUEST.BOOTLOADER)) {
         return UI_REQUEST.BOOTLOADER;
       }
-      if (!this.isInitialized() && !allow.includes(UI_REQUEST.INITIALIZE)) {
-        return UI_REQUEST.INITIALIZE;
+      if (!this.isInitialized() && !allow.includes(UI_REQUEST.NOT_INITIALIZE)) {
+        return UI_REQUEST.NOT_INITIALIZE;
       }
       if (this.isSeedless() && !allow.includes(UI_REQUEST.SEEDLESS)) {
         return UI_REQUEST.SEEDLESS;

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OneKey Developer Site</title>
+    <!-- Preconnect to Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // GitHub Pages客户端路由支持
+      // 将当前路径存储到sessionStorage，然后重定向到根路径
+      sessionStorage.setItem('redirectPath', location.pathname + location.search + location.hash);
+      location.replace('/OnekeyExample/');
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html> 

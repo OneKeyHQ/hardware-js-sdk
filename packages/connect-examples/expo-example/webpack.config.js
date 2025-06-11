@@ -46,6 +46,46 @@ module.exports = async function (env, argv) {
     });
 
     definePlugin.definitions['process.env'] = processEnv;
+
+    // 添加 commit SHA 和构建时间到全局变量
+    definePlugin.definitions.__COMMIT_SHA__ = JSON.stringify(
+      process.env.EXPO_PUBLIC_COMMIT_SHA || 'dev'
+    );
+    definePlugin.definitions.__BUILD_TIME__ = JSON.stringify(new Date().toISOString());
   }
+
+  // 如果在生产环境且有 commit SHA，修改输出文件名
+  if (process.env.NODE_ENV === 'production' && process.env.EXPO_PUBLIC_COMMIT_SHA) {
+    const commitSha = process.env.EXPO_PUBLIC_COMMIT_SHA;
+
+    // 修改 JS 文件名
+    if (config.output.filename) {
+      config.output.filename = config.output.filename.replace('[hash]', `${commitSha}-[hash]`);
+    }
+    if (config.output.chunkFilename) {
+      config.output.chunkFilename = config.output.chunkFilename.replace(
+        '[hash]',
+        `${commitSha}-[hash]`
+      );
+    }
+
+    // 修改 CSS 文件名
+    const miniCssExtractPlugin = config.plugins.find(
+      plugin => plugin.constructor.name === 'MiniCssExtractPlugin'
+    );
+    if (miniCssExtractPlugin && miniCssExtractPlugin.options) {
+      if (miniCssExtractPlugin.options.filename) {
+        miniCssExtractPlugin.options.filename = miniCssExtractPlugin.options.filename.replace(
+          '[hash]',
+          `${commitSha}-[hash]`
+        );
+      }
+      if (miniCssExtractPlugin.options.chunkFilename) {
+        miniCssExtractPlugin.options.chunkFilename =
+          miniCssExtractPlugin.options.chunkFilename.replace('[hash]', `${commitSha}-[hash]`);
+      }
+    }
+  }
+
   return config;
 };

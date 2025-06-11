@@ -12,7 +12,7 @@ export default class NostrSignEvent extends BaseMethod<SignEvent> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     const { payload } = this;
     if (!validateEvent(payload.event)) {

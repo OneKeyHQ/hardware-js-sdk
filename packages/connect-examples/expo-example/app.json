@@ -33,7 +33,8 @@
       "package": "com.onekey.dev.hardware.example"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "webpack"
     },
     "plugins": [
       "expo-image-picker",

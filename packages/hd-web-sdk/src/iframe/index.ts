@@ -1,5 +1,6 @@
 import HttpTransport from '@onekeyfe/hd-transport-http';
 import WebusbTransport from '@onekeyfe/hd-transport-webusb';
+import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 import {
   PostMessageEvent,
   IFRAME,
@@ -66,7 +67,18 @@ export async function init(payload: IFrameInit['payload']) {
   Log.enabled = !!settings.debug;
 
   try {
-    const Transport = settings.env === 'webusb' ? WebusbTransport : HttpTransport;
+    let Transport;
+    switch (settings.env) {
+      case 'webusb':
+        Transport = WebusbTransport;
+        break;
+      case 'emulator':
+        Transport = EmulatorTransport;
+        break;
+      default:
+        Transport = HttpTransport;
+        break;
+    }
     _core = await initCore(settings, Transport);
     _core?.on(CORE_EVENT, messages => sendMessage(messages, false));
   } catch (error) {
@@ -109,7 +121,18 @@ export async function init(payload: IFrameInit['payload']) {
 
 export const switchCoreTransport = (env: ConnectSettings['env']) => {
   if (_core) {
-    const Transport = env === 'webusb' ? WebusbTransport : HttpTransport;
+    let Transport;
+    switch (env) {
+      case 'webusb':
+        Transport = WebusbTransport;
+        break;
+      case 'emulator':
+        Transport = EmulatorTransport;
+        break;
+      default:
+        Transport = HttpTransport;
+        break;
+    }
     switchTransport({
       env,
       Transport,

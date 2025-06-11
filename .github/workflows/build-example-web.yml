@@ -8,8 +8,14 @@ jobs:
     env:
       TEST_ENDPOINT: hardware-example.onekeytest.com
       PROJECT_PATH: packages/connect-examples/expo-example
+      COMMIT_SHA: ${{ github.sha }}
+      COMMIT_SHORT_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v3
+      
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+        
       - name: Setup Environment
         uses: actions/setup-node@v3
         with:
@@ -27,15 +33,27 @@ jobs:
 
       - name: Build Web App
         run: |
-          yarn expo export:web
+          EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
+        working-directory: ${{ env.PROJECT_PATH }}
+
+      - name: Add commit info to build output
+        run: |
+          # 创建带有 commit id 的子目录
+          mkdir -p web-build/commits/${{ env.COMMIT_SHORT_SHA }}
+          # 复制构建产物到带有 commit id 的目录
+          cp -r web-build/* web-build/commits/${{ env.COMMIT_SHORT_SHA }}/
+          # 创建一个 commit 信息文件
+          echo '{"commit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ env.COMMIT_SHA }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > web-build/commits/${{ env.COMMIT_SHORT_SHA }}/commit-info.json
         working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Copy index.html to 404.html for Github Pages deployment (client-side routing)
-        run: cp web-build/index.html web-build/404.html
+        run: |
+          cp web-build/index.html web-build/404.html
+          cp web-build/commits/${{ env.COMMIT_SHORT_SHA }}/index.html web-build/commits/${{ env.COMMIT_SHORT_SHA }}/404.html
         working-directory: ${{ env.PROJECT_PATH }}
 
       - name: Deploy Github Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./${{ env.PROJECT_PATH }}/web-build
