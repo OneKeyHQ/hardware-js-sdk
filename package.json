@@ -80,5 +80,8 @@
     "tsconfig-paths": "^4.0.0",
     "typescript": "5.1.6"
   },
+  "resolutions": {
+    "wrap-ansi": "7.0.0"
+  },
   "version": "0.0.0"
 }

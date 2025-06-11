@@ -47,6 +47,12 @@ module.exports = {
         ...pkg.devDependencies,
       }),
     }),
+    {
+      '@abandonware/noble': 'commonjs @abandonware/noble',
+      '@abandonware/bluetooth-hci-socket': 'commonjs @abandonware/bluetooth-hci-socket',
+      bufferutil: 'commonjs bufferutil',
+      'utf-8-validate': 'commonjs utf-8-validate',
+    },
   ],
   output: {
     path: path.resolve(__dirname, 'dist'),

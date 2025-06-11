@@ -16,6 +16,10 @@ import { autoUpdater } from 'electron-updater';
 import initProcess, { restartBridge } from './process';
 import { ipcMessageKeys } from './config';
 
+/* eslint-disable @typescript-eslint/no-var-requires, global-require */
+// @ts-ignore
+const noble: typeof import('@abandonware/noble') = require('@abandonware/noble');
+
 // Set log level
 log.transports.file.level = 'info';
 log.transports.console.level = 'info';
