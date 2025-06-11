@@ -27,6 +27,17 @@ export enum EOneKeyBleMessageKeys {
 
   // BLE connection status related
   BLE_DEVICE_DISCONNECTED = '$onekey-ble-device-disconnected',
+
+  // Noble BLE related (for direct BLE communication)
+  NOBLE_BLE_ENUMERATE = '$onekey-noble-ble-enumerate',
+  NOBLE_BLE_STOP_SCAN = '$onekey-noble-ble-stop-scan',
+  NOBLE_BLE_GET_DEVICE = '$onekey-noble-ble-get-device',
+  NOBLE_BLE_CONNECT = '$onekey-noble-ble-connect',
+  NOBLE_BLE_DISCONNECT = '$onekey-noble-ble-disconnect',
+  NOBLE_BLE_WRITE = '$onekey-noble-ble-write',
+  NOBLE_BLE_SUBSCRIBE = '$onekey-noble-ble-subscribe',
+  NOBLE_BLE_UNSUBSCRIBE = '$onekey-noble-ble-unsubscribe',
+  NOBLE_BLE_NOTIFICATION = '$onekey-noble-ble-notification',
 }
 
 export const ONEKEY_SERVICE_UUID = '00000001-0000-1000-8000-00805f9b34fb';

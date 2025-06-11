@@ -4,7 +4,7 @@ import isDevelopment from 'electron-is-dev';
 import { format as formatUrl } from 'url';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
-import { initElectronBleBridge } from '@onekeyfe/hd-transport-electron';
+import { initNobleBleSupport } from '@onekeyfe/hd-transport-electron';
 import initProcess, { restartBridge } from './process';
 import { ipcMessageKeys } from './config';
 
@@ -256,7 +256,7 @@ function createMainWindow() {
     }
   });
 
-  initElectronBleBridge(browserWindow.webContents);
+  initNobleBleSupport(browserWindow.webContents);
 
   ipcMain.on(ipcMessageKeys.APP_RESTART, () => {
     browserWindow?.reload();
