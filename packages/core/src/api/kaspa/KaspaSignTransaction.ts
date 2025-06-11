@@ -32,6 +32,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       { name: 'lockTime', required: true },
       { name: 'sigOpCount', type: 'number' },
       { name: 'subNetworkID', type: 'string' },
+      { name: 'useTweak', type: 'boolean' },
     ]);
 
     // if(!payload.inputs.length) throw
@@ -76,6 +77,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       sigHashType: payload.sigHashType ?? SignatureType.SIGHASH_ALL | SignatureType.SIGHASH_FORKID,
       sigOpCount: payload.sigOpCount ?? 1,
       subNetworkID: payload.subNetworkID ?? bytesToHex(zeroSubnetworkID()),
+      useTweak: payload.useTweak,
     };
   }
 
@@ -86,6 +88,17 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
       },
       model_touch: {
         min: '4.3.0',
+      },
+    };
+  }
+
+  getUseTweakVersionRange() {
+    return {
+      pro: {
+        min: '4.14.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
       },
     };
   }
@@ -134,6 +147,15 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
   }
 
   async run() {
+    this.checkFeatureVersionLimit(
+      // exists use_tweak is false check firmware version
+      () => this.params.useTweak === false,
+      () => this.getUseTweakVersionRange(),
+      {
+        strictCheckDeviceSupport: true,
+      }
+    );
+
     const { raw: rawMessage } = serialize(this.params, 0);
     const input = this.params.inputs[0];
 
@@ -149,6 +171,7 @@ export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactio
         scheme: params.scheme,
         prefix: params.prefix,
         input_count: params.inputs.length,
+        use_tweak: params.useTweak,
       }
     );
 

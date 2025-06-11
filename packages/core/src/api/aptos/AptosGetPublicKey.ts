@@ -48,13 +48,11 @@ export default class AptosGetPublicKey extends BaseMethod<any> {
   async run() {
     const res = await batchGetPublickeys(this.device, this.params, 'ed25519', 637);
 
-    const responses: AptosPublicKey[] = res.message.public_keys.map(
-      (publicKey: string, index: number) => ({
-        path: serializedPath((this.params as unknown as any[])[index].address_n),
-        pub: publicKey,
-        publicKey,
-      })
-    );
+    const responses: AptosPublicKey[] = res.public_keys.map((publicKey: string, index: number) => ({
+      path: serializedPath((this.params as unknown as any[])[index].address_n),
+      pub: publicKey,
+      publicKey,
+    }));
 
     validateResult(responses, ['pub'], {
       expectedLength: this.params.length,

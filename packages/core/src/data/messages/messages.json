@@ -5888,6 +5888,13 @@
           "options": {
             "default": "schnorr"
           }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 5,
+          "options": {
+            "default": true
+          }
         }
       }
     },
@@ -5934,6 +5941,13 @@
           "id": 5,
           "options": {
             "default": 1
+          }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 6,
+          "options": {
+            "default": true
           }
         }
       }

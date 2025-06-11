@@ -51,6 +51,7 @@ export type AllNetworkAddressParams = {
 
   includePublicKey?: boolean;
   group?: string;
+  useTweak?: boolean;
 };
 
 type AllNetworkAddressPayload =

@@ -79,19 +79,19 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
         ignoreCoinType: true,
       });
 
-      if (!res.message?.hd_nodes || this.params.length !== res.message.hd_nodes.length) {
+      if (!res?.hd_nodes || this.params.length !== res.hd_nodes.length) {
         throw new Error('Invalid response from Publickeys');
       }
 
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
-        const node = res.message.hd_nodes[i];
+        const node = res.hd_nodes[i];
 
         const path = serializedPath(param.address_n);
 
         const xpub = createExtendedPublicKey(node, param.coin_name, param.script_type);
 
-        const rootFingerprint = res.message.root_fingerprint;
+        const rootFingerprint = res.root_fingerprint;
 
         let xpubSegwit = xpub;
         if (this.isBtcNetwork(param) && isTaprootPath(param.address_n)) {
