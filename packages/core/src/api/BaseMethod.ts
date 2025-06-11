@@ -58,8 +58,9 @@ export abstract class BaseMethod<Params = undefined> {
 
   /**
    * 不允许的设备模式。如果当前设备模式在该数组中，则抛出异常。
+   * NOT_INITIALIZE, BOOTLOADER, SEEDLESS
    */
-  notAllowDeviceMode: string[];
+  allowDeviceMode: string[];
 
   /**
    * 依赖的设备模式
@@ -105,7 +106,7 @@ export abstract class BaseMethod<Params = undefined> {
     this.connectId = payload.connectId || '';
     this.deviceId = payload.deviceId || '';
     this.useDevice = true;
-    this.notAllowDeviceMode = [UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
   }
 

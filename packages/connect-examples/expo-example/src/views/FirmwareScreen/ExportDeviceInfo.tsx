@@ -1,3 +1,4 @@
+import { Features } from '@onekeyfe/hd-core';
 import { useIntl } from 'react-intl';
 import { Button } from '../../components/ui/Button';
 import { downloadFile } from '../../utils/downloadUtils';
@@ -52,6 +53,13 @@ export function formatCurrentTime(timestamp: number) {
   return formatter.format(timestamp);
 }
 
+export function getDeviceMode(features: Features | undefined) {
+  if (features?.bootloader_mode === true) {
+    return 'label__device_bootloader_statue';
+  }
+  return 'label__device_firmware_status';
+}
+
 export function ExportDeviceInfo() {
   const intl = useIntl();
   const { features, onekeyFeatures } = useDeviceFieldContext();
@@ -71,10 +79,7 @@ export function ExportDeviceInfo() {
     } = getDeviceBasicInfo(features, onekeyFeatures);
 
     const bootloaderMode = intl.formatMessage({
-      id:
-        features?.bootloader_mode === true
-          ? 'label__device_bootloader_statue'
-          : 'label__device_firmware_status',
+      id: getDeviceMode(features),
     });
 
     markdown.push(`# Device OneKey ${deviceType} Info (${serialNumber})`);

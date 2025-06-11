@@ -15,7 +15,7 @@ import { getDeviceFirmwareVersion, getDeviceType } from '../utils';
 
 export default class CheckAllFirmwareRelease extends BaseMethod {
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
   }

@@ -5,7 +5,7 @@ import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 
 export default class CheckBridgeRelease extends BaseMethod {
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
   }

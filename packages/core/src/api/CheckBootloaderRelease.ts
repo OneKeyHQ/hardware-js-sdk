@@ -5,7 +5,7 @@ import { getBootloaderReleaseInfo } from './firmware/releaseHelper';
 
 export default class CheckBootloaderRelease extends BaseMethod {
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
   }

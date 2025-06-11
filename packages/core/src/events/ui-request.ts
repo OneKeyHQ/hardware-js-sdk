@@ -34,7 +34,7 @@ export const UI_REQUEST = {
   BOOTLOADER: 'ui-device_bootloader_mode',
   NOT_IN_BOOTLOADER: 'ui-device_not_in_bootloader_mode',
   REQUIRE_MODE: 'ui-device_require_mode',
-  INITIALIZE: 'ui-device_not_initialized',
+  NOT_INITIALIZE: 'ui-device_not_initialized',
   SEEDLESS: 'ui-device_seedless',
   FIRMWARE_OLD: 'ui-device_firmware_old',
   FIRMWARE_NOT_SUPPORTED: 'ui-device_firmware_unsupported',
