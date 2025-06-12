@@ -65,36 +65,23 @@ jobs:
         with:
           name: new-example-build
           path: deploy/new-example
-      - name: Create Landing Page
+      - name: Setup Expo as Root and create routing
         run: |
-          cat > deploy/index.html <<EOL
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>OneKey Hardware SDK Examples</title>
-              <style>
-                  body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f4; }
-                  .container { text-align: center; }
-                  h1 { color: #333; }
-                  a { display: inline-block; margin: 10px; padding: 15px 30px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-size: 1.2em; }
-                  a:hover { background-color: #0056b3; }
-              </style>
-          </head>
-          <body>
-              <div class="container">
-                  <h1>OneKey Hardware SDK Examples</h1>
-                  <a href="./expo-example/">Expo Example</a>
-                  <a href="./new-example/">New Example</a>
-              </div>
-          </body>
-          </html>
-          EOL
+          # Copy expo-example to root (default access)
+          cp -r deploy/expo-example/* deploy/
+          # Create expo-example subdirectory for explicit routing
+          mkdir -p deploy/expo-example
+          cp -r deploy/expo-example/* deploy/expo-example/
+          # Clean up temp directory
+          rm -rf deploy/temp-expo
       - name: Add SPA fallback for client-side routing
         run: |
-          cp deploy/expo-example/index.html deploy/expo-example/404.html
+          # Add 404.html for root (expo-example)
+          cp deploy/index.html deploy/404.html
+          # Add 404.html for new-example subdirectory
           cp deploy/new-example/index.html deploy/new-example/404.html
+          # Add 404.html for expo-example subdirectory
+          cp deploy/expo-example/index.html deploy/expo-example/404.html
       - name: Deploy to Github Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
