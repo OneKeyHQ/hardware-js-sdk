@@ -45,8 +45,8 @@ function nodePolyfillPlugin() {
 
 export default defineConfig({
   root: process.cwd(),
-  // For production, use a relative path. This is more robust for sub-directory deployments.
-  base: process.env.NODE_ENV === 'production' ? '' : '/',
+  // Set the base path to the repository name + sub-directory for a robust deployment
+  base: '/hardware-js-sdk/new-example/',
 
   plugins: [react(), tsconfigPaths(), nodePolyfillPlugin()],
 

@@ -37,7 +37,7 @@
       "bundler": "webpack"
     },
     "experiments": {
-      "baseUrl": "/expo-example/"
+      "baseUrl": "/hardware-js-sdk/expo-example/"
     },
     "plugins": [
       "expo-image-picker",
