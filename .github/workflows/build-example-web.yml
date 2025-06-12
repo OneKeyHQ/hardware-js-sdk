@@ -1,61 +1,72 @@
-name: build-deploy-example-web
+name: Build and Deploy Examples
 
-on: workflow_dispatch
+on:
+  workflow_dispatch
 
 jobs:
-  deploy:
+  build_expo:
     runs-on: ubuntu-latest
-    env:
-      TEST_ENDPOINT: hardware-example.onekeytest.com
-      PROJECT_PATH: packages/connect-examples/expo-example
-      COMMIT_SHA: ${{ github.sha }}
-      COMMIT_SHORT_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Get short commit SHA
-        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
-        
-      - name: Setup Environment
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Install Package
+      - name: Install Dependencies
         run: |
           yarn
           yarn bootstrap
+      - name: Build Expo Example
+        run: yarn expo export:web
+        working-directory: packages/connect-examples/expo-example
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: expo-build
+          path: packages/connect-examples/expo-example/web-build
 
-      - name: Build Target
-        run: |
-          yarn build
+  build_new_example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install Dependencies
+        run: yarn
+      - name: Build New Example
+        run: VITE_COMMIT_SHA=${GITHUB_SHA:0:7} yarn workspace onekeyexample run build
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: new-example-build
+          path: packages/connect-examples/new-example/dist
 
-      - name: Build Web App
-        run: |
-          EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
-        working-directory: ${{ env.PROJECT_PATH }}
-
-      - name: Add commit info to build output
-        run: |
-          # 创建带有 commit id 的子目录
-          mkdir -p web-build/commits/${{ env.COMMIT_SHORT_SHA }}
-          # 复制构建产物到带有 commit id 的目录
-          cp -r web-build/* web-build/commits/${{ env.COMMIT_SHORT_SHA }}/
-          # 创建一个 commit 信息文件
-          echo '{"commit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ env.COMMIT_SHA }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > web-build/commits/${{ env.COMMIT_SHORT_SHA }}/commit-info.json
-        working-directory: ${{ env.PROJECT_PATH }}
-
-      - name: Copy index.html to 404.html for Github Pages deployment (client-side routing)
-        run: |
-          cp web-build/index.html web-build/404.html
-          cp web-build/commits/${{ env.COMMIT_SHORT_SHA }}/index.html web-build/commits/${{ env.COMMIT_SHORT_SHA }}/404.html
-        working-directory: ${{ env.PROJECT_PATH }}
-
-      - name: Deploy Github Pages
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build_expo, build_new_example]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Deploy Directory
+        run: mkdir -p deploy
+      - name: Download Expo Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: expo-build
+          path: deploy/expo-example
+      - name: Download New Example Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: new-example-build
+          path: deploy/new-example
+      - name: Deploy to Github Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./${{ env.PROJECT_PATH }}/web-build
-          cname: ${{ env.TEST_ENDPOINT }}
+          publish_dir: ./deploy
+          cname: example.onekey-test.com
           force_orphan: true
