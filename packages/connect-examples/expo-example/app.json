@@ -8,7 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "experiments": {
-      "baseUrl": "/hardware-js-sdk/expo-example"
+      "baseUrl": "/hardware-js-sdk/"
     },
     "splash": {
       "image": "./assets/splash.png",
