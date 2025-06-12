@@ -5,6 +5,11 @@ const createExpoWebpackConfigAsync = require('@expo/webpack-config');
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
 
+  // 设置 publicPath 为 GitHub Pages 的路径
+  if (process.env.NODE_ENV === 'production') {
+    config.output.publicPath = '/hardware-js-sdk/';
+  }
+
   // 只为我们自己的代码启用 source map
   config.module.rules = config.module.rules.filter(rule => {
     if (!rule || !rule.use) return true;
