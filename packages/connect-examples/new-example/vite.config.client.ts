@@ -43,39 +43,17 @@ function nodePolyfillPlugin() {
   };
 }
 
-// 插件来注入全局 Buffer
-function injectBufferPlugin() {
-  return {
-    name: 'inject-buffer-plugin',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    generateBundle(_options: any, bundle: any) {
-      for (const fileName in bundle) {
-        const chunk = bundle[fileName];
-        if (chunk.type === 'chunk' && chunk.isEntry) {
-          // 在入口文件前注入 Buffer 的初始化代码
-          chunk.code = `import { Buffer as _Buffer } from 'buffer';
-if (typeof globalThis !== 'undefined') {
-  globalThis.Buffer = globalThis.Buffer || _Buffer;
-}
-if (typeof window !== 'undefined') {
-  window.Buffer = window.Buffer || _Buffer;
-}
-${chunk.code}`;
-        }
-      }
-    },
-  };
-}
-
 export default defineConfig({
   root: process.cwd(),
   // Set the base path to the repository name + sub-directory for a robust deployment
   base: '/hardware-js-sdk/new-example/',
 
-  plugins: [react(), tsconfigPaths(), nodePolyfillPlugin(), injectBufferPlugin()],
+  plugins: [react(), tsconfigPaths(), nodePolyfillPlugin()],
 
   define: {
     global: 'globalThis',
+    // 确保 Buffer 在全局作用域中可用
+    'globalThis.Buffer': 'globalThis.Buffer',
     // 将 commit SHA 注入到应用中
     __COMMIT_SHA__: JSON.stringify(process.env.VITE_COMMIT_SHA || 'dev'),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
@@ -106,6 +84,8 @@ export default defineConfig({
           sdk: ['@onekeyfe/hd-web-sdk', '@onekeyfe/hd-core', '@onekeyfe/hd-shared'],
           // 将UI组件打包到一个文件
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-checkbox', '@radix-ui/react-select'],
+          // 将 buffer 和其他 polyfills 打包在一起
+          polyfills: ['buffer', 'process', 'stream-browserify', 'util', 'events'],
         },
         // 设置更大的chunk大小限制，减少文件拆分
         chunkFileNames: chunkInfo => {
