@@ -28,8 +28,7 @@ jobs:
 
       - name: Build Target
         run: |
-          VITE_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn build
-        working-directory: ${{ env.PROJECT_PATH }}
+          VITE_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn workspace new-example run build
 
       - name: Add commit info to build output
         run: |
