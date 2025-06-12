@@ -22,7 +22,11 @@ const AddressTestScreen = lazy(() => import('./src/views/AddressTestScreen'));
 const SecurityCheckScreen = lazy(() => import('./src/views/SecurityCheckScreen'));
 const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTestingScreen'));
 
-const prefix = ExpoLinking.createURL('/');
+// 修复 GitHub Pages 路由问题
+const isGitHubPages =
+  typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
+const webBaseUrl = isGitHubPages ? '/hardware-js-sdk/' : '/';
+const prefix = ExpoLinking.createURL(webBaseUrl);
 
 const routeConfig = {};
 

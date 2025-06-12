@@ -31,9 +31,10 @@ if (redirectPath) {
   history.replaceState(null, '', redirectPath);
 }
 
-// GitHub Pages base path - 仅在 github.io 域名上使用
+// GitHub Pages base path - new-example 应该在 /hardware-js-sdk/new-example/ 路径下
 const isGitHubPages = window.location.hostname.endsWith('github.io');
-const basename = process.env.NODE_ENV === 'production' && isGitHubPages ? '/hardware-js-sdk/' : '/';
+const basename =
+  process.env.NODE_ENV === 'production' && isGitHubPages ? '/hardware-js-sdk/new-example/' : '/';
 
 // Create a root and render directly - no hydration needed for client-only app
 const container = document.getElementById('root');

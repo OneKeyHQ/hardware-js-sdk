@@ -80,11 +80,13 @@ jobs:
           rm -rf deploy/temp-expo
       - name: Add SPA fallback for client-side routing
         run: |
-          # Add 404.html for root (expo-example)
+          # Add 404.html for root (expo-example) - 处理所有未匹配的路由
           cp deploy/index.html deploy/404.html
-          # Add 404.html for new-example subdirectory
+
+          # Add 404.html for new-example subdirectory - 处理 new-example 的客户端路由
           cp deploy/new-example/index.html deploy/new-example/404.html
-          # Add 404.html for expo-example subdirectory
+
+          # Add 404.html for expo-example subdirectory - 处理显式 expo-example 路由
           cp deploy/expo-example/index.html deploy/expo-example/404.html
       - name: Deploy to Github Pages
         uses: peaceiris/actions-gh-pages@v4
