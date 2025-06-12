@@ -37,7 +37,11 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       - name: Install Dependencies
-        run: yarn
+        run: |
+          yarn
+          yarn bootstrap
+      - name: Build All Packages
+        run: yarn build
       - name: Build New Example
         run: VITE_COMMIT_SHA=${GITHUB_SHA:0:7} yarn vite build --config vite.config.client.ts --base=/hardware-js-sdk/new-example/
         working-directory: packages/connect-examples/new-example
