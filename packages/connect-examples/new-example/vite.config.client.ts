@@ -43,12 +43,36 @@ function nodePolyfillPlugin() {
   };
 }
 
+// 插件来注入全局 Buffer
+function injectBufferPlugin() {
+  return {
+    name: 'inject-buffer-plugin',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    generateBundle(_options: any, bundle: any) {
+      for (const fileName in bundle) {
+        const chunk = bundle[fileName];
+        if (chunk.type === 'chunk' && chunk.isEntry) {
+          // 在入口文件前注入 Buffer 的初始化代码
+          chunk.code = `import { Buffer as _Buffer } from 'buffer';
+if (typeof globalThis !== 'undefined') {
+  globalThis.Buffer = globalThis.Buffer || _Buffer;
+}
+if (typeof window !== 'undefined') {
+  window.Buffer = window.Buffer || _Buffer;
+}
+${chunk.code}`;
+        }
+      }
+    },
+  };
+}
+
 export default defineConfig({
   root: process.cwd(),
   // Set the base path to the repository name + sub-directory for a robust deployment
   base: '/hardware-js-sdk/new-example/',
 
-  plugins: [react(), tsconfigPaths(), nodePolyfillPlugin()],
+  plugins: [react(), tsconfigPaths(), nodePolyfillPlugin(), injectBufferPlugin()],
 
   define: {
     global: 'globalThis',
