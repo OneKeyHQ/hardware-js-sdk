@@ -37,16 +37,16 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // 减少代码拆分，将更多代码打包到主要chunk中
-        manualChunks: {
-          // 将所有vendor代码打包到一个文件
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          // 将SDK相关代码打包到一个文件，但确保 polyfill 在 entry 中
-          sdk: ['@onekeyfe/hd-web-sdk', '@onekeyfe/hd-core', '@onekeyfe/hd-shared'],
-          // 将UI组件打包到一个文件
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-checkbox', '@radix-ui/react-select'],
-          // 注意：不要将 polyfill 单独打包，让它们留在 entry chunk 中
-          // polyfill: ['buffer', 'process', 'stream-browserify', 'util', 'events'],
-        },
+        // manualChunks: {
+        //   // 将所有vendor代码打包到一个文件
+        //   vendor: ['react', 'react-dom', 'react-router-dom'],
+        //   // 将SDK相关代码打包到一个文件，但确保 polyfill 在 entry 中
+        //   sdk: ['@onekeyfe/hd-web-sdk', '@onekeyfe/hd-core', '@onekeyfe/hd-shared'],
+        //   // 将UI组件打包到一个文件
+        //   ui: ['@radix-ui/react-dialog', '@radix-ui/react-checkbox', '@radix-ui/react-select'],
+        //   // 注意：不要将 polyfill 单独打包，让它们留在 entry chunk 中
+        //   // polyfill: ['buffer', 'process', 'stream-browserify', 'util', 'events'],
+        // },
         // 设置更大的chunk大小限制，减少文件拆分
         chunkFileNames: chunkInfo => {
           const facadeModuleId = chunkInfo.facadeModuleId
