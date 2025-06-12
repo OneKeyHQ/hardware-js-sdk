@@ -7,6 +7,9 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "experiments": {
+      "baseUrl": "/hardware-js-sdk/expo-example"
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -35,9 +38,6 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "webpack"
-    },
-    "experiments": {
-      "baseUrl": "/hardware-js-sdk/expo-example/"
     },
     "plugins": [
       "expo-image-picker",
