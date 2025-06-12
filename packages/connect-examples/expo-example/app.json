@@ -36,6 +36,9 @@
       "favicon": "./assets/favicon.png",
       "bundler": "webpack"
     },
+    "experiments": {
+      "baseUrl": "/expo-example/"
+    },
     "plugins": [
       "expo-image-picker",
       "expo-document-picker",

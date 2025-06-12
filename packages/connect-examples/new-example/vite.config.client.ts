@@ -46,7 +46,7 @@ function nodePolyfillPlugin() {
 export default defineConfig({
   root: process.cwd(),
   // 根据环境设置base path
-  base: process.env.NODE_ENV === 'production' ? '/hardware-js-sdk/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/new-example/' : '/',
 
   plugins: [react(), tsconfigPaths(), nodePolyfillPlugin()],
 
@@ -59,7 +59,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      '~': path.resolve(__dirname, 'app'),
+      '~': path.resolve(__dirname, './app'),
       stream: 'stream-browserify',
       buffer: 'buffer',
       process: 'process/browser',
