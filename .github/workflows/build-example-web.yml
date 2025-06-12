@@ -19,7 +19,7 @@ jobs:
       - name: Build All Packages
         run: yarn build
       - name: Build Expo Example
-        run: EXPO_PUBLIC_COMMIT_SHA=${GITHUB_SHA:0:7} yarn expo export:web
+        run: EXPO_PUBLIC_COMMIT_SHA=${GITHUB_SHA:0:7} yarn expo export:web --public-url /hardware-js-sdk/expo-example/
         working-directory: packages/connect-examples/expo-example
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -39,7 +39,7 @@ jobs:
       - name: Install Dependencies
         run: yarn
       - name: Build New Example
-        run: VITE_COMMIT_SHA=${GITHUB_SHA:0:7} yarn workspace onekeyexample run build
+        run: VITE_COMMIT_SHA=${GITHUB_SHA:0:7} yarn workspace onekeyexample run build -- --base=/hardware-js-sdk/new-example/
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
