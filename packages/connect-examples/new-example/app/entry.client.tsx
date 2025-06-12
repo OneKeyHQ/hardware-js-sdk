@@ -6,12 +6,12 @@
  */
 
 // 先导入 shim 以确保 Node.js polyfills 在应用其余部分之前加载
-import "./utils/shim";
+import './utils/shim';
 
-import React from "react";
-import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./root";
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './root';
 
 // Declare global variable for TypeScript
 declare global {
@@ -24,18 +24,19 @@ declare global {
 window.__isClient = true;
 
 // GitHub Pages 路由支持：检查是否有重定向路径
-const redirectPath = sessionStorage.getItem("redirectPath");
+const redirectPath = sessionStorage.getItem('redirectPath');
 if (redirectPath) {
-  sessionStorage.removeItem("redirectPath");
+  sessionStorage.removeItem('redirectPath');
   // 使用 history.replaceState 替换当前历史记录
-  history.replaceState(null, "", redirectPath);
+  history.replaceState(null, '', redirectPath);
 }
 
-// GitHub Pages base path
-const basename = process.env.NODE_ENV === "production" ? "/OnekeyExample" : "";
+// GitHub Pages base path - 仅在 github.io 域名上使用
+const isGitHubPages = window.location.hostname.endsWith('github.io');
+const basename = process.env.NODE_ENV === 'production' && isGitHubPages ? '/hardware-js-sdk/' : '/';
 
 // Create a root and render directly - no hydration needed for client-only app
-const container = document.getElementById("root");
+const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);
   root.render(
