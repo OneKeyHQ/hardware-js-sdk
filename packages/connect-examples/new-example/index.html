@@ -11,6 +11,38 @@
       href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
       rel="stylesheet"
     />
+    <!-- Buffer polyfill script - must load before other modules -->
+    <script>
+      // 同步加载 Buffer polyfill - 确保在所有模块加载前就已经可用
+      window.global = window.global || window;
+      
+      // 如果 Buffer 还没有定义，我们创建一个占位符
+      if (typeof window.Buffer === 'undefined') {
+        // 创建一个简单的 Buffer 占位符，稍后会被真正的 Buffer 替换
+        window.Buffer = null;
+        window.bufferPolyfillPromise = import('./node_modules/buffer/index.js').then(function(module) {
+          window.Buffer = module.Buffer;
+          window.global.Buffer = module.Buffer;
+          if (typeof globalThis !== 'undefined') {
+            globalThis.Buffer = module.Buffer;
+          }
+          console.log('Buffer polyfill loaded');
+          return module.Buffer;
+        }).catch(function(error) {
+          // 如果无法加载，尝试从 CDN 加载
+          console.warn('Failed to load buffer from node_modules, trying CDN:', error);
+          return import('https://cdn.skypack.dev/buffer').then(function(module) {
+            window.Buffer = module.Buffer;
+            window.global.Buffer = module.Buffer;
+            if (typeof globalThis !== 'undefined') {
+              globalThis.Buffer = module.Buffer;
+            }
+            console.log('Buffer polyfill loaded from CDN');
+            return module.Buffer;
+          });
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

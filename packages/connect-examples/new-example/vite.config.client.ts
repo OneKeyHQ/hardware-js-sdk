@@ -52,8 +52,6 @@ export default defineConfig({
 
   define: {
     global: 'globalThis',
-    // 确保 Buffer 在全局作用域中可用
-    'globalThis.Buffer': 'globalThis.Buffer',
     // 将 commit SHA 注入到应用中
     __COMMIT_SHA__: JSON.stringify(process.env.VITE_COMMIT_SHA || 'dev'),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
@@ -84,7 +82,7 @@ export default defineConfig({
           sdk: ['@onekeyfe/hd-web-sdk', '@onekeyfe/hd-core', '@onekeyfe/hd-shared'],
           // 将UI组件打包到一个文件
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-checkbox', '@radix-ui/react-select'],
-          // 将 buffer 和其他 polyfills 打包在一起
+          // 将 buffer 和其他 polyfills 打包在一起，并确保它们优先加载
           polyfills: ['buffer', 'process', 'stream-browserify', 'util', 'events'],
         },
         // 设置更大的chunk大小限制，减少文件拆分
