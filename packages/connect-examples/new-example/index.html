@@ -11,19 +11,6 @@
       href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
       rel="stylesheet"
     />
-    <!-- Buffer polyfill - 从 CDN 同步加载 -->
-    <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.js"></script>
-    <script>
-      // 确保 Buffer 在全局作用域中可用
-      if (typeof window !== 'undefined' && window.buffer && window.buffer.Buffer) {
-        window.Buffer = window.buffer.Buffer;
-        window.global = window;
-        if (typeof globalThis !== 'undefined') {
-          globalThis.Buffer = window.buffer.Buffer;
-        }
-        console.log('Buffer polyfill loaded from CDN');
-      }
-    </script>
   </head>
   <body>
     <div id="root"></div>
