@@ -3,35 +3,6 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-// 创建一个插件来注入 Buffer polyfill
-function bufferPolyfillPlugin() {
-  return {
-    name: 'buffer-polyfill',
-    // 在构建时注入 Buffer 初始化代码
-    transformIndexHtml(html: string) {
-      return html.replace(
-        '<head>',
-        `<head>
-  <script type="module">
-    // 确保 Buffer 在运行时可用
-    if (typeof globalThis.Buffer === 'undefined') {
-      try {
-        import('buffer').then(({ Buffer }) => {
-          globalThis.Buffer = Buffer;
-          window.Buffer = Buffer;
-        }).catch(e => {
-          console.warn('Failed to load Buffer polyfill:', e);
-        });
-      } catch (e) {
-        console.warn('Failed to load Buffer polyfill:', e);
-      }
-    }
-  </script>`
-      );
-    },
-  };
-}
-
 // 创建一个插件来处理Node.js内置模块的polyfill
 function nodePolyfillPlugin() {
   const builtins: Record<string, string> = {
@@ -71,12 +42,10 @@ export default defineConfig({
   // Set the base path to the repository name + sub-directory for a robust deployment
   base: '/hardware-js-sdk/new-example/',
 
-  plugins: [react(), tsconfigPaths(), nodePolyfillPlugin(), bufferPolyfillPlugin()],
+  plugins: [react(), tsconfigPaths(), nodePolyfillPlugin()],
 
   define: {
     global: 'globalThis',
-    // 确保 process 全局可用
-    'process.env': 'process.env',
     // 将 commit SHA 注入到应用中
     __COMMIT_SHA__: JSON.stringify(process.env.VITE_COMMIT_SHA || 'dev'),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
