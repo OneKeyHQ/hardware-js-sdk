@@ -21,10 +21,10 @@ export default defineConfig({
     alias: {
       '~': path.resolve(__dirname, './app'),
       stream: 'stream-browserify',
-      buffer: 'buffer/',
+      buffer: 'buffer',
       process: 'process/browser',
-      util: 'util/',
-      events: 'events/',
+      util: 'util',
+      events: 'events',
     },
   },
 
