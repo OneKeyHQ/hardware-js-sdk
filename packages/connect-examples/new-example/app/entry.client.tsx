@@ -31,6 +31,17 @@ if (redirectPath) {
   history.replaceState(null, '', redirectPath);
 }
 
+// GitHub Pages hash 路由支持：处理从 404.html 重定向过来的 hash 路径
+if (window.location.hash) {
+  const hashPath = window.location.hash.substring(1); // 移除 # 号
+  if (hashPath && hashPath !== '/') {
+    // 将 hash 路径转换为正常路径
+    history.replaceState(null, '', hashPath);
+    // 清除 hash
+    window.location.hash = '';
+  }
+}
+
 // GitHub Pages base path - new-example 应该在 /hardware-js-sdk/new-example/ 路径下
 const isGitHubPages = window.location.hostname.endsWith('github.io');
 const basename =

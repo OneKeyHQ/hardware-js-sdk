@@ -80,14 +80,38 @@ jobs:
           rm -rf deploy/temp-expo
       - name: Add SPA fallback for client-side routing
         run: |
-          # Add 404.html for root (expo-example) - 处理所有未匹配的路由
-          cp deploy/index.html deploy/404.html
-
-          # Add 404.html for new-example subdirectory - 处理 new-example 的客户端路由
+          # 为 new-example 创建 404.html（Vite 构建的应用需要这个）
           cp deploy/new-example/index.html deploy/new-example/404.html
 
-          # Add 404.html for expo-example subdirectory - 处理显式 expo-example 路由
+          # 为 expo-example 创建 404.html  
           cp deploy/expo-example/index.html deploy/expo-example/404.html
+
+          # 简化的根 404.html - 只处理基本的路由分发
+          cat > deploy/404.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Redirecting...</title>
+            <script>
+              const path = window.location.pathname;
+              
+              // 简单的路由分发逻辑
+              if (path.includes('/new-example/')) {
+                window.location.replace('/hardware-js-sdk/new-example/');
+              } else if (path.includes('/expo-example/')) {
+                window.location.replace('/hardware-js-sdk/expo-example/');
+              } else {
+                // 默认重定向到根页面（expo-example）
+                window.location.replace('/hardware-js-sdk/');
+              }
+            </script>
+          </head>
+          <body>
+            <div>Redirecting...</div>
+          </body>
+          </html>
+          EOF
       - name: Deploy to Github Pages
         uses: peaceiris/actions-gh-pages@v4
         with:

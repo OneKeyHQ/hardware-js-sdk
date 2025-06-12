@@ -10,6 +10,42 @@ module.exports = async function (env, argv) {
     config.output.publicPath = '/hardware-js-sdk/';
   }
 
+  // 配置 SPA 路由支持
+  if (config.devServer) {
+    config.devServer.historyApiFallback = {
+      index: '/hardware-js-sdk/',
+      rewrites: [
+        // 处理 expo-example 的路由
+        {
+          from: /^\/hardware-js-sdk\/expo-example\/.*$/,
+          to: '/hardware-js-sdk/expo-example/index.html',
+        },
+        // 处理根路径的路由（默认 expo-example）
+        {
+          from: /^\/hardware-js-sdk\/(?!new-example|expo-example|assets).*$/,
+          to: '/hardware-js-sdk/index.html',
+        },
+      ],
+    };
+  } else {
+    // 为生产环境配置 historyApiFallback
+    config.devServer = {
+      historyApiFallback: {
+        index: '/hardware-js-sdk/',
+        rewrites: [
+          {
+            from: /^\/hardware-js-sdk\/expo-example\/.*$/,
+            to: '/hardware-js-sdk/expo-example/index.html',
+          },
+          {
+            from: /^\/hardware-js-sdk\/(?!new-example|expo-example|assets).*$/,
+            to: '/hardware-js-sdk/index.html',
+          },
+        ],
+      },
+    };
+  }
+
   // 只为我们自己的代码启用 source map
   config.module.rules = config.module.rules.filter(rule => {
     if (!rule || !rule.use) return true;

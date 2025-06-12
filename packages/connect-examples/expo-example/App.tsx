@@ -22,17 +22,25 @@ const AddressTestScreen = lazy(() => import('./src/views/AddressTestScreen'));
 const SecurityCheckScreen = lazy(() => import('./src/views/SecurityCheckScreen'));
 const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTestingScreen'));
 
-// 修复 GitHub Pages 路由问题
-const isGitHubPages =
-  typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
-const webBaseUrl = isGitHubPages ? '/hardware-js-sdk/' : '/';
-const prefix = ExpoLinking.createURL(webBaseUrl);
-
-const routeConfig = {};
-
+// React Navigation v6 linking 配置
 const linking = {
-  prefixes: [prefix],
-  routeConfig,
+  prefixes: [
+    // 为不同的部署环境设置 URL 前缀
+    'https://wabicai.github.io/hardware-js-sdk/',
+    'https://wabicai.github.io/hardware-js-sdk/expo-example/',
+    'http://localhost:19006/',
+    ExpoLinking.createURL('/'),
+  ],
+  config: {
+    screens: {
+      [Routes.Payload]: 'api-payload',
+      [Routes.FirmwareUpdateTest]: 'firmware-update-test',
+      [Routes.PassphraseTest]: 'passphrase-test',
+      [Routes.AddressTest]: 'address-test',
+      [Routes.SecurityCheck]: 'security-check',
+      [Routes.FunctionalTesting]: 'functional-testing',
+    },
+  },
 };
 
 // Create a native stack navigator
