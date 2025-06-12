@@ -34,8 +34,8 @@ jobs:
         run: |
           # 创建带有 commit id 的子目录
           mkdir -p dist/commits/${{ env.COMMIT_SHORT_SHA }}
-          # 复制构建产物到带有 commit id 的目录
-          cp -r dist/* dist/commits/${{ env.COMMIT_SHORT_SHA }}/
+          # 复制构建产物到带有 commit id 的目录，排除 commits 目录
+          rsync -av --exclude='commits' dist/ dist/commits/${{ env.COMMIT_SHORT_SHA }}/
           # 创建一个 commit 信息文件
           echo '{"commit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ env.COMMIT_SHA }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > dist/commits/${{ env.COMMIT_SHORT_SHA }}/commit-info.json
           # 创建一个主要的 commit 信息文件
