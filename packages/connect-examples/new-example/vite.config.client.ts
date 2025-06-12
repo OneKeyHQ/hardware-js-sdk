@@ -46,7 +46,7 @@ function nodePolyfillPlugin() {
 export default defineConfig({
   root: process.cwd(),
   // 根据环境设置base path
-  base: process.env.NODE_ENV === 'production' ? '/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/hardware-js-sdk/' : '/',
 
   plugins: [react(), tsconfigPaths(), nodePolyfillPlugin()],
 
