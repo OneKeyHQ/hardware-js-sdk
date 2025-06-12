@@ -8,7 +8,54 @@ declare global {
     Buffer: typeof BufferClass;
     process: NodeJS.Process;
   }
+  // 扩展 globalThis 类型
+  // eslint-disable-next-line no-var
+  var Buffer: typeof BufferClass;
+  // eslint-disable-next-line no-var
+  var global: typeof globalThis;
+  // eslint-disable-next-line no-var
+  var process: NodeJS.Process;
 }
+
+// 立即初始化全局变量 - 优先级最高
+(function initializeGlobals() {
+  // 首先设置 globalThis.Buffer
+  if (typeof globalThis !== 'undefined') {
+    globalThis.Buffer = BufferClass;
+    globalThis.global = globalThis;
+  }
+
+  // 如果在浏览器环境，也设置 window 变量
+  if (typeof window !== 'undefined') {
+    window.global = window;
+    window.Buffer = BufferClass;
+
+    // 设置 process 对象
+    if (!window.process) {
+      window.process = {
+        env: { NODE_ENV: process.env.NODE_ENV || 'production' },
+        browser: true,
+        nextTick: (cb: () => void) => setTimeout(cb, 0),
+        version: 'v18.0.0',
+        versions: { node: '18.0.0' },
+      } as unknown as NodeJS.Process;
+    }
+
+    // 同步到 globalThis
+    globalThis.process = window.process;
+  }
+
+  // 如果没有 window 对象（比如 Web Worker 环境）
+  else if (typeof globalThis !== 'undefined' && !globalThis.process) {
+    globalThis.process = {
+      env: { NODE_ENV: process.env.NODE_ENV || 'production' },
+      browser: true,
+      nextTick: (cb: () => void) => setTimeout(cb, 0),
+      version: 'v18.0.0',
+      versions: { node: '18.0.0' },
+    } as unknown as NodeJS.Process;
+  }
+})();
 
 // 创建一个简化的 require 函数来避免 require is not defined 错误
 if (typeof window !== 'undefined') {
@@ -31,41 +78,6 @@ if (typeof window !== 'undefined') {
     // 也设置到全局作用域
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).require = windowAny.require;
-  }
-}
-
-// 确保全局对象可用
-if (typeof window !== 'undefined') {
-  // 使 Buffer 全局可用 - 同时设置 window 和 globalThis
-  window.global = window;
-  window.Buffer = BufferClass;
-  globalThis.Buffer = BufferClass;
-
-  // 确保 process 对象可用
-  if (!window.process) {
-    // 使用双重类型断言来避免类型错误
-    window.process = {
-      env: { NODE_ENV: 'production' }, // 在生产环境中使用正确的 NODE_ENV
-      browser: true,
-      nextTick: (cb: () => void) => setTimeout(cb, 0),
-      version: 'v18.0.0', // 模拟 Node.js 版本
-      versions: { node: '18.0.0' },
-    } as unknown as NodeJS.Process;
-  }
-
-  // 设置到全局作用域
-  globalThis.process = window.process;
-} else if (typeof globalThis !== 'undefined') {
-  // 如果没有 window 对象（比如 Web Worker 环境），直接设置 globalThis
-  globalThis.Buffer = BufferClass;
-  if (!globalThis.process) {
-    globalThis.process = {
-      env: { NODE_ENV: 'production' },
-      browser: true,
-      nextTick: (cb: () => void) => setTimeout(cb, 0),
-      version: 'v18.0.0',
-      versions: { node: '18.0.0' },
-    } as unknown as NodeJS.Process;
   }
 }
 
@@ -111,5 +123,20 @@ export function verifyBufferPolyfill(): boolean {
   }
 }
 
-// 立即验证
-verifyBufferPolyfill();
+// 立即验证并记录结果
+const isBufferInitialized = verifyBufferPolyfill();
+if (!isBufferInitialized) {
+  console.error('CRITICAL: Buffer polyfill initialization failed!');
+  // 尝试手动设置全局 Buffer
+  try {
+    if (typeof globalThis !== 'undefined') {
+      globalThis.Buffer = BufferClass;
+    }
+    if (typeof window !== 'undefined') {
+      window.Buffer = BufferClass;
+    }
+    console.log('Manual Buffer initialization attempted');
+  } catch (error) {
+    console.error('Manual Buffer initialization failed:', error);
+  }
+}

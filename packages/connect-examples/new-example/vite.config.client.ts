@@ -67,7 +67,20 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false, // 禁用sourcemap减少文件数量
     rollupOptions: {
+      // 注入 polyfill 到所有 chunks
+      external: [],
       output: {
+        // 在每个 chunk 的开始处注入简单的全局变量检查
+        banner: `
+          if (typeof globalThis === 'undefined') {
+            var globalThis = (function() {
+              if (typeof window !== 'undefined') return window;
+              if (typeof global !== 'undefined') return global;
+              if (typeof self !== 'undefined') return self;
+              throw new Error('Unable to locate global object');
+            })();
+          }
+        `,
         // 减少代码拆分，将更多代码打包到主要chunk中
         manualChunks: {
           // 将所有vendor代码打包到一个文件
