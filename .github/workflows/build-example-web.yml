@@ -21,7 +21,7 @@ jobs:
         run: yarn expo export:web
         working-directory: packages/connect-examples/expo-example
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: expo-build
           path: packages/connect-examples/expo-example/web-build
@@ -40,7 +40,7 @@ jobs:
       - name: Build New Example
         run: VITE_COMMIT_SHA=${GITHUB_SHA:0:7} yarn workspace onekeyexample run build
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: new-example-build
           path: packages/connect-examples/new-example/dist
@@ -54,12 +54,12 @@ jobs:
       - name: Setup Deploy Directory
         run: mkdir -p deploy
       - name: Download Expo Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: expo-build
           path: deploy/expo-example
       - name: Download New Example Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: new-example-build
           path: deploy/new-example
