@@ -1,7 +1,6 @@
 name: Build and Deploy Examples
 
-on:
-  workflow_dispatch
+on: workflow_dispatch
 
 jobs:
   build_expo:
@@ -17,8 +16,10 @@ jobs:
         run: |
           yarn
           yarn bootstrap
+      - name: Build All Packages
+        run: yarn build
       - name: Build Expo Example
-        run: yarn expo export:web
+        run: EXPO_PUBLIC_COMMIT_SHA=${GITHUB_SHA:0:7} yarn expo export:web
         working-directory: packages/connect-examples/expo-example
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
