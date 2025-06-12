@@ -45,8 +45,8 @@ function nodePolyfillPlugin() {
 
 export default defineConfig({
   root: process.cwd(),
-  // 根据环境设置base path
-  base: process.env.NODE_ENV === 'production' ? '/new-example/' : '/',
+  // For production, use a relative path. This is more robust for sub-directory deployments.
+  base: process.env.NODE_ENV === 'production' ? '' : '/',
 
   plugins: [react(), tsconfigPaths(), nodePolyfillPlugin()],
 
