@@ -12,42 +12,6 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- Polyfill script - 必须在所有其他脚本之前 -->
-    <script>
-      // 设置基本的全局变量
-      if (typeof globalThis === 'undefined') {
-        var globalThis = (function() {
-          if (typeof window !== 'undefined') return window;
-          if (typeof global !== 'undefined') return global;
-          if (typeof self !== 'undefined') return self;
-          throw new Error('Unable to locate global object');
-        })();
-      }
-      
-      if (typeof global === 'undefined') {
-        globalThis.global = globalThis;
-        window.global = window;
-      }
-      
-      // 预设 process 对象 
-      if (typeof process === 'undefined') {
-        var process = {
-          env: { NODE_ENV: 'production' },
-          browser: false,
-          nextTick: function(cb) { setTimeout(cb, 0); },
-          version: 'v18.0.0',
-          versions: { node: '18.0.0' }
-        };
-        globalThis.process = process;
-        window.process = process;
-      }
-      
-      // 预设 __DEV__ 变量
-      if (typeof __DEV__ === 'undefined') {
-        globalThis.__DEV__ = false;
-        window.__DEV__ = false;
-      }
-    </script>
   </head>
   <body>
     <div id="root"></div>
