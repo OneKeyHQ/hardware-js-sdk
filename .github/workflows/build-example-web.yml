@@ -90,6 +90,10 @@ jobs:
           </body>
           </html>
           EOL
+      - name: Add SPA fallback for client-side routing
+        run: |
+          cp deploy/expo-example/index.html deploy/expo-example/404.html
+          cp deploy/new-example/index.html deploy/new-example/404.html
       - name: Deploy to Github Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
