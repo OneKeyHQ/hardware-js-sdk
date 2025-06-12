@@ -59,7 +59,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: expo-build
-          path: deploy/expo-example
+          path: deploy/temp-expo
       - name: Download New Example Artifact
         uses: actions/download-artifact@v4
         with:
@@ -68,10 +68,10 @@ jobs:
       - name: Setup Expo as Root and create routing
         run: |
           # Copy expo-example to root (default access)
-          cp -r deploy/expo-example/* deploy/
+          cp -r deploy/temp-expo/* deploy/
           # Create expo-example subdirectory for explicit routing
           mkdir -p deploy/expo-example
-          cp -r deploy/expo-example/* deploy/expo-example/
+          cp -r deploy/temp-expo/* deploy/expo-example/
           # Clean up temp directory
           rm -rf deploy/temp-expo
       - name: Add SPA fallback for client-side routing
