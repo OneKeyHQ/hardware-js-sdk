@@ -39,7 +39,8 @@ jobs:
       - name: Install Dependencies
         run: yarn
       - name: Build New Example
-        run: VITE_COMMIT_SHA=${GITHUB_SHA:0:7} yarn workspace onekeyexample run build -- --base=/hardware-js-sdk/new-example/
+        run: VITE_COMMIT_SHA=${GITHUB_SHA:0:7} yarn vite build --config vite.config.client.ts --base=/hardware-js-sdk/new-example/
+        working-directory: packages/connect-examples/new-example
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
