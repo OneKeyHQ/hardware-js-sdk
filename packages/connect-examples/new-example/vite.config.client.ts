@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import react from '@vitejs/plugin-react';
 import { Buffer } from 'buffer';
+import path from 'path';
 
 // 确保全局 Buffer 在浏览器环境可用
 if (typeof window !== 'undefined') {
@@ -58,6 +59,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
+      '~': path.resolve(__dirname, './app'),
       stream: 'stream-browserify',
       buffer: 'buffer',
       process: 'process/browser',
