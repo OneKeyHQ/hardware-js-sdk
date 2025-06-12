@@ -6,7 +6,7 @@
  */
 
 // 先导入 shim 以确保 Node.js polyfills 在应用其余部分之前加载
-import './utils/shim';
+import './utils/shim.js';
 
 import React from 'react';
 import { createRoot } from 'react-dom/client';

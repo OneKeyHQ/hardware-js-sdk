@@ -3,46 +3,12 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-// 创建一个插件来处理Node.js内置模块的polyfill
-function nodePolyfillPlugin() {
-  const builtins: Record<string, string> = {
-    stream: 'stream-browserify',
-    buffer: 'buffer',
-    process: 'process/browser',
-    util: 'util',
-    events: 'events',
-  };
-
-  return {
-    name: 'node-polyfill-plugin',
-
-    // 在解析阶段重写导入
-    resolveId(source: string) {
-      if (source in builtins) {
-        return { id: builtins[source], external: false };
-      }
-      return null;
-    },
-
-    // 配置开始前
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    configResolved(config: any) {
-      const aliases = config.resolve.alias || {};
-      for (const [key, value] of Object.entries(builtins)) {
-        if (!aliases[key]) {
-          aliases[key] = value;
-        }
-      }
-    },
-  };
-}
-
 export default defineConfig({
   root: process.cwd(),
   // Set the base path to the repository name + sub-directory for a robust deployment
   base: '/hardware-js-sdk/new-example/',
 
-  plugins: [react(), tsconfigPaths(), nodePolyfillPlugin()],
+  plugins: [react(), tsconfigPaths()],
 
   define: {
     global: 'globalThis',
@@ -55,10 +21,10 @@ export default defineConfig({
     alias: {
       '~': path.resolve(__dirname, './app'),
       stream: 'stream-browserify',
-      buffer: 'buffer',
+      buffer: 'buffer/',
       process: 'process/browser',
-      util: 'util',
-      events: 'events',
+      util: 'util/',
+      events: 'events/',
     },
   },
 
@@ -67,20 +33,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false, // 禁用sourcemap减少文件数量
     rollupOptions: {
-      // 注入 polyfill 到所有 chunks
-      external: [],
       output: {
-        // 在每个 chunk 的开始处注入简单的全局变量检查
-        banner: `
-          if (typeof globalThis === 'undefined') {
-            var globalThis = (function() {
-              if (typeof window !== 'undefined') return window;
-              if (typeof global !== 'undefined') return global;
-              if (typeof self !== 'undefined') return self;
-              throw new Error('Unable to locate global object');
-            })();
-          }
-        `,
         // 减少代码拆分，将更多代码打包到主要chunk中
         manualChunks: {
           // 将所有vendor代码打包到一个文件
@@ -89,6 +42,8 @@ export default defineConfig({
           sdk: ['@onekeyfe/hd-web-sdk', '@onekeyfe/hd-core', '@onekeyfe/hd-shared'],
           // 将UI组件打包到一个文件
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-checkbox', '@radix-ui/react-select'],
+          // 将 polyfill 相关代码单独打包
+          polyfill: ['buffer', 'process', 'stream-browserify', 'util', 'events'],
         },
         // 设置更大的chunk大小限制，减少文件拆分
         chunkFileNames: chunkInfo => {

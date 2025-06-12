@@ -3,7 +3,7 @@
   "version": "1.0.33-alpha.0",
   "private": true,
   "sideEffects": [
-    "app/utils/shim.ts",
+    "app/utils/shim.js",
     "app/i18n/config.ts",
     "**/*.css"
   ],
