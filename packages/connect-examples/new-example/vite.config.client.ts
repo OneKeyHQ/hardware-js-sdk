@@ -12,6 +12,8 @@ export default defineConfig({
 
   define: {
     global: 'globalThis',
+    // 注入环境变量
+    __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
     // 将 commit SHA 注入到应用中
     __COMMIT_SHA__: JSON.stringify(process.env.VITE_COMMIT_SHA || 'dev'),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
@@ -65,6 +67,11 @@ export default defineConfig({
     },
     // 增加chunk大小警告阈值
     chunkSizeWarningLimit: 1000,
+    // 确保 Node.js polyfill 被正确处理
+    commonjsOptions: {
+      transformMixedEsModules: true,
+      include: [/node_modules/, /buffer/, /process/, /stream-browserify/, /util/, /events/],
+    },
   },
 
   server: {
@@ -72,7 +79,7 @@ export default defineConfig({
     host: true,
   },
 
-  // 优化依赖处理
+  // 优化依赖处理 - 确保 polyfill 被预构建
   optimizeDeps: {
     include: [
       'react',
@@ -82,10 +89,12 @@ export default defineConfig({
       '@onekeyfe/hd-core',
       '@onekeyfe/hd-shared',
       'buffer',
-      'process',
+      'process/browser',
       'stream-browserify',
       'util',
       'events',
     ],
+    // 强制预构建这些模块，确保 polyfill 正确处理
+    force: true,
   },
 });
