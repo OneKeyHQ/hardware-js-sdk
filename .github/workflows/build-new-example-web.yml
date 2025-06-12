@@ -12,10 +12,10 @@ jobs:
       COMMIT_SHORT_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Get short commit SHA
         run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
-        
+
       - name: Setup Environment
         uses: actions/setup-node@v3
         with:

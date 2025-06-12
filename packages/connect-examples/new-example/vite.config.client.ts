@@ -59,7 +59,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      '~': path.resolve(__dirname, './app'),
+      '~': path.resolve(__dirname, 'app'),
       stream: 'stream-browserify',
       buffer: 'buffer',
       process: 'process/browser',
