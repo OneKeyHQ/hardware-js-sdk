@@ -15,6 +15,8 @@ import {
   accountsAtom,
 } from './atoms';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
+import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import { useHardwarePassphraseDialog } from '../../provider/HardwarePassphraseProvider';
 
 function AccountLists({ walletId }: { walletId: string }) {
   const toast = useToastController();
@@ -125,17 +127,18 @@ function AttachToPinTest() {
   const addWalletAction = useSetAtom(addWalletAtom);
   const addHiddenWalletAction = useSetAtom(addHiddenWalletAtom);
 
+  const { openDialog: openPinDialog } = useHardwareInputPinDialog();
+  const { openDialog: openPassphraseDialog } = useHardwarePassphraseDialog();
+
   useEffect(() => {
     const hardwareUiEventListener = (message: CoreMessage) => {
       if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
         setTimeout(() => {
-          sdk?.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-            payload: {
-              value: '',
-              passphraseOnDevice: true,
-            },
-          });
+          openPassphraseDialog(sdk, { existsAttachPinUser: message.payload.existsAttachPinUser });
+        }, 100);
+      } else if (message.type === UI_REQUEST.REQUEST_PIN) {
+        setTimeout(() => {
+          openPinDialog(sdk, message.payload.device.features);
         }, 100);
       }
     };
@@ -144,7 +147,7 @@ function AttachToPinTest() {
     return () => {
       sdk?.off(UI_EVENT, hardwareUiEventListener);
     };
-  }, [sdk]);
+  }, [openPassphraseDialog, openPinDialog, sdk]);
 
   return (
     <>

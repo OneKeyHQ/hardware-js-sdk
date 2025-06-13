@@ -166,19 +166,25 @@ export const addWalletAtom = atom(
       useEmptyPassphrase: mainWallet,
       passphraseState,
     });
+    if (!res1.success) {
+      console.log('get evm address failed', res1);
+      set(requestStatusAtom, {
+        state: 'error',
+        error: `get evm address failed: ${res1.payload?.code} ${res1.payload?.error}`,
+      });
+      return;
+    }
+
     const res2 = await sdk.btcGetAddress(deviceConnectId, deviceId, {
       path: "m/44'/0'/0'/0/0",
       showOnOneKey: false,
       useEmptyPassphrase: mainWallet,
       passphraseState,
     });
-
-    if (!res1.success || !res2.success) {
-      // @ts-ignore
-      const error = res1.error || res2.error;
+    if (!res2.success) {
       set(requestStatusAtom, {
         state: 'error',
-        error: `get address failed: ${error}`,
+        error: `get btc address failed: ${res2.payload?.code} ${res2.payload?.error}`,
       });
       return;
     }
@@ -201,6 +207,19 @@ export const addWalletAtom = atom(
     const walletName = `${mainWallet ? '' : 'Hidden-'}Wallet-${
       name || res2.payload?.address.slice(-4)
     }`;
+
+    // find wallet by name
+    const wallet = get(walletsAtom).find(
+      wallet => wallet.name === walletName && wallet.deviceConnectId === deviceConnectId
+    );
+    if (wallet) {
+      set(requestStatusAtom, {
+        state: 'error',
+        error: `wallet already exists: ${walletName}`,
+      });
+      return;
+    }
+
     const walletSave: Wallet = {
       id: Date.now().toString(),
       name: walletName,
@@ -255,8 +274,7 @@ export const addHiddenWalletAtom = atom(
     if (!res.success) {
       set(requestStatusAtom, {
         state: 'error',
-        // @ts-ignore
-        error: `get passphrase state failed: ${res.error}`,
+        error: `get passphrase state failed: ${res.payload?.code} ${res.payload?.error}`,
       });
       return;
     }

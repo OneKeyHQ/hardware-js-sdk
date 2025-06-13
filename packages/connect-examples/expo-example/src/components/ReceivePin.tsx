@@ -250,6 +250,7 @@ CloseButton.displayName = 'CloseButton';
 // 主组件
 type IReceivePinProps = {
   open: boolean;
+  payload?: any;
   onOpenChange: (open: boolean) => void;
   onConfirm: (value: string) => void;
   onSwitchDevice: () => void;
@@ -257,7 +258,7 @@ type IReceivePinProps = {
 };
 
 export const ReceivePin = memo<IReceivePinProps>(
-  ({ open, onOpenChange, onConfirm, onSwitchDevice, onCancel }: IReceivePinProps) => {
+  ({ open, payload, onOpenChange, onConfirm, onSwitchDevice, onCancel }: IReceivePinProps) => {
     const intl = useIntl();
     const media = useMedia();
 
@@ -267,11 +268,41 @@ export const ReceivePin = memo<IReceivePinProps>(
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <Dialog.Portal padding="$4">
-          <Dialog.Overlay key="overlay" backgroundColor="$bgBackdrop" />
-          <Dialog.Content key="content" minWidth={minWidth} minHeight={320}>
+          <Dialog.Overlay
+            key="overlay"
+            backgroundColor="$bgBackdrop"
+            animateOnly={['transform', 'opacity']}
+            animation={[
+              'quicker',
+              {
+                opacity: {
+                  overshootClamping: true,
+                },
+              },
+            ]}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            key="content"
+            minWidth={minWidth}
+            minHeight={320}
+            animateOnly={['transform', 'opacity']}
+            animation={[
+              'quicker',
+              {
+                opacity: {
+                  overshootClamping: true,
+                },
+              },
+            ]}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          >
             <Dialog.Title>{titleText}</Dialog.Title>
 
             <YStack gap="$2">
+              {payload && <Text>payload: {JSON.stringify(payload)}</Text>}
               <PinInputArea />
               <PinActions onConfirm={onConfirm} onSwitchDevice={onSwitchDevice} />
             </YStack>

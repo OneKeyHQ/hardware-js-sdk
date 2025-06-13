@@ -24,6 +24,7 @@
   "action__pick_file": "Pick File",
   "action__export_report": "Export Report",
   "action__switch_device": "Input Pin on Device",
+  "action__switch_device_attach_pin": "Attach Pin on Device",
   "action__update_restart": "Restart installation update",
 
   "action__start_test": "Start Test",
@@ -47,6 +48,7 @@
   "title__hardware_api_test": "Hardware Api Test",
   "title__updating": "Updating",
   "title__input_pin": "Input Pin",
+  "title__input_passphrase": "Input Passphrase",
 
   "title__device_info": "Device Information",
   "title__device_firmware_update": "Device Firmware Update",
