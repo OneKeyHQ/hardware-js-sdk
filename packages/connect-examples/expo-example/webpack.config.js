@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 // Expo CLI will await this method so you can optionally return a promise.
 module.exports = async function (env, argv) {
@@ -44,6 +45,22 @@ module.exports = async function (env, argv) {
         ],
       },
     };
+  }
+
+  // 在生产环境中，确保使用我们的自定义 HTML 模板
+  if (process.env.NODE_ENV === 'production') {
+    const htmlPluginIndex = config.plugins.findIndex(plugin => plugin instanceof HtmlWebpackPlugin);
+    if (htmlPluginIndex !== -1) {
+      const originalPlugin = config.plugins[htmlPluginIndex];
+      // 创建新的 HtmlWebpackPlugin 实例，使用我们的模板
+      config.plugins[htmlPluginIndex] = new HtmlWebpackPlugin({
+        ...originalPlugin.options,
+        template: './public/index.html',
+      });
+      // 成功替换为自定义模板
+    } else {
+      // HtmlWebpackPlugin 未找到
+    }
   }
 
   // 只为我们自己的代码启用 source map

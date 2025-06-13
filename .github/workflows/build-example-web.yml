@@ -83,10 +83,37 @@ jobs:
           # 为 new-example 创建 404.html（Vite 构建的应用需要这个）
           cp deploy/new-example/index.html deploy/new-example/404.html
 
-          # 为 expo-example 创建 404.html  
-          cp deploy/expo-example/index.html deploy/expo-example/404.html
+          # 为 expo-example 创建智能的 404.html，处理路由重定向
+          cat > deploy/expo-example/404.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Redirecting...</title>
+            <script>
+              // 获取当前路径，移除 /hardware-js-sdk/expo-example 前缀
+              const fullPath = window.location.pathname;
+              const basePath = '/hardware-js-sdk/expo-example';
+              
+              // 如果路径以基础路径开头，提取相对路径
+              if (fullPath.startsWith(basePath)) {
+                const relativePath = fullPath.substring(basePath.length) || '/';
+                // 重定向到正确的路径，保持查询参数和 hash
+                const newUrl = basePath + '/' + (relativePath.startsWith('/') ? relativePath.substring(1) : relativePath);
+                window.location.replace(newUrl + window.location.search + window.location.hash);
+              } else {
+                // 如果不是预期的路径格式，重定向到 expo-example 首页
+                window.location.replace('/hardware-js-sdk/expo-example/');
+              }
+            </script>
+          </head>
+          <body>
+            <div>Redirecting...</div>
+          </body>
+          </html>
+          EOF
 
-          # 简化的根 404.html - 只处理基本的路由分发
+          # 改进根 404.html - 更智能的路由分发
           cat > deploy/404.html << 'EOF'
           <!DOCTYPE html>
           <html>
@@ -95,15 +122,31 @@ jobs:
             <title>Redirecting...</title>
             <script>
               const path = window.location.pathname;
+              const search = window.location.search;
+              const hash = window.location.hash;
               
-              // 简单的路由分发逻辑
-              if (path.includes('/new-example/')) {
-                window.location.replace('/hardware-js-sdk/new-example/');
-              } else if (path.includes('/expo-example/')) {
-                window.location.replace('/hardware-js-sdk/expo-example/');
+              // 更精确的路由分发逻辑
+              if (path.startsWith('/hardware-js-sdk/new-example/')) {
+                // new-example 的路由，重定向到正确路径
+                window.location.replace(path + search + hash);
+              } else if (path.startsWith('/hardware-js-sdk/expo-example/')) {
+                // expo-example 的路由，重定向到正确路径
+                window.location.replace(path + search + hash);
+              } else if (path.includes('/new-example')) {
+                // 包含 new-example 但路径不正确，修正路径
+                const correctedPath = path.replace(/.*\/new-example/, '/hardware-js-sdk/new-example');
+                window.location.replace(correctedPath + search + hash);
+              } else if (path.includes('/expo-example')) {
+                // 包含 expo-example 但路径不正确，修正路径
+                const correctedPath = path.replace(/.*\/expo-example/, '/hardware-js-sdk/expo-example');
+                window.location.replace(correctedPath + search + hash);
+              } else if (path.startsWith('/hardware-js-sdk/') && !path.startsWith('/hardware-js-sdk/new-example') && !path.startsWith('/hardware-js-sdk/expo-example')) {
+                // 其他 hardware-js-sdk 路径，假设是 expo-example 的路由
+                const relativePath = path.substring('/hardware-js-sdk/'.length);
+                window.location.replace('/hardware-js-sdk/expo-example/' + relativePath + search + hash);
               } else {
                 // 默认重定向到根页面（expo-example）
-                window.location.replace('/hardware-js-sdk/');
+                window.location.replace('/hardware-js-sdk/' + search + hash);
               }
             </script>
           </head>
@@ -117,5 +160,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./deploy
-          # cname: example.onekey-test.com
+          cname: example.onekey-test.com
           force_orphan: true

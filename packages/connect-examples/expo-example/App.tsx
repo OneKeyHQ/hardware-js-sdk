@@ -32,6 +32,7 @@ const linking = {
     ExpoLinking.createURL('/'),
   ],
   config: {
+    initialRouteName: Routes.Payload,
     screens: {
       [Routes.Payload]: 'api-payload',
       [Routes.FirmwareUpdateTest]: 'firmware-update-test',
