@@ -2199,7 +2199,7 @@ export type Initialize = {
   session_id?: string;
   _skip_passphrase?: boolean;
   derive_cardano?: boolean;
-  btc_test?: string;
+  passphrase_state?: string;
 };
 
 // GetFeatures
@@ -2334,6 +2334,8 @@ export type Features = {
   onekey_se02_state?: string | null;
   onekey_se03_state?: string | null;
   onekey_se04_state?: string | null;
+  attach_to_pin_user?: boolean;
+  unlocked_attach_pin?: boolean;
 };
 
 // OnekeyFeatures

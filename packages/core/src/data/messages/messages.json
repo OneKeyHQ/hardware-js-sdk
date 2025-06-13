@@ -6061,7 +6061,7 @@
           "type": "bool",
           "id": 3
         },
-        "btc_test": {
+        "passphrase_state": {
           "type": "string",
           "id": 8000
         }
@@ -6442,6 +6442,14 @@
         "onekey_se04_state": {
           "type": "OneKeySEState",
           "id": 624
+        },
+        "attach_to_pin_user": {
+          "type": "bool",
+          "id": 625
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 626
         }
       },
       "nested": {
