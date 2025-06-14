@@ -27,6 +27,7 @@ export { default as deviceWipe } from './device/DeviceWipe';
 export { default as deviceFullyUploadResource } from './device/DeviceFullyUploadResource';
 export { default as deviceUpdateBootloader } from './device/DeviceUpdateBootloader';
 export { default as deviceLock } from './device/DeviceLock';
+export { default as deviceUnlock } from './device/DeviceUnlock';
 export { default as deviceCancel } from './device/DeviceCancel';
 
 export { default as setU2FCounter } from './u2f/SetU2FCounter';
