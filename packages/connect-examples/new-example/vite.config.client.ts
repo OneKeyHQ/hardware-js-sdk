@@ -1,14 +1,26 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type UserConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+// 自定义插件：确保 shim.js 优先加载
+function shimPlugin() {
+  return {
+    name: 'shim-plugin',
+    config(config: UserConfig) {
+      // 确保 shim.js 在所有模块之前加载
+      config.define = config.define || {};
+      config.define['global'] = 'globalThis';
+    },
+  };
+}
+
 export default defineConfig({
   root: process.cwd(),
   // Set the base path to the repository name + sub-directory for a robust deployment
-  base: '/hardware-js-sdk/new-example/',
+  base: process.env.NODE_ENV === 'production' ? '/hardware-js-sdk/new-example/' : '/',
 
-  plugins: [react(), tsconfigPaths()],
+  plugins: [react(), tsconfigPaths(), shimPlugin()],
 
   define: {
     global: 'globalThis',
@@ -17,6 +29,9 @@ export default defineConfig({
     // 将 commit SHA 注入到应用中
     __COMMIT_SHA__: JSON.stringify(process.env.VITE_COMMIT_SHA || 'dev'),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    // 其他可能需要的全局变量
+    __dirname: '""',
+    __filename: '""',
   },
 
   resolve: {
@@ -78,7 +93,6 @@ export default defineConfig({
       '@onekeyfe/hd-core',
       '@onekeyfe/hd-shared',
       'buffer',
-      'process/browser',
       'stream-browserify',
       'util',
       'events',

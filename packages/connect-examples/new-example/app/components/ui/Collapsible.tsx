@@ -1,5 +1,5 @@
-import * as React from "react";
-import { cn } from "../../lib/utils";
+import * as React from 'react';
+import { cn } from '../../utils/utils';
 
 interface CollapsibleProps {
   open?: boolean;
@@ -9,11 +9,10 @@ interface CollapsibleProps {
 }
 
 const Collapsible: React.FC<CollapsibleProps> = ({ children, className }) => {
-  return <div className={cn("w-full", className)}>{children}</div>;
+  return <div className={cn('w-full', className)}>{children}</div>;
 };
 
-interface CollapsibleTriggerProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface CollapsibleTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
 }
 
@@ -25,7 +24,7 @@ const CollapsibleTrigger: React.FC<CollapsibleTriggerProps> = ({
   return (
     <button
       className={cn(
-        "flex w-full items-center justify-between py-2 text-sm font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180",
+        'flex w-full items-center justify-between py-2 text-sm font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180',
         className
       )}
       {...props}
@@ -49,8 +48,8 @@ const CollapsibleContent: React.FC<CollapsibleContentProps> = ({
   return (
     <div
       className={cn(
-        "overflow-hidden transition-all duration-200",
-        open ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0",
+        'overflow-hidden transition-all duration-200',
+        open ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0',
         className
       )}
     >

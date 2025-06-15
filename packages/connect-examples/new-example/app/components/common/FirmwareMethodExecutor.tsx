@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useHardwareStore } from '../../store/hardwareStore';
+import { useHardwareStore, convertFilesToArrayBuffers } from '../../store/hardwareStore';
 import type { DeviceModel, ThemeType } from '../ui/DeviceActionAnimation';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useToast } from '../../hooks/use-toast';
 import type { MethodConfig, ExecutionStatus, ParameterField } from '~/data/types';
+import { UiEvent } from '@onekeyfe/hd-core';
+import { PlaygroundProps } from '../../data/components/Playground';
+import { useFirmwareProgress } from '../providers/SDKProvider';
 
 // 导入子组件
 import ParameterInput from './ParameterInput';
 import DeviceInteractionArea from './DeviceInteractionArea';
 import ExecutionPanel from './ExecutionPanel';
 import { LogEntry, LogType } from './ExecutionLogger';
-import { UiEvent } from '@onekeyfe/hd-core';
-import { PlaygroundProps } from '../../data/components/Playground';
 
 // 统一的预设类型
 interface UnifiedPreset {
@@ -19,7 +20,7 @@ interface UnifiedPreset {
   value: Record<string, unknown>;
 }
 
-export interface MethodExecutorProps {
+export interface FirmwareMethodExecutorProps {
   methodConfig: MethodConfig | PlaygroundProps;
   executionHandler: (params: Record<string, unknown>) => Promise<Record<string, unknown>>;
   onResult?: (result: unknown) => void;
@@ -27,7 +28,7 @@ export interface MethodExecutorProps {
   className?: string;
 }
 
-const MethodExecutor: React.FC<MethodExecutorProps> = ({
+const FirmwareMethodExecutor: React.FC<FirmwareMethodExecutorProps> = ({
   methodConfig,
   executionHandler,
   onResult,
@@ -105,9 +106,12 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   const [isCancelling, setIsCancelling] = useState(false);
   const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
 
+  // 添加固件进度状态
+  const { progressData } = useFirmwareProgress();
+
   // 初始化参数值 - 使用 useCallback 避免重复创建函数
   const initializeParameters = useCallback(() => {
-    console.log('[MethodExecutor] 🔄 方法变化，重置参数:', methodConfig.method);
+    console.log('[FirmwareMethodExecutor] 🔄 方法变化，重置参数:', methodConfig.method);
 
     resetMethodParameters();
 
@@ -119,7 +123,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       // 直接使用预设值
       const presetParams = { ...firstPreset.value };
 
-      console.log('[MethodExecutor] 📋 初始化参数:', {
+      console.log('[FirmwareMethodExecutor] 📋 初始化参数:', {
         方法名称: methodConfig.method,
         预设参数: firstPreset.value,
         最终参数: presetParams,
@@ -130,7 +134,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       setSelectedPreset(null);
       setMethodParameters({});
 
-      console.log('[MethodExecutor] 📋 无预设，使用空参数:', {
+      console.log('[FirmwareMethodExecutor] 📋 无预设，使用空参数:', {
         方法名称: methodConfig.method,
       });
     }
@@ -144,7 +148,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   // 监听全局设备动作状态
   useEffect(() => {
     if (globalDeviceAction.isActive && globalDeviceAction.actionType) {
-      console.log('🎯 [MethodExecutor] 设备交互开始:', globalDeviceAction.actionType);
+      console.log('🎯 [FirmwareMethodExecutor] 设备交互开始:', globalDeviceAction.actionType);
       // 添加硬件交互日志
       addLog('hardware', '设备交互开始', `等待设备操作: ${globalDeviceAction.actionType}`);
 
@@ -166,7 +170,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         // 直接使用预设值
         const newParams = { ...preset.value };
 
-        console.log('[MethodExecutor] 🔄 切换预设:', {
+        console.log('[FirmwareMethodExecutor] 🔄 切换预设:', {
           预设名称: presetTitle,
           预设参数: preset.value,
           最终参数: newParams,
@@ -199,7 +203,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     performExecution();
   };
 
-  // 执行具体操作
+  // 执行操作
   const performExecution = async () => {
     try {
       setStatus('loading');
@@ -207,10 +211,14 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       clearLogs();
 
       // 获取执行参数
-      const executionParams = getExecutionParameters();
+      const rawParams = getExecutionParameters();
 
-      console.log('🚀 [MethodExecutor] 开始执行方法:', {
+      // 转换文件参数为 ArrayBuffer
+      const executionParams = await convertFilesToArrayBuffers(rawParams);
+
+      console.log('🚀 [FirmwareMethodExecutor] 开始执行方法:', {
         方法名称: methodConfig.method,
+        原始参数: rawParams,
         执行参数: executionParams,
       });
 
@@ -224,7 +232,33 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
       const duration = Date.now() - startTime;
 
-      console.log('✅ [MethodExecutor] 方法执行成功:', {
+      // 检查执行结果
+      if (result.success === false) {
+        // 执行失败
+        const errorMessage = result.error || '执行失败';
+
+        console.error('❌ [FirmwareMethodExecutor] 方法执行失败:', {
+          方法名称: methodConfig.method,
+          错误信息: errorMessage,
+          耗时: `${duration}ms`,
+        });
+
+        // 添加错误日志
+        addLog('error', '执行失败', JSON.stringify(result));
+
+        setStatus('error');
+        onError?.(JSON.stringify(result));
+
+        toast({
+          title: '执行失败',
+          description: JSON.stringify(result),
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // 执行成功
+      console.log('✅ [FirmwareMethodExecutor] 方法执行成功:', {
         方法名称: methodConfig.method,
         执行结果: result,
         耗时: `${duration}ms`,
@@ -241,18 +275,18 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         description: `方法 "${methodConfig.method}" 执行完成`,
       });
     } catch (error) {
-      console.error('❌ [MethodExecutor] 方法执行失败:', error);
+      console.error('❌ [FirmwareMethodExecutor] 方法执行异常:', error);
 
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // 添加错误日志
-      addLog('error', '执行失败', errorMessage);
+      addLog('error', '执行异常', errorMessage);
 
       setStatus('error');
       onError?.(errorMessage);
 
       toast({
-        title: '执行失败',
+        title: '执行异常',
         description: errorMessage,
         variant: 'destructive',
       });
@@ -270,14 +304,14 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       // 重新初始化参数
       initializeParameters();
 
-      console.log('🔄 [MethodExecutor] 状态已重置');
+      console.log('🔄 [FirmwareMethodExecutor] 状态已重置');
 
       toast({
         title: '状态重置',
         description: '已重置到初始状态',
       });
     } catch (error) {
-      console.error('❌ [MethodExecutor] 重置失败:', error);
+      console.error('❌ [FirmwareMethodExecutor] 重置失败:', error);
       toast({
         title: '重置失败',
         description: error instanceof Error ? error.message : String(error),
@@ -341,6 +375,17 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     [methodConfig, presets]
   );
 
+  // 修复 handleParamChange 函数的类型
+  const handleParamChange = useCallback(
+    (paramName: string, value: unknown) => {
+      setMethodParameters({
+        ...methodParameters,
+        [paramName]: value,
+      });
+    },
+    [methodParameters, setMethodParameters]
+  );
+
   return (
     <div className={`h-full flex flex-col ${className}`}>
       {/* 参数输入区域 - 压缩高度 */}
@@ -349,9 +394,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           methodConfig={compatibleMethodConfig}
           selectedPreset={selectedPreset}
           onPresetChange={handlePresetChange}
-          onParamChange={(paramName, value) => {
-            setMethodParameters({ ...methodParameters, [paramName]: value });
-          }}
+          onParamChange={handleParamChange}
         />
       </div>
 
@@ -368,6 +411,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
               onExecute={executeMethod}
               onReset={handleReset}
               isCancelling={isCancelling}
+              firmwareProgress={progressData}
               currentDevice={currentDevice}
             />
           </div>
@@ -389,4 +433,4 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   );
 };
 
-export default MethodExecutor;
+export default FirmwareMethodExecutor;

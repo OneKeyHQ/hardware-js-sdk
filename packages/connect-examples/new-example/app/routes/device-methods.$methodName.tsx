@@ -1,14 +1,14 @@
-import React, { useCallback } from "react";
-import { useParams } from "@remix-run/react";
-import { Cpu, Settings } from "lucide-react";
-import MethodExecutor from "../components/common/MethodExecutor";
-import { PageLayout } from "../components/common/PageLayout";
-import { DeviceNotConnectedState } from "../components/common/DeviceNotConnectedState";
-import { MethodExecuteBoundary } from "../components/common/MethodExecuteBoundary";
-import { Breadcrumb } from "../components/ui/Breadcrumb";
-import { useMethodResolver } from "../hooks/useMethodResolver";
-import { useMethodExecution } from "../hooks/useMethodExecution";
-import { useDeviceStore } from "../store/deviceStore";
+import React, { useCallback } from 'react';
+import { useParams } from '@remix-run/react';
+import { Cpu, Settings } from 'lucide-react';
+import MethodExecutor from '../components/common/MethodExecutor';
+import { PageLayout } from '../components/common/PageLayout';
+import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
+import { MethodExecuteBoundary } from '../components/common/MethodExecuteBoundary';
+import { Breadcrumb } from '../components/ui/Breadcrumb';
+import { useMethodResolver } from '../hooks/useMethodResolver';
+import { useMethodExecution } from '../hooks/useMethodExecution';
+import { useDeviceStore } from '../store/deviceStore';
 
 const DeviceMethodExecutePage: React.FC = () => {
   const { methodName } = useParams();
@@ -18,16 +18,23 @@ const DeviceMethodExecutePage: React.FC = () => {
     methodName,
   });
   const { executeMethod } = useMethodExecution({
-    basePath: "/device-methods",
+    basePath: '/device-methods',
   });
 
   // 创建包装函数，在执行时传递方法配置
   const handleMethodExecution = useCallback(
-    async (params: Record<string, unknown>) => {
+    async (params: Record<string, unknown>): Promise<Record<string, unknown>> => {
       if (!selectedMethod) {
-        throw new Error("方法配置未找到");
+        throw new Error('方法配置未找到');
       }
-      return executeMethod(params, selectedMethod);
+      const result = await executeMethod(params, selectedMethod);
+      // 将 ExecutionResult 转换为 Record<string, unknown>
+      return {
+        success: result.success,
+        data: result.data,
+        error: result.error,
+        duration: result.duration,
+      };
     },
     [executeMethod, selectedMethod]
   );
@@ -49,8 +56,8 @@ const DeviceMethodExecutePage: React.FC = () => {
                 <Breadcrumb
                   items={[
                     {
-                      label: "Device Methods",
-                      href: "/device-methods",
+                      label: 'Device Methods',
+                      href: '/device-methods',
                       icon: Cpu,
                     },
                     { label: selectedMethod.method, icon: Settings },

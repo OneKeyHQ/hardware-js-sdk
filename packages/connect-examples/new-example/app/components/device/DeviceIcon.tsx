@@ -1,25 +1,20 @@
-import React from "react";
-import { type IDeviceType } from "@onekeyfe/hd-core";
-import { getDeviceImagePath } from "../../utils/deviceTypeUtils";
-
+import React from 'react';
+import { type IDeviceType } from '@onekeyfe/hd-core';
+import { getDeviceImagePath } from '../../utils/deviceTypeUtils';
 interface DeviceIconProps {
   deviceType: IDeviceType;
-  size?: "sm" | "md" | "lg" | "xl" | "2xl";
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   className?: string;
 }
 
-const DeviceIcon: React.FC<DeviceIconProps> = ({
-  deviceType,
-  size = "md",
-  className = "",
-}) => {
+const DeviceIcon: React.FC<DeviceIconProps> = ({ deviceType, size = 'md', className = '' }) => {
   // 尺寸映射
   const sizeClasses = {
-    sm: "w-8 h-8",
-    md: "w-12 h-12",
-    lg: "w-16 h-16",
-    xl: "w-24 h-24",
-    "2xl": "w-32 h-32",
+    sm: 'w-8 h-8',
+    md: 'w-12 h-12',
+    lg: 'w-16 h-16',
+    xl: 'w-24 h-24',
+    '2xl': 'w-32 h-32',
   };
 
   return (
@@ -28,10 +23,10 @@ const DeviceIcon: React.FC<DeviceIconProps> = ({
         src={getDeviceImagePath(deviceType)}
         alt={deviceType}
         className={`${sizeClasses[size]} object-contain`}
-        onError={(e) => {
+        onError={e => {
           // 如果图片加载失败，使用一个通用的设备图标
           const target = e.target as HTMLImageElement;
-          target.src = "/images/devices/onekey-default.png";
+          target.src = '';
         }}
       />
     </div>

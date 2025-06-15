@@ -1,15 +1,14 @@
 import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from "../types";
-
+import type { ChainCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
-  id: "device",
-  name: "Device",
-  description: "Device management operations",
+  id: 'device',
+  name: 'Device',
+  description: 'Device management operations',
   icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#10B981"/></svg>`,
-  color: "#10B981",
-  category: "device" as ChainCategory,
+  color: '#10B981',
+  category: 'device' as ChainCategory,
 };
 
 const api: PlaygroundProps[] = [
@@ -87,31 +86,7 @@ const api: PlaygroundProps[] = [
   //   description: 'Check if a device supports a feature',
   //   noDeviceIdReq: true,
   // },
-  {
-    method: 'checkFirmwareRelease',
-    description: 'Check firmware release of a device',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'checkBLEFirmwareRelease',
-    description: 'Check BLE firmware release of a device',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'checkBridgeRelease',
-    description: 'Check bridge release of a device',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'checkBootloaderRelease',
-    description: 'Check bootloader release of a device',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'deviceUpdateReboot',
-    description: 'Update and reboot a device',
-    noDeviceIdReq: true,
-  },
+
   // {
   //   method: 'deviceVerify',
   //   description: 'Verify a device',
@@ -130,50 +105,7 @@ const api: PlaygroundProps[] = [
   //   description: 'Wipe a device',
   //   noDeviceIdReq: true,
   // },
-  {
-    method: 'deviceRebootToBoardloader',
-    description: 'DeviceRebootToBoardloader',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'deviceUpdateBootloader',
-    description: 'Touch、Pro Update bootloader of a device',
-    noDeviceIdReq: true,
-  },
-  // {
-  //   method: 'firmwareUpdateV2',
-  //   description: 'Update firmware of a device',
-  //   noDeviceIdReq: true,
-  //   presupposes: [
-  //     {
-  //       title: 'Update firmware',
-  //       value: {
-  //         updateType: 'firmware',
-  //         platform: 'web',
-  //       },
-  //     },
-  //     {
-  //       title: 'Update ble firmware',
-  //       value: {
-  //         updateType: 'ble',
-  //         platform: 'web',
-  //       },
-  //     },
-  //   ],
-  // },
-  {
-    method: 'checkAllFirmwareRelease',
-    description: 'Check all firmware release of a device',
-    noDeviceIdReq: true,
-    presupposes: [
-      {
-        title: 'checkAllFirmwareRelease',
-        value: {
-          checkBridgeRelease: true,
-        },
-      },
-    ],
-  },
+
   // {
   //   method: 'setU2FCounter',
   //   description: 'setU2FCounter',
@@ -193,8 +125,8 @@ const api: PlaygroundProps[] = [
   //   noDeviceIdReq: true,
   // },
   {
-    method: 'deviceGetInfo',
-    description: 'get device info',
+    method: 'getFeatures',
+    description: 'get device features',
   },
   // {
   //   method: 'deviceInfoSettings',
@@ -254,7 +186,6 @@ const api: PlaygroundProps[] = [
   //   ],
   // },
 ];
-
 
 // 导出链配置对象
 export const chainConfig = {

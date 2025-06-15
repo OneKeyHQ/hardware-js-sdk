@@ -10,13 +10,13 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarSeparator,
-} from "./ui/sidebar";
-import { Badge } from "./ui/Badge";
-import { Card, CardContent } from "./ui/Card";
-import { Link, useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { useDeviceStore } from "../store/deviceStore";
-import DeviceIcon from "./device/DeviceIcon";
+} from './ui/sidebar';
+import { Badge } from './ui/Badge';
+import { Card, CardContent } from './ui/Card';
+import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useDeviceStore } from '../store/deviceStore';
+import DeviceIcon from './device/DeviceIcon';
 import {
   Home,
   Smartphone,
@@ -24,31 +24,37 @@ import {
   FileText,
   CheckCircle,
   XCircle,
-} from "lucide-react";
-import { getDeviceLabel } from "@onekeyfe/hd-core";
+  Download,
+} from 'lucide-react';
+import { getDeviceLabel } from '@onekeyfe/hd-core';
 
 // 导入图片
-import onekeyLogo from "~/assets/onekey.png";
+import onekeyLogo from '~/assets/onekey.png';
 
 const navigationItems = [
   {
-    title: "common.home",
-    url: "/",
+    title: 'common.home',
+    url: '/',
     icon: Home,
   },
   {
-    title: "common.deviceMethods",
-    url: "/device-methods",
+    title: 'common.deviceMethods',
+    url: '/device-methods',
     icon: Smartphone,
   },
   {
-    title: "common.chainMethods",
-    url: "/chains",
+    title: 'common.firmwareUpdate',
+    url: '/firmware-update',
+    icon: Download,
+  },
+  {
+    title: 'common.chainMethods',
+    url: '/chains',
     icon: LinkIcon,
   },
   {
-    title: "common.logs",
-    url: "/logs",
+    title: 'common.logs',
+    url: '/logs',
     icon: FileText,
   },
 ];
@@ -67,16 +73,16 @@ export function AppSidebar() {
 
   const getStatusText = () => {
     if (currentDevice) {
-      return t("device.connected");
+      return t('device.connected');
     }
-    return t("device.disconnected");
+    return t('device.disconnected');
   };
 
   const getStatusVariant = () => {
     if (currentDevice) {
-      return "default";
+      return 'default';
     }
-    return "secondary";
+    return 'secondary';
   };
 
   return (
@@ -84,16 +90,10 @@ export function AppSidebar() {
       <SidebarHeader>
         <div className="flex items-center gap-3 px-2 py-2">
           <div className="w-8 h-8 rounded-full overflow-hidden bg-white flex items-center justify-center">
-            <img
-              src={onekeyLogo}
-              alt="OneKey"
-              className="w-8 h-8 object-contain"
-            />
+            <img src={onekeyLogo} alt="OneKey" className="w-8 h-8 object-contain" />
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold text-base">
-              OneKey Developer Portal
-            </span>
+            <span className="font-semibold text-base">OneKey Developer Portal</span>
             <span className="text-sm text-muted-foreground">Hardware SDK</span>
           </div>
         </div>
@@ -104,7 +104,7 @@ export function AppSidebar() {
         {currentDevice && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-sm font-medium">
-              {t("device.status")}
+              {t('device.status')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <Card>
@@ -120,16 +120,12 @@ export function AppSidebar() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         {getStatusIcon()}
-                        <Badge
-                          variant={getStatusVariant()}
-                          className="text-xs px-1.5 py-0.5"
-                        >
+                        <Badge variant={getStatusVariant()} className="text-xs px-1.5 py-0.5">
                           {getStatusText()}
                         </Badge>
                       </div>
                       <p className="font-medium text-xs truncate">
-                        {currentDevice.label ||
-                          getDeviceLabel(currentDevice.features)}
+                        {currentDevice.label || getDeviceLabel(currentDevice.features)}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {currentDevice.connectId}
@@ -143,29 +139,21 @@ export function AppSidebar() {
         )}
 
         {/* 分割线 - 在设备状态和导航菜单之间 */}
-        {currentDevice && (
-          <SidebarSeparator className="bg-border/50 dark:bg-border" />
-        )}
+        {currentDevice && <SidebarSeparator className="bg-border/50 dark:bg-border" />}
 
         {/* 导航菜单 - 优化版本 */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-sm font-medium">
-            {t("common.navigation")}
+            {t('common.navigation')}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => (
+              {navigationItems.map(item => (
                 <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname === item.url}
-                    size="lg"
-                  >
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url} size="lg">
                     <Link to={item.url} className="flex items-center gap-3">
                       <item.icon className="h-5 w-5" />
-                      <span className="text-sm font-medium">
-                        {t(item.title)}
-                      </span>
+                      <span className="text-sm font-medium">{t(item.title)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

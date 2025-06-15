@@ -1,17 +1,54 @@
-import type { HardwareApiMethod } from "~/services/hardwareService";
+import type { HardwareApiMethod } from '~/services/hardwareService';
+
+// 参数字段类型
+export interface ParameterField {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'textarea' | 'select' | 'file';
+  label?: string;
+  description?: string;
+  placeholder?: string;
+  default?: unknown;
+  required?: boolean;
+  visible?: boolean;
+  editable?: boolean;
+  options?: string[];
+  validation?: {
+    pattern?: string;
+    min?: number;
+    max?: number;
+  };
+}
 
 // 统一的方法预设类型
+export type MethodCategory =
+  | 'address'
+  | 'publicKey'
+  | 'transaction'
+  | 'signing'
+  | 'device'
+  | 'info'
+  | 'security'
+  | 'management'
+  | 'basic'
+  | 'message'
+  | 'advanced';
+
 export interface MethodPreset {
   title: string;
+  description?: string;
   value: Record<string, unknown>;
+  visibleFields?: string[];
 }
 
 // 统一的方法配置类型 - 直接基于原始数据格式
 export interface MethodConfig {
+  name?: string;
   method: HardwareApiMethod;
   description: string;
+  parameters?: ParameterField[];
   presets?: MethodPreset[];
   deprecated?: boolean;
+  dangerous?: boolean;
   noConnIdReq?: boolean;
   noDeviceIdReq?: boolean;
 }
@@ -32,50 +69,45 @@ export interface ChainConfig extends ChainMeta {
 }
 
 // 功能模块分类（非区块链）
-export type FunctionalCategory = "basic" | "device";
+export type FunctionalCategory = 'basic' | 'device';
 
 // 区块链分类
 export type ChainCategory =
-  | "bitcoin"
-  | "ethereum"
-  | "solana"
-  | "cardano"
-  | "polkadot"
-  | "sui"
-  | "aptos"
-  | "near"
-  | "ton"
-  | "cosmos"
-  | "tron"
-  | "xrp"
-  | "stellar"
-  | "neo"
-  | "nem"
-  | "kaspa"
-  | "algorand"
-  | "filecoin"
-  | "nervos"
-  | "starcoin"
-  | "scdo"
-  | "dynex"
-  | "nexa"
-  | "alephium"
-  | "conflux"
-  | "nostr"
-  | "lightning"
-  | "benfen"
-  | "all-network";
+  | 'bitcoin'
+  | 'ethereum'
+  | 'solana'
+  | 'cardano'
+  | 'polkadot'
+  | 'sui'
+  | 'aptos'
+  | 'near'
+  | 'ton'
+  | 'cosmos'
+  | 'tron'
+  | 'xrp'
+  | 'stellar'
+  | 'neo'
+  | 'nem'
+  | 'kaspa'
+  | 'algorand'
+  | 'filecoin'
+  | 'nervos'
+  | 'starcoin'
+  | 'scdo'
+  | 'dynex'
+  | 'nexa'
+  | 'alephium'
+  | 'conflux'
+  | 'nostr'
+  | 'lightning'
+  | 'benfen'
+  | 'all-network';
 
 // 统一分类类型
 export type Category = FunctionalCategory | ChainCategory;
 
 // 执行相关类型
-export type ExecutionStatus =
-  | "idle"
-  | "loading"
-  | "device-interaction"
-  | "success"
-  | "error";
+export type ExecutionStatus = 'idle' | 'loading' | 'device-interaction' | 'success' | 'error';
 
 export interface ExecutionResult {
   success: boolean;
@@ -87,7 +119,7 @@ export interface ExecutionResult {
 export interface LogEntry {
   id: string;
   timestamp: number;
-  type: "request" | "response" | "error" | "info";
+  type: 'request' | 'response' | 'error' | 'info';
   method?: string;
   content: string;
   data?: unknown;

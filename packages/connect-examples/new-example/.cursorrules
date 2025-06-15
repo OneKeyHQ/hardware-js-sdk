@@ -1,0 +1,294 @@
+# OneKey Hardware SDK Example Project - Coding Rules
+
+## Project Overview
+This is a React + TypeScript web application for testing and demonstrating OneKey hardware wallet SDK functionality. The project uses modern web technologies with a focus on clean, maintainable code and consistent user experience.
+
+## Tech Stack & Dependencies
+- **Framework:** React 18+ with TypeScript
+- **Routing:** React Router DOM
+- **Styling:** Tailwind CSS with custom design system
+- **UI Components:** Radix UI primitives with custom wrappers
+- **Icons:** Lucide React
+- **Internationalization:** i18next with react-i18next
+- **Hardware SDK:** @onekeyfe/hd-core for hardware wallet integration
+- **State Management:** Custom hooks and context providers
+- **Build Tool:** Vite
+- **Component Variants:** Class Variance Authority (CVA)
+
+## Code Style & Patterns
+
+### React Components
+- Use functional components with TypeScript interfaces
+- Prefer named exports over default exports for components
+- Use React hooks for state management and side effects
+- Follow the pattern: `const ComponentName: React.FC<Props> = ({ ...props }) => { ... }`
+- Always define TypeScript interfaces for component props
+- Use descriptive prop names and include JSDoc comments for complex props
+
+### TypeScript Guidelines
+- Use strict TypeScript configuration
+- Define interfaces for all data structures
+- Use union types for component variants and states
+- Prefer `interface` over `type` for object shapes
+- Use generic types for reusable components
+- Always type function parameters and return values
+
+### File Organization
+```
+app/
+├── components/
+│   ├── ui/           # Base UI components (Button, Card, Dialog, etc.)
+│   ├── common/       # Shared business components
+│   └── layout/       # Layout components
+├── routes/           # Page components following file-based routing
+├── hooks/            # Custom React hooks
+├── store/            # State management
+├── services/         # API and hardware service integrations
+├── data/             # Static data and method configurations
+├── utils/            # Utility functions
+└── types/            # TypeScript type definitions
+```
+
+### Naming Conventions
+- **Components:** PascalCase (e.g., `MethodExecutor`, `DeviceInteractionArea`)
+- **Files:** kebab-case for routes, PascalCase for components
+- **Variables/Functions:** camelCase
+- **Constants:** UPPER_SNAKE_CASE
+- **CSS Classes:** Tailwind utility classes, kebab-case for custom classes
+- **Interfaces:** PascalCase with `I` prefix for complex interfaces (e.g., `IMethodConfig`)
+
+## UI Component Library
+
+### Design System
+- **Color Scheme:** Modern neutral palette with accent colors
+- **Typography:** Clean, readable fonts with consistent sizing
+- **Spacing:** Consistent spacing scale using Tailwind's spacing system
+- **Borders:** Rounded corners (rounded-xl, rounded-2xl) for modern look
+- **Shadows:** Elegant shadow system with hover effects
+- **Animations:** Subtle transitions and hover effects (duration-200, duration-300)
+
+### Component Patterns
+
+#### Button Component
+```tsx
+// Use the custom Button component with consistent variants
+<Button variant="default" size="lg" className="...">
+  Action Text
+</Button>
+
+// Available variants: default, destructive, warning, outline, secondary, ghost, link, success, elegant
+// Available sizes: sm, default, lg, icon, xl
+```
+
+#### Card Component
+```tsx
+// Use Card components for content grouping
+<Card className="bg-card border border-border/50">
+  <CardHeader>
+    <CardTitle>Title</CardTitle>
+  </CardHeader>
+  <CardContent>
+    Content here
+  </CardContent>
+</Card>
+```
+
+#### Layout Patterns
+- Use `PageLayout` for consistent page structure
+- Use `fixedHeight={true}` for full-screen layouts
+- Follow the grid system: `grid grid-cols-1 lg:grid-cols-12 gap-4`
+- Use flexbox for component internal layouts
+
+### Responsive Design
+- Mobile-first approach with Tailwind breakpoints
+- Use `lg:` prefix for desktop-specific styles
+- Ensure components work on all screen sizes
+- Test layouts at different viewport sizes
+
+## Hardware SDK Integration
+
+### Device Connection Patterns
+```tsx
+// Always check device connection before operations
+const { currentDevice, sdkInitState } = useDeviceStore();
+
+if (!currentDevice) {
+  return <DeviceNotConnectedState showFullPage={true} />;
+}
+
+if (!sdkInitState.isInitialized) {
+  // Show loading or initialization state
+}
+```
+
+### Method Execution Pattern
+```tsx
+// Use MethodExecutor for consistent method execution
+<MethodExecutor
+  methodConfig={selectedMethod}
+  executionHandler={handleMethodExecution}
+  className="h-full"
+/>
+```
+
+### Error Handling
+- Use toast notifications for user feedback
+- Implement proper error boundaries
+- Log errors for debugging
+- Provide meaningful error messages to users
+
+## Routing & Navigation
+
+### Route Structure
+- Use file-based routing pattern
+- Keep route components focused and delegate to business components
+- Use consistent breadcrumb navigation
+- Implement proper loading and error states
+
+### Page Layout Consistency
+```tsx
+// Standard page structure
+<PageLayout fixedHeight={true}>
+  <div className="h-full flex flex-col">
+    <div className="flex-1 flex flex-col px-4 py-2 min-h-0">
+      {/* Breadcrumb navigation - fixed height */}
+      <div className="flex-shrink-0 mb-3">
+        <Breadcrumb items={breadcrumbItems} />
+      </div>
+      
+      {/* Main content - fills remaining space */}
+      <div className="flex-1 min-h-0">
+        {/* Content here */}
+      </div>
+    </div>
+  </div>
+</PageLayout>
+```
+
+## Specific Component Requirements
+
+### Firmware Update Page
+- **Remove device information display** - Don't show current device info cards
+- **Remove back navigation buttons** - Maintain consistency with other method execution pages
+- **Add file selection capability** - Implement file picker for firmware update methods
+- **Use MethodExecutor pattern** - Follow the same execution pattern as other methods
+
+### File Selection Implementation
+```tsx
+// For methods requiring file uploads, implement file selection
+const handleFileSelect = async () => {
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.bin,.zip'; // Appropriate file types
+  fileInput.onchange = (event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file) {
+      // Update method parameters with selected file
+      setMethodParameters({ ...methodParameters, firmwareFile: file });
+    }
+  };
+  fileInput.click();
+};
+```
+
+### Method Configuration
+- Define method configurations in `data/methods/` directory
+- Use consistent structure for method presets
+- Include proper descriptions and parameter documentation
+- Support file upload parameters where needed
+
+## State Management
+
+### Store Patterns
+```tsx
+// Use custom hooks for state management
+const { currentDevice, sdkInitState } = useDeviceStore();
+const { methodParameters, setMethodParameters } = useHardwareStore();
+```
+
+### Context Providers
+- Wrap app with necessary providers (I18nProvider, SDKProvider)
+- Keep context focused and avoid over-nesting
+- Use TypeScript for context value types
+
+## Internationalization
+
+### i18n Patterns
+```tsx
+// Use translation hooks consistently
+const { t } = useTranslation();
+
+// Use translation keys for all user-facing text
+<Button>{t('common.execute')}</Button>
+```
+
+## Performance & Best Practices
+
+### React Performance
+- Use `useMemo` and `useCallback` for expensive computations
+- Implement proper dependency arrays for hooks
+- Avoid unnecessary re-renders
+- Use React.memo for pure components when needed
+
+### Code Quality
+- Follow ESLint and Prettier configurations
+- Write meaningful commit messages
+- Add JSDoc comments for complex functions
+- Keep components focused and single-responsibility
+- Extract reusable logic into custom hooks
+
+### Testing Considerations
+- Write components to be testable
+- Use semantic HTML elements
+- Add appropriate ARIA labels
+- Test with different device states
+
+## Security & Hardware Integration
+
+### Hardware Security
+- Never log sensitive data (private keys, seeds, etc.)
+- Validate all user inputs
+- Handle hardware disconnection gracefully
+- Implement proper error handling for hardware operations
+
+### Data Handling
+- Sanitize user inputs
+- Validate file uploads for firmware updates
+- Handle large file uploads appropriately
+- Implement proper loading states for long operations
+
+## Development Workflow
+
+### Code Organization
+- Keep components small and focused
+- Extract common logic into utilities
+- Use consistent import ordering
+- Group related functionality together
+
+### Documentation
+- Document complex business logic
+- Add README files for major features
+- Keep this .cursorrules file updated
+- Document API integrations and hardware methods
+
+## Common Patterns to Follow
+
+1. **Consistent Error Handling:** Always use toast notifications for user feedback
+2. **Loading States:** Show appropriate loading indicators during operations
+3. **Device State Checks:** Always verify device connection before operations
+4. **Responsive Design:** Ensure all components work on mobile and desktop
+5. **Accessibility:** Use semantic HTML and proper ARIA labels
+6. **Type Safety:** Leverage TypeScript for better development experience
+7. **Component Reusability:** Create reusable components for common patterns
+8. **Performance:** Optimize for smooth user experience
+
+## Anti-Patterns to Avoid
+
+1. **Don't** hardcode strings - use i18n translations
+2. **Don't** ignore TypeScript errors - fix them properly
+3. **Don't** create overly complex components - break them down
+4. **Don't** skip error handling - always handle potential failures
+5. **Don't** use inline styles - use Tailwind classes
+6. **Don't** ignore responsive design - test on different screen sizes
+7. **Don't** log sensitive hardware data - respect user privacy
+8. **Don't** create inconsistent navigation patterns - follow established routes

@@ -1,98 +1,68 @@
-import { Cpu, Loader2 } from "lucide-react";
+import { Loader2 } from 'lucide-react';
 
 interface LoadingSpinnerProps {
   message?: string;
   subtitle?: string;
   className?: string;
-  variant?: "default" | "centered" | "inline";
-  icon?: "default" | "device" | "cpu";
+  variant?: 'default' | 'centered' | 'inline';
 }
 
 export function LoadingSpinner({
-  message = "Loading...",
+  message = 'Loading...',
   subtitle,
-  className = "",
-  variant = "default",
-  icon = "default",
+  className = '',
+  variant = 'default',
 }: LoadingSpinnerProps) {
-  const renderIcon = () => {
-    switch (icon) {
-      case "device":
-      case "cpu":
-        return (
-          <div className="relative">
-            <div className="w-16 h-16 bg-muted/20 rounded-xl flex items-center justify-center">
-              <Cpu className="w-8 h-8 text-muted-foreground animate-pulse" />
-            </div>
-            {/* 旋转边框 */}
-            <div className="absolute inset-0 w-16 h-16 border-2 border-transparent border-t-muted-foreground/30 rounded-xl animate-spin" />
-          </div>
-        );
-      default:
-        return (
-          <div className="relative">
-            <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-          </div>
-        );
-    }
-  };
+  const renderIcon = () => (
+    <div className="relative">
+      <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+    </div>
+  );
 
   const renderProgressDots = () => (
-    <div className="flex gap-1.5">
+    <div className="flex gap-1">
       <div
-        className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce"
-        style={{ animationDelay: "0ms" }}
+        className="w-1 h-1 bg-muted-foreground/60 rounded-full animate-pulse"
+        style={{ animationDelay: '0ms' }}
       />
       <div
-        className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce"
-        style={{ animationDelay: "150ms" }}
+        className="w-1 h-1 bg-muted-foreground/60 rounded-full animate-pulse"
+        style={{ animationDelay: '200ms' }}
       />
       <div
-        className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce"
-        style={{ animationDelay: "300ms" }}
+        className="w-1 h-1 bg-muted-foreground/60 rounded-full animate-pulse"
+        style={{ animationDelay: '400ms' }}
       />
     </div>
   );
 
   // 内联变体 - 简单的spinner
-  if (variant === "inline") {
+  if (variant === 'inline') {
     return (
-      <div className={`flex items-center gap-3 ${className}`}>
-        <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+      <div className={`flex items-center gap-2 ${className}`}>
+        <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
         <span className="text-sm text-muted-foreground">{message}</span>
       </div>
     );
   }
 
-  // 居中变体 - 优雅的卡片式loading
-  if (variant === "centered") {
+  // 居中变体 - 极简卡片式loading
+  if (variant === 'centered') {
     return (
-      <div
-        className={`flex flex-col items-center justify-center min-h-[60vh] px-4 ${className}`}
-      >
-        <div className="relative">
-          {/* 背景装饰圆圈 */}
-          <div className="absolute inset-0 w-32 h-32 bg-gradient-to-br from-muted/20 to-muted/10 rounded-full blur-xl animate-pulse" />
+      <div className={`flex flex-col items-center justify-center min-h-[60vh] px-4 ${className}`}>
+        <div className="bg-card border border-border/50 rounded-xl p-6 shadow-sm">
+          <div className="flex flex-col items-center gap-4">
+            {/* 图标 */}
+            {renderIcon()}
 
-          {/* 主loading容器 */}
-          <div className="relative bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl p-8 shadow-lg">
-            <div className="flex flex-col items-center gap-6">
-              {/* 图标 */}
-              {renderIcon()}
-
-              {/* 文字信息 */}
-              <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold text-foreground tracking-tight">
-                  {message}
-                </h3>
-                {subtitle && (
-                  <p className="text-sm text-muted-foreground">{subtitle}</p>
-                )}
-              </div>
-
-              {/* 进度指示点 */}
-              {renderProgressDots()}
+            {/* 文字信息 */}
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-medium text-foreground">{message}</h3>
+              {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
             </div>
+
+            {/* 进度指示点 */}
+            {renderProgressDots()}
           </div>
         </div>
       </div>
@@ -102,13 +72,11 @@ export function LoadingSpinner({
   // 默认变体 - 简洁的居中loading
   return (
     <div className={`flex items-center justify-center min-h-96 ${className}`}>
-      <div className="text-center space-y-4">
+      <div className="text-center space-y-3">
         {renderIcon()}
-        <div className="space-y-2">
-          <p className="text-foreground font-medium">{message}</p>
-          {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          )}
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">{message}</p>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         {renderProgressDots()}
       </div>

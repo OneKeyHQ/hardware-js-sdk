@@ -2,11 +2,18 @@ name: Build and Deploy Examples
 
 on: workflow_dispatch
 
+env:
+  COMMIT_SHORT_SHA: ${{ github.sha }}
+
 jobs:
   build_expo:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+        
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -19,8 +26,21 @@ jobs:
       - name: Build All Packages
         run: yarn build
       - name: Build Expo Example
-        run: EXPO_PUBLIC_COMMIT_SHA=${GITHUB_SHA:0:7} yarn expo export:web
+        run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
         working-directory: packages/connect-examples/expo-example
+        
+      - name: Add commit info to build output
+        run: |
+          # 创建带有 commit id 的子目录
+          mkdir -p web-build/commits/${{ env.COMMIT_SHORT_SHA }}
+          # 复制构建产物到带有 commit id 的目录
+          cp -r web-build/* web-build/commits/${{ env.COMMIT_SHORT_SHA }}/
+          # 创建一个 commit 信息文件
+          echo '{"commit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ github.sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > web-build/commits/${{ env.COMMIT_SHORT_SHA }}/commit-info.json
+          # 为 commit 版本也创建 404.html
+          cp web-build/commits/${{ env.COMMIT_SHORT_SHA }}/index.html web-build/commits/${{ env.COMMIT_SHORT_SHA }}/404.html
+        working-directory: packages/connect-examples/expo-example
+        
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -31,6 +51,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+        
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -43,7 +67,7 @@ jobs:
       - name: Build All Packages
         run: yarn build
       - name: Build New Example
-        run: VITE_COMMIT_SHA=${GITHUB_SHA:0:7} yarn vite build --config vite.config.client.ts --base=/hardware-js-sdk/new-example/
+        run: VITE_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn vite build --config vite.config.client.ts --base=/hardware-js-sdk/new-example/
         working-directory: packages/connect-examples/new-example
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -57,6 +81,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+        
       - name: Setup Deploy Directory
         run: mkdir -p deploy
       - name: Download Expo Artifact

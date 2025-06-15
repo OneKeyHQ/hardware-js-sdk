@@ -1,26 +1,25 @@
 import React, { useCallback } from 'react';
 import { useParams } from '@remix-run/react';
-import { Layers, Settings } from 'lucide-react';
-import MethodExecutor from '../components/common/MethodExecutor';
+import { Download, Settings } from 'lucide-react';
+import FirmwareMethodExecutor from '../components/common/FirmwareMethodExecutor';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { MethodExecuteBoundary } from '../components/common/MethodExecuteBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
-import { useMethodResolver } from '../hooks/useMethodResolver';
 import { useMethodExecution } from '../hooks/useMethodExecution';
 import { useDeviceStore } from '../store/deviceStore';
-import { ChainIcon } from '../components/icons/ChainIcon';
+import firmwareUpdateMethods from '../data/methods/firmwareUpdate';
 
-const ChainMethodExecutePage: React.FC = () => {
-  const { chainId, methodName } = useParams();
+const FirmwareUpdateMethodExecutePage: React.FC = () => {
+  const { methodName } = useParams();
   const { currentDevice } = useDeviceStore();
 
-  const { selectedChain, selectedMethod, isMethodNotFound } = useMethodResolver({
-    chainId,
-    methodName,
-  });
+  // 查找选中的方法
+  const selectedMethod = firmwareUpdateMethods.find(method => method.method === methodName);
+  const isMethodNotFound = () => !selectedMethod;
+
   const { executeMethod } = useMethodExecution({
-    basePath: '/chains',
+    basePath: '/firmware-update',
   });
 
   // 创建包装函数，在执行时传递方法配置
@@ -44,12 +43,12 @@ const ChainMethodExecutePage: React.FC = () => {
   return (
     <MethodExecuteBoundary
       methodName={methodName}
-      basePath="/chains"
-      baseLabel="Blockchain Methods"
-      baseIcon={Layers}
+      basePath="/firmware-update"
+      baseLabel="Firmware Update"
+      baseIcon={Download}
       checkNotFound={isMethodNotFound}
     >
-      {selectedChain && selectedMethod && (
+      {selectedMethod && (
         <PageLayout fixedHeight={true}>
           <div className="h-full flex flex-col">
             <div className="flex-1 flex flex-col px-4 py-2 min-h-0">
@@ -58,14 +57,9 @@ const ChainMethodExecutePage: React.FC = () => {
                 <Breadcrumb
                   items={[
                     {
-                      label: 'Blockchain Methods',
-                      href: '/chains',
-                      icon: Layers,
-                    },
-                    {
-                      label: selectedChain.name,
-                      href: `/chains/${chainId}`,
-                      icon: () => <ChainIcon chainId={selectedChain.id} size={16} />,
+                      label: 'Firmware Update',
+                      href: '/firmware-update',
+                      icon: Download,
                     },
                     { label: selectedMethod.method, icon: Settings },
                   ]}
@@ -74,10 +68,10 @@ const ChainMethodExecutePage: React.FC = () => {
 
               {/* 执行器 - 填充剩余空间 */}
               <div className="flex-1 min-h-0">
-                {!currentDevice ? (
+                {!currentDevice && !selectedMethod.noDeviceIdReq ? (
                   <DeviceNotConnectedState showFullPage={true} />
                 ) : (
-                  <MethodExecutor
+                  <FirmwareMethodExecutor
                     methodConfig={selectedMethod}
                     executionHandler={handleMethodExecution}
                     className="h-full"
@@ -92,4 +86,4 @@ const ChainMethodExecutePage: React.FC = () => {
   );
 };
 
-export default ChainMethodExecutePage;
+export default FirmwareUpdateMethodExecutePage;

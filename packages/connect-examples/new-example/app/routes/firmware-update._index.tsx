@@ -1,52 +1,51 @@
 import React, { useState } from 'react';
 import { useNavigate } from '@remix-run/react';
-import { Search, Cpu } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { ListBoundary } from '../components/common/ListBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
-import { useTemplateRegistry } from '../hooks/useTemplateRegistry';
+import { Badge } from '../components/ui/Badge';
+import firmwareUpdateMethods from '../data/methods/firmwareUpdate';
 import type { MethodConfig } from '../data/types';
 
-const DeviceMethodsIndexPage: React.FC = () => {
+const FirmwareUpdateIndexPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { getFunctionalChains } = useTemplateRegistry();
-
-  // 获取功能模块方法
-  const functionalChains = getFunctionalChains();
-  const basicMethods = functionalChains
-    .filter(chain => chain.category === 'basic')
-    .flatMap(chain => chain.methods);
-  const deviceMethods = functionalChains
-    .filter(chain => chain.category === 'device')
-    .flatMap(chain => chain.methods);
-  const allDeviceMethods = [...basicMethods, ...deviceMethods];
+  // 获取固件更新方法
+  const allMethods = firmwareUpdateMethods;
 
   // 过滤方法
-  const filteredMethods = allDeviceMethods.filter(
+  const filteredMethods = allMethods.filter(
     method =>
       method.method.toLowerCase().includes(searchTerm.toLowerCase()) ||
       method.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 按来源链分组（而不是method.category）
-  const basicFilteredMethods = basicMethods.filter(
+  // 按类型分组
+  const checkMethods = filteredMethods.filter(
     method =>
-      method.method.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      method.description.toLowerCase().includes(searchTerm.toLowerCase())
+      method.method.toLowerCase().includes('check') ||
+      method.method.toLowerCase().includes('release')
   );
-  const deviceFilteredMethods = deviceMethods.filter(
+  const updateMethods = filteredMethods
+    .filter(
+      method =>
+        method.method.toLowerCase().includes('update') ||
+        method.method.toLowerCase().includes('firmware')
+    )
+    .filter(method => !checkMethods.includes(method));
+  const deviceMethods = filteredMethods.filter(
     method =>
-      method.method.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      method.description.toLowerCase().includes(searchTerm.toLowerCase())
+      method.method.toLowerCase().includes('reboot') ||
+      method.method.toLowerCase().includes('bootloader')
   );
 
   // 处理方法选择
   const handleMethodSelect = (methodName: string) => {
-    navigate(`/device-methods/${methodName}`);
+    navigate(`/firmware-update/${methodName}`);
   };
 
   // 处理键盘事件
@@ -79,9 +78,12 @@ const DeviceMethodsIndexPage: React.FC = () => {
                 {method.method}
               </h3>
               {method.deprecated && (
-                <span className="text-xs bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 px-2.5 py-1 rounded-full border border-orange-200 dark:border-orange-800">
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800"
+                >
                   Deprecated
-                </span>
+                </Badge>
               )}
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed pr-8">
@@ -113,13 +115,13 @@ const DeviceMethodsIndexPage: React.FC = () => {
   );
 
   return (
-    <ListBoundary title="Device Methods" icon={Cpu}>
+    <ListBoundary title="Firmware Update" icon={Download}>
       <PageLayout>
         <div className="min-h-screen bg-background">
           <div className="mx-auto px-6 py-4 space-y-4">
             {/* 面包屑导航 + 搜索框 */}
             <div className="flex items-center justify-between gap-4">
-              <Breadcrumb items={[{ label: 'Device Methods', icon: Cpu }]} />
+              <Breadcrumb items={[{ label: 'Firmware Update', icon: Download }]} />
               <div className="relative w-80">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -134,7 +136,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
             {/* 页面信息 */}
             <div>
               <p className="text-sm text-muted-foreground">
-                {filteredMethods.length} methods available
+                {filteredMethods.length} firmware update methods available
               </p>
             </div>
 
@@ -143,44 +145,64 @@ const DeviceMethodsIndexPage: React.FC = () => {
 
             {/* 方法列表 */}
             <div className="space-y-8">
-              {/* 基本操作 */}
-              {basicFilteredMethods.length > 0 && (
+              {/* 检查更新方法 */}
+              {checkMethods.length > 0 && (
                 <div className="space-y-4">
                   <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/80 border border-border/30 rounded-2xl p-6">
                     <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-foreground/[0.05]" />
                     <div className="relative">
                       <h2 className="text-xl font-bold text-foreground tracking-tight">
-                        Basic Operations
+                        Release Information
                       </h2>
                       <p className="text-muted-foreground font-medium mt-1">
-                        {basicFilteredMethods.length} essential methods
+                        {checkMethods.length} methods to check firmware releases
                       </p>
                     </div>
                   </div>
                   <div className="grid gap-4">
-                    {basicFilteredMethods.map((method, index) =>
-                      renderMethodCard(method, index, 'basic')
+                    {checkMethods.map((method, index) => renderMethodCard(method, index, 'check'))}
+                  </div>
+                </div>
+              )}
+
+              {/* 固件更新方法 */}
+              {updateMethods.length > 0 && (
+                <div className="space-y-4">
+                  <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/80 border border-border/30 rounded-2xl p-6">
+                    <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-foreground/[0.05]" />
+                    <div className="relative">
+                      <h2 className="text-xl font-bold text-foreground tracking-tight">
+                        Firmware Update
+                      </h2>
+                      <p className="text-muted-foreground font-medium mt-1">
+                        {updateMethods.length} methods to update device firmware
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid gap-4">
+                    {updateMethods.map((method, index) =>
+                      renderMethodCard(method, index, 'update')
                     )}
                   </div>
                 </div>
               )}
 
-              {/* 设备方法 */}
-              {deviceFilteredMethods.length > 0 && (
+              {/* 设备控制方法 */}
+              {deviceMethods.length > 0 && (
                 <div className="space-y-4">
                   <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/80 border border-border/30 rounded-2xl p-6">
                     <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-foreground/[0.05]" />
                     <div className="relative">
                       <h2 className="text-xl font-bold text-foreground tracking-tight">
-                        Device Operations
+                        Device Control
                       </h2>
                       <p className="text-muted-foreground font-medium mt-1">
-                        {deviceFilteredMethods.length} device-specific methods
+                        {deviceMethods.length} methods to control device state
                       </p>
                     </div>
                   </div>
                   <div className="grid gap-4">
-                    {deviceFilteredMethods.map((method, index) =>
+                    {deviceMethods.map((method, index) =>
                       renderMethodCard(method, index, 'device')
                     )}
                   </div>
@@ -198,7 +220,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
                   No methods found
                 </h3>
                 <p className="text-muted-foreground text-center max-w-md leading-relaxed">
-                  No methods match your search for{' '}
+                  No firmware update methods match your search for{' '}
                   <span className="font-semibold text-foreground/80">&quot;{searchTerm}&quot;</span>
                   . Try adjusting your search terms or browse all available methods.
                 </p>
@@ -211,4 +233,4 @@ const DeviceMethodsIndexPage: React.FC = () => {
   );
 };
 
-export default DeviceMethodsIndexPage;
+export default FirmwareUpdateIndexPage;

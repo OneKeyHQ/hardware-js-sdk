@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const webpack = require('webpack');
 
 // Expo CLI will await this method so you can optionally return a promise.
 module.exports = async function (env, argv) {
@@ -57,9 +58,6 @@ module.exports = async function (env, argv) {
         ...originalPlugin.options,
         template: './public/index.html',
       });
-      // 成功替换为自定义模板
-    } else {
-      // HtmlWebpackPlugin 未找到
     }
   }
 
@@ -96,53 +94,33 @@ module.exports = async function (env, argv) {
     config.devtool = false;
   }
 
-  const definePlugin = config.plugins.find(plugin => plugin.constructor.name === 'DefinePlugin');
-  if (definePlugin) {
-    const processEnv = {};
-    Object.keys(process.env).forEach(key => {
-      processEnv[key] = JSON.stringify(process.env[key]);
+  // 添加或修改 DefinePlugin 来注入 commit SHA
+  const commitSha = process.env.EXPO_PUBLIC_COMMIT_SHA || process.env.COMMIT_SHA || 'dev';
+  const buildTime = new Date().toISOString();
+
+  // 查找现有的 DefinePlugin
+  const definePluginIndex = config.plugins.findIndex(
+    plugin => plugin.constructor.name === 'DefinePlugin'
+  );
+
+  if (definePluginIndex !== -1) {
+    // 修改现有的 DefinePlugin
+    const existingPlugin = config.plugins[definePluginIndex];
+    config.plugins[definePluginIndex] = new webpack.DefinePlugin({
+      ...existingPlugin.definitions,
+      __COMMIT_SHA__: JSON.stringify(commitSha),
+      __BUILD_TIME__: JSON.stringify(buildTime),
+      'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
     });
-
-    definePlugin.definitions['process.env'] = processEnv;
-
-    // 添加 commit SHA 和构建时间到全局变量
-    definePlugin.definitions.__COMMIT_SHA__ = JSON.stringify(
-      process.env.EXPO_PUBLIC_COMMIT_SHA || 'dev'
+  } else {
+    // 添加新的 DefinePlugin
+    config.plugins.push(
+      new webpack.DefinePlugin({
+        __COMMIT_SHA__: JSON.stringify(commitSha),
+        __BUILD_TIME__: JSON.stringify(buildTime),
+        'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
+      })
     );
-    definePlugin.definitions.__BUILD_TIME__ = JSON.stringify(new Date().toISOString());
-  }
-
-  // 如果在生产环境且有 commit SHA，修改输出文件名
-  if (process.env.NODE_ENV === 'production' && process.env.EXPO_PUBLIC_COMMIT_SHA) {
-    const commitSha = process.env.EXPO_PUBLIC_COMMIT_SHA;
-
-    // 修改 JS 文件名
-    if (config.output.filename) {
-      config.output.filename = config.output.filename.replace('[hash]', `${commitSha}-[hash]`);
-    }
-    if (config.output.chunkFilename) {
-      config.output.chunkFilename = config.output.chunkFilename.replace(
-        '[hash]',
-        `${commitSha}-[hash]`
-      );
-    }
-
-    // 修改 CSS 文件名
-    const miniCssExtractPlugin = config.plugins.find(
-      plugin => plugin.constructor.name === 'MiniCssExtractPlugin'
-    );
-    if (miniCssExtractPlugin && miniCssExtractPlugin.options) {
-      if (miniCssExtractPlugin.options.filename) {
-        miniCssExtractPlugin.options.filename = miniCssExtractPlugin.options.filename.replace(
-          '[hash]',
-          `${commitSha}-[hash]`
-        );
-      }
-      if (miniCssExtractPlugin.options.chunkFilename) {
-        miniCssExtractPlugin.options.chunkFilename =
-          miniCssExtractPlugin.options.chunkFilename.replace('[hash]', `${commitSha}-[hash]`);
-      }
-    }
   }
 
   return config;

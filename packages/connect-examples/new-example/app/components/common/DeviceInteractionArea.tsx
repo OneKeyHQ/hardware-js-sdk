@@ -1,30 +1,35 @@
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/Card";
-import { Button } from "../ui/Button";
-import DeviceActionAnimation from "../ui/DeviceActionAnimation";
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Progress } from '../ui/Progress';
+import DeviceActionAnimation from '../ui/DeviceActionAnimation';
 import {
   CheckCircle,
   AlertTriangle,
   Clock,
   ArrowRight,
-  Tablet,
   Play,
   RotateCcw,
-} from "lucide-react";
-import type { DeviceModel, ThemeType } from "../ui/DeviceActionAnimation";
-import { UiEvent } from "@onekeyfe/hd-core";
+  Upload,
+  Zap,
+} from 'lucide-react';
+import type { DeviceModel, ThemeType } from '../ui/DeviceActionAnimation';
+import { UiEvent } from '@onekeyfe/hd-core';
+import { getDeviceImagePath } from '../../utils/deviceTypeUtils';
+import type { DeviceInfo } from '../../types/hardware';
 
-type ExecutionStatus =
-  | "idle"
-  | "loading"
-  | "device-interaction"
-  | "success"
-  | "error";
+type ExecutionStatus = 'idle' | 'loading' | 'device-interaction' | 'success' | 'error';
+
+// 添加固件进度数据类型
+interface FirmwareProgressData {
+  progress: number;
+  progressType: 'transferData' | 'installingFirmware';
+}
 
 interface DeviceInteractionAreaProps {
   status: ExecutionStatus;
   deviceAction?: {
-    actionType: UiEvent["type"];
+    actionType: UiEvent['type'];
     deviceInfo?: unknown;
   } | null;
   deviceModel: DeviceModel;
@@ -32,6 +37,10 @@ interface DeviceInteractionAreaProps {
   onExecute: () => void;
   onReset: () => void;
   isCancelling?: boolean;
+  // 添加固件进度相关属性
+  firmwareProgress?: FirmwareProgressData | null;
+  // 添加当前设备信息
+  currentDevice?: DeviceInfo | null;
 }
 
 const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
@@ -42,59 +51,86 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
   onExecute,
   onReset,
   isCancelling = false,
+  firmwareProgress,
+  currentDevice,
 }) => {
   // 获取状态配置
   const getStatusConfig = () => {
     switch (status) {
-      case "loading":
+      case 'loading':
         return {
           icon: <Clock className="h-5 w-5 animate-spin" />,
-          color: "text-blue-600",
-          bgColor: "bg-blue-50",
-          borderColor: "border-blue-200",
-          badgeColor: "bg-blue-100 text-blue-800 border-blue-300",
-          message: "正在执行...",
+          color: 'text-blue-600',
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-blue-200',
+          badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+          message: '正在执行...',
         };
-      case "device-interaction":
+      case 'device-interaction':
         return {
           icon: <Clock className="h-5 w-5 animate-pulse" />,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          borderColor: "border-green-200",
-          badgeColor: "bg-green-100 text-green-800 border-green-300",
-          message: "请在设备上确认操作",
+          color: 'text-green-600',
+          bgColor: 'bg-green-50',
+          borderColor: 'border-green-200',
+          badgeColor: 'bg-green-100 text-green-800 border-green-300',
+          message: '请在设备上确认操作',
         };
-      case "success":
+      case 'success':
         return {
           icon: <CheckCircle className="h-5 w-5" />,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          borderColor: "border-green-200",
-          badgeColor: "bg-green-100 text-green-800 border-green-300",
-          message: "执行成功",
+          color: 'text-green-600',
+          bgColor: 'bg-green-50',
+          borderColor: 'border-green-200',
+          badgeColor: 'bg-green-100 text-green-800 border-green-300',
+          message: '执行成功',
         };
-      case "error":
+      case 'error':
         return {
           icon: <AlertTriangle className="h-5 w-5" />,
-          color: "text-red-600",
-          bgColor: "bg-red-50",
-          borderColor: "border-red-200",
-          badgeColor: "bg-red-100 text-red-800 border-red-300",
-          message: "执行失败",
+          color: 'text-red-600',
+          bgColor: 'bg-red-50',
+          borderColor: 'border-red-200',
+          badgeColor: 'bg-red-100 text-red-800 border-red-300',
+          message: '执行失败',
         };
       default:
         return {
           icon: <ArrowRight className="h-5 w-5" />,
-          color: "text-muted-foreground",
-          bgColor: "bg-muted/20",
-          borderColor: "border-border/50",
-          badgeColor: "bg-muted text-muted-foreground border-border",
-          message: "等待执行",
+          color: 'text-muted-foreground',
+          bgColor: 'bg-muted/20',
+          borderColor: 'border-border/50',
+          badgeColor: 'bg-muted text-muted-foreground border-border',
+          message: '等待执行',
         };
     }
   };
 
+  // 获取固件进度配置
+  const getFirmwareProgressConfig = () => {
+    if (!firmwareProgress) return null;
+
+    switch (firmwareProgress.progressType) {
+      case 'transferData':
+        return {
+          icon: <Upload className="h-4 w-4" />,
+          title: '传输数据',
+          description: '正在将固件数据传输到设备...',
+          color: 'text-blue-600',
+        };
+      case 'installingFirmware':
+        return {
+          icon: <Zap className="h-4 w-4" />,
+          title: '安装固件',
+          description: '正在安装固件，请勿断开设备...',
+          color: 'text-orange-600',
+        };
+      default:
+        return null;
+    }
+  };
+
   const statusConfig = getStatusConfig();
+  const progressConfig = getFirmwareProgressConfig();
 
   return (
     <Card className="bg-card border border-border/50 shadow-sm h-full flex flex-col">
@@ -107,7 +143,27 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
         <div className="flex flex-col items-center justify-center h-full">
           {/* 设备展示区域 - 占用更多空间 */}
           <div className="flex-1 w-full flex items-center justify-center min-h-0 mb-6">
-            {deviceAction ? (
+            {status === 'success' ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <DeviceActionAnimation
+                  action="success"
+                  deviceModel={deviceModel}
+                  theme={deviceTheme}
+                  loop={false}
+                  autoplay={true}
+                />
+              </div>
+            ) : status === 'error' ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <DeviceActionAnimation
+                  action="error"
+                  deviceModel={deviceModel}
+                  theme={deviceTheme}
+                  loop={false}
+                  autoplay={true}
+                />
+              </div>
+            ) : deviceAction ? (
               <div className="w-100 h-100">
                 <DeviceActionAnimation
                   action={deviceAction.actionType}
@@ -118,35 +174,74 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                 />
               </div>
             ) : (
-              <div className="w-full h-full bg-muted/20 rounded-xl border-2 border-dashed border-border/50 flex flex-col items-center justify-center">
-                <div className="w-28 h-28 bg-muted/30 rounded-full flex items-center justify-center mb-8 border border-border">
-                  {status === "idle" ? (
-                    <Tablet className="h-14 w-14 text-muted-foreground" />
+              <div className="w-full h-full flex flex-col items-center justify-center">
+                {/* 设备图片或默认图标 */}
+                <div className="relative mb-8">
+                  {currentDevice ? (
+                    /* 显示真实设备图片 */
+                    <div className="w-32 h-48 flex items-center justify-center">
+                      <img
+                        src={getDeviceImagePath(currentDevice.deviceType)}
+                        alt={`OneKey ${currentDevice.deviceType || 'Device'}`}
+                        className="max-w-full max-h-full object-contain filter drop-shadow-lg"
+                      />
+                    </div>
                   ) : (
-                    <div className={statusConfig.color}>
-                      {statusConfig.icon}
+                    /* 默认设备图标 */
+                    <div className="w-24 h-36 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden">
+                      {/* 屏幕区域 */}
+                      <div className="absolute top-3 left-3 right-3 h-20 bg-gray-900 dark:bg-gray-100 rounded-sm"></div>
+
+                      {/* 按钮区域 */}
+                      <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-gray-300 dark:bg-gray-600 rounded-full" />
                     </div>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground text-center">
-                  {status === "idle"
-                    ? "准备执行"
-                    : status === "loading" || status === "device-interaction"
-                    ? "设备响应中..."
-                    : statusConfig.message}
-                </p>
+
+                {/* 设备信息 - 极简文字 */}
+                <div className="text-center space-y-3">
+                  <h3 className="text-base font-medium text-foreground">
+                    {currentDevice
+                      ? `OneKey ${currentDevice.deviceType || 'Device'}`
+                      : 'OneKey Pro'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {status === 'idle'
+                      ? currentDevice
+                        ? '设备已连接，准备执行'
+                        : '请连接设备'
+                      : status === 'loading'
+                      ? '正在执行...'
+                      : statusConfig.message}
+                  </p>
+                </div>
               </div>
             )}
           </div>
+
+          {/* 固件更新进度显示 */}
+          {firmwareProgress && progressConfig && (
+            <div className="w-full mb-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+              <div className="flex items-center gap-2 mb-2">
+                <div className={progressConfig.color}>{progressConfig.icon}</div>
+                <span className="text-sm font-medium text-foreground">{progressConfig.title}</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {firmwareProgress.progress}%
+                </span>
+              </div>
+              <Progress value={firmwareProgress.progress} className="h-2 mb-1" />
+              <p className="text-xs text-muted-foreground">{progressConfig.description}</p>
+            </div>
+          )}
 
           {/* 执行控制按钮 - 并排布局，恢复文字 */}
           <div className="w-full grid grid-cols-2 gap-4 flex-shrink-0">
             <Button
               onClick={onExecute}
-              disabled={status === "loading" || status === "device-interaction"}
+              disabled={status === 'loading' || status === 'device-interaction'}
               className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 text-sm flex items-center gap-2"
             >
-              {status === "loading" || status === "device-interaction" ? (
+              {status === 'loading' || status === 'device-interaction' ? (
                 <>
                   <Clock className="h-4 w-4 animate-spin" />
                   <span>执行中</span>
@@ -162,16 +257,14 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
             {/* 取消按钮 */}
             <Button
               variant={
-                status === "loading" || status === "device-interaction"
-                  ? "elegant"
-                  : "outline"
+                status === 'loading' || status === 'device-interaction' ? 'elegant' : 'outline'
               }
               onClick={onReset}
-              disabled={status === "idle" || status === "error" || isCancelling}
+              disabled={status === 'idle' || status === 'error' || isCancelling}
               className={
-                status === "loading" || status === "device-interaction"
-                  ? "h-11 text-sm flex items-center gap-2"
-                  : "border-border text-foreground hover:bg-muted h-11 text-sm flex items-center gap-2"
+                status === 'loading' || status === 'device-interaction'
+                  ? 'h-11 text-sm flex items-center gap-2'
+                  : 'border-border text-foreground hover:bg-muted h-11 text-sm flex items-center gap-2'
               }
             >
               {isCancelling ? (

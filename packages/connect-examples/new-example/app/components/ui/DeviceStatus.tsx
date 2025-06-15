@@ -1,14 +1,13 @@
-import React from "react";
-import { Card, CardContent } from "./Card";
-import { DeviceIcon } from "../icons/DeviceIcon";
-import { useDeviceStore } from "../../store/deviceStore";
-import { Button } from "./Button";
-import { X, Wifi, Monitor, Signal, CheckCircle } from "lucide-react";
-import { Badge } from "./Badge";
+import React from 'react';
+import { Card, CardContent } from './Card';
+import { DeviceIcon } from '../icons/DeviceIcon';
+import { useDeviceStore } from '../../store/deviceStore';
+import { Button } from './Button';
+import { X, Wifi, Monitor, Signal } from 'lucide-react';
+import { Badge } from './Badge';
 
 export const DeviceStatus: React.FC = () => {
-  const { currentDevice, setCurrentDevice, connectionType, transportType } =
-    useDeviceStore();
+  const { currentDevice, setCurrentDevice, connectionType, transportType } = useDeviceStore();
 
   const handleDisconnect = () => {
     setCurrentDevice(null);
@@ -39,39 +38,33 @@ export const DeviceStatus: React.FC = () => {
     // 规范化传输类型字符串
     const normalizedTransport = transport.toLowerCase();
 
-    if (normalizedTransport === "webusb") {
+    if (normalizedTransport === 'webusb') {
       return {
-        label: "WebUSB",
-        variant: "secondary" as const,
+        label: 'WebUSB',
+        variant: 'secondary' as const,
         icon: <Monitor className="h-4 w-4" />,
-        className: "bg-blue-50 text-blue-700 border-blue-200",
+        className: 'bg-blue-50 text-blue-700 border-blue-200',
       };
-    } else if (
-      normalizedTransport === "lowlevel" ||
-      normalizedTransport === "jsbridge"
-    ) {
+    } else if (normalizedTransport === 'lowlevel' || normalizedTransport === 'jsbridge') {
       return {
-        label: "JSBridge",
-        variant: "secondary" as const,
+        label: 'JSBridge',
+        variant: 'secondary' as const,
         icon: <Wifi className="h-4 w-4" />,
-        className: "bg-purple-50 text-purple-700 border-purple-200",
+        className: 'bg-purple-50 text-purple-700 border-purple-200',
       };
-    } else if (
-      normalizedTransport === "webble" ||
-      normalizedTransport === "ble"
-    ) {
+    } else if (normalizedTransport === 'webble' || normalizedTransport === 'ble') {
       return {
-        label: "WebBLE",
-        variant: "secondary" as const,
+        label: 'WebBLE',
+        variant: 'secondary' as const,
         icon: <Signal className="h-4 w-4" />,
-        className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+        className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
       };
     } else {
       return {
-        label: "未知",
-        variant: "secondary" as const,
+        label: '未知',
+        variant: 'secondary' as const,
         icon: <Wifi className="h-4 w-4" />,
-        className: "bg-gray-50 text-gray-700 border-gray-200",
+        className: 'bg-gray-50 text-gray-700 border-gray-200',
       };
     }
   };
@@ -80,19 +73,17 @@ export const DeviceStatus: React.FC = () => {
 
   // 设备类型显示名称映射
   const deviceTypeNames: Record<string, string> = {
-    Classic: "OneKey Classic",
-    Classic1s: "OneKey Classic 1S",
-    Mini: "OneKey Mini",
-    Touch: "OneKey Touch",
-    Pro: "OneKey Pro",
-    Unknown: "未知设备",
+    Classic: 'OneKey Classic',
+    Classic1s: 'OneKey Classic 1S',
+    Mini: 'OneKey Mini',
+    Touch: 'OneKey Touch',
+    Pro: 'OneKey Pro',
+    Unknown: '未知设备',
   };
 
   const displayName =
-    deviceTypeNames[currentDevice.deviceType] ||
-    currentDevice.deviceType ||
-    "OneKey Device";
-  const deviceLabel = currentDevice.label || currentDevice.name || "未命名设备";
+    deviceTypeNames[currentDevice.deviceType] || currentDevice.deviceType || 'OneKey Device';
+  const deviceLabel = currentDevice.label || currentDevice.name || '未命名设备';
 
   return (
     <Card className="bg-white border-gray-200 shadow-lg">
@@ -104,14 +95,9 @@ export const DeviceStatus: React.FC = () => {
               <div className="w-10 h-10 bg-gray-700 rounded-xl flex items-center justify-center">
                 <DeviceIcon className="w-5 h-5 text-white" />
               </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white">
-                <CheckCircle className="w-2 h-2 text-white" />
-              </div>
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-gray-900 truncate">
-                {displayName}
-              </h3>
+              <h3 className="text-sm font-semibold text-gray-900 truncate">{displayName}</h3>
               <p className="text-xs text-gray-600 truncate">{deviceLabel}</p>
             </div>
           </div>
@@ -144,9 +130,9 @@ export const DeviceStatus: React.FC = () => {
             <span className="text-gray-500 font-medium">标签:</span>
             <span
               className="text-gray-700 truncate ml-2 max-w-32 cursor-pointer hover:text-blue-600 transition-colors"
-              title={currentDevice.label || "无标签"}
+              title={currentDevice.label || '无标签'}
             >
-              {currentDevice.label || "无标签"}
+              {currentDevice.label || '无标签'}
             </span>
           </div>
 
@@ -155,9 +141,9 @@ export const DeviceStatus: React.FC = () => {
             <span className="text-gray-500 font-medium">名称:</span>
             <span
               className="text-gray-700 truncate ml-2 max-w-32 cursor-pointer hover:text-blue-600 transition-colors"
-              title={currentDevice.name || "无名称"}
+              title={currentDevice.name || '无名称'}
             >
-              {currentDevice.name || "无名称"}
+              {currentDevice.name || '无名称'}
             </span>
           </div>
 
@@ -165,7 +151,7 @@ export const DeviceStatus: React.FC = () => {
           <div className="flex justify-between items-center py-1">
             <span className="text-gray-500 font-medium">设备类型:</span>
             <span className="text-gray-700 truncate ml-2 max-w-32">
-              {currentDevice.deviceType || "Unknown"}
+              {currentDevice.deviceType || 'Unknown'}
             </span>
           </div>
 
@@ -174,16 +160,15 @@ export const DeviceStatus: React.FC = () => {
             <span className="text-gray-500 font-medium">设备ID:</span>
             <span
               className="text-gray-700 font-mono truncate ml-2 max-w-32 cursor-pointer hover:text-blue-600 transition-colors"
-              title={currentDevice.deviceId || "N/A"}
+              title={currentDevice.deviceId || 'N/A'}
             >
               {currentDevice.deviceId
                 ? currentDevice.deviceId.length > 8
-                  ? `${currentDevice.deviceId.substring(
-                      0,
-                      6
-                    )}...${currentDevice.deviceId.slice(-2)}`
+                  ? `${currentDevice.deviceId.substring(0, 6)}...${currentDevice.deviceId.slice(
+                      -2
+                    )}`
                   : currentDevice.deviceId
-                : "N/A"}
+                : 'N/A'}
             </span>
           </div>
 
@@ -192,16 +177,15 @@ export const DeviceStatus: React.FC = () => {
             <span className="text-gray-500 font-medium">连接ID:</span>
             <span
               className="text-gray-700 font-mono truncate ml-2 max-w-32 cursor-pointer hover:text-blue-600 transition-colors"
-              title={currentDevice.connectId || "NULL"}
+              title={currentDevice.connectId || 'NULL'}
             >
               {currentDevice.connectId
                 ? currentDevice.connectId.length > 8
-                  ? `${currentDevice.connectId.substring(
-                      0,
-                      6
-                    )}...${currentDevice.connectId.slice(-2)}`
+                  ? `${currentDevice.connectId.substring(0, 6)}...${currentDevice.connectId.slice(
+                      -2
+                    )}`
                   : currentDevice.connectId
-                : "NULL"}
+                : 'NULL'}
             </span>
           </div>
         </div>
@@ -209,10 +193,7 @@ export const DeviceStatus: React.FC = () => {
         {/* Status Footer */}
         <div className="mt-4 pt-3 border-t border-gray-100">
           <div className="flex items-center justify-center space-x-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-xs text-green-700 font-medium">
-              设备已连接
-            </span>
+            <span className="text-xs text-green-700 font-medium">✓ 设备已连接</span>
           </div>
         </div>
       </CardContent>

@@ -138,6 +138,44 @@ function AppSafeAreaContent({ children }: { children: React.ReactNode }) {
   );
 }
 
+// 声明全局变量类型
+declare global {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const __COMMIT_SHA__: string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const __BUILD_TIME__: string;
+}
+
+function BuildInfo() {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const commitSha = typeof __COMMIT_SHA__ !== 'undefined' ? __COMMIT_SHA__ : 'dev';
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const buildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'unknown';
+
+  // 只在生产环境显示
+  if (process.env.NODE_ENV !== 'production') {
+    return null;
+  }
+
+  return (
+    <Card
+      size="$2"
+      bordered
+      padding="$2"
+      position="absolute"
+      left={10}
+      bottom={10}
+      zIndex={1000}
+      backgroundColor="$bgApp"
+      opacity={0.8}
+    >
+      <Text fontSize="$1" color="$gray10">
+        v{commitSha} • {new Date(buildTime).toLocaleString()}
+      </Text>
+    </Card>
+  );
+}
+
 // Main App
 export default function App() {
   return (
@@ -150,6 +188,7 @@ export default function App() {
               <MediaProvider>
                 <NavigationContentMemo />
               </MediaProvider>
+              <BuildInfo />
             </AppIntlProvider>
           </SDKProvider>
         </AppSafeAreaContent>

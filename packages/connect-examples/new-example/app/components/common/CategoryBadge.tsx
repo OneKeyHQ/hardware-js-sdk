@@ -1,6 +1,6 @@
-import { Badge } from "~/components/ui/Badge";
-import { getCategoryIcon, getCategoryColor } from "~/lib/category-utils";
-import type { MethodCategory } from "~/data/types";
+import { Badge } from '../ui/Badge';
+import { getCategoryIcon, getCategoryColor } from '../../utils/category-utils';
+import type { MethodCategory } from '../../data/types';
 
 interface CategoryBadgeProps {
   category: MethodCategory;
@@ -8,11 +8,7 @@ interface CategoryBadgeProps {
   className?: string;
 }
 
-export function CategoryBadge({
-  category,
-  showIcon = true,
-  className = "",
-}: CategoryBadgeProps) {
+export function CategoryBadge({ category, showIcon = true, className = '' }: CategoryBadgeProps) {
   const IconComponent = getCategoryIcon(category);
   const colorClass = getCategoryColor(category);
 
