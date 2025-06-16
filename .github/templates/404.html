@@ -40,24 +40,6 @@
         window.location.replace('/expo-example/api-payload' + fullUrl);
         return;
       }
-      
-      // 处理包含旧路径格式的情况 - 添加向后兼容性
-      if (path.includes('/hardware-js-sdk/')) {
-        if (path.includes('/new-example')) {
-          const correctedPath = '/new-example' + path.split('/new-example')[1];
-          window.location.replace(correctedPath + fullUrl);
-          return;
-        }
-        if (path.includes('/expo-example')) {
-          const correctedPath = '/expo-example' + path.split('/expo-example')[1];
-          window.location.replace(correctedPath + fullUrl);
-          return;
-        }
-        // 默认重定向旧的 hardware-js-sdk 路径到 expo-example
-        window.location.replace('/expo-example/api-payload' + fullUrl);
-        return;
-      }
-      
       // 默认情况：对于不是 /expo-example/ 和 /new-example/ 开头的路径，跳转到 expo-example 首页
       console.log('Route dispatcher: default redirect to expo-example');
       window.location.replace('/expo-example/api-payload' + fullUrl);
