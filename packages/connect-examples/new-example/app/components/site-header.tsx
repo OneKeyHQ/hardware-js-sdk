@@ -35,6 +35,17 @@ export function SiteHeader() {
     (globalThis as typeof globalThis & { __COMMIT_SHA__?: string }).__COMMIT_SHA__ || 'dev';
   const isProduction = commitSha !== 'dev';
 
+  // 调试信息 - 只在开发环境显示
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('Debug - Environment info:', {
+      commitSha,
+      isProduction,
+      globalCommitSha: (globalThis as typeof globalThis & { __COMMIT_SHA__?: string })
+        .__COMMIT_SHA__,
+      nodeEnv: process.env.NODE_ENV,
+    });
+  }
+
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
