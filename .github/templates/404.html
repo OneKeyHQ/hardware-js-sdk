@@ -13,22 +13,31 @@
       
       console.log('Route dispatcher: handling path', path);
       
+      // 处理子应用的客户端路由
+      if (path.startsWith('/new-example/')) {
+        // 对于 new-example 的子路由，重定向到首页并保存路径信息
+        const subPath = path.substring('/new-example'.length);
+        if (subPath && subPath !== '/') {
+          sessionStorage.setItem('redirectPath', path + fullUrl);
+          window.location.replace('/new-example/' + fullUrl);
+          return;
+        }
+      }
+      
+      if (path.startsWith('/expo-example/')) {
+        // 对于 expo-example 的子路由，重定向到首页并保存路径信息
+        const subPath = path.substring('/expo-example'.length);
+        if (subPath && subPath !== '/') {
+          sessionStorage.setItem('redirectPath', path + fullUrl);
+          window.location.replace('/expo-example/' + fullUrl);
+          return;
+        }
+      }
+      
       // 精确匹配规则
-      if (path === '/hardware-js-sdk' || path === '/hardware-js-sdk/') {
+      if (path === '/' || path === '') {
         // 根路径重定向到 expo-example
-        window.location.replace('/hardware-js-sdk/expo-example/' + fullUrl);
-        return;
-      }
-      
-      if (path.startsWith('/hardware-js-sdk/new-example/')) {
-        // new-example 路径，确保正确访问
-        window.location.replace(path + fullUrl);
-        return;
-      }
-      
-      if (path.startsWith('/hardware-js-sdk/expo-example/')) {
-        // expo-example 路径，确保正确访问
-        window.location.replace(path + fullUrl);
+        window.location.replace('/expo-example/' + fullUrl);
         return;
       }
       
@@ -42,46 +51,33 @@
         'functional-testing'
       ];
       
-      if (path.startsWith('/hardware-js-sdk/')) {
-        const relativePath = path.substring('/hardware-js-sdk/'.length);
-        
-        // 如果是已知的 expo 路由，重定向到 expo-example
-        if (knownExpoRoutes.includes(relativePath)) {
-          window.location.replace('/hardware-js-sdk/expo-example/' + relativePath + fullUrl);
-          return;
-        }
-      }
-      
-      // 处理错误的路径格式
-      if (path.includes('/new-example')) {
-        // 修正 new-example 路径
-        const correctedPath = '/hardware-js-sdk/new-example' + path.split('/new-example')[1];
-        window.location.replace(correctedPath + fullUrl);
-        return;
-      }
-      
-      if (path.includes('/expo-example')) {
-        // 修正 expo-example 路径
-        const correctedPath = '/hardware-js-sdk/expo-example' + path.split('/expo-example')[1];
-        window.location.replace(correctedPath + fullUrl);
+      // 如果是已知的 expo 路由，重定向到 expo-example
+      if (knownExpoRoutes.includes(path.substring(1))) { // 移除开头的 /
+        window.location.replace('/expo-example/' + path.substring(1) + fullUrl);
         return;
       }
       
       // 默认情况：重定向到 expo-example
       console.log('Route dispatcher: default redirect to expo-example');
-      window.location.replace('/hardware-js-sdk/expo-example/' + fullUrl);
+      window.location.replace('/expo-example/' + fullUrl);
     })();
   </script>
 </head>
 <body>
   <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
-    <h2>Hardware SDK Examples</h2>
-    <p>Redirecting to the appropriate example...</p>
-    <p>If you are not redirected automatically, please visit:</p>
+    <h2>Page Not Found (404)</h2>
+    <p>The requested page could not be found.</p>
+    <p>You can visit one of our examples:</p>
     <ul style="list-style: none; padding: 0;">
-      <li><a href="/hardware-js-sdk/expo-example/">Expo Example</a></li>
-      <li><a href="/hardware-js-sdk/new-example/">New Example</a></li>
+      <li style="margin: 10px 0;"><a href="/expo-example/" style="color: #007bff; text-decoration: none;">📱 Expo Example</a></li>
+      <li style="margin: 10px 0;"><a href="/new-example/" style="color: #007bff; text-decoration: none;">🆕 New Example</a></li>
     </ul>
+    <p style="margin-top: 30px; font-size: 14px; color: #666;">
+      Current path: <code id="current-path"></code>
+    </p>
+    <script>
+      document.getElementById('current-path').textContent = window.location.pathname;
+    </script>
   </div>
 </body>
 </html> 

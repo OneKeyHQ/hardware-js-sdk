@@ -23,6 +23,14 @@ declare global {
 // Set global flag for client detection
 window.__isClient = true;
 
+// 处理从 404 页面重定向过来的路径
+const redirectPath = sessionStorage.getItem('redirectPath');
+if (redirectPath) {
+  sessionStorage.removeItem('redirectPath');
+  // 使用 history.replaceState 替换当前历史记录
+  history.replaceState(null, '', redirectPath);
+}
+
 // 生产环境使用 GitHub Pages 路径，开发环境使用根路径
 const basename = process.env.NODE_ENV === 'production' ? '/hardware-js-sdk/new-example/' : '/';
 

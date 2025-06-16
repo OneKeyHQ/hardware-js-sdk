@@ -72,7 +72,7 @@ jobs:
       - name: Build All Packages
         run: yarn build
       - name: Build New Example
-        run: VITE_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn vite build --config vite.config.client.ts --base=/hardware-js-sdk/new-example/
+        run: VITE_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn vite build --config vite.config.client.ts --base=/new-example/
         working-directory: packages/connect-examples/new-example
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -124,5 +124,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./deploy
-          # cname: example.onekey-test.com
+          cname: example.onekey-test.com
           force_orphan: true
