@@ -36,8 +36,8 @@
       
       // 精确匹配规则
       if (path === '/' || path === '') {
-        // 根路径重定向到 expo-example
-        window.location.replace('/expo-example/' + fullUrl);
+        // 根路径重定向到 expo-example 的默认页面
+        window.location.replace('/expo-example/api-payload' + fullUrl);
         return;
       }
       
@@ -76,13 +76,13 @@
           return;
         }
         // 默认重定向旧的 hardware-js-sdk 路径到 expo-example
-        window.location.replace('/expo-example/' + fullUrl);
+        window.location.replace('/expo-example/api-payload' + fullUrl);
         return;
       }
       
       // 默认情况：重定向到 expo-example
       console.log('Route dispatcher: default redirect to expo-example');
-      window.location.replace('/expo-example/' + fullUrl);
+      window.location.replace('/expo-example/api-payload' + fullUrl);
     })();
   </script>
 </head>
