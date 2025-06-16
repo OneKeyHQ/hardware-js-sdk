@@ -48,5 +48,5 @@ jobs:
           publish_branch: new-example-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./${{ env.PROJECT_PATH }}/dist
-          # cname: ${{ env.TEST_ENDPOINT }}
+          cname: ${{ env.TEST_ENDPOINT }}
           force_orphan: true
