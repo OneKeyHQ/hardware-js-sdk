@@ -32,7 +32,7 @@ if (redirectPath) {
 }
 
 // 生产环境使用 GitHub Pages 路径，开发环境使用根路径
-const basename = process.env.NODE_ENV === 'production' ? '/hardware-js-sdk/new-example/' : '/';
+const basename = process.env.NODE_ENV === 'production' ? '/new-example/' : '/';
 
 // Create a root and render directly - no hydration needed for client-only app
 const container = document.getElementById('root');

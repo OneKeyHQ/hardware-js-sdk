@@ -18,7 +18,7 @@ function shimPlugin() {
 export default defineConfig({
   root: process.cwd(),
   // Set the base path to the repository name + sub-directory for a robust deployment
-  base: process.env.NODE_ENV === 'production' ? '/hardware-js-sdk/new-example/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/new-example/' : '/',
 
   plugins: [react(), tsconfigPaths(), shimPlugin()],
 

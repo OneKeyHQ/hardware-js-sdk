@@ -104,9 +104,7 @@ jobs:
           path: deploy/new-example
       - name: Setup Expo as Root and create routing
         run: |
-          # Copy expo-example to root (default access)
-          cp -r deploy/temp-expo/* deploy/
-          # Create expo-example subdirectory for explicit routing
+          # Create expo-example subdirectory
           mkdir -p deploy/expo-example
           cp -r deploy/temp-expo/* deploy/expo-example/
           # Clean up temp directory

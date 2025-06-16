@@ -9,23 +9,18 @@ module.exports = async function (env, argv) {
 
   // 设置 publicPath 为 GitHub Pages 的路径
   if (process.env.NODE_ENV === 'production') {
-    config.output.publicPath = '/hardware-js-sdk/';
+    config.output.publicPath = '/expo-example/';
   }
 
   // 配置 SPA 路由支持
   if (config.devServer) {
     config.devServer.historyApiFallback = {
-      index: '/hardware-js-sdk/',
+      index: '/expo-example/',
       rewrites: [
         // 处理 expo-example 的路由
         {
-          from: /^\/hardware-js-sdk\/expo-example\/.*$/,
-          to: '/hardware-js-sdk/expo-example/index.html',
-        },
-        // 处理根路径的路由（默认 expo-example）
-        {
-          from: /^\/hardware-js-sdk\/(?!new-example|expo-example|assets).*$/,
-          to: '/hardware-js-sdk/index.html',
+          from: /^\/expo-example\/.*$/,
+          to: '/expo-example/index.html',
         },
       ],
     };
@@ -33,15 +28,11 @@ module.exports = async function (env, argv) {
     // 为生产环境配置 historyApiFallback
     config.devServer = {
       historyApiFallback: {
-        index: '/hardware-js-sdk/',
+        index: '/expo-example/',
         rewrites: [
           {
-            from: /^\/hardware-js-sdk\/expo-example\/.*$/,
-            to: '/hardware-js-sdk/expo-example/index.html',
-          },
-          {
-            from: /^\/hardware-js-sdk\/(?!new-example|expo-example|assets).*$/,
-            to: '/hardware-js-sdk/index.html',
+            from: /^\/expo-example\/.*$/,
+            to: '/expo-example/index.html',
           },
         ],
       },

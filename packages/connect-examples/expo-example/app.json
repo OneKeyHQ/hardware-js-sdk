@@ -15,9 +15,7 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "headers": {
       "Permissions-Policy": "usb=(self)"
     },
@@ -36,10 +34,6 @@
       "favicon": "./assets/favicon.png",
       "bundler": "webpack"
     },
-    "plugins": [
-      "expo-image-picker",
-      "expo-document-picker",
-      "expo-localization"
-    ]
+    "plugins": ["expo-image-picker", "expo-document-picker", "expo-localization"]
   }
 }
