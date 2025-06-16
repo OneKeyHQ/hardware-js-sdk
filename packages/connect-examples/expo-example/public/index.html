@@ -36,37 +36,6 @@
       -ms-overflow-style: scrollbar;
     }
   </style>
-  <script>
-    // 路由处理脚本 - 在应用加载前执行
-    (function() {
-      var currentPath = window.location.pathname;
-      var search = window.location.search;
-      var hash = window.location.hash;
-      
-      // 如果是 GitHub Pages 环境
-      if (window.location.hostname.endsWith('github.io')) {
-        // 检查是否需要重定向
-        if (currentPath.startsWith('/hardware-js-sdk/') && 
-            !currentPath.startsWith('/hardware-js-sdk/expo-example/') && 
-            !currentPath.startsWith('/hardware-js-sdk/new-example/')) {
-          
-          var relativePath = currentPath.substring('/hardware-js-sdk/'.length);
-          var knownRoutes = ['api-payload', 'firmware-update-test', 'passphrase-test', 'address-test', 'security-check', 'functional-testing'];
-          
-          // 如果是已知路由或空路径，重定向到 expo-example
-          if (knownRoutes.indexOf(relativePath) !== -1 || relativePath === '' || relativePath === '/') {
-            var newPath;
-            if (relativePath === '/' || relativePath === '') {
-              newPath = '/hardware-js-sdk/expo-example/';
-            } else {
-              newPath = '/hardware-js-sdk/expo-example/' + relativePath;
-            }
-            window.history.replaceState(null, '', newPath + search + hash);
-          }
-        }
-      }
-    })();
-  </script>
 </head>
 <body>
   <noscript>

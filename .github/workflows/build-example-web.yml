@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Get short commit SHA
         run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -28,19 +28,24 @@ jobs:
       - name: Build Expo Example
         run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
         working-directory: packages/connect-examples/expo-example
-        
+
       - name: Add commit info to build output
         run: |
+          # 先备份原始构建产物到临时目录
+          mkdir -p temp-build
+          cp -r web-build/* temp-build/ 2>/dev/null || true
           # 创建带有 commit id 的子目录
           mkdir -p web-build/commits/${{ env.COMMIT_SHORT_SHA }}
-          # 复制构建产物到带有 commit id 的目录
-          cp -r web-build/* web-build/commits/${{ env.COMMIT_SHORT_SHA }}/
+          # 复制备份的构建产物到带有 commit id 的目录
+          cp -r temp-build/* web-build/commits/${{ env.COMMIT_SHORT_SHA }}/
           # 创建一个 commit 信息文件
           echo '{"commit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ github.sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > web-build/commits/${{ env.COMMIT_SHORT_SHA }}/commit-info.json
           # 为 commit 版本也创建 404.html
           cp web-build/commits/${{ env.COMMIT_SHORT_SHA }}/index.html web-build/commits/${{ env.COMMIT_SHORT_SHA }}/404.html
+          # 清理临时目录
+          rm -rf temp-build
         working-directory: packages/connect-examples/expo-example
-        
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -51,10 +56,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Get short commit SHA
         run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -81,10 +86,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        
+
       - name: Get short commit SHA
         run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
-        
+
       - name: Setup Deploy Directory
         run: mkdir -p deploy
       - name: Download Expo Artifact
@@ -108,78 +113,97 @@ jobs:
           rm -rf deploy/temp-expo
       - name: Add SPA fallback for client-side routing
         run: |
-          # 为 new-example 创建 404.html（Vite 构建的应用需要这个）
+          # 为各子应用创建简单的 SPA 回退 404.html
           cp deploy/new-example/index.html deploy/new-example/404.html
+          cp deploy/expo-example/index.html deploy/expo-example/404.html
 
-          # 为 expo-example 创建智能的 404.html，处理路由重定向
-          cat > deploy/expo-example/404.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>Redirecting...</title>
-            <script>
-              // 获取当前路径，移除 /hardware-js-sdk/expo-example 前缀
-              const fullPath = window.location.pathname;
-              const basePath = '/hardware-js-sdk/expo-example';
-              
-              // 如果路径以基础路径开头，提取相对路径
-              if (fullPath.startsWith(basePath)) {
-                const relativePath = fullPath.substring(basePath.length) || '/';
-                // 重定向到正确的路径，保持查询参数和 hash
-                const newUrl = basePath + '/' + (relativePath.startsWith('/') ? relativePath.substring(1) : relativePath);
-                window.location.replace(newUrl + window.location.search + window.location.hash);
-              } else {
-                // 如果不是预期的路径格式，重定向到 expo-example 首页
-                window.location.replace('/hardware-js-sdk/expo-example/');
-              }
-            </script>
-          </head>
-          <body>
-            <div>Redirecting...</div>
-          </body>
-          </html>
-          EOF
-
-          # 改进根 404.html - 更智能的路由分发
+          # 创建统一的根 404.html - 作为唯一的路由分发器
           cat > deploy/404.html << 'EOF'
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="UTF-8">
-            <title>Redirecting...</title>
+            <title>Hardware SDK Examples</title>
             <script>
-              const path = window.location.pathname;
-              const search = window.location.search;
-              const hash = window.location.hash;
-              
-              // 更精确的路由分发逻辑
-              if (path.startsWith('/hardware-js-sdk/new-example/')) {
-                // new-example 的路由，重定向到正确路径
-                window.location.replace(path + search + hash);
-              } else if (path.startsWith('/hardware-js-sdk/expo-example/')) {
-                // expo-example 的路由，重定向到正确路径
-                window.location.replace(path + search + hash);
-              } else if (path.includes('/new-example')) {
-                // 包含 new-example 但路径不正确，修正路径
-                const correctedPath = path.replace(/.*\/new-example/, '/hardware-js-sdk/new-example');
-                window.location.replace(correctedPath + search + hash);
-              } else if (path.includes('/expo-example')) {
-                // 包含 expo-example 但路径不正确，修正路径
-                const correctedPath = path.replace(/.*\/expo-example/, '/hardware-js-sdk/expo-example');
-                window.location.replace(correctedPath + search + hash);
-              } else if (path.startsWith('/hardware-js-sdk/') && !path.startsWith('/hardware-js-sdk/new-example') && !path.startsWith('/hardware-js-sdk/expo-example')) {
-                // 其他 hardware-js-sdk 路径，假设是 expo-example 的路由
-                const relativePath = path.substring('/hardware-js-sdk/'.length);
-                window.location.replace('/hardware-js-sdk/expo-example/' + relativePath + search + hash);
-              } else {
-                // 默认重定向到根页面（expo-example）
-                window.location.replace('/hardware-js-sdk/' + search + hash);
-              }
+              // 统一路由分发器 - 处理所有未匹配的路径
+              (function() {
+                const path = window.location.pathname;
+                const search = window.location.search;
+                const hash = window.location.hash;
+                const fullUrl = search + hash;
+                
+                console.log('Route dispatcher: handling path', path);
+                
+                // 精确匹配规则
+                if (path === '/hardware-js-sdk' || path === '/hardware-js-sdk/') {
+                  // 根路径重定向到 expo-example
+                  window.location.replace('/hardware-js-sdk/expo-example/' + fullUrl);
+                  return;
+                }
+                
+                if (path.startsWith('/hardware-js-sdk/new-example/')) {
+                  // new-example 路径，确保正确访问
+                  window.location.replace(path + fullUrl);
+                  return;
+                }
+                
+                if (path.startsWith('/hardware-js-sdk/expo-example/')) {
+                  // expo-example 路径，确保正确访问
+                  window.location.replace(path + fullUrl);
+                  return;
+                }
+                
+                // 处理已知的 expo-example 路由
+                const knownExpoRoutes = [
+                  'api-payload', 
+                  'firmware-update-test', 
+                  'passphrase-test', 
+                  'address-test', 
+                  'security-check', 
+                  'functional-testing'
+                ];
+                
+                if (path.startsWith('/hardware-js-sdk/')) {
+                  const relativePath = path.substring('/hardware-js-sdk/'.length);
+                  
+                  // 如果是已知的 expo 路由，重定向到 expo-example
+                  if (knownExpoRoutes.includes(relativePath)) {
+                    window.location.replace('/hardware-js-sdk/expo-example/' + relativePath + fullUrl);
+                    return;
+                  }
+                }
+                
+                // 处理错误的路径格式
+                if (path.includes('/new-example')) {
+                  // 修正 new-example 路径
+                  const correctedPath = '/hardware-js-sdk/new-example' + path.split('/new-example')[1];
+                  window.location.replace(correctedPath + fullUrl);
+                  return;
+                }
+                
+                if (path.includes('/expo-example')) {
+                  // 修正 expo-example 路径
+                  const correctedPath = '/hardware-js-sdk/expo-example' + path.split('/expo-example')[1];
+                  window.location.replace(correctedPath + fullUrl);
+                  return;
+                }
+                
+                // 默认情况：重定向到 expo-example
+                console.log('Route dispatcher: default redirect to expo-example');
+                window.location.replace('/hardware-js-sdk/expo-example/' + fullUrl);
+              })();
             </script>
           </head>
           <body>
-            <div>Redirecting...</div>
+            <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
+              <h2>Hardware SDK Examples</h2>
+              <p>Redirecting to the appropriate example...</p>
+              <p>If you are not redirected automatically, please visit:</p>
+              <ul style="list-style: none; padding: 0;">
+                <li><a href="/hardware-js-sdk/expo-example/">Expo Example</a></li>
+                <li><a href="/hardware-js-sdk/new-example/">New Example</a></li>
+              </ul>
+            </div>
           </body>
           </html>
           EOF
