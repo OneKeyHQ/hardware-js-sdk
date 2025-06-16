@@ -1,4 +1,4 @@
-import { HardwareApiMethod } from "~/services/hardwareService";
+import { HardwareApiMethod } from '../../services/hardwareService';
 
 export interface PresupposeProps {
   title: string;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from 'react';
 import type {
   ChainConfig,
   MethodConfig,
@@ -6,17 +6,17 @@ import type {
   FunctionalCategory,
   Category,
   RegistryStats,
-  ChainMeta,
-} from "~/data/types";
-import type { HardwareApiMethod } from "~/services/hardwareService";
-import type { PlaygroundProps } from "~/data/components/Playground";
+} from '~/data/types';
+import type { HardwareApiMethod } from '~/services/hardwareService';
+import type { PlaygroundProps } from '~/data/components/Playground';
+import { methodsRegistry } from '../data/methodsRegistry';
 
 // 映射字段
 function convertToMethodConfig(props: PlaygroundProps): MethodConfig {
   return {
     method: props.method as HardwareApiMethod,
     description: props.description,
-    presets: props.presupposes?.map((preset) => ({
+    presets: props.presupposes?.map(preset => ({
       title: preset.title,
       value: preset.value,
     })),
@@ -26,85 +26,22 @@ function convertToMethodConfig(props: PlaygroundProps): MethodConfig {
   };
 }
 
-// 模板注册表类 - 简化
+// 模板注册表类 - 简化版，使用 methodsRegistry
 class TemplateRegistry {
   private chains: ChainConfig[] = [];
   private ready = false;
 
   async initialize(): Promise<void> {
     try {
-      // 动态导入所有链配置
-      const chainImports = [
-        // 基础功能
-        { module: import("~/data/methods/basic"), id: "basic" },
-        { module: import("~/data/methods/device"), id: "device" },
+      // 直接使用 methodsRegistry 的数据
+      this.chains = methodsRegistry.chains.map(chain => ({
+        ...chain,
+        methods: chain.methods.map(convertToMethodConfig),
+      }));
 
-        // 主要区块链
-        { module: import("~/data/methods/bitcoin"), id: "bitcoin" },
-        { module: import("~/data/methods/ethereum"), id: "ethereum" },
-        { module: import("~/data/methods/solana"), id: "solana" },
-        { module: import("~/data/methods/cardano"), id: "cardano" },
-        { module: import("~/data/methods/polkadot"), id: "polkadot" },
-
-        { module: import("~/data/methods/sui"), id: "sui" },
-        { module: import("~/data/methods/aptos"), id: "aptos" },
-        { module: import("~/data/methods/near"), id: "near" },
-        { module: import("~/data/methods/ton"), id: "ton" },
-        { module: import("~/data/methods/cosmos"), id: "cosmos" },
-        { module: import("~/data/methods/tron"), id: "tron" },
-        { module: import("~/data/methods/xrp"), id: "ripple" },
-        { module: import("~/data/methods/stellar"), id: "stellar" },
-        { module: import("~/data/methods/neo"), id: "neo" },
-        { module: import("~/data/methods/nem"), id: "nem" },
-        { module: import("~/data/methods/kaspa"), id: "kaspa" },
-        { module: import("~/data/methods/benfen"), id: "benfen" },
-        { module: import("~/data/methods/algorand"), id: "algorand" },
-        { module: import("~/data/methods/filecoin"), id: "filecoin" },
-        { module: import("~/data/methods/nervos"), id: "nervos" },
-        { module: import("~/data/methods/starcoin"), id: "starcoin" },
-        { module: import("~/data/methods/scdo"), id: "scdo" },
-        { module: import("~/data/methods/dynex"), id: "dynex" },
-        { module: import("~/data/methods/nexa"), id: "nexa" },
-        { module: import("~/data/methods/alephium"), id: "alephium" },
-        { module: import("~/data/methods/conflux"), id: "conflux" },
-        { module: import("~/data/methods/nostr"), id: "nostr" },
-
-        // 特殊功能
-        { module: import("~/data/methods/lightning"), id: "lightning" },
-        { module: import("~/data/methods/allnetwork"), id: "allnetwork" },
-      ];
-
-      const chainModules = await Promise.all(
-        chainImports.map(async ({ module, id }) => {
-          try {
-            const moduleData = await module;
-            const api = moduleData.default as PlaygroundProps[];
-            const chainMeta = moduleData.chainMeta as ChainMeta;
-
-            if (!api || !chainMeta) {
-              console.warn(`Missing data for chain ${id}`);
-              return null;
-            }
-
-            // 直接转换方法配置
-            const methods = api.map(convertToMethodConfig);
-
-            return {
-              ...chainMeta,
-              methods,
-            } as ChainConfig;
-          } catch (error) {
-            console.warn(`Failed to load chain ${id}:`, error);
-            return null;
-          }
-        })
-      );
-
-      // 过滤掉加载失败的链
-      this.chains = chainModules.filter(Boolean) as ChainConfig[];
       this.ready = true;
     } catch (error) {
-      console.error("Failed to initialize template registry:", error);
+      console.error('Failed to initialize template registry:', error);
       throw error;
     }
   }
@@ -118,11 +55,11 @@ class TemplateRegistry {
   }
 
   getAllMethods(): MethodConfig[] {
-    return this.chains.flatMap((chain) => chain.methods);
+    return this.chains.flatMap(chain => chain.methods);
   }
 
   getChain(chainId: string): ChainConfig | undefined {
-    return this.chains.find((chain) => chain.id === chainId);
+    return this.chains.find(chain => chain.id === chainId);
   }
 
   getChainMethods(chainId: string): MethodConfig[] {
@@ -131,25 +68,21 @@ class TemplateRegistry {
   }
 
   getChainsByCategory(category: Category): ChainConfig[] {
-    return this.chains.filter((chain) => chain.category === category);
+    return this.chains.filter(chain => chain.category === category);
   }
 
   getFunctionalChains(): ChainConfig[] {
-    return this.chains.filter(
-      (chain) => chain.category === "basic" || chain.category === "device"
-    );
+    return this.chains.filter(chain => chain.category === 'basic' || chain.category === 'device');
   }
 
   getBlockchainChains(): ChainConfig[] {
-    return this.chains.filter(
-      (chain) => chain.category !== "basic" && chain.category !== "device"
-    );
+    return this.chains.filter(chain => chain.category !== 'basic' && chain.category !== 'device');
   }
 
   searchMethods(query: string): MethodConfig[] {
     const searchTerm = query.toLowerCase();
     return this.getAllMethods().filter(
-      (method) =>
+      method =>
         method.method.toLowerCase().includes(searchTerm) ||
         method.description.toLowerCase().includes(searchTerm)
     );
@@ -160,11 +93,10 @@ class TemplateRegistry {
     const chainsByCategory = {} as Record<ChainCategory, number>;
 
     // 分别统计功能模块和区块链分类
-    this.chains.forEach((chain) => {
-      if (chain.category === "basic" || chain.category === "device") {
+    this.chains.forEach(chain => {
+      if (chain.category === 'basic' || chain.category === 'device') {
         functionalsByCategory[chain.category as FunctionalCategory] =
-          (functionalsByCategory[chain.category as FunctionalCategory] || 0) +
-          1;
+          (functionalsByCategory[chain.category as FunctionalCategory] || 0) + 1;
       } else {
         chainsByCategory[chain.category as ChainCategory] =
           (chainsByCategory[chain.category as ChainCategory] || 0) + 1;
@@ -199,8 +131,8 @@ export function useTemplateRegistry() {
       setIsReady(true);
       setIsInitialLoad(false);
     } catch (err) {
-      console.error("Failed to initialize template registry:", err);
-      setError(err instanceof Error ? err.message : "初始化失败");
+      console.error('Failed to initialize template registry:', err);
+      setError(err instanceof Error ? err.message : '初始化失败');
       setIsReady(false);
     } finally {
       setIsLoading(false);
@@ -221,10 +153,7 @@ export function useTemplateRegistry() {
     allMethods: isReady ? templateRegistry.getAllMethods() : [],
 
     // 查询方法
-    getChain: useCallback(
-      (chainId: string) => templateRegistry.getChain(chainId),
-      []
-    ),
+    getChain: useCallback((chainId: string) => templateRegistry.getChain(chainId), []),
     getChainMethods: useCallback(
       (chainId: string) => templateRegistry.getChainMethods(chainId),
       []
@@ -233,18 +162,9 @@ export function useTemplateRegistry() {
       (category: Category) => templateRegistry.getChainsByCategory(category),
       []
     ),
-    getFunctionalChains: useCallback(
-      () => templateRegistry.getFunctionalChains(),
-      []
-    ),
-    getBlockchainChains: useCallback(
-      () => templateRegistry.getBlockchainChains(),
-      []
-    ),
-    searchMethods: useCallback(
-      (query: string) => templateRegistry.searchMethods(query),
-      []
-    ),
+    getFunctionalChains: useCallback(() => templateRegistry.getFunctionalChains(), []),
+    getBlockchainChains: useCallback(() => templateRegistry.getBlockchainChains(), []),
+    searchMethods: useCallback((query: string) => templateRegistry.searchMethods(query), []),
     getStats: useCallback(() => templateRegistry.getStats(), []),
 
     // 状态

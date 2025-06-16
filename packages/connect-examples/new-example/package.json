@@ -14,7 +14,8 @@
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "preview": "vite preview --config vite.config.client.ts",
     "typecheck": "tsc",
-    "deploy:gh-pages": "npm run build:gh-pages && gh-pages -d dist"
+    "build:analyze": "vite build --config vite.config.client.ts --mode analyze",
+    "build:prod": "NODE_ENV=production VITE_COMMIT_SHA=$(git rev-parse HEAD) vite build --config vite.config.client.ts"
   },
   "dependencies": {
     "@noble/hashes": "^1.8.0",

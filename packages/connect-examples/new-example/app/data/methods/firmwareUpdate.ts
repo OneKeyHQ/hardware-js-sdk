@@ -1,8 +1,8 @@
 import { type PlaygroundProps } from '../components/Playground';
 import type { ChainCategory } from '../types';
 
-// 固件更新元数据
-export const firmwareUpdateMeta = {
+// 链元数据
+export const chainMeta = {
   id: 'firmwareUpdate',
   name: 'Firmware Update',
   description: 'Device firmware update operations',
@@ -239,7 +239,7 @@ export function getSupportedUpdateTypes(deviceType: string): FirmwareUpdateType[
 
 // 导出固件更新配置对象
 export const firmwareUpdateConfig = {
-  ...firmwareUpdateMeta,
+  ...chainMeta,
   api: firmwareUpdateMethods,
   updateTypes: firmwareUpdateTypes,
 };

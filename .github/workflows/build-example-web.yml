@@ -28,6 +28,21 @@ jobs:
       - name: Build Expo Example
         run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
         working-directory: packages/connect-examples/expo-example
+      
+      - name: Debug - List build output files
+        run: |
+          echo "=== Build output files ==="
+          find web-build -type f -name "*.json" -o -name "favicon*" -o -name "*.ico" | head -20
+          echo "=== Checking for manifest.json ==="
+          if [ -f "web-build/manifest.json" ]; then
+            echo "✅ manifest.json found"
+            cat web-build/manifest.json | head -10
+          else
+            echo "❌ manifest.json not found"
+          fi
+          echo "=== Checking for favicon files ==="
+          find web-build -name "favicon*" -type f
+        working-directory: packages/connect-examples/expo-example
 
       - name: Add commit info to build output
         run: |
@@ -70,7 +85,7 @@ jobs:
           yarn
           yarn bootstrap
       - name: Build All Packages
-        run: yarn build
+        run: yarn build:prod
       - name: Build New Example
         run: VITE_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn vite build --config vite.config.client.ts --base=/new-example/
         working-directory: packages/connect-examples/new-example
@@ -108,16 +123,34 @@ jobs:
           mkdir -p deploy/expo-example
           cp -r deploy/temp-expo/* deploy/expo-example/
 
-          # Copy Expo's favicon files to root path (for root-level favicon requests)
-          # This handles the case where browsers request /favicon-32.png directly
-          if [ -f "deploy/expo-example/favicon-32.png" ]; then
-            cp deploy/expo-example/favicon-32.png deploy/favicon-32.png
+          # Debug: List files in expo-example directory
+          echo "=== Files in deploy/expo-example ==="
+          find deploy/expo-example -type f -name "*.json" -o -name "favicon*" -o -name "*.ico" | head -10
+          
+          # Copy all favicon-related files to root path
+          # Handle various favicon formats that Expo might generate
+          favicon_count=0
+          find deploy/expo-example -name "favicon*" -type f | while read file; do
+            filename=$(basename "$file")
+            cp "$file" "deploy/$filename"
+            echo "✅ Copied favicon: $filename"
+            favicon_count=$((favicon_count + 1))
+          done
+          
+          if [ $favicon_count -eq 0 ]; then
+            echo "⚠️  No favicon files found in build output"
           fi
-          if [ -f "deploy/expo-example/favicon-16.png" ]; then
-            cp deploy/expo-example/favicon-16.png deploy/favicon-16.png
-          fi
-          if [ -f "deploy/expo-example/favicon.ico" ]; then
-            cp deploy/expo-example/favicon.ico deploy/favicon.ico
+
+          # Copy manifest.json to root path for PWA support
+          if [ -f "deploy/expo-example/manifest.json" ]; then
+            cp deploy/expo-example/manifest.json deploy/manifest.json
+            echo "✅ Copied manifest.json to root"
+            echo "=== Generated manifest.json content ==="
+            cat deploy/manifest.json | head -10
+          else
+            # Use fallback manifest.json if Expo didn't generate one
+            cp .github/templates/manifest.json deploy/manifest.json
+            echo "⚠️  Used fallback manifest.json (Expo didn't generate one)"
           fi
 
           # Clean up temp directory
