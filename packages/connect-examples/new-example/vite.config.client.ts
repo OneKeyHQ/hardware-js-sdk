@@ -68,15 +68,31 @@ export default defineConfig({
           if (id.includes('@radix-ui/') || id.includes('lucide-react')) {
             return 'ui-vendor';
           }
-          // Node.js polyfills
+          // Node.js polyfills - 分离到不同的 chunks 避免循环依赖
+          if (id.includes('buffer') && !id.includes('stream-browserify')) {
+            return 'buffer-polyfill';
+          }
+          if (id.includes('process') && !id.includes('stream-browserify')) {
+            return 'process-polyfill';
+          }
+          if (id.includes('stream-browserify')) {
+            return 'stream-polyfill';
+          }
           if (
-            id.includes('buffer') ||
-            id.includes('process') ||
-            id.includes('stream-browserify') ||
-            id.includes('util') ||
-            id.includes('events')
+            id.includes('util') &&
+            !id.includes('stream-browserify') &&
+            !id.includes('buffer') &&
+            !id.includes('process')
           ) {
-            return 'polyfills';
+            return 'util-polyfill';
+          }
+          if (
+            id.includes('events') &&
+            !id.includes('stream-browserify') &&
+            !id.includes('buffer') &&
+            !id.includes('process')
+          ) {
+            return 'events-polyfill';
           }
           // 工具库
           if (
@@ -166,7 +182,7 @@ export default defineConfig({
       '@onekeyfe/hd-web-sdk',
       '@onekeyfe/hd-core',
       '@onekeyfe/hd-shared',
-      // Node.js polyfills - 确保这些被正确预构建
+      // Node.js polyfills - 分别预构建避免循环依赖
       'buffer',
       'process/browser',
       'stream-browserify',
@@ -191,9 +207,9 @@ export default defineConfig({
       'i18next-browser-languagedetector',
     ],
     // 排除某些不需要预构建的模块
-    exclude: ['@onekeyfe/hd-core/dist/cjs'],
-    // 只在需要时强制重新构建
-    force: false,
+    // exclude: ['@onekeyfe/hd-core/dist/cjs'],
+    // 强制重新构建以确保配置生效
+    force: true,
   },
 
   // 预览服务器配置

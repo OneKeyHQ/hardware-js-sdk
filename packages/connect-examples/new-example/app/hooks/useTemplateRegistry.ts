@@ -72,11 +72,15 @@ class TemplateRegistry {
   }
 
   getFunctionalChains(): ChainConfig[] {
-    return this.chains.filter(chain => chain.category === 'basic' || chain.category === 'device');
+    return this.chains.filter(
+      chain => chain.category === 'device' || chain.category === 'firmwareUpdate'
+    );
   }
 
   getBlockchainChains(): ChainConfig[] {
-    return this.chains.filter(chain => chain.category !== 'basic' && chain.category !== 'device');
+    return this.chains.filter(
+      chain => chain.category !== 'device' && chain.category !== 'firmwareUpdate'
+    );
   }
 
   searchMethods(query: string): MethodConfig[] {

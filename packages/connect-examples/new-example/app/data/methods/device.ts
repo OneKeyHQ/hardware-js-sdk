@@ -1,20 +1,59 @@
 import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from '../types';
+import type { FunctionalCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
   id: 'device',
   name: 'Device',
-  description: 'Device management operations',
+  description: 'Device management and basic operations',
   icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#10B981"/></svg>`,
   color: '#10B981',
-  category: 'device' as ChainCategory,
+  category: 'device' as FunctionalCategory,
 };
 
 const api: PlaygroundProps[] = [
+  // Basic Operations
+  {
+    method: 'searchDevices',
+    description: 'Search for devices',
+    noConnIdReq: true,
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'getFeatures',
+    description: 'Get features of a device',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'getOnekeyFeatures',
+    description: 'Get OneKey specific features of a device',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'getPassphraseState',
+    description: 'Get passphrase state of a device',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'cancel',
+    description: 'Cancel a request',
+    noDeviceIdReq: true,
+  },
+
+  // Device Management Operations
   {
     method: 'deviceChangePin',
     description: 'Change pin of a device',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'deviceCancel',
+    description: 'Cancel device operation',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'deviceLock',
+    description: 'Lock device',
     noDeviceIdReq: true,
   },
   // {
@@ -22,64 +61,54 @@ const api: PlaygroundProps[] = [
   //   description: 'Reset a device',
   //   noDeviceIdReq: true,
   // },
-  // {
-  //   method: 'deviceSettings',
-  //   description: 'Get settings of a device',
-  //   noDeviceIdReq: true,
-  //   presupposes: [
-  //     {
-  //       title: 'Set Label',
-  //       value: {
-  //         label: 'My OneKey',
-  //       },
-  //     },
-  //     {
-  //       title: 'Enable Passphrase',
-  //       value: {
-  //         usePassphrase: true,
-  //       },
-  //     },
-  //     {
-  //       title: 'Disable Passphrase',
-  //       value: {
-  //         usePassphrase: false,
-  //       },
-  //     },
-  //     {
-  //       title: 'Set PassphraseAlwaysOnDevice',
-  //       value: {
-  //         passphraseAlwaysOnDevice: true,
-  //       },
-  //     },
-  //     {
-  //       title: 'Set English language',
-  //       value: {
-  //         language: 'en_UK',
-  //       },
-  //     },
-  //     {
-  //       title: 'Set Chinese language',
-  //       value: {
-  //         language: 'zh_CN',
-  //       },
-  //     },
-  //     {
-  //       title: 'Set safetyChecks',
-  //       value: {
-  //         safetyChecks: 0,
-  //       },
-  //     },
-  //   ],
-  // },
   {
-    method: 'deviceCancel',
-    description: 'cancel device',
+    method: 'deviceSettings',
+    description: 'Get settings of a device',
     noDeviceIdReq: true,
-  },
-  {
-    method: 'deviceLock',
-    description: 'lock device',
-    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Set Label',
+        value: {
+          label: 'My OneKey',
+        },
+      },
+      {
+        title: 'Enable Passphrase',
+        value: {
+          usePassphrase: true,
+        },
+      },
+      {
+        title: 'Disable Passphrase',
+        value: {
+          usePassphrase: false,
+        },
+      },
+      {
+        title: 'Set PassphraseAlwaysOnDevice',
+        value: {
+          passphraseAlwaysOnDevice: true,
+        },
+      },
+      {
+        title: 'Set English language',
+        value: {
+          language: 'en_UK',
+        },
+      },
+      {
+        title: 'Set Chinese language',
+        value: {
+          language: 'zh_CN',
+        },
+      },
+      {
+        title: 'Set safetyChecks',
+        value: {
+          safetyChecks: 0,
+        },
+      },
+    ],
   },
   // {
   //   method: 'deviceSupportFeatures',
@@ -124,10 +153,6 @@ const api: PlaygroundProps[] = [
   //   description: 'getNextU2FCounter',
   //   noDeviceIdReq: true,
   // },
-  {
-    method: 'getFeatures',
-    description: 'get device features',
-  },
   // {
   //   method: 'deviceInfoSettings',
   //   noDeviceIdReq: true,

@@ -69,7 +69,7 @@ export interface ChainConfig extends ChainMeta {
 }
 
 // 功能模块分类（非区块链）
-export type FunctionalCategory = 'basic' | 'device';
+export type FunctionalCategory = 'device' | 'firmwareUpdate';
 
 // 区块链分类
 export type ChainCategory =

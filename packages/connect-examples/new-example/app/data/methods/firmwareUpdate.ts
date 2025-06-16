@@ -1,5 +1,5 @@
 import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from '../types';
+import type { FunctionalCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
@@ -8,47 +8,14 @@ export const chainMeta = {
   description: 'Device firmware update operations',
   icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#F59E0B"/></svg>`,
   color: '#F59E0B',
-  category: 'device' as ChainCategory,
+  category: 'firmwareUpdate' as FunctionalCategory,
 };
 
 // 固件更新方法定义
 const firmwareUpdateMethods: PlaygroundProps[] = [
   {
-    method: 'checkFirmwareRelease',
-    description: 'Check firmware release information',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'checkBLEFirmwareRelease',
-    description: 'Check BLE firmware release information',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'checkBootloaderRelease',
-    description: 'Check bootloader release information',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'checkBridgeRelease',
-    description: 'Check bridge release information',
-    noDeviceIdReq: true,
-  },
-  {
-    method: 'checkAllFirmwareRelease',
-    description: 'Check all firmware release information',
-    noDeviceIdReq: true,
-    presupposes: [
-      {
-        title: 'Check all firmware releases',
-        value: {
-          checkBridgeRelease: true,
-        },
-      },
-    ],
-  },
-  {
     method: 'firmwareUpdateV2',
-    description: 'Firmware update with file selection (supports single file)',
+    description: 'Update firmware or ble-firmware',
     noDeviceIdReq: true,
     presupposes: [
       {
@@ -132,13 +99,46 @@ const firmwareUpdateMethods: PlaygroundProps[] = [
   },
   {
     method: 'deviceUpdateBootloader',
-    description: 'Update device bootloader (Touch & Pro devices)',
+    description: 'Update device bootloader (Pro devices & bootVersion > 4.12.0 only)',
     noDeviceIdReq: true,
     presupposes: [
       {
         title: 'Update bootloader with file',
         value: {
           bootloaderFile: null, // Will be set by file picker
+        },
+      },
+    ],
+  },
+  {
+    method: 'checkFirmwareRelease',
+    description: 'Check firmware release information',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'checkBLEFirmwareRelease',
+    description: 'Check BLE firmware release information',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'checkBootloaderRelease',
+    description: 'Check bootloader release information',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'checkBridgeRelease',
+    description: 'Check bridge release information',
+    noDeviceIdReq: true,
+  },
+  {
+    method: 'checkAllFirmwareRelease',
+    description: 'Check all firmware release information',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'Check all firmware releases',
+        value: {
+          checkBridgeRelease: true,
         },
       },
     ],

@@ -37,7 +37,6 @@ import * as lightning from './methods/lightning';
 import * as allnetwork from './methods/allnetwork';
 import * as benfen from './methods/benfen';
 import * as device from './methods/device';
-import * as basic from './methods/basic';
 import * as firmwareUpdate from './methods/firmwareUpdate';
 
 // 创建统一的方法注册表接口
@@ -53,8 +52,7 @@ export interface MethodsRegistry {
 
 // 链模块配置
 const chainModules = [
-  // 基础功能
-  { id: 'basic', module: basic },
+  // 基础功能 - basic已合并到device中
   { id: 'device', module: device },
   { id: 'firmwareUpdate', module: firmwareUpdate },
 

@@ -27,9 +27,14 @@ import {
   Download,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
+import packageJson from '../../package.json';
 
 // 导入图片
 import onekeyLogo from '../assets/onekey.png';
+
+// 版本信息
+const VERSION = packageJson.version;
+const COMMIT_SHA = import.meta.env.VITE_COMMIT_SHA || 'dev-build';
 
 const navigationItems = [
   {
@@ -93,8 +98,8 @@ export function AppSidebar() {
             <img src={onekeyLogo} alt="OneKey" className="w-8 h-8 object-contain" />
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold text-base">OneKey Developer Portal</span>
-            <span className="text-sm text-muted-foreground">Hardware SDK</span>
+            <span className="font-bold text-base">OneKey Developer Portal</span>
+            <span className="text-sm text-muted-foreground font-medium">Hardware SDK</span>
           </div>
         </div>
       </SidebarHeader>
@@ -103,7 +108,7 @@ export function AppSidebar() {
         {/* 设备状态 */}
         {currentDevice && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-sm font-medium">
+            <SidebarGroupLabel className="text-sm font-semibold">
               {t('device.status')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -120,14 +125,17 @@ export function AppSidebar() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         {getStatusIcon()}
-                        <Badge variant={getStatusVariant()} className="text-xs px-1.5 py-0.5">
+                        <Badge
+                          variant={getStatusVariant()}
+                          className="text-xs px-1.5 py-0.5 font-medium"
+                        >
                           {getStatusText()}
                         </Badge>
                       </div>
-                      <p className="font-medium text-xs truncate">
+                      <p className="font-semibold text-xs truncate">
                         {currentDevice.label || getDeviceLabel(currentDevice.features)}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-xs text-muted-foreground truncate font-medium">
                         {currentDevice.connectId}
                       </p>
                     </div>
@@ -143,7 +151,7 @@ export function AppSidebar() {
 
         {/* 导航菜单 - 优化版本 */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sm font-medium">
+          <SidebarGroupLabel className="text-sm font-semibold">
             {t('common.navigation')}
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -153,7 +161,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild isActive={location.pathname === item.url} size="lg">
                     <Link to={item.url} className="flex items-center gap-3">
                       <item.icon className="h-5 w-5" />
-                      <span className="text-sm font-medium">{t(item.title)}</span>
+                      <span className="text-sm font-semibold">{t(item.title)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -164,10 +172,12 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="py-2 w-full">
-          <div className="text-sm text-muted-foreground w-full text-center">
-            <div className="font-medium">OneKey SDK v1.0.0</div>
-            <div className="mt-1">© 2025 OneKey</div>
+        <div className="py-3 px-2">
+          <div className="text-center space-y-1">
+            <div className="text-sm font-bold text-foreground">OneKey Developer Portal</div>
+            <div className="text-xs text-muted-foreground font-mono">
+              v{VERSION} • {COMMIT_SHA.slice(0, 8)}
+            </div>
           </div>
         </div>
       </SidebarFooter>
