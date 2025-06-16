@@ -26,9 +26,7 @@ const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTesting
 const linking = {
   prefixes: [
     // 为不同的部署环境设置 URL 前缀
-    'https://wabicai.github.io/',
     'https://wabicai.github.io/expo-example/',
-    'https://example.onekey-test.com/',
     'https://example.onekey-test.com/expo-example/',
     'http://localhost:19006/',
     ExpoLinking.createURL('/'),
@@ -49,6 +47,16 @@ const linking = {
 // Create a native stack navigator
 const StackNavigator = createNativeStackNavigator();
 function NavigationContent() {
+  // 处理从 404 页面重定向过来的路径
+  useEffect(() => {
+    const redirectPath = sessionStorage.getItem('redirectPath');
+    if (redirectPath) {
+      sessionStorage.removeItem('redirectPath');
+      // 使用 window.history.replaceState 替换当前历史记录
+      window.history.replaceState(null, '', redirectPath);
+    }
+  }, []);
+
   return (
     <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
       <StackNavigator.Navigator
