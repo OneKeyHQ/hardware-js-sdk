@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build --config vite.config.client.ts",
-    "dev": "vite dev --config vite.config.client.ts",
+    "start": "vite dev --config vite.config.client.ts",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "preview": "vite preview --config vite.config.client.ts",
     "typecheck": "tsc",

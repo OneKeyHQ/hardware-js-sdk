@@ -117,100 +117,12 @@ jobs:
           cp deploy/new-example/index.html deploy/new-example/404.html
           cp deploy/expo-example/index.html deploy/expo-example/404.html
 
-          # 创建统一的根 404.html - 作为唯一的路由分发器
-          cat > deploy/404.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>Hardware SDK Examples</title>
-            <script>
-              // 统一路由分发器 - 处理所有未匹配的路径
-              (function() {
-                const path = window.location.pathname;
-                const search = window.location.search;
-                const hash = window.location.hash;
-                const fullUrl = search + hash;
-                
-                console.log('Route dispatcher: handling path', path);
-                
-                // 精确匹配规则
-                if (path === '/hardware-js-sdk' || path === '/hardware-js-sdk/') {
-                  // 根路径重定向到 expo-example
-                  window.location.replace('/hardware-js-sdk/expo-example/' + fullUrl);
-                  return;
-                }
-                
-                if (path.startsWith('/hardware-js-sdk/new-example/')) {
-                  // new-example 路径，确保正确访问
-                  window.location.replace(path + fullUrl);
-                  return;
-                }
-                
-                if (path.startsWith('/hardware-js-sdk/expo-example/')) {
-                  // expo-example 路径，确保正确访问
-                  window.location.replace(path + fullUrl);
-                  return;
-                }
-                
-                // 处理已知的 expo-example 路由
-                const knownExpoRoutes = [
-                  'api-payload', 
-                  'firmware-update-test', 
-                  'passphrase-test', 
-                  'address-test', 
-                  'security-check', 
-                  'functional-testing'
-                ];
-                
-                if (path.startsWith('/hardware-js-sdk/')) {
-                  const relativePath = path.substring('/hardware-js-sdk/'.length);
-                  
-                  // 如果是已知的 expo 路由，重定向到 expo-example
-                  if (knownExpoRoutes.includes(relativePath)) {
-                    window.location.replace('/hardware-js-sdk/expo-example/' + relativePath + fullUrl);
-                    return;
-                  }
-                }
-                
-                // 处理错误的路径格式
-                if (path.includes('/new-example')) {
-                  // 修正 new-example 路径
-                  const correctedPath = '/hardware-js-sdk/new-example' + path.split('/new-example')[1];
-                  window.location.replace(correctedPath + fullUrl);
-                  return;
-                }
-                
-                if (path.includes('/expo-example')) {
-                  // 修正 expo-example 路径
-                  const correctedPath = '/hardware-js-sdk/expo-example' + path.split('/expo-example')[1];
-                  window.location.replace(correctedPath + fullUrl);
-                  return;
-                }
-                
-                // 默认情况：重定向到 expo-example
-                console.log('Route dispatcher: default redirect to expo-example');
-                window.location.replace('/hardware-js-sdk/expo-example/' + fullUrl);
-              })();
-            </script>
-          </head>
-          <body>
-            <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
-              <h2>Hardware SDK Examples</h2>
-              <p>Redirecting to the appropriate example...</p>
-              <p>If you are not redirected automatically, please visit:</p>
-              <ul style="list-style: none; padding: 0;">
-                <li><a href="/hardware-js-sdk/expo-example/">Expo Example</a></li>
-                <li><a href="/hardware-js-sdk/new-example/">New Example</a></li>
-              </ul>
-            </div>
-          </body>
-          </html>
-          EOF
+          # 复制统一的路由分发器模板到根目录
+          cp .github/templates/404.html deploy/404.html
       - name: Deploy to Github Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./deploy
-          cname: example.onekey-test.com
+          # cname: example.onekey-test.com
           force_orphan: true
