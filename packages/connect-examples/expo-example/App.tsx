@@ -26,20 +26,20 @@ const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTesting
 const linking = {
   prefixes: [
     // 为不同的部署环境设置 URL 前缀
-    'https://wabicai.github.io/expo-example/',
-    'https://example.onekey-test.com/expo-example/',
+    'https://wabicai.github.io/',
+    'https://example.onekey-test.com/',
     'http://localhost:19006/',
     ExpoLinking.createURL('/'),
   ],
   config: {
     initialRouteName: Routes.Payload,
     screens: {
-      [Routes.Payload]: 'api-payload',
-      [Routes.FirmwareUpdateTest]: 'firmware-update-test',
-      [Routes.PassphraseTest]: 'passphrase-test',
-      [Routes.AddressTest]: 'address-test',
-      [Routes.SecurityCheck]: 'security-check',
-      [Routes.FunctionalTesting]: 'functional-testing',
+      [Routes.Payload]: 'expo-example/api-payload',
+      [Routes.FirmwareUpdateTest]: 'expo-example/firmware-update-test',
+      [Routes.PassphraseTest]: 'expo-example/passphrase-test',
+      [Routes.AddressTest]: 'expo-example/address-test',
+      [Routes.SecurityCheck]: 'expo-example/security-check',
+      [Routes.FunctionalTesting]: 'expo-example/functional-testing',
     },
   },
 };

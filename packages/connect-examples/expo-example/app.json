@@ -32,7 +32,8 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "webpack"
+      "bundler": "webpack",
+      "baseUrl": "/expo-example/"
     },
     "plugins": ["expo-image-picker", "expo-document-picker", "expo-localization"]
   }
