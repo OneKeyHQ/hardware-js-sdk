@@ -29,7 +29,7 @@ import {
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 
 // 导入图片
-import onekeyLogo from '~/assets/onekey.png';
+import onekeyLogo from '../assets/onekey.png';
 
 const navigationItems = [
   {

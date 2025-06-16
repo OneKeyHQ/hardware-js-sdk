@@ -104,11 +104,25 @@ jobs:
           path: deploy/new-example
       - name: Setup Expo as Root and create routing
         run: |
-          # Create expo-example subdirectory
+          # Create expo-example subdirectory and copy all build files
           mkdir -p deploy/expo-example
           cp -r deploy/temp-expo/* deploy/expo-example/
+
+          # Copy Expo's favicon files to root path (for root-level favicon requests)
+          # This handles the case where browsers request /favicon-32.png directly
+          if [ -f "deploy/expo-example/favicon-32.png" ]; then
+            cp deploy/expo-example/favicon-32.png deploy/favicon-32.png
+          fi
+          if [ -f "deploy/expo-example/favicon-16.png" ]; then
+            cp deploy/expo-example/favicon-16.png deploy/favicon-16.png
+          fi
+          if [ -f "deploy/expo-example/favicon.ico" ]; then
+            cp deploy/expo-example/favicon.ico deploy/favicon.ico
+          fi
+
           # Clean up temp directory
           rm -rf deploy/temp-expo
+
       - name: Add SPA fallback for client-side routing
         run: |
           # 为各子应用创建简单的 SPA 回退 404.html
