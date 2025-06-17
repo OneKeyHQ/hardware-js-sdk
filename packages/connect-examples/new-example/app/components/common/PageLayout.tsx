@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -6,18 +6,14 @@ interface PageLayoutProps {
   fixedHeight?: boolean;
 }
 
-export function PageLayout({
-  children,
-  className = "",
-  fixedHeight = false,
-}: PageLayoutProps) {
+export function PageLayout({ children, className = '', fixedHeight = false }: PageLayoutProps) {
   return (
     <div
       className={`${
-        fixedHeight ? "h-screen overflow-hidden" : "min-h-screen"
+        fixedHeight ? 'h-full overflow-hidden' : 'h-full overflow-y-auto p-4'
       } bg-background ${className}`}
     >
-      {children}
+      {fixedHeight ? children : <div className="mx-auto max-w-full">{children}</div>}
     </div>
   );
 }

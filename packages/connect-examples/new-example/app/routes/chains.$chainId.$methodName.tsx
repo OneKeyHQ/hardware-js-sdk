@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { useParams } from '@remix-run/react';
 import { Layers, Settings } from 'lucide-react';
-import MethodExecutor from '../components/common/MethodExecutor';
+import UnifiedMethodExecutor from '../components/common/UnifiedMethodExecutor';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { MethodExecuteBoundary } from '../components/common/MethodExecuteBoundary';
@@ -77,10 +77,11 @@ const ChainMethodExecutePage: React.FC = () => {
                 {!currentDevice ? (
                   <DeviceNotConnectedState showFullPage={true} />
                 ) : (
-                  <MethodExecutor
+                  <UnifiedMethodExecutor
                     methodConfig={selectedMethod}
                     executionHandler={handleMethodExecution}
                     className="h-full"
+                    type="standard"
                   />
                 )}
               </div>

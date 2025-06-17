@@ -111,92 +111,82 @@ const DeviceMethodsIndexPage: React.FC = () => {
   return (
     <ListBoundary title="Device Methods" icon={Cpu}>
       <PageLayout>
-        <div className="min-h-screen bg-background">
-          <div className="mx-auto px-6 py-4 space-y-3">
-            {/* 面包屑导航 + 搜索框 */}
-            <div className="flex items-center justify-between gap-4">
-              <Breadcrumb items={[{ label: 'Device Methods', icon: Cpu }]} />
-              <div className="relative w-80">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search methods..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-10 font-medium"
-                />
+        <div className="mx-auto px-6 py-4 space-y-3">
+          {/* 面包屑导航 + 搜索框 */}
+          <div className="flex items-center justify-between gap-4">
+            <Breadcrumb items={[{ label: 'Device Methods', icon: Cpu }]} />
+            <div className="relative w-80">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search methods..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-10 font-medium"
+              />
+            </div>
+          </div>
+
+          {/* 页面信息 */}
+          <div>
+            <p className="text-sm text-muted-foreground font-medium">
+              {filteredMethods.length} methods available
+            </p>
+          </div>
+
+          {/* 设备连接状态 */}
+          <DeviceNotConnectedState />
+
+          {/* 方法列表 - 优化间距 */}
+          <div className="space-y-5">
+            {/* 基本操作 */}
+            {basicMethods.length > 0 && (
+              <div className="space-y-3">
+                <div className="bg-muted/50 dark:bg-muted/30 border border-border/60 dark:border-border rounded-lg p-5">
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">
+                    Basic Operations
+                  </h2>
+                  <p className="text-muted-foreground dark:text-muted-foreground font-semibold mt-1 text-sm">
+                    {basicMethods.length} essential methods
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  {basicMethods.map((method, index) => renderMethodCard(method, index, 'basic'))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* 页面信息 */}
-            <div>
-              <p className="text-sm text-muted-foreground font-medium">
-                {filteredMethods.length} methods available
-              </p>
-            </div>
-
-            {/* 设备连接状态 */}
-            <DeviceNotConnectedState />
-
-            {/* 方法列表 - 优化间距 */}
-            <div className="space-y-5">
-              {/* 基本操作 */}
-              {basicMethods.length > 0 && (
-                <div className="space-y-3">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/80 border border-border/30 rounded-xl p-5">
-                    <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-foreground/[0.05]" />
-                    <div className="relative">
-                      <h2 className="text-lg font-bold text-foreground tracking-tight">
-                        Basic Operations
-                      </h2>
-                      <p className="text-muted-foreground font-semibold mt-0.5 text-sm">
-                        {basicMethods.length} essential methods
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid gap-3">
-                    {basicMethods.map((method, index) => renderMethodCard(method, index, 'basic'))}
-                  </div>
+            {/* 设备方法 */}
+            {deviceMethods.length > 0 && (
+              <div className="space-y-3">
+                <div className="bg-muted/50 dark:bg-muted/30 border border-border/60 dark:border-border rounded-lg p-5">
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">
+                    Device Operations
+                  </h2>
+                  <p className="text-muted-foreground dark:text-muted-foreground font-semibold mt-1 text-sm">
+                    {deviceMethods.length} device-specific methods
+                  </p>
                 </div>
-              )}
-
-              {/* 设备方法 */}
-              {deviceMethods.length > 0 && (
-                <div className="space-y-3">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/80 border border-border/30 rounded-xl p-5">
-                    <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-foreground/[0.05]" />
-                    <div className="relative">
-                      <h2 className="text-lg font-bold text-foreground tracking-tight">
-                        Device Operations
-                      </h2>
-                      <p className="text-muted-foreground font-semibold mt-0.5 text-sm">
-                        {deviceMethods.length} device-specific methods
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid gap-3">
-                    {deviceMethods.map((method, index) =>
-                      renderMethodCard(method, index, 'device')
-                    )}
-                  </div>
+                <div className="grid gap-2">
+                  {deviceMethods.map((method, index) => renderMethodCard(method, index, 'device'))}
                 </div>
-              )}
-            </div>
-
-            {/* 空状态 */}
-            {filteredMethods.length === 0 && searchTerm && (
-              <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="w-16 h-16 bg-muted/20 rounded-xl flex items-center justify-center mb-4">
-                  <Search className="w-7 h-7 text-muted-foreground/50" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground mb-2 tracking-tight">
-                  No methods found
-                </h3>
-                <p className="text-muted-foreground text-center max-w-md leading-relaxed font-medium">
-                  Try adjusting your search terms or browse all available methods.
-                </p>
               </div>
             )}
           </div>
+
+          {/* 空状态 */}
+          {filteredMethods.length === 0 && searchTerm && (
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+              <div className="w-16 h-16 bg-muted/20 rounded-xl flex items-center justify-center mb-4">
+                <Search className="w-7 h-7 text-muted-foreground/50" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2 tracking-tight">
+                No methods found
+              </h3>
+              <p className="text-muted-foreground text-center max-w-md leading-relaxed font-medium">
+                Try adjusting your search terms or browse all available methods.
+              </p>
+            </div>
+          )}
         </div>
       </PageLayout>
     </ListBoundary>

@@ -1,9 +1,9 @@
-import { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { useToast } from "./use-toast";
-import { useDeviceStore } from "~/store/deviceStore";
-import { callHardwareAPI } from "~/services/hardwareService";
-import type { MethodConfig, ExecutionResult } from "~/data/types";
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from './use-toast';
+import { useDeviceStore } from '../store/deviceStore';
+import { callHardwareAPI } from '../services/hardwareService';
+import type { MethodConfig, ExecutionResult } from '../data/types';
 
 export interface UseMethodExecutionOptions {
   requireDevice?: boolean;
@@ -11,14 +11,12 @@ export interface UseMethodExecutionOptions {
 }
 
 export function useMethodExecution(options: UseMethodExecutionOptions = {}) {
-  const { requireDevice = true, basePath = "" } = options;
+  const { requireDevice = true, basePath = '' } = options;
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentDevice } = useDeviceStore();
 
-  const [selectedMethod, setSelectedMethod] = useState<MethodConfig | null>(
-    null
-  );
+  const [selectedMethod, setSelectedMethod] = useState<MethodConfig | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
 
   const selectMethod = useCallback(
@@ -40,11 +38,11 @@ export function useMethodExecution(options: UseMethodExecutionOptions = {}) {
       const method = methodConfig || selectedMethod;
 
       if (!method) {
-        throw new Error("未选择方法");
+        throw new Error('未选择方法');
       }
 
       if (requireDevice && !currentDevice) {
-        throw new Error("设备未连接");
+        throw new Error('设备未连接');
       }
 
       setIsExecuting(true);
@@ -55,7 +53,8 @@ export function useMethodExecution(options: UseMethodExecutionOptions = {}) {
           requireDevice && currentDevice
             ? {
                 connectId: currentDevice.connectId,
-                deviceId: currentDevice.deviceId,
+                // 只有在方法需要 deviceId 时才传递
+                ...(method.noDeviceIdReq ? {} : { deviceId: currentDevice.deviceId }),
                 ...params,
               }
             : params;
@@ -65,7 +64,7 @@ export function useMethodExecution(options: UseMethodExecutionOptions = {}) {
 
         if (result.success) {
           toast({
-            title: "执行成功",
+            title: '执行成功',
             description: `方法 ${method.name} 执行完成`,
           });
 
@@ -75,17 +74,16 @@ export function useMethodExecution(options: UseMethodExecutionOptions = {}) {
             duration,
           };
         } else {
-          throw new Error(result.payload?.error || "执行失败");
+          throw new Error(result.payload?.error || '执行失败');
         }
       } catch (error) {
         const duration = Date.now() - startTime;
-        const errorMessage =
-          error instanceof Error ? error.message : "执行失败";
+        const errorMessage = error instanceof Error ? error.message : '执行失败';
 
         toast({
-          title: "执行失败",
+          title: '执行失败',
           description: errorMessage,
-          variant: "warning",
+          variant: 'warning',
         });
 
         return {

@@ -11,9 +11,39 @@ This is a React + TypeScript web application for testing and demonstrating OneKe
 - **Icons:** Lucide React
 - **Internationalization:** i18next with react-i18next
 - **Hardware SDK:** @onekeyfe/hd-core for hardware wallet integration
-- **State Management:** Custom hooks and context providers
+- **State Management:** Zustand with persistence middleware
 - **Build Tool:** Vite
 - **Component Variants:** Class Variance Authority (CVA)
+- **Compression:** LZ-string for log data compression
+
+## Architecture Overview
+
+### Component Architecture
+The project uses a unified component architecture:
+
+```
+UnifiedMethodExecutor (Core Implementation)
+├── type="standard" (Standard method execution)
+└── type="firmware" (Firmware method execution)
+```
+
+**Key Components:**
+- `UnifiedMethodExecutor.tsx` - Core execution logic for all hardware methods
+- `DeviceInteractionArea.tsx` - Device animation and interaction UI
+- `ExecutionPanel.tsx` - Request/response display and logging
+- `UnifiedLogger.tsx` - Centralized logging system
+
+### Persistent Log Storage System
+- **Storage Backend:** Zustand persist middleware with localStorage
+- **Compression:** LZ-string compression for large log entries (>1KB)
+- **Limits:** Configurable entry count, size, and expiration limits
+- **UI Filtering:** Automatic filtering of redundant device fields in UI events
+- **Statistics:** Real-time storage statistics and compression metrics
+
+### Hardware SDK Integration
+- **Cancel Functionality:** Proper SDK cancel method integration for operation cancellation
+- **Device Management:** Centralized device state management
+- **Error Handling:** Comprehensive error handling with user feedback
 
 ## Code Style & Patterns
 
@@ -42,7 +72,7 @@ app/
 │   └── layout/       # Layout components
 ├── routes/           # Page components following file-based routing
 ├── hooks/            # Custom React hooks
-├── store/            # State management
+├── store/            # Zustand state management
 ├── services/         # API and hardware service integrations
 ├── data/             # Static data and method configurations
 ├── utils/            # Utility functions
@@ -50,7 +80,7 @@ app/
 ```
 
 ### Naming Conventions
-- **Components:** PascalCase (e.g., `MethodExecutor`, `DeviceInteractionArea`)
+- **Components:** PascalCase (e.g., `UnifiedMethodExecutor`, `DeviceInteractionArea`)
 - **Files:** kebab-case for routes, PascalCase for components
 - **Variables/Functions:** camelCase
 - **Constants:** UPPER_SNAKE_CASE
@@ -60,7 +90,7 @@ app/
 ## UI Component Library
 
 ### Design System
-- **Color Scheme:** Modern neutral palette with accent colors
+- **Default Theme:** Dark theme with modern neutral palette
 - **Typography:** Clean, readable fonts with consistent sizing
 - **Spacing:** Consistent spacing scale using Tailwind's spacing system
 - **Borders:** Rounded corners (rounded-xl, rounded-2xl) for modern look
@@ -123,12 +153,29 @@ if (!sdkInitState.isInitialized) {
 
 ### Method Execution Pattern
 ```tsx
-// Use MethodExecutor for consistent method execution
-<MethodExecutor
+// Use UnifiedMethodExecutor for consistent method execution
+<UnifiedMethodExecutor
   methodConfig={selectedMethod}
   executionHandler={handleMethodExecution}
+  type="standard" // or "firmware"
   className="h-full"
 />
+```
+
+### Cancel Operation Implementation
+```tsx
+// Implement proper cancel functionality
+const handleCancel = async () => {
+  if (status === 'loading' || status === 'device-interaction') {
+    const { cancelHardwareOperation } = await import('../../services/hardwareService');
+    const connectId = currentDevice?.connectId;
+    const result = await cancelHardwareOperation(connectId);
+    
+    if (result.success) {
+      // Handle successful cancellation
+    }
+  }
+};
 ```
 
 ### Error Handling
@@ -136,6 +183,45 @@ if (!sdkInitState.isInitialized) {
 - Implement proper error boundaries
 - Log errors for debugging
 - Provide meaningful error messages to users
+
+## State Management with Zustand
+
+### Store Structure
+```tsx
+// Use Zustand with persistence for device state
+export const useDeviceStore = create<DeviceState>()(
+  persist(
+    (set, get) => ({
+      // Device management
+      currentDevice: null,
+      connectedDevices: [],
+      
+      // Log management with compression
+      logs: [],
+      logStorageConfig: DEFAULT_LOG_CONFIG,
+      
+      // Actions
+      addLog: (log) => { /* Implementation */ },
+      clearLogs: () => { /* Implementation */ },
+      getLogStorageStats: () => { /* Implementation */ },
+    }),
+    {
+      name: 'onekey-device-store',
+      version: 1,
+      partialize: (state) => ({
+        logs: state.logs.map(log => compressLogEntry(log, state.logStorageConfig)),
+        logStorageConfig: state.logStorageConfig,
+      }),
+    }
+  )
+);
+```
+
+### Log Storage Best Practices
+- **Compression:** Use LZ-string for entries >1KB
+- **Filtering:** Remove redundant device fields from UI events
+- **Limits:** Respect configured size, count, and expiration limits
+- **Statistics:** Provide real-time storage statistics
 
 ## Routing & Navigation
 
@@ -167,11 +253,11 @@ if (!sdkInitState.isInitialized) {
 
 ## Specific Component Requirements
 
-### Firmware Update Page
-- **Remove device information display** - Don't show current device info cards
-- **Remove back navigation buttons** - Maintain consistency with other method execution pages
-- **Add file selection capability** - Implement file picker for firmware update methods
-- **Use MethodExecutor pattern** - Follow the same execution pattern as other methods
+### Method Execution Pages
+- **Use UnifiedMethodExecutor** - Follow the unified execution pattern
+- **Proper cancel functionality** - Implement SDK cancel method integration
+- **File selection capability** - Implement file picker for firmware update methods
+- **Consistent layout** - Use standard page layout with breadcrumbs
 
 ### File Selection Implementation
 ```tsx
@@ -191,104 +277,49 @@ const handleFileSelect = async () => {
 };
 ```
 
-### Method Configuration
-- Define method configurations in `data/methods/` directory
-- Use consistent structure for method presets
-- Include proper descriptions and parameter documentation
-- Support file upload parameters where needed
+### Log Management
+- **Simplified Statistics:** Only show total entries and log size
+- **Real-time Updates:** Update statistics as logs are added/removed
+- **Export Functionality:** Support JSON and text export formats
+- **Configuration Management:** Allow users to configure storage limits
 
-## State Management
+## Performance Considerations
 
-### Store Patterns
-```tsx
-// Use custom hooks for state management
-const { currentDevice, sdkInitState } = useDeviceStore();
-const { methodParameters, setMethodParameters } = useHardwareStore();
-```
+### Log Storage Performance
+- **Compression Thresholds:** Only compress data >1KB
+- **Batch Operations:** Process multiple logs efficiently
+- **Memory Management:** Clean up expired logs automatically
+- **UI Responsiveness:** Avoid blocking UI during compression
 
-### Context Providers
-- Wrap app with necessary providers (I18nProvider, SDKProvider)
-- Keep context focused and avoid over-nesting
-- Use TypeScript for context value types
+### Component Optimization
+- **Lazy Loading:** Use dynamic imports for heavy components
+- **Memoization:** Use React.memo and useMemo appropriately
+- **Virtual Scrolling:** For large log lists
+- **Debounced Updates:** For real-time statistics
 
-## Internationalization
-
-### i18n Patterns
-```tsx
-// Use translation hooks consistently
-const { t } = useTranslation();
-
-// Use translation keys for all user-facing text
-<Button>{t('common.execute')}</Button>
-```
-
-## Performance & Best Practices
-
-### React Performance
-- Use `useMemo` and `useCallback` for expensive computations
-- Implement proper dependency arrays for hooks
-- Avoid unnecessary re-renders
-- Use React.memo for pure components when needed
+## Development Guidelines
 
 ### Code Quality
-- Follow ESLint and Prettier configurations
+- Follow ESLint and TypeScript strict mode
 - Write meaningful commit messages
+- Use descriptive variable and function names
 - Add JSDoc comments for complex functions
-- Keep components focused and single-responsibility
-- Extract reusable logic into custom hooks
+- Implement proper error boundaries
 
-### Testing Considerations
-- Write components to be testable
-- Use semantic HTML elements
-- Add appropriate ARIA labels
-- Test with different device states
-
-## Security & Hardware Integration
-
-### Hardware Security
-- Never log sensitive data (private keys, seeds, etc.)
-- Validate all user inputs
-- Handle hardware disconnection gracefully
-- Implement proper error handling for hardware operations
-
-### Data Handling
-- Sanitize user inputs
-- Validate file uploads for firmware updates
-- Handle large file uploads appropriately
-- Implement proper loading states for long operations
-
-## Development Workflow
-
-### Code Organization
-- Keep components small and focused
-- Extract common logic into utilities
-- Use consistent import ordering
-- Group related functionality together
+### Testing Strategy
+- Test hardware SDK integration thoroughly
+- Verify log compression and decompression
+- Test cancel functionality across different states
+- Validate responsive design on multiple devices
 
 ### Documentation
+- Keep README.md updated with setup instructions
 - Document complex business logic
-- Add README files for major features
-- Keep this .cursorrules file updated
-- Document API integrations and hardware methods
+- Maintain type definitions for all interfaces
+- Update this .cursorrules file as architecture evolves
 
-## Common Patterns to Follow
-
-1. **Consistent Error Handling:** Always use toast notifications for user feedback
-2. **Loading States:** Show appropriate loading indicators during operations
-3. **Device State Checks:** Always verify device connection before operations
-4. **Responsive Design:** Ensure all components work on mobile and desktop
-5. **Accessibility:** Use semantic HTML and proper ARIA labels
-6. **Type Safety:** Leverage TypeScript for better development experience
-7. **Component Reusability:** Create reusable components for common patterns
-8. **Performance:** Optimize for smooth user experience
-
-## Anti-Patterns to Avoid
-
-1. **Don't** hardcode strings - use i18n translations
-2. **Don't** ignore TypeScript errors - fix them properly
-3. **Don't** create overly complex components - break them down
-4. **Don't** skip error handling - always handle potential failures
-5. **Don't** use inline styles - use Tailwind classes
-6. **Don't** ignore responsive design - test on different screen sizes
-7. **Don't** log sensitive hardware data - respect user privacy
-8. **Don't** create inconsistent navigation patterns - follow established routes
+## Security Considerations
+- Validate all user inputs
+- Sanitize log data before storage
+- Handle sensitive device information carefully
+- Implement proper error handling to avoid information leakage

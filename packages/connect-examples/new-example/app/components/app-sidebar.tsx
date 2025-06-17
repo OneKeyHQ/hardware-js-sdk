@@ -16,7 +16,6 @@ import { Card, CardContent } from './ui/Card';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
-import DeviceIcon from './device/DeviceIcon';
 import {
   Home,
   Smartphone,
@@ -25,6 +24,7 @@ import {
   CheckCircle,
   XCircle,
   Download,
+  Server,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -58,6 +58,11 @@ const navigationItems = [
     icon: LinkIcon,
   },
   {
+    title: 'common.emulator',
+    url: '/emulator',
+    icon: Server,
+  },
+  {
     title: 'common.logs',
     url: '/logs',
     icon: FileText,
@@ -67,13 +72,13 @@ const navigationItems = [
 export function AppSidebar() {
   const location = useLocation();
   const { t } = useTranslation();
-  const { currentDevice } = useDeviceStore();
+  const { currentDevice, transportType } = useDeviceStore();
 
   const getStatusIcon = () => {
     if (currentDevice) {
-      return <CheckCircle className="h-4 w-4 text-primary" />;
+      return <CheckCircle className="h-4 w-4 text-primary dark:text-primary" />;
     }
-    return <XCircle className="h-4 w-4 text-muted-foreground" />;
+    return <XCircle className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" />;
   };
 
   const getStatusText = () => {
@@ -99,7 +104,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-base">OneKey Developer Portal</span>
-            <span className="text-sm text-muted-foreground font-medium">Hardware SDK</span>
+            <span className="text-sm text-muted-foreground font-medium">Hardware JS SDK</span>
           </div>
         </div>
       </SidebarHeader>
@@ -112,32 +117,56 @@ export function AppSidebar() {
               {t('device.status')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <Card>
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 mr-2">
-                      <DeviceIcon
-                        deviceType={currentDevice.deviceType}
-                        size="md"
-                        className="w-full h-full object-contain drop-shadow-sm"
-                      />
+              <Card className="border-border/60 bg-card/60 dark:bg-card/80 dark:border-border/40 backdrop-blur-sm">
+                <CardContent className="p-3 space-y-2">
+                  {/* 连接状态和设备名称 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon()}
+                      <Badge
+                        variant={getStatusVariant()}
+                        className="text-xs px-2 py-0.5 font-medium"
+                      >
+                        {getStatusText()}
+                      </Badge>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        {getStatusIcon()}
-                        <Badge
-                          variant={getStatusVariant()}
-                          className="text-xs px-1.5 py-0.5 font-medium"
-                        >
-                          {getStatusText()}
-                        </Badge>
-                      </div>
-                      <p className="font-semibold text-xs truncate">
+                  </div>
+
+                  {/* 设备信息 */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground font-medium">Device Name</span>
+                      <span className="text-xs font-bold text-foreground truncate max-w-24">
                         {currentDevice.label || getDeviceLabel(currentDevice.features)}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate font-medium">
-                        {currentDevice.connectId}
-                      </p>
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground font-medium">Device Type</span>
+                      <span className="text-xs font-semibold text-foreground">
+                        {currentDevice.deviceType.toUpperCase() || 'Unknown'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground font-medium">UUID</span>
+                      <span
+                        className="text-xs font-mono text-foreground truncate max-w-24"
+                        title={currentDevice.connectId}
+                      >
+                        {currentDevice.connectId?.slice(0, 8)}...
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground font-medium">Transport</span>
+                      <Badge variant="outline" className="text-xs px-1.5 py-0 font-medium">
+                        {transportType === 'webusb'
+                          ? 'WebUSB'
+                          : transportType === 'jsbridge'
+                          ? 'JSBridge'
+                          : transportType || 'Unknown'}
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>

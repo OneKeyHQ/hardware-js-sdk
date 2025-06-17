@@ -1,23 +1,17 @@
-import React, { useState } from "react";
-import { useDeviceStore } from "../../store/deviceStore";
-import { useSDK } from "../../hooks/useSDK";
-import { useToast } from "../../hooks/use-toast";
-import {
-  switchTransport,
-  TransportType,
-  searchDevices,
-} from "../../services/hardwareService";
-import { DeviceInfo } from "../../types/hardware";
-import { Button } from "../ui/Button";
-import { Monitor, Signal, ExternalLink, Info, Usb } from "lucide-react";
+import React, { useState } from 'react';
+import { useDeviceStore } from '../../store/deviceStore';
+import { useSDK } from '../../hooks/useSDK';
+import { useToast } from '../../hooks/use-toast';
+import { switchTransport, TransportType, searchDevices } from '../../services/hardwareService';
+import { DeviceInfo } from '../../types/hardware';
+import { Button } from '../ui/Button';
+import { Monitor, Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
 
 interface TransportSwitcherProps {
   className?: string;
 }
 
-const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
-  className = "",
-}) => {
+const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' }) => {
   const {
     transportType,
     setTransportType,
@@ -32,31 +26,39 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   const transportOptions: Array<{
-    type: TransportType | "webble";
+    type: TransportType | 'webble';
     label: string;
     icon: React.ReactNode;
     disabled?: boolean;
     description?: string;
     needsBridge?: boolean;
+    isEmulator?: boolean;
   }> = [
     {
-      type: "webusb",
-      label: "WebUSB",
+      type: 'webusb',
+      label: 'WebUSB',
       icon: <Usb className="h-4 w-4" />,
-      description: "推荐，直接连接",
+      description: '推荐，直接连接',
     },
     {
-      type: "jsbridge",
-      label: "JSBridge",
+      type: 'jsbridge',
+      label: 'JSBridge',
       icon: <Monitor className="h-4 w-4" />,
-      description: "稳定兼容",
+      description: '稳定兼容',
       needsBridge: true,
     },
     {
-      type: "webble",
-      label: "WebBLE",
+      type: 'emulator',
+      label: '模拟器',
+      icon: <Server className="h-4 w-4" />,
+      description: '开发测试',
+      isEmulator: true,
+    },
+    {
+      type: 'webble',
+      label: 'WebBLE',
       icon: <Signal className="h-4 w-4" />,
-      description: "蓝牙连接",
+      description: '蓝牙连接',
       disabled: true,
     },
   ];
@@ -79,7 +81,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
         }
       }
     } catch (error) {
-      console.error("Auto connection error:", error);
+      console.error('Auto connection error:', error);
     }
   };
 
@@ -87,9 +89,9 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
     // 检查SDK是否已初始化
     if (!sdkInitState.isInitialized) {
       toast({
-        title: "SDK未就绪",
-        description: "请等待SDK初始化完成后再切换传输方式",
-        variant: "warning",
+        title: 'SDK未就绪',
+        description: '请等待SDK初始化完成后再切换传输方式',
+        variant: 'warning',
       });
       return;
     }
@@ -109,11 +111,11 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
       const result = await switchTransport(newTransport);
 
       if (!result.success) {
-        const errorMessage = result.payload?.error || "切换传输方式失败";
+        const errorMessage = result.payload?.error || '切换传输方式失败';
         toast({
-          title: "连接失败",
+          title: '连接失败',
           description: errorMessage,
-          variant: "warning",
+          variant: 'warning',
         });
         return;
       }
@@ -130,27 +132,26 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
 
         if (devices.length === 0) {
           toast({
-            title: "未找到设备",
-            description: "请确保设备已连接并解锁",
-            variant: "warning",
+            title: '未找到设备',
+            description: '请确保设备已连接并解锁',
+            variant: 'warning',
           });
         }
       } else {
-        const errorMessage = searchResult.payload?.error || "搜索设备失败";
+        const errorMessage = searchResult.payload?.error || '搜索设备失败';
         toast({
-          title: "搜索失败",
+          title: '搜索失败',
           description: errorMessage,
-          variant: "warning",
+          variant: 'warning',
         });
         setConnectedDevices([]);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "连接过程中发生未知错误";
+      const errorMessage = error instanceof Error ? error.message : '连接过程中发生未知错误';
       toast({
-        title: "连接提示",
+        title: '连接提示',
         description: errorMessage,
-        variant: "warning",
+        variant: 'warning',
       });
     } finally {
       setIsLoading(false);
@@ -162,31 +163,24 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
     <div className={`w-full space-y-6 ${className}`}>
       {/* 连接方式选择 */}
       <div className="space-y-3">
-        {transportOptions.map((option) => (
+        {transportOptions.map(option => (
           <div key={option.type} className="space-y-2">
             <Button
               onClick={() =>
-                !option.disabled &&
-                handleTransportSwitch(option.type as TransportType)
+                !option.disabled && handleTransportSwitch(option.type as TransportType)
               }
-              disabled={
-                option.disabled || isLoading || !sdkInitState.isInitialized
-              }
+              disabled={option.disabled || isLoading || !sdkInitState.isInitialized}
               variant="outline"
               size="sm"
               className={`w-full h-14 flex items-center justify-between px-5 py-4 transition-all duration-200 ${
                 transportType === option.type
-                  ? "bg-gray-900 hover:bg-gray-800 text-white border-gray-700 shadow-md ring-1 ring-gray-600"
-                  : "bg-white hover:bg-gray-50 text-gray-900 border-gray-200 hover:border-gray-300"
-              } ${option.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                  ? 'bg-gray-900 hover:bg-gray-800 text-white border-gray-700 shadow-md ring-1 ring-gray-600'
+                  : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-200 hover:border-gray-300'
+              } ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="flex items-center space-x-4">
                 <div
-                  className={`${
-                    transportType === option.type
-                      ? "text-white"
-                      : "text-gray-600"
-                  }`}
+                  className={`${transportType === option.type ? 'text-white' : 'text-gray-600'}`}
                 >
                   {option.icon}
                 </div>
@@ -195,9 +189,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
                   {option.description && (
                     <div
                       className={`text-xs ${
-                        transportType === option.type
-                          ? "text-gray-300"
-                          : "text-gray-500"
+                        transportType === option.type ? 'text-gray-300' : 'text-gray-500'
                       }`}
                     >
                       {option.description}
@@ -213,7 +205,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
             </Button>
 
             {/* JSBridge 下载提示 */}
-            {option.type === "jsbridge" && option.needsBridge && (
+            {option.type === 'jsbridge' && option.needsBridge && (
               <div className="ml-8 flex items-center space-x-1.5 text-xs text-gray-500">
                 <Info className="h-3 w-3" />
                 <span>需要</span>
@@ -224,6 +216,21 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({
                   className="text-blue-600 hover:text-blue-700 underline decoration-1 underline-offset-2 inline-flex items-center space-x-1 transition-colors"
                 >
                   <span>下载Bridge</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+
+            {/* 模拟器教程提示 */}
+            {option.type === 'emulator' && option.isEmulator && (
+              <div className="ml-8 flex items-center space-x-1.5 text-xs text-gray-500">
+                <Info className="h-3 w-3" />
+                <span>需要</span>
+                <a
+                  href="/emulator"
+                  className="text-green-600 hover:text-green-700 underline decoration-1 underline-offset-2 inline-flex items-center space-x-1 transition-colors"
+                >
+                  <span>启动模拟器</span>
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>

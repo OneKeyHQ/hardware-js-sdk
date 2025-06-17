@@ -1,0 +1,351 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { Input } from '../ui/Input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
+import {
+  Copy,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Filter,
+  Info,
+  AlertCircle,
+  Send,
+  Inbox,
+  FileText,
+} from 'lucide-react';
+import { useToast } from '../../hooks/use-toast';
+import CollapsibleJsonViewer from './CollapsibleJsonViewer';
+
+// 兼容现有的日志类型定义
+export type LogType = 'request' | 'response' | 'hardware' | 'error' | 'info';
+
+// 统一的日志条目接口，兼容两种格式
+export interface UnifiedLogEntry {
+  id: string;
+  timestamp: Date | string;
+  type: LogType;
+  title?: string;
+  message?: string;
+  content?: string | Record<string, unknown> | null;
+  data?: Record<string, unknown>;
+  description?: string;
+}
+
+interface UnifiedLoggerProps {
+  logs: UnifiedLogEntry[];
+  onClearLogs: () => void;
+  title?: string;
+  showFilters?: boolean;
+  showHeader?: boolean;
+  className?: string;
+}
+
+// 内容处理组件
+const SmartContentDisplay: React.FC<{
+  content: string | Record<string, unknown> | null;
+  type: LogType;
+  title: string;
+}> = ({ content }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (!content) return null;
+
+  // 如果是字符串，直接显示
+  if (typeof content === 'string') {
+    const lines = content.split('\n');
+    if (lines.length <= 3) {
+      return (
+        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
+          {content}
+        </pre>
+      );
+    }
+    // 对于长字符串，使用简单的折叠显示
+    const previewContent = lines.slice(0, 3).join('\n') + (lines.length > 3 ? '\n...' : '');
+
+    return (
+      <div className="space-y-2">
+        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
+          {isExpanded ? content : previewContent}
+        </pre>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="h-3 w-3 mr-1" />
+              收起 ({lines.length} 行)
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-3 w-3 mr-1" />
+              展开 ({lines.length} 行)
+            </>
+          )}
+        </Button>
+      </div>
+    );
+  }
+
+  // 使用新的JSON查看器
+  return (
+    <div className="bg-muted/30 dark:bg-muted/20 p-3 rounded-md">
+      <CollapsibleJsonViewer data={content} maxDepth={2} />
+    </div>
+  );
+};
+
+const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
+  logs,
+  onClearLogs,
+  title = '执行日志',
+  showFilters = false,
+  showHeader = true,
+  className = '',
+}) => {
+  const { toast } = useToast();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [filter, setFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // 自动滚动到底部
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [logs]);
+
+  // 获取日志类型的配置
+  const getLogTypeConfig = (type: LogType) => {
+    switch (type) {
+      case 'request':
+        return {
+          icon: <Send className="h-3 w-3" />,
+          color: 'text-blue-600 dark:text-blue-400',
+          bgColor: 'bg-blue-50 dark:bg-blue-950/30',
+          badge:
+            'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700',
+        };
+      case 'response':
+        return {
+          icon: <Inbox className="h-3 w-3" />,
+          color: 'text-green-600 dark:text-green-400',
+          bgColor: 'bg-green-50 dark:bg-green-950/30',
+          badge:
+            'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700',
+        };
+      case 'hardware':
+        return {
+          icon: <FileText className="h-3 w-3" />,
+          color: 'text-purple-600 dark:text-purple-400',
+          bgColor: 'bg-purple-50 dark:bg-purple-950/30',
+          badge:
+            'bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700',
+        };
+      case 'error':
+        return {
+          icon: <AlertCircle className="h-3 w-3" />,
+          color: 'text-red-600 dark:text-red-400',
+          bgColor: 'bg-red-50 dark:bg-red-950/30',
+          badge:
+            'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700',
+        };
+      case 'info':
+      default:
+        return {
+          icon: <Info className="h-3 w-3" />,
+          color: 'text-gray-600 dark:text-gray-400',
+          bgColor: 'bg-gray-50 dark:bg-gray-950/30',
+          badge:
+            'bg-gray-100 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700',
+        };
+    }
+  };
+
+  // 标准化日志条目
+  const normalizeLogEntry = (log: UnifiedLogEntry) => {
+    const timestamp = typeof log.timestamp === 'string' ? new Date(log.timestamp) : log.timestamp;
+    const title = log.title || log.message || 'Unknown';
+    const content = log.content || log.data || null;
+
+    return {
+      ...log,
+      timestamp,
+      title,
+      content,
+    };
+  };
+
+  // 过滤日志
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      const normalizedLog = normalizeLogEntry(log);
+      const matchesFilter = filter === 'all' || log.type === filter;
+      const matchesSearch =
+        searchTerm === '' ||
+        normalizedLog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (typeof normalizedLog.content === 'string' &&
+          normalizedLog.content.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      return matchesFilter && matchesSearch;
+    });
+  }, [logs, filter, searchTerm]);
+
+  // 复制日志内容
+  const handleCopyLog = async (log: UnifiedLogEntry) => {
+    try {
+      const normalizedLog = normalizeLogEntry(log);
+      const content = normalizedLog.content
+        ? typeof normalizedLog.content === 'string'
+          ? normalizedLog.content
+          : JSON.stringify(normalizedLog.content, null, 2)
+        : '';
+
+      const logText = `[${normalizedLog.timestamp.toLocaleTimeString()}] [${log.type.toUpperCase()}] ${
+        normalizedLog.title
+      }\n${log.description || ''}\n${content}`;
+
+      await navigator.clipboard.writeText(logText);
+      toast({
+        title: '已复制',
+        description: '日志内容已复制到剪贴板',
+      });
+    } catch (error) {
+      toast({
+        title: '复制失败',
+        description: '无法复制到剪贴板',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <Card className={`${className} bg-card border border-border/50 shadow-sm flex flex-col h-full`}>
+      {showHeader && (
+        <CardHeader className="pb-3 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              {title}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">
+                {filteredLogs.length} 条记录
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClearLogs}
+                disabled={logs.length === 0}
+                className="h-7 px-2 text-xs"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                清除
+              </Button>
+            </div>
+          </div>
+
+          {showFilters && (
+            <div className="flex items-center gap-2 pt-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                <Input
+                  placeholder="搜索日志..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="pl-7 h-7 text-xs"
+                />
+              </div>
+              <Select value={filter} onValueChange={setFilter}>
+                <SelectTrigger className="w-24 h-7 text-xs">
+                  <Filter className="h-3 w-3 mr-1" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部</SelectItem>
+                  <SelectItem value="request">请求</SelectItem>
+                  <SelectItem value="response">响应</SelectItem>
+                  <SelectItem value="hardware">硬件</SelectItem>
+                  <SelectItem value="error">错误</SelectItem>
+                  <SelectItem value="info">信息</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </CardHeader>
+      )}
+
+      <CardContent className="p-0 flex flex-col flex-1 min-h-0">
+        <div ref={scrollRef} className={`flex-1 min-h-0 overflow-y-auto space-y-2 p-4`}>
+          {filteredLogs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">
+                {logs.length === 0 ? '暂无日志记录' : '没有匹配的日志'}
+              </p>
+            </div>
+          ) : (
+            filteredLogs.map(log => {
+              const normalizedLog = normalizeLogEntry(log);
+              const config = getLogTypeConfig(log.type);
+              return (
+                <div
+                  key={log.id}
+                  className={`${config.bgColor} border border-border/30 rounded-lg p-3 space-y-2`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Badge
+                        className={`${config.badge} text-xs px-2 py-0.5 flex items-center gap-1`}
+                      >
+                        {config.icon}
+                        {log.type}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {normalizedLog.timestamp.toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopyLog(log)}
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h4 className={`text-sm font-medium ${config.color}`}>{normalizedLog.title}</h4>
+                    {log.description && (
+                      <p className="text-xs text-muted-foreground">{log.description}</p>
+                    )}
+                  </div>
+
+                  {normalizedLog.content && (
+                    <SmartContentDisplay
+                      content={normalizedLog.content}
+                      type={log.type}
+                      title={normalizedLog.title}
+                    />
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default UnifiedLogger;

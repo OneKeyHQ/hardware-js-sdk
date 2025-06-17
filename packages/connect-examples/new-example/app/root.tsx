@@ -12,7 +12,8 @@ import { Toaster } from './components/ui/Toaster';
 
 // Pages - import from routes directory
 import IndexPage from './routes/_index';
-import LogsPage from './routes/LogsPage';
+import LogsPage from './routes/logs';
+import EmulatorPage from './routes/emulator';
 
 // New split route pages
 import ChainsIndexPage from './routes/chains._index';
@@ -34,6 +35,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<IndexPage />} />
             <Route path="/logs" element={<LogsPage />} />
+            <Route path="/emulator" element={<EmulatorPage />} />
 
             {/* Device Methods Routes */}
             <Route path="/device-methods" element={<DeviceMethodsIndexPage />} />

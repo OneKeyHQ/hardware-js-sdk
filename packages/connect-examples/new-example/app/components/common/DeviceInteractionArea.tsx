@@ -17,8 +17,7 @@ import type { DeviceModel, ThemeType } from '../ui/DeviceActionAnimation';
 import { UiEvent } from '@onekeyfe/hd-core';
 import { getDeviceImagePath } from '../../utils/deviceTypeUtils';
 import type { DeviceInfo } from '../../types/hardware';
-
-type ExecutionStatus = 'idle' | 'loading' | 'device-interaction' | 'success' | 'error';
+import type { ExecutionStatus } from '~/data/types';
 
 // 添加固件进度数据类型
 interface FirmwareProgressData {

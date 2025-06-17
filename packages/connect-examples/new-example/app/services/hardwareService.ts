@@ -3,10 +3,9 @@ import { UI_RESPONSE, Success, Unsuccessful, CoreApi } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../store/deviceStore';
 import { useHardwareStore } from '../store/hardwareStore';
 import { logError, logRequest, logResponse, logInfo } from '../utils/logger';
-
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
-export type TransportType = 'webusb' | 'jsbridge';
+export type TransportType = 'webusb' | 'jsbridge' | 'emulator';
 export type HardwareApiMethod = keyof CoreApi;
 
 // 扩展 Navigator 类型以支持 WebUSB
@@ -47,12 +46,17 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
     } as Unsuccessful;
   }
 
-  try {
+    try {
     const sdkInstance = await getSDKInstance();
-    const envParam = transport === 'webusb' ? 'webusb' : 'web';
-
-    // 调用SDK的switchTransport方法
-    await sdkInstance.switchTransport(envParam);
+    
+    if (transport === 'emulator') {
+      // 对于模拟器，我们使用特殊的初始化方式
+      // 暂时使用web模式，后续可以通过其他方式支持模拟器
+      await sdkInstance.switchTransport('web');
+    } else {
+      const envParam = transport === 'webusb' ? 'webusb' : 'web';
+      await sdkInstance.switchTransport(envParam);
+    }
 
     logResponse(`Transport switched successfully to ${transport}`);
     // switchTransport不返回值，所以直接认为成功
@@ -278,15 +282,16 @@ export async function callHardwareAPI(
       hasPassphraseState: !!params.passphraseState,
     });
 
-    const methodFunc = (sdk as any)[method] as (...args: any[]) => Promise<ApiResponse>;
-    const noDeviceIdMethod = ['firmwareUpdateV2', 'firmwareUpdateV3'];
+    const methodFunc = sdk[method] as (...args: any[]) => Promise<ApiResponse>;
     let result: ApiResponse;
-    // 特殊处理固件更新方法 - 这些方法只需要 connectId 和 params
-    if (noDeviceIdMethod.includes(method)) {
-      result = await methodFunc(connectId, params);
-    } else {
-      // 其他方法使用原有的三参数调用方式
+
+    // 根据参数中是否包含 deviceId 来决定调用方式
+    if (deviceId) {
+      // 三参数调用：connectId, deviceId, params
       result = await methodFunc(connectId, deviceId, params);
+    } else {
+      // 二参数调用：connectId, params
+      result = await methodFunc(connectId, params);
     }
 
     if (result.success) {
@@ -358,3 +363,37 @@ export async function searchDevices(): Promise<ApiResponse> {
 
 // 导出 hd-core 的标准类型和常量
 export { UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+
+// 取消当前硬件操作
+export async function cancelHardwareOperation(connectId?: string): Promise<ApiResponse> {
+  logRequest('Cancelling hardware operation', { connectId });
+
+  if (typeof window === 'undefined') {
+    const error = 'Browser environment required';
+    logError('Cancel operation failed', { error });
+    return {
+      success: false,
+      payload: { error },
+    } as Unsuccessful;
+  }
+
+  try {
+    const sdkInstance = await getSDKInstance();
+
+    // 调用SDK的cancel方法
+    sdkInstance.cancel(connectId);
+
+    logResponse('Hardware operation cancelled successfully', { connectId });
+    return {
+      success: true,
+      payload: { message: 'Operation cancelled', connectId },
+    } as Success<any>;
+  } catch (error) {
+    const errorMsg = `Cancel operation error: ${error}`;
+    logError(errorMsg, { connectId, error });
+    return {
+      success: false,
+      payload: { error: errorMsg },
+    } as Unsuccessful;
+  }
+}

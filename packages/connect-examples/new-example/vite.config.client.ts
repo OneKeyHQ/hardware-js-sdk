@@ -37,6 +37,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': path.resolve(__dirname, './app'),
+      // OneKey SDK 源码别名 - monorepo 标准做法，避免编译产物的模块格式问题
+      '@onekeyfe/hd-shared': path.resolve(__dirname, '../../shared/src'),
+      '@onekeyfe/hd-core': path.resolve(__dirname, '../../core/src'),
+      '@onekeyfe/hd-web-sdk': path.resolve(__dirname, '../../hd-web-sdk/src'),
+      '@onekeyfe/hd-transport': path.resolve(__dirname, '../../hd-transport/src'),
       // Node.js polyfills for browser
       stream: 'stream-browserify',
       buffer: 'buffer',
@@ -171,18 +176,14 @@ export default defineConfig({
     },
   },
 
-  // 优化依赖处理 - 确保 polyfill 被预构建
+  // 优化依赖处理
   optimizeDeps: {
     include: [
       // React 相关
       'react',
       'react-dom',
       'react-i18next',
-      // OneKey SDK
-      '@onekeyfe/hd-web-sdk',
-      '@onekeyfe/hd-core',
-      '@onekeyfe/hd-shared',
-      // Node.js polyfills - 分别预构建避免循环依赖
+      // Node.js polyfills
       'buffer',
       'process/browser',
       'stream-browserify',
@@ -206,10 +207,6 @@ export default defineConfig({
       'i18next',
       'i18next-browser-languagedetector',
     ],
-    // 排除某些不需要预构建的模块
-    // exclude: ['@onekeyfe/hd-core/dist/cjs'],
-    // 强制重新构建以确保配置生效
-    force: true,
   },
 
   // 预览服务器配置

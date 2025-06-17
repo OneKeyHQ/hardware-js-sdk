@@ -24,8 +24,6 @@ export function SiteHeader() {
   const languages = [
     { code: 'en', name: 'English' },
     { code: 'zh', name: '中文' },
-    { code: 'ja', name: '日本語' },
-    { code: 'ko', name: '한국어' },
   ];
 
   const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
@@ -66,39 +64,6 @@ export function SiteHeader() {
 
           {/* 右侧：工具栏 */}
           <div className="flex items-center gap-2">
-            {/* 语言切换 */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Globe className="h-4 w-4" />
-                  <span>{currentLanguage.name}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {languages.map(lang => (
-                  <DropdownMenuItem
-                    key={lang.code}
-                    onClick={() => changeLanguage(lang.code)}
-                    className="gap-2"
-                  >
-                    <span>{lang.name}</span>
-                    {i18n.language === lang.code && (
-                      <Badge variant="secondary" className="ml-auto">
-                        {t('common.current')}
-                      </Badge>
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* 主题切换 */}
-            <Button variant="ghost" size="sm" onClick={toggleTheme}>
-              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              <span className="sr-only">{t('common.toggleTheme')}</span>
-            </Button>
-
             {/* 外部链接 */}
             <Button variant="ghost" size="sm" asChild>
               <a
@@ -123,6 +88,42 @@ export function SiteHeader() {
                 <img src={githubIcon} alt="GitHub" className="h-5 w-5" />
               </a>
             </Button>
+
+            {/* 分隔线 */}
+            <div className="h-4 w-px bg-border mx-1" />
+
+            {/* 主题切换 - 常用功能 */}
+            <Button variant="ghost" size="sm" onClick={toggleTheme}>
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">{t('common.toggleTheme')}</span>
+            </Button>
+
+            {/* 语言切换 - 最右侧 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <Globe className="h-4 w-4" />
+                  <span>{currentLanguage.name}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {languages.map(lang => (
+                  <DropdownMenuItem
+                    key={lang.code}
+                    onClick={() => changeLanguage(lang.code)}
+                    className="gap-2"
+                  >
+                    <span>{lang.name}</span>
+                    {i18n.language === lang.code && (
+                      <Badge variant="secondary" className="ml-auto">
+                        {t('common.current')}
+                      </Badge>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

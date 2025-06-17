@@ -1,11 +1,11 @@
-import { Card, CardContent } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
-import { useTranslation } from "react-i18next";
-import { useDeviceStore } from "../store/deviceStore";
-import { CheckCircle, XCircle, Usb, Wifi } from "lucide-react";
-import TransportSwitcher from "../components/common/TransportSwitcher";
-import DeviceIcon from "../components/device/DeviceIcon";
-import deviceList from "../assets/device-list2.png";
+import { Card, CardContent } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { useTranslation } from 'react-i18next';
+import { useDeviceStore } from '../store/deviceStore';
+import { CheckCircle, XCircle, Usb, Wifi, Server } from 'lucide-react';
+import TransportSwitcher from '../components/common/TransportSwitcher';
+import DeviceIcon from '../components/device/DeviceIcon';
+import deviceList from '../assets/device-list2.png';
 export default function IndexPage() {
   const { t } = useTranslation();
   const {
@@ -18,16 +18,18 @@ export default function IndexPage() {
 
   const getTransportIcon = () => {
     switch (transportType) {
-      case "webusb":
+      case 'webusb':
         return <Usb className="h-4 w-4 text-primary" />;
-      case "jsbridge":
+      case 'jsbridge':
         return <Wifi className="h-4 w-4 text-primary" />;
+      case 'emulator':
+        return <Server className="h-4 w-4 text-primary" />;
       default:
         return null;
     }
   };
 
-  const deviceDisplayName = currentDevice ? getCurrentDeviceLabel() : "";
+  const deviceDisplayName = currentDevice ? getCurrentDeviceLabel() : '';
 
   return (
     <div className="min-h-screen bg-background flex justify-center pt-16 p-6">
@@ -37,9 +39,7 @@ export default function IndexPage() {
           <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
             OneKey Hardware Wallet SDK
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            {t("home.subtitle")}
-          </p>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{t('home.subtitle')}</p>
         </div>
 
         {/* 主要内容区域 - 等高布局 */}
@@ -70,14 +70,12 @@ export default function IndexPage() {
                         )}
                         <div>
                           <h3 className="font-semibold text-base text-foreground">
-                            {currentDevice
-                              ? t("device.connected")
-                              : t("device.disconnected")}
+                            {currentDevice ? t('device.connected') : t('device.disconnected')}
                           </h3>
                           <div className="flex items-center gap-2 mt-1">
                             {getTransportIcon()}
                             <p className="text-xs text-muted-foreground">
-                              {transportType || t("device.notSelected")}
+                              {transportType || t('device.notSelected')}
                             </p>
                           </div>
                         </div>
@@ -88,7 +86,7 @@ export default function IndexPage() {
                   {/* 连接方式选择 */}
                   <div className="space-y-4">
                     <h4 className="font-medium text-base text-foreground">
-                      {t("device.selectConnection")}
+                      {t('device.selectConnection')}
                     </h4>
                     <TransportSwitcher />
                   </div>
@@ -115,9 +113,7 @@ export default function IndexPage() {
                     <div className="flex-1 space-y-4">
                       {/* 设备名称和状态 */}
                       <div className="space-y-2">
-                        <h2 className="text-3xl font-light text-foreground">
-                          {deviceDisplayName}
-                        </h2>
+                        <h2 className="text-3xl font-light text-foreground">{deviceDisplayName}</h2>
                         <div className="flex items-center gap-3">
                           <span className="text-sm text-muted-foreground">
                             通过 {transportType} 连接
@@ -131,17 +127,13 @@ export default function IndexPage() {
                           <div className="text-xs text-muted-foreground uppercase tracking-wide">
                             设备类型
                           </div>
-                          <div className="text-sm font-medium">
-                            {currentDevice.deviceType}
-                          </div>
+                          <div className="text-sm font-medium">{currentDevice.deviceType}</div>
                         </div>
                         <div className="space-y-1">
                           <div className="text-xs text-muted-foreground uppercase tracking-wide">
                             连接ID
                           </div>
-                          <div className="text-sm font-mono">
-                            {currentDevice.connectId}
-                          </div>
+                          <div className="text-sm font-mono">{currentDevice.connectId}</div>
                         </div>
                       </div>
                     </div>
@@ -152,70 +144,45 @@ export default function IndexPage() {
 
                   {/* 设备信息 - 剩余空间填充 */}
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg mb-4 text-foreground">
-                      设备信息
-                    </h3>
+                    <h3 className="font-semibold text-lg mb-4 text-foreground">设备信息</h3>
 
                     <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          UUID
-                        </span>
-                        <span className="text-xs font-mono">
-                          {currentDevice.uuid || "N/A"}
-                        </span>
+                        <span className="text-sm text-muted-foreground">UUID</span>
+                        <span className="text-xs font-mono">{currentDevice.uuid || 'N/A'}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          deviceId
-                        </span>
-                        <span className="text-sm font-mono">
-                          {currentDevice.deviceId}
-                        </span>
+                        <span className="text-sm text-muted-foreground">deviceId</span>
+                        <span className="text-sm font-mono">{currentDevice.deviceId}</span>
                       </div>
                       {currentDevice.features && (
                         <>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">
-                              固件版本
-                            </span>
+                            <span className="text-sm text-muted-foreground">固件版本</span>
                             <span className="text-sm">
                               {currentDevice.features.onekey_firmware_version}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">
-                              蓝牙版本
-                            </span>
+                            <span className="text-sm text-muted-foreground">蓝牙版本</span>
                             <span className="text-sm">
                               {currentDevice.features.onekey_ble_version ||
                                 currentDevice.features.ble_ver ||
-                                "N/A"}
+                                'N/A'}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">
-                              Boot版本
-                            </span>
+                            <span className="text-sm text-muted-foreground">Boot版本</span>
                             <span className="text-sm">
-                              {currentDevice.features.onekey_boot_version ||
-                                "N/A"}
+                              {currentDevice.features.onekey_boot_version || 'N/A'}
                             </span>
                           </div>
                         </>
                       )}
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          网页输入pin
-                        </span>
-                        <Badge
-                          variant={
-                            isCurrentDeviceClassicModel()
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {isCurrentDeviceClassicModel() ? "支持" : "不支持"}
+                        <span className="text-sm text-muted-foreground">客户端中输入pin码</span>
+                        <Badge variant={isCurrentDeviceClassicModel() ? 'default' : 'secondary'}>
+                          {isCurrentDeviceClassicModel() ? '支持' : '不支持'}
                         </Badge>
                       </div>
                     </div>

@@ -30,16 +30,14 @@ const FirmwareUpdateIndexPage: React.FC = () => {
       method.method.toLowerCase().includes('check') ||
       method.method.toLowerCase().includes('release')
   );
+  const updateMethodsList = ['firmwareUpdateV2', 'firmwareUpdateV3', 'deviceUpdateBootloader'];
   const updateMethods = filteredMethods
-    .filter(
-      method =>
-        method.method.toLowerCase().includes('update') ||
-        method.method.toLowerCase().includes('firmware')
-    )
+    .filter(method => updateMethodsList.includes(method.method))
     .filter(method => !checkMethods.includes(method));
   const deviceMethods = filteredMethods.filter(
     method =>
       method.method.toLowerCase().includes('reboot') ||
+      method.method.toLowerCase().includes('Reboot') ||
       method.method.toLowerCase().includes('bootloader')
   );
 
@@ -117,114 +115,99 @@ const FirmwareUpdateIndexPage: React.FC = () => {
   return (
     <ListBoundary title="Firmware Update" icon={Download}>
       <PageLayout>
-        <div className="min-h-screen bg-background">
-          <div className="mx-auto px-6 py-4 space-y-3">
-            {/* 面包屑导航 + 搜索框 */}
-            <div className="flex items-center justify-between gap-4">
-              <Breadcrumb items={[{ label: 'Firmware Update', icon: Download }]} />
-              <div className="relative w-80">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search methods..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-10 font-medium"
-                />
+        <div className="mx-auto px-6 py-4 space-y-3">
+          {/* 面包屑导航 + 搜索框 */}
+          <div className="flex items-center justify-between gap-4">
+            <Breadcrumb items={[{ label: 'Firmware Update', icon: Download }]} />
+            <div className="relative w-80">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search methods..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-10 font-medium"
+              />
+            </div>
+          </div>
+
+          {/* 页面信息 */}
+          <div>
+            <p className="text-sm text-muted-foreground font-medium">
+              {filteredMethods.length} firmware update methods available
+            </p>
+          </div>
+
+          {/* 设备连接状态 */}
+          <DeviceNotConnectedState />
+
+          {/* 方法列表 */}
+          <div className="space-y-5">
+            {/* 固件更新方法 */}
+            {updateMethods.length > 0 && (
+              <div className="space-y-3">
+                <div className="bg-muted/50 dark:bg-muted/30 border border-border/60 dark:border-border rounded-lg p-5">
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">
+                    Firmware Update
+                  </h2>
+                  <p className="text-muted-foreground dark:text-muted-foreground font-semibold mt-1 text-sm">
+                    {updateMethods.length} methods to update device firmware
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  {updateMethods.map((method, index) => renderMethodCard(method, index, 'update'))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* 页面信息 */}
-            <div>
-              <p className="text-sm text-muted-foreground font-medium">
-                {filteredMethods.length} firmware update methods available
-              </p>
-            </div>
-
-            {/* 设备连接状态 */}
-            <DeviceNotConnectedState />
-
-            {/* 方法列表 - 优化间距 */}
-            <div className="space-y-5">
-              {/* 检查更新方法 */}
-              {checkMethods.length > 0 && (
-                <div className="space-y-3">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/80 border border-border/30 rounded-xl p-5">
-                    <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-foreground/[0.05]" />
-                    <div className="relative">
-                      <h2 className="text-lg font-bold text-foreground tracking-tight">
-                        Release Information
-                      </h2>
-                      <p className="text-muted-foreground font-semibold mt-0.5 text-sm">
-                        {checkMethods.length} methods to check firmware releases
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid gap-3">
-                    {checkMethods.map((method, index) => renderMethodCard(method, index, 'check'))}
-                  </div>
+            {/* 检查更新方法 */}
+            {checkMethods.length > 0 && (
+              <div className="space-y-3">
+                <div className="bg-muted/50 dark:bg-muted/30 border border-border/60 dark:border-border rounded-lg p-5">
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">
+                    Release Information
+                  </h2>
+                  <p className="text-muted-foreground dark:text-muted-foreground font-semibold mt-1 text-sm">
+                    {checkMethods.length} methods to check firmware releases
+                  </p>
                 </div>
-              )}
-
-              {/* 固件更新方法 */}
-              {updateMethods.length > 0 && (
-                <div className="space-y-3">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/80 border border-border/30 rounded-xl p-5">
-                    <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-foreground/[0.05]" />
-                    <div className="relative">
-                      <h2 className="text-lg font-bold text-foreground tracking-tight">
-                        Firmware Update
-                      </h2>
-                      <p className="text-muted-foreground font-semibold mt-0.5 text-sm">
-                        {updateMethods.length} methods to update device firmware
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid gap-3">
-                    {updateMethods.map((method, index) =>
-                      renderMethodCard(method, index, 'update')
-                    )}
-                  </div>
+                <div className="grid gap-2">
+                  {checkMethods.map((method, index) => renderMethodCard(method, index, 'check'))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* 设备控制方法 */}
-              {deviceMethods.length > 0 && (
-                <div className="space-y-3">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-card to-card/80 border border-border/30 rounded-xl p-5">
-                    <div className="absolute inset-0 bg-gradient-to-br from-foreground/[0.02] to-foreground/[0.05]" />
-                    <div className="relative">
-                      <h2 className="text-lg font-bold text-foreground tracking-tight">
-                        Device Control
-                      </h2>
-                      <p className="text-muted-foreground font-semibold mt-0.5 text-sm">
-                        {deviceMethods.length} methods to control device state
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid gap-3">
-                    {deviceMethods.map((method, index) =>
-                      renderMethodCard(method, index, 'device')
-                    )}
-                  </div>
+            {/* 设备控制方法 */}
+            {deviceMethods.length > 0 && (
+              <div className="space-y-3">
+                <div className="bg-muted/50 dark:bg-muted/30 border border-border/60 dark:border-border rounded-lg p-5">
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">
+                    Device Control
+                  </h2>
+                  <p className="text-muted-foreground dark:text-muted-foreground font-semibold mt-1 text-sm">
+                    {deviceMethods.length} methods to control device state
+                  </p>
                 </div>
-              )}
-            </div>
-
-            {/* 空状态 */}
-            {filteredMethods.length === 0 && searchTerm && (
-              <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="w-16 h-16 bg-muted/20 rounded-xl flex items-center justify-center mb-4">
-                  <Search className="w-7 h-7 text-muted-foreground/50" />
+                <div className="grid gap-2">
+                  {deviceMethods.map((method, index) => renderMethodCard(method, index, 'device'))}
                 </div>
-                <h3 className="text-lg font-bold text-foreground mb-2 tracking-tight">
-                  No methods found
-                </h3>
-                <p className="text-muted-foreground text-center max-w-md leading-relaxed font-medium">
-                  Try adjusting your search terms or browse all available methods.
-                </p>
               </div>
             )}
           </div>
+
+          {/* 空状态 */}
+          {filteredMethods.length === 0 && searchTerm && (
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+              <div className="w-16 h-16 bg-muted/20 rounded-xl flex items-center justify-center mb-4">
+                <Search className="w-7 h-7 text-muted-foreground/50" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2 tracking-tight">
+                No methods found
+              </h3>
+              <p className="text-muted-foreground text-center max-w-md leading-relaxed font-medium">
+                Try adjusting your search terms or browse all available methods.
+              </p>
+            </div>
+          )}
         </div>
       </PageLayout>
     </ListBoundary>

@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { useParams } from '@remix-run/react';
 import { Download, Settings } from 'lucide-react';
-import FirmwareMethodExecutor from '../components/common/FirmwareMethodExecutor';
+import UnifiedMethodExecutor from '../components/common/UnifiedMethodExecutor';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { MethodExecuteBoundary } from '../components/common/MethodExecuteBoundary';
@@ -71,10 +71,11 @@ const FirmwareUpdateMethodExecutePage: React.FC = () => {
                 {!currentDevice && !selectedMethod.noDeviceIdReq ? (
                   <DeviceNotConnectedState showFullPage={true} />
                 ) : (
-                  <FirmwareMethodExecutor
+                  <UnifiedMethodExecutor
                     methodConfig={selectedMethod}
                     executionHandler={handleMethodExecution}
                     className="h-full"
+                    type="firmware"
                   />
                 )}
               </div>

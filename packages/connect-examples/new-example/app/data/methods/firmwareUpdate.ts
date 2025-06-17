@@ -38,74 +38,31 @@ const firmwareUpdateMethods: PlaygroundProps[] = [
   },
   {
     method: 'firmwareUpdateV3',
-    description: 'Advanced firmware update with multi-file selection (Pro devices only)',
+    description:
+      'Advanced firmware update with optional multi-file selection (Pro devices & bootVersion > 4.12.0 only)',
     noDeviceIdReq: true,
     presupposes: [
-      {
-        title: 'Update with bootloader file',
-        value: {
-          platform: 'web',
-          bootloaderFile: null, // Will be set by file picker
-        },
-      },
-      {
-        title: 'Update with firmware file',
-        value: {
-          platform: 'web',
-          firmwareFile: null, // Will be set by file picker
-        },
-      },
-      {
-        title: 'Update with BLE firmware file',
-        value: {
-          platform: 'web',
-          bleFile: null, // Will be set by file picker
-        },
-      },
-      {
-        title: 'Update with resource package',
-        value: {
-          platform: 'web',
-          resourceFile: null, // Will be set by file picker
-        },
-      },
-      {
-        title: 'Update with multiple files (bootloader + firmware)',
-        value: {
-          platform: 'web',
-          bootloaderFile: null, // Will be set by file picker
-          firmwareFile: null, // Will be set by file picker
-        },
-      },
-      {
-        title: 'Update with multiple files (firmware + BLE)',
-        value: {
-          platform: 'web',
-          firmwareFile: null, // Will be set by file picker
-          bleFile: null, // Will be set by file picker
-        },
-      },
       {
         title: 'Update with all files (boot + fw + ble + resources)',
         value: {
           platform: 'web',
-          bootloaderFile: null, // Will be set by file picker
-          firmwareFile: null, // Will be set by file picker
-          bleFile: null, // Will be set by file picker
-          resourceFile: null, // Will be set by file picker
+          bootloaderBinary: null, // Will be set by file picker
+          firmwareBinary: null, // Will be set by file picker
+          bleBinary: null, // Will be set by file picker
+          resourceBinary: null, // Will be set by file picker
         },
       },
     ],
   },
   {
     method: 'deviceUpdateBootloader',
-    description: 'Update device bootloader (Pro devices & bootVersion > 4.12.0 only)',
+    description: 'Update device bootloader (Pro & Touch devices only)',
     noDeviceIdReq: true,
     presupposes: [
       {
         title: 'Update bootloader with file',
         value: {
-          bootloaderFile: null, // Will be set by file picker
+          binary: null, // Will be set by file picker
         },
       },
     ],
@@ -150,16 +107,9 @@ const firmwareUpdateMethods: PlaygroundProps[] = [
   },
   {
     method: 'deviceUpdateReboot',
-    description: 'Update and reboot device with file',
+    description: 'Reboot device',
     noDeviceIdReq: true,
-    presupposes: [
-      {
-        title: 'Update and reboot with firmware file',
-        value: {
-          firmwareFile: null, // Will be set by file picker
-        },
-      },
-    ],
+    presupposes: [],
   },
 ];
 
