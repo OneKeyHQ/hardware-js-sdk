@@ -9,6 +9,7 @@ export default defineConfig({
   // 配置入口文件
   root: '.',
   publicDir: 'public',
+  base: process.env.NODE_ENV === 'production' ? '/new-example/' : '/',
 
   define: {
     global: 'globalThis',
