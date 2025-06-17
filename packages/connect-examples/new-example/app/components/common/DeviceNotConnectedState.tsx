@@ -1,9 +1,9 @@
-import { Card, CardContent } from "../ui/Card";
-import { Button } from "../ui/Button";
-import { useNavigate } from "@remix-run/react";
-import { useTranslation } from "react-i18next";
-import { Home, AlertTriangle, ArrowRight } from "lucide-react";
-import { useDeviceStore } from "../../store/deviceStore";
+import { Card, CardContent } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { Home, AlertTriangle, ArrowRight } from 'lucide-react';
+import { useDeviceStore } from '../../store/deviceStore';
 
 interface DeviceNotConnectedStateProps {
   className?: string;
@@ -13,7 +13,7 @@ interface DeviceNotConnectedStateProps {
 }
 
 export function DeviceNotConnectedState({
-  className = "",
+  className = '',
   showFullPage = false,
   title,
   description,
@@ -28,7 +28,7 @@ export function DeviceNotConnectedState({
   }
 
   const handleGoHome = () => {
-    navigate("/");
+    navigate('/');
   };
 
   if (showFullPage) {
@@ -43,10 +43,10 @@ export function DeviceNotConnectedState({
           {/* 标题和描述 */}
           <div className="space-y-2">
             <h2 className="text-xl font-semibold text-foreground">
-              {title || t("device.connectionRequired")}
+              {title || t('device.connectionRequired')}
             </h2>
             <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-              {description || t("device.pleaseConnectFirst")}
+              {description || t('device.pleaseConnectFirst')}
             </p>
           </div>
 
@@ -59,7 +59,7 @@ export function DeviceNotConnectedState({
               className="w-full bg-background border-border text-foreground hover:bg-muted/50 gap-2 py-3"
             >
               <Home className="h-4 w-4" />
-              {t("common.goToHomePage")}
+              {t('common.goToHomePage')}
               <ArrowRight className="h-3 w-3" />
             </Button>
           </div>
@@ -78,10 +78,10 @@ export function DeviceNotConnectedState({
             </div>
             <div>
               <p className="text-sm font-medium text-foreground">
-                {title || t("device.connectionRequired")}
+                {title || t('device.connectionRequired')}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {description || t("device.pleaseConnectFirst")}
+                {description || t('device.pleaseConnectFirst')}
               </p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export function DeviceNotConnectedState({
             className="bg-background border-border text-foreground hover:bg-muted/50 gap-1.5 shrink-0"
           >
             <Home className="h-3 w-3" />
-            {t("common.goHome")}
+            {t('common.goHome')}
           </Button>
         </div>
       </CardContent>

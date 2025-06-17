@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from '@remix-run/react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Download } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { PageLayout } from '../components/common/PageLayout';

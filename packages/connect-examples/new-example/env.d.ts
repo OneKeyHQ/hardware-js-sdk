@@ -4,7 +4,6 @@
 declare global {
   // 全局变量声明
   const __COMMIT_SHA__: string;
-  const __BUILD_TIME__: string;
 
   // 添加 Buffer 到 window 对象的类型声明
   interface Window {

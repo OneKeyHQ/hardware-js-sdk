@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { useParams } from '@remix-run/react';
+import { useParams } from 'react-router-dom';
 import { Cpu, Settings } from 'lucide-react';
 import UnifiedMethodExecutor from '../components/common/UnifiedMethodExecutor';
 import { PageLayout } from '../components/common/PageLayout';
