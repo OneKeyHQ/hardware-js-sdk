@@ -7,7 +7,7 @@ import type { MethodConfig, ExecutionStatus, ParameterField } from '~/data/types
 import { UiEvent } from '@onekeyfe/hd-core';
 import { PlaygroundProps } from '../../data/components/Playground';
 import { useFirmwareProgress } from '../providers/SDKProvider';
-
+import { cancelHardwareOperation } from '../../services/hardwareService';
 // 导入子组件
 import ParameterInput from './ParameterInput';
 import DeviceInteractionArea from './DeviceInteractionArea';
@@ -303,9 +303,6 @@ const UnifiedMethodExecutor: React.FC<UnifiedMethodExecutorProps> = ({
         setIsCancelling(true);
 
         console.log('🛑 [UnifiedMethodExecutor] 正在取消硬件操作...');
-
-        // 动态导入cancelHardwareOperation函数
-        const { cancelHardwareOperation } = await import('../../services/hardwareService');
 
         // 获取当前设备的connectId
         const connectId = currentDevice?.connectId;

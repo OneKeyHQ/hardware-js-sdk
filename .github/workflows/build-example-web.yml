@@ -29,21 +29,6 @@ jobs:
         run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
         working-directory: packages/connect-examples/expo-example
 
-      - name: Debug - List build output files
-        run: |
-          echo "=== Build output files ==="
-          find web-build -type f -name "*.json" -o -name "favicon*" -o -name "*.ico" | head -20
-          echo "=== Checking for manifest.json ==="
-          if [ -f "web-build/manifest.json" ]; then
-            echo "✅ manifest.json found"
-            cat web-build/manifest.json | head -10
-          else
-            echo "❌ manifest.json not found"
-          fi
-          echo "=== Checking for favicon files ==="
-          find web-build -name "favicon*" -type f
-        working-directory: packages/connect-examples/expo-example
-
       - name: Add commit info to build output
         run: |
           # 先备份原始构建产物到临时目录

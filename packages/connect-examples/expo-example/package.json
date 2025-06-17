@@ -3,7 +3,6 @@
   "version": "1.0.33-alpha.10",
   "main": "index.js",
   "scripts": {
-    "postinstall": "expo-yarn-workspaces postinstall",
     "start": "CONNECT_SRC=https://localhost:8087/ yarn expo start --dev-client",
     "android": "yarn expo run:android",
     "ios": "yarn expo run:ios",
@@ -54,7 +53,7 @@
     "expo-localization": "~14.8.4",
     "expo-splash-screen": "~0.26.5",
     "expo-status-bar": "~1.11.1",
-    "jotai": "^2.6.4",
+    "jotai": "^2.5.2",
     "levelup": "^5.1.1",
     "lodash": "^4.17.21",
     "memoizee": "^0.4.15",
@@ -93,7 +92,6 @@
     "@types/react-native": "~0.73.0",
     "@types/w3c-web-usb": "^1.0.6",
     "babel-plugin-transform-inline-environment-variables": "^0.4.4",
-    "expo-yarn-workspaces": "^1.2.1",
     "typescript": "5.3.2"
   },
   "private": true

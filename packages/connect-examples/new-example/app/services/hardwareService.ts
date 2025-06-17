@@ -46,9 +46,9 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
     } as Unsuccessful;
   }
 
-    try {
+  try {
     const sdkInstance = await getSDKInstance();
-    
+
     if (transport === 'emulator') {
       // 对于模拟器，我们使用特殊的初始化方式
       // 暂时使用web模式，后续可以通过其他方式支持模拟器
@@ -91,8 +91,8 @@ export async function submitPin(pin: string | null): Promise<void> {
 
 export async function submitPassphrase(
   passphrase: string,
-  onDevice: boolean = false,
-  save: boolean = false
+  onDevice = false,
+  save = false
 ): Promise<void> {
   logRequest('Submitting passphrase response', { onDevice, save });
   if (typeof window === 'undefined') return;
