@@ -1,20 +1,8 @@
-import { defineConfig, type UserConfig } from 'vite';
+import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { viteCommonjs } from '@originjs/vite-plugin-commonjs';
-
-// 自定义插件：确保 shim.js 优先加载
-function shimPlugin() {
-  return {
-    name: 'shim-plugin',
-    config(config: UserConfig) {
-      // 确保 shim.js 在所有模块之前加载
-      config.define = config.define || {};
-      config.define['global'] = 'globalThis';
-    },
-  };
-}
 
 export default defineConfig({
   root: process.cwd(),
@@ -24,7 +12,6 @@ export default defineConfig({
   plugins: [
     react(),
     tsconfigPaths(),
-    shimPlugin(),
     viteCommonjs({
       // 指定需要转换的文件路径
       include: [
