@@ -56,7 +56,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: process.env.NODE_ENV !== 'production', // 生产环境禁用sourcemap
+    // sourcemap: process.env.NODE_ENV !== 'production', // 生产环境禁用sourcemap
+    sourcemap: true, // 生产环境禁用sourcemap
     // 增加chunk大小警告阈值 - 现代应用可以接受更大的chunk
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
