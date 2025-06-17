@@ -55,51 +55,49 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: process.env.NODE_ENV !== 'production', // 生产环境禁用sourcemap
-    // 增加chunk大小警告阈值
-    chunkSizeWarningLimit: 1500,
+    // 增加chunk大小警告阈值 - 现代应用可以接受更大的chunk
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
-        // 优化的chunk分割策略
+        // 优化的chunk分割策略 - 平衡性能和复杂度
         manualChunks: id => {
-          // React 相关库
+          // React 生态系统
           if (id.includes('react') || id.includes('react-dom') || id.includes('react-i18next')) {
             return 'react-vendor';
           }
+
           // OneKey SDK 相关库
           if (id.includes('@onekeyfe')) {
             return 'onekey-sdk';
           }
-          // UI 组件库
+
+          // UI 组件和图标库
           if (id.includes('@radix-ui/') || id.includes('lucide-react')) {
             return 'ui-vendor';
           }
-          // Node.js polyfills - 分离到不同的 chunks 避免循环依赖
-          if (id.includes('buffer') && !id.includes('stream-browserify')) {
-            return 'buffer-polyfill';
+
+          // 大型第三方库
+          if (id.includes('lottie-react') || id.includes('lottie-web')) {
+            return 'lottie';
           }
-          if (id.includes('process') && !id.includes('stream-browserify')) {
-            return 'process-polyfill';
+
+          // 加密相关库
+          if (id.includes('@noble/') || id.includes('ripple-keypairs')) {
+            return 'crypto-vendor';
           }
-          if (id.includes('stream-browserify')) {
-            return 'stream-polyfill';
-          }
+
+          // Node.js polyfills 合并处理
           if (
-            id.includes('util') &&
-            !id.includes('stream-browserify') &&
-            !id.includes('buffer') &&
-            !id.includes('process')
+            id.includes('buffer') ||
+            id.includes('process') ||
+            id.includes('stream-browserify') ||
+            id.includes('util') ||
+            id.includes('events')
           ) {
-            return 'util-polyfill';
+            return 'node-polyfills';
           }
-          if (
-            id.includes('events') &&
-            !id.includes('stream-browserify') &&
-            !id.includes('buffer') &&
-            !id.includes('process')
-          ) {
-            return 'events-polyfill';
-          }
-          // 工具库
+
+          // 工具库集合
           if (
             id.includes('clsx') ||
             id.includes('class-variance-authority') ||
@@ -109,14 +107,12 @@ export default defineConfig({
           ) {
             return 'utils';
           }
-          // 方法数据文件 - 更精确的匹配
-          if (id.includes('/data/methods/') || id.includes('/data/methodsRegistry')) {
-            return 'methods-data';
-          }
-          // 其他数据文件
+
+          // 应用数据（包含方法数据）
           if (id.includes('/data/')) {
-            return 'app-data';
+            return 'chain-data';
           }
+
           return undefined;
         },
         // commit hash前8位
@@ -174,10 +170,17 @@ export default defineConfig({
     hmr: {
       overlay: true,
     },
+    // 开发时的性能优化
+    fs: {
+      // 允许访问工作区外的文件（monorepo 支持）
+      allow: ['..'],
+    },
   },
 
   // 优化依赖处理
   optimizeDeps: {
+    // 强制预构建重要依赖
+    force: process.env.NODE_ENV === 'development',
     include: [
       // React 相关
       'react',
@@ -206,6 +209,20 @@ export default defineConfig({
       'zustand',
       'i18next',
       'i18next-browser-languagedetector',
+      // 加密库
+      '@noble/hashes',
+      'ripple-keypairs',
+      // 动画库
+      'lottie-react',
+      // 图标库
+      'lucide-react',
+    ],
+    // 排除通过别名指向源码的 OneKey SDK 包，让 Vite 直接处理 TypeScript 源码
+    exclude: [
+      '@onekeyfe/hd-core',
+      '@onekeyfe/hd-shared',
+      '@onekeyfe/hd-web-sdk',
+      '@onekeyfe/hd-transport',
     ],
   },
 
