@@ -65,6 +65,18 @@ export default defineConfig({
           if (id.includes('react') || id.includes('react-dom') || id.includes('react-i18next')) {
             return 'react-vendor';
           }
+          if (id.includes('@onekeyfe/hd-shared')) {
+            return 'hd-shared';
+          }
+          if (id.includes('@onekeyfe/hd-core')) {
+            return 'hd-core';
+          }
+          if (id.includes('@onekeyfe/hd-web-sdk')) {
+            return 'hd-web-sdk';
+          }
+          if (id.includes('@onekeyfe/hd-transport')) {
+            return 'hd-transport';
+          }
 
           // OneKey SDK 相关库
           if (id.includes('@onekeyfe')) {
@@ -107,12 +119,6 @@ export default defineConfig({
           ) {
             return 'utils';
           }
-
-          // 应用数据（包含方法数据）
-          if (id.includes('/data/')) {
-            return 'chain-data';
-          }
-
           return undefined;
         },
         // commit hash前8位
@@ -217,7 +223,7 @@ export default defineConfig({
       // 图标库
       'lucide-react',
     ],
-    // 排除通过别名指向源码的 OneKey SDK 包，让 Vite 直接处理 TypeScript 源码
+    // OneKey SDK 包现在从 node_modules 正常加载
     exclude: [
       '@onekeyfe/hd-core',
       '@onekeyfe/hd-shared',
