@@ -2,6 +2,7 @@ import { defineConfig, type UserConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { viteCommonjs } from '@originjs/vite-plugin-commonjs';
 
 // 自定义插件：确保 shim.js 优先加载
 function shimPlugin() {
@@ -20,7 +21,21 @@ export default defineConfig({
   // Set the base path to the repository name + sub-directory for a robust deployment
   base: process.env.NODE_ENV === 'production' ? '/new-example/' : '/',
 
-  plugins: [react(), tsconfigPaths(), shimPlugin()],
+  plugins: [
+    react(),
+    tsconfigPaths(),
+    shimPlugin(),
+    viteCommonjs({
+      // 指定需要转换的文件路径
+      include: [
+        // OneKey SDK 源码路径
+        path.resolve(__dirname, '../../shared/src/**/*'),
+        path.resolve(__dirname, '../../core/src/**/*'),
+        path.resolve(__dirname, '../../hd-web-sdk/src/**/*'),
+        path.resolve(__dirname, '../../hd-transport/src/**/*'),
+      ],
+    }),
+  ],
 
   define: {
     global: 'globalThis',
