@@ -7,7 +7,7 @@ This package provides HTTP-based transport for connecting to OneKey hardware emu
 - HTTP-based communication with emulator server
 - Compatible with OneKey Connect SDK
 - Support for switchTransport functionality
-- Default emulator server URL: `http://localhost:21321`
+- Default emulator server URL: `http://localhost:21333`
 
 ## Installation
 
@@ -25,7 +25,7 @@ import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 // Create transport instance
 const transport = new EmulatorTransport();
 // or with custom URL
-const transport = new EmulatorTransport('http://localhost:21321');
+const transport = new EmulatorTransport('http://localhost:21333');
 
 // Initialize transport
 await transport.init(logger);
@@ -64,7 +64,7 @@ The emulator transport is integrated into the connect examples:
 new EmulatorTransport(url?: string)
 ```
 
-- `url` (optional): Emulator server URL, defaults to `http://localhost:21321`
+- `url` (optional): Emulator server URL, defaults to `http://localhost:21333`
 
 ### Methods
 
@@ -80,7 +80,7 @@ All methods implement the standard OneKey Transport interface:
 
 ## Emulator Server
 
-Make sure your OneKey emulator server is running on the configured URL (default: `http://localhost:21321`) before using this transport.
+Make sure your OneKey emulator server is running on the configured URL (default: `http://localhost:21333`) before using this transport.
 
 ## Development
 
