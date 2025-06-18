@@ -18,9 +18,7 @@ import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../components/common/PageLayout';
 
 // 导入设备图片
-// @ts-expect-error - TypeScript类型声明问题，但webpack能正常处理
 import proWhiteImg from '../assets/deviceMockup/pro-white.png';
-// @ts-expect-error - TypeScript类型声明问题，但webpack能正常处理
 import classic1sImg from '../assets/deviceMockup/classic1s.png';
 
 export default function EmulatorPage() {
