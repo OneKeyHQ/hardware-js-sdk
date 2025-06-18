@@ -13,6 +13,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { SDKProvider } from './components/providers/SDKProvider';
 import { I18nProvider } from './i18n/i18n-provider';
+import { CommandPalette } from './components/CommandPalette';
 import MainLayout from './components/layout/MainLayout';
 import { Toaster } from './components/ui/Toaster';
 
@@ -20,6 +21,7 @@ import { Toaster } from './components/ui/Toaster';
 import IndexPage from './routes/_index';
 import LogsPage from './routes/logs';
 import EmulatorPage from './routes/emulator';
+
 import ChainsIndexPage from './routes/chains._index';
 import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
@@ -63,10 +65,12 @@ function RootLayout() {
   return (
     <I18nProvider>
       <SDKProvider>
-        <MainLayout>
-          <Outlet />
-        </MainLayout>
-        <Toaster />
+        <CommandPalette>
+          <MainLayout>
+            <Outlet />
+          </MainLayout>
+          <Toaster />
+        </CommandPalette>
       </SDKProvider>
     </I18nProvider>
   );
@@ -91,6 +95,7 @@ const router = createBrowserRouter(
           path: 'emulator',
           element: <EmulatorPage />,
         },
+
         {
           path: 'device-methods',
           element: <DeviceMethodsIndexPage />,

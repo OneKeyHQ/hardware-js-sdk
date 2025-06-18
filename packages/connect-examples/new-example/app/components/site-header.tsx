@@ -9,6 +9,7 @@ import {
 import { Moon, Sun, Globe, ExternalLink } from 'lucide-react';
 import { useTheme } from '../hooks/use-theme';
 import { useTranslation } from 'react-i18next';
+import { SearchTrigger } from './CommandPalette';
 
 // 导入GitHub图标
 import githubIcon from '../assets/gitHub.svg';
@@ -64,6 +65,12 @@ export function SiteHeader() {
 
           {/* 右侧：工具栏 */}
           <div className="flex items-center gap-2">
+            {/* 搜索功能 */}
+            <SearchTrigger />
+
+            {/* 分隔线 */}
+            <div className="h-4 w-px bg-border mx-1" />
+
             {/* 外部链接 */}
             <Button variant="ghost" size="sm" asChild>
               <a
