@@ -2,12 +2,30 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import path from 'path';
+import { viteCommonjs, esbuildCommonjs } from '@originjs/vite-plugin-commonjs';
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
+  plugins: [
+    react(),
+    tsconfigPaths(),
+    viteCommonjs({
+      include: [
+        '@onekeyfe/hd-shared',
+        '@onekeyfe/hd-core',
+        '@onekeyfe/hd-web-sdk',
+        '@onekeyfe/hd-transport',
+      ],
+    }),
+    esbuildCommonjs([
+      '@onekeyfe/hd-shared',
+      '@onekeyfe/hd-core',
+      '@onekeyfe/hd-web-sdk',
+      '@onekeyfe/hd-transport',
+    ]),
+  ],
 
   // 配置入口文件
-  root: '.',
+  root: './',
   publicDir: 'public',
   base: process.env.NODE_ENV === 'production' ? '/new-example/' : '/',
 
@@ -20,14 +38,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': path.resolve(__dirname, './app'),
-      ...(process.env.NODE_ENV === 'production'
-        ? {
-            '@onekeyfe/hd-core': path.resolve(__dirname, '../../core/src'),
-            '@onekeyfe/hd-shared': path.resolve(__dirname, '../../shared/src'),
-            '@onekeyfe/hd-web-sdk': path.resolve(__dirname, '../../hd-web-sdk/src'),
-            '@onekeyfe/hd-transport': path.resolve(__dirname, '../../hd-transport/src'),
-          }
-        : {}),
+      // 移除此处针对 @onekeyfe 包的 alias 配置
+      // ...(process.env.NODE_ENV === 'development'
+      //   ? {
+      '@onekeyfe/hd-core': path.resolve(__dirname, '../../core/src'),
+      '@onekeyfe/hd-shared': path.resolve(__dirname, '../../shared/src'),
+      '@onekeyfe/hd-web-sdk': path.resolve(__dirname, '../../hd-web-sdk/src'),
+      '@onekeyfe/hd-transport': path.resolve(__dirname, '../../hd-transport/src'),
+      //   }
+      // : {}),
 
       // Node.js polyfills for OneKey SDK
       stream: 'stream-browserify',
@@ -39,6 +58,7 @@ export default defineConfig({
       path: 'path-browserify',
       os: 'os-browserify/browser',
     },
+    dedupe: ['@onekeyfe/hd-shared', '@onekeyfe/hd-core', '@onekeyfe/hd-web-sdk'],
   },
 
   // 关键：正确处理 OneKey SDK 的 CommonJS 依赖
@@ -53,6 +73,7 @@ export default defineConfig({
       '@onekeyfe/hd-web-sdk',
       '@onekeyfe/hd-shared',
       '@onekeyfe/hd-core',
+      '@onekeyfe/hd-transport',
 
       // Node.js polyfills
       'buffer',
@@ -81,10 +102,17 @@ export default defineConfig({
 
     // 处理 CommonJS 模块
     commonjsOptions: {
-      include: [/node_modules/, /@onekeyfe/],
+      include: [
+        /node_modules/,
+        '@onekeyfe/hd-shared',
+        '@onekeyfe/hd-core',
+        '@onekeyfe/hd-web-sdk',
+        '@onekeyfe/hd-transport',
+      ],
       transformMixedEsModules: true,
       strictRequires: true,
       ignoreDynamicRequires: false,
+      defaultIsModuleExports: true,
     },
 
     rollupOptions: {
@@ -92,7 +120,12 @@ export default defineConfig({
         manualChunks: {
           // 分离 vendor chunks 以优化缓存
           react: ['react', 'react-dom', 'react-router-dom'],
-          onekey: ['@onekeyfe/hd-web-sdk', '@onekeyfe/hd-shared', '@onekeyfe/hd-core'],
+          onekey: [
+            '@onekeyfe/hd-web-sdk',
+            '@onekeyfe/hd-shared',
+            '@onekeyfe/hd-core',
+            '@onekeyfe/hd-transport',
+          ],
         },
       },
     },

@@ -19,8 +19,6 @@
     "paths": {
       "~/*": ["./app/*"]
     },
-
-    // Vite handles building
     "noEmit": true
   }
 }
