@@ -68,6 +68,9 @@ jobs:
       - name: Install Dependencies
         run: |
           yarn
+          yarn bootstrap
+      - name: Build All Packages
+        run: yarn build
       - name: Build New Example
         run: COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn build
         working-directory: packages/connect-examples/new-example
