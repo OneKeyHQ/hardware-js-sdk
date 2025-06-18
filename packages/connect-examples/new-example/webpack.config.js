@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const webpack = require('webpack');
 
 module.exports = (env, argv) => {
@@ -80,6 +81,17 @@ module.exports = (env, argv) => {
         template: 'public/index.html',
         inject: true,
         filename: 'index.html',
+      }),
+      new CopyWebpackPlugin({
+        patterns: [
+          {
+            from: 'public',
+            to: '.',
+            globOptions: {
+              ignore: ['**/index.html'], // 忽略 index.html，因为 HtmlWebpackPlugin 会处理它
+            },
+          },
+        ],
       }),
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
