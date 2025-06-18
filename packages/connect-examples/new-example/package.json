@@ -8,12 +8,12 @@
     "**/*.css"
   ],
   "scripts": {
-    "dev": "NODE_ENV=development webpack serve --config webpack.config.js",
-    "start": "NODE_ENV=development webpack serve --config webpack.config.js",
-    "build": "NODE_ENV=production webpack --config webpack.config.js",
+    "dev": "webpack serve --mode=development --config webpack.config.js",
+    "start": "webpack serve --mode=development --config webpack.config.js",
+    "build": "webpack --mode=production --config webpack.config.js",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "typecheck": "tsc",
-    "build:analyze": "NODE_ENV=production webpack --config webpack.config.js --analyze"
+    "build:analyze": "webpack --mode=production --config webpack.config.js --analyze"
   },
   "dependencies": {
     "@noble/hashes": "^1.8.0",
