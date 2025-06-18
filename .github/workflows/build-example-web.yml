@@ -69,7 +69,7 @@ jobs:
         run: |
           yarn
       - name: Build New Example
-        run: VITE_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn build
+        run: COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn build
         working-directory: packages/connect-examples/new-example
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -146,6 +146,10 @@ jobs:
 
           # 复制统一的路由分发器模板到根目录
           cp .github/templates/404.html deploy/404.html
+
+          # 验证部署结构
+          echo "=== Deployment Structure ==="
+          find deploy -name "*.html" -o -name "manifest.json" -o -name "favicon*" | sort
       - name: Deploy to Github Pages
         uses: peaceiris/actions-gh-pages@v4
         with:

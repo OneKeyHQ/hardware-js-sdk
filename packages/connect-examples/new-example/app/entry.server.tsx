@@ -3,16 +3,12 @@
  * This is necessary for Remix, but we're doing pure client-side rendering.
  */
 
-import type { EntryContext } from "@remix-run/node";
-
 export default function handleRequest(
-  request: Request,
   responseStatusCode: number,
-  responseHeaders: Headers,
+  responseHeaders: Headers
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  remixContext: EntryContext
 ) {
-  responseHeaders.set("Content-Type", "text/html");
+  responseHeaders.set('Content-Type', 'text/html');
 
   // Just return a minimal HTML shell - all rendering will happen on the client
   return new Response(

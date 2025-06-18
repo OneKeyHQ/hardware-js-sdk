@@ -52,7 +52,7 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
     if (transport === 'emulator') {
       // 对于模拟器，我们使用特殊的初始化方式
       // 暂时使用web模式，后续可以通过其他方式支持模拟器
-      await sdkInstance.switchTransport('web');
+      await sdkInstance.switchTransport('emulator');
     } else {
       const envParam = transport === 'webusb' ? 'webusb' : 'web';
       await sdkInstance.switchTransport(envParam);

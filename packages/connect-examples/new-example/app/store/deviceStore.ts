@@ -433,7 +433,7 @@ export const useDeviceStore = create<DeviceState>()(
     }),
     {
       name: 'onekey-device-store',
-      version: 1,
+      version: 12,
 
       // 只持久化日志和配置，其他状态保持会话级别
       partialize: state => ({
@@ -459,6 +459,11 @@ export const useDeviceStore = create<DeviceState>()(
             return JSON.stringify(parsed);
           } catch (error) {
             console.warn('Failed to read persisted logs:', error);
+            // 如果是版本错误，清除存储并返回null以重新初始化
+            if (error instanceof Error && error.message.includes('version')) {
+              console.warn('Version conflict detected, clearing storage');
+              localStorage.removeItem(name);
+            }
             return null;
           }
         },

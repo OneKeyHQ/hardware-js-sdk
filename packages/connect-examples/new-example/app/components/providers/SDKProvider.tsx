@@ -206,6 +206,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         debug: true,
         fetchConfig: true,
         env: 'webusb',
+        // connectSrc: 'https://localhost:8087/',
       };
 
       // 执行SDK初始化

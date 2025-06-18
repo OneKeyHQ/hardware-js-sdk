@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Hardware SDK Examples</title>
   <script>
-    // 统一路由分发器 - 处理所有未匹配的路径
+    // 简化的路由分发器
     (function() {
       const path = window.location.pathname;
       const search = window.location.search;
@@ -13,47 +13,61 @@
       
       console.log('Route dispatcher: handling path', path);
       
-      // 处理子应用的客户端路由
+      // 智能路由分发逻辑 - 保持原始URL不变，让SPA自己处理路由
       if (path.startsWith('/new-example/')) {
-        // 对于 new-example 的子路由，重定向到首页并保存路径信息
-        const subPath = path.substring('/new-example'.length);
-        if (subPath && subPath !== '/') {
-          sessionStorage.setItem('redirectPath', path + fullUrl);
-          window.location.replace('/new-example/' + fullUrl);
+        // new-example 的子路由，保存原始路径信息
+        if (path !== '/new-example/' && path !== '/new-example') {
+          console.log('Handling new-example sub-route:', path);
+          // 保存完整的原始URL到sessionStorage供应用恢复路由
+          sessionStorage.setItem('spa_redirect_url', path + fullUrl);
+          // 重定向到应用首页，让React Router处理路由恢复
+          window.location.replace('/new-example/');
           return;
         }
+        return;
       }
       
       if (path.startsWith('/expo-example/')) {
-        // 对于 expo-example 的子路由，重定向到首页并保存路径信息
-        const subPath = path.substring('/expo-example'.length);
-        if (subPath && subPath !== '/') {
-          sessionStorage.setItem('redirectPath', path + fullUrl);
-          window.location.replace('/expo-example/' + fullUrl);
+        // expo-example 的子路由，保存原始路径信息  
+        if (path !== '/expo-example/' && path !== '/expo-example') {
+          console.log('Handling expo-example sub-route:', path);
+          // 保存完整的原始URL到sessionStorage供应用恢复路由
+          sessionStorage.setItem('spa_redirect_url', path + fullUrl);
+          // 重定向到应用首页，让React Navigation处理路由恢复
+          window.location.replace('/expo-example/');
           return;
         }
+        return;
       }
       
-      // 精确匹配规则
-      if (path === '/' || path === '') {
-        // 根路径重定向到 expo-example 的默认页面
+      // 根路径或其他未匹配路径，重定向到 expo-example 首页
+      if (path === '/' || path === '' || !path.startsWith('/expo-example/') && !path.startsWith('/new-example/')) {
+        console.log('Route dispatcher: redirecting to expo-example');
         window.location.replace('/expo-example/api-payload' + fullUrl);
         return;
       }
-      // 默认情况：对于不是 /expo-example/ 和 /new-example/ 开头的路径，跳转到 expo-example 首页
-      console.log('Route dispatcher: default redirect to expo-example');
-      window.location.replace('/expo-example/api-payload' + fullUrl);
     })();
   </script>
 </head>
 <body>
   <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
-    <h2>Page Not Found (404)</h2>
-    <p>The requested page could not be found.</p>
-    <p>You can visit one of our examples:</p>
-    <ul style="list-style: none; padding: 0;">
-      <li style="margin: 10px 0;"><a href="/expo-example/" style="color: #007bff; text-decoration: none;">📱 Expo Example</a></li>
-      <li style="margin: 10px 0;"><a href="/new-example/" style="color: #007bff; text-decoration: none;">🆕 New Example</a></li>
+    <h2>Hardware SDK Examples</h2>
+    <p>Choose an example to explore:</p>
+    <ul style="list-style: none; padding: 0; max-width: 400px; margin: 20px auto;">
+      <li style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+        <a href="/expo-example/" style="color: #007bff; text-decoration: none; display: block;">
+          <strong>📱 Expo Example</strong>
+          <br>
+          <small style="color: #666;">React Native Web with Expo SDK</small>
+        </a>
+      </li>
+      <li style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+        <a href="/new-example/" style="color: #007bff; text-decoration: none; display: block;">
+          <strong>🆕 New Example</strong>
+          <br>
+          <small style="color: #666;">Modern React with Webpack</small>
+        </a>
+      </li>
     </ul>
     <p style="margin-top: 30px; font-size: 14px; color: #666;">
       Current path: <code id="current-path"></code>

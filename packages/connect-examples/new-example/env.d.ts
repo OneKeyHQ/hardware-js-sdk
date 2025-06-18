@@ -1,17 +1,27 @@
-/// <reference types="@remix-run/dev" />
-/// <reference types="vite/client" />
+/// <reference types="node" />
 
 declare global {
   // 全局变量声明
   const __COMMIT_SHA__: string;
+  const __BUILD_TIME__: string;
 
   // 添加 Buffer 到 window 对象的类型声明
   interface Window {
     Buffer: typeof Buffer;
+    __isClient: boolean;
+  }
+
+  // 环境变量类型
+  namespace NodeJS {
+    interface ProcessEnv {
+      NODE_ENV: 'development' | 'production';
+      COMMIT_SHA?: string;
+      BUILD_TIME?: string;
+    }
   }
 }
 
-// ESM 模块声明
+// 静态资源模块声明
 declare module '*.svg' {
   const content: string;
   export default content;
@@ -35,6 +45,27 @@ declare module '*.jpeg' {
 declare module '*.gif' {
   const content: string;
   export default content;
+}
+
+declare module '*.webp' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.ico' {
+  const content: string;
+  export default content;
+}
+
+// CSS 模块声明
+declare module '*.css' {
+  const content: { [className: string]: string };
+  export default content;
+}
+
+declare module '*.module.css' {
+  const classes: { [key: string]: string };
+  export default classes;
 }
 
 export {};

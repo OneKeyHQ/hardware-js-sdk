@@ -3,53 +3,38 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 /* eslint-disable global-require */
 
-// 使用 ES module import 来导入 Buffer 和 process
-import { Buffer as BufferPolyfill } from 'buffer';
-import processPolyfill from 'process';
+if (typeof __dirname === 'undefined') global.__dirname = '/';
+if (typeof __filename === 'undefined') global.__filename = '';
 
-// 设置全局变量，确保在浏览器环境中可用
-if (typeof globalThis !== 'undefined') {
-  // 设置 Buffer 全局变量
-  if (typeof globalThis.Buffer === 'undefined') {
-    globalThis.Buffer = BufferPolyfill;
-  }
-
-  // 设置 process 全局变量 - 与 Buffer 处理方式一致
-  if (typeof globalThis.process === 'undefined') {
-    globalThis.process = processPolyfill;
-  }
-
-  // 设置 global 变量指向 globalThis
-  if (typeof globalThis.global === 'undefined') {
-    globalThis.global = globalThis;
-  }
-
-  // 确保 window 对象也有这些全局变量（如果在浏览器环境中）
-  if (typeof window !== 'undefined') {
-    if (typeof window.Buffer === 'undefined') {
-      window.Buffer = BufferPolyfill;
-    }
-    if (typeof window.process === 'undefined') {
-      window.process = processPolyfill;
-    }
-    if (typeof window.global === 'undefined') {
-      window.global = globalThis;
+if (typeof process === 'undefined') {
+  global.process = require('process');
+} else {
+  const bProcess = require('process');
+  for (const p in bProcess) {
+    if (!(p in process)) {
+      process[p] = bProcess[p];
     }
   }
 }
 
-// 为 window 对象设置这些变量（如果在浏览器环境中）
-if (typeof window !== 'undefined') {
-  if (typeof window.Buffer === 'undefined') {
-    window.Buffer = BufferPolyfill;
-  }
+process.browser = true;
 
-  if (typeof window.process === 'undefined') {
-    window.process = processPolyfill;
+// 修复 Buffer 的导入方式，确保与 webpack fallback 兼容
+if (typeof Buffer === 'undefined') {
+  try {
+    const { Buffer: BufferPolyfill } = require('buffer');
+    global.Buffer = BufferPolyfill;
+  } catch (error) {
+    console.warn('Failed to load Buffer polyfill:', error);
   }
+}
 
-  if (typeof window.global === 'undefined') {
-    window.global = globalThis;
+// 设置 global 变量
+if (typeof global === 'undefined') {
+  if (typeof window !== 'undefined') {
+    window.global = window;
+  } else if (typeof globalThis !== 'undefined') {
+    globalThis.global = globalThis;
   }
 }
 

@@ -34,7 +34,7 @@ import onekeyLogo from '../assets/onekey.png';
 
 // 版本信息
 const VERSION = packageJson.version;
-const COMMIT_SHA = import.meta.env.VITE_COMMIT_SHA || 'dev-build';
+const COMMIT_SHA = process.env.COMMIT_SHA || 'dev-build';
 
 const navigationItems = [
   {

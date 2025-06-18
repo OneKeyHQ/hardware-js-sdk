@@ -8,10 +8,28 @@
 // 先导入 shim 以确保 Node.js polyfills 在应用其余部分之前加载
 import './utils/shim.js';
 
-import React from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import App from './root';
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import { SDKProvider } from './components/providers/SDKProvider';
+import { I18nProvider } from './i18n/i18n-provider';
+import MainLayout from './components/layout/MainLayout';
+import { Toaster } from './components/ui/Toaster';
+
+// Import existing route components
+import IndexPage from './routes/_index';
+import LogsPage from './routes/logs';
+import EmulatorPage from './routes/emulator';
+import ChainsIndexPage from './routes/chains._index';
+import ChainMethodsIndexPage from './routes/chains.$chainId._index';
+import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
+import DeviceMethodsIndexPage from './routes/device-methods._index';
+import DeviceMethodExecutePage from './routes/device-methods.$methodName';
+import FirmwareUpdateIndexPage from './routes/firmware-update._index';
+import FirmwareUpdateMethodExecutePage from './routes/firmware-update.$methodName';
+
+// Import styles
+import './tailwind.css';
 
 // Declare global variable for TypeScript
 declare global {
@@ -20,29 +38,107 @@ declare global {
   }
 }
 
-// Set global flag for client detection
+// Mark as client-side rendering
 window.__isClient = true;
 
-// 处理从 404 页面重定向过来的路径
-const redirectPath = sessionStorage.getItem('redirectPath');
-if (redirectPath) {
-  sessionStorage.removeItem('redirectPath');
-  // 使用 history.replaceState 替换当前历史记录
-  history.replaceState(null, '', redirectPath);
+// 根据环境确定 basename
+const basename = process.env.NODE_ENV === 'production' ? '/new-example' : '';
+
+// 处理从404页面重定向过来的路径恢复
+function handleSpaRedirect() {
+  const redirectUrl = sessionStorage.getItem('spa_redirect_url');
+  if (
+    redirectUrl &&
+    redirectUrl !== window.location.pathname + window.location.search + window.location.hash
+  ) {
+    console.log('Restoring SPA route from redirect:', redirectUrl);
+    sessionStorage.removeItem('spa_redirect_url');
+    // 使用 window.history.replaceState 替换当前历史记录
+    window.history.replaceState(null, '', redirectUrl);
+  }
 }
 
-// 生产环境使用 GitHub Pages 路径，开发环境使用根路径
-const basename = process.env.NODE_ENV === 'production' ? '/new-example/' : '/';
-
-// Create a root and render directly - no hydration needed for client-only app
-const container = document.getElementById('root');
-if (container) {
-  const root = createRoot(container);
-  root.render(
-    <React.StrictMode>
-      <BrowserRouter basename={basename}>
-        <App />
-      </BrowserRouter>
-    </React.StrictMode>
+// Layout wrapper component
+function RootLayout() {
+  return (
+    <I18nProvider>
+      <SDKProvider>
+        <MainLayout>
+          <Outlet />
+        </MainLayout>
+        <Toaster />
+      </SDKProvider>
+    </I18nProvider>
   );
 }
+
+// 创建路由配置
+const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <RootLayout />,
+      children: [
+        {
+          index: true,
+          element: <IndexPage />,
+        },
+        {
+          path: 'logs',
+          element: <LogsPage />,
+        },
+        {
+          path: 'emulator',
+          element: <EmulatorPage />,
+        },
+        {
+          path: 'device-methods',
+          element: <DeviceMethodsIndexPage />,
+        },
+        {
+          path: 'device-methods/:methodName',
+          element: <DeviceMethodExecutePage />,
+        },
+        {
+          path: 'firmware-update',
+          element: <FirmwareUpdateIndexPage />,
+        },
+        {
+          path: 'firmware-update/:methodName',
+          element: <FirmwareUpdateMethodExecutePage />,
+        },
+        {
+          path: 'chains',
+          element: <ChainsIndexPage />,
+        },
+        {
+          path: 'chains/:chainId',
+          element: <ChainMethodsIndexPage />,
+        },
+        {
+          path: 'chains/:chainId/:methodName',
+          element: <ChainMethodExecutePage />,
+        },
+      ],
+    },
+  ],
+  {
+    basename,
+  }
+);
+
+// 启动应用
+const container = document.getElementById('root');
+if (!container) {
+  throw new Error('Root container not found');
+}
+
+// 在渲染前处理路由恢复
+handleSpaRedirect();
+
+const root = createRoot(container);
+root.render(
+  <StrictMode>
+    <RouterProvider router={router} />
+  </StrictMode>
+);
