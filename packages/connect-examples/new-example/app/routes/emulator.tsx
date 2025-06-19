@@ -145,9 +145,7 @@ export default function EmulatorPage() {
                     <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
                       1
                     </div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                      克隆 Docker 仓库
-                    </h3>
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">克隆 Git 仓库</h3>
                   </div>
                   <CommandBlock
                     command={commands.clone}
@@ -296,7 +294,7 @@ export default function EmulatorPage() {
                       }
                     >
                       <GitBranch className="h-3.5 w-3.5" />
-                      Docker 仓库
+                      Git 仓库
                       <ExternalLink className="h-3 w-3 ml-auto" />
                     </Button>
 

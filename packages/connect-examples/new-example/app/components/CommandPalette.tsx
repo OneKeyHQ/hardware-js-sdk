@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import {
   KBarProvider,
   KBarPortal,
@@ -12,111 +11,10 @@ import {
 } from 'kbar';
 import { searchActions } from '../data/searchActions';
 
-// 搜索历史管理
-const SEARCH_HISTORY_KEY = 'kbar_search_history';
-const MAX_HISTORY_ITEMS = 10;
-
-function getSearchHistory(): string[] {
-  try {
-    const history = localStorage.getItem(SEARCH_HISTORY_KEY);
-    return history ? JSON.parse(history) : [];
-  } catch {
-    return [];
-  }
-}
-
-function addToSearchHistory(query: string) {
-  if (!query.trim()) return;
-
-  const history = getSearchHistory();
-  const newHistory = [query, ...history.filter(item => item !== query)].slice(0, MAX_HISTORY_ITEMS);
-
-  try {
-    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(newHistory));
-  } catch {
-    // 忽略存储错误
-  }
-}
-
 // 结果渲染组件
 function RenderResults() {
   const { results } = useMatches();
-  const { query } = useKBar();
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
-  useEffect(() => {
-    setSearchHistory(getSearchHistory());
-  }, []);
-
-  // 如果没有搜索查询，显示搜索历史或空状态
-  if (!query) {
-    if (searchHistory.length > 0) {
-      return (
-        <div className="py-2">
-          <div className="px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
-            最近搜索
-          </div>
-          {searchHistory.map((historyItem, index) => (
-            <button
-              key={index}
-              type="button"
-              className="w-full text-left px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-              onClick={() => {
-                // 触发搜索并设置输入值
-                const searchInput = document.querySelector(
-                  '[data-kbar-search]'
-                ) as HTMLInputElement;
-                if (searchInput) {
-                  searchInput.value = historyItem;
-                  searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                  searchInput.focus();
-                }
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                {historyItem}
-              </div>
-            </button>
-          ))}
-        </div>
-      );
-    } else {
-      return (
-        <div className="py-12 text-center text-gray-500 dark:text-gray-400 text-sm">
-          <svg
-            className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          <div>开始输入以搜索...</div>
-          <div className="text-xs mt-1 text-gray-400 dark:text-gray-500">搜索功能、页面或文档</div>
-        </div>
-      );
-    }
-  }
-
-  // 显示搜索结果
   return (
     <KBarResults
       items={results}
@@ -159,19 +57,10 @@ function RenderResults() {
 
 // 搜索触发按钮组件
 export function SearchTrigger() {
+  const { query } = useKBar();
+
   const handleClick = () => {
-    // 检测操作系统并发送相应的键盘事件
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-
-    const event = new KeyboardEvent('keydown', {
-      key: 'k',
-      code: 'KeyK',
-      metaKey: isMac, // Mac 使用 Cmd 键
-      ctrlKey: !isMac, // Windows/Linux 使用 Ctrl 键
-      bubbles: true,
-    });
-
-    document.dispatchEvent(event);
+    query.toggle();
   };
 
   return (
@@ -201,14 +90,11 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
     <KBarProvider
       actions={searchActions}
       options={{
+        // 启用 kbar 内置的历史记录功能
+        enableHistory: true,
         callbacks: {
           onSelectAction: action => {
-            // 当用户选择一个动作时，将搜索查询添加到历史记录
-            const searchInput = document.querySelector('[data-kbar-search]') as HTMLInputElement;
-            if (searchInput && searchInput.value.trim()) {
-              addToSearchHistory(searchInput.value.trim());
-            }
-            // 执行原始动作
+            // 执行动作
             if (action.perform) {
               action.perform(action);
             }
@@ -223,8 +109,7 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
             <div className="border-b border-gray-100 dark:border-gray-800">
               <KBarSearch
                 className="w-full px-4 py-4 text-base border-0 outline-0 bg-transparent placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100"
-                placeholder="搜索功能、页面或文档..."
-                data-kbar-search
+                placeholder="搜索方法和区块链..."
               />
             </div>
 

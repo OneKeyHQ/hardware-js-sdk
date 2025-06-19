@@ -141,7 +141,7 @@ const LogsPage: React.FC = () => {
   const breadcrumbItems = [{ label: 'System Logs', icon: FileText }];
 
   return (
-    <PageLayout>
+    <PageLayout fixedHeight={true}>
       <div className="min-h-screen bg-background">
         <div className="mx-auto px-6 py-4 space-y-4">
           {/* 面包屑导航 + 操作按钮 */}
