@@ -9,6 +9,17 @@ const navigateTo = (path: string) => {
   window.dispatchEvent(new PopStateEvent('popstate'));
 };
 
+// 主题切换函数
+const setTheme = (theme: 'light' | 'dark') => {
+  localStorage.setItem('theme', theme);
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+};
+
+// 外部链接跳转函数
+const openExternalLink = (url: string) => {
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
+
 // 构建搜索动作
 export const buildSearchActions = (): Action[] => {
   const actions: Action[] = [];
@@ -72,6 +83,80 @@ export const buildSearchActions = (): Action[] => {
       shortcut: ['c'],
       keywords: 'chains blockchain 区块链 链',
       perform: () => navigateTo('/chains'),
+    }
+  );
+
+  // SETTINGS 分类 - 设置和配置
+  actions.push(
+    {
+      id: 'theme-light',
+      name: 'Light Theme',
+      subtitle: '切换到浅色主题',
+      section: 'Settings',
+      keywords: 'theme light 主题 浅色 白色',
+      perform: () => setTheme('light'),
+    },
+    {
+      id: 'theme-dark',
+      name: 'Dark Theme',
+      subtitle: '切换到深色主题',
+      section: 'Settings',
+      shortcut: ['t'],
+      keywords: 'theme dark 主题 深色 黑色',
+      perform: () => setTheme('dark'),
+    }
+  );
+
+  // EXTERNAL 分类 - 外部链接和文档
+  actions.push(
+    {
+      id: 'github-repo',
+      name: 'GitHub Repository',
+      subtitle: 'OneKey Hardware JS SDK 源代码仓库',
+      section: 'External',
+      shortcut: ['g', 'h'],
+      keywords: 'github repository source code 源代码 仓库',
+      perform: () => openExternalLink('https://github.com/OneKeyHQ/hardware-js-sdk'),
+    },
+    {
+      id: 'github-issues',
+      name: 'GitHub Issues',
+      subtitle: '报告问题或查看已知问题',
+      section: 'External',
+      keywords: 'github issues bug report 问题 报告 反馈',
+      perform: () => openExternalLink('https://github.com/OneKeyHQ/hardware-js-sdk/issues'),
+    },
+    {
+      id: 'github-releases',
+      name: 'GitHub Releases',
+      subtitle: '查看版本发布历史和更新日志',
+      section: 'External',
+      keywords: 'github releases changelog version 版本 发布 更新',
+      perform: () => openExternalLink('https://github.com/OneKeyHQ/hardware-js-sdk/releases'),
+    },
+    {
+      id: 'onekey-docs',
+      name: 'OneKey Documentation',
+      subtitle: 'OneKey 官方开发文档',
+      section: 'External',
+      keywords: 'documentation docs onekey 文档 开发',
+      perform: () => openExternalLink('https://developer.onekey.so/'),
+    },
+    {
+      id: 'onekey-website',
+      name: 'OneKey Website',
+      subtitle: 'OneKey 官方网站',
+      section: 'External',
+      keywords: 'website onekey official 官网 网站',
+      perform: () => openExternalLink('https://onekey.so/'),
+    },
+    {
+      id: 'hardware-connect',
+      name: 'Hardware Connect Guide',
+      subtitle: '硬件设备连接指南',
+      section: 'External',
+      keywords: 'hardware connect guide tutorial 硬件 连接 指南 教程',
+      perform: () => openExternalLink('https://developer.onekey.so/hardware/'),
     }
   );
 

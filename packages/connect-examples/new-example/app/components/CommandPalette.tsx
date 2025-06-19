@@ -92,14 +92,6 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
       options={{
         // 启用 kbar 内置的历史记录功能
         enableHistory: true,
-        callbacks: {
-          onSelectAction: action => {
-            // 执行动作
-            if (action.perform) {
-              action.perform(action);
-            }
-          },
-        },
       }}
     >
       <KBarPortal>
