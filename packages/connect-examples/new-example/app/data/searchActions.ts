@@ -1,10 +1,17 @@
 import { methodsRegistry } from './methodsRegistry';
 import type { Action } from 'kbar';
 
+// 获取 basename 前缀
+const getBasename = () => {
+  return process.env.NODE_ENV === 'production' ? '/new-example' : '';
+};
+
 // 导航函数 - 使用 React Router 的编程式导航
 const navigateTo = (path: string) => {
+  // 添加 basename 前缀
+  const fullPath = getBasename() + path;
   // 使用 window.history.pushState 进行 SPA 导航
-  window.history.pushState(null, '', path);
+  window.history.pushState(null, '', fullPath);
   // 触发 popstate 事件让 React Router 响应
   window.dispatchEvent(new PopStateEvent('popstate'));
 };

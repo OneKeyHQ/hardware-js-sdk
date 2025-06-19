@@ -1,6 +1,6 @@
 {
   "name": "expo-example",
-  "version": "1.0.33-alpha.10",
+  "version": "1.0.33-alpha.11",
   "main": "index.js",
   "scripts": {
     "start": "CONNECT_SRC=https://localhost:8087/ yarn expo start --dev-client",
@@ -20,10 +20,10 @@
     "@noble/ed25519": "^2.1.0",
     "@noble/hashes": "^1.3.3",
     "@noble/secp256k1": "^1.7.1",
-    "@onekeyfe/hd-ble-sdk": "^1.0.33-alpha.10",
-    "@onekeyfe/hd-common-connect-sdk": "^1.0.33-alpha.10",
-    "@onekeyfe/hd-core": "^1.0.33-alpha.10",
-    "@onekeyfe/hd-web-sdk": "^1.0.33-alpha.10",
+    "@onekeyfe/hd-ble-sdk": "^1.0.33-alpha.11",
+    "@onekeyfe/hd-common-connect-sdk": "^1.0.33-alpha.11",
+    "@onekeyfe/hd-core": "^1.0.33-alpha.11",
+    "@onekeyfe/hd-web-sdk": "^1.0.33-alpha.11",
     "@onekeyfe/react-native-ble-utils": "^0.1.3",
     "@polkadot/util-crypto": "13.1.1",
     "@react-native-async-storage/async-storage": "1.21.0",
