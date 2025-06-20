@@ -55,7 +55,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   } = useHardwareStore();
 
   // 获取预设值
-  const presets = methodConfig.presets || [];
+  const presets = useMemo(() => methodConfig.presets || [], [methodConfig.presets]);
 
   const hasBundleParam = methodParameters.bundle !== undefined && methodParameters.bundle !== null;
 

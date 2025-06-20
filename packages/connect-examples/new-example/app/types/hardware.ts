@@ -1,4 +1,4 @@
-import type { IDeviceType, Features } from "@onekeyfe/hd-core";
+import type { IDeviceType, Features } from '@onekeyfe/hd-core';
 
 export interface DeviceInfo {
   connectId: string;
@@ -24,7 +24,7 @@ export interface DeviceDisplayInfo {
   deviceType: string;
   deviceId: string;
   connectId: string;
-  status: "connected" | "disconnected" | "connecting";
+  status: 'connected' | 'disconnected' | 'connecting';
   firmwareVersion?: string;
   isInitialized?: boolean;
   needsBackup?: boolean;
@@ -36,14 +36,6 @@ export interface ApiResponse {
   success: boolean;
   payload?: Record<string, unknown>;
   error?: string;
-}
-
-export interface LogEntry {
-  id: string;
-  timestamp: string;
-  type: "info" | "error" | "request" | "response";
-  message: string;
-  data?: Record<string, unknown>;
 }
 
 export interface UIEventMessage {

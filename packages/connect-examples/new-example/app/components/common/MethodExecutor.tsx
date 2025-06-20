@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import { useToast } from '../../hooks/use-toast';
 import { useMethodParameters } from '../../hooks/useMethodParameters';
 import { useMethodExecution } from '../../hooks/useMethodExecution';
@@ -6,12 +6,10 @@ import { useDeviceInfo } from '../../hooks/useDeviceInfo';
 import { useFirmwareProgress } from '../providers/SDKProvider';
 import { useDeviceStore } from '../../store/deviceStore';
 import type { UnifiedMethodConfig } from '~/data/types';
-
 // 导入子组件
 import ParameterInput from './ParameterInput';
 import DeviceInteractionArea from './DeviceInteractionArea';
 import ExecutionPanel from './ExecutionPanel';
-import { UnifiedLogEntry } from './UnifiedLogger';
 
 interface MethodExecutorProps {
   methodConfig: UnifiedMethodConfig;
@@ -31,7 +29,10 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   type = 'standard',
 }) => {
   const { toast } = useToast();
-  const { deviceAction: globalDeviceAction } = useDeviceStore();
+  const { deviceAction: globalDeviceAction, logs: globalLogs } = useDeviceStore();
+
+  // 方法级别的执行日志状态
+  const [executionStartTime, setExecutionStartTime] = useState<number | null>(null);
 
   // 使用新的 Hooks
   const { currentDevice, deviceModel, deviceTheme, isConnected } = useDeviceInfo();
@@ -61,8 +62,21 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     onError,
   });
 
-  // 执行日志
-  const [executionLogs, setExecutionLogs] = useState<UnifiedLogEntry[]>([]);
+  // 计算当前方法的执行日志（只显示本次执行的日志）
+  const currentExecutionLogs = useMemo(() => {
+    if (!executionStartTime) {
+      return [];
+    }
+
+    // 只返回执行开始时间之后的日志
+    return globalLogs.filter(log => {
+      const logTime =
+        typeof log.timestamp === 'string'
+          ? new Date(log.timestamp).getTime()
+          : log.timestamp.getTime();
+      return logTime >= executionStartTime;
+    });
+  }, [globalLogs, executionStartTime]);
 
   // 监听全局设备动作状态
   useEffect(() => {
@@ -85,6 +99,9 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       return;
     }
 
+    // 记录执行开始时间，用于过滤当前执行的日志
+    setExecutionStartTime(Date.now());
+
     await execute(executionParameters, executionHandler);
   }, [isConnected, execute, executionParameters, executionHandler, toast]);
 
@@ -100,7 +117,14 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     }
     resetExecution();
     resetParameters();
+    // 重置执行开始时间，清空执行日志显示
+    setExecutionStartTime(null);
   }, [status, handleCancel, resetExecution, resetParameters]);
+
+  // 清空当前执行日志（只影响显示，不影响全局日志）
+  const handleClearExecutionLogs = useCallback(() => {
+    setExecutionStartTime(Date.now());
+  }, []);
 
   // 处理参数变化
   const handleParamChange = useCallback(
@@ -120,11 +144,6 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     },
     [setParameter]
   );
-
-  // 清空日志
-  const clearLogs = useCallback(() => {
-    setExecutionLogs([]);
-  }, []);
 
   return (
     <div className={`h-full flex flex-col ${className}`}>
@@ -161,8 +180,8 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
             <ExecutionPanel
               requestData={executionParameters}
               onSaveRequest={handleRequestParamsEdit}
-              logs={executionLogs}
-              onClearLogs={clearLogs}
+              logs={currentExecutionLogs}
+              onClearLogs={handleClearExecutionLogs}
               disabled={status === 'loading' || status === 'device-interaction'}
               className="h-full"
             />

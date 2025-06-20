@@ -164,6 +164,9 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
               }
             }
             break;
+          case 'ui-firmware-tip':
+            logInfo('收到UI事件: ui-firmware-progress', message.payload);
+            break;
 
           default:
             console.log(`[SDKProvider] ❓ 未知事件类型: ${message.type}`);

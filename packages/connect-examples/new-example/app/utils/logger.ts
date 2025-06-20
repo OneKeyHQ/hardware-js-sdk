@@ -1,16 +1,21 @@
 import { useDeviceStore } from '../store/deviceStore';
-
-// Log types
-export type LogType = 'info' | 'error' | 'request' | 'response';
+import type { UnifiedLogEntry, LogType } from '../components/common/UnifiedLogger';
 
 export type logData = Record<string, unknown> | undefined;
-// Create a log entry
-export function createLogEntry(type: LogType, message: string, data?: logData) {
+
+// Create a unified log entry
+export function createUnifiedLogEntry(
+  type: LogType,
+  message: string,
+  data?: logData
+): UnifiedLogEntry {
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     timestamp: new Date().toISOString(),
     type,
+    title: message,
     message,
+    content: data || null,
     data,
   };
 }
@@ -21,7 +26,7 @@ export function logInfo(message: string, data?: logData) {
   // Only add to store if in browser environment
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createLogEntry('info', message, data));
+    store.addLog(createUnifiedLogEntry('info', message, data));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }
@@ -32,7 +37,7 @@ export function logError(message: string, data?: logData) {
   console.error(`[ERROR] ${message}`, data || '');
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createLogEntry('error', message, data));
+    store.addLog(createUnifiedLogEntry('error', message, data));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }
@@ -43,7 +48,7 @@ export function logRequest(message: string, data?: logData) {
   console.info(`[REQUEST] ${message}`, data || '');
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createLogEntry('request', message, data));
+    store.addLog(createUnifiedLogEntry('request', message, data));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }
@@ -54,7 +59,7 @@ export function logResponse(message: string, data?: logData) {
   console.info(`[RESPONSE] ${message}`, data || '');
   try {
     const store = useDeviceStore.getState();
-    store.addLog(createLogEntry('response', message, data));
+    store.addLog(createUnifiedLogEntry('response', message, data));
   } catch (e) {
     console.error('Failed to add log to store:', e);
   }

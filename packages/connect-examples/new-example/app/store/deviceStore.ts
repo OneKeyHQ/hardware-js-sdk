@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import LZString from 'lz-string';
-import { DeviceInfo, LogEntry, ApiResponse } from '../types/hardware';
+import { DeviceInfo, ApiResponse } from '../types/hardware';
+import type { UnifiedLogEntry } from '../components/common/UnifiedLogger';
 import { TransportType } from '../services/hardwareService';
 import { isClassicModelDevice, isTouchModelDevice } from '../utils/deviceTypeUtils';
 import type { IDeviceType, Features } from '@onekeyfe/hd-core';
@@ -42,9 +43,11 @@ export interface LogStorageConfig {
 export interface CompressedLogEntry {
   id: string;
   timestamp: string;
-  type: LogEntry['type'];
-  message: string;
-  data?: string; // 压缩后的JSON字符串
+  type: UnifiedLogEntry['type'];
+  title?: string;
+  message?: string;
+  content?: string; // 压缩后的JSON字符串
+  data?: string; // 压缩后的JSON字符串 (兼容性)
   compressed?: boolean;
 }
 
@@ -87,11 +90,11 @@ interface DeviceState {
 
   // Response and logs
   lastResponse: ApiResponse | null;
-  logs: LogEntry[];
+  logs: UnifiedLogEntry[];
 
   // Response and log management
   setLastResponse: (response: ApiResponse | null) => void;
-  addLog: (log: LogEntry) => void;
+  addLog: (log: UnifiedLogEntry) => void;
   clearLogs: () => void;
 
   // 新增：日志存储管理
@@ -199,21 +202,24 @@ const cleanupLogs = (
 };
 
 // 过滤UI事件中的device字段，不然数据量太大了。
-const filterUIEventData = (log: LogEntry): LogEntry => {
+const filterUIEventData = (log: UnifiedLogEntry): UnifiedLogEntry => {
   // 检查是否为UI事件（通常消息包含"UI事件"或以"ui-"开头）
-  const isUIEvent =
-    log.message.includes('UI事件') ||
-    log.message.includes('ui-') ||
-    (log.data &&
-      typeof log.data === 'object' &&
-      Object.keys(log.data).some(key => key.startsWith('ui-')));
+  const message = log.message || log.title || '';
+  const logData = log.data || (typeof log.content === 'object' ? log.content : null);
 
-  if (!isUIEvent || !log.data || typeof log.data !== 'object') {
+  const isUIEvent =
+    message.includes('UI事件') ||
+    message.includes('ui-') ||
+    (logData &&
+      typeof logData === 'object' &&
+      Object.keys(logData).some(key => key.startsWith('ui-')));
+
+  if (!isUIEvent || !logData || typeof logData !== 'object') {
     return log;
   }
 
   // 创建过滤后的数据副本，移除device字段
-  const filteredData = { ...log.data };
+  const filteredData = { ...logData };
   if ('device' in filteredData) {
     delete filteredData.device;
   }
@@ -221,49 +227,67 @@ const filterUIEventData = (log: LogEntry): LogEntry => {
   return {
     ...log,
     data: filteredData,
+    content: filteredData,
   };
 };
 
-// 转换LogEntry到CompressedLogEntry
-const compressLogEntry = (log: LogEntry, config: LogStorageConfig): CompressedLogEntry => {
+// 转换UnifiedLogEntry到CompressedLogEntry
+const compressLogEntry = (log: UnifiedLogEntry, config: LogStorageConfig): CompressedLogEntry => {
   // 先过滤UI事件数据
   const filteredLog = filterUIEventData(log);
+  const logData =
+    filteredLog.data || (typeof filteredLog.content === 'object' ? filteredLog.content : null);
 
-  if (!config.compressionEnabled || !filteredLog.data) {
+  if (!config.compressionEnabled || !logData) {
     return {
       id: filteredLog.id,
-      timestamp: filteredLog.timestamp,
+      timestamp:
+        typeof filteredLog.timestamp === 'string'
+          ? filteredLog.timestamp
+          : filteredLog.timestamp.toISOString(),
       type: filteredLog.type,
+      title: filteredLog.title,
       message: filteredLog.message,
-      data: filteredLog.data ? JSON.stringify(filteredLog.data) : undefined,
+      content: logData ? JSON.stringify(logData) : undefined,
+      data: logData ? JSON.stringify(logData) : undefined,
       compressed: false,
     };
   }
 
-  const originalData = JSON.stringify(filteredLog.data);
-  const compressedData = compressData(filteredLog.data);
+  const originalData = JSON.stringify(logData);
+  const compressedData = compressData(logData);
 
   // 判断是否真正被压缩了（LZ-string压缩 vs 原始JSON）
   const wasCompressed = compressedData !== originalData;
 
   return {
     id: filteredLog.id,
-    timestamp: filteredLog.timestamp,
+    timestamp:
+      typeof filteredLog.timestamp === 'string'
+        ? filteredLog.timestamp
+        : filteredLog.timestamp.toISOString(),
     type: filteredLog.type,
+    title: filteredLog.title,
     message: filteredLog.message,
+    content: compressedData,
     data: compressedData,
     compressed: wasCompressed,
   };
 };
 
-// 转换CompressedLogEntry到LogEntry
-const decompressLogEntry = (compressed: CompressedLogEntry): LogEntry => {
+// 转换CompressedLogEntry到UnifiedLogEntry
+const decompressLogEntry = (compressed: CompressedLogEntry): UnifiedLogEntry => {
+  const data = compressed.data || compressed.content;
+  const decompressedData = data ? decompressData(data) : undefined;
+
   return {
     id: compressed.id,
     timestamp: compressed.timestamp,
     type: compressed.type,
+    title: compressed.title || compressed.message,
     message: compressed.message,
-    data: compressed.data ? decompressData(compressed.data) : undefined,
+    content: decompressedData || null,
+    data: decompressedData,
   };
 };
 
@@ -320,7 +344,7 @@ export const useDeviceStore = create<DeviceState>()(
           },
         }),
 
-      addLog: (log: LogEntry) =>
+      addLog: (log: UnifiedLogEntry) =>
         set(state => {
           const newLogs = [...state.logs, log];
           // 在内存中也进行基本的大小限制
@@ -352,15 +376,28 @@ export const useDeviceStore = create<DeviceState>()(
         }
 
         const totalSizeBytes = getStringByteSize(JSON.stringify(logs));
-        const sortedLogs = [...logs].sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
+        const sortedLogs = [...logs].sort((a, b) => {
+          const timeA =
+            typeof a.timestamp === 'string'
+              ? new Date(a.timestamp).getTime()
+              : a.timestamp.getTime();
+          const timeB =
+            typeof b.timestamp === 'string'
+              ? new Date(b.timestamp).getTime()
+              : b.timestamp.getTime();
+          return timeA - timeB;
+        });
+
+        const oldestTimestamp = sortedLogs[0]?.timestamp;
+        const newestTimestamp = sortedLogs[sortedLogs.length - 1]?.timestamp;
 
         return {
           totalEntries: logs.length,
           totalSizeBytes,
-          oldestEntry: sortedLogs[0]?.timestamp,
-          newestEntry: sortedLogs[sortedLogs.length - 1]?.timestamp,
+          oldestEntry:
+            typeof oldestTimestamp === 'string' ? oldestTimestamp : oldestTimestamp?.toISOString(),
+          newestEntry:
+            typeof newestTimestamp === 'string' ? newestTimestamp : newestTimestamp?.toISOString(),
         };
       },
 
@@ -371,7 +408,10 @@ export const useDeviceStore = create<DeviceState>()(
             now.getTime() - state.logStorageConfig.expirationDays * 24 * 60 * 60 * 1000;
 
           const cleanedLogs = state.logs.filter(log => {
-            const logTime = new Date(log.timestamp).getTime();
+            const logTime =
+              typeof log.timestamp === 'string'
+                ? new Date(log.timestamp).getTime()
+                : log.timestamp.getTime();
             return logTime > expirationTime;
           });
 
@@ -385,12 +425,15 @@ export const useDeviceStore = create<DeviceState>()(
 
         if (format === 'text') {
           return logs
-            .map(
-              log =>
-                `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}${
-                  log.data ? '\nData: ' + JSON.stringify(log.data, null, 2) : ''
-                }`
-            )
+            .map(log => {
+              const timestamp =
+                typeof log.timestamp === 'string' ? log.timestamp : log.timestamp.toISOString();
+              const message = log.message || log.title || '';
+              const data = log.data || (typeof log.content === 'object' ? log.content : null);
+              return `[${timestamp}] ${log.type.toUpperCase()}: ${message}${
+                data ? '\nData: ' + JSON.stringify(data, null, 2) : ''
+              }`;
+            })
             .join('\n\n');
         }
 

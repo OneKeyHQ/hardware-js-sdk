@@ -46,6 +46,95 @@ UnifiedMethodExecutor (Core Implementation)
 - **Device State Management**: Centralized device state with Zustand persistence
 - **Error Handling**: Comprehensive error boundaries with user feedback
 
+## Unified Logging System
+
+### CRITICAL: Use Only UnifiedLogEntry Format
+**The project has been refactored to use a single, unified logging format. DO NOT create or use any other log formats.**
+
+```tsx
+// ✅ CORRECT - Use UnifiedLogEntry from UnifiedLogger
+import { UnifiedLogEntry } from '../components/common/UnifiedLogger';
+
+// ❌ INCORRECT - DO NOT create custom log interfaces
+interface LogEntry { ... } // This format has been removed
+
+// ✅ CORRECT - Use the unified logging utilities
+import { logRequest, logResponse, logError, logInfo } from '../utils/logger';
+```
+
+### UnifiedLogEntry Structure
+```tsx
+interface UnifiedLogEntry {
+  id: string;
+  timestamp: Date | string;
+  level: 'info' | 'warn' | 'error' | 'success';
+  title: string;
+  message?: string;
+  content?: string;
+  data?: any;
+  category?: string;
+  tags?: string[];
+  duration?: number;
+  source?: string;
+}
+```
+
+### Logging Best Practices
+
+#### 1. Use Unified Logging Functions
+```tsx
+// Always use these functions from utils/logger.ts
+logRequest(methodName, params, deviceId);
+logResponse(methodName, response, deviceId, duration);
+logError(methodName, error, deviceId);
+logInfo(title, message, data);
+```
+
+#### 2. Proper Log Categorization
+```tsx
+// Hardware SDK operations
+logRequest('btcGetAddress', { path: "m/44'/0'/0'/0/0" }, deviceId);
+
+// User interactions
+logInfo('Parameter Updated', 'Address derivation path changed', { 
+  path: newPath,
+  source: 'user-input'
+});
+
+// System events
+logInfo('Device Connected', 'Hardware device successfully connected', {
+  deviceId,
+  transportType,
+  category: 'device-management'
+});
+```
+
+#### 3. Global Log Access Pattern
+```tsx
+// ✅ CORRECT - Access logs from global store
+const { logs } = useDeviceStore();
+
+// ❌ INCORRECT - DO NOT create local log state
+const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
+```
+
+#### 4. Log Storage Configuration
+```tsx
+// Configure log storage limits in deviceStore
+logStorageConfig: {
+  maxSizeBytes: 50 * 1024 * 1024, // 50MB
+  maxEntries: 10000,
+  maxAgeHours: 24 * 7, // 1 week
+  compressionThreshold: 1024, // 1KB
+}
+```
+
+### Log Compression & Performance
+- **Automatic Compression**: Entries >1KB are automatically compressed using LZ-string
+- **Storage Optimization**: UI event data is filtered to remove redundant device fields
+- **Memory Management**: Expired logs are automatically cleaned up
+- **Statistics Tracking**: Real-time storage usage statistics available
+
 ## OneKey Design System & Brand Guidelines
 
 ### Color Usage Guidelines
@@ -208,6 +297,31 @@ if (!sdkInitState.isInitialized) {
 />
 ```
 
+### Hardware Method Execution with Unified Logging
+```tsx
+const handleMethodExecution = async (methodName: string, params: any) => {
+  const deviceId = currentDevice?.connectId;
+  
+  try {
+    // Log the request
+    logRequest(methodName, params, deviceId);
+    
+    const startTime = Date.now();
+    const response = await callHardwareAPI(methodName, params, deviceId);
+    const duration = Date.now() - startTime;
+    
+    // Log the response
+    logResponse(methodName, response, deviceId, duration);
+    
+    return response;
+  } catch (error) {
+    // Log the error
+    logError(methodName, error, deviceId);
+    throw error;
+  }
+};
+```
+
 ### Cancel Operation Implementation
 ```tsx
 const handleCancel = async () => {
@@ -216,6 +330,10 @@ const handleCancel = async () => {
     const result = await cancelHardwareOperation(connectId);
     
     if (result.success) {
+      logInfo('Operation Cancelled', 'Hardware operation cancelled by user', {
+        connectId,
+        category: 'user-action'
+      });
       toast({ title: '操作已取消', description: '硬件操作已成功取消' });
     }
   }
@@ -231,24 +349,38 @@ interface StoreState {
   currentDevice: DeviceInfo | null;
   connectedDevices: DeviceInfo[];
   
-  // Log management with compression
-  logs: LogEntry[];
+  // Unified log management
+  logs: UnifiedLogEntry[];
   logStorageConfig: LogStorageConfig;
   
   // Actions
-  addLog: (log: LogEntry) => void;
+  addLog: (log: UnifiedLogEntry) => void;
   clearLogs: () => void;
+  exportLogs: () => Promise<string>;
+  getLogStorageStats: () => LogStorageStats;
 }
 
 export const useDeviceStore = create<StoreState>()(
   persist(
     (set, get) => ({
-      // Implementation with proper compression
+      logs: [],
+      
+      addLog: (log: UnifiedLogEntry) => {
+        set((state) => {
+          const newLogs = [...state.logs, log];
+          // Apply storage limits and compression
+          return { logs: applyStorageLimits(newLogs, state.logStorageConfig) };
+        });
+      },
+      
+      // Other implementations...
     }),
     {
       name: 'onekey-device-store',
-      version: 1,
+      version: 2, // Increment version for breaking changes
       partialize: (state) => ({
+        logs: state.logs.map(compressLogEntry),
+        logStorageConfig: state.logStorageConfig,
         // Only persist necessary data
       }),
     }
@@ -257,10 +389,12 @@ export const useDeviceStore = create<StoreState>()(
 ```
 
 ### Log Storage Best Practices
-- **Compression:** Use LZ-string for entries >1KB to optimize storage
-- **Filtering:** Remove redundant device fields from UI events
-- **Limits:** Respect configured size, count, and expiration limits
-- **Statistics:** Provide real-time storage statistics and metrics
+- **Single Format**: Use only `UnifiedLogEntry` format throughout the application
+- **Compression**: Use LZ-string for entries >1KB to optimize storage
+- **Filtering**: Remove redundant device fields from UI events
+- **Limits**: Respect configured size, count, and expiration limits
+- **Statistics**: Provide real-time storage statistics and metrics
+- **Type Safety**: Handle timestamp compatibility (string vs Date types)
 
 ## Routing & Page Layout Standards
 
@@ -315,6 +449,7 @@ const MethodExecutePage: React.FC = () => {
 - **Batch Operations:** Process multiple logs efficiently  
 - **Memory Management:** Clean up expired logs automatically
 - **UI Responsiveness:** Avoid blocking UI during compression
+- **Type Compatibility:** Handle mixed timestamp types (string/Date) gracefully
 
 ## Development Quality Standards
 
@@ -362,7 +497,7 @@ npm run preview
 # Type checking
 npm run type-check
 
-# Linting
+# Linting (with dist folder ignored)
 npm run lint
 ```
 
@@ -373,4 +508,4 @@ npm run lint
 
 ---
 
-**Before developing, please thoroughly read this guide to understand the architecture, design system, and coding standards. Pay special attention to the OneKey green color usage guidelines to maintain proper brand consistency.** 🎨
+**Before developing, please thoroughly read this guide to understand the architecture, design system, and coding standards. Pay special attention to the unified logging system and OneKey green color usage guidelines to maintain proper brand consistency.** 🎨
