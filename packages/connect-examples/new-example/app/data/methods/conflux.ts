@@ -1,11 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'conflux',
-  name: 'Conflux',
-  description: 'Conflux Network operations',
-  category: 'ethereum' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -202,4 +199,7 @@ const api: UnifiedMethodConfig[] = [
   },
 ];
 
-export default api;
+export const conflux = {
+  ...chainMeta,
+  api,
+};

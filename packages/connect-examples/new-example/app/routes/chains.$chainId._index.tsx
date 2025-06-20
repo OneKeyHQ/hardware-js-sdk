@@ -44,7 +44,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                     icon: Layers,
                   },
                   {
-                    label: selectedChain.name,
+                    label: selectedChain.id,
                     icon: () => <ChainIcon chainId={selectedChain.id} size={16} />,
                   },
                 ]}
@@ -69,7 +69,7 @@ const ChainMethodsIndexPage: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <h1 className="text-2xl font-bold text-foreground mb-1 tracking-tight">
-                    {selectedChain.name}
+                    {selectedChain.id}
                   </h1>
                   <p className="text-muted-foreground font-medium">
                     {

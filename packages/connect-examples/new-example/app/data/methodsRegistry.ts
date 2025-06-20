@@ -3,40 +3,38 @@
 // 将所有方法数据合并到一个文件中以优化打包
 // ============================================
 
-import type { UnifiedMethodConfig, ChainConfig, ChainMeta } from './types';
+import type { UnifiedMethodConfig, ChainConfig, ChainCategory } from './types';
 
 // 静态导入所有方法，确保它们被打包到一个chunk中
-import * as bitcoin from './methods/bitcoin';
-import * as ethereum from './methods/ethereum';
-import * as solana from './methods/solana';
-import * as cardano from './methods/cardano';
-import * as polkadot from './methods/polkadot';
-import * as sui from './methods/sui';
-import * as aptos from './methods/aptos';
-import * as near from './methods/near';
-import * as ton from './methods/ton';
-import * as cosmos from './methods/cosmos';
-import * as tron from './methods/tron';
-import * as ripple from './methods/xrp';
-import * as stellar from './methods/stellar';
-import * as neo from './methods/neo';
-import * as nem from './methods/nem';
-import * as kaspa from './methods/kaspa';
-import * as algorand from './methods/algorand';
-import * as filecoin from './methods/filecoin';
-import * as nervos from './methods/nervos';
-import * as starcoin from './methods/starcoin';
-import * as scdo from './methods/scdo';
-import * as dynex from './methods/dynex';
-import * as nexa from './methods/nexa';
-import * as alephium from './methods/alephium';
-import * as conflux from './methods/conflux';
-import * as nostr from './methods/nostr';
-import * as lightning from './methods/lightning';
-import * as allnetwork from './methods/allnetwork';
-import * as benfen from './methods/benfen';
-import * as device from './methods/device';
-import * as firmwareUpdate from './methods/firmware';
+import { bitcoin } from './methods/bitcoin';
+import { ethereum } from './methods/ethereum';
+import { solana } from './methods/solana';
+import { cardano } from './methods/cardano';
+import { polkadot } from './methods/polkadot';
+import { sui } from './methods/sui';
+import { aptos } from './methods/aptos';
+import { near } from './methods/near';
+import { ton } from './methods/ton';
+import { cosmos } from './methods/cosmos';
+import { tron } from './methods/tron';
+import { xrp } from './methods/xrp';
+import { stellar } from './methods/stellar';
+import { neo } from './methods/neo';
+import { nem } from './methods/nem';
+import { kaspa } from './methods/kaspa';
+import { algorand } from './methods/algorand';
+import { filecoin } from './methods/filecoin';
+import { nervos } from './methods/nervos';
+import { starcoin } from './methods/starcoin';
+import { scdo } from './methods/scdo';
+import { dynex } from './methods/dynex';
+import { nexa } from './methods/nexa';
+import { alephium } from './methods/alephium';
+import { conflux } from './methods/conflux';
+import { nostr } from './methods/nostr';
+import { lightning } from './methods/lightning';
+import { allnetwork } from './methods/allnetwork';
+import { benfen } from './methods/benfen';
 
 // 创建统一的方法注册表接口
 export interface MethodsRegistry {
@@ -51,10 +49,6 @@ export interface MethodsRegistry {
 
 // 链模块配置
 const chainModules = [
-  // 基础功能 - basic已合并到device中
-  { id: 'device', module: device },
-  { id: 'firmwareUpdate', module: firmwareUpdate },
-
   // 主要区块链
   { id: 'bitcoin', module: bitcoin },
   { id: 'ethereum', module: ethereum },
@@ -67,7 +61,7 @@ const chainModules = [
   { id: 'ton', module: ton },
   { id: 'cosmos', module: cosmos },
   { id: 'tron', module: tron },
-  { id: 'ripple', module: ripple },
+  { id: 'ripple', module: xrp },
   { id: 'stellar', module: stellar },
   { id: 'neo', module: neo },
   { id: 'nem', module: nem },
@@ -98,13 +92,13 @@ function buildMethodsRegistry(): MethodsRegistry {
   chainModules.forEach(({ id, module }) => {
     try {
       // 获取方法数组和链元数据
-      const methods = (module as Record<string, unknown>).default as UnifiedMethodConfig[];
-      const chainMeta = (module as Record<string, unknown>).chainMeta as ChainMeta;
+      const methods = module.api;
+      const chainMetaId = module.id as ChainCategory;
 
-      if (Array.isArray(methods) && methods.length > 0 && chainMeta) {
+      if (Array.isArray(methods) && methods.length > 0 && chainMetaId) {
         // 创建链配置
         const chainConfig: ChainConfig = {
-          ...chainMeta,
+          id: chainMetaId,
           methods: methods,
         };
 
@@ -112,7 +106,7 @@ function buildMethodsRegistry(): MethodsRegistry {
         methodsByChain[id] = methods;
         allMethodsList.push(...methods);
       } else {
-        console.warn(`Invalid data for chain ${id}:`, { methods, chainMeta });
+        console.warn(`Invalid data for chain ${id}:`, { methods, chainMetaId });
       }
     } catch (error) {
       console.warn(`Failed to process chain ${id}:`, error);
@@ -152,7 +146,7 @@ export const getMethodsByCategory = () => {
   const categories: Record<string, ChainConfig[]> = {};
 
   methodsRegistry.chains.forEach(chain => {
-    const category = chain.category;
+    const category = chain.id;
     if (!categories[category]) {
       categories[category] = [];
     }
@@ -169,7 +163,7 @@ export const getRegistryStats = () => {
   const categoryCounts: Record<string, number> = {};
 
   methodsRegistry.chains.forEach(chain => {
-    const category = chain.category;
+    const category = chain.id;
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
   });
 

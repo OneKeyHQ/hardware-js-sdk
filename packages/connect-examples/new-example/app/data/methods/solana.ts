@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'solana',
-  name: 'Solana',
-  description: 'Solana blockchain operations',
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.22 9.4a.77.77 0 0 1 .55-.23h16.27a.39.39 0 0 1 .28.67l-2.72 2.72a.77.77 0 0 1-.55.23H1.78a.39.39 0 0 1-.28-.67L4.22 9.4z" fill="url(#a)"/><path d="M4.22 2.13a.77.77 0 0 1 .55-.23h16.27a.39.39 0 0 1 .28.67L18.6 5.29a.77.77 0 0 1-.55.23H1.78a.39.39 0 0 1-.28-.67L4.22 2.13z" fill="url(#b)"/><path d="M18.6 16.87a.77.77 0 0 1-.55.23H1.78a.39.39 0 0 1-.28-.67l2.72-2.72a.77.77 0 0 1 .55-.23h16.27a.39.39 0 0 1 .28.67l-2.72 2.72z" fill="url(#c)"/><defs><linearGradient id="a" x1="21.84" y1="12.82" x2="6.34" y2="-2.68" gradientUnits="userSpaceOnUse"><stop stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient><linearGradient id="b" x1="21.84" y1="5.55" x2="6.34" y2="-9.95" gradientUnits="userSpaceOnUse"><stop stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient><linearGradient id="c" x1="21.84" y1="20.09" x2="6.34" y2="4.59" gradientUnits="userSpaceOnUse"><stop stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient></defs></svg>`,
-  color: '#9945FF',
-  category: 'solana' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -153,9 +148,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const solana = {
   ...chainMeta,
   api,
 };
-
-export default api;

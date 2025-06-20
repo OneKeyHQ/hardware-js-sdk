@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'nexa',
-  name: 'Nexa',
-  description: 'Nexa blockchain operations',
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#6366F1"/><path d="M8 12l4 4 4-4-4-4-4 4z" fill="white"/></svg>`,
-  color: '#6366F1',
-  category: 'nexa' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -108,9 +103,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const nexa = {
   ...chainMeta,
   api,
 };
-
-export default api;

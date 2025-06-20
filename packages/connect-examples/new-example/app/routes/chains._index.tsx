@@ -16,10 +16,9 @@ const ChainsIndexPage: React.FC = () => {
 
   const { chains, getChainMethods } = useTemplateRegistry();
 
-  // 过滤链（排除功能性分类，只保留区块链，按原始数组顺序）
-  const filteredChains = chains
-    .filter(chain => chain.category !== 'device' && chain.category !== 'firmwareUpdate')
-    .filter(chain => chain.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredChains = chains.filter(chain =>
+    chain.id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   // 处理链选择
   const handleChainSelect = (chain: ChainConfig) => {
@@ -72,11 +71,11 @@ const ChainsIndexPage: React.FC = () => {
                 onKeyDown={e => handleKeyDown(e, () => handleChainSelect(chain))}
                 tabIndex={0}
                 role="button"
-                aria-label={`Explore ${chain.name} methods`}
+                aria-label={`Explore ${chain.id}   methods`}
               >
                 <ChainIcon chainId={chain.id} size={32} />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">{chain.name}</h3>
+                  <h3 className="font-semibold text-foreground">{chain.id}</h3>
                   <p className="text-sm text-muted-foreground">
                     {getChainMethods(chain.id).length} methods
                   </p>

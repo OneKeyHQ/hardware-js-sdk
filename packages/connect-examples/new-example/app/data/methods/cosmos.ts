@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'cosmos',
-  name: 'Cosmos',
-  description: 'Cosmos blockchain operations',
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#2E3148"/><path d="M8 12l4 4 4-4-4-4-4 4z" fill="white"/></svg>`,
-  color: '#2E3148',
-  category: 'cosmos' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -168,9 +163,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const cosmos = {
   ...chainMeta,
   api,
 };
-
-export default api;

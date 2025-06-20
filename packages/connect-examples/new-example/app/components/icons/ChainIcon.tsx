@@ -1,35 +1,35 @@
-import React from "react";
+import React from 'react';
 
 // 直接导入所有常用的图标资源
-import bitcoinIcon from "../../assets/chain/tbtc.png";
-import ethereumIcon from "../../assets/chain/teth.png";
-import solanaIcon from "../../assets/chain/sol.png";
-import tronIcon from "../../assets/chain/tron.png";
-import nearIcon from "../../assets/chain/near.png";
-import suiIcon from "../../assets/chain/sui.png";
-import tonIcon from "../../assets/chain/ton.png";
-import aptosIcon from "../../assets/chain/tapt.png";
-import filecoinIcon from "../../assets/chain/fil.png";
-import kaspaIcon from "../../assets/chain/kas.png";
-import nervosIcon from "../../assets/chain/nervos.png";
-import polkadotIcon from "../../assets/chain/polkadot.png";
-import cardanoIcon from "../../assets/chain/cardano.png";
-import algorandIcon from "../../assets/chain/algo.png";
-import cosmosIcon from "../../assets/chain/cosmos.png";
-import neoIcon from "../../assets/chain/neon3.png";
-import nemIcon from "../../assets/chain/nem.png";
-import starcoinIcon from "../../assets/chain/stc.png";
-import scdoIcon from "../../assets/chain/scdo.png";
-import dynexIcon from "../../assets/chain/dynex.png";
-import nexaIcon from "../../assets/chain/nexa.png";
-import nostrIcon from "../../assets/chain/nostr.png";
-import xrpIcon from "../../assets/chain/xrp.png";
-import confluxIcon from "../../assets/chain/conflux-espace.png";
-import lightningIcon from "../../assets/chain/lnd.png";
-import benfenIcon from "../../assets/chain/bfc.png";
-import stellarIcon from "../../assets/chain/stellar.png";
-import alephiumIcon from "../../assets/chain/alephium.png";
-import { ChainCategory } from "~/data/types";
+import bitcoinIcon from '../../assets/chain/tbtc.png';
+import ethereumIcon from '../../assets/chain/teth.png';
+import solanaIcon from '../../assets/chain/sol.png';
+import tronIcon from '../../assets/chain/tron.png';
+import nearIcon from '../../assets/chain/near.png';
+import suiIcon from '../../assets/chain/sui.png';
+import tonIcon from '../../assets/chain/ton.png';
+import aptosIcon from '../../assets/chain/tapt.png';
+import filecoinIcon from '../../assets/chain/fil.png';
+import kaspaIcon from '../../assets/chain/kas.png';
+import nervosIcon from '../../assets/chain/nervos.png';
+import polkadotIcon from '../../assets/chain/polkadot.png';
+import cardanoIcon from '../../assets/chain/cardano.png';
+import algorandIcon from '../../assets/chain/algo.png';
+import cosmosIcon from '../../assets/chain/cosmos.png';
+import neoIcon from '../../assets/chain/neon3.png';
+import nemIcon from '../../assets/chain/nem.png';
+import starcoinIcon from '../../assets/chain/stc.png';
+import scdoIcon from '../../assets/chain/scdo.png';
+import dynexIcon from '../../assets/chain/dynex.png';
+import nexaIcon from '../../assets/chain/nexa.png';
+import nostrIcon from '../../assets/chain/nostr.png';
+import xrpIcon from '../../assets/chain/xrp.png';
+import confluxIcon from '../../assets/chain/conflux-espace.png';
+import lightningIcon from '../../assets/chain/lnd.png';
+import benfenIcon from '../../assets/chain/bfc.png';
+import stellarIcon from '../../assets/chain/stellar.png';
+import alephiumIcon from '../../assets/chain/alephium.png';
+import { ChainCategory } from '../../data/types';
 
 interface ChainIconProps {
   chainId: ChainCategory;
@@ -69,7 +69,7 @@ const CHAIN_ICON_MAP: Record<ChainCategory, string> = {
   lightning: lightningIcon,
   benfen: benfenIcon,
   alephium: alephiumIcon,
-  "all-network": "",
+  'all-network': '',
 };
 
 // 默认的fallback图标
@@ -80,8 +80,8 @@ const DefaultChainIcon: React.FC<{
   <div
     className={`bg-gray-100 rounded-full flex items-center justify-center ${className}`}
     style={{
-      width: typeof size === "number" ? `${size}px` : size,
-      height: typeof size === "number" ? `${size}px` : size,
+      width: typeof size === 'number' ? `${size}px` : size,
+      height: typeof size === 'number' ? `${size}px` : size,
     }}
   >
     <span className="text-gray-400 text-xs font-bold">?</span>
@@ -91,7 +91,7 @@ const DefaultChainIcon: React.FC<{
 export const ChainIcon: React.FC<ChainIconProps> = ({
   chainId,
   size = 24,
-  className = "",
+  className = '',
   fallback,
 }) => {
   // 直接从映射表获取图标
@@ -112,16 +112,14 @@ export const ChainIcon: React.FC<ChainIconProps> = ({
       alt={`${chainId} chain icon`}
       className={`object-contain ${className}`}
       style={{
-        width: typeof size === "number" ? `${size}px` : size,
-        height: typeof size === "number" ? `${size}px` : size,
+        width: typeof size === 'number' ? `${size}px` : size,
+        height: typeof size === 'number' ? `${size}px` : size,
       }}
-      onError={(e) => {
+      onError={e => {
         // 图片加载失败时隐藏img标签
         const target = e.target as HTMLImageElement;
-        target.style.display = "none";
-        console.warn(
-          `ChainIcon: Failed to display icon for chainId "${chainId}"`
-        );
+        target.style.display = 'none';
+        console.warn(`ChainIcon: Failed to display icon for chainId "${chainId}"`);
       }}
     />
   );

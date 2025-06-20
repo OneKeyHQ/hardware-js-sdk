@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'algorand',
-  name: 'Algorand',
-  description: 'Algorand blockchain operations',
-  icon: ``,
-  color: '#000000',
-  category: 'algorand' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -99,9 +94,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const algorand = {
   ...chainMeta,
   api,
 };
-
-export default api;

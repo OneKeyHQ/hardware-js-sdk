@@ -1,11 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'near',
-  name: 'NEAR',
-  description: 'NEAR Protocol operations',
-  category: 'near' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -92,9 +89,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const near = {
   ...chainMeta,
   api,
 };
-
-export default api;

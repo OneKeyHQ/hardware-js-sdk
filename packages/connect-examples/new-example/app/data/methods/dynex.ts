@@ -1,11 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'dynex',
-  name: 'Dynex',
-  description: 'Dynex blockchain operations',
-  category: 'dynex' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -125,9 +122,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const dynex = {
   ...chainMeta,
   api,
 };
-
-export default api;

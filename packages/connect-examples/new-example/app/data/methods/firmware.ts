@@ -1,7 +1,11 @@
 import type { UnifiedMethodConfig } from '../types';
 
+const chainMeta = {
+  id: 'firmware',
+};
+
 // 固件更新方法定义 - 使用统一格式
-const firmwareUpdateMethods: UnifiedMethodConfig[] = [
+const api: UnifiedMethodConfig[] = [
   {
     method: 'firmwareUpdateV2',
     description: 'Update firmware or ble-firmware',
@@ -376,14 +380,7 @@ export function getSupportedUpdateTypes(deviceType: string): FirmwareUpdateType[
   return firmwareUpdateTypes.filter(type => isUpdateTypeSupported(deviceType, type.id));
 }
 
-// 导出固件更新配置对象
-export const firmwareUpdateConfig = {
-  id: 'firmwareUpdate',
-  name: 'Firmware Update',
-  description: 'Device firmware update operations',
-  category: 'firmware' as const,
-  api: firmwareUpdateMethods,
-  updateTypes: firmwareUpdateTypes,
+export const firmware = {
+  ...chainMeta,
+  api,
 };
-
-export default firmwareUpdateMethods;

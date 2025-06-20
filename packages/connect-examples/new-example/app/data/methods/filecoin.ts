@@ -1,11 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'filecoin',
-  name: 'Filecoin',
-  description: 'Filecoin network operations',
-  category: 'filecoin' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -98,9 +95,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const filecoin = {
   ...chainMeta,
   api,
 };
-
-export default api;

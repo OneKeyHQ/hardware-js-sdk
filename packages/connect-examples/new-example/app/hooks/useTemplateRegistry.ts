@@ -1,17 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import type {
-  ChainConfig,
-  UnifiedMethodConfig,
-  ChainCategory,
-  FunctionalCategory,
-} from '~/data/types';
+import type { ChainConfig, UnifiedMethodConfig, ChainCategory } from '~/data/types';
 import { methodsRegistry } from '../data/methodsRegistry';
 
 // 统计信息类型
 interface RegistryStats {
   totalChains: number;
   totalMethods: number;
-  functionalsByCategory: Record<FunctionalCategory, number>;
   chainsByCategory: Record<ChainCategory, number>;
 }
 
@@ -52,22 +46,6 @@ class TemplateRegistry {
     return chain ? chain.methods : [];
   }
 
-  getChainsByCategory(category: FunctionalCategory): ChainConfig[] {
-    return this.chains.filter(chain => chain.category === category);
-  }
-
-  getFunctionalChains(): ChainConfig[] {
-    return this.chains.filter(
-      chain => chain.category === 'device' || chain.category === 'firmware'
-    );
-  }
-
-  getBlockchainChains(): ChainConfig[] {
-    return this.chains.filter(
-      chain => chain.category !== 'device' && chain.category !== 'firmware'
-    );
-  }
-
   searchMethods(query: string): UnifiedMethodConfig[] {
     const searchTerm = query.toLowerCase();
     return this.getAllMethods().filter(
@@ -78,24 +56,16 @@ class TemplateRegistry {
   }
 
   getStats(): RegistryStats {
-    const functionalsByCategory = {} as Record<FunctionalCategory, number>;
     const chainsByCategory = {} as Record<ChainCategory, number>;
 
-    // 分别统计功能模块和区块链分类
+    // 统计所有链的分类
     this.chains.forEach(chain => {
-      if (chain.category === 'device' || chain.category === 'firmware') {
-        functionalsByCategory[chain.category as FunctionalCategory] =
-          (functionalsByCategory[chain.category as FunctionalCategory] || 0) + 1;
-      } else {
-        chainsByCategory[chain.category as ChainCategory] =
-          (chainsByCategory[chain.category as ChainCategory] || 0) + 1;
-      }
+      chainsByCategory[chain.id] = (chainsByCategory[chain.id] || 0) + 1;
     });
 
     return {
       totalChains: this.chains.length,
       totalMethods: this.getAllMethods().length,
-      functionalsByCategory,
       chainsByCategory,
     };
   }
@@ -147,12 +117,6 @@ export function useTemplateRegistry() {
       (chainId: string) => templateRegistry.getChainMethods(chainId),
       []
     ),
-    getChainsByCategory: useCallback(
-      (category: FunctionalCategory) => templateRegistry.getChainsByCategory(category),
-      []
-    ),
-    getFunctionalChains: useCallback(() => templateRegistry.getFunctionalChains(), []),
-    getBlockchainChains: useCallback(() => templateRegistry.getBlockchainChains(), []),
     searchMethods: useCallback((query: string) => templateRegistry.searchMethods(query), []),
     getStats: useCallback(() => templateRegistry.getStats(), []),
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTemplateRegistry } from './useTemplateRegistry';
-import deviceMethods from '../data/methods/device';
-import firmwareUpdateMethods from '../data/methods/firmware';
+import { device } from '../data/methods/device';
+import { firmware } from '../data/methods/firmware';
 import type { ChainConfig, UnifiedMethodConfig } from '~/data/types';
 
 interface MethodResolverResult {
@@ -41,7 +41,7 @@ export function useMethodResolver({
     const chain = getChain(chainId);
     if (chain) {
       setSelectedChain(chain);
-      console.log('[MethodResolver] 找到链:', chain.name);
+      console.log('[MethodResolver] 找到链:', chain.id);
     } else {
       console.warn('[MethodResolver] 未找到链:', chainId);
       setSelectedChain(null);
@@ -74,7 +74,7 @@ export function useMethodResolver({
       }
     } else {
       // 设备方法模式：直接从设备和固件方法中查找
-      methods = [...deviceMethods, ...firmwareUpdateMethods]; // 现在都是 UnifiedMethodConfig 格式
+      methods = [...device.api, ...firmware.api]; // 现在都是 UnifiedMethodConfig 格式
       console.log(
         '[MethodResolver] 设备方法模式，可用方法:',
         methods.map(m => m.method)

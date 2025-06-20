@@ -45,15 +45,6 @@ export type MethodCategory =
   | 'firmware'
   | 'other';
 
-// 功能分类
-export type FunctionalCategory =
-  | 'device'
-  | 'blockchain'
-  | 'crypto'
-  | 'utility'
-  | 'firmware'
-  | 'other';
-
 // 链分类
 export type ChainCategory =
   | 'bitcoin'
@@ -83,7 +74,8 @@ export type ChainCategory =
   | 'dynex'
   | 'filecoin'
   | 'nostr'
-  | 'other';
+  | 'lightning'
+  | 'all-network';
 
 // **统一的方法配置类型** - 极简设计
 export interface UnifiedMethodConfig {
@@ -118,12 +110,7 @@ export type LogType = 'info' | 'success' | 'error' | 'warning';
 
 // 链元数据类型
 export interface ChainMeta {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  color: string;
-  category: FunctionalCategory;
+  id: ChainCategory;
 }
 
 // 链配置类型（保持兼容）

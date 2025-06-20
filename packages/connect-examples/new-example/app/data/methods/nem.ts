@@ -1,11 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'nem',
-  name: 'NEM',
-  description: 'NEM blockchain operations',
-  category: 'nem' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -109,9 +106,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const nem = {
   ...chainMeta,
   api,
 };
-
-export default api;

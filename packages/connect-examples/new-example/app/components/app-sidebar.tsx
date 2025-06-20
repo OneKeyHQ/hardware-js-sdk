@@ -104,73 +104,126 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* 设备状态 */}
-        {currentDevice && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-sm font-semibold">
-              {t('device.status')}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <Card className="border-border/60 bg-card/60 dark:bg-card/80 dark:border-border/40 backdrop-blur-sm">
-                <CardContent className="p-3 space-y-2">
-                  {/* 连接状态和设备名称 */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon()}
-                      <Badge
-                        variant={getStatusVariant()}
-                        className="text-xs px-2 py-0.5 font-medium"
-                      >
-                        {getStatusText()}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* 设备信息 */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-muted-foreground font-medium">Device Name</span>
-                      <span className="text-xs font-bold text-foreground truncate max-w-24">
-                        {currentDevice.label || getDeviceLabel(currentDevice.features)}
-                      </span>
+        {/* 设备状态 - 始终预留空间 */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm font-semibold">
+            {t('device.status')}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <Card className="border-border/60 bg-card/60 dark:bg-card/80 dark:border-border/40 backdrop-blur-sm">
+              <CardContent className="p-3 space-y-2">
+                {currentDevice ? (
+                  <>
+                    {/* 连接状态和设备名称 */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon()}
+                        <Badge
+                          variant={getStatusVariant()}
+                          className="text-xs px-2 py-0.5 font-medium"
+                        >
+                          {getStatusText()}
+                        </Badge>
+                      </div>
                     </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-muted-foreground font-medium">Device Type</span>
-                      <span className="text-xs font-semibold text-foreground">
-                        {currentDevice.deviceType.toUpperCase() || 'Unknown'}
-                      </span>
+                    {/* 设备信息 */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Device Name
+                        </span>
+                        <span className="text-xs font-bold text-foreground truncate max-w-24">
+                          {currentDevice.label || getDeviceLabel(currentDevice.features)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Device Type
+                        </span>
+                        <span className="text-xs font-semibold text-foreground">
+                          {currentDevice.deviceType.toUpperCase() || 'Unknown'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">UUID</span>
+                        <span
+                          className="text-xs font-mono text-foreground truncate max-w-24"
+                          title={currentDevice.connectId}
+                        >
+                          {currentDevice.connectId?.slice(0, 8)}...
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">Transport</span>
+                        <Badge variant="outline" className="text-xs px-1.5 py-0 font-medium">
+                          {transportType === 'webusb'
+                            ? 'WebUSB'
+                            : transportType === 'jsbridge'
+                            ? 'JSBridge'
+                            : transportType || 'Unknown'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* 未连接设备时的占位内容 */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon()}
+                        <Badge
+                          variant={getStatusVariant()}
+                          className="text-xs px-2 py-0.5 font-medium"
+                        >
+                          {getStatusText()}
+                        </Badge>
+                      </div>
                     </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-muted-foreground font-medium">UUID</span>
-                      <span
-                        className="text-xs font-mono text-foreground truncate max-w-24"
-                        title={currentDevice.connectId}
-                      >
-                        {currentDevice.connectId?.slice(0, 8)}...
-                      </span>
-                    </div>
+                    {/* 占位信息 - 保持与连接状态相同的高度 */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Device Name
+                        </span>
+                        <span className="text-xs text-muted-foreground">--</span>
+                      </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-muted-foreground font-medium">Transport</span>
-                      <Badge variant="outline" className="text-xs px-1.5 py-0 font-medium">
-                        {transportType === 'webusb'
-                          ? 'WebUSB'
-                          : transportType === 'jsbridge'
-                          ? 'JSBridge'
-                          : transportType || 'Unknown'}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Device Type
+                        </span>
+                        <span className="text-xs text-muted-foreground">--</span>
+                      </div>
 
-        {/* 分割线 - 在设备状态和导航菜单之间 */}
-        {currentDevice && <SidebarSeparator className="bg-border/50 dark:bg-border" />}
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">UUID</span>
+                        <span className="text-xs text-muted-foreground">--</span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground font-medium">Transport</span>
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-1.5 py-0 font-medium text-muted-foreground border-muted"
+                        >
+                          --
+                        </Badge>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* 分割线 - 始终显示 */}
+        <SidebarSeparator className="bg-border/50 dark:bg-border" />
 
         {/* 导航菜单 - 优化版本 */}
         <SidebarGroup>

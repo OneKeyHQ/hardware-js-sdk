@@ -32,9 +32,9 @@ const getShortcutKeys = () => {
 
   return {
     CmdOrCtrl: isMac ? '⌘' : 'Ctrl+',
-    Alt: isMac ? '⌥' : 'Alt+',
-    Shift: 'Shift+',
-    Meta: isMac ? '⌘' : 'Win+',
+    Alt: isMac ? '⌥' : 'Alt',
+    Shift: 'Shift',
+    Meta: isMac ? '⌘' : 'Win',
   };
 };
 

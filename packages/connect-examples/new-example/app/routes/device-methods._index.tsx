@@ -19,9 +19,9 @@ import { DeviceNotConnectedState } from '../components/common/DeviceNotConnected
 import { ListBoundary } from '../components/common/ListBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 
-import deviceMethods from '../data/methods/device';
-import firmwareUpdateMethods from '../data/methods/firmware';
-import type { MethodConfig } from '../data/types';
+import { device } from '../data/methods/device';
+import { firmware } from '../data/methods/firmware';
+import type { UnifiedMethodConfig } from '../data/types';
 
 // 方法分类定义
 interface MethodCategory {
@@ -32,7 +32,7 @@ interface MethodCategory {
   color: string;
   bgColor: string;
   borderColor: string;
-  methods: MethodConfig[];
+  methods: UnifiedMethodConfig[];
 }
 
 const DeviceMethodsIndexPage: React.FC = () => {
@@ -41,21 +41,23 @@ const DeviceMethodsIndexPage: React.FC = () => {
   // 获取所有方法数据
   const allMethods = useMemo(() => {
     // 将device方法转换为统一格式
-    const convertedDeviceMethods = deviceMethods.map(method => ({
+    const convertedDeviceMethods = device.api.map(method => ({
       method: method.method,
       description: method.description,
       deprecated: method.deprecated || false,
       noDeviceIdReq: method.noDeviceIdReq,
       noConnIdReq: method.noConnIdReq,
+      presets: method.presets,
     }));
 
     // 将firmware方法转换为统一格式
-    const convertedFirmwareMethods = firmwareUpdateMethods.map(method => ({
+    const convertedFirmwareMethods = firmware.api.map(method => ({
       method: method.method,
       description: method.description,
       deprecated: method.deprecated || false,
       noDeviceIdReq: method.noDeviceIdReq,
       noConnIdReq: method.noConnIdReq,
+      presets: method.presets,
     }));
 
     console.log('Device methods found:', convertedDeviceMethods.length);
@@ -71,11 +73,11 @@ const DeviceMethodsIndexPage: React.FC = () => {
 
   // 智能分类逻辑
   const categories = useMemo((): MethodCategory[] => {
-    const basicMethods: MethodConfig[] = [];
-    const deviceManagementMethods: MethodConfig[] = [];
-    const firmwareMethods: MethodConfig[] = [];
-    const releaseMethods: MethodConfig[] = [];
-    const controlMethods: MethodConfig[] = [];
+    const basicMethods: UnifiedMethodConfig[] = [];
+    const deviceManagementMethods: UnifiedMethodConfig[] = [];
+    const firmwareMethods: UnifiedMethodConfig[] = [];
+    const releaseMethods: UnifiedMethodConfig[] = [];
+    const controlMethods: UnifiedMethodConfig[] = [];
 
     allMethods.forEach(method => {
       const methodName = method.method.toLowerCase();
@@ -168,13 +170,13 @@ const DeviceMethodsIndexPage: React.FC = () => {
   const totalMethods = allMethods.length;
 
   // 处理方法选择
-  const handleMethodSelect = (method: MethodConfig) => {
+  const handleMethodSelect = (method: UnifiedMethodConfig) => {
     // 统一导航到设备方法路由
     navigate(`/device-methods/${method.method}`);
   };
 
   // 渲染方法项
-  const renderMethodItem = (method: MethodConfig) => {
+  const renderMethodItem = (method: UnifiedMethodConfig) => {
     return (
       <div
         key={method.method}

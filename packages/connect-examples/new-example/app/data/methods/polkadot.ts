@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'polkadot',
-  name: 'Polkadot',
-  description: 'Polkadot ecosystem operations',
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm6.4 7.7a2.4 2.4 0 1 1-2.4-2.4 2.4 2.4 0 0 1 2.4 2.4zm-2.4 8.6a2.4 2.4 0 1 1 2.4-2.4 2.4 2.4 0 0 1-2.4 2.4zM12 18.4a2.4 2.4 0 1 1 2.4-2.4A2.4 2.4 0 0 1 12 18.4zm0-12.8a2.4 2.4 0 1 1 2.4-2.4A2.4 2.4 0 0 1 12 5.6zM5.6 16.3a2.4 2.4 0 1 1 2.4-2.4 2.4 2.4 0 0 1-2.4 2.4zm2.4-8.6a2.4 2.4 0 1 1-2.4-2.4 2.4 2.4 0 0 1 2.4 2.4z" fill="#E6007A"/></svg>`,
-  color: '#E6007A',
-  category: 'polkadot' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -318,9 +313,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const polkadot = {
   ...chainMeta,
   api,
 };
-
-export default api;

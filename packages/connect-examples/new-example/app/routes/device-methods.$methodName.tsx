@@ -9,7 +9,7 @@ import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { useMethodResolver } from '../hooks/useMethodResolver';
 import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
 import { useDeviceStore } from '../store/deviceStore';
-import firmwareUpdateMethods from '../data/methods/firmware';
+import { firmware } from '../data/methods/firmware';
 
 const DeviceMethodExecutePage: React.FC = () => {
   const { methodName } = useParams();
@@ -68,7 +68,7 @@ const DeviceMethodExecutePage: React.FC = () => {
                     executionHandler={handleMethodExecution}
                     className="h-full"
                     type={
-                      firmwareUpdateMethods.some(m => m.method === selectedMethod.method)
+                      firmware.api.some(m => m.method === selectedMethod.method)
                         ? 'firmware'
                         : 'standard'
                     }

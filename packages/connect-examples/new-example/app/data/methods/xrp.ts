@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'xrp',
-  name: 'XRP',
-  description: 'XRP Ledger operations',
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#23292F"/><path d="M8 12l4 4 4-4-4-4-4 4z" fill="white"/></svg>`,
-  color: '#23292F',
-  category: 'xrp' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -139,9 +134,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const xrp = {
   ...chainMeta,
   api,
 };
-
-export default api;

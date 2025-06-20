@@ -11,7 +11,7 @@ const enResources = {
       device: 'Device',
       chainMethods: 'Signer',
       deviceMethods: 'Device Methods',
-      firmwareUpdate: 'Firmware Update',
+      firmware: 'Firmware',
       logs: 'Logs',
       connect: 'Connect',
       shareLog: 'Share Logs',
@@ -131,9 +131,9 @@ const enResources = {
         title: 'Device Status',
         description: 'Check the current status and features of your device',
       },
-      firmwareUpdate: {
-        title: 'Firmware Update',
-        description: 'Check for firmware updates and manage device software',
+      firmware: {
+        title: 'Firmware',
+        description: 'Check for firmware and manage device software',
       },
       passphraseStatus: {
         title: 'Passphrase Status',
@@ -298,7 +298,7 @@ const zhResources = {
       device: '设备',
       chainMethods: 'Signer',
       deviceMethods: '设备方法',
-      firmwareUpdate: '固件更新',
+      firmware: '固件更新',
       logs: '日志',
       connect: '连接',
       shareLog: '分享日志',
@@ -415,7 +415,7 @@ const zhResources = {
         title: '设备状态',
         description: '检查设备的当前状态和功能',
       },
-      firmwareUpdate: {
+      firmware: {
         title: '固件更新',
         description: '检查固件更新并管理设备软件',
       },

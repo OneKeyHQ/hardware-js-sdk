@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'alephium',
-  name: 'Alephium',
-  description: 'Alephium blockchain operations',
-  icon: ``,
-  color: '#FF6B35',
-  category: 'alephium' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -326,9 +321,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const alephium = {
   ...chainMeta,
   api,
 };
-
-export default api;

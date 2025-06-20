@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'ethereum',
-  name: 'Ethereum',
-  description: 'Ethereum and EVM-compatible chains',
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.999 0L7.06 12.188l4.939 2.274 4.94-2.274L11.999 0z" fill="#627EEA"/><path d="M11.999 24l4.94-6.838-4.94-2.274-4.939 2.274L11.999 24z" fill="#627EEA"/><path d="M11.999 17.538l4.94-2.274-4.94-2.273-4.939 2.273 4.939 2.274z" fill="#627EEA" fill-opacity="0.6"/><path d="M7.06 12.188L11.999 0v15.265l-4.939-3.077z" fill="#627EEA" fill-opacity="0.45"/><path d="M11.999 0l4.94 12.188-4.94 3.077V0z" fill="#627EEA" fill-opacity="0.8"/></svg>`,
-  color: '#627EEA',
-  category: 'ethereum' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -522,9 +517,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const ethereum = {
   ...chainMeta,
   api,
 };
-
-export default api;

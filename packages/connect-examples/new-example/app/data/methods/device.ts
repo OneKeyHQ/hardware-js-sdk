@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, FunctionalCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
 export const chainMeta = {
   id: 'device',
-  name: 'Device',
-  description: 'Device management and basic operations',
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#10B981"/></svg>`,
-  color: '#10B981',
-  category: 'device' as FunctionalCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -164,9 +159,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const device = {
   ...chainMeta,
   api,
 };
-
-export default api;

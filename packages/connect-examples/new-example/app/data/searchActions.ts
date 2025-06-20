@@ -75,11 +75,11 @@ export const buildSearchActions = (): Action[] => {
     },
     {
       id: 'chains',
-      name: 'Blockchains',
+      name: 'signer',
       subtitle: '支持的区块链和相关方法',
       section: 'Documentation',
-      shortcut: ['c'],
-      keywords: 'chains blockchain 区块链 链',
+      shortcut: ['s'],
+      keywords: 'blockchain signer',
       perform: () => navigateTo('/chains'),
     }
   );
@@ -91,7 +91,6 @@ export const buildSearchActions = (): Action[] => {
       name: 'Light Theme',
       subtitle: '切换到浅色主题',
       section: 'Settings',
-      shortcut: ['shift', 'l'],
       keywords: 'theme light 主题 浅色 白色',
       perform: () => setTheme('light'),
     },
@@ -100,7 +99,6 @@ export const buildSearchActions = (): Action[] => {
       name: 'Dark Theme',
       subtitle: '切换到深色主题',
       section: 'Settings',
-      shortcut: ['shift', 'd'],
       keywords: 'theme dark 主题 深色 黑色',
       perform: () => setTheme('dark'),
     }
@@ -164,18 +162,16 @@ export const buildSearchActions = (): Action[] => {
     let routePrefix: string;
     const chainIdStr = String(chain.id);
 
-    if (chainIdStr === 'device' || chainIdStr === 'firmwareUpdate') {
+    if (chainIdStr === 'device' || chainIdStr === 'firmware') {
       routePrefix = '/device-methods';
     } else {
       routePrefix = `/chains/${chain.id}`;
-
       // 为区块链添加链级别的搜索项
       actions.push({
         id: `chain-${chain.id}`,
-        name: chain.name,
-        subtitle: chain.description,
+        name: chain.id,
         section: 'Blockchains',
-        keywords: `${chain.name} ${chain.description} ${chain.id}`,
+        keywords: `${chain.id}`,
         perform: () => navigateTo(`/chains/${chain.id}`),
       });
     }
@@ -186,12 +182,12 @@ export const buildSearchActions = (): Action[] => {
         let sectionName: string;
         let actionName: string;
 
-        if (chainIdStr === 'device' || chainIdStr === 'firmwareUpdate') {
+        if (chainIdStr === 'device' || chainIdStr === 'firmware') {
           sectionName = 'Device Methods';
           actionName = method.method;
         } else {
           sectionName = 'Chain Methods';
-          actionName = `${chain.name} - ${method.method}`;
+          actionName = `${chain.id} - ${method.method}`;
         }
 
         actions.push({
@@ -199,7 +195,7 @@ export const buildSearchActions = (): Action[] => {
           name: actionName,
           subtitle: method.description,
           section: sectionName,
-          keywords: `${chain.name} ${method.method} ${method.description} ${chain.id}`,
+          keywords: `${chain.id} ${method.method} ${method.description}`,
           perform: () => navigateTo(`${routePrefix}/${method.method}`),
         });
       });

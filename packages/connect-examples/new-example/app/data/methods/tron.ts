@@ -1,13 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'tron',
-  name: 'TRON',
-  description: 'TRON blockchain operations',
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#FF0013"/><path d="M8 12l4 4 4-4-4-4-4 4z" fill="white"/></svg>`,
-  color: '#FF0013',
-  category: 'tron' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -163,9 +158,7 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const chainConfig = {
+export const tron = {
   ...chainMeta,
   api,
 };
-
-export default api;

@@ -494,6 +494,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   };
 
   const hasPresets = presets && presets.length > 0;
+  const hasMultiplePresets = presets && presets.length > 1;
 
   return (
     <Card className="bg-card border border-border/50 shadow-sm">
@@ -510,10 +511,12 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
       <CardContent className="space-y-4">
         <div
-          className={`grid grid-cols-1 gap-6 ${hasPresets ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}
+          className={`grid grid-cols-1 gap-6 ${
+            hasMultiplePresets ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
+          }`}
         >
-          {/* 快捷预设 - 只在有预设时显示 */}
-          {hasPresets && (
+          {/* 快捷预设 - 只在有多个预设时显示 */}
+          {hasMultiplePresets && (
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-2">
                 快捷预设

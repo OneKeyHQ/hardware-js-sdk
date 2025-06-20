@@ -55,7 +55,7 @@ const ChainMethodExecutePage: React.FC = () => {
                       icon: Layers,
                     },
                     {
-                      label: selectedChain.name,
+                      label: selectedChain.id,
                       href: `/chains/${chainId}`,
                       icon: () => <ChainIcon chainId={selectedChain.id} size={16} />,
                     },

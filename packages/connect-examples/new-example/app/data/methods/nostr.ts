@@ -1,11 +1,8 @@
-import type { UnifiedMethodConfig, ChainCategory } from '../types';
+import type { UnifiedMethodConfig } from '../types';
 
 // 链元数据
-export const chainMeta = {
+const chainMeta = {
   id: 'nostr',
-  name: 'Nostr',
-  description: 'Nostr protocol operations',
-  category: 'nostr' as ChainCategory,
 };
 
 const api: UnifiedMethodConfig[] = [
@@ -209,4 +206,7 @@ const api: UnifiedMethodConfig[] = [
   },
 ];
 
-export default api;
+export const nostr = {
+  ...chainMeta,
+  api,
+};
