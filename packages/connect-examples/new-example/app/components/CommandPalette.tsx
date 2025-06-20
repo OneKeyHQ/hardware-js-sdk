@@ -11,6 +11,33 @@ import {
 } from 'kbar';
 import { searchActions } from '../data/searchActions';
 
+// 平台检测工具
+const getPlatformInfo = () => {
+  if (typeof window === 'undefined') return { isMac: false, isWindows: false };
+
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  const platform = window.navigator.platform?.toLowerCase() || '';
+
+  const isMac =
+    platform.includes('mac') || platform.includes('darwin') || userAgent.includes('macintosh');
+
+  const isWindows = platform.includes('win') || userAgent.includes('windows');
+
+  return { isMac, isWindows };
+};
+
+// 跨平台快捷键映射
+const getShortcutKeys = () => {
+  const { isMac } = getPlatformInfo();
+
+  return {
+    CmdOrCtrl: isMac ? '⌘' : 'Ctrl+',
+    Alt: isMac ? '⌥' : 'Alt+',
+    Shift: 'Shift+',
+    Meta: isMac ? '⌘' : 'Win+',
+  };
+};
+
 // 结果渲染组件
 function RenderResults() {
   const { results } = useMatches();
@@ -30,6 +57,46 @@ function RenderResults() {
 
         // 处理搜索结果项
         const action = item as ActionImpl;
+
+        // 格式化快捷键显示
+        const formatShortcut = (shortcut: string[]) => {
+          if (!shortcut || shortcut.length === 0) return null;
+
+          const shortcutKeys = getShortcutKeys();
+
+          return shortcut
+            .map(key => {
+              const lowerKey = key.toLowerCase();
+
+              // 处理特殊键名 - 使用跨平台映射
+              const keyMap: Record<string, string> = {
+                shift: shortcutKeys.Shift,
+                cmd: shortcutKeys.CmdOrCtrl,
+                ctrl: shortcutKeys.CmdOrCtrl,
+                alt: shortcutKeys.Alt,
+                meta: shortcutKeys.Meta,
+                // 其他常用键
+                enter: '↵',
+                return: '↵',
+                escape: 'Esc',
+                esc: 'Esc',
+                space: 'Space',
+                tab: 'Tab',
+                backspace: '⌫',
+                delete: 'Del',
+                up: '↑',
+                down: '↓',
+                left: '←',
+                right: '→',
+              };
+
+              return keyMap[lowerKey] || key.toUpperCase();
+            })
+            .join(' + ');
+        };
+
+        const shortcutDisplay = action.shortcut ? formatShortcut(action.shortcut) : null;
+
         return (
           <div
             className={`px-4 py-3 cursor-pointer transition-colors border-l-2 ${
@@ -47,6 +114,13 @@ function RenderResults() {
                   </div>
                 )}
               </div>
+              {shortcutDisplay && (
+                <div className="flex-shrink-0 ml-3">
+                  <kbd className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600">
+                    {shortcutDisplay}
+                  </kbd>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -58,6 +132,7 @@ function RenderResults() {
 // 搜索触发按钮组件
 export function SearchTrigger() {
   const { query } = useKBar();
+  const shortcutKeys = getShortcutKeys();
 
   const handleClick = () => {
     query.toggle();
@@ -78,7 +153,7 @@ export function SearchTrigger() {
       </svg>
       <span className="text-gray-500 dark:text-gray-400">搜索</span>
       <kbd className="ml-auto text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
-        ⌘K
+        {shortcutKeys.CmdOrCtrl}K
       </kbd>
     </button>
   );

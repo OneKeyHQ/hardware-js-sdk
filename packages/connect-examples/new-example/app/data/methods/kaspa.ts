@@ -1,104 +1,151 @@
-import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from "../types";
-
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
-  id: "kaspa",
-  name: "Kaspa",
-  description: "Kaspa blockchain operations",
-  icon: ``,
-  color: "#70C7C7",
-  category: "kaspa" as ChainCategory,
+  id: 'kaspa',
+  name: 'Kaspa',
+  description: 'Kaspa blockchain operations',
+  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#70C7BA"/><path d="M8 12l4 4 4-4-4-4-4 4z" fill="white"/></svg>`,
+  color: '#70C7BA',
+  category: 'kaspa' as ChainCategory,
 };
 
-const api: PlaygroundProps[] = [
+const api: UnifiedMethodConfig[] = [
   {
     method: 'kaspaGetAddress',
     description: 'Get address',
-    presupposes: [
+    presets: [
       {
         title: 'Get address',
-        value: {
-          path: "m/44'/111111'/0'/0/0",
-          showOnOneKey: false,
-          prefix: 'kaspa',
-          scheme: 'schnorr',
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/111111'/0'/0/0",
+          },
+          {
+            name: 'prefix',
+            type: 'string',
+            required: false,
+            label: 'Address Prefix',
+            value: 'kaspa',
+          },
+          {
+            name: 'scheme',
+            type: 'string',
+            required: false,
+            label: 'Address Scheme',
+            value: 'schnorr',
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            required: false,
+            label: 'Show on Device',
+            value: false,
+          },
+        ],
       },
       {
         title: 'Batch Get Address',
-        value: {
-          bundle: [
-            {
-              path: "m/44'/111111'/0'/0/0",
-              showOnOneKey: false,
-              prefix: 'kaspa',
-              scheme: 'schnorr',
-            },
-            {
-              path: "m/44'/111111'/0'/0/1",
-              showOnOneKey: false,
-              prefix: 'kaspa',
-              scheme: 'schnorr',
-            },
-            {
-              path: "m/44'/111111'/0'/0/2",
-              showOnOneKey: false,
-              prefix: 'kaspa',
-              scheme: 'schnorr',
-            },
-          ],
-        },
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+            label: 'Bundle Configuration',
+            value: JSON.stringify(
+              [
+                {
+                  path: "m/44'/111111'/0'/0/0",
+                  prefix: 'kaspa',
+                  scheme: 'schnorr',
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/111111'/0'/0/1",
+                  prefix: 'kaspa',
+                  scheme: 'schnorr',
+                  showOnOneKey: false,
+                },
+              ],
+              null,
+              2
+            ),
+          },
+        ],
       },
     ],
   },
   {
     method: 'kaspaSignTransaction',
-    description: 'Sign Transaction',
-    presupposes: [
+    description: 'Sign transaction',
+    presets: [
       {
-        title: 'Sign Transaction',
-        value: {
-          path: "m/44'/461'/0'/0/0",
-          subNetworkID: '00000000000000000000000000000000',
-          prefix: 'kaspa',
-          scheme: 'schnorr',
-          version: 0,
-          lockTime: '0',
-          sigHashType: 0x1,
-          sigOpCount: 1,
-          inputs: [
-            {
-              outputIndex: 1,
-              path: "m/44'/111111'/0'/0/0",
-              prevTxId: '1f226507807ff7dc5a7f8f2dec353fffc9dacc2645d8aecd02e5046907e3e2b2',
-              sequenceNumber: '0',
-              sigOpCount: 1,
-              output: {
-                satoshis: '990096458',
-                script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
-              },
-            },
-          ],
-          outputs: [
-            {
-              satoshis: '100000000',
-              script: '205ca3a7530284e5c5e472544edd6002c3afeb8c8f84d3a728fad255a4872753fbac',
-              scriptVersion: 0,
-            },
-            {
-              satoshis: '890094182',
-              script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
-              scriptVersion: 0,
-            },
-          ],
-        },
+        title: 'Sign transaction',
+        parameters: [
+          {
+            name: 'inputs',
+            type: 'textarea',
+            required: true,
+            label: 'Inputs',
+            value: JSON.stringify(
+              [
+                {
+                  path: "m/44'/111111'/0'/0/0",
+                  prevTxId: '40b022362652a0b8e72fcbc2e4c8f8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9',
+                  outputIndex: 0,
+                  sequenceNumber: 0,
+                  output: {
+                    satoshis: 1000000,
+                    script: '76a914...',
+                  },
+                },
+              ],
+              null,
+              2
+            ),
+          },
+          {
+            name: 'outputs',
+            type: 'textarea',
+            required: true,
+            label: 'Outputs',
+            value: JSON.stringify(
+              [
+                {
+                  satoshis: 500000,
+                  script: '76a914...',
+                  scriptPublicKey: {
+                    scriptPublicKey: '76a914...',
+                  },
+                },
+              ],
+              null,
+              2
+            ),
+          },
+          {
+            name: 'version',
+            type: 'number',
+            required: false,
+            label: 'Version',
+            value: 0,
+          },
+          {
+            name: 'lockTime',
+            type: 'number',
+            required: false,
+            label: 'Lock Time',
+            value: 0,
+          },
+        ],
       },
     ],
   },
 ];
-
 
 // 导出链配置对象
 export const chainConfig = {

@@ -1,192 +1,280 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Cpu } from 'lucide-react';
-import { Input } from '../components/ui/Input';
+import {
+  Cpu,
+  Download,
+  Settings,
+  Zap,
+  RefreshCw,
+  ChevronRight,
+  AlertTriangle,
+  Info,
+} from 'lucide-react';
+
+import { Badge } from '../components/ui/Badge';
+import { Card, CardContent } from '../components/ui/Card';
+import { Separator } from '../components/ui/Separator';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { ListBoundary } from '../components/common/ListBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
-import { useTemplateRegistry } from '../hooks/useTemplateRegistry';
+
+import deviceMethods from '../data/methods/device';
+import firmwareUpdateMethods from '../data/methods/firmware';
 import type { MethodConfig } from '../data/types';
+
+// 方法分类定义
+interface MethodCategory {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  methods: MethodConfig[];
+}
 
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
 
-  const { getFunctionalChains } = useTemplateRegistry();
+  // 获取所有方法数据
+  const allMethods = useMemo(() => {
+    // 将device方法转换为统一格式
+    const convertedDeviceMethods = deviceMethods.map(method => ({
+      method: method.method,
+      description: method.description,
+      deprecated: method.deprecated || false,
+      noDeviceIdReq: method.noDeviceIdReq,
+      noConnIdReq: method.noConnIdReq,
+    }));
 
-  // 获取设备方法
-  const functionalChains = getFunctionalChains();
-  const allDeviceMethods = functionalChains
-    .filter(chain => chain.category === 'device')
-    .flatMap(chain => chain.methods);
+    // 将firmware方法转换为统一格式
+    const convertedFirmwareMethods = firmwareUpdateMethods.map(method => ({
+      method: method.method,
+      description: method.description,
+      deprecated: method.deprecated || false,
+      noDeviceIdReq: method.noDeviceIdReq,
+      noConnIdReq: method.noConnIdReq,
+    }));
 
-  // 过滤方法
-  const filteredMethods = allDeviceMethods.filter(
-    method =>
-      method.method.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      method.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    console.log('Device methods found:', convertedDeviceMethods.length);
+    console.log('Firmware methods found:', convertedFirmwareMethods.length);
+    console.log('Total methods:', convertedDeviceMethods.length + convertedFirmwareMethods.length);
+    console.log(
+      'All method names:',
+      [...convertedDeviceMethods, ...convertedFirmwareMethods].map(m => m.method)
+    );
 
-  // 按功能分组
-  const basicMethods = filteredMethods.filter(
-    method =>
-      method.method === 'searchDevices' ||
-      method.method === 'getFeatures' ||
-      method.method === 'getOnekeyFeatures' ||
-      method.method === 'getPassphraseState' ||
-      method.method === 'cancel'
-  );
+    return [...convertedDeviceMethods, ...convertedFirmwareMethods];
+  }, []);
 
-  const deviceMethods = filteredMethods.filter(method => !basicMethods.includes(method));
+  // 智能分类逻辑
+  const categories = useMemo((): MethodCategory[] => {
+    const basicMethods: MethodConfig[] = [];
+    const deviceManagementMethods: MethodConfig[] = [];
+    const firmwareMethods: MethodConfig[] = [];
+    const releaseMethods: MethodConfig[] = [];
+    const controlMethods: MethodConfig[] = [];
+
+    allMethods.forEach(method => {
+      const methodName = method.method.toLowerCase();
+
+      // 基本操作
+      if (
+        [
+          'searchdevices',
+          'getfeatures',
+          'getonekeyfeatures',
+          'getpassphrasestate',
+          'cancel',
+        ].includes(methodName)
+      ) {
+        basicMethods.push(method);
+      }
+      // 固件更新
+      else if (methodName.includes('firmwareupdate') || methodName.includes('updatebootloader')) {
+        firmwareMethods.push(method);
+      }
+      // 版本信息检查
+      else if (methodName.includes('check') && methodName.includes('release')) {
+        releaseMethods.push(method);
+      }
+      // 设备控制
+      else if (methodName.includes('reboot') || methodName.includes('bootloader')) {
+        controlMethods.push(method);
+      }
+      // 设备管理
+      else {
+        deviceManagementMethods.push(method);
+      }
+    });
+
+    return [
+      {
+        id: 'basic',
+        name: 'Basic Operations',
+        description: 'Essential device connectivity and information',
+        icon: Zap,
+        color: 'text-slate-700',
+        bgColor: 'bg-slate-50',
+        borderColor: 'border-slate-200',
+        methods: basicMethods,
+      },
+      {
+        id: 'device',
+        name: 'Device Management',
+        description: 'PIN, settings and security configuration',
+        icon: Settings,
+        color: 'text-slate-700',
+        bgColor: 'bg-slate-50',
+        borderColor: 'border-slate-200',
+        methods: deviceManagementMethods,
+      },
+      {
+        id: 'firmware',
+        name: 'Firmware Update',
+        description: 'Firmware, bootloader and BLE updates',
+        icon: Download,
+        color: 'text-slate-700',
+        bgColor: 'bg-slate-50',
+        borderColor: 'border-slate-200',
+        methods: firmwareMethods,
+      },
+      {
+        id: 'release',
+        name: 'Release Information',
+        description: 'Version checks and release data',
+        icon: Info,
+        color: 'text-slate-700',
+        bgColor: 'bg-slate-50',
+        borderColor: 'border-slate-200',
+        methods: releaseMethods,
+      },
+      {
+        id: 'control',
+        name: 'Device Control',
+        description: 'Reboot and bootloader operations',
+        icon: RefreshCw,
+        color: 'text-slate-700',
+        bgColor: 'bg-slate-50',
+        borderColor: 'border-slate-200',
+        methods: controlMethods,
+      },
+    ].filter(category => category.methods.length > 0);
+  }, [allMethods]);
+
+  // 统计信息
+  const totalMethods = allMethods.length;
 
   // 处理方法选择
-  const handleMethodSelect = (methodName: string) => {
-    navigate(`/device-methods/${methodName}`);
+  const handleMethodSelect = (method: MethodConfig) => {
+    // 统一导航到设备方法路由
+    navigate(`/device-methods/${method.method}`);
   };
 
-  // 处理键盘事件
-  const handleKeyDown = (event: React.KeyboardEvent, callback: () => void) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      callback();
-    }
-  };
+  // 渲染方法项
+  const renderMethodItem = (method: MethodConfig) => {
+    return (
+      <div
+        key={method.method}
+        onClick={() => handleMethodSelect(method)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleMethodSelect(method);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:border-border/50 hover:bg-muted/30 cursor-pointer transition-all duration-200"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-1">
+            <code className="text-sm font-semibold text-foreground">{method.method}</code>
 
-  // 渲染方法卡片 - 优化版本
-  const renderMethodCard = (method: MethodConfig, index: number, keyPrefix: string) => (
-    <div
-      key={`${keyPrefix}-${method.method}-${index}`}
-      className="group relative overflow-hidden bg-card border border-border/50 rounded-xl p-4 cursor-pointer transition-all duration-200 hover:border-border hover:shadow-md hover:shadow-black/5 dark:hover:shadow-white/5 hover:-translate-y-0.5"
-      onClick={() => handleMethodSelect(method.method)}
-      onKeyDown={e => handleKeyDown(e, () => handleMethodSelect(method.method))}
-      tabIndex={0}
-      role="button"
-      aria-label={`Execute ${method.method}`}
-    >
-      {/* 微妙的悬停效果 */}
-      <div className="absolute inset-0 bg-gradient-to-r from-foreground/0 via-foreground/0 to-foreground/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-
-      <div className="relative">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-base font-bold font-mono text-foreground group-hover:text-foreground/80 transition-colors duration-200">
-                {method.method}
-              </h3>
+            {/* 状态标签 */}
+            <div className="flex items-center gap-1">
               {method.deprecated && (
-                <span className="text-xs bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full border border-orange-200 dark:border-orange-800 font-medium">
-                  Deprecated
-                </span>
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-orange-50 text-orange-700 border-orange-200 px-1.5 py-0"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed pr-6 font-medium">
-              {method.description}
-            </p>
           </div>
 
-          {/* 简约箭头 */}
-          <div className="flex-shrink-0 mt-0.5">
-            <div className="w-7 h-7 rounded-lg bg-muted/30 flex items-center justify-center group-hover:bg-muted/50 group-hover:scale-105 transition-all duration-200">
-              <svg
-                className="w-3.5 h-3.5 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors duration-200"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
-              </svg>
+          <p className="text-xs text-muted-foreground leading-relaxed">{method.description}</p>
+        </div>
+
+        <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0 ml-3" />
+      </div>
+    );
+  };
+
+  // 渲染分类卡片
+  const renderCategoryCard = (category: MethodCategory) => {
+    const CategoryIcon = category.icon;
+
+    return (
+      <Card
+        key={category.id}
+        className="border-border/50 hover:border-border/80 transition-colors duration-200"
+      >
+        <CardContent className="p-0">
+          {/* 分类标题 */}
+          <div className={`${category.bgColor} ${category.borderColor} border-b p-4`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${category.bgColor} border ${category.borderColor}`}>
+                <CategoryIcon className={`w-4 h-4 ${category.color}`} />
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-semibold ${category.color} text-sm`}>{category.name}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{category.description}</p>
+              </div>
+              <Badge variant="secondary" className="text-xs font-medium">
+                {category.methods.length}
+              </Badge>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
+
+          {/* 方法列表 */}
+          <div className="p-2">
+            <div className="space-y-1">
+              {category.methods.map(method => renderMethodItem(method))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
-    <ListBoundary title="Device Methods" icon={Cpu}>
+    <ListBoundary title="Device" icon={Cpu}>
       <PageLayout>
-        <div className="mx-auto px-6 py-4 space-y-3">
-          {/* 面包屑导航 + 搜索框 */}
-          <div className="flex items-center justify-between gap-4">
-            <Breadcrumb items={[{ label: 'Device Methods', icon: Cpu }]} />
-            <div className="relative w-80">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search methods..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-10 font-medium"
-              />
-            </div>
-          </div>
+        <div className="mx-auto px-6 py-6 space-y-6">
+          {/* 顶部导航和统计 */}
+          <div className="flex items-center justify-between">
+            <Breadcrumb items={[{ label: 'Device', icon: Cpu }]} />
 
-          {/* 页面信息 */}
-          <div>
-            <p className="text-sm text-muted-foreground font-medium">
-              {filteredMethods.length} methods available
-            </p>
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium">{totalMethods} methods</span>
+              <span className="mx-2">•</span>
+              <span>{categories.length} categories</span>
+            </div>
           </div>
 
           {/* 设备连接状态 */}
           <DeviceNotConnectedState />
 
-          {/* 方法列表 - 优化间距 */}
-          <div className="space-y-5">
-            {/* 基本操作 */}
-            {basicMethods.length > 0 && (
-              <div className="space-y-3">
-                <div className="bg-muted/50 dark:bg-muted/30 border border-border/60 dark:border-border rounded-lg p-5">
-                  <h2 className="text-xl font-bold text-foreground tracking-tight">
-                    Basic Operations
-                  </h2>
-                  <p className="text-muted-foreground dark:text-muted-foreground font-semibold mt-1 text-sm">
-                    {basicMethods.length} essential methods
-                  </p>
-                </div>
-                <div className="grid gap-2">
-                  {basicMethods.map((method, index) => renderMethodCard(method, index, 'basic'))}
-                </div>
-              </div>
-            )}
+          <Separator />
 
-            {/* 设备方法 */}
-            {deviceMethods.length > 0 && (
-              <div className="space-y-3">
-                <div className="bg-muted/50 dark:bg-muted/30 border border-border/60 dark:border-border rounded-lg p-5">
-                  <h2 className="text-xl font-bold text-foreground tracking-tight">
-                    Device Operations
-                  </h2>
-                  <p className="text-muted-foreground dark:text-muted-foreground font-semibold mt-1 text-sm">
-                    {deviceMethods.length} device-specific methods
-                  </p>
-                </div>
-                <div className="grid gap-2">
-                  {deviceMethods.map((method, index) => renderMethodCard(method, index, 'device'))}
-                </div>
-              </div>
-            )}
+          {/* 分类网格 */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {categories.map(category => renderCategoryCard(category))}
           </div>
-
-          {/* 空状态 */}
-          {filteredMethods.length === 0 && searchTerm && (
-            <div className="flex flex-col items-center justify-center py-16 px-4">
-              <div className="w-16 h-16 bg-muted/20 rounded-xl flex items-center justify-center mb-4">
-                <Search className="w-7 h-7 text-muted-foreground/50" />
-              </div>
-              <h3 className="text-lg font-bold text-foreground mb-2 tracking-tight">
-                No methods found
-              </h3>
-              <p className="text-muted-foreground text-center max-w-md leading-relaxed font-medium">
-                Try adjusting your search terms or browse all available methods.
-              </p>
-            </div>
-          )}
         </div>
       </PageLayout>
     </ListBoundary>

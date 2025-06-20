@@ -1,13 +1,13 @@
 import React, { useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Layers, Settings } from 'lucide-react';
-import UnifiedMethodExecutor from '../components/common/UnifiedMethodExecutor';
+import MethodExecutor from '../components/common/MethodExecutor';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { MethodExecuteBoundary } from '../components/common/MethodExecuteBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { useMethodResolver } from '../hooks/useMethodResolver';
-import { useMethodExecution } from '../hooks/useMethodExecution';
+import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
 import { useDeviceStore } from '../store/deviceStore';
 import { ChainIcon } from '../components/icons/ChainIcon';
 
@@ -19,9 +19,7 @@ const ChainMethodExecutePage: React.FC = () => {
     chainId,
     methodName,
   });
-  const { executeMethod } = useMethodExecution({
-    basePath: '/chains',
-  });
+  const { executeMethod } = useHardwareMethodExecution();
 
   // 创建包装函数，在执行时传递方法配置
   const handleMethodExecution = useCallback(
@@ -30,13 +28,7 @@ const ChainMethodExecutePage: React.FC = () => {
         throw new Error('方法配置未找到');
       }
       const result = await executeMethod(params, selectedMethod);
-      // 将 ExecutionResult 转换为 Record<string, unknown>
-      return {
-        success: result.success,
-        data: result.data,
-        error: result.error,
-        duration: result.duration,
-      };
+      return result;
     },
     [executeMethod, selectedMethod]
   );
@@ -77,7 +69,7 @@ const ChainMethodExecutePage: React.FC = () => {
                 {!currentDevice ? (
                   <DeviceNotConnectedState showFullPage={true} />
                 ) : (
-                  <UnifiedMethodExecutor
+                  <MethodExecutor
                     methodConfig={selectedMethod}
                     executionHandler={handleMethodExecution}
                     className="h-full"

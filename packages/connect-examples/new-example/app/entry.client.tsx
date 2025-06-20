@@ -27,8 +27,6 @@ import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
 import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
-import FirmwareUpdateIndexPage from './routes/firmware-update._index';
-import FirmwareUpdateMethodExecutePage from './routes/firmware-update.$methodName';
 
 // Import styles
 import './tailwind.css';
@@ -104,14 +102,7 @@ const router = createBrowserRouter(
           path: 'device-methods/:methodName',
           element: <DeviceMethodExecutePage />,
         },
-        {
-          path: 'firmware-update',
-          element: <FirmwareUpdateIndexPage />,
-        },
-        {
-          path: 'firmware-update/:methodName',
-          element: <FirmwareUpdateMethodExecutePage />,
-        },
+
         {
           path: 'chains',
           element: <ChainsIndexPage />,

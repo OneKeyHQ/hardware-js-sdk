@@ -1,67 +1,138 @@
-import { type PlaygroundProps } from "../components/Playground";
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
-  id: "xrp",
-  name: "XRP",
-  description: "XRP Ledger operations",
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#23292F"/><path d="M8 8h8l-4 8-4-8z" fill="#00D4FF"/></svg>`,
-  color: "#00D4FF",
-  category: "xrp",
+  id: 'xrp',
+  name: 'XRP',
+  description: 'XRP Ledger operations',
+  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#23292F"/><path d="M8 12l4 4 4-4-4-4-4 4z" fill="white"/></svg>`,
+  color: '#23292F',
+  category: 'xrp' as ChainCategory,
 };
 
-const api: PlaygroundProps[] = [
+const api: UnifiedMethodConfig[] = [
   {
-    method: "xrpGetAddress",
-    description: "Get address",
-    presupposes: [
+    method: 'xrpGetAddress',
+    description: 'Get address',
+    presets: [
       {
-        title: "Get address",
-        value: {
-          path: "m/44'/144'/0'/0/0",
-          showOnOneKey: false,
-        },
+        title: 'Get address',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/144'/0'/0/0",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            required: false,
+            label: 'Show on Device',
+            value: false,
+          },
+        ],
       },
       {
-        title: "Batch Get Address",
-        value: {
-          bundle: [
-            {
-              path: "m/44'/144'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/144'/0'/0/1",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/144'/0'/0/2",
-              showOnOneKey: false,
-            },
-          ],
-        },
+        title: 'Batch Get Address',
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+            label: 'Bundle Configuration',
+            value: JSON.stringify(
+              [
+                {
+                  path: "m/44'/144'/0'/0/0",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/144'/0'/0/1",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/144'/0'/0/2",
+                  showOnOneKey: false,
+                },
+              ],
+              null,
+              2
+            ),
+          },
+        ],
       },
     ],
   },
   {
-    method: "xrpSignTransaction",
-    description: "Sign Transaction",
-    presupposes: [
+    method: 'xrpSignTransaction',
+    description: 'Sign transaction',
+    presets: [
       {
-        title: "Sign Transaction",
-        value: {
-          path: "m/44'/144'/1'/0/0",
-          transaction: {
-            fee: "12",
-            flags: 0,
-            sequence: 32841006,
-            maxLedgerVersion: 32841630,
-            payment: {
-              amount: 1000000,
-              destination: "rwgumKP89VhMrJ4dRkGVS4tafRfAmZmKf8",
-            },
+        title: 'Payment transaction',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/144'/0'/0/0",
           },
-        },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            value: JSON.stringify(
+              {
+                fee: '100000',
+                flags: 0x80000000,
+                sequence: 25,
+                maxLedgerVersion: 8820051,
+                payment: {
+                  amount: '100000000',
+                  destination: 'rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws',
+                },
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      },
+      {
+        title: 'Payment with destination tag',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/144'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            value: JSON.stringify(
+              {
+                fee: '100000',
+                flags: 0x80000000,
+                sequence: 25,
+                maxLedgerVersion: 8820051,
+                payment: {
+                  amount: '100000000',
+                  destination: 'rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws',
+                  destinationTag: 12345,
+                },
+              },
+              null,
+              2
+            ),
+          },
+        ],
       },
     ],
   },

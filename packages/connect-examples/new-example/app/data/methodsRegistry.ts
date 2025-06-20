@@ -3,8 +3,7 @@
 // 将所有方法数据合并到一个文件中以优化打包
 // ============================================
 
-import type { PlaygroundProps } from './components/Playground';
-import type { ChainConfig, ChainMeta } from './types';
+import type { UnifiedMethodConfig, ChainConfig, ChainMeta } from './types';
 
 // 静态导入所有方法，确保它们被打包到一个chunk中
 import * as bitcoin from './methods/bitcoin';
@@ -37,15 +36,15 @@ import * as lightning from './methods/lightning';
 import * as allnetwork from './methods/allnetwork';
 import * as benfen from './methods/benfen';
 import * as device from './methods/device';
-import * as firmwareUpdate from './methods/firmwareUpdate';
+import * as firmwareUpdate from './methods/firmware';
 
 // 创建统一的方法注册表接口
 export interface MethodsRegistry {
   chains: ChainConfig[];
-  methodsByChain: Record<string, PlaygroundProps[]>;
-  allMethods: PlaygroundProps[];
-  getChainMethods: (chainId: string) => PlaygroundProps[];
-  searchMethods: (query: string) => PlaygroundProps[];
+  methodsByChain: Record<string, UnifiedMethodConfig[]>;
+  allMethods: UnifiedMethodConfig[];
+  getChainMethods: (chainId: string) => UnifiedMethodConfig[];
+  searchMethods: (query: string) => UnifiedMethodConfig[];
   getChain: (chainId: string) => ChainConfig | undefined;
   isReady: () => boolean;
 }
@@ -93,13 +92,13 @@ const chainModules = [
 // 构建注册表
 function buildMethodsRegistry(): MethodsRegistry {
   const chains: ChainConfig[] = [];
-  const methodsByChain: Record<string, PlaygroundProps[]> = {};
-  const allMethodsList: PlaygroundProps[] = [];
+  const methodsByChain: Record<string, UnifiedMethodConfig[]> = {};
+  const allMethodsList: UnifiedMethodConfig[] = [];
 
   chainModules.forEach(({ id, module }) => {
     try {
       // 获取方法数组和链元数据
-      const methods = (module as Record<string, unknown>).default as PlaygroundProps[];
+      const methods = (module as Record<string, unknown>).default as UnifiedMethodConfig[];
       const chainMeta = (module as Record<string, unknown>).chainMeta as ChainMeta;
 
       if (Array.isArray(methods) && methods.length > 0 && chainMeta) {

@@ -23,7 +23,6 @@ import {
   FileText,
   CheckCircle,
   XCircle,
-  Download,
   Server,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
@@ -43,14 +42,9 @@ const navigationItems = [
     icon: Home,
   },
   {
-    title: 'common.deviceMethods',
+    title: 'common.device',
     url: '/device-methods',
     icon: Smartphone,
-  },
-  {
-    title: 'common.firmwareUpdate',
-    url: '/firmware-update',
-    icon: Download,
   },
   {
     title: 'common.chainMethods',

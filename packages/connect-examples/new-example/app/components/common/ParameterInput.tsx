@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -6,20 +6,12 @@ import { Input } from '../ui/Input';
 import { Checkbox } from '../ui/Checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
 import { ExternalLink } from 'lucide-react';
-import type { ParameterField, MethodConfig } from '../../data/types';
+import type { ParameterField, UnifiedMethodConfig } from '../../data/types';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { Alert, AlertDescription } from '../ui/Alert';
 
-import { PlaygroundProps } from '../../data/components/Playground';
-
-// 统一的预设类型
-interface UnifiedPreset {
-  title: string;
-  value: Record<string, unknown>;
-}
-
 interface ParameterInputProps {
-  methodConfig: MethodConfig | PlaygroundProps;
+  methodConfig: UnifiedMethodConfig;
   selectedPreset: string | null;
   onPresetChange: (presetTitle: string) => void;
   onParamChange?: (paramName: string, value: unknown) => void;
@@ -32,7 +24,7 @@ const COMMON_PARAMETERS: ParameterField[] = [
     type: 'boolean',
     label: 'useEmptyPassphrase',
     description: '使用空passphrase，跳过输入弹窗',
-    default: false,
+    value: false,
     visible: true,
     editable: true,
   },
@@ -42,7 +34,7 @@ const COMMON_PARAMETERS: ParameterField[] = [
     type: 'boolean',
     label: '是否使用passPhraseState',
     description: '设备中已保存的passphrase状态字符串',
-    default: false,
+    value: false,
     visible: true,
     editable: true,
   },
@@ -62,96 +54,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     setMethodParameters,
   } = useHardwareStore();
 
-  // 统一获取预设的辅助函数
-  const getPresets = (): UnifiedPreset[] => {
-    if ('presets' in methodConfig && methodConfig.presets) {
-      return methodConfig.presets.map(p => ({
-        title: p.title,
-        value: p.value,
-      }));
-    }
-    if ('presupposes' in methodConfig && methodConfig.presupposes) {
-      return methodConfig.presupposes.map(p => ({
-        title: p.title,
-        value: p.value,
-      }));
-    }
-    return [];
-  };
+  // 获取预设值
+  const presets = methodConfig.presets || [];
 
-  const presets = getPresets();
-
-  // 智能检测参数类型
-  const detectParameterType = (paramName: string): 'file' | 'boolean' | 'string' => {
-    // 文件参数检测模式
-    const filePatterns = [
-      /binary$/i, // 以 binary 结尾
-      /file$/i, // 以 file 结尾
-      /firmware/i, // 包含 firmware
-      /bootloader/i, // 包含 bootloader
-      /ble/i, // 包含 ble
-      /resource/i, // 包含 resource
-    ];
-
-    // 布尔参数检测模式
-    const booleanPatterns = [
-      /^show/i, // 以 show 开头
-      /^use/i, // 以 use 开头
-      /^is/i, // 以 is 开头
-      /^has/i, // 以 has 开头
-      /^enable/i, // 以 enable 开头
-      /^disable/i, // 以 disable 开头
-      /reboot/i, // 包含 reboot
-    ];
-
-    // 检测文件类型
-    if (filePatterns.some(pattern => pattern.test(paramName))) {
-      return 'file';
-    }
-
-    // 检测布尔类型
-    if (booleanPatterns.some(pattern => pattern.test(paramName))) {
-      return 'boolean';
-    }
-
-    // 默认为字符串类型
-    return 'string';
-  };
-
-  // 获取方法参数（从预设中推断或使用配置的参数）
-  const getAllParameters = (): ParameterField[] => {
-    // 如果有配置的参数，优先使用
-    if ('parameters' in methodConfig && methodConfig.parameters) {
-      return methodConfig.parameters;
-    }
-
-    // 否则从预设中推断
-    if (!presets || presets.length === 0) {
-      return [];
-    }
-
-    const parameterSet = new Set<string>();
-    presets.forEach(preset => {
-      Object.keys(preset.value).forEach(key => {
-        parameterSet.add(key);
-      });
-    });
-
-    return Array.from(parameterSet).map(name => {
-      const detectedType = detectParameterType(name);
-
-      return {
-        name,
-        type: detectedType,
-        required: false,
-        default: undefined,
-        visible: true,
-        editable: true,
-      };
-    });
-  };
-
-  const allParameters = getAllParameters();
   const hasBundleParam = methodParameters.bundle !== undefined && methodParameters.bundle !== null;
 
   // 获取参数值的统一函数
@@ -159,32 +64,88 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     if (field.name === 'useEmptyPassphrase' || field.name === 'usePassphraseState') {
       return commonParameters[field.name as keyof typeof commonParameters];
     }
-    return methodParameters[field.name];
+    // 优先使用当前输入的值，如果没有则使用预设值
+    return methodParameters[field.name] ?? field.value;
   };
 
   // 获取可见的方法参数
-  const getVisibleMethodParameters = (): ParameterField[] => {
-    if (hasBundleParam) {
-      return [];
-    }
+  const visibleMethodParameters = useMemo((): ParameterField[] => {
+    console.log('[ParameterInput] 调试信息:', {
+      method: methodConfig.method,
+      hasBundleParam,
+      selectedPreset,
+      presetsLength: presets?.length || 0,
+      presets: presets?.map(p => ({
+        title: p.title,
+        parametersLength: p.parameters?.length || 0,
+        parameters: p.parameters?.map(param => ({
+          name: param.name,
+          type: param.type,
+          visible: param.visible,
+          value: param.value,
+        })),
+      })),
+    });
 
-    // 过滤掉通用参数
     const commonParamNames = ['useEmptyPassphrase', 'usePassphraseState'];
-    let methodParams = allParameters.filter(
-      (param: ParameterField) => param.visible !== false && !commonParamNames.includes(param.name)
-    );
 
-    // 如果选择了预设，进一步过滤
+    // 使用统一的预设方式获取参数
     if (selectedPreset && presets) {
       const preset = presets.find(p => p.title === selectedPreset);
-      if (preset) {
-        const presetParamNames = Object.keys(preset.value);
-        methodParams = methodParams.filter(param => presetParamNames.includes(param.name));
+      console.log('[ParameterInput] 找到的预设:', {
+        preset: preset
+          ? {
+              title: preset.title,
+              parametersLength: preset.parameters?.length || 0,
+              parameters: preset.parameters?.map(param => ({
+                name: param.name,
+                type: param.type,
+                visible: param.visible,
+                value: param.value,
+                shouldFilter:
+                  param.visible === false ||
+                  commonParamNames.includes(param.name) ||
+                  param.name === 'bundle',
+              })),
+            }
+          : null,
+      });
+
+      if (preset && preset.parameters) {
+        console.log(
+          '[ParameterInput] 预设参数:',
+          preset.parameters.map(param => ({
+            name: param.name,
+            type: param.type,
+            visible: param.visible,
+            value: param.value,
+          }))
+        );
+
+        // 过滤掉通用参数、不可见参数和 bundle 参数
+        const filtered = preset.parameters.filter(
+          (param: ParameterField) =>
+            param.visible !== false &&
+            !commonParamNames.includes(param.name) &&
+            param.name !== 'bundle' // 排除 bundle 参数
+        );
+        console.log(
+          '[ParameterInput] 过滤后的参数:',
+          filtered.map(param => ({
+            name: param.name,
+            type: param.type,
+            visible: param.visible,
+            value: param.value,
+          }))
+        );
+        console.log('[ParameterInput] 使用预设参数:', filtered.length);
+        return filtered;
       }
     }
 
-    return methodParams;
-  };
+    console.log('[ParameterInput] 无参数可显示');
+    return []; // 没有可显示的参数
+  }, [methodConfig, hasBundleParam, selectedPreset, presets]);
 
   // 参数变化处理
   const handleParamChange = (paramName: string, value: unknown) => {
@@ -201,8 +162,20 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       return;
     }
 
-    // 方法参数
-    setMethodParameter(paramName, value);
+    // 特殊处理 bundle 参数
+    if (paramName === 'bundle') {
+      try {
+        // 如果是字符串，尝试解析为 JSON
+        const parsedValue = typeof value === 'string' ? JSON.parse(value) : value;
+        setMethodParameter(paramName, parsedValue);
+      } catch (error) {
+        // 如果解析失败，保存原始字符串值
+        setMethodParameter(paramName, value);
+      }
+    } else {
+      // 普通方法参数
+      setMethodParameter(paramName, value);
+    }
 
     onParamChange?.(paramName, value);
   };
@@ -210,18 +183,29 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   // 预设选择处理
   const handlePresetChange = (presetTitle: string) => {
     const preset = presets.find(p => p.title === presetTitle);
-    if (preset) {
-      // 清空现有方法参数
-      setMethodParameters({});
+    if (preset && preset.parameters) {
+      const newMethodParams: Record<string, unknown> = {};
 
-      // 设置预设参数
-      const presetParams = preset.value;
-      Object.entries(presetParams).forEach(([key, value]) => {
-        // 跳过通用参数
-        if (!['useEmptyPassphrase', 'passphraseState', 'usePassphraseState'].includes(key)) {
-          setMethodParameter(key, value);
+      // 从预设参数中获取值
+      preset.parameters.forEach((param: ParameterField) => {
+        if (
+          param.value !== undefined &&
+          !['useEmptyPassphrase', 'passphraseState', 'usePassphraseState'].includes(param.name)
+        ) {
+          // 对于 bundle 参数，需要解析 JSON 字符串
+          if (param.name === 'bundle' && typeof param.value === 'string') {
+            try {
+              newMethodParams[param.name] = JSON.parse(param.value);
+            } catch (error) {
+              console.error('Failed to parse bundle JSON:', error);
+              newMethodParams[param.name] = param.value;
+            }
+          } else {
+            newMethodParams[param.name] = param.value;
+          }
         }
       });
+      setMethodParameters(newMethodParams);
     }
     onPresetChange(presetTitle);
   };
@@ -285,6 +269,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const config = getFileParameterConfig(field.name);
     const currentValue = getParameterValue(field) as File | null;
 
+    // 优先使用字段配置的accept，否则使用默认配置
+    const acceptTypes = field.accept || config.accept;
+
     return (
       <div key={field.name} className="space-y-2">
         <div className="space-y-1">
@@ -296,7 +283,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
         <div className="relative">
           <input
             type="file"
-            accept={config.accept}
+            accept={acceptTypes}
             onChange={e => {
               const file = e.target.files?.[0] || null;
               handleParamChange(field.name, file);
@@ -396,29 +383,42 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             <p className="text-xs text-muted-foreground">{field.description}</p>
           )}
         </div>
-        <Input
-          id={field.name}
-          type={type}
-          value={String(value || '')}
-          onChange={e => {
-            if (!isEditable) return;
-            const newValue =
-              type === 'number' && e.target.value ? Number(e.target.value) : e.target.value;
-            handleParamChange(field.name, newValue);
-          }}
-          placeholder={field.placeholder}
-          disabled={!isEditable}
-          className={`bg-background border-border focus:border-primary ${
-            field.type === 'textarea' ? 'h-20 resize-none' : ''
-          }`}
-          {...(field.validation && {
-            pattern: field.validation.pattern,
-            min: field.validation.min,
-            max: field.validation.max,
-            minLength: field.validation.min,
-            maxLength: field.validation.max,
-          })}
-        />
+        {field.type === 'textarea' ? (
+          <textarea
+            id={field.name}
+            value={String(value || '')}
+            onChange={e => {
+              if (!isEditable) return;
+              handleParamChange(field.name, e.target.value);
+            }}
+            placeholder={field.placeholder}
+            disabled={!isEditable}
+            rows={4}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+        ) : (
+          <Input
+            id={field.name}
+            type={type}
+            value={String(value || '')}
+            onChange={e => {
+              if (!isEditable) return;
+              const newValue =
+                type === 'number' && e.target.value ? Number(e.target.value) : e.target.value;
+              handleParamChange(field.name, newValue);
+            }}
+            placeholder={field.placeholder}
+            disabled={!isEditable}
+            className="bg-background border-border focus:border-primary"
+            {...(field.validation && {
+              pattern: field.validation.pattern,
+              min: field.validation.min,
+              max: field.validation.max,
+              minLength: field.validation.min,
+              maxLength: field.validation.max,
+            })}
+          />
+        )}
       </div>
     );
   };
@@ -448,11 +448,22 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             <SelectValue placeholder={field.placeholder || `选择${field.label || field.name}`} />
           </SelectTrigger>
           <SelectContent>
-            {field.options?.map((option: string) => (
-              <SelectItem key={option} value={option}>
-                {option}
-              </SelectItem>
-            ))}
+            {field.options?.map(option => {
+              // 支持字符串和对象两种格式
+              if (typeof option === 'string') {
+                return (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                );
+              } else {
+                return (
+                  <SelectItem key={option.value} value={option.value}>
+                    {String(option.label)}
+                  </SelectItem>
+                );
+              }
+            })}
           </SelectContent>
         </Select>
       </div>
@@ -482,11 +493,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     }
   };
 
-  const visibleMethodParameters = getVisibleMethodParameters();
   const hasPresets = presets && presets.length > 0;
-
-  // 检查是否为危险操作
-  const isDangerous = 'dangerous' in methodConfig ? methodConfig.dangerous : false;
 
   return (
     <Card className="bg-card border border-border/50 shadow-sm">
@@ -497,11 +504,6 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             <Badge variant="outline" className="text-xs">
               {methodConfig.method}
             </Badge>
-            {isDangerous && (
-              <Badge variant="warning" className="text-xs">
-                危险操作
-              </Badge>
-            )}
           </div>
         </CardTitle>
       </CardHeader>

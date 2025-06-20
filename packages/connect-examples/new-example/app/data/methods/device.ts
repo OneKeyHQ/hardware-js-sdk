@@ -1,5 +1,4 @@
-import { type PlaygroundProps } from '../components/Playground';
-import type { FunctionalCategory } from '../types';
+import type { UnifiedMethodConfig, FunctionalCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
@@ -11,33 +10,38 @@ export const chainMeta = {
   category: 'device' as FunctionalCategory,
 };
 
-const api: PlaygroundProps[] = [
+const api: UnifiedMethodConfig[] = [
   // Basic Operations
   {
     method: 'searchDevices',
     description: 'Search for devices',
     noConnIdReq: true,
     noDeviceIdReq: true,
+    presets: [],
   },
   {
     method: 'getFeatures',
     description: 'Get features of a device',
     noDeviceIdReq: true,
+    presets: [],
   },
   {
     method: 'getOnekeyFeatures',
     description: 'Get OneKey specific features of a device',
     noDeviceIdReq: true,
+    presets: [],
   },
   {
     method: 'getPassphraseState',
     description: 'Get passphrase state of a device',
     noDeviceIdReq: true,
+    presets: [],
   },
   {
     method: 'cancel',
     description: 'Cancel a request',
     noDeviceIdReq: true,
+    presets: [],
   },
 
   // Device Management Operations
@@ -45,171 +49,118 @@ const api: PlaygroundProps[] = [
     method: 'deviceChangePin',
     description: 'Change pin of a device',
     noDeviceIdReq: true,
+    presets: [],
   },
   {
     method: 'deviceCancel',
     description: 'Cancel device operation',
     noDeviceIdReq: true,
+    presets: [],
   },
   {
     method: 'deviceLock',
     description: 'Lock device',
     noDeviceIdReq: true,
+    presets: [],
   },
-  // {
-  //   method: 'deviceReset',
-  //   description: 'Reset a device',
-  //   noDeviceIdReq: true,
-  // },
   {
     method: 'deviceSettings',
     description: 'Get settings of a device',
     noDeviceIdReq: true,
-    presupposes: [
+    presets: [
       {
         title: 'Set Label',
-        value: {
-          label: 'My OneKey',
-        },
+        parameters: [
+          {
+            name: 'label',
+            type: 'string',
+            required: true,
+            label: 'Device Label',
+            description: 'Custom label for the device',
+            value: 'My OneKey',
+          },
+        ],
       },
       {
         title: 'Enable Passphrase',
-        value: {
-          usePassphrase: true,
-        },
+        parameters: [
+          {
+            name: 'usePassphrase',
+            type: 'boolean',
+            required: true,
+            label: 'Use Passphrase',
+            description: 'Enable passphrase protection',
+            value: true,
+          },
+        ],
       },
       {
         title: 'Disable Passphrase',
-        value: {
-          usePassphrase: false,
-        },
+        parameters: [
+          {
+            name: 'usePassphrase',
+            type: 'boolean',
+            required: true,
+            label: 'Use Passphrase',
+            description: 'Disable passphrase protection',
+            value: false,
+          },
+        ],
       },
       {
         title: 'Set PassphraseAlwaysOnDevice',
-        value: {
-          passphraseAlwaysOnDevice: true,
-        },
+        parameters: [
+          {
+            name: 'passphraseAlwaysOnDevice',
+            type: 'boolean',
+            required: true,
+            label: 'Passphrase Always On Device',
+            description: 'Always enter passphrase on device',
+            value: true,
+          },
+        ],
       },
       {
         title: 'Set English language',
-        value: {
-          language: 'en_UK',
-        },
+        parameters: [
+          {
+            name: 'language',
+            type: 'string',
+            required: true,
+            label: 'Language',
+            description: 'Device display language',
+            value: 'en_UK',
+          },
+        ],
       },
       {
         title: 'Set Chinese language',
-        value: {
-          language: 'zh_CN',
-        },
+        parameters: [
+          {
+            name: 'language',
+            type: 'string',
+            required: true,
+            label: 'Language',
+            description: 'Device display language',
+            value: 'zh_CN',
+          },
+        ],
       },
       {
         title: 'Set safetyChecks',
-        value: {
-          safetyChecks: 0,
-        },
+        parameters: [
+          {
+            name: 'safetyChecks',
+            type: 'number',
+            required: true,
+            label: 'Safety Checks',
+            description: 'Safety check level (0=disabled, 1=prompt, 2=strict)',
+            value: 0,
+          },
+        ],
       },
     ],
   },
-  // {
-  //   method: 'deviceSupportFeatures',
-  //   description: 'Check if a device supports a feature',
-  //   noDeviceIdReq: true,
-  // },
-
-  // {
-  //   method: 'deviceVerify',
-  //   description: 'Verify a device',
-  //   noDeviceIdReq: true,
-  //   presupposes: [
-  //     {
-  //       title: 'Verify device',
-  //       value: {
-  //         dataHex: '0x1234567890',
-  //       },
-  //     },
-  //   ],
-  // },
-  // {
-  //   method: 'deviceWipe',
-  //   description: 'Wipe a device',
-  //   noDeviceIdReq: true,
-  // },
-
-  // {
-  //   method: 'setU2FCounter',
-  //   description: 'setU2FCounter',
-  //   noDeviceIdReq: true,
-  //   presupposes: [
-  //     {
-  //       title: 'setU2FCounter',
-  //       value: {
-  //         u2f_counter: 1,
-  //       },
-  //     },
-  //   ],
-  // },
-  // {
-  //   method: 'getNextU2FCounter',
-  //   description: 'getNextU2FCounter',
-  //   noDeviceIdReq: true,
-  // },
-  // {
-  //   method: 'deviceInfoSettings',
-  //   noDeviceIdReq: true,
-  //   description: 'get device info settings',
-  //   presupposes: [
-  //     {
-  //       title: 'read to spi flash',
-  //       value: {
-  //         serial_no: 'MI05W01202110111148040000078',
-  //       },
-  //     },
-  //   ],
-  // },
-  // {
-  //   method: 'deviceReadSEPublicCert',
-  //   description: 'read se public cert',
-  // },
-  // {
-  //   method: 'deviceWriteSEPrivateKey',
-  //   noDeviceIdReq: true,
-  //   description: 'write se private key',
-  //   presupposes: [
-  //     {
-  //       title: 'write se private key',
-  //       value: {
-  //         private_key: '013568656419313e64d4352f640cc2ff9f89d45d9dd8ab9229789714e4481245',
-  //       },
-  //     },
-  //   ],
-  // },
-  // {
-  //   method: 'deviceWriteSEPublicCert',
-  //   noDeviceIdReq: true,
-  //   description: 'write se public cert',
-  //   presupposes: [
-  //     {
-  //       title: 'write se public cert',
-  //       value: {
-  //         public_cert:
-  //           '308201693082010ea003020102020103300a06082a8648ce3d0403023065310b3009060355040613025553310e300c06035504080c055374617465310d300b06035504070c044369747931153013060355040a0c0c4f7267616e697a6174696f6e310d300b060355040b0c04556e69743111300f06035504030c086661632d74657374301e170d3234313032313037313034315a170d3434313031363037313034315a30163114301206035504030c0b50524234334a30303033413059301306072a8648ce3d020106082a8648ce3d03010703420004d909a201f985455e38bc703e1adf4347a521892f99d52e95b783b2aeaaa6a4ba5068a33557cdbb63990ef695331178832c347af7845b0088e2c45e3395d6eac9300a06082a8648ce3d0403020349003046022100f913025f6b0ffb855c7a044e83a9f9050b8a5381afaa2293ca25aa422ac11525022100fd3de51cc26ae84e4bf65f463b1f3a881206c42db9bb25027ce9426aec48a064',
-  //       },
-  //     },
-  //   ],
-  // },
-  // {
-  //   method: 'deviceSESignMessage',
-  //   noDeviceIdReq: true,
-  //   description: 'se sign message',
-  //   presupposes: [
-  //     {
-  //       title: 'se sign message',
-  //       value: {
-  //         message: '0x1234567890',
-  //       },
-  //     },
-  //   ],
-  // },
 ];
 
 // 导出链配置对象

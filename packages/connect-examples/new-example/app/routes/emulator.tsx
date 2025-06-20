@@ -46,10 +46,10 @@ export default function EmulatorPage() {
 
   const commands = {
     clone: 'git clone https://github.com/Johnwanzi/onekey-docker.git',
-    proVnc: 'bash build_emu.sh pro-emu',
-    classicVnc: 'bash build_emu.sh 1s-emu',
-    proX11: 'bash build_emu.sh pro-emu --x11',
-    classicX11: 'bash build_emu.sh 1s-emu --x11',
+    proVnc: 'bash build-emu.sh pro-emu',
+    classicVnc: 'bash build-emu.sh 1s-emu',
+    proX11: 'bash build-emu.sh pro-emu --x11',
+    classicX11: 'bash build-emu.sh 1s-emu --x11',
   };
 
   const CommandBlock = ({
@@ -69,18 +69,18 @@ export default function EmulatorPage() {
           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</span>
           {description && (
             <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
-              {description.includes('http://localhost:6088') ? (
+              {description.includes('http://localhost:6088/vnc.html') ? (
                 <>
-                  {description.split('http://localhost:6088')[0]}
+                  {description.split('http://localhost:6088/vnc.html')[0]}
                   <a
-                    href="http://localhost:6088"
+                    href="http://localhost:6088/vnc.html"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline"
                   >
-                    http://localhost:6088
+                    http://localhost:6088/vnc.html
                   </a>
-                  {description.split('http://localhost:6088')[1]}
+                  {description.split('http://localhost:6088/vnc.html')[1]}
                 </>
               ) : (
                 description
@@ -196,7 +196,7 @@ export default function EmulatorPage() {
                         command={commands.proVnc}
                         commandKey="proVnc"
                         title="VNC 模式（推荐）"
-                        description="所有平台通用，启动后访问 http://localhost:6088"
+                        description="所有平台通用，启动后访问 http://localhost:6088/vnc.html"
                       />
 
                       <CommandBlock
@@ -238,7 +238,7 @@ export default function EmulatorPage() {
                         command={commands.classicVnc}
                         commandKey="classicVnc"
                         title="VNC 模式（推荐）"
-                        description="所有平台通用，启动后访问 http://localhost:6088"
+                        description="所有平台通用，启动后访问 http://localhost:6088/vnc.html"
                       />
 
                       <CommandBlock

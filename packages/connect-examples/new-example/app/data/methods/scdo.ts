@@ -1,88 +1,146 @@
-import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from "../types";
-
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
-  id: "scdo",
-  name: "SCDO",
-  description: "SCDO blockchain operations",
-  icon: ``,
-  color: "#FF6B6B",
-  category: "scdo" as ChainCategory,
+  id: 'scdo',
+  name: 'SCDO',
+  description: 'SCDO blockchain operations',
+  category: 'scdo' as ChainCategory,
 };
 
-const api: PlaygroundProps[] = [
+const api: UnifiedMethodConfig[] = [
   {
     method: 'scdoGetAddress',
     description: 'Get address',
-    presupposes: [
+    presets: [
       {
         title: 'Get address',
-        value: {
-          path: "m/44'/541'/0'/0/0",
-          showOnOneKey: false,
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/541'/0'/0/0",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            label: 'Show On One Key',
+            value: false,
+          },
+        ],
       },
       {
         title: 'Batch Get Address',
-        value: {
-          bundle: [
-            {
-              path: "m/44'/541'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/541'/1'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/541'/2'/0/0",
-              showOnOneKey: false,
-            },
-          ],
-        },
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+            label: 'Bundle Configuration',
+            description: 'JSON array of address configurations',
+            value: JSON.stringify(
+              [
+                {
+                  path: "m/44'/541'/0'/0/0",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/541'/1'/0/0",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/541'/2'/0/0",
+                  showOnOneKey: false,
+                },
+              ],
+              null,
+              2
+            ),
+          },
+        ],
       },
     ],
   },
   {
     method: 'scdoSignMessage',
     description: 'Sign Message',
-    presupposes: [
+    presets: [
       {
         title: 'Sign Message',
-        value: {
-          path: "m/44'/541'/0'/0/0",
-          messageHex: Buffer.from('hello', 'utf8').toString('hex'),
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/541'/0'/0/0",
+          },
+          {
+            name: 'messageHex',
+            type: 'string',
+            label: 'Message Hex',
+            value: '68656c6c6f',
+          },
+        ],
       },
     ],
   },
   {
     method: 'scdoSignTransaction',
     description: 'Sign Transaction',
-    presupposes: [
+    presets: [
       {
         title: 'Sign Transaction',
-        value: {
-          path: "m/44'/541'/0'/0/0",
-          nonce: '0x0',
-          gasPrice: '0xbebc200',
-          gasLimit: '0x5208',
-          to: '1S0118a02f993fc7a4348fd36b7f7a596948f02b31',
-          value: '0xf4240',
-          timestamp: '0',
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/541'/0'/0/0",
+          },
+          {
+            name: 'nonce',
+            type: 'string',
+            label: 'Nonce',
+            value: '0x0',
+          },
+          {
+            name: 'gasPrice',
+            type: 'string',
+            label: 'Gas Price',
+            value: '0xbebc200',
+          },
+          {
+            name: 'gasLimit',
+            type: 'string',
+            label: 'Gas Limit',
+            value: '0x5208',
+          },
+          {
+            name: 'to',
+            type: 'string',
+            label: 'To',
+            value: '1S0118a02f993fc7a4348fd36b7f7a596948f02b31',
+          },
+          {
+            name: 'value',
+            type: 'string',
+            label: 'Value',
+            value: '0xf4240',
+          },
+          {
+            name: 'timestamp',
+            type: 'string',
+            label: 'Timestamp',
+            value: '0',
+          },
+        ],
       },
     ],
   },
 ];
-
-
-// 导出链配置对象
-export const chainConfig = {
-  ...chainMeta,
-  api,
-};
 
 export default api;

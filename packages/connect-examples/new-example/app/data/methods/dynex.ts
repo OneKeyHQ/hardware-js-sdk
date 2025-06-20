@@ -1,77 +1,128 @@
-import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from "../types";
-
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
-  id: "dynex",
-  name: "Dynex",
-  description: "Dynex blockchain operations",
-  icon: ``,
-  color: "#00CED1",
-  category: "dynex" as ChainCategory,
+  id: 'dynex',
+  name: 'Dynex',
+  description: 'Dynex blockchain operations',
+  category: 'dynex' as ChainCategory,
 };
 
-const api: PlaygroundProps[] = [
+const api: UnifiedMethodConfig[] = [
   {
     method: 'dnxGetAddress',
     description: 'Get address',
-    presupposes: [
+    presets: [
       {
         title: 'Get address',
-        value: {
-          path: "m/44'/29538'/0'/0'/0'",
-          showOnOneKey: false,
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/29538'/0'/0'/0'",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            label: 'Show On One Key',
+            value: false,
+          },
+        ],
       },
       {
         title: 'Batch Get Address',
-        value: {
-          bundle: [
-            {
-              path: "m/44'/29538'/0'/0'/0'",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/29538'/0'/0'/1'",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/29538'/0'/0'/2'",
-              showOnOneKey: false,
-            },
-          ],
-        },
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+            label: 'Bundle Configuration',
+            description: 'JSON array of address configurations',
+            value: JSON.stringify(
+              [
+                {
+                  path: "m/44'/29538'/0'/0'/0'",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/29538'/0'/0'/1'",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/29538'/0'/0'/2'",
+                  showOnOneKey: false,
+                },
+              ],
+              null,
+              2
+            ),
+          },
+        ],
       },
     ],
   },
   {
     method: 'dnxSignTransaction',
     description: 'Sign Transaction',
-    presupposes: [
+    presets: [
       {
         title: 'Normal Transaction',
-        value: {
-          path: "m/44'/29538'/0'/0'/0'",
-          inputs: [
-            {
-              prevIndex: 0,
-              globalIndex: 323,
-              prevOutPubkey: 'ff4df9a9fc83e48f2c0242c4d94f3906546a889950bccd8ba4392f3e7886c3a1',
-              txPubkey: '0d708b68003ae5fee4c9f9aad56a8cfdb0a5dcbcdd2e3fc18eb813349457a78c',
-              amount: '1300000000',
-            },
-          ],
-          toAddress:
-            'XwmxTF8FxAy2s5cvtS62oSGxY3fzvDcgo2CiJ6rrpz9te68sApSDs3LQihubFtpsfT5z6NYHZzMKUjavNpTkW46i2dYgHBULG',
-          amount: '13000000',
-          fee: '10000',
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/29538'/0'/0'/0'",
+          },
+          {
+            name: 'inputs',
+            type: 'textarea',
+            required: true,
+            label: 'Inputs',
+            description: 'Transaction inputs',
+            value: JSON.stringify(
+              [
+                {
+                  prev_hash: 'b902e34e3e4d4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e',
+                  prev_index: 0,
+                  global_index: 1234567,
+                  amount: 13000000,
+                },
+              ],
+              null,
+              2
+            ),
+          },
+          {
+            name: 'toAddress',
+            type: 'string',
+            required: true,
+            label: 'To Address',
+            value:
+              'XwmxTF8FxAy2s5cvtS62oSGxY3fzvDcgo2CiJ6rrpz9te68sApSDs3LQihubFtpsfT5z6NYHZzMKUjavNpTkW46i2dYgHBULG',
+          },
+          {
+            name: 'amount',
+            type: 'string',
+            required: true,
+            label: 'Amount',
+            value: '13000000',
+          },
+          {
+            name: 'fee',
+            type: 'string',
+            required: true,
+            label: 'Fee',
+            value: '10000',
+          },
+        ],
       },
     ],
   },
 ];
-
 
 // 导出链配置对象
 export const chainConfig = {

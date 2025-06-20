@@ -66,21 +66,12 @@ export const buildSearchActions = (): Action[] => {
   actions.push(
     {
       id: 'device-methods',
-      name: 'Device Methods',
-      subtitle: '硬件设备相关的 API 方法',
+      name: 'Device',
+      subtitle: '硬件设备管理和固件更新相关的 API 方法',
       section: 'Documentation',
       shortcut: ['d'],
-      keywords: 'device methods api 设备 方法',
+      keywords: 'device methods firmware update api 设备 方法 固件 更新',
       perform: () => navigateTo('/device-methods'),
-    },
-    {
-      id: 'firmware-update',
-      name: 'Firmware Update',
-      subtitle: '固件更新相关的 API 方法',
-      section: 'Documentation',
-      shortcut: ['f'],
-      keywords: 'firmware update 固件 更新',
-      perform: () => navigateTo('/firmware-update'),
     },
     {
       id: 'chains',
@@ -100,7 +91,7 @@ export const buildSearchActions = (): Action[] => {
       name: 'Light Theme',
       subtitle: '切换到浅色主题',
       section: 'Settings',
-      shortcut: ['l'],
+      shortcut: ['shift', 'l'],
       keywords: 'theme light 主题 浅色 白色',
       perform: () => setTheme('light'),
     },
@@ -109,7 +100,7 @@ export const buildSearchActions = (): Action[] => {
       name: 'Dark Theme',
       subtitle: '切换到深色主题',
       section: 'Settings',
-      shortcut: ['d'],
+      shortcut: ['shift', 'd'],
       keywords: 'theme dark 主题 深色 黑色',
       perform: () => setTheme('dark'),
     }
@@ -173,10 +164,8 @@ export const buildSearchActions = (): Action[] => {
     let routePrefix: string;
     const chainIdStr = String(chain.id);
 
-    if (chainIdStr === 'device') {
+    if (chainIdStr === 'device' || chainIdStr === 'firmwareUpdate') {
       routePrefix = '/device-methods';
-    } else if (chainIdStr === 'firmwareUpdate') {
-      routePrefix = '/firmware-update';
     } else {
       routePrefix = `/chains/${chain.id}`;
 
@@ -197,11 +186,8 @@ export const buildSearchActions = (): Action[] => {
         let sectionName: string;
         let actionName: string;
 
-        if (chainIdStr === 'device') {
+        if (chainIdStr === 'device' || chainIdStr === 'firmwareUpdate') {
           sectionName = 'Device Methods';
-          actionName = method.method;
-        } else if (chainIdStr === 'firmwareUpdate') {
-          sectionName = 'Firmware Update';
           actionName = method.method;
         } else {
           sectionName = 'Chain Methods';

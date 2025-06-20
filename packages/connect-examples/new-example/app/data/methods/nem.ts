@@ -1,77 +1,112 @@
-import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from "../types";
-
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
-  id: "nem",
-  name: "NEM",
-  description: "NEM blockchain operations",
-  icon: ``,
-  color: "#67B2E8",
-  category: "nem" as ChainCategory,
+  id: 'nem',
+  name: 'NEM',
+  description: 'NEM blockchain operations',
+  category: 'nem' as ChainCategory,
 };
 
-const api: PlaygroundProps[] = [
+const api: UnifiedMethodConfig[] = [
   {
     method: 'nemGetAddress',
     description: 'Get address',
-    presupposes: [
+    presets: [
       {
         title: 'Get address',
-        value: {
-          path: "m/44'/43'/0'",
-          showOnOneKey: false,
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/43'/0'",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            label: 'Show On One Key',
+            value: false,
+          },
+        ],
       },
       {
         title: 'Batch Get Address',
-        value: {
-          bundle: [
-            {
-              path: "m/44'/43'/0'",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/43'/1'",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/43'/2'",
-              showOnOneKey: false,
-            },
-          ],
-        },
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+            label: 'Bundle Configuration',
+            description: 'JSON array of address configurations',
+            value: JSON.stringify(
+              [
+                {
+                  path: "m/44'/43'/0'",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/43'/1'",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/43'/2'",
+                  showOnOneKey: false,
+                },
+              ],
+              null,
+              2
+            ),
+          },
+        ],
       },
     ],
   },
   {
     method: 'nemSignTransaction',
     description: 'Sign Transaction',
-    presupposes: [
+    presets: [
       {
         title: 'Sign Transaction',
-        value: {
-          path: "m/44'/1'/0'/0'/0'",
-          transaction: {
-            amount: 2000000,
-            recipient: 'TALICE2GMA34CXHD7XLJQ536NM5UNKQHTORNNT2J',
-            timeStamp: 74649215,
-            type: 257,
-            fee: 2000000,
-            deadline: 74735615,
-            version: -1744830464,
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/43'/0'",
           },
-          message: {
-            payload: '746573745f6e656d5f7472616e73616374696f6e5f7472616e73666572',
-            type: 1,
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'NEM transaction object',
+            value: JSON.stringify(
+              {
+                timeStamp: 74649215,
+                amount: 2000000,
+                fee: 2000000,
+                recipient: 'TALICE2GMA34CXHD7XLJQ536NM5UNKQF23HF6YK',
+                type: 257,
+                deadline: 74735615,
+                message: {
+                  payload: '746573745f6e656d5f7472616e73616374696f6e5f7472616e73666572',
+                  type: 1,
+                },
+                version: 1744830465,
+                signer: 'be6e84f957e4bce4c5a8a8a2c88f8e5ea2b5d0a4b1e4d1e4b1e4d1e4b1e4d1e4',
+              },
+              null,
+              2
+            ),
           },
-        },
+        ],
       },
     ],
   },
 ];
-
 
 // 导出链配置对象
 export const chainConfig = {

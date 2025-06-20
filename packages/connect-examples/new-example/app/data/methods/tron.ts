@@ -1,190 +1,166 @@
-import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from "../types";
-
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
-  id: "tron",
-  name: "Tron",
-  description: "Tron blockchain operations",
-  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 22h20L12 2z" fill="#FF060A"/></svg>`,
-  color: "#FF060A",
-  category: "tron" as ChainCategory,
+  id: 'tron',
+  name: 'TRON',
+  description: 'TRON blockchain operations',
+  icon: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="#FF0013"/><path d="M8 12l4 4 4-4-4-4-4 4z" fill="white"/></svg>`,
+  color: '#FF0013',
+  category: 'tron' as ChainCategory,
 };
 
-const api: PlaygroundProps[] = [
+const api: UnifiedMethodConfig[] = [
   {
     method: 'tronGetAddress',
     description: 'Get address',
-    presupposes: [
+    presets: [
       {
         title: 'Get address',
-        value: {
-          path: "m/44'/195'/0'/0/0",
-          showOnOneKey: false,
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/195'/0'/0/0",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            required: false,
+            label: 'Show on Device',
+            value: false,
+          },
+        ],
       },
       {
         title: 'Batch Get Address',
-        value: {
-          bundle: [
-            {
-              path: "m/44'/195'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/195'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/195'/0'/0/0",
-              showOnOneKey: false,
-            },
-          ],
-        },
-      },
-    ],
-  },
-  {
-    method: 'tronSignMessage',
-    description: 'Sign Message',
-    presupposes: [
-      {
-        title: 'Sign Message',
-        value: {
-          path: "m/44'/195'/0'/0/0",
-          messageHex: '0x6578616d706c65206d657373616765',
-        },
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+            label: 'Bundle Configuration',
+            value: JSON.stringify(
+              [
+                {
+                  path: "m/44'/195'/0'/0/0",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/195'/0'/0/1",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/195'/0'/0/2",
+                  showOnOneKey: false,
+                },
+              ],
+              null,
+              2
+            ),
+          },
+        ],
       },
     ],
   },
   {
     method: 'tronSignTransaction',
-    description: 'Sign Transaction',
-    presupposes: [
+    description: 'Sign transaction',
+    presets: [
       {
-        title: 'Sign Transaction',
-        value: {
-          path: "m/44'/195'/0'/0/0",
-          transaction: {
-            refBlockBytes: 'ddf1',
-            refBlockHash: 'd04764f22469a0b8',
-            data: '0x0',
-            feeLimit: 0,
-            expiration: 1655692140000,
-            timestamp: 1655692083406,
-            contract: {
-              transferContract: {
-                toAddress: 'TXrs7yxQLNzig7J9EbKhoEiUp6kWpdWKnD',
-                amount: 100,
-              },
-            },
+        title: 'Transfer TRX',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/195'/0'/0/0",
           },
-        },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            value: JSON.stringify(
+              {
+                to: 'TLPpXqSGqpNBwbNnTf1hcypL7m8nLBFqzF',
+                amount: 100000000,
+                blockID: '0000000000aeff54ea62e7fcce1aaec4bb88d26a5ac2d1b50c92ca9b5ba5e0a7',
+                blockNumber: 11468628,
+                blockTimestamp: 1578057072000,
+                expiration: 1578057132000,
+                feeLimit: 100000000,
+              },
+              null,
+              2
+            ),
+          },
+        ],
       },
       {
-        title: 'Sign Transaction TRC20',
-        value: {
-          path: "m/44'/195'/0'/0/0",
-          transaction: {
-            refBlockBytes: 'f37c',
-            refBlockHash: 'aadfb347dabb84de',
-            data: '0x0',
-            feeLimit: 1000000,
-            expiration: 1657770198000,
-            timestamp: 1657770139291,
-            contract: {
-              triggerSmartContract: {
+        title: 'Transfer TRC20 Token',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/195'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            value: JSON.stringify(
+              {
                 contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-                data: 'a9059cbb000000000000000000000000f01fad0beb95a0a41cb1e68f384b33b846fe7d830000000000000000000000000000000000000000000000000000000000000001',
+                functionSelector: 'transfer(address,uint256)',
+                parameter:
+                  '000000000000000000000000389ffce9db8f9a637a4e6905b892b6aaa0c7c44b0000000000000000000000000000000000000000000000000de0b6b3a7640000',
+                feeLimit: 100000000,
+                blockID: '0000000000aeff54ea62e7fcce1aaec4bb88d26a5ac2d1b50c92ca9b5ba5e0a7',
+                blockNumber: 11468628,
+                blockTimestamp: 1578057072000,
+                expiration: 1578057132000,
               },
-            },
+              null,
+              2
+            ),
           },
-        },
+        ],
       },
+    ],
+  },
+  {
+    method: 'tronSignMessage',
+    description: 'Sign message',
+    presets: [
       {
-        title: 'Sign Transaction Stake',
-        value: {
-          path: "m/44'/195'/0'/0/0",
-          transaction: {
-            refBlockBytes: 'f37c',
-            refBlockHash: 'aadfb347dabb84de',
-            data: '0x0',
-            feeLimit: 1000000,
-            expiration: 1657770198000,
-            timestamp: 1657770139291,
-            contract: {
-              freezeBalanceV2Contract: {
-                frozenBalance: 100,
-                resource: 0,
-              },
-            },
+        title: 'Sign message',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/195'/0'/0/0",
           },
-        },
-      },
-      {
-        title: 'Sign Transaction Unstake',
-        value: {
-          path: "m/44'/195'/0'/0/0",
-          transaction: {
-            refBlockBytes: 'f37c',
-            refBlockHash: 'aadfb347dabb84de',
-            data: '0x0',
-            feeLimit: 1000000,
-            expiration: 1657770198000,
-            timestamp: 1657770139291,
-            contract: {
-              unfreezeBalanceV2Contract: {
-                unfreezeBalance: 100,
-                resource: 0,
-              },
-            },
+          {
+            name: 'messageHex',
+            type: 'string',
+            required: true,
+            label: 'Message (Hex)',
+            value: '48656c6c6f20576f726c64',
           },
-        },
-      },
-      {
-        title: 'Sign Transaction Vote',
-        value: {
-          path: "m/44'/195'/0'/0/0",
-          transaction: {
-            refBlockBytes: 'f37c',
-            refBlockHash: 'aadfb347dabb84de',
-            feeLimit: 1000000,
-            expiration: 1657770198000,
-            timestamp: 1657770139291,
-            contract: {
-              voteWitnessContract: {
-                votes: [
-                  {
-                    voteAddress: 'TXrs7yxQLNzig7J9EbKhoEiUp6kWpdWKnD',
-                    voteCount: 100,
-                  },
-                ],
-              },
-            },
-          },
-        },
-      },
-      {
-        title: 'Sign Transaction Cancel AllUnfreeze V2',
-        value: {
-          path: "m/44'/195'/0'/0/0",
-          transaction: {
-            refBlockBytes: 'f37c',
-            refBlockHash: 'aadfb347dabb84de',
-            feeLimit: 1000000,
-            expiration: 1657770198000,
-            timestamp: 1657770139291,
-            contract: {
-              cancelAllUnfreezeV2Contract: {},
-            },
-          },
-        },
+        ],
       },
     ],
   },
 ];
-
 
 // 导出链配置对象
 export const chainConfig = {

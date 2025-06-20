@@ -8,14 +8,7 @@ export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type TransportType = 'webusb' | 'jsbridge' | 'emulator';
 export type HardwareApiMethod = keyof CoreApi;
 
-// 扩展 Navigator 类型以支持 WebUSB
-declare global {
-  interface Navigator {
-    usb?: {
-      requestDevice(options: { filters: { vendorId: number; productId: number }[] }): Promise<any>;
-    };
-  }
-}
+// WebUSB 类型已经在全局定义中，无需重复声明
 
 // 获取SDK实例的函数 - 需要从外部注入
 let getSDKInstanceFunc: (() => Promise<CoreApi>) | null = null;

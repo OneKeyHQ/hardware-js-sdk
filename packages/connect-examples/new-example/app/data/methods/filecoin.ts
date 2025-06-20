@@ -1,67 +1,101 @@
-import { type PlaygroundProps } from '../components/Playground';
-import type { ChainCategory } from "../types";
-
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 // 链元数据
 export const chainMeta = {
-  id: "filecoin",
-  name: "Filecoin",
-  description: "Filecoin network operations",
-  icon: ``,
-  color: "#0090FF",
-  category: "filecoin" as ChainCategory,
+  id: 'filecoin',
+  name: 'Filecoin',
+  description: 'Filecoin network operations',
+  category: 'filecoin' as ChainCategory,
 };
 
-const api: PlaygroundProps[] = [
+const api: UnifiedMethodConfig[] = [
   {
     method: 'filecoinGetAddress',
     description: 'Get address',
-    presupposes: [
+    presets: [
       {
         title: 'Get address',
-        value: {
-          path: "m/44'/461'/0'/0/0",
-          showOnOneKey: false,
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/461'/0'/0/0",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            label: 'Show On One Key',
+            value: false,
+          },
+        ],
       },
       {
         title: 'Batch Get Address',
-        value: {
-          bundle: [
-            {
-              path: "m/44'/461'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/461'/0'/0/1",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/461'/0'/0/2",
-              showOnOneKey: false,
-            },
-          ],
-        },
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+            label: 'Bundle Configuration',
+            description: 'JSON array of address configurations',
+            value: JSON.stringify(
+              [
+                {
+                  path: "m/44'/461'/0'/0/0",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/461'/0'/0/1",
+                  showOnOneKey: false,
+                },
+                {
+                  path: "m/44'/461'/0'/0/2",
+                  showOnOneKey: false,
+                },
+              ],
+              null,
+              2
+            ),
+          },
+        ],
       },
     ],
   },
   {
     method: 'filecoinSignTransaction',
     description: 'Sign Transaction',
-    presupposes: [
+    presets: [
       {
         title: 'Sign Transaction',
-        value: {
-          path: "m/44'/461'/0'/0/0",
-          showOnOneKey: false,
-          rawTx:
-            '8a0055015a2fd22d821d5855e401118fef6ea0373dadbde355018ae51a9d6c9fe1872fd31b10c96df89106790297004900016345785d8a00001a0009354445001730ee6e440001865e0040',
-        },
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Path',
+            value: "m/44'/461'/0'/0/0",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            label: 'Show On One Key',
+            value: false,
+          },
+          {
+            name: 'rawTx',
+            type: 'string',
+            required: true,
+            label: 'Raw Tx',
+            value:
+              '8a0055015a2fd22d821d5855e401118fef6ea0373dadbde355018ae51a9d6c9fe1872fd31b10c96df89106790297004900016345785d8a00001a0009354445001730ee6e440001865e0040',
+          },
+        ],
       },
     ],
   },
 ];
-
 
 // 导出链配置对象
 export const chainConfig = {

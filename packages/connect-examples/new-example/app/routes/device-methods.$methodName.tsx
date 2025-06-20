@@ -1,14 +1,15 @@
 import React, { useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Cpu, Settings } from 'lucide-react';
-import UnifiedMethodExecutor from '../components/common/UnifiedMethodExecutor';
+import MethodExecutor from '../components/common/MethodExecutor';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { MethodExecuteBoundary } from '../components/common/MethodExecuteBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { useMethodResolver } from '../hooks/useMethodResolver';
-import { useMethodExecution } from '../hooks/useMethodExecution';
+import { useHardwareMethodExecution } from '../hooks/useHardwareMethodExecution';
 import { useDeviceStore } from '../store/deviceStore';
+import firmwareUpdateMethods from '../data/methods/firmware';
 
 const DeviceMethodExecutePage: React.FC = () => {
   const { methodName } = useParams();
@@ -17,9 +18,7 @@ const DeviceMethodExecutePage: React.FC = () => {
   const { selectedMethod, isMethodNotFound } = useMethodResolver({
     methodName,
   });
-  const { executeMethod } = useMethodExecution({
-    basePath: '/device-methods',
-  });
+  const { executeMethod } = useHardwareMethodExecution();
 
   // 创建包装函数，在执行时传递方法配置
   const handleMethodExecution = useCallback(
@@ -28,13 +27,7 @@ const DeviceMethodExecutePage: React.FC = () => {
         throw new Error('方法配置未找到');
       }
       const result = await executeMethod(params, selectedMethod);
-      // 将 ExecutionResult 转换为 Record<string, unknown>
-      return {
-        success: result.success,
-        data: result.data,
-        error: result.error,
-        duration: result.duration,
-      };
+      return result;
     },
     [executeMethod, selectedMethod]
   );
@@ -43,7 +36,7 @@ const DeviceMethodExecutePage: React.FC = () => {
     <MethodExecuteBoundary
       methodName={methodName}
       basePath="/device-methods"
-      baseLabel="Device Methods"
+      baseLabel="Device"
       baseIcon={Cpu}
       checkNotFound={isMethodNotFound}
     >
@@ -56,7 +49,7 @@ const DeviceMethodExecutePage: React.FC = () => {
                 <Breadcrumb
                   items={[
                     {
-                      label: 'Device Methods',
+                      label: 'Device',
                       href: '/device-methods',
                       icon: Cpu,
                     },
@@ -70,11 +63,15 @@ const DeviceMethodExecutePage: React.FC = () => {
                 {!currentDevice ? (
                   <DeviceNotConnectedState showFullPage={true} />
                 ) : (
-                  <UnifiedMethodExecutor
+                  <MethodExecutor
                     methodConfig={selectedMethod}
                     executionHandler={handleMethodExecution}
                     className="h-full"
-                    type="standard"
+                    type={
+                      firmwareUpdateMethods.some(m => m.method === selectedMethod.method)
+                        ? 'firmware'
+                        : 'standard'
+                    }
                   />
                 )}
               </div>

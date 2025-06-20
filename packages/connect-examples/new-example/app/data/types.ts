@@ -1,17 +1,24 @@
 import type { HardwareApiMethod } from '~/services/hardwareService';
 
-// 参数字段类型
+// 选项类型定义
+export interface SelectOption {
+  label: string;
+  value: string;
+}
+
+// 参数字段类型 - 包含值和UI配置
 export interface ParameterField {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'textarea' | 'select' | 'file';
   label?: string;
   description?: string;
   placeholder?: string;
-  default?: unknown;
+  value?: unknown; // 参数的实际值
   required?: boolean;
   visible?: boolean;
   editable?: boolean;
-  options?: string[];
+  options?: string[] | SelectOption[];
+  accept?: string; // 文件类型限制
   validation?: {
     pattern?: string;
     min?: number;
@@ -19,7 +26,15 @@ export interface ParameterField {
   };
 }
 
-// 统一的方法预设类型
+// 统一的预设配置 - 既包含参数定义，也包含参数值
+export interface MethodPreset {
+  title: string;
+  description?: string;
+  // 参数列表 - 每个参数包含完整的配置和值
+  parameters: ParameterField[];
+}
+
+// 方法分类
 export type MethodCategory =
   | 'address'
   | 'publicKey'
@@ -27,109 +42,94 @@ export type MethodCategory =
   | 'signing'
   | 'device'
   | 'info'
-  | 'security'
-  | 'management'
-  | 'basic'
-  | 'message'
-  | 'advanced';
+  | 'firmware'
+  | 'other';
 
-export interface MethodPreset {
-  title: string;
-  description?: string;
-  value: Record<string, unknown>;
-  visibleFields?: string[];
-}
+// 功能分类
+export type FunctionalCategory =
+  | 'device'
+  | 'blockchain'
+  | 'crypto'
+  | 'utility'
+  | 'firmware'
+  | 'other';
 
-// 统一的方法配置类型 - 直接基于原始数据格式
-export interface MethodConfig {
-  name?: string;
+// 链分类
+export type ChainCategory =
+  | 'bitcoin'
+  | 'ethereum'
+  | 'polkadot'
+  | 'cosmos'
+  | 'solana'
+  | 'cardano'
+  | 'tron'
+  | 'sui'
+  | 'ton'
+  | 'aptos'
+  | 'near'
+  | 'algorand'
+  | 'stellar'
+  | 'xrp'
+  | 'neo'
+  | 'nem'
+  | 'kaspa'
+  | 'nervos'
+  | 'nexa'
+  | 'starcoin'
+  | 'conflux'
+  | 'scdo'
+  | 'benfen'
+  | 'alephium'
+  | 'dynex'
+  | 'filecoin'
+  | 'nostr'
+  | 'other';
+
+// **统一的方法配置类型** - 极简设计
+export interface UnifiedMethodConfig {
   method: HardwareApiMethod;
   description: string;
-  parameters?: ParameterField[];
-  presets?: MethodPreset[];
-  deprecated?: boolean;
-  dangerous?: boolean;
-  noConnIdReq?: boolean;
+  category?: MethodCategory;
+
+  // 预设配置 - 每个预设包含完整的参数定义和值
+  presets: MethodPreset[];
+
+  // 其他配置
   noDeviceIdReq?: boolean;
+  noConnIdReq?: boolean;
+  deprecated?: boolean;
+  supportedDevices?: string[];
+  tags?: string[];
 }
+
+// 执行状态
+export type ExecutionStatus =
+  | 'idle'
+  | 'preparing'
+  | 'loading'
+  | 'executing'
+  | 'device-interaction'
+  | 'success'
+  | 'error'
+  | 'cancelled';
+
+// 日志类型
+export type LogType = 'info' | 'success' | 'error' | 'warning';
 
 // 链元数据类型
 export interface ChainMeta {
-  id: ChainCategory;
+  id: string;
   name: string;
   description: string;
   icon: string;
   color: string;
-  category: Category;
+  category: FunctionalCategory;
 }
 
-// 完整的链配置类型
+// 链配置类型（保持兼容）
 export interface ChainConfig extends ChainMeta {
-  methods: MethodConfig[];
+  methods: UnifiedMethodConfig[];
 }
 
-// 功能模块分类（非区块链）
-export type FunctionalCategory = 'device' | 'firmwareUpdate';
-
-// 区块链分类
-export type ChainCategory =
-  | 'bitcoin'
-  | 'ethereum'
-  | 'solana'
-  | 'cardano'
-  | 'polkadot'
-  | 'sui'
-  | 'aptos'
-  | 'near'
-  | 'ton'
-  | 'cosmos'
-  | 'tron'
-  | 'xrp'
-  | 'stellar'
-  | 'neo'
-  | 'nem'
-  | 'kaspa'
-  | 'algorand'
-  | 'filecoin'
-  | 'nervos'
-  | 'starcoin'
-  | 'scdo'
-  | 'dynex'
-  | 'nexa'
-  | 'alephium'
-  | 'conflux'
-  | 'nostr'
-  | 'lightning'
-  | 'benfen'
-  | 'all-network';
-
-// 统一分类类型
-export type Category = FunctionalCategory | ChainCategory;
-
-// 执行相关类型
-export type ExecutionStatus = 'idle' | 'loading' | 'device-interaction' | 'success' | 'error';
-
-export interface ExecutionResult {
-  success: boolean;
-  data?: unknown;
-  error?: string;
-  duration?: number;
-}
-
-export interface LogEntry {
-  id: string;
-  timestamp: number;
-  type: 'request' | 'response' | 'error' | 'info';
-  method?: string;
-  content: string;
-  data?: unknown;
-  duration?: number;
-}
-
-// 注册表统计类型 - 简化
-export interface RegistryStats {
-  totalChains: number;
-  totalMethods: number;
-  functionalsByCategory: Record<FunctionalCategory, number>;
-  chainsByCategory: Record<ChainCategory, number>;
-}
+// 标准方法配置类型 - 这是唯一的数据格式
+export type MethodConfig = UnifiedMethodConfig;

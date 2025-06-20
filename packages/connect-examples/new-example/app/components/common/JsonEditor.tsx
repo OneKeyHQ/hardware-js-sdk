@@ -1,20 +1,8 @@
-import {
-  useState,
-  useEffect,
-  forwardRef,
-  useImperativeHandle,
-  useCallback,
-} from "react";
-import { Button } from "../ui/Button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "../ui/Dialog";
-import { Alert, AlertDescription } from "../ui/Alert";
-import { Edit, Save, X } from "lucide-react";
+import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { Button } from '../ui/Button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/Dialog';
+import { Alert, AlertDescription } from '../ui/Alert';
+import { Edit, Save, X } from 'lucide-react';
 
 interface JsonEditorProps {
   data: Record<string, unknown> | null;
@@ -32,18 +20,8 @@ export interface JsonEditorRef {
 }
 
 const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
-  (
-    {
-      data,
-      onSave,
-      disabled = false,
-      onCopy,
-      isEditing = false,
-      onEditingChange,
-    },
-    ref
-  ) => {
-    const [editValue, setEditValue] = useState("");
+  ({ data, onSave, disabled = false, onCopy, isEditing = false, onEditingChange }, ref) => {
+    const [editValue, setEditValue] = useState('');
     const [error, setError] = useState<string | null>(null);
 
     // 暴露给外部的方法
@@ -57,11 +35,10 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
       if (data) {
         setEditValue(JSON.stringify(data, null, 2));
       } else {
-        setEditValue("{}");
+        setEditValue('{}');
       }
       setError(null);
-      onEditingChange?.(true);
-    }, [data, onEditingChange]);
+    }, [data]);
 
     const handleCopy = async (): Promise<boolean> => {
       if (data) {
@@ -70,7 +47,7 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
           onCopy?.();
           return true;
         } catch (err) {
-          console.error("复制失败:", err);
+          console.error('复制失败:', err);
           return false;
         }
       }
@@ -84,7 +61,7 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
         onEditingChange?.(false);
         setError(null);
       } catch (err) {
-        setError("JSON格式不正确，请检查语法");
+        setError('JSON格式不正确，请检查语法');
       }
     };
 
@@ -93,14 +70,17 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
       setError(null);
     }, [onEditingChange]);
 
-    // 监听外部编辑状态变化
+    // 监听外部编辑状态变化 - 只在编辑状态开启时初始化数据
     useEffect(() => {
       if (isEditing && !disabled) {
-        handleOpen();
-      } else if (!isEditing) {
-        handleCancel();
+        if (data) {
+          setEditValue(JSON.stringify(data, null, 2));
+        } else {
+          setEditValue('{}');
+        }
+        setError(null);
       }
-    }, [isEditing, disabled, handleOpen, handleCancel]);
+    }, [isEditing, disabled, data]);
 
     return (
       <>
@@ -121,7 +101,14 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
           </div>
         )}
 
-        <Dialog open={isEditing} onOpenChange={onEditingChange}>
+        <Dialog
+          open={isEditing}
+          onOpenChange={open => {
+            if (!open) {
+              onEditingChange?.(false);
+            }
+          }}
+        >
           <DialogContent className="bg-card border-border/50 max-w-4xl max-h-[80vh] flex flex-col shadow-xl">
             <DialogHeader className="flex-shrink-0 border-b border-border/50 pb-4">
               <DialogTitle className="text-foreground flex items-center gap-2 text-lg font-semibold">
@@ -132,16 +119,13 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
 
             <div className="flex-1 space-y-4 min-h-0 py-4">
               <div className="space-y-3">
-                <label
-                  htmlFor="json-textarea"
-                  className="text-sm font-medium text-foreground"
-                >
+                <label htmlFor="json-textarea" className="text-sm font-medium text-foreground">
                   JSON内容
                 </label>
                 <textarea
                   id="json-textarea"
                   value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
+                  onChange={e => setEditValue(e.target.value)}
                   className="w-full h-96 p-4 text-sm font-mono bg-muted/10 border border-border rounded-lg focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/10 resize-none transition-all duration-200 shadow-sm"
                   placeholder="请输入JSON格式的数据..."
                 />
@@ -184,6 +168,6 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
   }
 );
 
-JsonEditor.displayName = "JsonEditor";
+JsonEditor.displayName = 'JsonEditor';
 
 export default JsonEditor;

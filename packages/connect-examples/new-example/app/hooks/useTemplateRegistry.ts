@@ -1,29 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import type {
   ChainConfig,
-  MethodConfig,
+  UnifiedMethodConfig,
   ChainCategory,
   FunctionalCategory,
-  Category,
-  RegistryStats,
 } from '~/data/types';
-import type { HardwareApiMethod } from '~/services/hardwareService';
-import type { PlaygroundProps } from '~/data/components/Playground';
 import { methodsRegistry } from '../data/methodsRegistry';
 
-// 映射字段
-function convertToMethodConfig(props: PlaygroundProps): MethodConfig {
-  return {
-    method: props.method as HardwareApiMethod,
-    description: props.description,
-    presets: props.presupposes?.map(preset => ({
-      title: preset.title,
-      value: preset.value,
-    })),
-    deprecated: props.deprecated,
-    noConnIdReq: props.noConnIdReq,
-    noDeviceIdReq: props.noDeviceIdReq,
-  };
+// 统计信息类型
+interface RegistryStats {
+  totalChains: number;
+  totalMethods: number;
+  functionalsByCategory: Record<FunctionalCategory, number>;
+  chainsByCategory: Record<ChainCategory, number>;
 }
 
 // 模板注册表类 - 简化版，使用 methodsRegistry
@@ -33,12 +22,8 @@ class TemplateRegistry {
 
   async initialize(): Promise<void> {
     try {
-      // 直接使用 methodsRegistry 的数据
-      this.chains = methodsRegistry.chains.map(chain => ({
-        ...chain,
-        methods: chain.methods.map(convertToMethodConfig),
-      }));
-
+      // 直接使用 methodsRegistry 的数据，无需转换
+      this.chains = methodsRegistry.chains;
       this.ready = true;
     } catch (error) {
       console.error('Failed to initialize template registry:', error);
@@ -54,7 +39,7 @@ class TemplateRegistry {
     return [...this.chains];
   }
 
-  getAllMethods(): MethodConfig[] {
+  getAllMethods(): UnifiedMethodConfig[] {
     return this.chains.flatMap(chain => chain.methods);
   }
 
@@ -62,28 +47,28 @@ class TemplateRegistry {
     return this.chains.find(chain => chain.id === chainId);
   }
 
-  getChainMethods(chainId: string): MethodConfig[] {
+  getChainMethods(chainId: string): UnifiedMethodConfig[] {
     const chain = this.getChain(chainId);
     return chain ? chain.methods : [];
   }
 
-  getChainsByCategory(category: Category): ChainConfig[] {
+  getChainsByCategory(category: FunctionalCategory): ChainConfig[] {
     return this.chains.filter(chain => chain.category === category);
   }
 
   getFunctionalChains(): ChainConfig[] {
     return this.chains.filter(
-      chain => chain.category === 'device' || chain.category === 'firmwareUpdate'
+      chain => chain.category === 'device' || chain.category === 'firmware'
     );
   }
 
   getBlockchainChains(): ChainConfig[] {
     return this.chains.filter(
-      chain => chain.category !== 'device' && chain.category !== 'firmwareUpdate'
+      chain => chain.category !== 'device' && chain.category !== 'firmware'
     );
   }
 
-  searchMethods(query: string): MethodConfig[] {
+  searchMethods(query: string): UnifiedMethodConfig[] {
     const searchTerm = query.toLowerCase();
     return this.getAllMethods().filter(
       method =>
@@ -98,7 +83,7 @@ class TemplateRegistry {
 
     // 分别统计功能模块和区块链分类
     this.chains.forEach(chain => {
-      if (chain.category === 'basic' || chain.category === 'device') {
+      if (chain.category === 'device' || chain.category === 'firmware') {
         functionalsByCategory[chain.category as FunctionalCategory] =
           (functionalsByCategory[chain.category as FunctionalCategory] || 0) + 1;
       } else {
@@ -163,7 +148,7 @@ export function useTemplateRegistry() {
       []
     ),
     getChainsByCategory: useCallback(
-      (category: Category) => templateRegistry.getChainsByCategory(category),
+      (category: FunctionalCategory) => templateRegistry.getChainsByCategory(category),
       []
     ),
     getFunctionalChains: useCallback(() => templateRegistry.getFunctionalChains(), []),
