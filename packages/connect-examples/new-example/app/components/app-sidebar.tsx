@@ -223,7 +223,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* 分割线 - 始终显示 */}
-        <SidebarSeparator className="bg-border/50 dark:bg-border" />
+        <SidebarSeparator className="onekey-divider mx-3" />
 
         {/* 导航菜单 - 优化版本 */}
         <SidebarGroup>

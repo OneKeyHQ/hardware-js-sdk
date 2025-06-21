@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 
 import { Badge } from '../components/ui/Badge';
-import { Card, CardContent } from '../components/ui/Card';
 import { Separator } from '../components/ui/Separator';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
@@ -189,18 +188,20 @@ const DeviceMethodsIndexPage: React.FC = () => {
         }}
         role="button"
         tabIndex={0}
-        className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:border-border/50 hover:bg-muted/30 cursor-pointer transition-all duration-200"
+        className="onekey-method-item group"
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <code className="text-sm font-semibold text-foreground">{method.method}</code>
+            <code className="text-sm font-semibold text-foreground bg-muted/50 px-2 py-1 rounded border border-border/30">
+              {method.method}
+            </code>
 
             {/* 状态标签 */}
             <div className="flex items-center gap-1">
               {method.deprecated && (
                 <Badge
                   variant="outline"
-                  className="text-xs bg-orange-50 text-orange-700 border-orange-200 px-1.5 py-0"
+                  className="text-xs bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 px-1.5 py-0"
                 >
                   <AlertTriangle className="w-3 h-3" />
                 </Badge>
@@ -211,7 +212,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
           <p className="text-xs text-muted-foreground leading-relaxed">{method.description}</p>
         </div>
 
-        <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0 ml-3" />
+        <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0 ml-3" />
       </div>
     );
   };
@@ -221,35 +222,31 @@ const DeviceMethodsIndexPage: React.FC = () => {
     const CategoryIcon = category.icon;
 
     return (
-      <Card
-        key={category.id}
-        className="border-border/50 hover:border-border/80 transition-colors duration-200"
-      >
-        <CardContent className="p-0">
-          {/* 分类标题 */}
-          <div className={`${category.bgColor} ${category.borderColor} border-b p-4`}>
+      <div key={category.id} className="onekey-category-card">
+        <div className="category-header">
+          <div className="onekey-category-title">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${category.bgColor} border ${category.borderColor}`}>
-                <CategoryIcon className={`w-4 h-4 ${category.color}`} />
+              <div className="p-2 rounded-lg bg-muted/50 border border-border/30">
+                <CategoryIcon className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="flex-1">
-                <h3 className={`font-semibold ${category.color} text-sm`}>{category.name}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">{category.description}</p>
+                <h3>{category.name}</h3>
+                <p>{category.description}</p>
               </div>
               <Badge variant="secondary" className="text-xs font-medium">
                 {category.methods.length}
               </Badge>
             </div>
           </div>
+        </div>
 
-          {/* 方法列表 */}
-          <div className="p-2">
-            <div className="space-y-1">
-              {category.methods.map(method => renderMethodItem(method))}
-            </div>
+        {/* 方法列表 */}
+        <div className="p-2">
+          <div className="space-y-1">
+            {category.methods.map(method => renderMethodItem(method))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   };
 
@@ -271,7 +268,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
           {/* 设备连接状态 */}
           <DeviceNotConnectedState />
 
-          <Separator />
+          <Separator className="onekey-divider" />
 
           {/* 分类网格 */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

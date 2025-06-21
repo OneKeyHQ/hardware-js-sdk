@@ -1,7 +1,7 @@
 import React from 'react';
 
 // 直接导入所有常用的图标资源
-import bitcoinIcon from '../../assets/chain/tbtc.png';
+import bitcoinIcon from '../../assets/chain/btc.png';
 import ethereumIcon from '../../assets/chain/teth.png';
 import solanaIcon from '../../assets/chain/sol.png';
 import tronIcon from '../../assets/chain/tron.png';
@@ -29,6 +29,7 @@ import lightningIcon from '../../assets/chain/lnd.png';
 import benfenIcon from '../../assets/chain/bfc.png';
 import stellarIcon from '../../assets/chain/stellar.png';
 import alephiumIcon from '../../assets/chain/alephium.png';
+import allnetworkIcon from '../../assets/chain/all_network_logo.png';
 import { ChainCategory } from '../../data/types';
 
 interface ChainIconProps {
@@ -69,7 +70,7 @@ const CHAIN_ICON_MAP: Record<ChainCategory, string> = {
   lightning: lightningIcon,
   benfen: benfenIcon,
   alephium: alephiumIcon,
-  'all-network': '',
+  'all-network': allnetworkIcon,
 };
 
 // 默认的fallback图标
