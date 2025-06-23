@@ -730,6 +730,11 @@ export class Device extends EventEmitter {
     return false;
   }
 
+  async lockDevice() {
+    const res = await this.commands.typedCall('LockDevice', 'Success', {});
+    return res.message;
+  }
+
   async checkPassphraseStateSafety(passphraseState?: string, useEmptyPassphraseState?: boolean) {
     if (!this.features) return false;
     const { passphraseState: newPassphraseState, unlockedAttachPin } =
@@ -739,7 +744,16 @@ export class Device extends EventEmitter {
       });
 
     // Main wallet and unlock Attach Pin, throw safe error
-    if (unlockedAttachPin && useEmptyPassphraseState) {
+    const mainWalletUseAttachPin = unlockedAttachPin && useEmptyPassphraseState;
+    const useErrorAttachPin =
+      unlockedAttachPin && passphraseState && passphraseState !== newPassphraseState;
+
+    if (mainWalletUseAttachPin || useErrorAttachPin) {
+      try {
+        await this.lockDevice();
+      } catch (error) {
+        // ignore error
+      }
       this.clearInternalState();
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckUnlockTypeError));
     }
