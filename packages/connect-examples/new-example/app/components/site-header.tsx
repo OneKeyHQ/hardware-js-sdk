@@ -10,6 +10,7 @@ import { Moon, Sun, Globe, ExternalLink } from 'lucide-react';
 import { useTheme } from '../hooks/use-theme';
 import { useTranslation } from 'react-i18next';
 import { SearchTrigger } from './CommandPalette';
+import { SidebarTrigger } from './ui/sidebar';
 
 // 导入GitHub图标
 import githubIcon from '../assets/gitHub.svg';
@@ -49,18 +50,24 @@ export function SiteHeader() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-6 max-w-[100%]">
-          {/* 左侧：版本信息 */}
-          <div className="flex items-center gap-2">
-            {isProduction && (
-              <Badge variant="secondary" className="text-xs">
-                v{commitSha}
-              </Badge>
-            )}
-            {!isProduction && (
-              <Badge variant="outline" className="text-xs">
-                dev
-              </Badge>
-            )}
+          {/* 左侧：侧边栏切换按钮和版本信息 */}
+          <div className="flex items-center gap-3">
+            {/* 侧边栏切换按钮 */}
+            <SidebarTrigger />
+
+            {/* 版本信息 */}
+            <div className="flex items-center gap-2">
+              {isProduction && (
+                <Badge variant="secondary" className="text-xs">
+                  v{commitSha}
+                </Badge>
+              )}
+              {!isProduction && (
+                <Badge variant="outline" className="text-xs">
+                  dev
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* 右侧：工具栏 */}

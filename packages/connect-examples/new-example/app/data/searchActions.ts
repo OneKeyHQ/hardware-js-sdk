@@ -1,9 +1,10 @@
 import { methodsRegistry } from './methodsRegistry';
 import type { Action } from 'kbar';
 
-// 获取 basename 前缀
+// 获取基础路径
 const getBasename = () => {
-  return process.env.NODE_ENV === 'production' ? '/new-example' : '';
+  if (typeof window === 'undefined') return '';
+  return window.location.pathname.includes('/hardware-js-sdk') ? '/hardware-js-sdk' : '';
 };
 
 // 导航函数 - 使用 React Router 的编程式导航
@@ -22,6 +23,18 @@ const setTheme = (theme: 'light' | 'dark') => {
   document.documentElement.classList.toggle('dark', theme === 'dark');
 };
 
+// 侧边栏切换函数 - 使用键盘事件触发
+const toggleSidebar = () => {
+  // 触发键盘事件来切换侧边栏，这样可以利用现有的键盘监听器
+  const event = new KeyboardEvent('keydown', {
+    key: 'b',
+    metaKey: navigator.platform.includes('Mac'),
+    ctrlKey: !navigator.platform.includes('Mac'),
+    bubbles: true,
+  });
+  window.dispatchEvent(event);
+};
+
 // 外部链接跳转函数
 const openExternalLink = (url: string) => {
   window.open(url, '_blank', 'noopener,noreferrer');
@@ -31,16 +44,45 @@ const openExternalLink = (url: string) => {
 export const buildSearchActions = (): Action[] => {
   const actions: Action[] = [];
 
-  // NAVIGATION 分类 - 页面导航
+  // 界面控制
+  actions.push(
+    {
+      id: 'toggle-sidebar',
+      name: '切换侧边栏',
+      shortcut: [navigator.platform.includes('Mac') ? 'cmd' : 'ctrl', 'b'],
+      keywords: 'sidebar toggle 侧边栏 切换 显示 隐藏',
+      section: '界面控制',
+      perform: toggleSidebar,
+      icon: '📋',
+    },
+    {
+      id: 'theme-light',
+      name: '浅色主题',
+      keywords: 'theme light 主题 浅色 明亮',
+      section: '界面控制',
+      perform: () => setTheme('light'),
+      icon: '☀️',
+    },
+    {
+      id: 'theme-dark',
+      name: '深色主题',
+      keywords: 'theme dark 主题 深色 暗色',
+      section: '界面控制',
+      perform: () => setTheme('dark'),
+      icon: '🌙',
+    }
+  );
+
+  // 导航
   actions.push(
     {
       id: 'home',
-      name: 'Home',
-      subtitle: 'SDK 使用示例和快速开始',
-      section: 'Navigation',
+      name: '首页',
       shortcut: ['h'],
-      keywords: 'home index 首页 主页 开始 start',
+      keywords: 'home 首页 主页',
+      section: '导航',
       perform: () => navigateTo('/'),
+      icon: '🏠',
     },
     {
       id: 'emulator',
@@ -81,26 +123,6 @@ export const buildSearchActions = (): Action[] => {
       shortcut: ['s'],
       keywords: 'blockchain signer',
       perform: () => navigateTo('/chains'),
-    }
-  );
-
-  // SETTINGS 分类 - 设置和配置
-  actions.push(
-    {
-      id: 'theme-light',
-      name: 'Light Theme',
-      subtitle: '切换到浅色主题',
-      section: 'Settings',
-      keywords: 'theme light 主题 浅色 白色',
-      perform: () => setTheme('light'),
-    },
-    {
-      id: 'theme-dark',
-      name: 'Dark Theme',
-      subtitle: '切换到深色主题',
-      section: 'Settings',
-      keywords: 'theme dark 主题 深色 黑色',
-      perform: () => setTheme('dark'),
     }
   );
 

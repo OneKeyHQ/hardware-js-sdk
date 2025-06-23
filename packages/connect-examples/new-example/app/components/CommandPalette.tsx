@@ -152,9 +152,14 @@ export function SearchTrigger() {
         />
       </svg>
       <span className="text-gray-500 dark:text-gray-400">搜索</span>
-      <kbd className="ml-auto text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
-        {shortcutKeys.CmdOrCtrl}K
-      </kbd>
+      <div className="ml-auto flex items-center gap-1">
+        <kbd className="text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
+          {shortcutKeys.CmdOrCtrl.replace('+', '')}
+        </kbd>
+        <kbd className="text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
+          K
+        </kbd>
+      </div>
     </button>
   );
 }

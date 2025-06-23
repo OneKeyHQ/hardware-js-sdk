@@ -32,7 +32,6 @@ body {
     --popover-foreground: 220 13% 18%; /* #2d3748 - Dark text */
     
     /* Primary colors - OneKey green for accents only */
-    --primary: var(--ok-green);
     --primary-foreground: 220 13% 18%; /* Dark text on green */
     
     /* Secondary surfaces */
@@ -54,10 +53,8 @@ body {
     /* Borders and inputs - clear definition */
     --border: 220 13% 91%; /* #e2e8f0 - Light gray borders */
     --input: 220 13% 91%; /* #e2e8f0 - Input borders */
-    --ring: var(--ok-green); /* OneKey green focus rings */
     
     /* Chart colors */
-    --chart-1: var(--ok-green);
     --chart-2: 217 91% 60%; /* Blue */
     --chart-3: 262 83% 58%; /* Purple */
     --chart-4: 43 96% 56%; /* Yellow */
@@ -68,12 +65,10 @@ body {
     /* Sidebar - Light Mode with enhanced contrast */
     --sidebar-background: 220 14% 97%; /* #f8fafc - Slightly cooler and more distinct */
     --sidebar-foreground: 220 13% 18%; /* #2d3748 - Dark text */
-    --sidebar-primary: var(--ok-green);
     --sidebar-primary-foreground: 220 13% 18%; /* Dark text on green */
     --sidebar-accent: 220 14% 94%; /* #f1f5f9 - Light hover with better contrast */
     --sidebar-accent-foreground: 220 13% 18%; /* #2d3748 - Dark text */
     --sidebar-border: 220 13% 85%; /* #d2d6dc - More visible borders */
-    --sidebar-ring: var(--ok-green);
   }
   
   .dark {
@@ -118,10 +113,8 @@ body {
     /* Borders and inputs - subtle but visible */
     --border: 220 13% 20%; /* #4a5568 - Visible borders in dark mode */
     --input: 220 13% 20%; /* #4a5568 - Input borders */
-    --ring: var(--ok-green); /* OneKey green focus rings */
     
     /* Chart colors - adjusted for dark backgrounds */
-    --chart-1: var(--ok-green);
     --chart-2: 217 91% 60%; /* Blue */
     --chart-3: 262 83% 58%; /* Purple */
     --chart-4: 43 96% 56%; /* Yellow */
@@ -130,12 +123,10 @@ body {
     /* Sidebar - Dark Mode with clear separation */
     --sidebar-background: 220 13% 8%; /* #171923 - Darker than main background */
     --sidebar-foreground: 220 14% 96%; /* #f7fafc - Light text */
-    --sidebar-primary: var(--ok-green);
     --sidebar-primary-foreground: 220 13% 9%; /* Dark text on green */
     --sidebar-accent: 220 13% 12%; /* #2d3748 - Hover state */
     --sidebar-accent-foreground: 220 14% 96%; /* #f7fafc - Light text */
     --sidebar-border: 220 13% 20%; /* #4a5568 - Visible borders */
-    --sidebar-ring: var(--ok-green);
   }
 }
 
@@ -203,31 +194,28 @@ body {
     @apply bg-muted text-muted-foreground border-border;
   }
   
-  /* 设备页面标题样式 - 优雅的分类标题 */
+  /* 分类标题样式 */
   .onekey-category-title {
-    @apply relative;
+    @apply space-y-2 mb-6;
   }
   
   .onekey-category-title h3 {
-    @apply pl-4 text-base font-semibold text-foreground;
+    @apply text-2xl font-bold text-foreground;
   }
   
   .onekey-category-title p {
-    @apply pl-4 text-sm text-muted-foreground mt-0.5;
+    @apply text-muted-foreground text-lg;
   }
   
-  /* 分类卡片样式 */
+  /* 分类卡片增强 */
   .onekey-category-card {
-    @apply bg-card border border-border/60 rounded-xl;
-    @apply shadow-sm hover:shadow-md hover:border-border/80;
+    @apply bg-card border border-border rounded-xl shadow-sm hover:shadow-md;
     @apply transition-all duration-200 ease-in-out;
   }
   
   .onekey-category-card .category-header {
     @apply relative bg-muted/30 border-b border-border/50 p-4 rounded-t-xl;
   }
-  
-
   
   /* Light mode specific enhancements */
   .onekey-category-card:not(.dark) .category-header {
@@ -240,8 +228,6 @@ body {
     @apply bg-gradient-to-r from-slate-800/40 to-slate-800/20;
     @apply border-slate-700/50;
   }
-  
-
   
   /* 方法项样式 */
   .onekey-method-item {
@@ -326,15 +312,6 @@ body {
   /* 焦点样式统一 */
   .onekey-focus {
     @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
-  }
-}
-
-/* 主题切换动画 */
-@media (prefers-reduced-motion: no-preference) {
-  * {
-    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-    transition-duration: 0.2s;
-    transition-timing-function: ease-in-out;
   }
 }
 
