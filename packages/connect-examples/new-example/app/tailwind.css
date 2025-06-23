@@ -196,15 +196,15 @@ body {
   
   /* 分类标题样式 */
   .onekey-category-title {
-    @apply space-y-2 mb-6;
+    @apply space-y-0.5 mb-0.5;
   }
   
   .onekey-category-title h3 {
-    @apply text-2xl font-bold text-foreground;
+    @apply text-base font-semibold text-foreground;
   }
   
   .onekey-category-title p {
-    @apply text-muted-foreground text-lg;
+    @apply text-xs font-light text-muted-foreground opacity-70;
   }
   
   /* 分类卡片增强 */

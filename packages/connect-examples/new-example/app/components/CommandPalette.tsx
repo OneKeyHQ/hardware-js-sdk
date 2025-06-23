@@ -49,7 +49,7 @@ function RenderResults() {
         // 处理分组标题
         if (typeof item === 'string') {
           return (
-            <div className="px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+            <div className="px-4 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
               {item}
             </div>
           );
@@ -99,7 +99,7 @@ function RenderResults() {
 
         return (
           <div
-            className={`px-4 py-3 cursor-pointer transition-colors border-l-2 ${
+            className={`px-4 py-2 cursor-pointer transition-colors border-l-2 ${
               active
                 ? 'bg-blue-50 dark:bg-blue-900/20 border-l-blue-500 text-blue-900 dark:text-blue-100'
                 : 'border-l-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100'
@@ -107,16 +107,16 @@ function RenderResults() {
           >
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{action.name}</div>
+                <div className="font-medium text-sm truncate">{action.name}</div>
                 {action.subtitle && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
                     {action.subtitle}
                   </div>
                 )}
               </div>
               {shortcutDisplay && (
-                <div className="flex-shrink-0 ml-3">
-                  <kbd className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600">
+                <div className="flex-shrink-0 ml-2">
+                  <kbd className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600">
                     {shortcutDisplay}
                   </kbd>
                 </div>
@@ -176,11 +176,11 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
     >
       <KBarPortal>
         <KBarPositioner className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm p-4">
-          <KBarAnimator className="max-w-xl w-full bg-white dark:bg-gray-900 rounded-lg shadow-2xl mx-auto mt-16 overflow-hidden border border-gray-200 dark:border-gray-700">
+          <KBarAnimator className="max-w-xl w-full bg-white dark:bg-gray-900 rounded-lg shadow-2xl mx-auto mt-12 overflow-hidden border border-gray-200 dark:border-gray-700">
             {/* 搜索输入框 */}
             <div className="border-b border-gray-100 dark:border-gray-800">
               <KBarSearch
-                className="w-full px-4 py-4 text-base border-0 outline-0 bg-transparent placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100"
+                className="w-full px-4 py-3 text-base border-0 outline-0 bg-transparent placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100"
                 placeholder="搜索方法和区块链..."
               />
             </div>

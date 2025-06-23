@@ -15,7 +15,6 @@ import { Badge } from '../components/ui/Badge';
 import { Separator } from '../components/ui/Separator';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
-import { ListBoundary } from '../components/common/ListBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 
 import { device } from '../data/methods/device';
@@ -115,7 +114,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
       {
         id: 'basic',
         name: 'Basic Operations',
-        description: 'Essential device connectivity and information',
+        description: 'Device connectivity & info',
         icon: Zap,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -125,7 +124,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
       {
         id: 'device',
         name: 'Device Management',
-        description: 'PIN, settings and security configuration',
+        description: 'PIN, settings & security',
         icon: Settings,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -135,7 +134,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
       {
         id: 'firmware',
         name: 'Firmware Update',
-        description: 'Firmware, bootloader and BLE updates',
+        description: 'Firmware, bootloader & BLE updates',
         icon: Download,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -145,7 +144,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
       {
         id: 'release',
         name: 'Release Information',
-        description: 'Version checks and release data',
+        description: 'Version checks & release data',
         icon: Info,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -155,7 +154,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
       {
         id: 'control',
         name: 'Device Control',
-        description: 'Reboot and bootloader operations',
+        description: 'Reboot & bootloader operations',
         icon: RefreshCw,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -188,13 +187,13 @@ const DeviceMethodsIndexPage: React.FC = () => {
         }}
         role="button"
         tabIndex={0}
-        className="onekey-method-item group"
+        className="onekey-method-item group px-4 py-4.5 border-b border-border/30 last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors flex items-center justify-between"
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1">
-            <code className="text-sm font-semibold text-foreground bg-muted/50 px-2 py-1 rounded border border-border/30">
+          <div className="flex items-center gap-3 mb-1.5">
+            <div className="text-lg font-bold text-foreground bg-muted/50 px-4 py-2 rounded border border-border/30">
               {method.method}
-            </code>
+            </div>
 
             {/* 状态标签 */}
             <div className="flex items-center gap-1">
@@ -209,7 +208,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
             </div>
           </div>
 
-          <p className="text-xs text-muted-foreground leading-relaxed">{method.description}</p>
+          <p className="text-xs text-muted-foreground truncate">{method.description}</p>
         </div>
 
         <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0 ml-3" />
@@ -222,16 +221,21 @@ const DeviceMethodsIndexPage: React.FC = () => {
     const CategoryIcon = category.icon;
 
     return (
-      <div key={category.id} className="onekey-category-card">
-        <div className="category-header">
+      <div
+        key={category.id}
+        className="onekey-category-card bg-card border border-border/50 shadow-sm rounded-lg overflow-hidden flex flex-col"
+      >
+        <div className="category-header py-1.5 px-4">
           <div className="onekey-category-title">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-muted/50 border border-border/30">
+            <div className="flex items-center gap-1">
+              <div className="p-1 rounded-lg bg-muted/50 border border-border/30">
                 <CategoryIcon className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="flex-1">
-                <h3>{category.name}</h3>
-                <p>{category.description}</p>
+                <h3 className="text-base font-semibold">{category.name}</h3>
+                <p className="text-xs text-muted-foreground line-clamp-1 font-light opacity-70">
+                  {category.description}
+                </p>
               </div>
               <Badge variant="secondary" className="text-xs font-medium">
                 {category.methods.length}
@@ -241,8 +245,8 @@ const DeviceMethodsIndexPage: React.FC = () => {
         </div>
 
         {/* 方法列表 */}
-        <div className="p-2">
-          <div className="space-y-1">
+        <div className="p-1.5 pt-0">
+          <div className="space-y-2">
             {category.methods.map(method => renderMethodItem(method))}
           </div>
         </div>
@@ -251,32 +255,30 @@ const DeviceMethodsIndexPage: React.FC = () => {
   };
 
   return (
-    <ListBoundary title="Device" icon={Cpu}>
-      <PageLayout>
-        <div className="mx-auto px-6 py-6 space-y-6">
-          {/* 顶部导航和统计 */}
-          <div className="flex items-center justify-between">
-            <Breadcrumb items={[{ label: 'Device', icon: Cpu }]} />
+    <PageLayout>
+      <div className="mx-auto px-6 py-6 space-y-6">
+        {/* 顶部导航和统计 */}
+        <div className="flex items-center justify-between">
+          <Breadcrumb items={[{ label: 'Device', icon: Cpu }]} />
 
-            <div className="text-sm text-muted-foreground">
-              <span className="font-medium">{totalMethods} methods</span>
-              <span className="mx-2">•</span>
-              <span>{categories.length} categories</span>
-            </div>
-          </div>
-
-          {/* 设备连接状态 */}
-          <DeviceNotConnectedState />
-
-          <Separator className="onekey-divider" />
-
-          {/* 分类网格 */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {categories.map(category => renderCategoryCard(category))}
+          <div className="text-sm text-muted-foreground">
+            <span className="font-medium">{totalMethods} methods</span>
+            <span className="mx-2">•</span>
+            <span>{categories.length} categories</span>
           </div>
         </div>
-      </PageLayout>
-    </ListBoundary>
+
+        {/* 设备连接状态 */}
+        <DeviceNotConnectedState />
+
+        <Separator className="my-8" />
+
+        {/* 分类网格 */}
+        <div className="grid lg:grid-cols-3 gap-6 auto-rows-fr">
+          {categories.map(category => renderCategoryCard(category))}
+        </div>
+      </div>
+    </PageLayout>
   );
 };
 
