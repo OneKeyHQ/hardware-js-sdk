@@ -2,10 +2,8 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
-import { useSDK } from '../../hooks/useSDK';
-import { useToast } from '../../hooks/use-toast';
-import { switchTransport, TransportType, searchDevices } from '../../services/hardwareService';
-import { DeviceInfo } from '../../types/hardware';
+import { useTransport } from '../../hooks/useTransport';
+import { TransportType } from '../../services/hardwareService';
 import { Button } from '../ui/Button';
 import { Monitor, Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
 
@@ -15,30 +13,8 @@ interface TransportSwitcherProps {
 
 const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' }) => {
   const { t } = useTranslation();
-  const {
-    transportType,
-    setTransportType,
-    setIsConnecting,
-    setConnectedDevices,
-    setCurrentDevice,
-    setDeviceFeatures,
-    sdkInitState,
-  } = useDeviceStore();
-
-  // 从localStorage恢复transport选择
-  React.useEffect(() => {
-    const savedTransport = localStorage.getItem('preferred-transport') as TransportType;
-    if (savedTransport && savedTransport !== transportType) {
-      setTransportType(savedTransport);
-    }
-  });
-
-  // 保存transport选择到localStorage
-  const saveTransportPreference = (transport: TransportType) => {
-    localStorage.setItem('preferred-transport', transport);
-  };
-  const { getSDKInstance } = useSDK();
-  const { toast } = useToast();
+  const { sdkInitState } = useDeviceStore();
+  const { transportType, switchAndConnect } = useTransport();
   const [isLoading, setIsLoading] = useState(false);
 
   const transportOptions: Array<{
@@ -79,116 +55,18 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     },
   ];
 
-  // Auto-connect logic for different connection types
-  const handleDeviceConnection = async (devices: DeviceInfo[]) => {
-    if (!devices.length) return;
-
-    try {
-      // 自动选择第一个设备进行连接
-      const targetDevice = devices[0];
-      setCurrentDevice(targetDevice);
-
-      // 获取设备特征信息
-      const sdk = await getSDKInstance();
-      if (targetDevice.connectId && targetDevice.deviceId) {
-        const featuresResult = await sdk.getFeatures(targetDevice.connectId);
-        if (featuresResult.success && featuresResult.payload) {
-          setDeviceFeatures(featuresResult.payload);
-        }
-      }
-    } catch (error) {
-      console.error('Auto connection error:', error);
-    }
-  };
-
   const handleTransportSwitch = async (newTransport: TransportType) => {
-    // 检查SDK是否已初始化
-    if (!sdkInitState.isInitialized) {
-      toast({
-        title: t('transport.sdkNotReady'),
-        description: t('transport.pleaseWaitForInit'),
-        variant: 'warning',
-      });
-      return;
-    }
-
     if (isLoading) {
       return;
     }
 
     setIsLoading(true);
-    setIsConnecting(true);
-
     try {
-      // 先更新UI状态
-      setTransportType(newTransport);
-
-      // 保存用户选择
-      saveTransportPreference(newTransport);
-
-      // 切换传输方式
-      const result = await switchTransport(newTransport);
-
-      if (!result.success) {
-        const errorMessage = result.payload?.error || t('transport.switchFailed');
-        toast({
-          title: t('transport.connectionFailed'),
-          description: errorMessage,
-          variant: 'warning',
-        });
-        return;
-      }
-
-      // 搜索设备
-      const searchResult = await searchDevices();
-
-      if (searchResult.success && searchResult.payload) {
-        const devices = searchResult.payload as DeviceInfo[];
-        setConnectedDevices(devices);
-
-        // 自动连接设备
-        await handleDeviceConnection(devices);
-
-        if (devices.length === 0) {
-          toast({
-            title: t('transport.noDevicesFound'),
-            description: t('transport.ensureDeviceConnected'),
-            variant: 'warning',
-          });
-        }
-      } else {
-        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
-        toast({
-          title: t('transport.searchFailed'),
-          description: errorMessage,
-          variant: 'warning',
-        });
-        setConnectedDevices([]);
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : t('transport.unknownConnectionError');
-      toast({
-        title: t('transport.connectionTip'),
-        description: errorMessage,
-        variant: 'warning',
-      });
+      await switchAndConnect(newTransport);
     } finally {
       setIsLoading(false);
-      setIsConnecting(false);
     }
   };
-
-  // 处理 SDK 初始化错误 - 使用 toast 通知
-  React.useEffect(() => {
-    if (sdkInitState.error) {
-      toast({
-        title: t('transport.sdkInitError'),
-        description: sdkInitState.error,
-        variant: 'destructive',
-      });
-    }
-  }, [sdkInitState.error, toast, t]);
 
   return (
     <div className={`w-full space-y-6 ${className}`}>

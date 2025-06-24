@@ -1,4 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  useMethodParameters as useMethodParametersStore,
+  useMethodPresets,
+} from '../store/methodStore';
 import type { UnifiedMethodConfig, MethodPreset } from '~/data/types';
 
 interface UseMethodParametersOptions {
@@ -27,6 +31,10 @@ export function useMethodParameters({
   methodConfig,
   autoInitialize = true,
 }: UseMethodParametersOptions): UseMethodParametersReturn {
+  // 使用 methodStore 进行持久化
+  const { saveParameters, getParameters } = useMethodParametersStore(methodConfig.method);
+  const { setLastPreset, getLastPreset } = useMethodPresets(methodConfig.method);
+
   // 基础状态
   const [parameters, setParametersState] = useState<Record<string, unknown>>({});
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
@@ -37,12 +45,21 @@ export function useMethodParameters({
 
   // 初始化参数
   const initializeParameters = useCallback(() => {
-    const initialParams: Record<string, unknown> = {};
+    // 首先尝试从 store 中获取保存的参数
+    const savedParams = getParameters();
+    const lastPreset = getLastPreset();
 
-    // 应用第一个预设值（如果存在）
-    if (hasPresets) {
+    let initialParams: Record<string, unknown> = {};
+    let presetToSelect: string | null = null;
+
+    // 如果有保存的参数，优先使用
+    if (Object.keys(savedParams).length > 0) {
+      initialParams = savedParams;
+      presetToSelect = lastPreset;
+    } else if (hasPresets) {
+      // 否则使用第一个预设值
       const firstPreset = presets[0];
-      setSelectedPreset(firstPreset.title);
+      presetToSelect = firstPreset.title;
 
       // 从预设的参数中提取值
       if (firstPreset.parameters) {
@@ -62,12 +79,11 @@ export function useMethodParameters({
           }
         });
       }
-    } else {
-      setSelectedPreset(null);
     }
 
     setParametersState(initialParams);
-  }, [presets, hasPresets]);
+    setSelectedPreset(presetToSelect);
+  }, [presets, hasPresets, getParameters, getLastPreset]);
 
   // 自动初始化
   useEffect(() => {
@@ -77,22 +93,38 @@ export function useMethodParameters({
   }, [initializeParameters, autoInitialize]);
 
   // 操作函数
-  const setParameter = useCallback((key: string, value: unknown) => {
-    setParametersState(prev => ({
-      ...prev,
-      [key]: value,
-    }));
-  }, []);
+  const setParameter = useCallback(
+    (key: string, value: unknown) => {
+      setParametersState(prev => {
+        const newParams = {
+          ...prev,
+          [key]: value,
+        };
 
-  const setParameters = useCallback((newParams: Record<string, unknown>) => {
-    setParametersState(newParams);
-  }, []);
+        // 自动保存到 store
+        saveParameters(newParams);
+        return newParams;
+      });
+    },
+    [saveParameters]
+  );
+
+  const setParameters = useCallback(
+    (newParams: Record<string, unknown>) => {
+      setParametersState(newParams);
+      // 保存到 store
+      saveParameters(newParams);
+    },
+    [saveParameters]
+  );
 
   const selectPreset = useCallback(
     (presetTitle: string) => {
       const preset = presets.find(p => p.title === presetTitle);
       if (preset) {
         setSelectedPreset(presetTitle);
+        // 保存最后选择的预设
+        setLastPreset(presetTitle);
 
         // 从预设的参数中提取值
         const presetParams: Record<string, unknown> = {};
@@ -115,9 +147,11 @@ export function useMethodParameters({
         }
 
         setParametersState(presetParams);
+        // 保存到 store
+        saveParameters(presetParams);
       }
     },
-    [presets]
+    [presets, setLastPreset, saveParameters]
   );
 
   const reset = useCallback(() => {
