@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useSDK } from '../../hooks/useSDK';
 import { useToast } from '../../hooks/use-toast';
@@ -12,6 +13,7 @@ interface TransportSwitcherProps {
 }
 
 const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' }) => {
+  const { t } = useTranslation();
   const {
     transportType,
     setTransportType,
@@ -38,27 +40,27 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       type: 'webusb',
       label: 'WebUSB',
       icon: <Usb className="h-4 w-4" />,
-      description: '推荐，直接连接',
+      description: t('transport.webusb.description'),
     },
     {
       type: 'jsbridge',
       label: 'JSBridge',
       icon: <Monitor className="h-4 w-4" />,
-      description: '稳定兼容',
+      description: t('transport.jsbridge.description'),
       needsBridge: true,
     },
     {
       type: 'emulator',
-      label: '模拟器',
+      label: t('common.emulator'),
       icon: <Server className="h-4 w-4" />,
-      description: '开发测试',
+      description: t('transport.emulator.description'),
       isEmulator: true,
     },
     {
       type: 'webble',
       label: 'WebBLE',
       icon: <Signal className="h-4 w-4" />,
-      description: '蓝牙连接',
+      description: t('transport.webble.description'),
       disabled: true,
     },
   ];
@@ -89,8 +91,8 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     // 检查SDK是否已初始化
     if (!sdkInitState.isInitialized) {
       toast({
-        title: 'SDK未就绪',
-        description: '请等待SDK初始化完成后再切换传输方式',
+        title: t('transport.sdkNotReady'),
+        description: t('transport.pleaseWaitForInit'),
         variant: 'warning',
       });
       return;
@@ -111,9 +113,9 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       const result = await switchTransport(newTransport);
 
       if (!result.success) {
-        const errorMessage = result.payload?.error || '切换传输方式失败';
+        const errorMessage = result.payload?.error || t('transport.switchFailed');
         toast({
-          title: '连接失败',
+          title: t('transport.connectionFailed'),
           description: errorMessage,
           variant: 'warning',
         });
@@ -132,24 +134,25 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
 
         if (devices.length === 0) {
           toast({
-            title: '未找到设备',
-            description: '请确保设备已连接并解锁',
+            title: t('transport.noDevicesFound'),
+            description: t('transport.ensureDeviceConnected'),
             variant: 'warning',
           });
         }
       } else {
-        const errorMessage = searchResult.payload?.error || '搜索设备失败';
+        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
         toast({
-          title: '搜索失败',
+          title: t('transport.searchFailed'),
           description: errorMessage,
           variant: 'warning',
         });
         setConnectedDevices([]);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '连接过程中发生未知错误';
+      const errorMessage =
+        error instanceof Error ? error.message : t('transport.unknownConnectionError');
       toast({
-        title: '连接提示',
+        title: t('transport.connectionTip'),
         description: errorMessage,
         variant: 'warning',
       });
@@ -199,7 +202,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
               </div>
               {option.disabled && (
                 <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                  即将推出
+                  {t('transport.comingSoon')}
                 </span>
               )}
             </Button>
@@ -208,14 +211,14 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
             {option.type === 'jsbridge' && option.needsBridge && (
               <div className="ml-8 flex items-center space-x-1.5 text-xs text-gray-500">
                 <Info className="h-3 w-3" />
-                <span>需要</span>
+                <span>{t('transport.needsBridge')}</span>
                 <a
                   href="https://help.onekey.so/hc/zh-cn/articles/9740566472335-%E4%B8%8B%E8%BD%BD%E5%B9%B6%E6%9B%B4%E6%96%B0-OneKey-Bridge"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:text-blue-700 underline decoration-1 underline-offset-2 inline-flex items-center space-x-1 transition-colors"
                 >
-                  <span>下载Bridge</span>
+                  <span>{t('transport.downloadBridge')}</span>
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -225,12 +228,12 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
             {option.type === 'emulator' && option.isEmulator && (
               <div className="ml-8 flex items-center space-x-1.5 text-xs text-gray-500">
                 <Info className="h-3 w-3" />
-                <span>需要</span>
+                <span>{t('transport.needsEmulator')}</span>
                 <a
                   href="/emulator"
                   className="text-green-600 hover:text-green-700 underline decoration-1 underline-offset-2 inline-flex items-center space-x-1 transition-colors"
                 >
-                  <span>启动模拟器</span>
+                  <span>{t('transport.startEmulator')}</span>
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>

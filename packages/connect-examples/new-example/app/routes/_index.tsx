@@ -36,9 +36,7 @@ export default function IndexPage() {
       <div className="container max-w-7xl mx-auto">
         {/* 主标题区域 - 紧凑设计 */}
         <div className="text-center space-y-3 mb-20">
-          <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
-            OneKey Hardware Wallet SDK
-          </h1>
+          <h1 className="text-3xl lg:text-4xl font-bold text-foreground">{t('home.title')}</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{t('home.subtitle')}</p>
         </div>
 
@@ -52,7 +50,7 @@ export default function IndexPage() {
                 <div className="absolute top-4 right-4 z-10 bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-xs text-gray-600">连接中</span>
+                    <span className="text-xs text-gray-600">{t('common.connecting')}</span>
                   </div>
                 </div>
               )}
@@ -116,7 +114,7 @@ export default function IndexPage() {
                         <h2 className="text-3xl font-light text-foreground">{deviceDisplayName}</h2>
                         <div className="flex items-center gap-3">
                           <span className="text-sm text-muted-foreground">
-                            通过 {transportType} 连接
+                            {t('home.connectedVia', { transport: transportType })}
                           </span>
                         </div>
                       </div>
@@ -125,13 +123,13 @@ export default function IndexPage() {
                       <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-1">
                           <div className="text-xs text-muted-foreground uppercase tracking-wide">
-                            设备类型
+                            {t('common.deviceType')}
                           </div>
                           <div className="text-sm font-medium">{currentDevice.deviceType}</div>
                         </div>
                         <div className="space-y-1">
                           <div className="text-xs text-muted-foreground uppercase tracking-wide">
-                            连接ID
+                            {t('common.connectId')}
                           </div>
                           <div className="text-sm font-mono">{currentDevice.connectId}</div>
                         </div>
@@ -144,11 +142,13 @@ export default function IndexPage() {
 
                   {/* 设备信息 - 剩余空间填充 */}
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg mb-4 text-foreground">设备信息</h3>
+                    <h3 className="font-semibold text-lg mb-4 text-foreground">
+                      {t('common.deviceInfo')}
+                    </h3>
 
                     <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">UUID</span>
+                        <span className="text-sm text-muted-foreground">{t('common.uuid')}</span>
                         <span className="text-xs font-mono">{currentDevice.uuid || 'N/A'}</span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -158,13 +158,17 @@ export default function IndexPage() {
                       {currentDevice.features && (
                         <>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">固件版本</span>
+                            <span className="text-sm text-muted-foreground">
+                              {t('common.firmwareVersion')}
+                            </span>
                             <span className="text-sm">
                               {currentDevice.features.onekey_firmware_version}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">蓝牙版本</span>
+                            <span className="text-sm text-muted-foreground">
+                              {t('common.bluetoothVersion')}
+                            </span>
                             <span className="text-sm">
                               {currentDevice.features.onekey_ble_version ||
                                 currentDevice.features.ble_ver ||
@@ -172,7 +176,9 @@ export default function IndexPage() {
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Boot版本</span>
+                            <span className="text-sm text-muted-foreground">
+                              {t('common.bootVersion')}
+                            </span>
                             <span className="text-sm">
                               {currentDevice.features.onekey_boot_version || 'N/A'}
                             </span>
@@ -180,9 +186,13 @@ export default function IndexPage() {
                         </>
                       )}
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">客户端中输入pin码</span>
+                        <span className="text-sm text-muted-foreground">
+                          {t('common.pinInputSupport')}
+                        </span>
                         <Badge variant={isCurrentDeviceClassicModel() ? 'default' : 'secondary'}>
-                          {isCurrentDeviceClassicModel() ? '支持' : '不支持'}
+                          {isCurrentDeviceClassicModel()
+                            ? t('common.supported')
+                            : t('common.notSupported')}
                         </Badge>
                       </div>
                     </div>

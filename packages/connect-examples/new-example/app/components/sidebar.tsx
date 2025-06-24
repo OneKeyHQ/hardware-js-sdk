@@ -131,7 +131,7 @@ export function AppSidebar() {
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground font-medium">
-                          Device Name
+                          {t('common.deviceName')}
                         </span>
                         <span className="text-xs font-bold text-foreground truncate max-w-24">
                           {currentDevice.label || getDeviceLabel(currentDevice.features)}
@@ -140,7 +140,7 @@ export function AppSidebar() {
 
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground font-medium">
-                          Device Type
+                          {t('common.deviceType')}
                         </span>
                         <span className="text-xs font-semibold text-foreground">
                           {currentDevice.deviceType.toUpperCase() || 'Unknown'}
@@ -148,7 +148,9 @@ export function AppSidebar() {
                       </div>
 
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground font-medium">UUID</span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          {t('common.uuid')}
+                        </span>
                         <span
                           className="text-xs font-mono text-foreground truncate max-w-24"
                           title={currentDevice.connectId}
@@ -158,7 +160,9 @@ export function AppSidebar() {
                       </div>
 
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground font-medium">Transport</span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          {t('common.transport')}
+                        </span>
                         <Badge variant="outline" className="text-xs px-1.5 py-0 font-medium">
                           {transportType === 'webusb'
                             ? 'WebUSB'
@@ -188,25 +192,29 @@ export function AppSidebar() {
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground font-medium">
-                          Device Name
+                          {t('common.deviceName')}
                         </span>
                         <span className="text-xs text-muted-foreground">--</span>
                       </div>
 
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-muted-foreground font-medium">
-                          Device Type
+                          {t('common.deviceType')}
                         </span>
                         <span className="text-xs text-muted-foreground">--</span>
                       </div>
 
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground font-medium">UUID</span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          {t('common.uuid')}
+                        </span>
                         <span className="text-xs text-muted-foreground">--</span>
                       </div>
 
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground font-medium">Transport</span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          {t('common.transport')}
+                        </span>
                         <Badge
                           variant="outline"
                           className="text-xs px-1.5 py-0 font-medium text-muted-foreground border-muted"

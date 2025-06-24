@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Cpu,
   Download,
@@ -35,6 +36,7 @@ interface MethodCategory {
 
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // 获取所有方法数据
   const allMethods = useMemo(() => {
@@ -113,8 +115,8 @@ const DeviceMethodsIndexPage: React.FC = () => {
     return [
       {
         id: 'basic',
-        name: 'Basic Operations',
-        description: 'Device connectivity & info',
+        name: t('deviceMethods.categories.basicOperations.name'),
+        description: t('deviceMethods.categories.basicOperations.description'),
         icon: Zap,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -123,8 +125,8 @@ const DeviceMethodsIndexPage: React.FC = () => {
       },
       {
         id: 'device',
-        name: 'Device Management',
-        description: 'PIN, settings & security',
+        name: t('deviceMethods.categories.deviceManagement.name'),
+        description: t('deviceMethods.categories.deviceManagement.description'),
         icon: Settings,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -133,8 +135,8 @@ const DeviceMethodsIndexPage: React.FC = () => {
       },
       {
         id: 'firmware',
-        name: 'Firmware Update',
-        description: 'Firmware, bootloader & BLE updates',
+        name: t('deviceMethods.categories.firmwareUpdate.name'),
+        description: t('deviceMethods.categories.firmwareUpdate.description'),
         icon: Download,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -143,8 +145,8 @@ const DeviceMethodsIndexPage: React.FC = () => {
       },
       {
         id: 'release',
-        name: 'Release Information',
-        description: 'Version checks & release data',
+        name: t('deviceMethods.categories.releaseInformation.name'),
+        description: t('deviceMethods.categories.releaseInformation.description'),
         icon: Info,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -153,8 +155,8 @@ const DeviceMethodsIndexPage: React.FC = () => {
       },
       {
         id: 'control',
-        name: 'Device Control',
-        description: 'Reboot & bootloader operations',
+        name: t('deviceMethods.categories.deviceControl.name'),
+        description: t('deviceMethods.categories.deviceControl.description'),
         icon: RefreshCw,
         color: 'text-slate-700',
         bgColor: 'bg-slate-50',
@@ -262,9 +264,11 @@ const DeviceMethodsIndexPage: React.FC = () => {
           <Breadcrumb items={[{ label: 'Device', icon: Cpu }]} />
 
           <div className="text-sm text-muted-foreground">
-            <span className="font-medium">{totalMethods} methods</span>
+            <span className="font-medium">
+              {t('deviceMethods.totalMethods', { count: totalMethods })}
+            </span>
             <span className="mx-2">•</span>
-            <span>{categories.length} categories</span>
+            <span>{t('deviceMethods.totalCategories', { count: categories.length })}</span>
           </div>
         </div>
 

@@ -14,6 +14,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../components/common/PageLayout';
 
@@ -22,6 +23,7 @@ import proWhiteImg from '../assets/deviceMockup/pro-white.png';
 import classic1sImg from '../assets/deviceMockup/classic1s.png';
 
 export default function EmulatorPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [hoveredDevice, setHoveredDevice] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export default function EmulatorPage() {
       setTimeout(() => setCopiedCommand(null), 2000);
     } catch (error) {
       toast({
-        title: '复制失败',
+        title: 'Copy failed',
         description: '请手动复制命令',
         variant: 'destructive',
       });
@@ -119,11 +121,9 @@ export default function EmulatorPage() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-50">
-                  硬件模拟器
+                  {t('emulator.title')}
                 </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  使用 Docker 快速启动 OneKey 硬件模拟器进行开发测试
-                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{t('emulator.subtitle')}</p>
               </div>
             </div>
           </div>
@@ -135,7 +135,7 @@ export default function EmulatorPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-50 text-lg">
                   <Zap className="h-4 w-4 text-blue-500" />
-                  快速开始
+                  {t('emulator.quickStart')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -145,13 +145,15 @@ export default function EmulatorPage() {
                     <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
                       1
                     </div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">克隆 Git 仓库</h3>
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                      {t('emulator.cloneRepo')}
+                    </h3>
                   </div>
                   <CommandBlock
                     command={commands.clone}
                     commandKey="clone"
-                    title="下载模拟器脚本"
-                    description="包含所有平台的一键启动脚本"
+                    title={t('emulator.downloadScript')}
+                    description={t('emulator.scriptDescription')}
                   />
                 </div>
 
@@ -161,7 +163,9 @@ export default function EmulatorPage() {
                     <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
                       2
                     </div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">启动模拟器</h3>
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                      {t('emulator.startEmulator')}
+                    </h3>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -195,15 +199,15 @@ export default function EmulatorPage() {
                       <CommandBlock
                         command={commands.proVnc}
                         commandKey="proVnc"
-                        title="VNC 模式（推荐）"
-                        description="所有平台通用，启动后访问 http://localhost:6088/vnc.html"
+                        title={t('emulator.vncMode')}
+                        description={t('emulator.vncDescription')}
                       />
 
                       <CommandBlock
                         command={commands.proX11}
                         commandKey="proX11"
-                        title="X11 模式"
-                        description="仅限 Linux，原生窗口显示"
+                        title={t('emulator.x11Mode')}
+                        description={t('emulator.x11Description')}
                       />
                     </div>
 
@@ -237,15 +241,15 @@ export default function EmulatorPage() {
                       <CommandBlock
                         command={commands.classicVnc}
                         commandKey="classicVnc"
-                        title="VNC 模式（推荐）"
-                        description="所有平台通用，启动后访问 http://localhost:6088/vnc.html"
+                        title={t('emulator.vncMode')}
+                        description={t('emulator.vncDescription')}
                       />
 
                       <CommandBlock
                         command={commands.classicX11}
                         commandKey="classicX11"
-                        title="X11 模式"
-                        description="仅限 Linux，原生窗口显示"
+                        title={t('emulator.x11Mode')}
+                        description={t('emulator.x11Description')}
                       />
                     </div>
                   </div>
@@ -257,7 +261,9 @@ export default function EmulatorPage() {
                     <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
                       3
                     </div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">连接到应用</h3>
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                      {t('emulator.connectToApp')}
+                    </h3>
                   </div>
 
                   <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-md p-3">
@@ -265,12 +271,12 @@ export default function EmulatorPage() {
                       <Settings className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
                         <div className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                          在首页切换连接方式
+                          {t('emulator.connectionInstructions')}
                         </div>
                         <ol className="text-xs text-blue-800 dark:text-blue-200 space-y-0.5 list-decimal list-inside">
-                          <li>返回首页，在连接设置中选择 &ldquo;模拟器&rdquo; 传输方式</li>
-                          <li>点击连接按钮，系统会自动检测运行中的模拟器</li>
-                          <li>开始使用完整的硬件钱包功能进行开发测试</li>
+                          <li>{t('emulator.connectionSteps.step1')}</li>
+                          <li>{t('emulator.connectionSteps.step2')}</li>
+                          <li>{t('emulator.connectionSteps.step3')}</li>
                         </ol>
                       </div>
                     </div>
@@ -281,7 +287,9 @@ export default function EmulatorPage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Code className="h-4 w-4 text-gray-500 dark:text-gray-300" />
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">开发资源</h3>
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                      {t('emulator.developmentResources')}
+                    </h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -294,7 +302,7 @@ export default function EmulatorPage() {
                       }
                     >
                       <GitBranch className="h-3.5 w-3.5" />
-                      Git 仓库
+                      {t('emulator.gitRepo')}
                       <ExternalLink className="h-3 w-3 ml-auto" />
                     </Button>
 
@@ -304,18 +312,18 @@ export default function EmulatorPage() {
                       className="justify-start gap-2 bg-gray-50 dark:bg-gray-700/40 border-gray-200 dark:border-gray-600/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 text-gray-900 dark:text-gray-100"
                       onClick={() => {
                         toast({
-                          title: '文档正在完善中',
-                          description: '详细文档即将发布，敬请期待',
+                          title: t('emulator.docInProgress'),
+                          description: t('emulator.docInProgressDesc'),
                         });
                       }}
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
-                      详细文档
+                      {t('emulator.documentation')}
                       <Badge
                         variant="secondary"
                         className="ml-auto text-xs bg-gray-200 dark:bg-gray-600/50 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-500"
                       >
-                        即将发布
+                        {t('emulator.comingSoon')}
                       </Badge>
                     </Button>
                   </div>
@@ -323,11 +331,10 @@ export default function EmulatorPage() {
                   <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-600/50 rounded-md p-3 mt-3">
                     <div className="text-xs text-gray-600 dark:text-gray-200 space-y-1">
                       <div>
-                        <strong>VNC 模式</strong>
-                        ：跨平台通用，通过浏览器访问模拟器界面，无需额外配置
+                        <strong>VNC 模式</strong>：{t('emulator.vncModeNote')}
                       </div>
                       <div>
-                        <strong>X11 模式</strong>：Linux 专用，原生窗口显示，性能更佳
+                        <strong>X11 模式</strong>：{t('emulator.x11ModeNote')}
                       </div>
                     </div>
                   </div>

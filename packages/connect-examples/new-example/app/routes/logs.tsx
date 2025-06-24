@@ -1,15 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import {
-  Download,
-  Trash2,
-  FileText,
-  Home,
-  Settings,
-  Info,
-  HardDrive,
-  Clock,
-  Database,
-} from 'lucide-react';
+import { Trash2, FileText, Home, Settings, Info, HardDrive, Clock, Database } from 'lucide-react';
 import { useDeviceStore } from '../store/deviceStore';
 import UnifiedLogger from '../components/common/UnifiedLogger';
 import { Button } from '../components/ui/Button';
@@ -33,15 +23,8 @@ import { Checkbox } from '../components/ui/Checkbox';
 import { useToast } from '../hooks/use-toast';
 
 const LogsPage: React.FC = () => {
-  const {
-    logs,
-    clearLogs,
-    logStorageConfig,
-    setLogStorageConfig,
-    getLogStorageStats,
-    cleanupExpiredLogs,
-    exportLogs,
-  } = useDeviceStore();
+  const { logs, clearLogs, logStorageConfig, setLogStorageConfig, getLogStorageStats, exportLogs } =
+    useDeviceStore();
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -52,70 +35,50 @@ const LogsPage: React.FC = () => {
   // 获取存储统计信息
   const storageStats = getLogStorageStats();
 
-  const handleExportLogs = useCallback(
-    (format: 'json' | 'text' = 'json') => {
-      if (logs.length === 0) {
-        toast({
-          title: '导出失败',
-          description: '没有日志可以导出',
-          variant: 'destructive',
-        });
-        return;
-      }
+  const handleExportLogs = useCallback(() => {
+    if (logs.length === 0) {
+      toast({
+        title: t('logs.exportMessages.failed'),
+        description: t('logs.exportMessages.noLogs'),
+        variant: 'destructive',
+      });
+      return;
+    }
 
-      try {
-        const logContent = exportLogs(format);
-        const fileExtension = format === 'json' ? 'json' : 'txt';
-        const mimeType = format === 'json' ? 'application/json' : 'text/plain';
+    try {
+      const logContent = exportLogs('text');
 
-        // Create download link
-        const blob = new Blob([logContent], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `onekey_logs_${new Date()
-          .toISOString()
-          .slice(0, 19)
-          .replace(/:/g, '-')}.${fileExtension}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+      // Create download link
+      const blob = new Blob([logContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `onekey_logs_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
-        toast({
-          title: '导出成功',
-          description: `已导出 ${logs.length} 条日志记录`,
-        });
-      } catch (error) {
-        toast({
-          title: '导出失败',
-          description: error instanceof Error ? error.message : '导出过程中发生错误',
-          variant: 'destructive',
-        });
-      }
-    },
-    [logs, exportLogs, toast]
-  );
-
-  const handleCleanupExpiredLogs = useCallback(() => {
-    const beforeCount = logs.length;
-    cleanupExpiredLogs();
-    const afterCount = getLogStorageStats().totalEntries;
-    const cleanedCount = beforeCount - afterCount;
-
-    toast({
-      title: '清理完成',
-      description: `已清理 ${cleanedCount} 条过期日志`,
-    });
-  }, [logs.length, cleanupExpiredLogs, getLogStorageStats, toast]);
+      toast({
+        title: t('logs.exportMessages.success'),
+        description: t('logs.exportMessages.successDesc', { count: logs.length }),
+      });
+    } catch (error) {
+      toast({
+        title: t('logs.exportMessages.failed'),
+        description: error instanceof Error ? error.message : t('logs.exportMessages.error'),
+        variant: 'destructive',
+      });
+    }
+  }, [logs, exportLogs, toast]);
 
   const handleSaveConfig = useCallback(() => {
     setLogStorageConfig(tempConfig);
     setIsConfigOpen(false);
 
     toast({
-      title: '配置已保存',
-      description: '日志存储配置已更新',
+      title: t('logs.config.saved'),
+      description: t('logs.config.savedDesc'),
     });
   }, [tempConfig, setLogStorageConfig, toast]);
 
@@ -134,8 +97,8 @@ const LogsPage: React.FC = () => {
 
   // 格式化日期
   const formatDate = (dateString?: string): string => {
-    if (!dateString) return '无';
-    return new Date(dateString).toLocaleString('zh-CN');
+    if (!dateString) return t('logs.stats.none');
+    return new Date(dateString).toLocaleString();
   };
 
   const breadcrumbItems = [{ label: 'System Logs', icon: FileText }];
@@ -161,20 +124,18 @@ const LogsPage: React.FC = () => {
                     className="bg-background border-border text-foreground hover:bg-muted/50"
                   >
                     <Settings className="h-3 w-3 mr-1.5" />
-                    配置
+                    {t('logs.configuration')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
-                    <DialogTitle>日志存储配置</DialogTitle>
-                    <DialogDescription>
-                      配置日志的存储策略，包括大小限制、过期时间和压缩设置
-                    </DialogDescription>
+                    <DialogTitle>{t('logs.storageConfig.title')}</DialogTitle>
+                    <DialogDescription>{t('logs.storageConfig.description')}</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="maxEntries">最大条数</Label>
+                        <Label htmlFor="maxEntries">{t('logs.storageConfig.maxEntries')}</Label>
                         <Input
                           id="maxEntries"
                           type="number"
@@ -190,7 +151,9 @@ const LogsPage: React.FC = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="expirationDays">过期天数</Label>
+                        <Label htmlFor="expirationDays">
+                          {t('logs.storageConfig.expirationDays')}
+                        </Label>
                         <Input
                           id="expirationDays"
                           type="number"
@@ -207,7 +170,7 @@ const LogsPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="maxSizeBytes">最大大小 (MB)</Label>
+                      <Label htmlFor="maxSizeBytes">{t('logs.storageConfig.maxSizeMb')}</Label>
                       <Input
                         id="maxSizeBytes"
                         type="number"
@@ -233,28 +196,20 @@ const LogsPage: React.FC = () => {
                           })
                         }
                       />
-                      <Label htmlFor="compressionEnabled">启用压缩</Label>
+                      <Label htmlFor="compressionEnabled">
+                        {t('logs.storageConfig.enableCompression')}
+                      </Label>
                     </div>
                   </div>
                   <div className="flex justify-end space-x-2">
                     <Button variant="outline" onClick={handleResetConfig}>
-                      重置
+                      {t('logs.storageConfig.reset')}
                     </Button>
-                    <Button onClick={handleSaveConfig}>保存</Button>
+                    <Button onClick={handleSaveConfig}>{t('logs.storageConfig.save')}</Button>
                   </div>
                 </DialogContent>
               </Dialog>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCleanupExpiredLogs}
-                disabled={logs.length === 0}
-                className="bg-background border-border text-foreground hover:bg-muted hover:text-muted-foreground hover:border-border/70 disabled:opacity-50"
-              >
-                <Clock className="h-3 w-3 mr-1.5" />
-                清理过期
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -265,25 +220,16 @@ const LogsPage: React.FC = () => {
                 <Trash2 className="h-3 w-3 mr-1.5" />
                 {t('logs.clear')}
               </Button>
+
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleExportLogs('json')}
-                disabled={logs.length === 0}
-                className="bg-background border-border text-foreground hover:bg-muted/50 disabled:opacity-50"
-              >
-                <Download className="h-3 w-3 mr-1.5" />
-                导出JSON
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExportLogs('text')}
+                onClick={handleExportLogs}
                 disabled={logs.length === 0}
                 className="bg-background border-border text-foreground hover:bg-muted/50 disabled:opacity-50"
               >
                 <FileText className="h-3 w-3 mr-1.5" />
-                导出文本
+                {t('logs.exportText')}
               </Button>
             </div>
           </div>
@@ -296,7 +242,7 @@ const LogsPage: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Database className="h-4 w-4 text-blue-500" />
                     <div>
-                      <p className="text-sm font-medium">总条数</p>
+                      <p className="text-sm font-medium">{t('logs.stats.totalEntries')}</p>
                       <p className="text-lg font-bold">{storageStats.totalEntries}</p>
                     </div>
                   </div>
@@ -307,7 +253,7 @@ const LogsPage: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <HardDrive className="h-4 w-4 text-green-500" />
                     <div>
-                      <p className="text-sm font-medium">存储大小</p>
+                      <p className="text-sm font-medium">{t('logs.stats.storageSize')}</p>
                       <p className="text-lg font-bold">
                         {formatFileSize(storageStats.totalSizeBytes)}
                       </p>
@@ -320,7 +266,7 @@ const LogsPage: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Clock className="h-4 w-4 text-orange-500" />
                     <div>
-                      <p className="text-sm font-medium">最早记录</p>
+                      <p className="text-sm font-medium">{t('logs.stats.oldestRecord')}</p>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(storageStats.oldestEntry)}
                       </p>
@@ -333,7 +279,7 @@ const LogsPage: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Info className="h-4 w-4 text-purple-500" />
                     <div>
-                      <p className="text-sm font-medium">最新记录</p>
+                      <p className="text-sm font-medium">{t('logs.stats.newestRecord')}</p>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(storageStats.newestEntry)}
                       </p>

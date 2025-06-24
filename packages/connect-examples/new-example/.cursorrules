@@ -698,39 +698,253 @@ const MethodExecutePage: React.FC = () => {
 - **Sensitive Information:** Handle device information securely
 - **Error Handling:** Avoid information leakage in error messages
 
+## Search Functionality & User Experience
+
+### Command Palette Integration
+The project implements an advanced command palette search system using `kbar` with intelligent sorting and internationalization support.
+
+#### Search Actions Architecture
+```typescript
+// Search actions are organized with priority-based sorting
+interface ActionWithPriority extends Action {
+  priority?: number;
+}
+
+// Import search functionality
+import { 
+  searchActions,        // Default priority-sorted actions
+  getSearchActions,     // Custom sorting modes
+  SortMode,            // Sorting options enum
+  getSearchStats       // Statistics and metrics
+} from './data/searchActions';
+```
+
+#### Search Sorting Modes
+The system provides three intelligent sorting approaches:
+
+**1. Priority-Based Sorting (Default)**
+- High Priority (7-10): Core functions (Home, Device Methods, Chains, Sidebar Toggle)
+- Medium Priority (4-6): Common tools (Emulator, Logs, Theme)
+- Low Priority (1-3): External links and documentation
+
+**2. Alphabetical Sorting**
+- Sorts all actions by name for quick alphabetical lookup
+- Useful for users who prefer predictable ordering
+
+**3. Section-Based Sorting**
+- Groups by functional categories first, then alphabetical within groups
+- Order: Interface Control → Navigation → Documentation → External → Blockchains
+
+#### Usage Patterns
+```typescript
+// Use default priority sorting
+import { searchActions } from './data/searchActions';
+
+// Custom sorting for specific needs
+const alphabeticalActions = getSearchActions(SortMode.ALPHABETICAL);
+const sectionActions = getSearchActions(SortMode.SECTION);
+
+// Get search statistics for analytics
+const stats = getSearchStats();
+// Returns: { totalActions, sections, sectionCounts, sortModes }
+```
+
+#### Search Action Definition Pattern
+```typescript
+// Standard search action structure
+{
+  id: 'unique-identifier',
+  name: t('search.actions.actionName'),           // Internationalized name
+  subtitle: t('search.descriptions.actionName'), // Detailed description
+  section: t('search.sections.sectionName'),     // Category grouping
+  keywords: t('search.keywords.actionName'),     // Search keywords (multilingual)
+  shortcut: ['key'],                             // Keyboard shortcut
+  perform: () => navigateTo('/path'),            // Action handler
+  priority: 8,                                   // Sorting priority
+  icon: '🎯'                                     // Visual indicator
+}
+```
+
+#### Search i18n Integration
+```typescript
+// Translation helper with fallback
+const t = (key: string, options?: Record<string, unknown>): string => {
+  if (typeof window === 'undefined' || !i18n.isInitialized) {
+    return key; // Fallback to key if i18n not ready
+  }
+  const result = i18n.t(key, options);
+  return typeof result === 'string' ? result : key;
+};
+
+// Multilingual keywords for better search matching
+search: {
+  keywords: {
+    sidebar: 'sidebar toggle 侧边栏 切换 显示 隐藏',
+    theme: 'theme light dark 主题 浅色 深色 明亮 暗色',
+    // Mix English and Chinese terms for comprehensive matching
+  }
+}
+```
+
+### Search UX Best Practices
+- **Progressive Disclosure**: Show most relevant actions first with priority sorting
+- **Keyboard Navigation**: Full keyboard support with intuitive shortcuts
+- **Visual Feedback**: Clear icons and descriptions for all actions
+- **Contextual Help**: Detailed subtitles explain what each action does
+- **Performance**: Efficient search algorithms with debounced input
+- **Accessibility**: Screen reader friendly with proper ARIA labels
+
+### Search Extension Guidelines
+```typescript
+// Adding new search actions
+const ACTION_PRIORITIES = {
+  'new-feature': 5,  // Medium priority for new features
+  // Update priority based on expected usage frequency
+};
+
+// Extend search functionality
+export const customSearchConfig = {
+  defaultSortMode: SortMode.PRIORITY,
+  enableAnalytics: true,
+  maxRecentSearches: 10,
+  searchDebounceMs: 150,
+};
+```
+
 ## Internationalization (i18n)
 
-### Translation Usage
+### Translation Architecture
+The project uses a structured approach to internationalization with separate language files and comprehensive translation coverage.
+
+#### File Structure
+```
+app/i18n/
+├── config.ts           # i18n configuration
+├── locales/
+│   ├── index.ts        # Export all locales
+│   ├── en.ts          # English translations
+│   └── zh.ts          # Chinese translations
+```
+
+### Translation Usage Patterns
 ```tsx
 // Use translation hooks consistently
 const { t } = useTranslation();
 
-// Translation key structure: namespace.section.key
+// Standard translation usage
 <h1>{t('deviceOperations.status.title')}</h1>
 <p>{t('deviceOperations.status.description')}</p>
+
+// Translation with interpolation
+<span>{t('chains.methodsCount', { count: 5 })}</span>
+
+// Conditional translations based on state
+<Badge>{t(`transport.${transportType}.description`)}</Badge>
 ```
 
-### Translation Key Patterns
-- **Namespace:** Component or feature area (`deviceOperations`, `chainMethods`)
-- **Section:** Logical grouping (`status`, `buttons`, `messages`)
+### Translation Key Organization
+```typescript
+// Translation namespace structure
+{
+  common: {        // Shared UI elements
+    device: 'Device',
+    connect: 'Connect',
+    // ...
+  },
+  search: {        // Search functionality
+    sections: { /* ... */ },
+    actions: { /* ... */ },
+    keywords: { /* ... */ },
+    sortModes: { /* ... */ }
+  },
+  deviceMethods: { // Feature-specific translations
+    title: 'Device Methods',
+    categories: { /* ... */ }
+  }
+}
+```
+
+#### Translation Key Patterns
+- **Namespace:** Component or feature area (`deviceOperations`, `chainMethods`, `search`)
+- **Section:** Logical grouping (`status`, `actions`, `descriptions`, `keywords`)
 - **Key:** Specific translation (`title`, `description`, `confirmButton`)
+
+### Technical Term Preservation
+**CRITICAL:** Preserve technical and blockchain terms in English across all languages:
+- `Signer` - Always in English (not translated to "签名者")
+- `BTC`, `EVM`, `SOL` - Blockchain identifiers remain unchanged
+- `WebUSB`, `JSBridge`, `WebBluetooth` - Technical transport methods
+- Method names and blockchain terminology should remain in English for clarity
+
+```tsx
+// ✅ CORRECT - Technical terms preserved
+search: {
+  actions: {
+    chains: 'Signer',           // Not translated
+    deviceMethods: 'Device',    // Can be translated
+  }
+}
+
+// ❌ INCORRECT - Over-translation
+search: {
+  actions: {
+    chains: '签名器',            // Should remain "Signer"
+  }
+}
+```
+
+### Search-Specific i18n Guidelines
+```tsx
+// Search translations structure
+search: {
+  sections: {
+    interface: 'Interface Control',
+    navigation: 'Navigation',
+    documentation: 'Documentation',
+    external: 'External',
+    blockchains: 'Blockchains',
+    deviceMethods: 'Device Methods',
+    chainMethods: 'Chain Methods',
+  },
+  actions: {
+    toggleSidebar: 'Toggle Sidebar',
+    lightTheme: 'Light Theme',
+    // ... action names
+  },
+  descriptions: {
+    emulator: 'Start hardware emulator using Docker',
+    logs: 'View operation logs and debug information',
+    // ... detailed descriptions
+  },
+  keywords: {
+    sidebar: 'sidebar toggle display hide',
+    theme: 'theme light dark bright',
+    // ... search keywords (multilingual for better matching)
+  },
+  sortModes: {
+    priority: 'By Priority',
+    alphabetical: 'Alphabetical',
+    section: 'By Section',
+  }
+}
+```
 
 ## Build & Deployment
 
 ### Development Workflow
 ```bash
 # Development server
-npm run dev
+yarn dev
 
 # Production build
-npm run build
-npm run preview
+yarn build
+yarn preview
 
 # Type checking
-npm run type-check
+yarn type-check
 
 # Linting (with dist folder ignored)
-npm run lint
+yarn lint
 ```
 
 ### Environment Configuration
@@ -738,6 +952,65 @@ npm run lint
 - **Production:** Optimized builds, error boundaries, performance monitoring
 - **Testing:** Isolated environment for hardware SDK testing
 
+## Recent Feature Additions & Best Practices
+
+### ✨ Search System Enhancement
+- **Command Palette**: Advanced search with intelligent priority-based sorting
+- **Multi-Modal Sorting**: Priority, alphabetical, and section-based organization
+- **Smart i18n Integration**: Multilingual search keywords and descriptions
+- **Performance Optimized**: Debounced search with efficient action matching
+
+### 🌐 Comprehensive i18n Implementation
+- **Structured Translations**: Separate language files with clear organization
+- **Technical Term Preservation**: Blockchain/technical terms remain in English
+- **Complete Coverage**: All user-facing text internationalized
+- **Developer Friendly**: Type-safe translation keys with fallback mechanisms
+
+### 🛠️ Development Workflow Updates
+
+#### Key Implementation Patterns
+```typescript
+// ✅ Use unified search actions
+import { searchActions, getSearchActions, SortMode } from './data/searchActions';
+
+// ✅ Implement proper i18n
+const { t } = useTranslation();
+<h1>{t('page.title')}</h1>
+
+// ✅ Preserve technical terms
+search: {
+  actions: {
+    chains: 'Signer',        // Always English
+    btc: 'BTC',             // Always English
+  }
+}
+
+// ✅ Use priority-based action organization
+const ACTION_PRIORITIES = {
+  'core-feature': 10,       // Highest priority
+  'utility-tool': 5,        // Medium priority
+  'external-link': 1,       // Lowest priority
+};
+```
+
+#### Quality Checklist
+- [ ] All new search actions include priority levels
+- [ ] Technical terms preserved in translations
+- [ ] Search keywords include both languages
+- [ ] Actions have clear descriptions and shortcuts
+- [ ] TypeScript types properly defined
+- [ ] Error handling with graceful fallbacks
+- [ ] Performance considerations implemented
+
 ---
 
-**Before developing, please thoroughly read this guide to understand the architecture, design system, and coding standards. Pay special attention to the unified logging system and OneKey green color usage guidelines to maintain proper brand consistency.** 🎨
+**Before developing, please thoroughly read this guide to understand the architecture, design system, and coding standards. Pay special attention to:**
+
+1. **🎨 OneKey Design System**: Proper use of OneKey green as accent color only
+2. **🔍 Search Functionality**: Implement intelligent sorting and comprehensive i18n
+3. **📝 Unified Logging**: Use only UnifiedLogEntry format throughout
+4. **🌐 Internationalization**: Preserve technical terms while translating UI text
+5. **🏗️ Component Architecture**: Follow the unified component patterns
+6. **⚡ Performance**: Optimize for responsive user experience
+
+**The project now features advanced search capabilities with intelligent sorting and comprehensive internationalization support while maintaining technical accuracy for blockchain terminology.** 🚀

@@ -1,4 +1,5 @@
 import { methodsRegistry } from './methodsRegistry';
+import i18n from '../i18n/config';
 import type { Action } from 'kbar';
 
 // 获取基础路径
@@ -40,36 +41,79 @@ const openExternalLink = (url: string) => {
   window.open(url, '_blank', 'noopener,noreferrer');
 };
 
+// 定义搜索动作的优先级和使用频率
+const ACTION_PRIORITIES = {
+  // 高优先级 - 最常用的功能
+  home: 10,
+  'device-methods': 9,
+  chains: 8,
+  'toggle-sidebar': 7,
+
+  // 中优先级 - 常用功能
+  emulator: 6,
+  logs: 5,
+  'theme-light': 4,
+  'theme-dark': 4,
+
+  // 低优先级 - 外部链接和其他
+  'github-repo': 3,
+  'onekey-docs': 3,
+  'github-issues': 2,
+  'github-releases': 2,
+  'onekey-website': 1,
+  'hardware-connect': 1,
+};
+
+// 排序选项枚举
+export enum SortMode {
+  PRIORITY = 'priority', // 按优先级排序（默认）
+  ALPHABETICAL = 'alphabetical', // 按字母顺序排序
+  SECTION = 'section', // 按分组排序
+}
+
+// 获取翻译文本的辅助函数
+const t = (key: string, options?: Record<string, unknown>): string => {
+  if (typeof window === 'undefined' || !i18n.isInitialized) {
+    // 服务端渲染或 i18n 未初始化时的回退
+    return key;
+  }
+  const result = i18n.t(key, options);
+  return typeof result === 'string' ? result : key;
+};
+
 // 构建搜索动作
-export const buildSearchActions = (): Action[] => {
+export const buildSearchActions = (sortMode: SortMode = SortMode.PRIORITY): Action[] => {
   const actions: Action[] = [];
 
   // 界面控制
   actions.push(
     {
       id: 'toggle-sidebar',
-      name: '切换侧边栏',
+      name: t('search.actions.toggleSidebar'),
       shortcut: [navigator.platform.includes('Mac') ? 'cmd' : 'ctrl', 'b'],
-      keywords: 'sidebar toggle 侧边栏 切换 显示 隐藏',
-      section: '界面控制',
+      keywords: t('search.keywords.sidebar'),
+      section: t('search.sections.interface'),
       perform: toggleSidebar,
       icon: '📋',
+      priority: ACTION_PRIORITIES['toggle-sidebar'] || 1,
     },
     {
       id: 'theme-light',
-      name: '浅色主题',
-      keywords: 'theme light 主题 浅色 明亮',
-      section: '界面控制',
+      name: t('search.actions.lightTheme'),
+      keywords: t('search.keywords.theme'),
+      section: t('search.sections.interface'),
       perform: () => setTheme('light'),
       icon: '☀️',
+      priority: ACTION_PRIORITIES['theme-light'] || 1,
     },
     {
       id: 'theme-dark',
-      name: '深色主题',
-      keywords: 'theme dark 主题 深色 暗色',
-      section: '界面控制',
+      name: t('search.actions.darkTheme'),
+      keywords: t('search.keywords.theme'),
+      section: t('search.sections.interface'),
       perform: () => setTheme('dark'),
       icon: '🌙',
+      priority: ACTION_PRIORITIES['theme-dark'] || 1,
     }
   );
 
@@ -77,30 +121,33 @@ export const buildSearchActions = (): Action[] => {
   actions.push(
     {
       id: 'home',
-      name: '首页',
+      name: t('search.actions.home'),
       shortcut: ['h'],
-      keywords: 'home 首页 主页',
-      section: '导航',
+      keywords: t('search.keywords.home'),
+      section: t('search.sections.navigation'),
       perform: () => navigateTo('/'),
       icon: '🏠',
+      priority: ACTION_PRIORITIES.home || 1,
     },
     {
       id: 'emulator',
-      name: 'Hardware Emulator',
-      subtitle: '使用 Docker 启动硬件模拟器',
-      section: 'Navigation',
+      name: t('search.actions.emulator'),
+      subtitle: t('search.descriptions.emulator'),
+      section: t('search.sections.navigation'),
       shortcut: ['e'],
-      keywords: 'emulator hardware 模拟器 硬件 docker',
+      keywords: t('search.keywords.emulator'),
       perform: () => navigateTo('/emulator'),
+      priority: ACTION_PRIORITIES.emulator || 1,
     },
     {
       id: 'logs',
-      name: 'Logs',
-      subtitle: '查看操作日志和调试信息',
-      section: 'Navigation',
+      name: t('search.actions.logs'),
+      subtitle: t('search.descriptions.logs'),
+      section: t('search.sections.navigation'),
       shortcut: ['l'],
-      keywords: 'logs debug 日志 调试',
+      keywords: t('search.keywords.logs'),
       perform: () => navigateTo('/logs'),
+      priority: ACTION_PRIORITIES.logs || 1,
     }
   );
 
@@ -108,21 +155,23 @@ export const buildSearchActions = (): Action[] => {
   actions.push(
     {
       id: 'device-methods',
-      name: 'Device',
-      subtitle: '硬件设备管理和固件更新相关的 API 方法',
-      section: 'Documentation',
+      name: t('search.actions.deviceMethods'),
+      subtitle: t('search.descriptions.deviceMethods'),
+      section: t('search.sections.documentation'),
       shortcut: ['d'],
-      keywords: 'device methods firmware update api 设备 方法 固件 更新',
+      keywords: t('search.keywords.device'),
       perform: () => navigateTo('/device-methods'),
+      priority: ACTION_PRIORITIES['device-methods'] || 1,
     },
     {
       id: 'chains',
-      name: 'signer',
-      subtitle: '支持的区块链和相关方法',
-      section: 'Documentation',
+      name: t('search.actions.chains'),
+      subtitle: t('search.descriptions.chains'),
+      section: t('search.sections.documentation'),
       shortcut: ['s'],
-      keywords: 'blockchain signer',
+      keywords: t('search.keywords.chains'),
       perform: () => navigateTo('/chains'),
+      priority: ACTION_PRIORITIES.chains || 1,
     }
   );
 
@@ -130,51 +179,57 @@ export const buildSearchActions = (): Action[] => {
   actions.push(
     {
       id: 'github-repo',
-      name: 'GitHub Repository',
-      subtitle: 'OneKey Hardware JS SDK 源代码仓库',
-      section: 'External',
-      keywords: 'github repository source code 源代码 仓库',
+      name: t('search.actions.githubRepo'),
+      subtitle: t('search.descriptions.githubRepo'),
+      section: t('search.sections.external'),
+      keywords: t('search.keywords.github'),
       perform: () => openExternalLink('https://github.com/OneKeyHQ/hardware-js-sdk'),
+      priority: ACTION_PRIORITIES['github-repo'] || 1,
     },
     {
       id: 'github-issues',
-      name: 'GitHub Issues',
-      subtitle: '报告问题或查看已知问题',
-      section: 'External',
-      keywords: 'github issues bug report 问题 报告 反馈',
+      name: t('search.actions.githubIssues'),
+      subtitle: t('search.descriptions.githubIssues'),
+      section: t('search.sections.external'),
+      keywords: t('search.keywords.issues'),
       perform: () => openExternalLink('https://github.com/OneKeyHQ/hardware-js-sdk/issues'),
+      priority: ACTION_PRIORITIES['github-issues'] || 1,
     },
     {
       id: 'github-releases',
-      name: 'GitHub Releases',
-      subtitle: '查看版本发布历史和更新日志',
-      section: 'External',
-      keywords: 'github releases changelog version 版本 发布 更新',
+      name: t('search.actions.githubReleases'),
+      subtitle: t('search.descriptions.githubReleases'),
+      section: t('search.sections.external'),
+      keywords: t('search.keywords.releases'),
       perform: () => openExternalLink('https://github.com/OneKeyHQ/hardware-js-sdk/releases'),
+      priority: ACTION_PRIORITIES['github-releases'] || 1,
     },
     {
       id: 'onekey-docs',
-      name: 'OneKey Documentation',
-      subtitle: 'OneKey 官方开发文档',
-      section: 'External',
-      keywords: 'documentation docs onekey 文档 开发',
+      name: t('search.actions.onekeyDocs'),
+      subtitle: t('search.descriptions.onekeyDocs'),
+      section: t('search.sections.external'),
+      keywords: t('search.keywords.docs'),
       perform: () => openExternalLink('https://developer.onekey.so/'),
+      priority: ACTION_PRIORITIES['onekey-docs'] || 1,
     },
     {
       id: 'onekey-website',
-      name: 'OneKey Website',
-      subtitle: 'OneKey 官方网站',
-      section: 'External',
-      keywords: 'website onekey official 官网 网站',
+      name: t('search.actions.onekeyWebsite'),
+      subtitle: t('search.descriptions.onekeyWebsite'),
+      section: t('search.sections.external'),
+      keywords: t('search.keywords.website'),
       perform: () => openExternalLink('https://onekey.so/'),
+      priority: ACTION_PRIORITIES['onekey-website'] || 1,
     },
     {
       id: 'hardware-connect',
-      name: 'Hardware Connect Guide',
-      subtitle: '硬件设备连接指南',
-      section: 'External',
-      keywords: 'hardware connect guide tutorial 硬件 连接 指南 教程',
+      name: t('search.actions.hardwareConnect'),
+      subtitle: t('search.descriptions.hardwareConnect'),
+      section: t('search.sections.external'),
+      keywords: t('search.keywords.connect'),
       perform: () => openExternalLink('https://developer.onekey.so/hardware/'),
+      priority: ACTION_PRIORITIES['hardware-connect'] || 1,
     }
   );
 
@@ -192,9 +247,10 @@ export const buildSearchActions = (): Action[] => {
       actions.push({
         id: `chain-${chain.id}`,
         name: chain.id,
-        section: 'Blockchains',
+        section: t('search.sections.blockchains'),
         keywords: `${chain.id}`,
         perform: () => navigateTo(`/chains/${chain.id}`),
+        priority: 3, // 中等优先级
       });
     }
 
@@ -205,10 +261,10 @@ export const buildSearchActions = (): Action[] => {
         let actionName: string;
 
         if (chainIdStr === 'device' || chainIdStr === 'firmware') {
-          sectionName = 'Device Methods';
+          sectionName = t('search.sections.deviceMethods');
           actionName = method.method;
         } else {
-          sectionName = 'Chain Methods';
+          sectionName = t('search.sections.chainMethods');
           actionName = `${chain.id} - ${method.method}`;
         }
 
@@ -219,16 +275,59 @@ export const buildSearchActions = (): Action[] => {
           section: sectionName,
           keywords: `${chain.id} ${method.method} ${method.description}`,
           perform: () => navigateTo(`${routePrefix}/${method.method}`),
+          priority: 2, // 较低优先级
         });
       });
     }
   });
 
-  return actions;
+  // 根据排序模式排序动作
+  return sortActions(actions, sortMode);
 };
 
-// 导出搜索动作
+// 扩展 Action 类型以包含 priority 属性
+type ActionWithPriority = Action & { priority?: number };
+
+// 排序函数
+const sortActions = (actions: Action[], sortMode: SortMode): Action[] => {
+  switch (sortMode) {
+    case SortMode.PRIORITY:
+      return actions.sort((a, b) => {
+        const priorityA = (a as ActionWithPriority).priority || 0;
+        const priorityB = (b as ActionWithPriority).priority || 0;
+        // 优先级高的在前，相同优先级按字母顺序
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+    case SortMode.ALPHABETICAL:
+      return actions.sort((a, b) => a.name.localeCompare(b.name));
+
+    case SortMode.SECTION:
+      return actions.sort((a, b) => {
+        // 先按 section 排序，再在同一 section 内按字母顺序排序
+        const sectionA = (a.section as string) || '';
+        const sectionB = (b.section as string) || '';
+        if (sectionA !== sectionB) {
+          return sectionA.localeCompare(sectionB);
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+    default:
+      return actions;
+  }
+};
+
+// 导出搜索动作（默认按优先级排序）
 export const searchActions = buildSearchActions();
+
+// 导出不同排序模式的搜索动作
+export const getSearchActions = (sortMode?: SortMode) => {
+  return buildSearchActions(sortMode || SortMode.PRIORITY);
+};
 
 // 导出统计信息
 export const getSearchStats = () => {
@@ -245,5 +344,16 @@ export const getSearchStats = () => {
     totalActions: actions.length,
     sections: sections,
     sectionCounts: sectionCounts,
+    sortModes: Object.values(SortMode),
   };
+};
+
+// 搜索配置选项
+export const searchConfig = {
+  defaultSortMode: SortMode.PRIORITY,
+  availableSortModes: [
+    { value: SortMode.PRIORITY, label: t('search.sortModes.priority') || 'By Priority' },
+    { value: SortMode.ALPHABETICAL, label: t('search.sortModes.alphabetical') || 'Alphabetical' },
+    { value: SortMode.SECTION, label: t('search.sortModes.section') || 'By Section' },
+  ],
 };

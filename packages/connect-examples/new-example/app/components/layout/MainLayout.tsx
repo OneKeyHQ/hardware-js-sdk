@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { SidebarProvider, SidebarInset } from '../ui/sidebar';
-import { AppSidebar } from '../app-sidebar';
-import { SiteHeader } from '../site-header';
+import { AppSidebar } from '../sidebar';
+import { SiteHeader } from '../header';
 
 interface MainLayoutProps {
   children: ReactNode;

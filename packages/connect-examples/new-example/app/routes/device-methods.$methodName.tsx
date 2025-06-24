@@ -24,7 +24,7 @@ const DeviceMethodExecutePage: React.FC = () => {
   const handleMethodExecution = useCallback(
     async (params: Record<string, unknown>): Promise<Record<string, unknown>> => {
       if (!selectedMethod) {
-        throw new Error('方法配置未找到');
+        throw new Error('Method configuration not found');
       }
       const result = await executeMethod(params, selectedMethod);
       return result;

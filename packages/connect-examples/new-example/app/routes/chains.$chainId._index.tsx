@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, Layers } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { PageLayout } from '../components/common/PageLayout';
@@ -12,6 +13,7 @@ import { ChainIcon } from '../components/icons/ChainIcon';
 const ChainMethodsIndexPage: React.FC = () => {
   const { chainId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
   const { selectedChain, isChainNotFound } = useMethodResolver({ chainId });
@@ -39,7 +41,7 @@ const ChainMethodsIndexPage: React.FC = () => {
               <Breadcrumb
                 items={[
                   {
-                    label: 'Blockchain Methods',
+                    label: t('chains.title'),
                     href: '/chains',
                     icon: Layers,
                   },
@@ -52,7 +54,7 @@ const ChainMethodsIndexPage: React.FC = () => {
               <div className="relative w-80">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="Search methods..."
+                  placeholder={t('chains.searchPlaceholder')}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -72,14 +74,13 @@ const ChainMethodsIndexPage: React.FC = () => {
                     {selectedChain.id}
                   </h1>
                   <p className="text-muted-foreground font-medium">
-                    {
-                      selectedChain.methods.filter(
+                    {t('chains.methodsCount', {
+                      count: selectedChain.methods.filter(
                         method =>
                           method.method.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           method.description.toLowerCase().includes(searchTerm.toLowerCase())
-                      ).length
-                    }{' '}
-                    methods available
+                      ).length,
+                    })}
                   </p>
                 </div>
               </div>
@@ -163,14 +164,10 @@ const ChainMethodsIndexPage: React.FC = () => {
                     <Search className="w-8 h-8 text-muted-foreground/50" />
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-3 tracking-tight">
-                    No methods found
+                    {t('chains.noResults', { searchTerm: '' }).split(' ')[0]} methods found
                   </h3>
                   <p className="text-muted-foreground text-center max-w-md leading-relaxed">
-                    No methods match your search for{' '}
-                    <span className="font-semibold text-foreground/80">
-                      &quot;{searchTerm}&quot;
-                    </span>
-                    . Try adjusting your search terms or browse all available methods.
+                    {t('chains.noResults', { searchTerm })}
                   </p>
                 </div>
               )}
