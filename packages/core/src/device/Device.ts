@@ -748,6 +748,13 @@ export class Device extends EventEmitter {
     const useErrorAttachPin =
       unlockedAttachPin && passphraseState && passphraseState !== newPassphraseState;
 
+    console.log('=====>>>>>> checkPassphraseStateSafety passphraseState: ', {
+      passphraseState,
+      newPassphraseState,
+      unlockedAttachPin,
+      useEmptyPassphraseState,
+    });
+
     if (mainWalletUseAttachPin || useErrorAttachPin) {
       try {
         await this.lockDevice();

@@ -134,7 +134,7 @@ export const getPassphraseState = async (
   const firmwareVersion = getDeviceFirmwareVersion(features);
   const deviceType = getDeviceType(features);
 
-  if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.13.2')) {
+  if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.14.0')) {
     console.log(
       '=====>>>>>> getPassphraseState begin: ',
       options?.onlyMainPin,
