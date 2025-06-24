@@ -9,7 +9,7 @@ import {
 import { Moon, Sun, Globe, ExternalLink } from 'lucide-react';
 import { useTheme } from '../hooks/use-theme';
 import { useTranslation } from 'react-i18next';
-import { SearchTrigger } from './commandPalette';
+import { SearchTrigger } from './common/CommandPalette';
 import { SidebarTrigger } from './ui/sidebar';
 
 // 导入GitHub图标

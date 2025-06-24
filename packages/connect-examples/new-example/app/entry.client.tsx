@@ -13,7 +13,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { SDKProvider } from './components/providers/SDKProvider';
 import { I18nProvider } from './i18n/i18n-provider';
-import { CommandPalette } from './components/commandPalette';
+import { CommandPalette } from './components/common/CommandPalette';
 import MainLayout from './components/layout/MainLayout';
 import { Toaster } from './components/ui/Toaster';
 

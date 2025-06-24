@@ -11,7 +11,7 @@ import {
   type ActionImpl,
 } from 'kbar';
 import { useTranslation } from 'react-i18next';
-import { getSearchActions } from '../data/searchActions';
+import { getSearchActions } from '../../data/searchActions';
 
 // 平台检测工具
 const getPlatformInfo = () => {
