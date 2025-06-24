@@ -35,16 +35,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/144'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/144'/0'/0/1",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/144'/0'/0/2",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -71,14 +71,14 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             value: {
-              fee: "100000",
+              fee: '100000',
               flags: 2147483648,
               sequence: 25,
               maxLedgerVersion: 8820051,
               payment: {
-                amount: "100000000",
-                destination: "rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws"
-              }
+                amount: '100000000',
+                destination: 'rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws',
+              },
             },
           },
         ],
@@ -99,15 +99,15 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             value: {
-              fee: "100000",
+              fee: '100000',
               flags: 2147483648,
               sequence: 25,
               maxLedgerVersion: 8820051,
               payment: {
-                amount: "100000000",
-                destination: "rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws",
-                destinationTag: 12345
-              }
+                amount: '100000000',
+                destination: 'rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws',
+                destinationTag: 12345,
+              },
             },
           },
         ],
@@ -117,10 +117,10 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const xrp: {
+export const ripple: {
   api: UnifiedMethodConfig[];
   id: ChainCategory;
 } = {
-  id: 'xrp',
+  id: 'ripple',
   api,
 };

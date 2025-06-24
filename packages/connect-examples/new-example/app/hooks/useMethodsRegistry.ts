@@ -30,12 +30,12 @@ import { near } from '../data/methods/near';
 import { ton } from '../data/methods/ton';
 import { cosmos } from '../data/methods/cosmos';
 import { tron } from '../data/methods/tron';
-import { xrp } from '../data/methods/xrp';
+import { ripple } from '../data/methods/ripple';
 import { stellar } from '../data/methods/stellar';
 import { neo } from '../data/methods/neo';
 import { nem } from '../data/methods/nem';
 import { kaspa } from '../data/methods/kaspa';
-import { algorand } from '../data/methods/algorand';
+import { algo } from '../data/methods/algo';
 import { filecoin } from '../data/methods/filecoin';
 import { nervos } from '../data/methods/nervos';
 import { starcoin } from '../data/methods/starcoin';
@@ -71,13 +71,13 @@ const chainModules: ModuleConfig[] = [
   { id: 'ton', module: ton },
   { id: 'cosmos', module: cosmos },
   { id: 'tron', module: tron },
-  { id: 'xrp', module: xrp },
+  { id: 'ripple', module: ripple },
   { id: 'stellar', module: stellar },
   { id: 'neo', module: neo },
   { id: 'nem', module: nem },
   { id: 'kaspa', module: kaspa },
   { id: 'benfen', module: benfen },
-  { id: 'algorand', module: algorand },
+  { id: 'algo', module: algo },
   { id: 'filecoin', module: filecoin },
   { id: 'nervos', module: nervos },
   { id: 'starcoin', module: starcoin },

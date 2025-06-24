@@ -38,16 +38,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/283'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/283'/1'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/283'/2'/0'/0'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -85,10 +85,10 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const algorand: {
+export const algo: {
   api: UnifiedMethodConfig[];
   id: ChainCategory;
 } = {
-  id: 'algorand',
+  id: 'algo',
   api,
 };

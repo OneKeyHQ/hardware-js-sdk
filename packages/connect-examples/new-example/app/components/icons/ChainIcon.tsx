@@ -42,7 +42,7 @@ interface ChainIconProps {
 // 链ID到图标资源的直接映射 (预加载)
 const CHAIN_ICON_MAP: Partial<Record<AllMethodCategory, string>> = {
   // 主要区块链
-  xrp: xrpIcon,
+  ripple: xrpIcon,
   stellar: stellarIcon,
   bitcoin: bitcoinIcon,
   ethereum: ethereumIcon,
