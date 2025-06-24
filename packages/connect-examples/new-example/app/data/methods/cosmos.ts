@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'cosmosGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -42,19 +42,19 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/118'/0'/0/0",
-                hrp: "cosmos",
-                showOnOneKey: false
+                hrp: 'cosmos',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/118'/0'/0/1",
-                hrp: "cosmos",
-                showOnOneKey: false
+                hrp: 'cosmos',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/118'/0'/0/2",
-                hrp: "cosmos",
-                showOnOneKey: false
-              }
+                hrp: 'cosmos',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -63,7 +63,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'cosmosGetPublicKey',
-    description: 'Get public key',
+
     presets: [
       {
         title: 'Get public key',
@@ -102,19 +102,19 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/118'/0'/0/0",
-                curve: "secp256k1",
-                showOnOneKey: false
+                curve: 'secp256k1',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/118'/0'/0/1",
-                curve: "secp256k1",
-                showOnOneKey: false
+                curve: 'secp256k1',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/118'/0'/0/2",
-                curve: "secp256k1",
-                showOnOneKey: false
-              }
+                curve: 'secp256k1',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -123,7 +123,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'cosmosSignTransaction',
-    description: 'Sign transaction',
+
     presets: [
       {
         title: 'Sign transaction',

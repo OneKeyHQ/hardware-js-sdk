@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'nervosGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -46,19 +46,19 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/309'/0'/0/0",
-                network: "ckb",
-                showOnOneKey: false
+                network: 'ckb',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/309'/1'/0/0",
-                network: "ckb",
-                showOnOneKey: false
+                network: 'ckb',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/309'/2'/0/0",
-                network: "ckb",
-                showOnOneKey: false
-              }
+                network: 'ckb',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -67,7 +67,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'nervosSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Normal Transaction',

@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'scdoGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -35,7 +35,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'scdoSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',
@@ -48,7 +48,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'scdoSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',

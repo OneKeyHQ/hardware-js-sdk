@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'polkadotGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -56,22 +56,22 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/354'/0'/0'/0'",
-                prefix: "0",
-                network: "polkadot",
-                showOnOneKey: false
+                prefix: '0',
+                network: 'polkadot',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/354'/1'/0'/0'",
-                prefix: "0",
-                network: "polkadot",
-                showOnOneKey: false
+                prefix: '0',
+                network: 'polkadot',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/354'/2'/0'/0'",
-                prefix: "0",
-                network: "polkadot",
-                showOnOneKey: false
-              }
+                prefix: '0',
+                network: 'polkadot',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -80,7 +80,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'polkadotSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Sign Transaction',

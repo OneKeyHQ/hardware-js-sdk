@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'solGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -38,16 +38,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/501'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/501'/1'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/501'/2'/0'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -56,7 +56,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'solSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Sign Transaction',
@@ -111,7 +111,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'solSignMessage',
-    description: 'Sign Message',
+
     presets: [
       {
         title: 'Sign Message',

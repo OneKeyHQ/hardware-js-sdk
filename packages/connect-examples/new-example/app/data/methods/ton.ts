@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'tonGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -12,13 +12,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/607'/0'",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
           {
@@ -48,13 +48,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/607'/1'",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
           {
@@ -84,29 +84,29 @@ const api: UnifiedMethodConfig[] = [
             name: 'bundle',
             type: 'textarea',
             required: true,
-            label: 'Bundle Parameters',
+
             value: [
               {
                 path: "m/44'/607'/0'",
                 showOnOneKey: false,
                 walletVersion: 3,
                 isBounceable: false,
-                isTestnetOnly: false
+                isTestnetOnly: false,
               },
               {
                 path: "m/44'/607'/1'",
                 showOnOneKey: false,
                 walletVersion: 3,
                 isBounceable: false,
-                isTestnetOnly: false
+                isTestnetOnly: false,
               },
               {
                 path: "m/44'/607'/2'",
                 showOnOneKey: false,
                 walletVersion: 3,
                 isBounceable: false,
-                isTestnetOnly: false
-              }
+                isTestnetOnly: false,
+              },
             ],
           },
         ],
@@ -115,7 +115,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'tonSignMessage',
-    description: 'Sign Message',
+
     presets: [
       {
         title: 'Native',
@@ -124,7 +124,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/607'/0'",
           },
           {
@@ -181,7 +181,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/607'/0'",
           },
           {
@@ -233,25 +233,19 @@ const api: UnifiedMethodConfig[] = [
             name: 'extDestination',
             type: 'textarea',
             label: 'Ext Destination',
-            value: [
-              "UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_"
-            ],
+            value: ['UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_'],
           },
           {
             name: 'extTonAmount',
             type: 'textarea',
             label: 'Ext Ton Amount',
-            value: [
-              100
-            ],
+            value: [100],
           },
           {
             name: 'extPayload',
             type: 'textarea',
             label: 'Ext Payload',
-            value: [
-              "48656c6c6f204f6e654b6579"
-            ],
+            value: ['48656c6c6f204f6e654b6579'],
           },
         ],
       },
@@ -262,7 +256,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/607'/0'",
           },
           {
@@ -351,7 +345,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/607'/0'",
           },
           {
@@ -440,7 +434,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/607'/0'",
           },
           {
@@ -530,7 +524,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/607'/0'",
           },
           {

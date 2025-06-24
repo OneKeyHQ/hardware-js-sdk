@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'cardanoGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -16,8 +16,19 @@ const api: UnifiedMethodConfig[] = [
             value: {
               addressType: 0,
               path: "m/1852'/1815'/0'/0/0",
-              stakingPath: "m/1852'/1815'/0'/2/0"
+              stakingPath: "m/1852'/1815'/0'/2/0",
+              stakingKeyHash: undefined,
+              paymentScriptHash: undefined,
+              stakingScriptHash: undefined,
             },
+          },
+          {
+            name: 'derivationType',
+            type: 'number',
+            required: false,
+            label: 'Derivation Type',
+            description: 'Derivation type (1 for Classic, 2 for Touch)',
+            value: 1,
           },
           {
             name: 'protocolMagic',
@@ -43,34 +54,107 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
-        title: 'Batch Get Address',
+        title: 'Classic Batch Get Address',
         parameters: [
           {
             name: 'bundle',
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
+            description: 'Classic derivation batch address configuration',
             value: [
               {
                 addressParameters: {
                   addressType: 0,
                   path: "m/1852'/1815'/0'/0/0",
-                  stakingPath: "m/1852'/1815'/0'/2/0"
+                  stakingPath: "m/1852'/1815'/0'/2/0",
                 },
                 protocolMagic: 764824073,
                 networkId: 1,
-                showOnOneKey: false
+                derivationType: 1,
+                address: '',
+                showOnOneKey: false,
+                isCheck: false,
               },
               {
                 addressParameters: {
                   addressType: 0,
-                  path: "m/1852'/1815'/0'/0/1",
-                  stakingPath: "m/1852'/1815'/0'/2/0"
+                  path: "m/1852'/1815'/0'/1/0",
+                  stakingPath: "m/1852'/1815'/0'/2/0",
                 },
                 protocolMagic: 764824073,
                 networkId: 1,
-                showOnOneKey: false
-              }
+                derivationType: 1,
+                address: '',
+                showOnOneKey: false,
+                isCheck: false,
+              },
+              {
+                addressParameters: {
+                  addressType: 0,
+                  path: "m/1852'/1815'/0'/2/0",
+                  stakingPath: "m/1852'/1815'/0'/2/0",
+                },
+                protocolMagic: 764824073,
+                networkId: 1,
+                derivationType: 1,
+                address: '',
+                showOnOneKey: false,
+                isCheck: false,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Touch Batch Get Address',
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+            label: 'Bundle Configuration',
+            description: 'Touch derivation batch address configuration',
+            value: [
+              {
+                addressParameters: {
+                  addressType: 0,
+                  path: "m/1852'/1815'/0'/0/0",
+                  stakingPath: "m/1852'/1815'/0'/2/0",
+                },
+                protocolMagic: 764824073,
+                networkId: 1,
+                derivationType: 1,
+                address: '',
+                showOnOneKey: false,
+                isCheck: false,
+              },
+              {
+                addressParameters: {
+                  addressType: 0,
+                  path: "m/1852'/1815'/0'/1/0",
+                  stakingPath: "m/1852'/1815'/0'/2/0",
+                },
+                protocolMagic: 764824073,
+                networkId: 1,
+                derivationType: 2,
+                address: '',
+                showOnOneKey: false,
+                isCheck: false,
+              },
+              {
+                addressParameters: {
+                  addressType: 0,
+                  path: "m/1852'/1815'/0'/2/0",
+                  stakingPath: "m/1852'/1815'/0'/2/0",
+                },
+                protocolMagic: 764824073,
+                networkId: 1,
+                derivationType: 1,
+                address: '',
+                showOnOneKey: false,
+                isCheck: false,
+              },
             ],
           },
         ],
@@ -79,7 +163,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'cardanoGetPublicKey',
-    description: 'Get public key',
+
     presets: [
       {
         title: 'Get public key',
@@ -98,6 +182,14 @@ const api: UnifiedMethodConfig[] = [
             label: 'Show on Device',
             value: false,
           },
+          {
+            name: 'derivationType',
+            type: 'number',
+            required: false,
+            label: 'Derivation Type',
+            description: 'Derivation type (1 for Classic, 2 for Touch)',
+            value: 1,
+          },
         ],
       },
       {
@@ -111,16 +203,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/1852'/1815'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/1852'/1815'/1'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/1852'/1815'/2'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -129,7 +221,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'cardanoSignMessage',
-    description: 'Sign message',
+
     presets: [
       {
         title: 'Sign message',
@@ -149,6 +241,14 @@ const api: UnifiedMethodConfig[] = [
             value: 'Hello World',
           },
           {
+            name: 'derivationType',
+            type: 'number',
+            required: false,
+            label: 'Derivation Type',
+            description: 'Derivation type (1 for Classic, 2 for Touch)',
+            value: 1,
+          },
+          {
             name: 'networkId',
             type: 'number',
             required: true,
@@ -161,11 +261,19 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'cardanoSignTransaction',
-    description: 'Sign transaction',
+
     presets: [
       {
         title: 'Sign transaction',
         parameters: [
+          {
+            name: 'signingMode',
+            type: 'number',
+            required: false,
+            label: 'Signing Mode',
+            description: 'Transaction signing mode',
+            value: 0,
+          },
           {
             name: 'inputs',
             type: 'textarea',
@@ -174,9 +282,9 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/1852'/1815'/0'/0/0",
-                prev_hash: "1af8fa0b754ff99253d983894e63a2b09cbb56c833ba18c3384210163f63dcfc",
-                prev_index: 0
-              }
+                prev_hash: '1af8fa0b754ff99253d983894e63a2b09cbb56c833ba18c3384210163f63dcfc',
+                prev_index: 0,
+              },
             ],
           },
           {
@@ -186,20 +294,21 @@ const api: UnifiedMethodConfig[] = [
             label: 'Outputs',
             value: [
               {
-                address: "addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x",
-                amount: "3003112",
+                address:
+                  'addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x',
+                amount: '3003112',
                 tokenBundle: [
                   {
-                    policyId: "95a292ffee938be03e9bae5657982a74e9014eb4960108c9c67a5b9b",
+                    policyId: '95a292ffee938be03e9bae5657982a74e9014eb4960108c9c67a5b9b',
                     tokenAmounts: [
                       {
-                        assetNameBytes: "74652474436f696e",
-                        amount: "7878754"
-                      }
-                    ]
-                  }
-                ]
-              }
+                        assetNameBytes: '74652474436f696e',
+                        amount: '7878754',
+                      },
+                    ],
+                  },
+                ],
+              },
             ],
           },
           {
@@ -228,6 +337,14 @@ const api: UnifiedMethodConfig[] = [
             type: 'number',
             required: true,
             label: 'Network ID',
+            value: 1,
+          },
+          {
+            name: 'derivationType',
+            type: 'number',
+            required: false,
+            label: 'Derivation Type',
+            description: 'Derivation type (1 for Classic, 2 for Touch)',
             value: 1,
           },
         ],

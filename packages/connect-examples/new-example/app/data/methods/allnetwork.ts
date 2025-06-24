@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'allNetworkGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Batch Get Address',
@@ -12,202 +12,202 @@ const api: UnifiedMethodConfig[] = [
             name: 'bundle',
             type: 'textarea',
             required: true,
-            label: 'Bundle Parameters',
+
             value: [
               {
-                network: "tbtc",
+                network: 'tbtc',
                 path: "m/44'/1'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "ltc",
+                network: 'ltc',
                 path: "m/44'/2'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "bch",
+                network: 'bch',
                 path: "m/44'/145'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "neurai",
+                network: 'neurai',
                 path: "m/44'/1900'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "doge",
+                network: 'doge',
                 path: "m/44'/3'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "btc",
-                chainName: "bitcoin",
+                network: 'btc',
+                chainName: 'bitcoin',
                 path: "m/44'/0'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "btc",
-                chainName: "testnet",
+                network: 'btc',
+                chainName: 'testnet',
                 path: "m/44'/1'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "btc",
-                chainName: "litecoin",
+                network: 'btc',
+                chainName: 'litecoin',
                 path: "m/44'/2'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "btc",
-                chainName: "bcash",
+                network: 'btc',
+                chainName: 'bcash',
                 path: "m/44'/145'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "btc",
-                chainName: "neurai",
+                network: 'btc',
+                chainName: 'neurai',
                 path: "m/44'/1900'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "btc",
-                chainName: "dogecoin",
+                network: 'btc',
+                chainName: 'dogecoin',
                 path: "m/44'/3'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "evm",
+                network: 'evm',
                 path: "m/44'/60'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "evm",
+                network: 'evm',
                 path: "m/44'/60'/0'/0/0",
-                chainName: "20",
-                showOnOneKey: false
+                chainName: '20',
+                showOnOneKey: false,
               },
               {
-                network: "algo",
+                network: 'algo',
                 path: "m/44'/283'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "aptos",
+                network: 'aptos',
                 path: "m/44'/637'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "ada",
+                network: 'ada',
                 path: "m/1852'/1815'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "cfx",
+                network: 'cfx',
                 path: "m/44'/503'/0'/0/0",
-                chainName: "1029",
-                showOnOneKey: false
+                chainName: '1029',
+                showOnOneKey: false,
               },
               {
-                network: "cfx",
+                network: 'cfx',
                 path: "m/44'/503'/0'/0/0",
-                chainName: "1",
-                showOnOneKey: false
+                chainName: '1',
+                showOnOneKey: false,
               },
               {
-                network: "cosmos",
+                network: 'cosmos',
                 path: "m/44'/118'/0'/0/0",
-                prefix: "cosmos",
-                showOnOneKey: false
+                prefix: 'cosmos',
+                showOnOneKey: false,
               },
               {
-                network: "cosmos",
+                network: 'cosmos',
                 path: "m/44'/118'/0'/0/0",
-                prefix: "osmosis",
-                showOnOneKey: false
+                prefix: 'osmosis',
+                showOnOneKey: false,
               },
               {
-                network: "dynex",
+                network: 'dynex',
                 path: "m/44'/29538'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "fil",
+                network: 'fil',
                 path: "m/44'/461'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "kaspa",
+                network: 'kaspa',
                 path: "m/44'/111111'/0'/0/0",
-                prefix: "kaspa",
-                showOnOneKey: false
+                prefix: 'kaspa',
+                showOnOneKey: false,
               },
               {
-                network: "near",
+                network: 'near',
                 path: "m/44'/397'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "nexa",
+                network: 'nexa',
                 path: "m/44'/29223'/0'/0/0",
-                prefix: "nexa",
-                showOnOneKey: false
+                prefix: 'nexa',
+                showOnOneKey: false,
               },
               {
-                network: "nervos",
+                network: 'nervos',
                 path: "m/44'/309'/0'/0/0",
-                chainName: "ckb",
-                showOnOneKey: false
+                chainName: 'ckb',
+                showOnOneKey: false,
               },
               {
-                network: "dot",
+                network: 'dot',
                 path: "m/44'/354'/0'/0'/0'",
-                prefix: "0",
-                chainName: "polkadot",
-                showOnOneKey: false
+                prefix: '0',
+                chainName: 'polkadot',
+                showOnOneKey: false,
               },
               {
-                network: "xrp",
+                network: 'xrp',
                 path: "m/44'/144'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "sol",
+                network: 'sol',
                 path: "m/44'/501'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "stc",
+                network: 'stc',
                 path: "m/44'/101010'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "sui",
+                network: 'sui',
                 path: "m/44'/784'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "benfen",
+                network: 'benfen',
                 path: "m/44'/728'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "tron",
+                network: 'tron',
                 path: "m/44'/195'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "ton",
+                network: 'ton',
                 path: "m/44'/607'/0'",
                 walletVersion: 3,
                 isBounceable: false,
                 isTestnetOnly: false,
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
-                network: "nostr",
+                network: 'nostr',
                 path: "m/44'/1237'/0'/0/0",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],

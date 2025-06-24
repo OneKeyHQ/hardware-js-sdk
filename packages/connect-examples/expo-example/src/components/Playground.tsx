@@ -13,7 +13,7 @@ export interface PresupposeProps {
 }
 
 export type PlaygroundProps = {
-  description: string;
+  description?: string;
   presupposes?: PresupposeProps[];
   deprecated?: boolean;
 } & MethodPayload;

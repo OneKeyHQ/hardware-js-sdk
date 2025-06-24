@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'kaspaGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -73,7 +73,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'kaspaSignTransaction',
-    description: 'Sign transaction',
+
     presets: [
       {
         title: 'Sign transaction',

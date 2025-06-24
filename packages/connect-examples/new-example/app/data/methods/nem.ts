@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'nemGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -12,13 +12,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/43'/0'",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
         ],
@@ -35,16 +35,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/43'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/43'/1'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/43'/2'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -53,7 +53,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'nemSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Sign Transaction',
@@ -62,7 +62,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/43'/0'",
           },
           {

@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'dnxGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -12,13 +12,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/29538'/0'/0'/0'",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
         ],
@@ -35,16 +35,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/29538'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/29538'/0'/0'/1'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/29538'/0'/0'/2'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -53,7 +53,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'dnxSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Normal Transaction',
@@ -62,7 +62,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/29538'/0'/0'/0'",
           },
           {
@@ -73,11 +73,11 @@ const api: UnifiedMethodConfig[] = [
             description: 'Transaction inputs',
             value: [
               {
-                prev_hash: "b902e34e3e4d4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e",
+                prev_hash: 'b902e34e3e4d4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e',
                 prev_index: 0,
                 global_index: 1234567,
-                amount: 13000000
-              }
+                amount: 13000000,
+              },
             ],
           },
           {

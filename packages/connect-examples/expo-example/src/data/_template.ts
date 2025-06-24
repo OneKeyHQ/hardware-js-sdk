@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'algoGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',

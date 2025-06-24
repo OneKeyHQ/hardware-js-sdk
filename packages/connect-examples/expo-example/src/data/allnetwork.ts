@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'allNetworkGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Batch Get Address',

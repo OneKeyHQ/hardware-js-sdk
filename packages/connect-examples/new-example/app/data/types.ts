@@ -85,7 +85,7 @@ export type AllMethodCategory = ChainCategory | DeviceMethodCategory;
 // **统一的方法配置类型** - 极简设计
 export interface UnifiedMethodConfig {
   method: HardwareApiMethod;
-  description: string;
+  description?: string;
   category?: MethodCategory;
 
   // 预设配置 - 每个预设包含完整的参数定义和值

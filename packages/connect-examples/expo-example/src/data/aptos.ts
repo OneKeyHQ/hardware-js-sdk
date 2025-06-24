@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'aptosGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -35,7 +35,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'aptosGetPublicKey',
-    description: 'Get public key',
+
     presupposes: [
       {
         title: 'Get public key',
@@ -67,7 +67,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'aptosSignMessage',
-    description: 'Sign message',
+
     presupposes: [
       {
         title: 'Sign message',
@@ -86,7 +86,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'aptosSignTransaction',
-    description: 'Sign transaction',
+
     presupposes: [
       {
         title: 'Sign transaction',

@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'cosmosGetAddress',
-    description: 'Get address',
+    
     presupposes: [
       {
         title: 'Get address',
@@ -39,7 +39,6 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cosmosGetPublicKey',
-    description: 'Get PublicKey',
     presupposes: [
       {
         title: 'Get PublicKey',
@@ -75,7 +74,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cosmosSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',

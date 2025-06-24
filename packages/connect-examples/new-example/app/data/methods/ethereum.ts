@@ -38,24 +38,24 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/60'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/60'/0'/0/1",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/60'/0'/0/2",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/60'/0'/0/3",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/60'/0'/0/4",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -99,16 +99,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/60'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/60'/0'/0/1",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/60'/0'/0/2",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -217,13 +217,13 @@ const api: UnifiedMethodConfig[] = [
             label: 'Transaction',
             description: 'Transaction object',
             value: {
-              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
-              value: "0xf4240",
-              data: "0x00",
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0xf4240',
+              data: '0x00',
               chainId: 1,
-              nonce: "0x0",
-              gasLimit: "0x5208",
-              gasPrice: "0xbebc200"
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              gasPrice: '0xbebc200',
             },
           },
         ],
@@ -246,13 +246,13 @@ const api: UnifiedMethodConfig[] = [
             label: 'Transaction',
             description: 'Transaction object',
             value: {
-              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
-              value: "0xf4240",
-              data: "0x",
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0xf4240',
+              data: '0x',
               chainId: 1,
-              nonce: "0x0",
-              gasLimit: "0x5208",
-              gasPrice: "0xbebc200"
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              gasPrice: '0xbebc200',
             },
           },
         ],
@@ -275,13 +275,13 @@ const api: UnifiedMethodConfig[] = [
             label: 'Transaction',
             description: 'Transaction object',
             value: {
-              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
-              value: "0xf4240",
-              data: "",
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0xf4240',
+              data: '',
               chainId: 1,
-              nonce: "0x0",
-              gasLimit: "0x5208",
-              gasPrice: "0xbebc200"
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              gasPrice: '0xbebc200',
             },
           },
         ],
@@ -304,13 +304,192 @@ const api: UnifiedMethodConfig[] = [
             label: 'Transaction',
             description: 'Transaction object',
             value: {
-              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
-              value: "0x0",
-              data: "0xa9059cbb0000000000000000000000009755c3921b56b166876e2268e5b750ed301fe1b100000000000000000000000000000000000000000000000000000002046f78cf",
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0x0',
+              data: '0xa9059cbb0000000000000000000000009755c3921b56b166876e2268e5b750ed301fe1b100000000000000000000000000000000000000000000000000000002046f78cf',
               chainId: 1,
-              nonce: "0x0",
-              gasLimit: "0x5208",
-              gasPrice: "0xbebc200"
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              gasPrice: '0xbebc200',
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign Transaction(Send ERC721 NFT)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'Transaction object',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0x0000000000000068F116a894984e2DB1123eB395',
+              data: '0x42842e0e0000000000000000000000007baa4e405e3fd07d361d5530e4a6180954106ee4000000000000000000000000d1464d62321c15bb73f80f9dcef7edc37acc22e40000000000000000000000000000000000000000000000000000000000000a65360c6ebe',
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              gasPrice: '0xbebc200',
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign Transaction (Big Data)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'Transaction object with big data',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0xf4240',
+              data: `0x${'01'.repeat(3072)}`,
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0xbebc200',
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign EIP1559 Transaction(Empty data 1)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'EIP1559 transaction object',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0xf4240',
+              data: '0x',
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0xbebc200',
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign EIP1559 Transaction(Empty data 2)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'EIP1559 transaction object',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0xf4240',
+              data: '',
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0xbebc200',
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign EIP1559 Transaction(Send ERC20 USDC)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'EIP1559 transaction object',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0x0',
+              data: '0xa9059cbb0000000000000000000000009755c3921b56b166876e2268e5b750ed301fe1b100000000000000000000000000000000000000000000000000000002046f78cf',
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0xbebc200',
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign EIP1559 Transaction(Send ERC721 NFT)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'EIP1559 transaction object',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0x0000000000000068F116a894984e2DB1123eB395',
+              data: '0x42842e0e0000000000000000000000007baa4e405e3fd07d361d5530e4a6180954106ee4000000000000000000000000d1464d62321c15bb73f80f9dcef7edc37acc22e40000000000000000000000000000000000000000000000000000000000000a65360c6ebe',
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0xbebc200',
             },
           },
         ],
@@ -333,14 +512,44 @@ const api: UnifiedMethodConfig[] = [
             label: 'Transaction',
             description: 'EIP1559 transaction object',
             value: {
-              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
-              value: "0xf4240",
-              data: "0x00",
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0xf4240',
+              data: '0x00',
               chainId: 1,
-              nonce: "0x0",
-              gasLimit: "0x5208",
-              maxFeePerGas: "0xbebc200",
-              maxPriorityFeePerGas: "0xbebc200"
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0xbebc200',
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign EIP1559 Transaction (Big Data)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'EIP1559 transaction object with big data',
+            value: {
+              to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+              value: '0xf4240',
+              data: `0x${'01'.repeat(3072)}`,
+              chainId: 1,
+              nonce: '0x0',
+              gasLimit: '0x5208',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0xbebc200',
             },
           },
         ],
@@ -404,29 +613,359 @@ const api: UnifiedMethodConfig[] = [
               types: {
                 EIP712Domain: [
                   {
-                    name: "name",
-                    type: "string"
-                  }
+                    name: 'name',
+                    type: 'string',
+                  },
                 ],
                 Message: [
                   {
-                    name: "Wallet",
-                    type: "string"
+                    name: 'Wallet',
+                    type: 'string',
                   },
                   {
-                    name: "Number",
-                    type: "uint64"
-                  }
-                ]
+                    name: 'Number',
+                    type: 'uint64',
+                  },
+                ],
               },
-              primaryType: "Message",
+              primaryType: 'Message',
               domain: {
-                name: "example.onekey.so"
+                name: 'example.onekey.so',
               },
               message: {
-                Wallet: "Onekey Touch",
-                Number: "911112119"
-              }
+                Wallet: 'Onekey Touch',
+                Number: '911112119',
+              },
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign Bigger data',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'metamaskV4Compat',
+            type: 'boolean',
+            required: false,
+            label: 'Metamask V4 Compatibility',
+            description: 'Enable Metamask V4 compatibility mode',
+            value: true,
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            required: true,
+            label: 'Typed Data',
+            description: 'EIP712 typed data structure',
+            value: {
+              domain: {
+                name: 'Franklin',
+                version: '0.0.1',
+                chainId: 1,
+                verifyingContract: '0x0000000000000000000000000000000000000000',
+              },
+              primaryType: 'ForwardRequest',
+              types: {
+                EIP712Domain: [
+                  { name: 'name', type: 'string' },
+                  { name: 'version', type: 'string' },
+                  { name: 'chainId', type: 'uint256' },
+                  { name: 'verifyingContract', type: 'address' },
+                ],
+                ForwardRequest: [
+                  { name: 'from', type: 'address' },
+                  { name: 'to', type: 'address' },
+                  { name: 'value', type: 'uint256' },
+                  { name: 'gas', type: 'uint256' },
+                  { name: 'nonce', type: 'uint256' },
+                  { name: 'data', type: 'bytes' },
+                ],
+                VerifyWallet: [{ name: 'contents', type: 'string' }],
+              },
+              message: {
+                from: '0x0000000000000000000000000000000000000000',
+                to: '0x0000000000000000000000000000000000000000',
+                value: 0,
+                gas: 275755,
+                nonce: 3,
+                data: `0x${'01'.repeat(3072)}`,
+              },
+            },
+          },
+          {
+            name: 'domainHash',
+            type: 'string',
+            required: true,
+            label: 'Domain Hash',
+            description: 'EIP712 domain hash',
+            value: 'e1630040b43761d37578b947e7036afbc20d84c81af8d781275e318f080cc9f9',
+          },
+          {
+            name: 'messageHash',
+            type: 'string',
+            required: true,
+            label: 'Message Hash',
+            description: 'EIP712 message hash',
+            value: '182a9c8090b0facb90c403825fd01a144ce8d0152a8ad785be33e9f8884bd0f5',
+          },
+          {
+            name: 'chainId',
+            type: 'number',
+            required: false,
+            label: 'Chain ID',
+            description: 'EVM chain ID',
+            value: 1,
+          },
+          {
+            name: 'useEmptyPassphrase',
+            type: 'boolean',
+            required: false,
+            label: 'Use Empty Passphrase',
+            description: 'Use empty passphrase for signing',
+            value: true,
+          },
+          {
+            name: 'connectId',
+            type: 'string',
+            required: false,
+            label: 'Connect ID',
+            description: 'Device connection ID',
+            value: 'TC01WBD202303160742560002553',
+          },
+          {
+            name: 'deviceId',
+            type: 'string',
+            required: false,
+            label: 'Device ID',
+            description: 'Hardware device ID',
+            value: '91CC3D3EDFE355DE7619148C',
+          },
+          {
+            name: 'method',
+            type: 'string',
+            required: false,
+            label: 'Method',
+            description: 'Method name',
+            value: 'evmSignTypedData',
+          },
+        ],
+      },
+      {
+        title: 'Sign Nested array',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'metamaskV4Compat',
+            type: 'boolean',
+            required: false,
+            label: 'Metamask V4 Compatibility',
+            description: 'Enable Metamask V4 compatibility mode',
+            value: true,
+          },
+          {
+            name: 'domainHash',
+            type: 'string',
+            required: true,
+            label: 'Domain Hash',
+            description: 'EIP712 domain hash',
+            value: '276bc64a43ff20d362b6c982bc21d1f83716496363478990aa0bbaa99044923a',
+          },
+          {
+            name: 'messageHash',
+            type: 'string',
+            required: true,
+            label: 'Message Hash',
+            description: 'EIP712 message hash',
+            value: 'f8d0b2b47784324fed641b26f594e164d78a7e53fd6b3c9db099ab5cbfa9fa30',
+          },
+          {
+            name: 'chainId',
+            type: 'number',
+            required: false,
+            label: 'Chain ID',
+            description: 'EVM chain ID',
+            value: 1,
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            required: true,
+            label: 'Typed Data',
+            description: 'EIP712 typed data structure with nested arrays',
+            value: {
+              types: {
+                EIP712Domain: [{ name: 'name', type: 'string' }],
+                NestedArray: [{ name: 'items', type: 'SingleItem[2]' }],
+                SingleItem: [
+                  { name: 'id', type: 'uint256' },
+                  { name: 'value', type: 'string' },
+                ],
+              },
+              primaryType: 'NestedArray',
+              domain: {
+                name: 'NestedArrayTest',
+              },
+              message: {
+                nestedItems: [
+                  [
+                    {
+                      items: [
+                        { id: 1, value: 'Item1-1' },
+                        { id: 2, value: 'Item1-2' },
+                      ],
+                    },
+                    {
+                      items: [
+                        { id: 3, value: 'Item2-1' },
+                        { id: 4, value: 'Item2-2' },
+                      ],
+                    },
+                  ],
+                  [
+                    {
+                      items: [
+                        { id: 5, value: 'Item3-1' },
+                        { id: 6, value: 'Item3-2' },
+                      ],
+                    },
+                    {
+                      items: [
+                        { id: 7, value: 'Item4-1' },
+                        { id: 8, value: 'Item4-2' },
+                      ],
+                    },
+                  ],
+                ],
+              },
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign Gnosis Safe Tx',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            required: true,
+            label: 'Typed Data',
+            description: 'Gnosis Safe transaction typed data',
+            value: {
+              types: {
+                SafeTx: [
+                  { name: 'to', type: 'address' },
+                  { name: 'value', type: 'uint256' },
+                  { name: 'data', type: 'bytes' },
+                  { name: 'operation', type: 'uint8' },
+                  { name: 'safeTxGas', type: 'uint256' },
+                  { name: 'baseGas', type: 'uint256' },
+                  { name: 'gasPrice', type: 'uint256' },
+                  { name: 'gasToken', type: 'address' },
+                  { name: 'refundReceiver', type: 'address' },
+                  { name: 'nonce', type: 'uint256' },
+                ],
+                EIP712Domain: [
+                  { name: 'chainId', type: 'uint256' },
+                  { name: 'verifyingContract', type: 'address' },
+                ],
+              },
+              domain: {
+                chainId: '0x1',
+                verifyingContract: '0x673f21761c5400531a37554a602fe0407addd0dd',
+              },
+              primaryType: 'SafeTx',
+              message: {
+                to: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+                value: '10000000000000',
+                data: '0x',
+                operation: '0',
+                safeTxGas: '0',
+                baseGas: '0',
+                gasPrice: '0',
+                gasToken: '0x0000000000000000000000000000000000000000',
+                refundReceiver: '0x0000000000000000000000000000000000000000',
+                nonce: '0',
+              },
+            },
+          },
+        ],
+      },
+      {
+        title: 'Sign Gnosis Safe Tx(Danger)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'data',
+            type: 'textarea',
+            required: true,
+            label: 'Typed Data',
+            description: 'Gnosis Safe transaction typed data (dangerous operation)',
+            value: {
+              types: {
+                SafeTx: [
+                  { name: 'to', type: 'address' },
+                  { name: 'value', type: 'uint256' },
+                  { name: 'data', type: 'bytes' },
+                  { name: 'operation', type: 'uint8' },
+                  { name: 'safeTxGas', type: 'uint256' },
+                  { name: 'baseGas', type: 'uint256' },
+                  { name: 'gasPrice', type: 'uint256' },
+                  { name: 'gasToken', type: 'address' },
+                  { name: 'refundReceiver', type: 'address' },
+                  { name: 'nonce', type: 'uint256' },
+                ],
+                EIP712Domain: [
+                  { name: 'chainId', type: 'uint256' },
+                  { name: 'verifyingContract', type: 'address' },
+                ],
+              },
+              domain: {
+                chainId: '0x1',
+                verifyingContract: '0x673f21761c5400531a37554a602fe0407addd0dd',
+              },
+              primaryType: 'SafeTx',
+              message: {
+                to: '0x5618207d27d78f09f61a5d92190d58c453feb4b7',
+                value: '10000000000000',
+                data: '0x',
+                operation: '1',
+                safeTxGas: '0',
+                baseGas: '0',
+                gasPrice: '0',
+                gasToken: '0x0000000000000000000000000000000000000000',
+                refundReceiver: '0x0000000000000000000000000000000000000000',
+                nonce: '0',
+              },
             },
           },
         ],

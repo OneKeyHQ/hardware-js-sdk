@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'filecoinGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -12,13 +12,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/461'/0'/0/0",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
         ],
@@ -35,16 +35,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/461'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/461'/0'/0/1",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/461'/0'/0/2",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -53,7 +53,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'filecoinSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Sign Transaction',
@@ -62,13 +62,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/461'/0'/0/0",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
           {

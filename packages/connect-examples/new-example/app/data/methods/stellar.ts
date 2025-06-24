@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'stellarGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -35,16 +35,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/148'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/148'/1'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/148'/2'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -53,7 +53,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'stellarSignTransaction',
-    description: 'Sign transaction',
+
     presets: [
       {
         title: 'Sign transaction',
@@ -78,23 +78,23 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             value: {
-              source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+              source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
               fee: 100,
-              sequence: "4294967297",
+              sequence: '4294967297',
               memo: {
-                type: 0
+                type: 0,
               },
               operations: [
                 {
-                  type: "payment",
-                  source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
-                  destination: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+                  type: 'payment',
+                  source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
+                  destination: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
                   asset: {
-                    type: "native"
+                    type: 'native',
                   },
-                  amount: "10000000"
-                }
-              ]
+                  amount: '10000000',
+                },
+              ],
             },
           },
         ],
@@ -122,24 +122,24 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             value: {
-              source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+              source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
               fee: 100,
-              sequence: "4294967297",
+              sequence: '4294967297',
               memo: {
                 type: 1,
-                text: "test memo"
+                text: 'test memo',
               },
               operations: [
                 {
-                  type: "payment",
-                  source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
-                  destination: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+                  type: 'payment',
+                  source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
+                  destination: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
                   asset: {
-                    type: "native"
+                    type: 'native',
                   },
-                  amount: "10000000"
-                }
-              ]
+                  amount: '10000000',
+                },
+              ],
             },
           },
         ],

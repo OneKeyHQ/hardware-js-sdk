@@ -12,13 +12,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/1237'/0'/0/0",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: true,
           },
         ],
@@ -30,24 +30,24 @@ const api: UnifiedMethodConfig[] = [
             name: 'bundle',
             type: 'textarea',
             required: true,
-            label: 'Bundle Parameters',
+
             value: [
               {
                 path: "m/44'/1237'/0'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/1237'/1'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/1237'/2'/0/0",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/1237'/3'/0/0",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -65,7 +65,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/1237'/0'/0/0",
           },
           {
@@ -75,9 +75,9 @@ const api: UnifiedMethodConfig[] = [
             label: 'Event Data',
             value: {
               kind: 1,
-              content: "Hello Nostr!",
+              content: 'Hello Nostr!',
               tags: [],
-              created_at: 1750749405
+              created_at: 1750749405,
             },
           },
         ],
@@ -89,7 +89,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/1237'/0'/0/0",
           },
           {
@@ -99,9 +99,9 @@ const api: UnifiedMethodConfig[] = [
             label: 'Event Data',
             value: {
               kind: 3,
-              content: "{\"name\":\"Test User\",\"about\":\"Test profile\"}",
+              content: '{"name":"Test User","about":"Test profile"}',
               tags: [],
-              created_at: 1750749405
+              created_at: 1750749405,
             },
           },
         ],
@@ -119,7 +119,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/1237'/0'/0/0",
           },
           {
@@ -139,7 +139,47 @@ const api: UnifiedMethodConfig[] = [
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
+            value: false,
+          },
+        ],
+      },
+    ],
+  },
+
+  {
+    method: 'nostrEncryptMessage',
+    description: 'Encrypt message',
+    presets: [
+      {
+        title: 'Encrypt message',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/1237'/0'/0/0",
+          },
+          {
+            name: 'pubkey',
+            type: 'string',
+            required: true,
+            label: 'Pubkey',
+            value: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
+          },
+          {
+            name: 'plaintext',
+            type: 'string',
+            required: true,
+            label: 'Plaintext',
+            value: 'Hello world',
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+            required: false,
+            label: 'Show on Device',
             value: false,
           },
         ],
@@ -157,7 +197,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+            label: 'Derivation Path',
             value: "m/44'/1237'/0'/0/0",
           },
           {
@@ -177,8 +217,34 @@ const api: UnifiedMethodConfig[] = [
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+            required: false,
+            label: 'Show on Device',
             value: false,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'nostrSignSchnorr',
+    description: 'Sign schnorr',
+    presets: [
+      {
+        title: 'Sign schnorr',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            value: "m/44'/1237'/0'/0/0",
+          },
+          {
+            name: 'hash',
+            type: 'string',
+            required: true,
+            label: 'Hash',
+            value: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
           },
         ],
       },

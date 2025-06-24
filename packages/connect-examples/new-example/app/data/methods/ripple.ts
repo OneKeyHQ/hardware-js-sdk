@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'xrpGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -53,7 +53,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'xrpSignTransaction',
-    description: 'Sign transaction',
+
     presets: [
       {
         title: 'Payment transaction',

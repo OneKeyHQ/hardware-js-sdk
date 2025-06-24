@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'starcoinGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -12,13 +12,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/101010'/0'/0'/0'",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
         ],
@@ -35,16 +35,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/101010'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/101010'/1'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/101010'/2'/0'/0'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -53,7 +53,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'starcoinGetPublicKey',
-    description: 'Get PublicKey',
+
     presets: [
       {
         title: 'Get PublicKey',
@@ -62,13 +62,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/101010'/0'/0'/0'",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
         ],
@@ -85,16 +85,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/101010'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/101010'/1'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/101010'/2'/0'/0'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -103,7 +103,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'starcoinSignMessage',
-    description: 'Sign Message',
+
     presets: [
       {
         title: 'Sign Message',
@@ -112,7 +112,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/101010'/0'/0'/0'",
           },
           {
@@ -127,7 +127,6 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'starcoinVerifyMessage',
-    description: 'Verify Message',
     presets: [
       {
         title: 'Verify Message',
@@ -136,7 +135,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/101010'/0'/0'/0'",
           },
           {
@@ -164,7 +163,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'starcoinSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Sign Transaction',
@@ -173,7 +172,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/101010'/0'/0'/0'",
           },
           {

@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'algoGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -56,7 +56,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'algoSignTransaction',
-    description: 'Sign transaction',
+
     presets: [
       {
         title: 'Sign transaction',

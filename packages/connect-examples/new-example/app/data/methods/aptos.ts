@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'aptosGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -38,16 +38,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/637'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/637'/1'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/637'/2'/0'/0'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -56,7 +56,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'aptosGetPublicKey',
-    description: 'Get public key',
+
     presets: [
       {
         title: 'Get public key',
@@ -91,16 +91,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/637'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/637'/1'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/637'/2'/0'/0'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -109,7 +109,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'aptosSignMessage',
-    description: 'Sign message',
+
     presets: [
       {
         title: 'Sign message',
@@ -129,11 +129,11 @@ const api: UnifiedMethodConfig[] = [
             label: 'Payload',
             description: 'Message payload to sign',
             value: {
-              address: "0x1234",
-              chainId: "0x1",
-              application: "OneKey Apps",
-              nonce: "12345",
-              message: "hello"
+              address: '0x1234',
+              chainId: '0x1',
+              application: 'OneKey Apps',
+              nonce: '12345',
+              message: 'hello',
             },
           },
         ],
@@ -142,7 +142,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'aptosSignTransaction',
-    description: 'Sign transaction',
+
     presets: [
       {
         title: 'Sign transaction',

@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'suiGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -30,20 +30,20 @@ const api: UnifiedMethodConfig[] = [
             name: 'bundle',
             type: 'textarea',
             required: true,
-            label: 'Bundle Parameters',
+
             value: [
               {
                 path: "m/44'/784'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/784'/1'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/784'/2'/0'/0'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -52,7 +52,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'suiGetPublicKey',
-    description: 'Get PublicKey',
+
     presets: [
       {
         title: 'Get PublicKey',
@@ -61,13 +61,13 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/784'/0'/0'/0'",
           },
           {
             name: 'showOnOneKey',
             type: 'boolean',
-            label: 'Show On One Key',
+
             value: false,
           },
         ],
@@ -84,16 +84,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/784'/0'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/784'/1'/0'/0'",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/784'/2'/0'/0'",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -102,7 +102,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'suiSignMessage',
-    description: 'Sign Message',
+
     presets: [
       {
         title: 'Sign Message',
@@ -111,7 +111,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/784'/0'/0'/0'",
           },
           {
@@ -126,7 +126,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'suiSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Sign Transaction',
@@ -135,7 +135,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/784'/0'/0'/0'",
           },
           {
@@ -155,7 +155,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/784'/0'/0'/0'",
           },
           {
@@ -175,7 +175,7 @@ const api: UnifiedMethodConfig[] = [
             name: 'path',
             type: 'string',
             required: true,
-            label: 'Path',
+
             value: "m/44'/784'/0'/0'/0'",
           },
           {

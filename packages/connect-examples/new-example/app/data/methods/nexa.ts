@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'nexaGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -42,14 +42,16 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/29223'/0'/0/0",
-                prefix: "nexa",
-                showOnOneKey: false
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/29223'/0'/0/1",
-                prefix: "nexa",
-                showOnOneKey: false
-              }
+                showOnOneKey: false,
+              },
+              {
+                path: "m/44'/29223'/0'/0/2",
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -58,7 +60,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'nexaSignTransaction',
-    description: 'Sign transaction',
+
     presets: [
       {
         title: 'Sign transaction',
@@ -71,17 +73,11 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/29223'/0'/0/0",
-                message: "c6a5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5",
-                preimage: "01000000..."
-              }
+                message:
+                  '000578c6c76f10156fbc7ee4a8faa7a4e92b6adadc978abf66ae70f13a03b75d36cd7a6acc0967cc9f2f632f585cb7b4297873858c23233792767fd4ae662ec1093bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e70665044026cad0dba749a112e0d2ea420fa68e0218453db6bb0744e44eb51edc76af8bb6871190000000000',
+                prefix: 'nexa',
+              },
             ],
-          },
-          {
-            name: 'prefix',
-            type: 'string',
-            required: false,
-            label: 'Address Prefix',
-            value: 'nexa',
           },
         ],
       },

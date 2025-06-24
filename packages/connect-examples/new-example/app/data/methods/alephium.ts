@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'alephiumGetAddress',
-    description: 'Get address',
+
     presets: [
       {
         title: 'Get address',
@@ -56,19 +56,19 @@ const api: UnifiedMethodConfig[] = [
                 path: "m/44'/1234'/0'/0/0",
                 includePublicKey: true,
                 showOnOneKey: false,
-                group: 0
+                group: 0,
               },
               {
                 path: "m/44'/1234'/0'/0/1",
                 includePublicKey: true,
                 showOnOneKey: false,
-                group: 0
+                group: 0,
               },
               {
                 path: "m/44'/1234'/0'/0/2",
                 showOnOneKey: false,
-                group: 0
-              }
+                group: 0,
+              },
             ],
           },
         ],
@@ -77,7 +77,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'alephiumSignMessage',
-    description: 'Sign Message',
+
     presets: [
       {
         title: 'Sign Alephium',
@@ -199,7 +199,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'alephiumSignTransaction',
-    description: 'Sign Transaction',
+
     presets: [
       {
         title: 'Native Transfer',

@@ -56,7 +56,7 @@ const CHAIN_ICON_MAP: Partial<Record<AllMethodCategory, string>> = {
   ton: tonIcon,
   tron: tronIcon,
   kaspa: kaspaIcon,
-  algorand: algorandIcon,
+  algo: algorandIcon,
   filecoin: filecoinIcon,
   neo: neoIcon,
   nem: nemIcon,

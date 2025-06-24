@@ -45,54 +45,54 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/0'/0'/0/0",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/1",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/2",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/3",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/4",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/5",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/6",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/7",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/8",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/9",
-                coin: "btc",
-                showOnOneKey: false
-              }
+                coin: 'btc',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -109,54 +109,54 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/49'/0'/0'/0/0",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/1",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/2",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/3",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/4",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/5",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/6",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/7",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/8",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/9",
-                coin: "btc",
-                showOnOneKey: false
-              }
+                coin: 'btc',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -173,54 +173,54 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/84'/0'/0'/0/0",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/1",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/2",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/3",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/4",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/5",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/6",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/7",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/8",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/9",
-                coin: "btc",
-                showOnOneKey: false
-              }
+                coin: 'btc',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -237,54 +237,54 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/86'/0'/0'/0/0",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/1",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/2",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/3",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/4",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/5",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/6",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/7",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/8",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/9",
-                coin: "btc",
-                showOnOneKey: false
-              }
+                coin: 'btc',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -336,54 +336,54 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/44'/0'/0'/0/0",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/1",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/2",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/3",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/4",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/5",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/6",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/7",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/8",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/44'/0'/0'/0/9",
-                coin: "btc",
-                showOnOneKey: false
-              }
+                coin: 'btc',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -400,54 +400,54 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/49'/0'/0'/0/0",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/1",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/2",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/3",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/4",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/5",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/6",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/7",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/8",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/49'/0'/0'/0/9",
-                coin: "btc",
-                showOnOneKey: false
-              }
+                coin: 'btc',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -464,54 +464,54 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/84'/0'/0'/0/0",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/1",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/2",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/3",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/4",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/5",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/6",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/7",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/8",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/84'/0'/0'/0/9",
-                coin: "btc",
-                showOnOneKey: false
-              }
+                coin: 'btc',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -528,54 +528,54 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 path: "m/86'/0'/0'/0/0",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/1",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/2",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/3",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/4",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/5",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/6",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/7",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/8",
-                coin: "btc",
-                showOnOneKey: false
+                coin: 'btc',
+                showOnOneKey: false,
               },
               {
                 path: "m/86'/0'/0'/0/9",
-                coin: "btc",
-                showOnOneKey: false
-              }
+                coin: 'btc',
+                showOnOneKey: false,
+              },
             ],
           },
         ],
@@ -735,6 +735,117 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
       {
+        title: 'Sign Message (ecdsa | Native Segwit)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/84'/0'/0'/0/0",
+          },
+          {
+            name: 'coin',
+            type: 'string',
+            required: true,
+            label: 'Coin',
+            description: 'Cryptocurrency symbol',
+            value: 'btc',
+          },
+          {
+            name: 'messageHex',
+            type: 'string',
+            required: true,
+            label: 'Message (Hex)',
+            description: 'Message to sign in hexadecimal format',
+            value: '48656c6c6f20576f726c64',
+          },
+          {
+            name: 'dAppSignType',
+            type: 'string',
+            required: false,
+            label: 'DApp Sign Type',
+            description: 'Signature type for DApp integration',
+            value: 'ecdsa',
+          },
+        ],
+      },
+      {
+        title: 'Sign Message (ecdsa | Nested Segwit)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/49'/0'/0'/0/0",
+          },
+          {
+            name: 'coin',
+            type: 'string',
+            required: true,
+            label: 'Coin',
+            description: 'Cryptocurrency symbol',
+            value: 'btc',
+          },
+          {
+            name: 'messageHex',
+            type: 'string',
+            required: true,
+            label: 'Message (Hex)',
+            description: 'Message to sign in hexadecimal format',
+            value: '48656c6c6f20576f726c64',
+          },
+          {
+            name: 'dAppSignType',
+            type: 'string',
+            required: false,
+            label: 'DApp Sign Type',
+            description: 'Signature type for DApp integration',
+            value: 'ecdsa',
+          },
+        ],
+      },
+      {
+        title: 'Sign Message (ecdsa | Legacy)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/0'/0'/0/0",
+          },
+          {
+            name: 'coin',
+            type: 'string',
+            required: true,
+            label: 'Coin',
+            description: 'Cryptocurrency symbol',
+            value: 'btc',
+          },
+          {
+            name: 'messageHex',
+            type: 'string',
+            required: true,
+            label: 'Message (Hex)',
+            description: 'Message to sign in hexadecimal format',
+            value: '48656c6c6f20576f726c64',
+          },
+          {
+            name: 'dAppSignType',
+            type: 'string',
+            required: false,
+            label: 'DApp Sign Type',
+            description: 'Signature type for DApp integration',
+            value: 'ecdsa',
+          },
+        ],
+      },
+      {
         title: 'Sign Message (bip322-simple | Taproot)',
         parameters: [
           {
@@ -744,6 +855,43 @@ const api: UnifiedMethodConfig[] = [
             label: 'Derivation Path',
             description: 'BIP32 derivation path',
             value: "m/86'/0'/0'/0/0",
+          },
+          {
+            name: 'coin',
+            type: 'string',
+            required: true,
+            label: 'Coin',
+            description: 'Cryptocurrency symbol',
+            value: 'btc',
+          },
+          {
+            name: 'messageHex',
+            type: 'string',
+            required: true,
+            label: 'Message (Hex)',
+            description: 'Message to sign in hexadecimal format',
+            value: '48656c6c6f20576f726c64',
+          },
+          {
+            name: 'dAppSignType',
+            type: 'string',
+            required: false,
+            label: 'DApp Sign Type',
+            description: 'Signature type for DApp integration',
+            value: 'bip322-simple',
+          },
+        ],
+      },
+      {
+        title: 'Sign Message (bip322-simple | Native Segwit)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/84'/0'/0'/0/0",
           },
           {
             name: 'coin',
@@ -821,6 +969,28 @@ const api: UnifiedMethodConfig[] = [
           },
         ],
       },
+      {
+        title: 'Mock Babylon Slashing 销毁BTC（Seed3 专用）',
+        parameters: [
+          {
+            name: 'psbt',
+            type: 'textarea',
+            required: true,
+            label: 'PSBT',
+            description: 'Partially Signed Bitcoin Transaction',
+            value:
+              '70736274ff01007002000000010de21538513d44100cf27cfbed0303884f808074749463526a976400ca3b5bc80000000000ffffffff02ec9d020000000000096a07626162796c6f6e54bd340a00000000225120ec47ecd23739768f3e3b9fa3ee03b7bea57cfdc316acb9c45157f017465b764a000000000001012be0e1380a00000000225120192c3e1ca8308fe262f7a953b9466753df7624a44fb352e4315b4c50423269474215c150929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac05e528cd4c722bd7e2e07b5d127e642031cec10a723c9cd2c8e29cc2e064dcc79fd790120f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b2ad20374601b4c400b31f3aa78dc16b4e4d589c1284118e2476d83f0c39743881032cad2023b29f89b45f4af41588dcaf0ca572ada32872a88224f311373917f1b37d08d1ac204b15848e495a3a62283daaadb3f458a00859fe48e321f0121ebabbdd6698f9faba208242640732773249312c47ca7bdb50ca79f15f2ecc32b9c83ceebba44fb74df7ba20cbdd028cfe32c1c1f2d84bfec71e19f92df509bba7b8ad31ca6c1a134fe09204ba20d3c79b99ac4d265c2f97ac11e3232c07a598b020cf56c6f055472c893c0967aeba20d45c70d28f169e1f0c7f4a78e2bc73497afe585b70aa897955989068f3350aaaba20de13fc96ea6899acbdc5db3afaa683f62fe35b60ff6eb723dad28a11d2b12f8cba20e36200aaa8dce9453567bba108bdc51f7f1174b97a65e4dc4402fc5de779d41cba20f178fcce82f95c524b53b077e6180bd2d779a9057fdff4255a0af95af918cee0ba569cc02116f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b21900fc885a5e560000800100008000000080000000000000000001172050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0000000',
+          },
+          {
+            name: 'coin',
+            type: 'string',
+            required: true,
+            label: 'Coin',
+            description: 'Cryptocurrency symbol',
+            value: 'Bitcoin',
+          },
+        ],
+      },
     ],
   },
   {
@@ -847,17 +1017,11 @@ const api: UnifiedMethodConfig[] = [
             value: [
               {
                 prev_index: 0,
-                prev_hash: "b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7",
-                amount: "150000",
-                address_n: [
-                  2147483697,
-                  2147483648,
-                  2147483648,
-                  0,
-                  0
-                ],
-                script_type: "SPENDP2SHWITNESS"
-              }
+                prev_hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
+                amount: '150000',
+                address_n: [2147483697, 2147483648, 2147483648, 0, 0],
+                script_type: 'SPENDP2SHWITNESS',
+              },
             ],
           },
           {
@@ -868,21 +1032,15 @@ const api: UnifiedMethodConfig[] = [
             description: 'Transaction outputs configuration',
             value: [
               {
-                script_type: "PAYTOADDRESS",
-                address: "3F6g14r5Z37at7HTvMN5Mmf8QJxLJp2p3U",
-                amount: "10000"
+                script_type: 'PAYTOADDRESS',
+                address: '3F6g14r5Z37at7HTvMN5Mmf8QJxLJp2p3U',
+                amount: '10000',
               },
               {
-                script_type: "PAYTOP2SHWITNESS",
-                address_n: [
-                  2147483697,
-                  2147483648,
-                  2147483648,
-                  0,
-                  0
-                ],
-                amount: "128474"
-              }
+                script_type: 'PAYTOP2SHWITNESS',
+                address_n: [2147483697, 2147483648, 2147483648, 0, 0],
+                amount: '128474',
+              },
             ],
           },
           {
@@ -893,28 +1051,115 @@ const api: UnifiedMethodConfig[] = [
             description: 'Reference transaction data',
             value: [
               {
-                hash: "b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7",
+                hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
                 version: 2,
                 inputs: [
                   {
-                    prev_hash: "141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9",
+                    prev_hash: '141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9',
                     prev_index: 1,
-                    script_sig: "",
-                    sequence: 4294967295
-                  }
+                    script_sig: '',
+                    sequence: 4294967295,
+                  },
                 ],
                 bin_outputs: [
                   {
                     amount: 150000,
-                    script_pubkey: "a9144204752392de72c50f0591313f98937c67325a3d87"
+                    script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87',
                   },
                   {
                     amount: 116300,
-                    script_pubkey: "512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c"
-                  }
+                    script_pubkey:
+                      '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
+                  },
                 ],
-                lock_time: 0
-              }
+                lock_time: 0,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Sign Transaction(Big Ref Txs)',
+        parameters: [
+          {
+            name: 'coin',
+            type: 'string',
+            required: true,
+            label: 'Coin',
+            description: 'Cryptocurrency symbol',
+            value: 'btc',
+          },
+          {
+            name: 'inputs',
+            type: 'textarea',
+            required: true,
+            label: 'Inputs',
+            description: 'Transaction inputs configuration',
+            value: [
+              {
+                prev_index: 60000,
+                prev_hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
+                amount: '150000',
+                address_n: [2147483697, 2147483648, 2147483648, 0, 0],
+                script_type: 'SPENDP2SHWITNESS',
+              },
+            ],
+          },
+          {
+            name: 'outputs',
+            type: 'textarea',
+            required: true,
+            label: 'Outputs',
+            description: 'Transaction outputs configuration',
+            value: [
+              {
+                script_type: 'PAYTOADDRESS',
+                address: '3F6g14r5Z37at7HTvMN5Mmf8QJxLJp2p3U',
+                amount: '10000',
+              },
+              {
+                script_type: 'PAYTOP2SHWITNESS',
+                address_n: [2147483697, 2147483648, 2147483648, 0, 0],
+                amount: '128474',
+              },
+            ],
+          },
+          {
+            name: 'refTxs',
+            type: 'textarea',
+            required: true,
+            label: 'Reference Transactions',
+            description: 'Reference transaction data with big outputs',
+            value: [
+              {
+                hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
+                version: 2,
+                inputs: [
+                  {
+                    prev_hash: '141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9',
+                    prev_index: 1,
+                    script_sig: '',
+                    sequence: 4294967295,
+                  },
+                ],
+                bin_outputs: [
+                  {
+                    amount: 150000,
+                    script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87',
+                  },
+                  {
+                    amount: 116300,
+                    script_pubkey:
+                      '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
+                  },
+                  // 80,000 additional outputs for testing large transactions
+                  ...Array.from({ length: 80000 }, (_, i) => ({
+                    amount: '100000000',
+                    script_pubkey: `76a914${i.toString(16).padStart(40, '0')}88ac`,
+                  })),
+                ],
+                lock_time: 0,
+              },
             ],
           },
         ],
