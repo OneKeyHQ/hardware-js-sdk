@@ -6,6 +6,7 @@ import { useMethodExecution } from '../../hooks/useMethodExecution';
 import { useDeviceInfo } from '../../hooks/useDeviceInfo';
 import { useFirmwareProgress } from '../providers/SDKProvider';
 import { useDeviceStore } from '../../store/deviceStore';
+import { useHardwareStore } from '../../store/hardwareStore';
 import type { UnifiedMethodConfig } from '~/data/types';
 // 导入子组件
 import ParameterInput from './ParameterInput';
@@ -33,6 +34,14 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   const { t } = useTranslation();
   const { deviceAction: globalDeviceAction, logs: globalLogs } = useDeviceStore();
 
+  // 使用 hardwareStore 获取完整的执行参数（包含通用参数）
+  const {
+    executionParameters: storeExecutionParameters,
+    getExecutionParameters,
+    setMethodParameter,
+    setMethodParameters,
+  } = useHardwareStore();
+
   // 方法级别的执行日志状态
   const [executionStartTime, setExecutionStartTime] = useState<number | null>(null);
 
@@ -43,11 +52,27 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   // 参数管理
   const {
     selectedPreset,
-    executionParameters,
+    parameters: methodParams,
     setParameter,
     selectPreset,
     reset: resetParameters,
   } = useMethodParameters({ methodConfig });
+
+  // 同步 useMethodParameters 的参数到 hardwareStore
+  useEffect(() => {
+    if (Object.keys(methodParams).length > 0) {
+      setMethodParameters(methodParams);
+    }
+  }, [methodParams, setMethodParameters]);
+
+  // 处理预设选择
+  const handlePresetChange = useCallback(
+    (presetTitle: string) => {
+      selectPreset(presetTitle);
+      // 预设选择后，参数会通过上面的 useEffect 自动同步到 hardwareStore
+    },
+    [selectPreset]
+  );
 
   // 执行状态管理
   const {
@@ -104,8 +129,10 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     // 记录执行开始时间，用于过滤当前执行的日志
     setExecutionStartTime(Date.now());
 
-    await execute(executionParameters, executionHandler);
-  }, [isConnected, execute, executionParameters, executionHandler, toast, t]);
+    // 使用 hardwareStore 的完整执行参数（包含通用参数）
+    const finalExecutionParams = getExecutionParameters();
+    await execute(finalExecutionParams, executionHandler);
+  }, [isConnected, execute, getExecutionParameters, executionHandler, toast, t]);
 
   // 取消操作
   const handleCancel = useCallback(async () => {
@@ -131,20 +158,44 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   // 处理参数变化
   const handleParamChange = useCallback(
     (paramName: string, value: unknown) => {
+      // 同时更新 useMethodParameters 和 hardwareStore
       setParameter(paramName, value);
+      setMethodParameter(paramName, value);
     },
-    [setParameter]
+    [setParameter, setMethodParameter]
   );
 
   // 处理参数编辑请求
   const handleRequestParamsEdit = useCallback(
     (data: Record<string, unknown>) => {
-      // 批量更新参数
+      // 分离通用参数和方法参数
+      const commonParamNames = ['useEmptyPassphrase', 'passphraseState', 'usePassphraseState'];
+      const methodParams: Record<string, unknown> = {};
+      const commonParams: Record<string, unknown> = {};
+
       Object.entries(data).forEach(([key, value]) => {
-        setParameter(key, value);
+        if (commonParamNames.includes(key)) {
+          commonParams[key] = value;
+        } else {
+          methodParams[key] = value;
+          // 也更新 useMethodParameters
+          setParameter(key, value);
+        }
       });
+
+      // 批量更新到 hardwareStore
+      if (Object.keys(methodParams).length > 0) {
+        setMethodParameters(methodParams);
+      }
+
+      // 如果有通用参数，需要单独处理
+      if (Object.keys(commonParams).length > 0) {
+        // 这里需要调用 hardwareStore 的 setCommonParameters
+        const { setCommonParameters } = useHardwareStore.getState();
+        setCommonParameters(commonParams);
+      }
     },
-    [setParameter]
+    [setParameter, setMethodParameters]
   );
 
   return (
@@ -154,7 +205,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         <ParameterInput
           methodConfig={methodConfig}
           selectedPreset={selectedPreset}
-          onPresetChange={selectPreset}
+          onPresetChange={handlePresetChange}
           onParamChange={handleParamChange}
         />
       </div>
@@ -180,7 +231,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           {/* 右侧：执行面板 */}
           <div className="lg:col-span-3 flex flex-col min-h-0">
             <ExecutionPanel
-              requestData={executionParameters}
+              requestData={storeExecutionParameters}
               onSaveRequest={handleRequestParamsEdit}
               logs={currentExecutionLogs}
               onClearLogs={handleClearExecutionLogs}

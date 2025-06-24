@@ -432,6 +432,11 @@ export const en = {
       sdkInitializing: 'Initializing...',
       sdkInitError: 'SDK initialization failed',
     },
+    sdk: {
+      browserRequired: 'Browser environment required',
+      initError: 'SDK initialization failed',
+      initFailed: 'Initialization failed: {{error}}',
+    },
     search: {
       sections: {
         interface: 'Interface Control',

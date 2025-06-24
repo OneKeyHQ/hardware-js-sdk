@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import SDK from '@onekeyfe/hd-web-sdk';
 import { ConnectSettings, CoreApi, UiEvent, UI_REQUEST } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
@@ -10,7 +11,6 @@ import GlobalDialogManager from '../global/GlobalDialogManager';
 import { logData, logInfo } from '../../utils/logger';
 import { CONNECT_SRC } from '../../constants/connect';
 import { create } from 'zustand';
-import { t } from 'i18next';
 
 // 声明全局弹窗管理器类型
 declare global {
@@ -57,6 +57,7 @@ export const useFirmwareProgress = () => {
 };
 
 export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
+  const { t } = useTranslation();
   const { setDeviceAction, clearDeviceAction, updateSdkInitState } = useDeviceStore();
 
   const initializationRef = useRef<boolean>(false);
@@ -194,7 +195,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
 
   const initializeSDKCore = useCallback(async (): Promise<CoreApi> => {
     if (typeof window === 'undefined') {
-      throw new Error('Browser environment required');
+      throw new Error(t('sdk.browserRequired'));
     }
 
     try {
@@ -217,7 +218,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
       // 执行SDK初始化
       const res = await HardwareWebSdk.init(initConfig);
       if (res === false) {
-        throw new Error(t('transport.sdkInitError'));
+        throw new Error(t('sdk.initError'));
       }
       sdkInstance = HardwareWebSdk;
 
@@ -259,13 +260,14 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
       updateSdkInitState({
         isInitialized: false,
         isInitializing: false,
-        error: `初始化失败: ${error}`,
+        error: t('sdk.initFailed', { error: String(error) }),
         lastInitTime: Date.now(),
       });
 
       throw error;
     }
-  }, [updateSdkInitState, setupSDKEventListeners]);
+  }, [updateSdkInitState, setupSDKEventListeners, t]);
+
   // 获取SDK实例 - 单例模式
   const getSDKInstance = useCallback(async (): Promise<CoreApi> => {
     if (sdkInstance) {

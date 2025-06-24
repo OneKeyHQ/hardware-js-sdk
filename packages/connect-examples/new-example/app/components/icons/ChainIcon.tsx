@@ -30,17 +30,17 @@ import benfenIcon from '../../assets/chain/bfc.png';
 import stellarIcon from '../../assets/chain/stellar.png';
 import alephiumIcon from '../../assets/chain/alephium.png';
 import allnetworkIcon from '../../assets/chain/all_network_logo.png';
-import { ChainCategory } from '../../data/types';
+import { AllMethodCategory } from '../../data/types';
 
 interface ChainIconProps {
-  chainId: ChainCategory;
+  chainId: AllMethodCategory;
   size?: number | string;
   className?: string;
   fallback?: React.ReactNode;
 }
 
 // 链ID到图标资源的直接映射 (预加载)
-const CHAIN_ICON_MAP: Record<ChainCategory, string> = {
+const CHAIN_ICON_MAP: Partial<Record<AllMethodCategory, string>> = {
   // 主要区块链
   xrp: xrpIcon,
   stellar: stellarIcon,
@@ -70,7 +70,10 @@ const CHAIN_ICON_MAP: Record<ChainCategory, string> = {
   lightning: lightningIcon,
   benfen: benfenIcon,
   alephium: alephiumIcon,
-  'all-network': allnetworkIcon,
+  allnetwork: allnetworkIcon,
+  // 设备方法可能没有图标，使用默认图标
+  // device: deviceIcon, // 可以添加设备图标
+  // firmware: firmwareIcon, // 可以添加固件图标
 };
 
 // 默认的fallback图标

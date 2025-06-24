@@ -422,6 +422,11 @@ export const zh = {
       sdkInitializing: '初始化...',
       sdkInitError: 'SDK初始化失败',
     },
+    sdk: {
+      browserRequired: '需要浏览器环境',
+      initError: 'SDK初始化失败',
+      initFailed: '初始化失败: {{error}}',
+    },
     search: {
       sections: {
         interface: '界面控制',

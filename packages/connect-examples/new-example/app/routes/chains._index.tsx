@@ -7,7 +7,7 @@ import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { ListBoundary } from '../components/common/ListBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
-import { useTemplateRegistry } from '../hooks/useTemplateRegistry';
+import { signerMethodsRegistry } from '../data/methodsRegistry';
 import { ChainIcon } from '../components/icons/ChainIcon';
 import type { ChainConfig } from '../data/types';
 
@@ -16,7 +16,7 @@ const ChainsIndexPage: React.FC = () => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { chains, getChainMethods } = useTemplateRegistry();
+  const chains = signerMethodsRegistry.chains;
 
   const filteredChains = chains.filter(chain =>
     chain.id.toLowerCase().includes(searchTerm.toLowerCase())
@@ -79,7 +79,9 @@ const ChainsIndexPage: React.FC = () => {
                 <div className="flex-1">
                   <h3 className="font-semibold text-foreground">{chain.id}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {t('chains.methodsCount', { count: getChainMethods(chain.id).length })}
+                    {t('chains.methodsCount', {
+                      count: signerMethodsRegistry.getChainMethods(chain.id).length,
+                    })}
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />

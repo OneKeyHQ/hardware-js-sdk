@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useTemplateRegistry } from './useTemplateRegistry';
+import { signerMethodsRegistry } from '../data/methodsRegistry';
 import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
 import type { ChainConfig, UnifiedMethodConfig } from '~/data/types';
@@ -20,7 +20,6 @@ export function useMethodResolver({
   chainId,
   methodName,
 }: MethodResolverOptions): MethodResolverResult {
-  const { getChain, getChainMethods, isFullyReady } = useTemplateRegistry();
   const [selectedChain, setSelectedChain] = useState<ChainConfig | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<UnifiedMethodConfig | null>(null);
 
@@ -31,14 +30,9 @@ export function useMethodResolver({
       return;
     }
 
-    if (!isFullyReady) {
-      setSelectedChain(null);
-      return;
-    }
+    console.log('[MethodResolver] 查找链:', { chainId });
 
-    console.log('[MethodResolver] 查找链:', { chainId, isFullyReady });
-
-    const chain = getChain(chainId);
+    const chain = signerMethodsRegistry.getChain(chainId);
     if (chain) {
       setSelectedChain(chain);
       console.log('[MethodResolver] 找到链:', chain.id);
@@ -46,7 +40,7 @@ export function useMethodResolver({
       console.warn('[MethodResolver] 未找到链:', chainId);
       setSelectedChain(null);
     }
-  }, [chainId, getChain, isFullyReady]);
+  }, [chainId]);
 
   // 方法查找逻辑
   useEffect(() => {
@@ -64,17 +58,15 @@ export function useMethodResolver({
 
     if (chainId) {
       // 链方法模式：查找特定链的方法
-      if (isFullyReady) {
-        const chainMethods = getChainMethods(chainId);
-        methods = chainMethods; // 现在直接使用，无需转换
-        console.log(
-          '[MethodResolver] 链方法模式，可用方法:',
-          methods.map(m => m.method)
-        );
-      }
+      const chainMethods = signerMethodsRegistry.getChainMethods(chainId);
+      methods = chainMethods;
+      console.log(
+        '[MethodResolver] 链方法模式，可用方法:',
+        methods.map(m => m.method)
+      );
     } else {
       // 设备方法模式：直接从设备和固件方法中查找
-      methods = [...device.api, ...firmware.api]; // 现在都是 UnifiedMethodConfig 格式
+      methods = [...device.api, ...firmware.api];
       console.log(
         '[MethodResolver] 设备方法模式，可用方法:',
         methods.map(m => m.method)
@@ -90,14 +82,14 @@ export function useMethodResolver({
       console.warn('[MethodResolver] 未找到方法:', methodName);
       setSelectedMethod(null);
     }
-  }, [chainId, methodName, getChainMethods, isFullyReady]);
+  }, [chainId, methodName]);
 
   return {
     // 仅在链模式下返回 selectedChain
     ...(chainId ? { selectedChain } : {}),
     selectedMethod,
     // 检查函数
-    isChainNotFound: () => Boolean(chainId && isFullyReady && !selectedChain),
-    isMethodNotFound: () => Boolean(isFullyReady && methodName && !selectedMethod),
+    isChainNotFound: () => Boolean(chainId && !selectedChain),
+    isMethodNotFound: () => Boolean(methodName && !selectedMethod),
   };
 }

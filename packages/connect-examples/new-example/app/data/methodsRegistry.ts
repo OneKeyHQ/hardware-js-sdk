@@ -3,7 +3,20 @@
 // 将所有方法数据合并到一个文件中以优化打包
 // ============================================
 
-import type { UnifiedMethodConfig, ChainConfig, ModuleConfig, MethodsRegistry } from './types';
+import type {
+  UnifiedMethodConfig,
+  ChainConfig,
+  ModuleConfig,
+  MethodsRegistry,
+  AllMethodCategory,
+} from './types';
+
+// 统计信息类型
+export interface RegistryStats {
+  totalChains: number;
+  totalMethods: number;
+  chainsByCategory: Partial<Record<AllMethodCategory, number>>;
+}
 
 // 静态导入所有方法，确保它们被打包到一个chunk中
 import { bitcoin } from './methods/bitcoin';
@@ -119,7 +132,7 @@ function buildRegistry(modules: ModuleConfig[]): MethodsRegistry {
       const lowerQuery = query.toLowerCase();
       return allMethodsList.filter(
         method =>
-          method.method.toLowerCase().includes(lowerQuery) ||
+          method.method.toString().toLowerCase().includes(lowerQuery) ||
           method.description.toLowerCase().includes(lowerQuery)
       );
     },
@@ -155,19 +168,19 @@ export const getMethodsByCategory = () => {
 };
 
 // 获取统计信息
-export const getRegistryStats = () => {
+export const getRegistryStats = (): RegistryStats => {
   const totalChains = signerMethodsRegistry.chains.length;
   const totalMethods = signerMethodsRegistry.allMethods.length;
-  const categoryCounts: Record<string, number> = {};
+  const chainsByCategory: Partial<Record<AllMethodCategory, number>> = {};
 
   signerMethodsRegistry.chains.forEach(chain => {
     const category = chain.id;
-    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    chainsByCategory[category] = (chainsByCategory[category] || 0) + 1;
   });
 
   return {
     totalChains,
     totalMethods,
-    categoryCounts,
+    chainsByCategory,
   };
 };
