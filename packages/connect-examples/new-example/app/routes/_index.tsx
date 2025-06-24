@@ -2,18 +2,22 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
-import { CheckCircle, XCircle, Usb, Wifi, Server } from 'lucide-react';
+import { CheckCircle, XCircle, Usb, Wifi, Server, AlertCircle } from 'lucide-react';
 import TransportSwitcher from '../components/common/TransportSwitcher';
 import DeviceIcon from '../components/device/DeviceIcon';
 import deviceList from '../assets/device-list2.png';
+import { useToast } from '../hooks/use-toast';
+import React from 'react';
 export default function IndexPage() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const {
     transportType,
     currentDevice,
     getCurrentDeviceLabel,
     isCurrentDeviceClassicModel,
     isConnecting,
+    sdkInitState,
   } = useDeviceStore();
 
   const getTransportIcon = () => {
@@ -31,6 +35,17 @@ export default function IndexPage() {
 
   const deviceDisplayName = currentDevice ? getCurrentDeviceLabel() : '';
 
+  // 处理 SDK 初始化错误 - 使用 toast 通知
+  React.useEffect(() => {
+    if (sdkInitState.error) {
+      toast({
+        title: t('transport.sdkInitError'),
+        description: sdkInitState.error,
+        variant: 'destructive',
+      });
+    }
+  }, [sdkInitState.error, toast, t]);
+
   return (
     <div className="min-h-screen bg-background flex justify-center pt-16 p-6">
       <div className="container max-w-7xl mx-auto">
@@ -45,12 +60,30 @@ export default function IndexPage() {
           {/* 左侧：设备连接控制 */}
           <div className="lg:col-span-1">
             <Card className="bg-card border border-border/50 shadow-sm h-full relative">
-              {/* 卡片右上角加载指示器 */}
-              {isConnecting && (
+              {/* 卡片右上角状态指示器 */}
+              {sdkInitState.isInitializing && (
+                <div className="absolute top-4 right-4 z-10 bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-xs text-gray-600">{t('transport.sdkInitializing')}</span>
+                  </div>
+                </div>
+              )}
+
+              {isConnecting && !sdkInitState.isInitializing && (
                 <div className="absolute top-4 right-4 z-10 bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                     <span className="text-xs text-gray-600">{t('common.connecting')}</span>
+                  </div>
+                </div>
+              )}
+
+              {sdkInitState.error && (
+                <div className="absolute top-4 right-4 z-10 bg-red-50 border border-red-200 rounded-lg shadow-sm px-3 py-2">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="w-3 h-3 text-red-500" />
+                    <span className="text-xs text-red-600">{t('transport.sdkInitError')}</span>
                   </div>
                 </div>
               )}

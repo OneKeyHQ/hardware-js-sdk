@@ -392,6 +392,8 @@ export const en = {
       downloadBridge: 'Download Bridge',
       needsEmulator: 'Requires',
       startEmulator: 'Start emulator',
+      sdkInitializing: 'Initializing...',
+      sdkInitError: 'SDK initialization failed',
     },
     search: {
       sections: {

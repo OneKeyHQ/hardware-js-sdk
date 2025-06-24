@@ -99,6 +99,7 @@ module.exports = (env, argv) => {
       }),
       new webpack.DefinePlugin({
         'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
+        'process.env.CONNECT_SRC': JSON.stringify(process.env.CONNECT_SRC || ''),
         'process.env.COMMIT_SHA': JSON.stringify(process.env.COMMIT_SHA || 'dev'),
         'process.env.BUILD_TIME': JSON.stringify(new Date().toISOString()),
       }),

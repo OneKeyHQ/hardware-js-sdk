@@ -8,7 +8,9 @@ import { setSDKInstanceGetter, submitPin, submitPassphrase } from '../../service
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
 import { logData, logInfo } from '../../utils/logger';
+import { CONNECT_SRC } from '../../constants/connect';
 import { create } from 'zustand';
+import { t } from 'i18next';
 
 // 声明全局弹窗管理器类型
 declare global {
@@ -209,14 +211,14 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         debug: true,
         fetchConfig: true,
         env: 'webusb',
-        // 开发模式下使用 localhost，生产模式下不设置 connectSrc
-        ...(process.env.NODE_ENV === 'development' && {
-          connectSrc: 'https://localhost:8087/',
-        }),
+        connectSrc: CONNECT_SRC,
       };
 
       // 执行SDK初始化
-      await HardwareWebSdk.init(initConfig);
+      const res = await HardwareWebSdk.init(initConfig);
+      if (res === false) {
+        throw new Error(t('transport.sdkInitError'));
+      }
       sdkInstance = HardwareWebSdk;
 
       // 设置事件监听器

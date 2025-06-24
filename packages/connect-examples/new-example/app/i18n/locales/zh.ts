@@ -382,6 +382,8 @@ export const zh = {
       downloadBridge: '下载Bridge',
       needsEmulator: '需要',
       startEmulator: '启动模拟器',
+      sdkInitializing: '初始化...',
+      sdkInitError: 'SDK初始化失败',
     },
     search: {
       sections: {

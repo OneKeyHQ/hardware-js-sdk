@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useSDK } from '../../hooks/useSDK';
 import { useToast } from '../../hooks/use-toast';
@@ -162,6 +163,17 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     }
   };
 
+  // 处理 SDK 初始化错误 - 使用 toast 通知
+  React.useEffect(() => {
+    if (sdkInitState.error) {
+      toast({
+        title: t('transport.sdkInitError'),
+        description: sdkInitState.error,
+        variant: 'destructive',
+      });
+    }
+  }, [sdkInitState.error, toast, t]);
+
   return (
     <div className={`w-full space-y-6 ${className}`}>
       {/* 连接方式选择 */}
@@ -229,13 +241,13 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
               <div className="ml-8 flex items-center space-x-1.5 text-xs text-gray-500">
                 <Info className="h-3 w-3" />
                 <span>{t('transport.needsEmulator')}</span>
-                <a
-                  href="/emulator"
+                <Link
+                  to="/emulator"
                   className="text-green-600 hover:text-green-700 underline decoration-1 underline-offset-2 inline-flex items-center space-x-1 transition-colors"
                 >
                   <span>{t('transport.startEmulator')}</span>
                   <ExternalLink className="h-3 w-3" />
-                </a>
+                </Link>
               </div>
             )}
           </div>
