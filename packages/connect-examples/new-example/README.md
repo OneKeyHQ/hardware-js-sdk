@@ -1,57 +1,102 @@
-# OneKey Hardware Wallet Demo
+# OneKey Hardware SDK Integration Example
 
-一个现代化的硬件钱包管理工具示例项目，展示OneKey硬件钱包的完整集成方案。
+## Overview
 
-## 🚀 快速开始
+A complete web application example demonstrating OneKey Hardware SDK integration with modern web technologies. This example serves as a practical reference for developers integrating OneKey hardware wallets into their applications.
 
-### 安装依赖
+## 🌐 Live Demo & Repository
+
+- **Live Demo**: [https://connect.onekey.so/new-example](https://connect.onekey.so/new-example)
+- **Source Code**: [GitHub Repository](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/new-example)
+
+## 🚀 What You Can Learn
+
+### 1. **Connection Methods**
+- **WebUSB**: Direct browser-to-device connection
+- **JSBridge**: Connection via OneKey Bridge desktop app
+- **Hardware Emulator**: Docker-based device simulation for testing
+
+### 2. **Blockchain Integration**
+- Bitcoin, Ethereum, Solana, and 20+ other networks
+- Address generation, transaction signing, message signing
+- Multi-chain wallet functionality
+
+### 3. **Modern Implementation**
+- React + TypeScript architecture
+- Proper error handling and user feedback
+- State management patterns
+- Real-time operation logging
+
+## 🔧 Hardware Emulator for Development
+
+The example includes hardware emulator support for development without physical devices.
+
+### Quick Setup
 ```bash
-npm install
+# 1. Clone emulator repository
+git clone https://github.com/Johnwanzi/onekey-docker.git
+
+# 2. Start OneKey Pro emulator
+bash build-emu.sh pro-emu
+
+# 3. Start OneKey Classic 1s emulator  
+bash build-emu.sh 1s-emu
+
+# 4. Access via browser
+# Open: http://localhost:6088/vnc.html
 ```
 
-### 开发环境
-```bash
-npm run dev
+### Connect to Example
+1. Open the example application
+2. Select "Emulator" transport method
+3. Click connect - automatically detects running emulators
+
+## 💻 Main Use Cases
+
+1. **Learning SDK Integration**: Understand how to properly initialize and use the OneKey SDK
+2. **Testing API Methods**: Interactive testing of all hardware wallet functions
+3. **Development Reference**: See best practices for error handling, state management, and UX
+4. **Emulator Testing**: Develop and test without physical hardware devices
+
+## 🛠️ Basic SDK Usage
+
+```typescript
+import { CoreApi } from '@onekeyfe/hd-core';
+
+// Initialize SDK
+const sdk = new CoreApi({
+  env: 'web',
+  debug: true,
+  connectSrc: 'https://connect.onekey.so/'
+});
+
+// Switch connection method
+await sdk.switchTransport('webusb'); // or 'emulator'
+
+// Find devices
+const devices = await sdk.searchDevices();
+
+// Get address example
+const result = await sdk.evmGetAddress({
+  path: "m/44'/60'/0'/0/0",
+  showOnOneKey: true
+});
 ```
-访问 http://localhost:5173
 
-### 生产构建
+## 📚 Getting Started
+
 ```bash
-npm run build
-npm run preview
+# Clone and setup
+git clone https://github.com/OneKeyHQ/hardware-js-sdk.git
+cd hardware-js-sdk/packages/connect-examples/new-example
+yarn 
+yarn start
 ```
 
-## 📖 完整文档
+Open `http://localhost:3010` to explore the example.
 
-请查看 **[PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md)** 获取：
-- 📋 项目架构和技术栈
-- 🎨 设计系统和组件规范  
-- 🔧 开发指南和最佳实践
-- 📊 重构成果和代码质量指标
-- 🚀 核心功能和API使用
+## 🔗 Resources
 
-## 🛠 开发规范
-
-本项目使用 `.cursorrules` 确保开发一致性，包含：
-- OneKey 品牌设计系统
-- shadcn/ui 组件使用规范
-- TypeScript 严格模式要求
-- 代码质量检查清单
-
-## 🎯 主要功能
-
-- **设备连接**: WebUSB/JSBridge/WebBLE 多种连接方式
-- **方法浏览**: 完整的API方法分类和执行界面
-- **多链支持**: BTC/ETH/BSC/Polygon 等主流区块链
-- **实时日志**: 详细的操作记录和错误追踪
-
-## 💡 技术亮点
-
-- **重构优化**: 代码量减少280+行，模块化程度提升85%
-- **组件复用**: 公共组件复用率从40%提升到85%  
-- **类型安全**: 完整的TypeScript类型定义
-- **现代化UI**: shadcn/ui + Tailwind CSS + OneKey设计语言
-
----
-
-**开发前请仔细阅读 PROJECT_OVERVIEW.md 了解完整的架构和规范** 📚
+- **Main SDK**: [OneKey Hardware SDK](https://github.com/OneKeyHQ/hardware-js-sdk)
+- **OneKey Bridge**: [Download Bridge App](https://help.onekey.so/hc/zh-cn/articles/9740566472335)
+- **API Documentation**: [Hardware API Reference](https://connect.onekey.so/docs) 
