@@ -32,24 +32,20 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of address configurations',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/29538'/0'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/29538'/0'/0'/1'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/29538'/0'/0'/2'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/29538'/0'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/29538'/0'/0'/1'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/29538'/0'/0'/2'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -75,18 +71,14 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Inputs',
             description: 'Transaction inputs',
-            value: JSON.stringify(
-              [
-                {
-                  prev_hash: 'b902e34e3e4d4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e',
-                  prev_index: 0,
-                  global_index: 1234567,
-                  amount: 13000000,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                prev_hash: "b902e34e3e4d4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e",
+                prev_index: 0,
+                global_index: 1234567,
+                amount: 13000000
+              }
+            ],
           },
           {
             name: 'toAddress',

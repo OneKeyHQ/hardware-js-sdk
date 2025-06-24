@@ -39,22 +39,18 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/29223'/0'/0/0",
-                  prefix: 'nexa',
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/29223'/0'/0/1",
-                  prefix: 'nexa',
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/29223'/0'/0/0",
+                prefix: "nexa",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/29223'/0'/0/1",
+                prefix: "nexa",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -72,17 +68,13 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Inputs',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/29223'/0'/0/0",
-                  message: 'c6a5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5',
-                  preimage: '01000000...',
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/29223'/0'/0/0",
+                message: "c6a5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9f5",
+                preimage: "01000000..."
+              }
+            ],
           },
           {
             name: 'prefix',

@@ -31,24 +31,20 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Parameters',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/784'/0'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/784'/1'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/784'/2'/0'/0'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/784'/0'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/784'/1'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/784'/2'/0'/0'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -85,24 +81,20 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of public key configurations',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/784'/0'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/784'/1'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/784'/2'/0'/0'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/784'/0'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/784'/1'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/784'/2'/0'/0'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },

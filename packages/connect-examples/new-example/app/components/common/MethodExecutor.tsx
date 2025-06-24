@@ -7,6 +7,7 @@ import { useDeviceInfo } from '../../hooks/useDeviceInfo';
 import { useFirmwareProgress } from '../providers/SDKProvider';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
+import { separateParameters } from '../../utils/parameterUtils';
 import type { UnifiedMethodConfig } from '~/data/types';
 // 导入子组件
 import ParameterInput from './ParameterInput';
@@ -168,19 +169,12 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   // 处理参数编辑请求
   const handleRequestParamsEdit = useCallback(
     (data: Record<string, unknown>) => {
-      // 分离通用参数和方法参数
-      const commonParamNames = ['useEmptyPassphrase', 'passphraseState', 'usePassphraseState'];
-      const methodParams: Record<string, unknown> = {};
-      const commonParams: Record<string, unknown> = {};
+      // 使用统一的参数处理工具分离和处理参数
+      const { methodParams, commonParams } = separateParameters(data);
 
-      Object.entries(data).forEach(([key, value]) => {
-        if (commonParamNames.includes(key)) {
-          commonParams[key] = value;
-        } else {
-          methodParams[key] = value;
-          // 也更新 useMethodParameters
-          setParameter(key, value);
-        }
+      // 同步方法参数到 useMethodParameters
+      Object.entries(methodParams).forEach(([key, value]) => {
+        setParameter(key, value);
       });
 
       // 批量更新到 hardwareStore

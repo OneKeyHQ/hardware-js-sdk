@@ -31,24 +31,20 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Parameters',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/728'/0'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/728'/1'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/728'/2'/0'/0'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/728'/0'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/728'/1'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/728'/2'/0'/0'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -84,24 +80,20 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Parameters',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/728'/0'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/728'/1'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/728'/2'/0'/0'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/728'/0'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/728'/1'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/728'/2'/0'/0'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },

@@ -35,32 +35,28 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of address configurations',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/60'/0'/0/0",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/60'/0'/0/1",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/60'/0'/0/2",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/60'/0'/0/3",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/60'/0'/0/4",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/60'/0'/0/0",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/60'/0'/0/1",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/60'/0'/0/2",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/60'/0'/0/3",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/60'/0'/0/4",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -100,24 +96,20 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of public key configurations',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/60'/0'/0/0",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/60'/0'/0/1",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/60'/0'/0/2",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/60'/0'/0/0",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/60'/0'/0/1",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/60'/0'/0/2",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -224,19 +216,15 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             description: 'Transaction object',
-            value: JSON.stringify(
-              {
-                to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
-                value: '0xf4240',
-                data: '0x00',
-                chainId: 1,
-                nonce: '0x0',
-                gasLimit: '0x5208',
-                gasPrice: '0xbebc200',
-              },
-              null,
-              2
-            ),
+            value: {
+              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+              value: "0xf4240",
+              data: "0x00",
+              chainId: 1,
+              nonce: "0x0",
+              gasLimit: "0x5208",
+              gasPrice: "0xbebc200"
+            },
           },
         ],
       },
@@ -257,19 +245,15 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             description: 'Transaction object',
-            value: JSON.stringify(
-              {
-                to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
-                value: '0xf4240',
-                data: '0x',
-                chainId: 1,
-                nonce: '0x0',
-                gasLimit: '0x5208',
-                gasPrice: '0xbebc200',
-              },
-              null,
-              2
-            ),
+            value: {
+              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+              value: "0xf4240",
+              data: "0x",
+              chainId: 1,
+              nonce: "0x0",
+              gasLimit: "0x5208",
+              gasPrice: "0xbebc200"
+            },
           },
         ],
       },
@@ -290,19 +274,15 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             description: 'Transaction object',
-            value: JSON.stringify(
-              {
-                to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
-                value: '0xf4240',
-                data: '',
-                chainId: 1,
-                nonce: '0x0',
-                gasLimit: '0x5208',
-                gasPrice: '0xbebc200',
-              },
-              null,
-              2
-            ),
+            value: {
+              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+              value: "0xf4240",
+              data: "",
+              chainId: 1,
+              nonce: "0x0",
+              gasLimit: "0x5208",
+              gasPrice: "0xbebc200"
+            },
           },
         ],
       },
@@ -323,19 +303,15 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             description: 'Transaction object',
-            value: JSON.stringify(
-              {
-                to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
-                value: '0x0',
-                data: '0xa9059cbb0000000000000000000000009755c3921b56b166876e2268e5b750ed301fe1b100000000000000000000000000000000000000000000000000000002046f78cf',
-                chainId: 1,
-                nonce: '0x0',
-                gasLimit: '0x5208',
-                gasPrice: '0xbebc200',
-              },
-              null,
-              2
-            ),
+            value: {
+              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+              value: "0x0",
+              data: "0xa9059cbb0000000000000000000000009755c3921b56b166876e2268e5b750ed301fe1b100000000000000000000000000000000000000000000000000000002046f78cf",
+              chainId: 1,
+              nonce: "0x0",
+              gasLimit: "0x5208",
+              gasPrice: "0xbebc200"
+            },
           },
         ],
       },
@@ -356,20 +332,16 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Transaction',
             description: 'EIP1559 transaction object',
-            value: JSON.stringify(
-              {
-                to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
-                value: '0xf4240',
-                data: '0x00',
-                chainId: 1,
-                nonce: '0x0',
-                gasLimit: '0x5208',
-                maxFeePerGas: '0xbebc200',
-                maxPriorityFeePerGas: '0xbebc200',
-              },
-              null,
-              2
-            ),
+            value: {
+              to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+              value: "0xf4240",
+              data: "0x00",
+              chainId: 1,
+              nonce: "0x0",
+              gasLimit: "0x5208",
+              maxFeePerGas: "0xbebc200",
+              maxPriorityFeePerGas: "0xbebc200"
+            },
           },
         ],
       },
@@ -428,38 +400,34 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Typed Data',
             description: 'EIP712 typed data structure',
-            value: JSON.stringify(
-              {
-                types: {
-                  EIP712Domain: [
-                    {
-                      name: 'name',
-                      type: 'string',
-                    },
-                  ],
-                  Message: [
-                    {
-                      name: 'Wallet',
-                      type: 'string',
-                    },
-                    {
-                      name: 'Number',
-                      type: 'uint64',
-                    },
-                  ],
-                },
-                primaryType: 'Message',
-                domain: {
-                  name: 'example.onekey.so',
-                },
-                message: {
-                  Wallet: 'Onekey Touch',
-                  Number: '911112119',
-                },
+            value: {
+              types: {
+                EIP712Domain: [
+                  {
+                    name: "name",
+                    type: "string"
+                  }
+                ],
+                Message: [
+                  {
+                    name: "Wallet",
+                    type: "string"
+                  },
+                  {
+                    name: "Number",
+                    type: "uint64"
+                  }
+                ]
               },
-              null,
-              2
-            ),
+              primaryType: "Message",
+              domain: {
+                name: "example.onekey.so"
+              },
+              message: {
+                Wallet: "Onekey Touch",
+                Number: "911112119"
+              }
+            },
           },
         ],
       },

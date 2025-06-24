@@ -31,28 +31,24 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Parameters',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/1237'/0'/0/0",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/1237'/1'/0/0",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/1237'/2'/0/0",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/1237'/3'/0/0",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/1237'/0'/0/0",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/1237'/1'/0/0",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/1237'/2'/0/0",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/1237'/3'/0/0",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -77,16 +73,12 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Event Data',
-            value: JSON.stringify(
-              {
-                kind: 1,
-                content: 'Hello Nostr!',
-                tags: [],
-                created_at: Math.floor(Date.now() / 1000),
-              },
-              null,
-              2
-            ),
+            value: {
+              kind: 1,
+              content: "Hello Nostr!",
+              tags: [],
+              created_at: 1750749405
+            },
           },
         ],
       },
@@ -105,19 +97,12 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Event Data',
-            value: JSON.stringify(
-              {
-                kind: 3,
-                content: JSON.stringify({
-                  name: 'Test User',
-                  about: 'Test profile',
-                }),
-                tags: [],
-                created_at: Math.floor(Date.now() / 1000),
-              },
-              null,
-              2
-            ),
+            value: {
+              kind: 3,
+              content: "{\"name\":\"Test User\",\"about\":\"Test profile\"}",
+              tags: [],
+              created_at: 1750749405
+            },
           },
         ],
       },

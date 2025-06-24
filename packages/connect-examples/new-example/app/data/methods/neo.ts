@@ -32,24 +32,20 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of address configurations',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/888'/0'/0/0",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/888'/0'/0/1",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/888'/0'/0/2",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/888'/0'/0/0",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/888'/0'/0/1",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/888'/0'/0/2",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },

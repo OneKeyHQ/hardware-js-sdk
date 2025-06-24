@@ -10,6 +10,7 @@ import { ExternalLink } from 'lucide-react';
 import type { ParameterField, UnifiedMethodConfig } from '../../data/types';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { Alert, AlertDescription } from '../ui/Alert';
+import { parseParameterValue } from '../../utils/parameterUtils';
 
 interface ParameterInputProps {
   methodConfig: UnifiedMethodConfig;
@@ -164,20 +165,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       return;
     }
 
-    // 特殊处理 bundle 参数
-    if (paramName === 'bundle') {
-      try {
-        // 如果是字符串，尝试解析为 JSON
-        const parsedValue = typeof value === 'string' ? JSON.parse(value) : value;
-        setMethodParameter(paramName, parsedValue);
-      } catch (error) {
-        // 如果解析失败，保存原始字符串值
-        setMethodParameter(paramName, value);
-      }
-    } else {
-      // 普通方法参数
-      setMethodParameter(paramName, value);
-    }
+    // 使用统一的参数处理工具
+    const processedValue = parseParameterValue(paramName, value);
+    setMethodParameter(paramName, processedValue);
 
     onParamChange?.(paramName, value);
   };
@@ -194,17 +184,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
           param.value !== undefined &&
           !['useEmptyPassphrase', 'passphraseState', 'usePassphraseState'].includes(param.name)
         ) {
-          // 对于 bundle 参数，需要解析 JSON 字符串
-          if (param.name === 'bundle' && typeof param.value === 'string') {
-            try {
-              newMethodParams[param.name] = JSON.parse(param.value);
-            } catch (error) {
-              console.error('Failed to parse bundle JSON:', error);
-              newMethodParams[param.name] = param.value;
-            }
-          } else {
-            newMethodParams[param.name] = param.value;
-          }
+          // 使用统一的参数处理工具
+          newMethodParams[param.name] = parseParameterValue(param.name, param.value);
         }
       });
       setMethodParameters(newMethodParams);
@@ -381,6 +362,14 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const value = getParameterValue(field);
     const isEditable = field.editable !== false;
 
+    // 对于 textarea 类型，如果值是对象，需要序列化为 JSON 字符串显示
+    const getDisplayValue = (val: unknown): string => {
+      if (field.type === 'textarea' && typeof val === 'object' && val !== null) {
+        return JSON.stringify(val, null, 2);
+      }
+      return String(val || '');
+    };
+
     return (
       <div key={field.name} className="space-y-2">
         <div className="space-y-1">
@@ -392,7 +381,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
         {field.type === 'textarea' ? (
           <textarea
             id={field.name}
-            value={String(value || '')}
+            value={getDisplayValue(value)}
             onChange={e => {
               if (!isEditable) return;
               handleParamChange(field.name, e.target.value);

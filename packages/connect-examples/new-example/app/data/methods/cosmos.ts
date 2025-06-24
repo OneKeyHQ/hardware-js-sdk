@@ -39,27 +39,23 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/118'/0'/0/0",
-                  hrp: 'cosmos',
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/118'/0'/0/1",
-                  hrp: 'cosmos',
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/118'/0'/0/2",
-                  hrp: 'cosmos',
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/118'/0'/0/0",
+                hrp: "cosmos",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/118'/0'/0/1",
+                hrp: "cosmos",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/118'/0'/0/2",
+                hrp: "cosmos",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -103,27 +99,23 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/118'/0'/0/0",
-                  curve: 'secp256k1',
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/118'/0'/0/1",
-                  curve: 'secp256k1',
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/118'/0'/0/2",
-                  curve: 'secp256k1',
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/118'/0'/0/0",
+                curve: "secp256k1",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/118'/0'/0/1",
+                curve: "secp256k1",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/118'/0'/0/2",
+                curve: "secp256k1",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { signerMethodsRegistry } from '../data/methodsRegistry';
+import { signerMethodsRegistry } from './useMethodsRegistry';
 import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
 import type { ChainConfig, UnifiedMethodConfig } from '~/data/types';

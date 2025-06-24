@@ -32,24 +32,20 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/148'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/148'/1'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/148'/2'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/148'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/148'/1'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/148'/2'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -81,29 +77,25 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Transaction',
-            value: JSON.stringify(
-              {
-                source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
-                fee: 100,
-                sequence: '4294967297',
-                memo: {
-                  type: 0,
-                },
-                operations: [
-                  {
-                    type: 'payment',
-                    source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
-                    destination: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
-                    asset: {
-                      type: 'native',
-                    },
-                    amount: '10000000',
-                  },
-                ],
+            value: {
+              source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+              fee: 100,
+              sequence: "4294967297",
+              memo: {
+                type: 0
               },
-              null,
-              2
-            ),
+              operations: [
+                {
+                  type: "payment",
+                  source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+                  destination: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+                  asset: {
+                    type: "native"
+                  },
+                  amount: "10000000"
+                }
+              ]
+            },
           },
         ],
       },
@@ -129,30 +121,26 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Transaction',
-            value: JSON.stringify(
-              {
-                source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
-                fee: 100,
-                sequence: '4294967297',
-                memo: {
-                  type: 1,
-                  text: 'test memo',
-                },
-                operations: [
-                  {
-                    type: 'payment',
-                    source: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
-                    destination: 'GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV',
-                    asset: {
-                      type: 'native',
-                    },
-                    amount: '10000000',
-                  },
-                ],
+            value: {
+              source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+              fee: 100,
+              sequence: "4294967297",
+              memo: {
+                type: 1,
+                text: "test memo"
               },
-              null,
-              2
-            ),
+              operations: [
+                {
+                  type: "payment",
+                  source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+                  destination: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHSVQ2HWOFEJNYYMRJENBV",
+                  asset: {
+                    type: "native"
+                  },
+                  amount: "10000000"
+                }
+              ]
+            },
           },
         ],
       },

@@ -32,24 +32,20 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/195'/0'/0/0",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/195'/0'/0/1",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/195'/0'/0/2",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/195'/0'/0/0",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/195'/0'/0/1",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/195'/0'/0/2",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -74,19 +70,15 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Transaction',
-            value: JSON.stringify(
-              {
-                to: 'TLPpXqSGqpNBwbNnTf1hcypL7m8nLBFqzF',
-                amount: 100000000,
-                blockID: '0000000000aeff54ea62e7fcce1aaec4bb88d26a5ac2d1b50c92ca9b5ba5e0a7',
-                blockNumber: 11468628,
-                blockTimestamp: 1578057072000,
-                expiration: 1578057132000,
-                feeLimit: 100000000,
-              },
-              null,
-              2
-            ),
+            value: {
+              to: "TLPpXqSGqpNBwbNnTf1hcypL7m8nLBFqzF",
+              amount: 100000000,
+              blockID: "0000000000aeff54ea62e7fcce1aaec4bb88d26a5ac2d1b50c92ca9b5ba5e0a7",
+              blockNumber: 11468628,
+              blockTimestamp: 1578057072000,
+              expiration: 1578057132000,
+              feeLimit: 100000000
+            },
           },
         ],
       },
@@ -105,21 +97,16 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Transaction',
-            value: JSON.stringify(
-              {
-                contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-                functionSelector: 'transfer(address,uint256)',
-                parameter:
-                  '000000000000000000000000389ffce9db8f9a637a4e6905b892b6aaa0c7c44b0000000000000000000000000000000000000000000000000de0b6b3a7640000',
-                feeLimit: 100000000,
-                blockID: '0000000000aeff54ea62e7fcce1aaec4bb88d26a5ac2d1b50c92ca9b5ba5e0a7',
-                blockNumber: 11468628,
-                blockTimestamp: 1578057072000,
-                expiration: 1578057132000,
-              },
-              null,
-              2
-            ),
+            value: {
+              contractAddress: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+              functionSelector: "transfer(address,uint256)",
+              parameter: "000000000000000000000000389ffce9db8f9a637a4e6905b892b6aaa0c7c44b0000000000000000000000000000000000000000000000000de0b6b3a7640000",
+              feeLimit: 100000000,
+              blockID: "0000000000aeff54ea62e7fcce1aaec4bb88d26a5ac2d1b50c92ca9b5ba5e0a7",
+              blockNumber: 11468628,
+              blockTimestamp: 1578057072000,
+              expiration: 1578057132000
+            },
           },
         ],
       },

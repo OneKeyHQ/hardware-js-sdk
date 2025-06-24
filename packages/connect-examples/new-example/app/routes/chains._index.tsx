@@ -7,7 +7,7 @@ import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { ListBoundary } from '../components/common/ListBoundary';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
-import { signerMethodsRegistry } from '../data/methodsRegistry';
+import { signerMethodsRegistry } from '../hooks/useMethodsRegistry';
 import { ChainIcon } from '../components/icons/ChainIcon';
 import type { ChainConfig } from '../data/types';
 

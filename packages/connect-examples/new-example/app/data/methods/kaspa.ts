@@ -46,24 +46,26 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/111111'/0'/0/0",
-                  prefix: 'kaspa',
-                  scheme: 'schnorr',
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/111111'/0'/0/1",
-                  prefix: 'kaspa',
-                  scheme: 'schnorr',
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/111111'/0'/0/0",
+                prefix: 'kaspa',
+                scheme: 'schnorr',
+                showOnOneKey: false,
+              },
+              {
+                path: "m/44'/111111'/0'/0/1",
+                prefix: 'kaspa',
+                scheme: 'schnorr',
+                showOnOneKey: false,
+              },
+              {
+                path: "m/44'/111111'/0'/0/2",
+                prefix: 'kaspa',
+                scheme: 'schnorr',
+                showOnOneKey: false,
+              },
+            ],
           },
         ],
       },
@@ -77,45 +79,32 @@ const api: UnifiedMethodConfig[] = [
         title: 'Sign transaction',
         parameters: [
           {
-            name: 'inputs',
-            type: 'textarea',
+            name: 'path',
+            type: 'string',
             required: true,
-            label: 'Inputs',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/111111'/0'/0/0",
-                  prevTxId: '40b022362652a0b8e72fcbc2e4c8f8e8c9f5f5e8e8c9f5f5e8e8c9f5f5e8e8c9',
-                  outputIndex: 0,
-                  sequenceNumber: 0,
-                  output: {
-                    satoshis: 1000000,
-                    script: '76a914...',
-                  },
-                },
-              ],
-              null,
-              2
-            ),
+            label: 'Derivation Path',
+            value: "m/44'/461'/0'/0/0",
           },
           {
-            name: 'outputs',
-            type: 'textarea',
-            required: true,
-            label: 'Outputs',
-            value: JSON.stringify(
-              [
-                {
-                  satoshis: 500000,
-                  script: '76a914...',
-                  scriptPublicKey: {
-                    scriptPublicKey: '76a914...',
-                  },
-                },
-              ],
-              null,
-              2
-            ),
+            name: 'subNetworkID',
+            type: 'string',
+            required: false,
+            label: 'Sub Network ID',
+            value: '00000000000000000000000000000000',
+          },
+          {
+            name: 'prefix',
+            type: 'string',
+            required: false,
+            label: 'Address Prefix',
+            value: 'kaspa',
+          },
+          {
+            name: 'scheme',
+            type: 'string',
+            required: false,
+            label: 'Address Scheme',
+            value: 'schnorr',
           },
           {
             name: 'version',
@@ -126,10 +115,61 @@ const api: UnifiedMethodConfig[] = [
           },
           {
             name: 'lockTime',
-            type: 'number',
+            type: 'string',
             required: false,
             label: 'Lock Time',
-            value: 0,
+            value: '0',
+          },
+          {
+            name: 'sigHashType',
+            type: 'number',
+            required: false,
+            label: 'Signature Hash Type',
+            value: 0x1,
+          },
+          {
+            name: 'sigOpCount',
+            type: 'number',
+            required: false,
+            label: 'Signature Operation Count',
+            value: 1,
+          },
+          {
+            name: 'inputs',
+            type: 'textarea',
+            required: true,
+            label: 'Inputs',
+            value: [
+              {
+                outputIndex: 1,
+                path: "m/44'/111111'/0'/0/0",
+                prevTxId: '1f226507807ff7dc5a7f8f2dec353fffc9dacc2645d8aecd02e5046907e3e2b2',
+                sequenceNumber: '0',
+                sigOpCount: 1,
+                output: {
+                  satoshis: '990096458',
+                  script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
+                },
+              },
+            ],
+          },
+          {
+            name: 'outputs',
+            type: 'textarea',
+            required: true,
+            label: 'Outputs',
+            value: [
+              {
+                satoshis: '100000000',
+                script: '205ca3a7530284e5c5e472544edd6002c3afeb8c8f84d3a728fad255a4872753fbac',
+                scriptVersion: 0,
+              },
+              {
+                satoshis: '890094182',
+                script: '207afdae557e69c0040fd4135adffc60f9486fb21f4cbae233fd6db3e84ba47c55ac',
+                scriptVersion: 0,
+              },
+            ],
           },
         ],
       },

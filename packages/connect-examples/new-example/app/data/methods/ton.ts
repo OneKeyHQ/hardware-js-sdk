@@ -85,33 +85,29 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Parameters',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/607'/0'",
-                  showOnOneKey: false,
-                  walletVersion: 3,
-                  isBounceable: false,
-                  isTestnetOnly: false,
-                },
-                {
-                  path: "m/44'/607'/1'",
-                  showOnOneKey: false,
-                  walletVersion: 3,
-                  isBounceable: false,
-                  isTestnetOnly: false,
-                },
-                {
-                  path: "m/44'/607'/2'",
-                  showOnOneKey: false,
-                  walletVersion: 3,
-                  isBounceable: false,
-                  isTestnetOnly: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/607'/0'",
+                showOnOneKey: false,
+                walletVersion: 3,
+                isBounceable: false,
+                isTestnetOnly: false
+              },
+              {
+                path: "m/44'/607'/1'",
+                showOnOneKey: false,
+                walletVersion: 3,
+                isBounceable: false,
+                isTestnetOnly: false
+              },
+              {
+                path: "m/44'/607'/2'",
+                showOnOneKey: false,
+                walletVersion: 3,
+                isBounceable: false,
+                isTestnetOnly: false
+              }
+            ],
           },
         ],
       },
@@ -237,19 +233,25 @@ const api: UnifiedMethodConfig[] = [
             name: 'extDestination',
             type: 'textarea',
             label: 'Ext Destination',
-            value: JSON.stringify(['UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_'], null, 2),
+            value: [
+              "UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_"
+            ],
           },
           {
             name: 'extTonAmount',
             type: 'textarea',
             label: 'Ext Ton Amount',
-            value: JSON.stringify([100], null, 2),
+            value: [
+              100
+            ],
           },
           {
             name: 'extPayload',
             type: 'textarea',
             label: 'Ext Payload',
-            value: JSON.stringify(['48656c6c6f204f6e654b6579'], null, 2),
+            value: [
+              "48656c6c6f204f6e654b6579"
+            ],
           },
         ],
       },

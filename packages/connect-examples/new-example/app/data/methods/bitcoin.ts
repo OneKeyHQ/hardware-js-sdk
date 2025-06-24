@@ -42,15 +42,58 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of address configurations',
-            value: JSON.stringify(
-              Array.from({ length: 10 }, (_, i) => ({
-                path: `m/44'/0'/0'/0/${i}`,
-                coin: 'btc',
-                showOnOneKey: false,
-              })),
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/0'/0'/0/0",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/1",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/2",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/3",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/4",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/5",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/6",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/7",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/8",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/9",
+                coin: "btc",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -63,15 +106,58 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of segwit P2SH address configurations',
-            value: JSON.stringify(
-              Array.from({ length: 10 }, (_, i) => ({
-                path: `m/49'/0'/0'/0/${i}`,
-                coin: 'btc',
-                showOnOneKey: false,
-              })),
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/49'/0'/0'/0/0",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/1",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/2",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/3",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/4",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/5",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/6",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/7",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/8",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/9",
+                coin: "btc",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -84,15 +170,58 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of native segwit address configurations',
-            value: JSON.stringify(
-              Array.from({ length: 10 }, (_, i) => ({
-                path: `m/84'/0'/0'/0/${i}`,
-                coin: 'btc',
-                showOnOneKey: false,
-              })),
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/84'/0'/0'/0/0",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/1",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/2",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/3",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/4",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/5",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/6",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/7",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/8",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/9",
+                coin: "btc",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -105,15 +234,58 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of taproot address configurations',
-            value: JSON.stringify(
-              Array.from({ length: 10 }, (_, i) => ({
-                path: `m/86'/0'/0'/0/${i}`,
-                coin: 'btc',
-                showOnOneKey: false,
-              })),
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/86'/0'/0'/0/0",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/1",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/2",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/3",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/4",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/5",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/6",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/7",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/8",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/9",
+                coin: "btc",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -161,15 +333,58 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of public key configurations',
-            value: JSON.stringify(
-              Array.from({ length: 10 }, (_, i) => ({
-                path: `m/44'/0'/0'/0/${i}`,
-                coin: 'btc',
-                showOnOneKey: false,
-              })),
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/0'/0'/0/0",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/1",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/2",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/3",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/4",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/5",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/6",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/7",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/8",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/0'/0'/0/9",
+                coin: "btc",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -182,15 +397,58 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of segwit P2SH public key configurations',
-            value: JSON.stringify(
-              Array.from({ length: 10 }, (_, i) => ({
-                path: `m/49'/0'/0'/0/${i}`,
-                coin: 'btc',
-                showOnOneKey: false,
-              })),
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/49'/0'/0'/0/0",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/1",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/2",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/3",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/4",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/5",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/6",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/7",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/8",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/49'/0'/0'/0/9",
+                coin: "btc",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -203,15 +461,58 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of native segwit public key configurations',
-            value: JSON.stringify(
-              Array.from({ length: 10 }, (_, i) => ({
-                path: `m/84'/0'/0'/0/${i}`,
-                coin: 'btc',
-                showOnOneKey: false,
-              })),
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/84'/0'/0'/0/0",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/1",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/2",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/3",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/4",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/5",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/6",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/7",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/8",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/84'/0'/0'/0/9",
+                coin: "btc",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -224,15 +525,58 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of taproot public key configurations',
-            value: JSON.stringify(
-              Array.from({ length: 10 }, (_, i) => ({
-                path: `m/86'/0'/0'/0/${i}`,
-                coin: 'btc',
-                showOnOneKey: false,
-              })),
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/86'/0'/0'/0/0",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/1",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/2",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/3",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/4",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/5",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/6",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/7",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/8",
+                coin: "btc",
+                showOnOneKey: false
+              },
+              {
+                path: "m/86'/0'/0'/0/9",
+                coin: "btc",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -500,19 +844,21 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Inputs',
             description: 'Transaction inputs configuration',
-            value: JSON.stringify(
-              [
-                {
-                  prev_index: 0,
-                  prev_hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
-                  amount: '150000',
-                  address_n: [2147483697, 2147483648, 2147483648, 0, 0],
-                  script_type: 'SPENDP2SHWITNESS',
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                prev_index: 0,
+                prev_hash: "b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7",
+                amount: "150000",
+                address_n: [
+                  2147483697,
+                  2147483648,
+                  2147483648,
+                  0,
+                  0
+                ],
+                script_type: "SPENDP2SHWITNESS"
+              }
+            ],
           },
           {
             name: 'outputs',
@@ -520,22 +866,24 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Outputs',
             description: 'Transaction outputs configuration',
-            value: JSON.stringify(
-              [
-                {
-                  script_type: 'PAYTOADDRESS',
-                  address: '3F6g14r5Z37at7HTvMN5Mmf8QJxLJp2p3U',
-                  amount: '10000',
-                },
-                {
-                  script_type: 'PAYTOP2SHWITNESS',
-                  address_n: [2147483697, 2147483648, 2147483648, 0, 0],
-                  amount: '128474',
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                script_type: "PAYTOADDRESS",
+                address: "3F6g14r5Z37at7HTvMN5Mmf8QJxLJp2p3U",
+                amount: "10000"
+              },
+              {
+                script_type: "PAYTOP2SHWITNESS",
+                address_n: [
+                  2147483697,
+                  2147483648,
+                  2147483648,
+                  0,
+                  0
+                ],
+                amount: "128474"
+              }
+            ],
           },
           {
             name: 'refTxs',
@@ -543,36 +891,31 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Reference Transactions',
             description: 'Reference transaction data',
-            value: JSON.stringify(
-              [
-                {
-                  hash: 'b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7',
-                  version: 2,
-                  inputs: [
-                    {
-                      prev_hash: '141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9',
-                      prev_index: 1,
-                      script_sig: '',
-                      sequence: 4294967295,
-                    },
-                  ],
-                  bin_outputs: [
-                    {
-                      amount: 150000,
-                      script_pubkey: 'a9144204752392de72c50f0591313f98937c67325a3d87',
-                    },
-                    {
-                      amount: 116300,
-                      script_pubkey:
-                        '512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c',
-                    },
-                  ],
-                  lock_time: 0,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                hash: "b3eb628dd06261805ef2232a704a727c9eb1787bccbc62cf343b05bfd7b882c7",
+                version: 2,
+                inputs: [
+                  {
+                    prev_hash: "141f43a36d8421b0d30f63b2d98461e5b6172b0be606b0ac0a917fe1aaa08ba9",
+                    prev_index: 1,
+                    script_sig: "",
+                    sequence: 4294967295
+                  }
+                ],
+                bin_outputs: [
+                  {
+                    amount: 150000,
+                    script_pubkey: "a9144204752392de72c50f0591313f98937c67325a3d87"
+                  },
+                  {
+                    amount: 116300,
+                    script_pubkey: "512003b963b69e1b26e56546d9a7a47ef0fbee91573a1c85be8b98ea79b9b83b843c"
+                  }
+                ],
+                lock_time: 0
+              }
+            ],
           },
         ],
       },

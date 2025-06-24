@@ -9,7 +9,7 @@ import type {
   ModuleConfig,
   MethodsRegistry,
   AllMethodCategory,
-} from './types';
+} from '../data/types';
 
 // 统计信息类型
 export interface RegistryStats {
@@ -19,37 +19,37 @@ export interface RegistryStats {
 }
 
 // 静态导入所有方法，确保它们被打包到一个chunk中
-import { bitcoin } from './methods/bitcoin';
-import { ethereum } from './methods/ethereum';
-import { solana } from './methods/solana';
-import { cardano } from './methods/cardano';
-import { polkadot } from './methods/polkadot';
-import { sui } from './methods/sui';
-import { aptos } from './methods/aptos';
-import { near } from './methods/near';
-import { ton } from './methods/ton';
-import { cosmos } from './methods/cosmos';
-import { tron } from './methods/tron';
-import { xrp } from './methods/xrp';
-import { stellar } from './methods/stellar';
-import { neo } from './methods/neo';
-import { nem } from './methods/nem';
-import { kaspa } from './methods/kaspa';
-import { algorand } from './methods/algorand';
-import { filecoin } from './methods/filecoin';
-import { nervos } from './methods/nervos';
-import { starcoin } from './methods/starcoin';
-import { scdo } from './methods/scdo';
-import { dynex } from './methods/dynex';
-import { nexa } from './methods/nexa';
-import { alephium } from './methods/alephium';
-import { conflux } from './methods/conflux';
-import { nostr } from './methods/nostr';
-import { lightning } from './methods/lightning';
-import { allnetwork } from './methods/allnetwork';
-import { benfen } from './methods/benfen';
-import { device } from './methods/device';
-import { firmware } from './methods/firmware';
+import { bitcoin } from '../data/methods/bitcoin';
+import { ethereum } from '../data/methods/ethereum';
+import { solana } from '../data/methods/solana';
+import { cardano } from '../data/methods/cardano';
+import { polkadot } from '../data/methods/polkadot';
+import { sui } from '../data/methods/sui';
+import { aptos } from '../data/methods/aptos';
+import { near } from '../data/methods/near';
+import { ton } from '../data/methods/ton';
+import { cosmos } from '../data/methods/cosmos';
+import { tron } from '../data/methods/tron';
+import { xrp } from '../data/methods/xrp';
+import { stellar } from '../data/methods/stellar';
+import { neo } from '../data/methods/neo';
+import { nem } from '../data/methods/nem';
+import { kaspa } from '../data/methods/kaspa';
+import { algorand } from '../data/methods/algorand';
+import { filecoin } from '../data/methods/filecoin';
+import { nervos } from '../data/methods/nervos';
+import { starcoin } from '../data/methods/starcoin';
+import { scdo } from '../data/methods/scdo';
+import { dynex } from '../data/methods/dynex';
+import { nexa } from '../data/methods/nexa';
+import { alephium } from '../data/methods/alephium';
+import { conflux } from '../data/methods/conflux';
+import { nostr } from '../data/methods/nostr';
+import { lightning } from '../data/methods/lightning';
+import { allnetwork } from '../data/methods/allnetwork';
+import { benfen } from '../data/methods/benfen';
+import { device } from '../data/methods/device';
+import { firmware } from '../data/methods/firmware';
 
 // 设备模块配置
 const deviceModules: ModuleConfig[] = [

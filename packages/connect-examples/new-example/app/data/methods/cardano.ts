@@ -13,15 +13,11 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Address Parameters',
-            value: JSON.stringify(
-              {
-                addressType: 0,
-                path: "m/1852'/1815'/0'/0/0",
-                stakingPath: "m/1852'/1815'/0'/2/0",
-              },
-              null,
-              2
-            ),
+            value: {
+              addressType: 0,
+              path: "m/1852'/1815'/0'/0/0",
+              stakingPath: "m/1852'/1815'/0'/2/0"
+            },
           },
           {
             name: 'protocolMagic',
@@ -54,32 +50,28 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  addressParameters: {
-                    addressType: 0,
-                    path: "m/1852'/1815'/0'/0/0",
-                    stakingPath: "m/1852'/1815'/0'/2/0",
-                  },
-                  protocolMagic: 764824073,
-                  networkId: 1,
-                  showOnOneKey: false,
+            value: [
+              {
+                addressParameters: {
+                  addressType: 0,
+                  path: "m/1852'/1815'/0'/0/0",
+                  stakingPath: "m/1852'/1815'/0'/2/0"
                 },
-                {
-                  addressParameters: {
-                    addressType: 0,
-                    path: "m/1852'/1815'/0'/0/1",
-                    stakingPath: "m/1852'/1815'/0'/2/0",
-                  },
-                  protocolMagic: 764824073,
-                  networkId: 1,
-                  showOnOneKey: false,
+                protocolMagic: 764824073,
+                networkId: 1,
+                showOnOneKey: false
+              },
+              {
+                addressParameters: {
+                  addressType: 0,
+                  path: "m/1852'/1815'/0'/0/1",
+                  stakingPath: "m/1852'/1815'/0'/2/0"
                 },
-              ],
-              null,
-              2
-            ),
+                protocolMagic: 764824073,
+                networkId: 1,
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -116,24 +108,20 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/1852'/1815'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/1852'/1815'/1'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/1852'/1815'/2'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/1852'/1815'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/1852'/1815'/1'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/1852'/1815'/2'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -183,45 +171,36 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Inputs',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/1852'/1815'/0'/0/0",
-                  prev_hash: '1af8fa0b754ff99253d983894e63a2b09cbb56c833ba18c3384210163f63dcfc',
-                  prev_index: 0,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/1852'/1815'/0'/0/0",
+                prev_hash: "1af8fa0b754ff99253d983894e63a2b09cbb56c833ba18c3384210163f63dcfc",
+                prev_index: 0
+              }
+            ],
           },
           {
             name: 'outputs',
             type: 'textarea',
             required: true,
             label: 'Outputs',
-            value: JSON.stringify(
-              [
-                {
-                  address:
-                    'addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x',
-                  amount: '3003112',
-                  tokenBundle: [
-                    {
-                      policyId: '95a292ffee938be03e9bae5657982a74e9014eb4960108c9c67a5b9b',
-                      tokenAmounts: [
-                        {
-                          assetNameBytes: '74652474436f696e',
-                          amount: '7878754',
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                address: "addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x",
+                amount: "3003112",
+                tokenBundle: [
+                  {
+                    policyId: "95a292ffee938be03e9bae5657982a74e9014eb4960108c9c67a5b9b",
+                    tokenAmounts: [
+                      {
+                        assetNameBytes: "74652474436f696e",
+                        amount: "7878754"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
           },
           {
             name: 'fee',

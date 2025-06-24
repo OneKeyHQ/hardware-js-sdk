@@ -32,24 +32,20 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Bundle Configuration',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/144'/0'/0/0",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/144'/0'/0/1",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/144'/0'/0/2",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/144'/0'/0/0",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/144'/0'/0/1",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/144'/0'/0/2",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -74,20 +70,16 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Transaction',
-            value: JSON.stringify(
-              {
-                fee: '100000',
-                flags: 0x80000000,
-                sequence: 25,
-                maxLedgerVersion: 8820051,
-                payment: {
-                  amount: '100000000',
-                  destination: 'rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws',
-                },
-              },
-              null,
-              2
-            ),
+            value: {
+              fee: "100000",
+              flags: 2147483648,
+              sequence: 25,
+              maxLedgerVersion: 8820051,
+              payment: {
+                amount: "100000000",
+                destination: "rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws"
+              }
+            },
           },
         ],
       },
@@ -106,21 +98,17 @@ const api: UnifiedMethodConfig[] = [
             type: 'textarea',
             required: true,
             label: 'Transaction',
-            value: JSON.stringify(
-              {
-                fee: '100000',
-                flags: 0x80000000,
-                sequence: 25,
-                maxLedgerVersion: 8820051,
-                payment: {
-                  amount: '100000000',
-                  destination: 'rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws',
-                  destinationTag: 12345,
-                },
-              },
-              null,
-              2
-            ),
+            value: {
+              fee: "100000",
+              flags: 2147483648,
+              sequence: 25,
+              maxLedgerVersion: 8820051,
+              payment: {
+                amount: "100000000",
+                destination: "rBKz5MC2iXdoS3XgnNSYmF69K1Yo4NS3Ws",
+                destinationTag: 12345
+              }
+            },
           },
         ],
       },

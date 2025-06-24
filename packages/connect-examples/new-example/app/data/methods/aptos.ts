@@ -35,24 +35,20 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of address configurations',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/637'/0'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/637'/1'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/637'/2'/0'/0'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/637'/0'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/637'/1'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/637'/2'/0'/0'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -92,24 +88,20 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Bundle Configuration',
             description: 'JSON array of public key configurations',
-            value: JSON.stringify(
-              [
-                {
-                  path: "m/44'/637'/0'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/637'/1'/0'/0'",
-                  showOnOneKey: false,
-                },
-                {
-                  path: "m/44'/637'/2'/0'/0'",
-                  showOnOneKey: false,
-                },
-              ],
-              null,
-              2
-            ),
+            value: [
+              {
+                path: "m/44'/637'/0'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/637'/1'/0'/0'",
+                showOnOneKey: false
+              },
+              {
+                path: "m/44'/637'/2'/0'/0'",
+                showOnOneKey: false
+              }
+            ],
           },
         ],
       },
@@ -136,17 +128,13 @@ const api: UnifiedMethodConfig[] = [
             required: true,
             label: 'Payload',
             description: 'Message payload to sign',
-            value: JSON.stringify(
-              {
-                address: '0x1234',
-                chainId: '0x1',
-                application: 'OneKey Apps',
-                nonce: '12345',
-                message: 'hello',
-              },
-              null,
-              2
-            ),
+            value: {
+              address: "0x1234",
+              chainId: "0x1",
+              application: "OneKey Apps",
+              nonce: "12345",
+              message: "hello"
+            },
           },
         ],
       },

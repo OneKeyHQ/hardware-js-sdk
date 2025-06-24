@@ -1,4 +1,4 @@
-import { signerMethodsRegistry } from './methodsRegistry';
+import { deviceMethodsRegistry, signerMethodsRegistry } from '../hooks/useMethodsRegistry';
 import i18n from '../i18n/config';
 import type { Action } from 'kbar';
 
@@ -61,7 +61,7 @@ const ACTION_PRIORITIES = {
   'github-issues': 2,
   'github-releases': 2,
   'onekey-website': 1,
-  'hardware-connect': 1,
+  'hardware-connect-docs': 1,
 };
 
 // 排序选项枚举
@@ -187,33 +187,6 @@ export const buildSearchActions = (sortMode: SortMode = SortMode.PRIORITY): Acti
       priority: ACTION_PRIORITIES['github-repo'] || 1,
     },
     {
-      id: 'github-issues',
-      name: t('search.actions.githubIssues'),
-      subtitle: t('search.descriptions.githubIssues'),
-      section: t('search.sections.external'),
-      keywords: t('search.keywords.issues'),
-      perform: () => openExternalLink('https://github.com/OneKeyHQ/hardware-js-sdk/issues'),
-      priority: ACTION_PRIORITIES['github-issues'] || 1,
-    },
-    {
-      id: 'github-releases',
-      name: t('search.actions.githubReleases'),
-      subtitle: t('search.descriptions.githubReleases'),
-      section: t('search.sections.external'),
-      keywords: t('search.keywords.releases'),
-      perform: () => openExternalLink('https://github.com/OneKeyHQ/hardware-js-sdk/releases'),
-      priority: ACTION_PRIORITIES['github-releases'] || 1,
-    },
-    {
-      id: 'onekey-docs',
-      name: t('search.actions.onekeyDocs'),
-      subtitle: t('search.descriptions.onekeyDocs'),
-      section: t('search.sections.external'),
-      keywords: t('search.keywords.docs'),
-      perform: () => openExternalLink('https://developer.onekey.so/'),
-      priority: ACTION_PRIORITIES['onekey-docs'] || 1,
-    },
-    {
       id: 'onekey-website',
       name: t('search.actions.onekeyWebsite'),
       subtitle: t('search.descriptions.onekeyWebsite'),
@@ -223,15 +196,28 @@ export const buildSearchActions = (sortMode: SortMode = SortMode.PRIORITY): Acti
       priority: ACTION_PRIORITIES['onekey-website'] || 1,
     },
     {
-      id: 'hardware-connect',
+      id: 'hardware-connect-docs',
       name: t('search.actions.hardwareConnect'),
       subtitle: t('search.descriptions.hardwareConnect'),
       section: t('search.sections.external'),
       keywords: t('search.keywords.connect'),
-      perform: () => openExternalLink('https://developer.onekey.so/hardware/'),
-      priority: ACTION_PRIORITIES['hardware-connect'] || 1,
+      perform: () => openExternalLink('https://developer.onekey.so/connect-to-hardware/page-1'),
+      priority: ACTION_PRIORITIES['hardware-connect-docs'] || 1,
     }
   );
+
+  deviceMethodsRegistry.chains.forEach(chain => {
+    chain.methods.forEach(method => {
+      actions.push({
+        id: `method-${chain.id}-${method.method}`,
+        name: method.method,
+        section: t('search.sections.deviceMethods'),
+        keywords: `${method.method}`,
+        perform: () => navigateTo(`/device-methods/${method.method}`),
+        priority: 2, // 较低优先级
+      });
+    });
+  });
 
   // 为每个链创建搜索动作，并处理方法
   signerMethodsRegistry.chains.forEach(chain => {
