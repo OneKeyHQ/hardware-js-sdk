@@ -10,10 +10,14 @@ export function PageLayout({ children, className = '', fixedHeight = false }: Pa
   return (
     <div
       className={`${
-        fixedHeight ? 'h-full overflow-hidden' : 'h-full overflow-y-auto p-4'
+        fixedHeight ? 'h-full flex flex-col' : 'h-full overflow-y-auto p-4'
       } bg-background ${className}`}
     >
-      {fixedHeight ? children : <div className="mx-auto max-w-full">{children}</div>}
+      {fixedHeight ? (
+        <div className="flex-1 overflow-y-auto min-h-0">{children}</div>
+      ) : (
+        <div className="mx-auto max-w-full">{children}</div>
+      )}
     </div>
   );
 }
