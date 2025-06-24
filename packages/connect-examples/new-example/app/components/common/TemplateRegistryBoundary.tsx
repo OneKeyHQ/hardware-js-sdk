@@ -4,14 +4,12 @@ import { PageLayout } from './PageLayout';
 
 interface TemplateRegistryBoundaryProps {
   children: React.ReactNode;
-  notFoundTitle?: string;
   notFoundMessage?: string;
   checkNotFound?: () => boolean;
 }
 
 export const TemplateRegistryBoundary: React.FC<TemplateRegistryBoundaryProps> = ({
   children,
-  notFoundTitle = 'Not Found',
   notFoundMessage = 'The requested resource could not be found.',
   checkNotFound,
 }) => {
@@ -22,7 +20,7 @@ export const TemplateRegistryBoundary: React.FC<TemplateRegistryBoundaryProps> =
         <div className="flex items-center justify-center min-h-96">
           <Card className="bg-card border border-orange-200">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-orange-800 mb-2">{notFoundTitle}</h3>
+              <h3 className="text-lg font-semibold text-orange-800 mb-2">Not Found</h3>
               <p className="text-muted-foreground">{notFoundMessage}</p>
             </CardContent>
           </Card>

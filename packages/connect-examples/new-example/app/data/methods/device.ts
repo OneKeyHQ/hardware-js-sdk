@@ -1,7 +1,7 @@
 import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
 
 const api: UnifiedMethodConfig[] = [
-  // Basic Operations
+  // === 基础操作 ===
   {
     method: 'searchDevices',
     description: 'Search for devices',
@@ -27,35 +27,11 @@ const api: UnifiedMethodConfig[] = [
     noDeviceIdReq: true,
     presets: [],
   },
-  {
-    method: 'cancel',
-    description: 'Cancel a request',
-    noDeviceIdReq: true,
-    presets: [],
-  },
 
-  // Device Management Operations
-  {
-    method: 'deviceChangePin',
-    description: 'Change pin of a device',
-    noDeviceIdReq: true,
-    presets: [],
-  },
-  {
-    method: 'deviceCancel',
-    description: 'Cancel device operation',
-    noDeviceIdReq: true,
-    presets: [],
-  },
-  {
-    method: 'deviceLock',
-    description: 'Lock device',
-    noDeviceIdReq: true,
-    presets: [],
-  },
+  // === 设备管理 ===
   {
     method: 'deviceSettings',
-    description: 'Get settings of a device',
+    description: 'Configure device settings',
     noDeviceIdReq: true,
     presets: [
       {
@@ -150,6 +126,92 @@ const api: UnifiedMethodConfig[] = [
         ],
       },
     ],
+  },
+  {
+    method: 'deviceChangePin',
+    description: 'Change pin of a device',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceLock',
+    description: 'Lock device',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceCancel',
+    description: 'Cancel device operation',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+
+  // === 高级功能 ===
+  {
+    method: 'deviceSupportFeatures',
+    description: 'Check if device supports specific features',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceVerify',
+    description: 'Verify device authenticity',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Verify device',
+        parameters: [
+          {
+            name: 'dataHex',
+            type: 'string',
+            required: true,
+            label: 'Data Hex',
+            description: 'Hex data for verification',
+            value: '0x1234567890',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'getLogs',
+    description: 'Get device logs',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+
+  // === U2F 功能 ===
+  {
+    method: 'setU2FCounter',
+    description: 'Set U2F counter value',
+    noDeviceIdReq: true,
+    presets: [
+      {
+        title: 'Set U2F counter',
+        parameters: [
+          {
+            name: 'u2f_counter',
+            type: 'number',
+            required: true,
+            label: 'U2F Counter',
+            description: 'U2F counter value to set',
+            value: 1,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'getNextU2FCounter',
+    description: 'Get next U2F counter value',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceWipe',
+    description: 'Wipe device(DANGER: This will erase all data)',
+    noDeviceIdReq: true,
+    presets: [],
   },
 ];
 

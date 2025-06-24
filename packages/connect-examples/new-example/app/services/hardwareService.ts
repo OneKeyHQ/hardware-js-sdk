@@ -8,7 +8,26 @@ export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type TransportType = 'webusb' | 'jsbridge' | 'emulator';
 export type HardwareApiMethod = keyof CoreApi;
 
-// WebUSB 类型已经在全局定义中，无需重复声明
+// WebUSB 类型声明
+interface USBDevice {
+  vendorId: number;
+  productId: number;
+}
+
+interface USBDeviceFilter {
+  vendorId: number;
+  productId: number;
+}
+
+interface USB {
+  requestDevice(options: { filters: USBDeviceFilter[] }): Promise<USBDevice>;
+}
+
+declare global {
+  interface Navigator {
+    usb?: USB;
+  }
+}
 
 // 获取SDK实例的函数 - 需要从外部注入
 let getSDKInstanceFunc: (() => Promise<CoreApi>) | null = null;
@@ -315,9 +334,12 @@ export async function callHardwareAPI(
 export async function searchDevices(): Promise<ApiResponse> {
   logRequest('Searching for devices');
 
-  // 获取当前transport类型
-  const currentTransport = useDeviceStore.getState().transportType;
-  logInfo(`Using transport type: ${currentTransport}`);
+  // 获取持久化的transport类型，如果没有则从store获取
+  const savedTransport = localStorage.getItem('preferred-transport') as TransportType;
+  const currentTransport = savedTransport || useDeviceStore.getState().transportType;
+  logInfo(
+    `Using transport type: ${currentTransport} (from ${savedTransport ? 'localStorage' : 'store'})`
+  );
 
   // WebUSB 特殊处理
   if (currentTransport === 'webusb' && navigator.usb) {

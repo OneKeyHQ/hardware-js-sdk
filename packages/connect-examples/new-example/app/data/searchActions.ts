@@ -1,5 +1,5 @@
 import { deviceMethodsRegistry, signerMethodsRegistry } from '../hooks/useMethodsRegistry';
-import i18n from '../i18n/config';
+import { useUIStore } from '../store/uiStore';
 import type { Action } from 'kbar';
 
 // 获取基础路径
@@ -20,8 +20,8 @@ const navigateTo = (path: string) => {
 
 // 主题切换函数
 const setTheme = (theme: 'light' | 'dark') => {
-  localStorage.setItem('theme', theme);
-  document.documentElement.classList.toggle('dark', theme === 'dark');
+  // 更新 Zustand store
+  useUIStore.getState().setThemePreference(theme);
 };
 
 // 侧边栏切换函数 - 使用键盘事件触发
@@ -71,18 +71,11 @@ export enum SortMode {
   SECTION = 'section', // 按分组排序
 }
 
-// 获取翻译文本的辅助函数
-const t = (key: string, options?: Record<string, unknown>): string => {
-  if (typeof window === 'undefined' || !i18n.isInitialized) {
-    // 服务端渲染或 i18n 未初始化时的回退
-    return key;
-  }
-  const result = i18n.t(key, options);
-  return typeof result === 'string' ? result : key;
-};
-
-// 构建搜索动作
-export const buildSearchActions = (sortMode: SortMode = SortMode.PRIORITY): Action[] => {
+// 构建搜索动作 - 接收翻译函数作为参数
+export const buildSearchActions = (
+  t: (key: string, options?: Record<string, unknown>) => string,
+  sortMode: SortMode = SortMode.PRIORITY
+): Action[] => {
   const actions: Action[] = [];
 
   // 界面控制
@@ -308,16 +301,17 @@ const sortActions = (actions: Action[], sortMode: SortMode): Action[] => {
 };
 
 // 导出搜索动作（默认按优先级排序）
-export const searchActions = buildSearchActions();
-
-// 导出不同排序模式的搜索动作
-export const getSearchActions = (sortMode?: SortMode) => {
-  return buildSearchActions(sortMode || SortMode.PRIORITY);
+// 注意：这个需要传入翻译函数
+export const getSearchActions = (
+  t: (key: string, options?: Record<string, unknown>) => string,
+  sortMode?: SortMode
+) => {
+  return buildSearchActions(t, sortMode || SortMode.PRIORITY);
 };
 
 // 导出统计信息
-export const getSearchStats = () => {
-  const actions = searchActions;
+export const getSearchStats = (t: (key: string, options?: Record<string, unknown>) => string) => {
+  const actions = getSearchActions(t);
   const sections = [...new Set(actions.map(action => action.section).filter(Boolean))] as string[];
   const sectionCounts = sections.reduce((acc, section) => {
     if (typeof section === 'string') {
@@ -334,12 +328,18 @@ export const getSearchStats = () => {
   };
 };
 
-// 搜索配置选项
-export const searchConfig = {
+// 搜索配置选项 - 动态获取翻译
+export const getSearchConfig = (t: (key: string, options?: Record<string, unknown>) => string) => ({
   defaultSortMode: SortMode.PRIORITY,
   availableSortModes: [
-    { value: SortMode.PRIORITY, label: t('search.sortModes.priority') || 'By Priority' },
-    { value: SortMode.ALPHABETICAL, label: t('search.sortModes.alphabetical') || 'Alphabetical' },
+    {
+      value: SortMode.PRIORITY,
+      label: t('search.sortModes.priority') || 'By Priority',
+    },
+    {
+      value: SortMode.ALPHABETICAL,
+      label: t('search.sortModes.alphabetical') || 'Alphabetical',
+    },
     { value: SortMode.SECTION, label: t('search.sortModes.section') || 'By Section' },
   ],
-};
+});

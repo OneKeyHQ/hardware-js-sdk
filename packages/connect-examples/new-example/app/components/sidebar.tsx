@@ -12,10 +12,14 @@ import {
   SidebarSeparator,
 } from './ui/sidebar';
 import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
 import { Card, CardContent } from './ui/Card';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
+import { useSDK } from '../hooks/useSDK';
+import { useToast } from '../hooks/use-toast';
+import { searchDevices, TransportType } from '../services/hardwareService';
 import {
   Home,
   Smartphone,
@@ -24,6 +28,7 @@ import {
   CheckCircle,
   XCircle,
   Server,
+  Search,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -66,7 +71,97 @@ const navigationItems = [
 export function AppSidebar() {
   const location = useLocation();
   const { t } = useTranslation();
-  const { currentDevice, transportType } = useDeviceStore();
+  const {
+    currentDevice,
+    transportType,
+    isConnecting,
+    sdkInitState,
+    setIsConnecting,
+    setConnectedDevices,
+    setCurrentDevice,
+    setDeviceFeatures,
+    setTransportType,
+  } = useDeviceStore();
+
+  const { getSDKInstance } = useSDK();
+  const { toast } = useToast();
+
+  // 快速连接设备
+  const handleQuickConnect = async () => {
+    if (!sdkInitState.isInitialized) {
+      toast({
+        title: t('transport.sdkNotReady'),
+        description: t('transport.pleaseWaitForInit'),
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setIsConnecting(true);
+
+    try {
+      // 确保使用持久化的transport设置
+      const savedTransport = localStorage.getItem('preferred-transport');
+      if (savedTransport && savedTransport !== transportType) {
+        // 同步store中的transport类型
+        setTransportType(savedTransport as TransportType);
+      }
+
+      // 搜索设备
+      const searchResult = await searchDevices();
+
+      if (searchResult.success && searchResult.payload) {
+        const devices = searchResult.payload;
+        setConnectedDevices(devices);
+
+        // 自动连接第一个设备
+        if (devices.length > 0) {
+          const targetDevice = devices[0];
+          setCurrentDevice(targetDevice);
+
+          // 获取设备特征信息
+          const sdk = await getSDKInstance();
+          if (targetDevice.connectId && targetDevice.deviceId) {
+            const featuresResult = await sdk.getFeatures(targetDevice.connectId);
+            if (featuresResult.success && featuresResult.payload) {
+              setDeviceFeatures(featuresResult.payload);
+            }
+          }
+
+          toast({
+            title: t('device.connected'),
+            description: `${t('device.connectedTo')} ${
+              targetDevice.label || targetDevice.deviceType
+            }`,
+            variant: 'default',
+          });
+        } else {
+          toast({
+            title: t('transport.noDevicesFound'),
+            description: t('transport.ensureDeviceConnected'),
+            variant: 'warning',
+          });
+        }
+      } else {
+        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
+        toast({
+          title: t('transport.searchFailed'),
+          description: errorMessage,
+          variant: 'warning',
+        });
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : t('transport.unknownConnectionError');
+      toast({
+        title: t('transport.connectionTip'),
+        description: errorMessage,
+        variant: 'warning',
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   const getStatusIcon = () => {
     if (currentDevice) {
@@ -104,7 +199,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* 设备状态 - 始终预留空间 */}
+        {/* 设备状态 */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-sm font-semibold">
             {t('device.status')}
@@ -219,9 +314,38 @@ export function AppSidebar() {
                           variant="outline"
                           className="text-xs px-1.5 py-0 font-medium text-muted-foreground border-muted"
                         >
-                          --
+                          {transportType === 'webusb'
+                            ? 'WebUSB'
+                            : transportType === 'jsbridge'
+                            ? 'JSBridge'
+                            : transportType === 'emulator'
+                            ? 'Emulator'
+                            : '--'}
                         </Badge>
                       </div>
+                    </div>
+
+                    {/* 连接按钮 */}
+                    <div className="pt-2 border-t border-border/30">
+                      <Button
+                        onClick={handleQuickConnect}
+                        disabled={isConnecting || !sdkInitState.isInitialized}
+                        size="sm"
+                        className="w-full h-8 text-xs"
+                        variant="outline"
+                      >
+                        {isConnecting ? (
+                          <>
+                            <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1.5" />
+                            {t('device.connecting')}
+                          </>
+                        ) : (
+                          <>
+                            <Search className="w-3 h-3 mr-1.5" />
+                            {t('device.searchDevices')}
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </>
                 )}

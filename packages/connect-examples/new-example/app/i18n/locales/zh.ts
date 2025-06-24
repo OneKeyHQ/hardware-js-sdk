@@ -179,6 +179,22 @@ export const zh = {
       totalMethods: '{{count}} 个方法',
       totalCategories: '{{count}} 个分类',
       categories: {
+        basic: {
+          name: '基础操作',
+          description: '设备连接和基本信息获取',
+        },
+        device: {
+          name: '设备管理',
+          description: '设备设置和常用操作',
+        },
+        firmware: {
+          name: '固件更新',
+          description: '固件检查、更新和重启操作',
+        },
+        advanced: {
+          name: '高级功能',
+          description: 'U2F、验证和危险操作',
+        },
         basicOperations: {
           name: '基本操作',
           description: '设备连接和信息查询',
@@ -439,8 +455,8 @@ export const zh = {
       },
       actions: {
         toggleSidebar: '切换侧边栏',
-        lightTheme: '浅色主题',
-        darkTheme: '深色主题',
+        lightTheme: 'light theme',
+        darkTheme: 'dark theme',
         home: '首页',
         emulator: 'Hardware Emulator',
         logs: 'Logs',
@@ -485,6 +501,11 @@ export const zh = {
         alphabetical: '按字母顺序',
         section: '按分组',
       },
+      placeholder: '搜索',
+      inputPlaceholder: '搜索方法和区块链...',
+      navigate: '导航',
+      select: '选择',
+      close: '关闭',
     },
     emulator: {
       title: '硬件模拟器',
@@ -569,11 +590,8 @@ export const zh = {
         noDataAvailable: '没有可用数据。',
       },
       methodExecuteBoundary: {
-        loadingMethod: '加载方法',
-        preparingExecution: '准备方法执行...',
         methodNotFound: '方法未找到',
         methodNotFoundDesc: '无法找到请求的方法。',
-        loadingDefault: '加载中...',
       },
       methodExecutor: {
         deviceNotConnected: '设备未连接',

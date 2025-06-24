@@ -24,6 +24,19 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     setDeviceFeatures,
     sdkInitState,
   } = useDeviceStore();
+
+  // 从localStorage恢复transport选择
+  React.useEffect(() => {
+    const savedTransport = localStorage.getItem('preferred-transport') as TransportType;
+    if (savedTransport && savedTransport !== transportType) {
+      setTransportType(savedTransport);
+    }
+  });
+
+  // 保存transport选择到localStorage
+  const saveTransportPreference = (transport: TransportType) => {
+    localStorage.setItem('preferred-transport', transport);
+  };
   const { getSDKInstance } = useSDK();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -109,6 +122,9 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     try {
       // 先更新UI状态
       setTransportType(newTransport);
+
+      // 保存用户选择
+      saveTransportPreference(newTransport);
 
       // 切换传输方式
       const result = await switchTransport(newTransport);

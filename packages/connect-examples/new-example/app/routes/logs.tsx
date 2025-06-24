@@ -70,7 +70,7 @@ const LogsPage: React.FC = () => {
         variant: 'destructive',
       });
     }
-  }, [logs, exportLogs, toast]);
+  }, [logs, exportLogs, toast, t]);
 
   const handleSaveConfig = useCallback(() => {
     setLogStorageConfig(tempConfig);
@@ -80,7 +80,7 @@ const LogsPage: React.FC = () => {
       title: t('logs.config.saved'),
       description: t('logs.config.savedDesc'),
     });
-  }, [tempConfig, setLogStorageConfig, toast]);
+  }, [tempConfig, setLogStorageConfig, toast, t]);
 
   const handleResetConfig = useCallback(() => {
     setTempConfig(logStorageConfig);

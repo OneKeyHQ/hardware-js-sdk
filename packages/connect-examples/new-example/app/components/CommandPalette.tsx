@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   KBarProvider,
   KBarPortal,
@@ -9,7 +10,8 @@ import {
   useKBar,
   type ActionImpl,
 } from 'kbar';
-import { searchActions } from '../data/searchActions';
+import { useTranslation } from 'react-i18next';
+import { getSearchActions } from '../data/searchActions';
 
 // 平台检测工具
 const getPlatformInfo = () => {
@@ -132,6 +134,7 @@ function RenderResults() {
 // 搜索触发按钮组件
 export function SearchTrigger() {
   const { query } = useKBar();
+  const { t } = useTranslation();
   const shortcutKeys = getShortcutKeys();
 
   const handleClick = () => {
@@ -151,7 +154,7 @@ export function SearchTrigger() {
           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
         />
       </svg>
-      <span className="text-gray-500 dark:text-gray-400">搜索</span>
+      <span className="text-gray-500 dark:text-gray-400">{t('search.placeholder')}</span>
       <div className="ml-auto flex items-center gap-1">
         <kbd className="text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
           {shortcutKeys.CmdOrCtrl.replace('+', '')}
@@ -166,9 +169,21 @@ export function SearchTrigger() {
 
 // 主要的命令面板提供者组件
 export function CommandPalette({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
+  const [actions, setActions] = useState(() => getSearchActions(t));
+  const [key, setKey] = useState(0); // 用于强制重新挂载 KBarProvider
+
+  // 监听语言变化，重新获取搜索动作并强制重新挂载
+  useEffect(() => {
+    const newActions = getSearchActions(t);
+    setActions(newActions);
+    setKey(prev => prev + 1); // 强制重新挂载 KBarProvider
+  }, [t]);
+
   return (
     <KBarProvider
-      actions={searchActions}
+      key={key} // 强制重新挂载以支持动态更新
+      actions={actions}
       options={{
         // 启用 kbar 内置的历史记录功能
         enableHistory: true,
@@ -181,7 +196,7 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
             <div className="border-b border-gray-100 dark:border-gray-800">
               <KBarSearch
                 className="w-full px-4 py-3 text-base border-0 outline-0 bg-transparent placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100"
-                placeholder="搜索方法和区块链..."
+                placeholder={t('search.inputPlaceholder')}
               />
             </div>
 
@@ -197,19 +212,19 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
                   <kbd className="bg-white dark:bg-gray-700 px-1 py-0.5 rounded text-xs border border-gray-200 dark:border-gray-600">
                     ↑↓
                   </kbd>
-                  <span>导航</span>
+                  <span>{t('search.navigate')}</span>
                 </span>
                 <span className="flex items-center gap-1">
                   <kbd className="bg-white dark:bg-gray-700 px-1 py-0.5 rounded text-xs border border-gray-200 dark:border-gray-600">
                     ↵
                   </kbd>
-                  <span>选择</span>
+                  <span>{t('search.select')}</span>
                 </span>
                 <span className="flex items-center gap-1">
                   <kbd className="bg-white dark:bg-gray-700 px-1 py-0.5 rounded text-xs border border-gray-200 dark:border-gray-600">
                     esc
                   </kbd>
-                  <span>关闭</span>
+                  <span>{t('search.close')}</span>
                 </span>
               </div>
             </div>

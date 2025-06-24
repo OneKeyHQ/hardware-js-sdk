@@ -1,15 +1,26 @@
 import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
 
-// 固件更新方法定义 - 使用统一格式
 const api: UnifiedMethodConfig[] = [
   {
     method: 'firmwareUpdateV2',
-    description: 'Update firmware or ble-firmware',
+    description: 'compatible with all devices',
     noDeviceIdReq: true,
     presets: [
       {
-        title: 'Update Single firmware with file',
+        title: 'Update firmware',
         parameters: [
+          {
+            name: 'updateType',
+            type: 'select',
+            required: true,
+            label: 'Update Type',
+            options: [
+              { label: 'Web', value: 'web' },
+              { label: 'Desktop', value: 'desktop' },
+              { label: 'Mobile', value: 'mobile' },
+            ],
+            value: 'firmware',
+          },
           {
             name: 'platform',
             type: 'select',
@@ -21,13 +32,11 @@ const api: UnifiedMethodConfig[] = [
             ],
             value: 'web',
           },
-          {
-            name: 'binary',
-            type: 'file',
-            required: true,
-            label: 'Firmware Binary',
-            accept: '.bin,.hex,.fw',
-          },
+        ],
+      },
+      {
+        title: 'Update ble firmware',
+        parameters: [
           {
             name: 'updateType',
             type: 'select',
@@ -37,21 +46,19 @@ const api: UnifiedMethodConfig[] = [
               { label: 'Firmware', value: 'firmware' },
               { label: 'BLE Firmware', value: 'ble' },
             ],
-            value: 'firmware',
+            value: 'ble',
           },
           {
-            name: 'forcedUpdateRes',
-            type: 'boolean',
-            required: false,
-            label: 'Force Update Resources',
-            value: false,
-          },
-          {
-            name: 'isUpdateBootloader',
-            type: 'boolean',
-            required: false,
-            label: 'Update Bootloader',
-            value: false,
+            name: 'platform',
+            type: 'select',
+            required: true,
+            label: 'Platform',
+            options: [
+              { label: 'Web', value: 'web' },
+              { label: 'Desktop', value: 'desktop' },
+              { label: 'Mobile', value: 'mobile' },
+            ],
+            value: 'web',
           },
         ],
       },
@@ -59,11 +66,11 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'firmwareUpdateV3',
-    description: 'Update firmware using V3 protocol',
+    description: 'pro deivce & bootloader > 4.12.0 only',
     noDeviceIdReq: true,
     presets: [
       {
-        title: 'Update multiple firmware with file',
+        title: 'Update multiple firmware',
         parameters: [
           {
             name: 'platform',
@@ -78,32 +85,9 @@ const api: UnifiedMethodConfig[] = [
             value: 'web',
           },
           {
-            name: 'firmwareBinary',
-            type: 'file',
-            label: 'Firmware Binary',
-            accept: '.bin',
-          },
-          {
-            name: 'bleBinary',
-            type: 'file',
-            label: 'BLE Firmware Binary',
-            accept: '.bin',
-          },
-          {
-            name: 'bootloaderBinary',
-            type: 'file',
-            label: 'Bootloader Binary',
-            accept: '.bin',
-          },
-          {
-            name: 'resourceBinary',
-            type: 'file',
-            label: 'System Resources',
-            accept: '.zip',
-          },
-          {
             name: 'forcedUpdateRes',
             type: 'boolean',
+            required: false,
             label: 'Force Update Resources',
             value: true,
           },
@@ -111,79 +95,79 @@ const api: UnifiedMethodConfig[] = [
       },
     ],
   },
+  // === 固件信息检查 ===
   {
-    method: 'deviceUpdateBootloader',
-    description: 'Update device bootloader',
+    method: 'checkFirmwareRelease',
+    description: 'Check firmware release information',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'checkBLEFirmwareRelease',
+    description: 'Check BLE firmware release information',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'checkBootloaderRelease',
+    description: 'Check bootloader release information',
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'checkAllFirmwareRelease',
+    description: 'Check all firmware release information',
     noDeviceIdReq: true,
     presets: [
       {
-        title: 'Update bootloader with file',
+        title: 'Check all firmware releases',
         parameters: [
           {
-            name: 'binary',
-            type: 'file',
-            required: true,
-            label: 'Bootloader Binary',
-            accept: '.bin',
+            name: 'checkBridgeRelease',
+            type: 'boolean',
+            required: false,
+            label: 'Check Bridge Release',
+            description: 'Include bridge release in check',
+            value: true,
           },
         ],
       },
     ],
   },
   {
-    method: 'checkFirmwareRelease',
-    description: 'Check firmware release information',
+    method: 'checkBridgeRelease',
+    description: 'Check bridge release information',
     noDeviceIdReq: true,
-    presets: [
-      {
-        title: 'Check latest firmware release',
-        parameters: [],
-      },
-    ],
+    presets: [],
   },
   {
-    method: 'checkBLEFirmwareRelease',
-    description: 'Check BLE firmware release information',
+    method: 'checkBridgeStatus',
+    description: 'Check bridge connection status',
     noDeviceIdReq: true,
-    presets: [
-      {
-        title: 'Check latest BLE firmware release',
-        parameters: [],
-      },
-    ],
+    presets: [],
   },
+
+  // === 固件更新 ===
+
   {
-    method: 'checkBootloaderRelease',
-    description: 'Check bootloader release information',
+    method: 'deviceUpdateBootloader',
+    description: 'Update device bootloader',
     noDeviceIdReq: true,
-    presets: [
-      {
-        title: 'Check latest bootloader release',
-        parameters: [],
-      },
-    ],
+    presets: [],
   },
   {
     method: 'deviceRebootToBootloader',
     description: 'Reboot device to bootloader mode',
-    presets: [
-      {
-        title: 'Reboot to bootloader',
-        parameters: [],
-      },
-    ],
+    noDeviceIdReq: true,
+    presets: [],
+  },
+  {
+    method: 'deviceRebootToBoardloader',
+    description: 'Reboot to boardloader mode(pro & touch only)',
+    noDeviceIdReq: true,
+    presets: [],
   },
 ];
-
-// 固件更新类型定义
-export interface FirmwareUpdateType {
-  id: string;
-  name: string;
-  description: string;
-  acceptedFormats: string;
-  supportedDevices: string[];
-  isProOnly?: boolean;
-}
 
 // 导出链配置对象
 export const firmware: {

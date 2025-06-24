@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,10 +6,11 @@ import {
   Download,
   Settings,
   Zap,
-  RefreshCw,
   ChevronRight,
   AlertTriangle,
-  Info,
+  ChevronDown,
+  ChevronUp,
+  Wrench,
 } from 'lucide-react';
 
 import { Badge } from '../components/ui/Badge';
@@ -17,6 +18,7 @@ import { Separator } from '../components/ui/Separator';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
+import { CollapsibleTrigger, CollapsibleContent } from '../components/ui/Collapsible';
 
 import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
@@ -37,6 +39,19 @@ interface MethodCategory {
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+
+  // 折叠状态管理
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+    basic: true, // 基础操作默认展开
+  });
+
+  // 切换分类展开状态
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }));
+  };
 
   // 获取所有方法数据
   const allMethods = useMemo(() => {
@@ -74,15 +89,14 @@ const DeviceMethodsIndexPage: React.FC = () => {
   // 智能分类逻辑
   const categories = useMemo((): MethodCategory[] => {
     const basicMethods: UnifiedMethodConfig[] = [];
-    const deviceManagementMethods: UnifiedMethodConfig[] = [];
+    const deviceMethods: UnifiedMethodConfig[] = [];
     const firmwareMethods: UnifiedMethodConfig[] = [];
-    const releaseMethods: UnifiedMethodConfig[] = [];
-    const controlMethods: UnifiedMethodConfig[] = [];
+    const advancedMethods: UnifiedMethodConfig[] = [];
 
     allMethods.forEach(method => {
       const methodName = method.method.toLowerCase();
 
-      // 基本操作
+      // 基本操作 - 最常用的
       if (
         [
           'searchdevices',
@@ -90,81 +104,77 @@ const DeviceMethodsIndexPage: React.FC = () => {
           'getonekeyfeatures',
           'getpassphrasestate',
           'cancel',
+          'devicesupportfeatures',
+          'getlogs',
         ].includes(methodName)
       ) {
         basicMethods.push(method);
       }
-      // 固件更新
-      else if (methodName.includes('firmwareupdate') || methodName.includes('updatebootloader')) {
+      // 固件相关 - 所有固件和检查相关
+      else if (
+        methodName.includes('firmware') ||
+        methodName.includes('bootloader') ||
+        methodName.includes('check') ||
+        methodName.includes('bridge') ||
+        methodName.includes('reboot')
+      ) {
         firmwareMethods.push(method);
       }
-      // 版本信息检查
-      else if (methodName.includes('check') && methodName.includes('release')) {
-        releaseMethods.push(method);
+      // 设备管理 - 常用设备操作
+      else if (
+        ['devicesettings', 'devicechangepin', 'devicelock', 'devicecancel'].includes(methodName)
+      ) {
+        deviceMethods.push(method);
       }
-      // 设备控制
-      else if (methodName.includes('reboot') || methodName.includes('bootloader')) {
-        controlMethods.push(method);
-      }
-      // 设备管理
+      // 高级功能 - 包括U2F、验证、日志、危险操作等
       else {
-        deviceManagementMethods.push(method);
+        advancedMethods.push(method);
       }
     });
 
     return [
       {
         id: 'basic',
-        name: t('deviceMethods.categories.basicOperations.name'),
-        description: t('deviceMethods.categories.basicOperations.description'),
+        name: t('deviceMethods.categories.basic.name'),
+        description: t('deviceMethods.categories.basic.description'),
         icon: Zap,
-        color: 'text-slate-700',
-        bgColor: 'bg-slate-50',
-        borderColor: 'border-slate-200',
+        color: 'text-foreground',
+        bgColor: 'bg-muted/50',
+        borderColor: 'border-border',
         methods: basicMethods,
       },
       {
         id: 'device',
-        name: t('deviceMethods.categories.deviceManagement.name'),
-        description: t('deviceMethods.categories.deviceManagement.description'),
+        name: t('deviceMethods.categories.device.name'),
+        description: t('deviceMethods.categories.device.description'),
         icon: Settings,
-        color: 'text-slate-700',
-        bgColor: 'bg-slate-50',
-        borderColor: 'border-slate-200',
-        methods: deviceManagementMethods,
+        color: 'text-foreground',
+        bgColor: 'bg-muted/50',
+        borderColor: 'border-border',
+        methods: deviceMethods,
       },
       {
         id: 'firmware',
-        name: t('deviceMethods.categories.firmwareUpdate.name'),
-        description: t('deviceMethods.categories.firmwareUpdate.description'),
+        name: t('deviceMethods.categories.firmware.name'),
+        description: t('deviceMethods.categories.firmware.description'),
         icon: Download,
-        color: 'text-slate-700',
-        bgColor: 'bg-slate-50',
-        borderColor: 'border-slate-200',
+        color: 'text-foreground',
+        bgColor: 'bg-muted/50',
+        borderColor: 'border-border',
         methods: firmwareMethods,
       },
       {
-        id: 'release',
-        name: t('deviceMethods.categories.releaseInformation.name'),
-        description: t('deviceMethods.categories.releaseInformation.description'),
-        icon: Info,
-        color: 'text-slate-700',
-        bgColor: 'bg-slate-50',
-        borderColor: 'border-slate-200',
-        methods: releaseMethods,
-      },
-      {
-        id: 'control',
-        name: t('deviceMethods.categories.deviceControl.name'),
-        description: t('deviceMethods.categories.deviceControl.description'),
-        icon: RefreshCw,
-        color: 'text-slate-700',
-        bgColor: 'bg-slate-50',
-        borderColor: 'border-slate-200',
-        methods: controlMethods,
+        id: 'advanced',
+        name: t('deviceMethods.categories.advanced.name'),
+        description: t('deviceMethods.categories.advanced.description'),
+        icon: Wrench,
+        color: 'text-foreground',
+        bgColor: 'bg-muted/50',
+        borderColor: 'border-border',
+        methods: advancedMethods,
       },
     ].filter(category => category.methods.length > 0);
-  }, [allMethods]);
+  }, [allMethods, t]);
 
   // 统计信息
   const totalMethods = allMethods.length;
@@ -175,7 +185,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
     navigate(`/device-methods/${method.method}`);
   };
 
-  // 渲染方法项
+  // 渲染方法项 - 卡片式网格布局
   const renderMethodItem = (method: UnifiedMethodConfig) => {
     return (
       <div
@@ -189,69 +199,82 @@ const DeviceMethodsIndexPage: React.FC = () => {
         }}
         role="button"
         tabIndex={0}
-        className="onekey-method-item group px-4 py-4.5 border-b border-border/30 last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors flex items-center justify-between"
+        className="onekey-method-item group p-4 bg-muted/30 dark:bg-muted/20 border border-border/50 rounded-lg cursor-pointer hover:border-border hover:bg-muted/50 dark:hover:bg-muted/40 hover:shadow-md transition-all duration-200 flex flex-col gap-3"
       >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1.5">
-            <div className="text-lg font-bold text-foreground bg-muted/50 px-4 py-2 rounded border border-border/30">
-              {method.method}
-            </div>
-
-            {/* 状态标签 */}
-            <div className="flex items-center gap-1">
-              {method.deprecated && (
-                <Badge
-                  variant="outline"
-                  className="text-xs bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 px-1.5 py-0"
-                >
-                  <AlertTriangle className="w-3 h-3" />
-                </Badge>
-              )}
-            </div>
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-bold text-foreground font-mono bg-background/80 dark:bg-background/60 px-3 py-1.5 rounded-md border border-border/50 shadow-sm text-nowrap">
+            {method.method}
           </div>
 
-          <p className="text-xs text-muted-foreground truncate">{method.description}</p>
+          <div className="flex items-center gap-2">
+            {/* 状态标签 */}
+            {method.deprecated && (
+              <Badge
+                variant="outline"
+                className="text-xs bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 px-1.5 py-0.5"
+              >
+                <AlertTriangle className="w-3 h-3" />
+              </Badge>
+            )}
+
+            <ChevronRight className="w-4 h-4 text-muted-foreground/60 group-hover:text-foreground group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0" />
+          </div>
         </div>
 
-        <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0 ml-3" />
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+          {method.description}
+        </p>
       </div>
     );
   };
 
-  // 渲染分类卡片
+  // 渲染分类卡片 - 简洁优雅版本
   const renderCategoryCard = (category: MethodCategory) => {
     const CategoryIcon = category.icon;
+    const isExpanded = expandedCategories[category.id] || false;
 
     return (
       <div
         key={category.id}
-        className="onekey-category-card bg-card border border-border/50 shadow-sm rounded-lg overflow-hidden flex flex-col"
+        className="onekey-category-card bg-card border border-border/60 rounded-lg overflow-hidden transition-all duration-200 hover:border-border"
       >
-        <div className="category-header py-1.5 px-4">
-          <div className="onekey-category-title">
-            <div className="flex items-center gap-1">
-              <div className="p-1 rounded-lg bg-muted/50 border border-border/30">
-                <CategoryIcon className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-base font-semibold">{category.name}</h3>
-                <p className="text-xs text-muted-foreground line-clamp-1 font-light opacity-70">
-                  {category.description}
-                </p>
-              </div>
-              <Badge variant="secondary" className="text-xs font-medium">
+        {/* 分类头部 - 可点击折叠 */}
+        <CollapsibleTrigger
+          onClick={() => toggleCategory(category.id)}
+          className="w-full px-5 py-4 hover:bg-muted/30 transition-colors hover:no-underline"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-2.5 rounded-lg bg-muted/50 border border-border/50">
+              <CategoryIcon className="w-5 h-5 text-muted-foreground" />
+            </div>
+
+            <div className="flex-1 text-left">
+              <h3 className="text-lg font-semibold text-foreground">{category.name}</h3>
+              <p className="text-sm text-muted-foreground mt-1">{category.description}</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="text-sm font-medium px-2.5 py-1">
                 {category.methods.length}
               </Badge>
+
+              {isExpanded ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform duration-200" />
+              )}
             </div>
           </div>
-        </div>
+        </CollapsibleTrigger>
 
-        {/* 方法列表 */}
-        <div className="p-1.5 pt-0">
-          <div className="space-y-2">
-            {category.methods.map(method => renderMethodItem(method))}
+        {/* 方法列表 - 可折叠内容 */}
+        <CollapsibleContent open={isExpanded}>
+          <div className="border-t border-border/30 bg-muted/10 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {category.methods.map(method => renderMethodItem(method))}
+            </div>
           </div>
-        </div>
+        </CollapsibleContent>
       </div>
     );
   };
@@ -261,7 +284,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
       <div className="mx-auto px-6 py-6 space-y-6">
         {/* 顶部导航和统计 */}
         <div className="flex items-center justify-between">
-          <Breadcrumb items={[{ label: 'Device', icon: Cpu }]} />
+          <Breadcrumb items={[{ label: t('deviceMethods.title') || 'Device', icon: Cpu }]} />
 
           <div className="text-sm text-muted-foreground">
             <span className="font-medium">
@@ -275,12 +298,10 @@ const DeviceMethodsIndexPage: React.FC = () => {
         {/* 设备连接状态 */}
         <DeviceNotConnectedState />
 
-        <Separator className="my-8" />
+        <Separator className="my-6" />
 
-        {/* 分类网格 */}
-        <div className="grid lg:grid-cols-3 gap-6 auto-rows-fr">
-          {categories.map(category => renderCategoryCard(category))}
-        </div>
+        {/* 分类列表 - 折叠式布局 */}
+        <div className="space-y-3">{categories.map(category => renderCategoryCard(category))}</div>
       </div>
     </PageLayout>
   );
