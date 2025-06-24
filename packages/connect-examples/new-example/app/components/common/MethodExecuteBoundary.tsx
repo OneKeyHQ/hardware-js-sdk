@@ -1,5 +1,6 @@
-import React from "react";
-import { TemplateRegistryBoundary } from "./TemplateRegistryBoundary";
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { TemplateRegistryBoundary } from './TemplateRegistryBoundary';
 
 interface BreadcrumbItem {
   label: string;
@@ -24,18 +25,19 @@ export const MethodExecuteBoundary: React.FC<MethodExecuteBoundaryProps> = ({
   baseIcon,
   checkNotFound,
 }) => {
+  const { t } = useTranslation();
   const breadcrumbs: BreadcrumbItem[] = [
     { label: baseLabel, href: basePath, icon: baseIcon },
-    { label: methodName || "Loading...", icon: baseIcon },
+    { label: methodName || t('components.methodExecuteBoundary.loadingDefault'), icon: baseIcon },
   ];
 
   return (
     <TemplateRegistryBoundary
-      loadingMessage="Loading Method"
-      loadingSubtitle="Preparing method execution..."
+      loadingMessage={t('components.methodExecuteBoundary.loadingMethod')}
+      loadingSubtitle={t('components.methodExecuteBoundary.preparingExecution')}
       loadingBreadcrumbs={breadcrumbs}
-      notFoundTitle="Method Not Found"
-      notFoundMessage="The requested method could not be found."
+      notFoundTitle={t('components.methodExecuteBoundary.methodNotFound')}
+      notFoundMessage={t('components.methodExecuteBoundary.methodNotFoundDesc')}
       checkNotFound={checkNotFound}
     >
       {children}

@@ -1,4 +1,5 @@
 import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/Dialog';
 import { Alert, AlertDescription } from '../ui/Alert';
@@ -23,6 +24,7 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
   ({ data, onSave, disabled = false, onCopy, isEditing = false, onEditingChange }, ref) => {
     const [editValue, setEditValue] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const { t } = useTranslation();
 
     // 暴露给外部的方法
     useImperativeHandle(ref, () => ({
@@ -61,7 +63,7 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
         onEditingChange?.(false);
         setError(null);
       } catch (err) {
-        setError('JSON格式不正确，请检查语法');
+        setError(t('components.jsonEditor.jsonFormatError'));
       }
     };
 
@@ -97,7 +99,7 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
           </div>
         ) : (
           <div className="bg-muted/20 p-8 rounded-xl text-center border-2 border-dashed border-border/30">
-            <p className="text-muted-foreground text-sm">暂无数据</p>
+            <p className="text-muted-foreground text-sm">{t('components.jsonEditor.noData')}</p>
           </div>
         )}
 
@@ -113,21 +115,21 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
             <DialogHeader className="flex-shrink-0 border-b border-border/50 pb-4">
               <DialogTitle className="text-foreground flex items-center gap-2 text-lg font-semibold">
                 <Edit className="h-5 w-5 text-muted-foreground" />
-                编辑 JSON 内容
+                {t('components.jsonEditor.editJsonContent')}
               </DialogTitle>
             </DialogHeader>
 
             <div className="flex-1 space-y-4 min-h-0 py-4">
               <div className="space-y-3">
                 <label htmlFor="json-textarea" className="text-sm font-medium text-foreground">
-                  JSON内容
+                  {t('components.jsonEditor.jsonContent')}
                 </label>
                 <textarea
                   id="json-textarea"
                   value={editValue}
                   onChange={e => setEditValue(e.target.value)}
                   className="w-full h-96 p-4 text-sm font-mono bg-muted/10 border border-border rounded-lg focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/10 resize-none transition-all duration-200 shadow-sm"
-                  placeholder="请输入JSON格式的数据..."
+                  placeholder={t('components.jsonEditor.enterJsonData')}
                 />
               </div>
 
@@ -150,7 +152,7 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
                 onClick={handleCancel}
                 className="border-border text-foreground hover:bg-muted/50 transition-colors duration-200"
               >
-                取消
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={handleSave}
@@ -158,7 +160,7 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
                 className="bg-foreground hover:bg-foreground/90 text-background shadow-sm hover:shadow-md transition-all duration-200"
               >
                 <Save className="h-4 w-4 mr-2" />
-                保存
+                {t('common.save')}
               </Button>
             </DialogFooter>
           </DialogContent>

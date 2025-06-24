@@ -1,5 +1,6 @@
-import React from "react";
-import { TemplateRegistryBoundary } from "./TemplateRegistryBoundary";
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { TemplateRegistryBoundary } from './TemplateRegistryBoundary';
 
 interface BreadcrumbItem {
   label: string;
@@ -13,20 +14,17 @@ interface ListBoundaryProps {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-export const ListBoundary: React.FC<ListBoundaryProps> = ({
-  children,
-  title,
-  icon,
-}) => {
+export const ListBoundary: React.FC<ListBoundaryProps> = ({ children, title, icon }) => {
+  const { t } = useTranslation();
   const breadcrumbs: BreadcrumbItem[] = [{ label: title, icon }];
 
   return (
     <TemplateRegistryBoundary
       loadingMessage={`Loading ${title}`}
-      loadingSubtitle="Preparing data..."
+      loadingSubtitle={t('components.listBoundary.preparingData')}
       loadingBreadcrumbs={breadcrumbs}
-      notFoundTitle="Data Not Found"
-      notFoundMessage="No data available."
+      notFoundTitle={t('components.listBoundary.dataNotFound')}
+      notFoundMessage={t('components.listBoundary.noDataAvailable')}
       // 列表页面通常不需要 checkNotFound，因为空列表是正常状态
     >
       {children}

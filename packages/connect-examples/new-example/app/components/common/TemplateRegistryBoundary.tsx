@@ -1,10 +1,10 @@
-import React from "react";
-import { Card, CardContent } from "../ui/Card";
-import { PageLayout } from "./PageLayout";
-import { LoadingSpinner } from "./LoadingSpinner";
-import { Breadcrumb } from "../ui/Breadcrumb";
-import { useTranslation } from "react-i18next";
-import { useTemplateRegistry } from "~/hooks/useTemplateRegistry";
+import React from 'react';
+import { Card, CardContent } from '../ui/Card';
+import { PageLayout } from './PageLayout';
+import { LoadingSpinner } from './LoadingSpinner';
+import { Breadcrumb } from '../ui/Breadcrumb';
+import { useTranslation } from 'react-i18next';
+import { useTemplateRegistry } from '../../hooks/useTemplateRegistry';
 
 interface BreadcrumbItem {
   label: string;
@@ -22,15 +22,13 @@ interface TemplateRegistryBoundaryProps {
   checkNotFound?: () => boolean;
 }
 
-export const TemplateRegistryBoundary: React.FC<
-  TemplateRegistryBoundaryProps
-> = ({
+export const TemplateRegistryBoundary: React.FC<TemplateRegistryBoundaryProps> = ({
   children,
-  loadingMessage = "Loading",
-  loadingSubtitle = "Please wait...",
+  loadingMessage = 'Loading',
+  loadingSubtitle = 'Please wait...',
   loadingBreadcrumbs = [],
-  notFoundTitle = "Not Found",
-  notFoundMessage = "The requested resource could not be found.",
+  notFoundTitle = 'Not Found',
+  notFoundMessage = 'The requested resource could not be found.',
   checkNotFound,
 }) => {
   const { t } = useTranslation();
@@ -68,7 +66,7 @@ export const TemplateRegistryBoundary: React.FC<
           <Card className="bg-card border border-orange-200">
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-orange-800 mb-2">
-                {t("common.loadError")}
+                {t('common.loadError')}
               </h3>
               <p className="text-muted-foreground">{error}</p>
             </CardContent>
@@ -85,9 +83,7 @@ export const TemplateRegistryBoundary: React.FC<
         <div className="flex items-center justify-center min-h-96">
           <Card className="bg-card border border-orange-200">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-orange-800 mb-2">
-                {notFoundTitle}
-              </h3>
+              <h3 className="text-lg font-semibold text-orange-800 mb-2">{notFoundTitle}</h3>
               <p className="text-muted-foreground">{notFoundMessage}</p>
             </CardContent>
           </Card>

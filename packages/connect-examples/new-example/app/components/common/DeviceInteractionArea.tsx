@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
+import { useTranslation } from 'react-i18next';
 import DeviceActionAnimation from '../ui/DeviceActionAnimation';
 import {
   CheckCircle,
@@ -53,6 +54,8 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
   firmwareProgress,
   currentDevice,
 }) => {
+  const { t } = useTranslation();
+
   // 获取状态配置
   const getStatusConfig = () => {
     switch (status) {
@@ -63,7 +66,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           bgColor: 'bg-blue-50',
           borderColor: 'border-blue-200',
           badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
-          message: '正在执行...',
+          message: t('components.methodExecutor.executing'),
         };
       case 'device-interaction':
         return {
@@ -72,7 +75,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           bgColor: 'bg-green-50',
           borderColor: 'border-green-200',
           badgeColor: 'bg-green-100 text-green-800 border-green-300',
-          message: '请在设备上确认操作',
+          message: t('deviceOperations.deviceInstructions'),
         };
       case 'success':
         return {
@@ -81,7 +84,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           bgColor: 'bg-green-50',
           borderColor: 'border-green-200',
           badgeColor: 'bg-green-100 text-green-800 border-green-300',
-          message: '执行成功',
+          message: t('components.methodExecutor.executionSuccess'),
         };
       case 'error':
         return {
@@ -90,7 +93,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           bgColor: 'bg-red-50',
           borderColor: 'border-red-200',
           badgeColor: 'bg-red-100 text-red-800 border-red-300',
-          message: '执行失败',
+          message: t('components.methodExecutor.executionFailed'),
         };
       default:
         return {
@@ -99,7 +102,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
           bgColor: 'bg-muted/20',
           borderColor: 'border-border/50',
           badgeColor: 'bg-muted text-muted-foreground border-border',
-          message: '等待执行',
+          message: t('components.methodExecutor.waitingExecution'),
         };
     }
   };
@@ -112,15 +115,15 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
       case 'transferData':
         return {
           icon: <Upload className="h-4 w-4" />,
-          title: '传输数据',
-          description: '正在将固件数据传输到设备...',
+          title: t('components.deviceInteractionArea.transferringData'),
+          description: t('components.deviceInteractionArea.transferringDataDesc'),
           color: 'text-blue-600',
         };
       case 'installingFirmware':
         return {
           icon: <Zap className="h-4 w-4" />,
-          title: '安装固件',
-          description: '正在安装固件，请勿断开设备...',
+          title: t('components.deviceInteractionArea.installingFirmware'),
+          description: t('components.deviceInteractionArea.installingFirmwareDesc'),
           color: 'text-orange-600',
         };
       default:
@@ -135,7 +138,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
     <Card className="bg-card border border-border/50 shadow-sm h-full flex flex-col">
       <CardHeader className="pb-1 flex-shrink-0">
         <CardTitle className="text-sm text-foreground flex items-center justify-between">
-          期望的用户体验：
+          {t('components.methodExecutor.expectedUserExperience')}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0">
@@ -207,10 +210,10 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                   <p className="text-sm text-muted-foreground">
                     {status === 'idle'
                       ? currentDevice
-                        ? '设备已连接，准备执行'
-                        : '请连接设备'
+                        ? t('components.methodExecutor.deviceConnected')
+                        : t('components.methodExecutor.connectDevice')
                       : status === 'loading'
-                      ? '正在执行...'
+                      ? t('components.methodExecutor.executing')
                       : statusConfig.message}
                   </p>
                 </div>
@@ -243,12 +246,12 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
               {status === 'loading' || status === 'device-interaction' ? (
                 <>
                   <Clock className="h-4 w-4 animate-spin" />
-                  <span>执行中</span>
+                  <span>{t('components.methodExecutor.executing2')}</span>
                 </>
               ) : (
                 <>
                   <Play className="h-4 w-4" />
-                  <span>执行</span>
+                  <span>{t('common.execute')}</span>
                 </>
               )}
             </Button>
@@ -269,12 +272,12 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
               {isCancelling ? (
                 <>
                   <Clock className="h-4 w-4 animate-spin" />
-                  <span>取消中</span>
+                  <span>{t('components.methodExecutor.cancelling')}</span>
                 </>
               ) : (
                 <>
                   <RotateCcw className="h-4 w-4" />
-                  <span>取消</span>
+                  <span>{t('common.cancel')}</span>
                 </>
               )}
             </Button>

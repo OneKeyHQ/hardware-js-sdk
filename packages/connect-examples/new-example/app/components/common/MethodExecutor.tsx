@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/use-toast';
 import { useMethodParameters } from '../../hooks/useMethodParameters';
 import { useMethodExecution } from '../../hooks/useMethodExecution';
@@ -29,6 +30,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   type = 'standard',
 }) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { deviceAction: globalDeviceAction, logs: globalLogs } = useDeviceStore();
 
   // 方法级别的执行日志状态
@@ -92,8 +94,8 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   const handleExecute = useCallback(async () => {
     if (!isConnected) {
       toast({
-        title: '设备未连接',
-        description: '请先连接硬件设备',
+        title: t('components.methodExecutor.deviceNotConnected'),
+        description: t('components.methodExecutor.connectDeviceFirst'),
         variant: 'destructive',
       });
       return;
@@ -103,7 +105,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     setExecutionStartTime(Date.now());
 
     await execute(executionParameters, executionHandler);
-  }, [isConnected, execute, executionParameters, executionHandler, toast]);
+  }, [isConnected, execute, executionParameters, executionHandler, toast, t]);
 
   // 取消操作
   const handleCancel = useCallback(async () => {

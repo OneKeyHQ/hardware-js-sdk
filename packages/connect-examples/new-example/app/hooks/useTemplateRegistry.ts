@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ChainConfig, UnifiedMethodConfig, ChainCategory } from '~/data/types';
-import { methodsRegistry } from '../data/methodsRegistry';
+import { signerMethodsRegistry } from '../data/methodsRegistry';
 
 // 统计信息类型
 interface RegistryStats {
@@ -9,15 +9,15 @@ interface RegistryStats {
   chainsByCategory: Record<ChainCategory, number>;
 }
 
-// 模板注册表类 - 简化版，使用 methodsRegistry
+// 模板注册表类 - 简化版，使用 signerMethodsRegistry
 class TemplateRegistry {
   private chains: ChainConfig[] = [];
   private ready = false;
 
   async initialize(): Promise<void> {
     try {
-      // 直接使用 methodsRegistry 的数据，无需转换
-      this.chains = methodsRegistry.chains;
+      // 直接使用 signerMethodsRegistry 的数据，无需转换
+      this.chains = signerMethodsRegistry.chains;
       this.ready = true;
     } catch (error) {
       console.error('Failed to initialize template registry:', error);

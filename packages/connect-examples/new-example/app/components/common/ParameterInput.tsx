@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -17,13 +18,13 @@ interface ParameterInputProps {
   onParamChange?: (paramName: string, value: unknown) => void;
 }
 
-// 通用配置
-const COMMON_PARAMETERS: ParameterField[] = [
+// 通用配置函数
+const getCommonParameters = (t: (key: string) => string): ParameterField[] => [
   {
     name: 'useEmptyPassphrase',
     type: 'boolean',
-    label: 'useEmptyPassphrase',
-    description: '使用空passphrase，跳过输入弹窗',
+    label: t('components.parameterInput.useEmptyPassphrase'),
+    description: t('components.parameterInput.useEmptyPassphraseDesc'),
     value: false,
     visible: true,
     editable: true,
@@ -32,8 +33,8 @@ const COMMON_PARAMETERS: ParameterField[] = [
   {
     name: 'usePassphraseState',
     type: 'boolean',
-    label: '是否使用passPhraseState',
-    description: '设备中已保存的passphrase状态字符串',
+    label: t('components.parameterInput.usePassphraseState'),
+    description: t('components.parameterInput.usePassphraseStateDesc'),
     value: false,
     visible: true,
     editable: true,
@@ -46,6 +47,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   onPresetChange,
   onParamChange,
 }) => {
+  const { t } = useTranslation();
   const {
     commonParameters,
     methodParameters,
@@ -217,36 +219,36 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       if (/firmware/i.test(paramName)) {
         return {
           accept: '.bin',
-          title: '固件文件',
-          description: '主固件程序文件，用于更新设备核心功能',
+          title: t('components.firmwareFileUpload.firmwareFile'),
+          description: t('components.firmwareFileUpload.firmwareDesc'),
         };
       }
       if (/bootloader/i.test(paramName)) {
         return {
           accept: '.bin',
-          title: 'Bootloader文件',
-          description: '引导程序文件，用于更新设备启动程序',
+          title: t('components.firmwareFileUpload.bootloaderFile'),
+          description: t('components.firmwareFileUpload.bootloaderDesc'),
         };
       }
       if (/ble/i.test(paramName)) {
         return {
           accept: '.bin',
-          title: 'BLE固件文件',
-          description: '蓝牙低功耗固件文件，用于更新蓝牙功能',
+          title: t('components.firmwareFileUpload.bleFile'),
+          description: t('components.firmwareFileUpload.bleDesc'),
         };
       }
       if (/resource/i.test(paramName)) {
         return {
           accept: '.zip',
-          title: '资源文件',
-          description: '设备界面资源包，包含图标、字体等界面元素',
+          title: t('components.firmwareFileUpload.resourceFile'),
+          description: t('components.firmwareFileUpload.resourceDesc'),
         };
       }
       // 默认配置
       return {
         accept: '.bin',
-        title: '固件文件',
-        description: '请选择相应的固件文件',
+        title: t('components.firmwareFileUpload.firmwareFile'),
+        description: t('components.firmwareFileUpload.firmwareDesc'),
       };
     };
 
@@ -294,7 +296,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             {currentValue ? (
               <span className="text-foreground cursor-pointer">{currentValue.name}</span>
             ) : (
-              <span className="text-muted-foreground cursor-pointer">选择{config.title}...</span>
+              <span className="text-muted-foreground cursor-pointer">
+                {t('components.parameterInput.selectFirmwareFile', { title: config.title })}
+              </span>
             )}
           </div>
         </div>
@@ -338,7 +342,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                   isDisabled ? 'text-muted-foreground opacity-50' : 'text-muted-foreground'
                 }`}
               >
-                {isDisabled ? '目前无passphraseState' : commonParameters.passphraseState}
+                {isDisabled
+                  ? t('components.parameterInput.currentlyNoPassphraseState')
+                  : commonParameters.passphraseState}
               </p>
             </div>
           </div>
@@ -445,7 +451,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             id={field.name}
             className="bg-background border-border focus:border-primary"
           >
-            <SelectValue placeholder={field.placeholder || `选择${field.label || field.name}`} />
+            <SelectValue
+              placeholder={field.placeholder || `${t('common.select')}${field.label || field.name}`}
+            />
           </SelectTrigger>
           <SelectContent>
             {field.options?.map(option => {
@@ -500,7 +508,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     <Card className="bg-card border border-border/50 shadow-sm">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center justify-between text-base">
-          <span className="text-foreground">⚙️ 执行参数</span>
+          <span className="text-foreground">
+            {t('components.parameterInput.executionParameters')}
+          </span>
           <div className="flex items-center space-x-2">
             <Badge variant="outline" className="text-xs">
               {methodConfig.method}
@@ -519,11 +529,11 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
           {hasMultiplePresets && (
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-2">
-                快捷预设
+                {t('components.parameterInput.quickPresets')}
               </h4>
               <Select value={selectedPreset || ''} onValueChange={handlePresetChange}>
                 <SelectTrigger className="bg-background border-border focus:border-primary">
-                  <SelectValue placeholder="选择预设配置" />
+                  <SelectValue placeholder={t('components.parameterInput.selectPreset')} />
                 </SelectTrigger>
                 <SelectContent>
                   {presets.map(preset => (
@@ -541,7 +551,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
           {/* 通用参数 */}
           <div className="space-y-3">
             <div className="flex items-center border-b border-border/50 pb-2">
-              <h4 className="text-sm font-medium text-foreground mr-2">通用参数</h4>
+              <h4 className="text-sm font-medium text-foreground mr-2">
+                {t('components.parameterInput.commonParameters')}
+              </h4>
               <Button
                 variant="ghost"
                 size="sm"
@@ -556,13 +568,13 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                 <ExternalLink className="h-3 w-3" />
               </Button>
             </div>
-            <div className="space-y-3">{COMMON_PARAMETERS.map(renderParameterField)}</div>
+            <div className="space-y-3">{getCommonParameters(t).map(renderParameterField)}</div>
           </div>
 
           {/* 方法参数 */}
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-2">
-              方法参数
+              {t('components.parameterInput.methodParameters')}
               {selectedPreset && (
                 <span className="text-xs text-muted-foreground ml-2">({selectedPreset})</span>
               )}
@@ -573,12 +585,12 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
               <div className="text-center py-4">
                 <p className="text-xs text-muted-foreground">
                   {hasBundleParam
-                    ? '参数在 bundle 数组中配置'
+                    ? t('components.parameterInput.parametersInBundle')
                     : hasPresets && selectedPreset
-                    ? '无需配置额外参数'
+                    ? t('components.parameterInput.noAdditionalParams')
                     : hasPresets
-                    ? '请先选择预设配置'
-                    : '无需配置额外参数'}
+                    ? t('components.parameterInput.selectPresetFirst')
+                    : t('components.parameterInput.noAdditionalParams')}
                 </p>
               </div>
             )}
@@ -589,9 +601,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
         {hasBundleParam && (
           <Alert className="border-border bg-muted/20 py-3">
             <AlertDescription className="text-muted-foreground text-sm">
-              <strong>批量模式：</strong>方法参数在
-              <code className="mx-1 px-1 py-0.5 bg-muted/50 rounded text-xs">bundle</code>
-              数组中，外层仅保留通用参数。
+              <strong>{t('components.parameterInput.batchMode')}</strong>
+              {t('components.parameterInput.batchModeDesc')}
             </AlertDescription>
           </Alert>
         )}

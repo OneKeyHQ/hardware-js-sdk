@@ -1,9 +1,4 @@
-import type { UnifiedMethodConfig } from '../types';
-
-// 链元数据
-const chainMeta = {
-  id: 'sui',
-};
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 const api: UnifiedMethodConfig[] = [
   {
@@ -206,7 +201,10 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const sui = {
-  ...chainMeta,
+export const sui: {
+  api: UnifiedMethodConfig[];
+  id: ChainCategory;
+} = {
+  id: 'sui',
   api,
 };

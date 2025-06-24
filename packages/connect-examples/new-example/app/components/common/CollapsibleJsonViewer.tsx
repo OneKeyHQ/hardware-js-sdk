@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronRight, ChevronDown, Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hooks/use-toast';
 
@@ -15,19 +16,20 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
   currentDepth = 0,
 }) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const copyToClipboard = async (value: unknown) => {
     try {
       const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
       await navigator.clipboard.writeText(text);
       toast({
-        title: '已复制',
-        description: '内容已复制到剪贴板',
+        title: t('components.collapsibleJsonViewer.copied'),
+        description: t('components.collapsibleJsonViewer.copyToClipboard'),
       });
     } catch (error) {
       toast({
-        title: '复制失败',
-        description: '无法复制到剪贴板',
+        title: t('components.collapsibleJsonViewer.copyFailed'),
+        description: t('components.collapsibleJsonViewer.cannotCopyToClipboard'),
         variant: 'destructive',
       });
     }
@@ -97,6 +99,7 @@ const ObjectViewer: React.FC<{
 }> = ({ object, currentDepth, maxDepth }) => {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const toggleKey = (key: string) => {
     const newExpanded = new Set(expandedKeys);
@@ -112,13 +115,13 @@ const ObjectViewer: React.FC<{
     try {
       await navigator.clipboard.writeText(JSON.stringify(object, null, 2));
       toast({
-        title: '已复制',
-        description: '对象已复制到剪贴板',
+        title: t('components.collapsibleJsonViewer.copied'),
+        description: t('components.collapsibleJsonViewer.objectCopied'),
       });
     } catch (error) {
       toast({
-        title: '复制失败',
-        description: '无法复制到剪贴板',
+        title: t('components.collapsibleJsonViewer.copyFailed'),
+        description: t('components.collapsibleJsonViewer.cannotCopyToClipboard'),
         variant: 'destructive',
       });
     }
@@ -228,18 +231,19 @@ const ArrayViewer: React.FC<{
 }> = ({ array, currentDepth, maxDepth }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const copyArray = async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(array, null, 2));
       toast({
-        title: '已复制',
-        description: '数组已复制到剪贴板',
+        title: t('components.collapsibleJsonViewer.copied'),
+        description: t('components.collapsibleJsonViewer.arrayCopied'),
       });
     } catch (error) {
       toast({
-        title: '复制失败',
-        description: '无法复制到剪贴板',
+        title: t('components.collapsibleJsonViewer.copyFailed'),
+        description: t('components.collapsibleJsonViewer.cannotCopyToClipboard'),
         variant: 'destructive',
       });
     }
@@ -261,7 +265,11 @@ const ArrayViewer: React.FC<{
           {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </Button>
         <span className="text-gray-600 dark:text-gray-400">[</span>
-        {!isExpanded && <span className="text-gray-500 italic">{array.length} items</span>}
+        {!isExpanded && (
+          <span className="text-gray-500 italic">
+            {array.length} {t('components.collapsibleJsonViewer.items')}
+          </span>
+        )}
         <Button
           variant="ghost"
           size="sm"

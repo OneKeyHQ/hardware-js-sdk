@@ -1,9 +1,4 @@
-import type { UnifiedMethodConfig } from '../types';
-
-// 链元数据
-const chainMeta = {
-  id: 'scdo',
-};
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 const api: UnifiedMethodConfig[] = [
   {
@@ -140,7 +135,11 @@ const api: UnifiedMethodConfig[] = [
   },
 ];
 
-export const scdo = {
-  ...chainMeta,
+// 导出链配置对象
+export const scdo: {
+  api: UnifiedMethodConfig[];
+  id: ChainCategory;
+} = {
+  id: 'scdo',
   api,
 };

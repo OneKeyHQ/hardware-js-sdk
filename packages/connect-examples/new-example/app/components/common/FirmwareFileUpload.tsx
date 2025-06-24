@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Upload, File, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -31,6 +32,7 @@ const FirmwareFileUpload: React.FC<FirmwareFileUploadProps> = ({
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   // 格式化文件大小
   const formatFileSize = (bytes: number): string => {
@@ -46,7 +48,9 @@ const FirmwareFileUpload: React.FC<FirmwareFileUploadProps> = ({
     (file: File): string | null => {
       // 检查文件大小
       if (file.size > maxSize) {
-        return `文件大小超过限制 (${formatFileSize(maxSize)})`;
+        return `${t('components.firmwareFileUpload.fileSizeTooLarge')} (${formatFileSize(
+          maxSize
+        )})`;
       }
 
       // 检查文件格式
@@ -54,12 +58,12 @@ const FirmwareFileUpload: React.FC<FirmwareFileUploadProps> = ({
       const acceptedExtensions = acceptedFormats.split(',').map(ext => ext.trim().toLowerCase());
 
       if (!acceptedExtensions.includes(fileExtension)) {
-        return `不支持的文件格式。支持的格式: ${acceptedFormats}`;
+        return `${t('components.firmwareFileUpload.unsupportedFormat')}: ${acceptedFormats}`;
       }
 
       return null;
     },
-    [maxSize, acceptedFormats]
+    [maxSize, acceptedFormats, t]
   );
 
   // 处理文件选择
@@ -156,9 +160,12 @@ const FirmwareFileUpload: React.FC<FirmwareFileUploadProps> = ({
             <div className="space-y-2">
               <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
               <div className="space-y-1">
-                <p className="text-sm font-medium">点击选择文件或拖拽文件到此处</p>
+                <p className="text-sm font-medium">
+                  {t('components.firmwareFileUpload.clickToSelect')}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  支持格式: {acceptedFormats} | 最大: {formatFileSize(maxSize)}
+                  {t('components.firmwareFileUpload.supportedFormats')}: {acceptedFormats} |{' '}
+                  {t('components.firmwareFileUpload.maxSize')}: {formatFileSize(maxSize)}
                 </p>
               </div>
             </div>
@@ -203,9 +210,9 @@ const FirmwareFileUpload: React.FC<FirmwareFileUploadProps> = ({
 
         {/* 帮助信息 */}
         <div className="text-xs text-muted-foreground space-y-1">
-          <p>• 请确保固件文件来源可靠，避免使用未经验证的固件</p>
-          <p>• 更新过程中请勿断开设备连接或关闭浏览器</p>
-          <p>• 建议在更新前备份重要数据</p>
+          <p>{t('components.firmwareFileUpload.helpInfo.line1')}</p>
+          <p>{t('components.firmwareFileUpload.helpInfo.line2')}</p>
+          <p>{t('components.firmwareFileUpload.helpInfo.line3')}</p>
         </div>
       </CardContent>
     </Card>

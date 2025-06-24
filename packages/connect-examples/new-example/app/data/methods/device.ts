@@ -1,9 +1,4 @@
-import type { UnifiedMethodConfig } from '../types';
-
-// 链元数据
-export const chainMeta = {
-  id: 'device',
-};
+import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
 
 const api: UnifiedMethodConfig[] = [
   // Basic Operations
@@ -159,7 +154,10 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const device = {
-  ...chainMeta,
+export const device: {
+  api: UnifiedMethodConfig[];
+  id: DeviceMethodCategory;
+} = {
+  id: 'device',
   api,
 };

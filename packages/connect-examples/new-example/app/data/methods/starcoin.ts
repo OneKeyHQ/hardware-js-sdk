@@ -1,9 +1,4 @@
-import type { UnifiedMethodConfig } from '../types';
-
-// 链元数据
-const chainMeta = {
-  id: 'starcoin',
-};
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 const api: UnifiedMethodConfig[] = [
   {
@@ -204,7 +199,10 @@ const api: UnifiedMethodConfig[] = [
 ];
 
 // 导出链配置对象
-export const starcoin = {
-  ...chainMeta,
+export const starcoin: {
+  api: UnifiedMethodConfig[];
+  id: ChainCategory;
+} = {
+  id: 'starcoin',
   api,
 };

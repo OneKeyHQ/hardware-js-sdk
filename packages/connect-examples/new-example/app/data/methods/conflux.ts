@@ -1,9 +1,4 @@
-import type { UnifiedMethodConfig } from '../types';
-
-// 链元数据
-const chainMeta = {
-  id: 'conflux',
-};
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
 
 const api: UnifiedMethodConfig[] = [
   {
@@ -199,7 +194,11 @@ const api: UnifiedMethodConfig[] = [
   },
 ];
 
-export const conflux = {
-  ...chainMeta,
+// 导出链配置对象
+export const conflux: {
+  api: UnifiedMethodConfig[];
+  id: ChainCategory;
+} = {
+  id: 'conflux',
   api,
 };

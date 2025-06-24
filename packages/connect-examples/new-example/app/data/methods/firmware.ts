@@ -1,7 +1,4 @@
-import type { UnifiedMethodConfig } from '../types';
-const chainMeta = {
-  id: 'firmware',
-};
+import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
 
 // 固件更新方法定义 - 使用统一格式
 const api: UnifiedMethodConfig[] = [
@@ -188,7 +185,11 @@ export interface FirmwareUpdateType {
   isProOnly?: boolean;
 }
 
-export const firmware = {
-  ...chainMeta,
+// 导出链配置对象
+export const firmware: {
+  api: UnifiedMethodConfig[];
+  id: DeviceMethodCategory;
+} = {
+  id: 'firmware',
   api,
 };

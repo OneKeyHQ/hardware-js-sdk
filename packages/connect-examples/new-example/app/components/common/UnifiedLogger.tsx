@@ -17,6 +17,7 @@ import {
   Inbox,
   FileText,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/use-toast';
 import CollapsibleJsonViewer from './CollapsibleJsonViewer';
 
@@ -51,6 +52,7 @@ const SmartContentDisplay: React.FC<{
   title: string;
 }> = ({ content }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { t } = useTranslation();
 
   if (!content) return null;
 
@@ -81,12 +83,12 @@ const SmartContentDisplay: React.FC<{
           {isExpanded ? (
             <>
               <ChevronUp className="h-3 w-3 mr-1" />
-              收起 ({lines.length} 行)
+              {t('components.unifiedLogger.collapseLines', { count: lines.length })}
             </>
           ) : (
             <>
               <ChevronDown className="h-3 w-3 mr-1" />
-              展开 ({lines.length} 行)
+              {t('components.unifiedLogger.expandLines', { count: lines.length })}
             </>
           )}
         </Button>
@@ -114,6 +116,7 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const { t } = useTranslation();
 
   // 自动滚动到底部
   useEffect(() => {
@@ -216,13 +219,13 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
 
       await navigator.clipboard.writeText(logText);
       toast({
-        title: '已复制',
-        description: '日志内容已复制到剪贴板',
+        title: t('components.unifiedLogger.logsCopied'),
+        description: t('components.unifiedLogger.logsCopiedDesc'),
       });
     } catch (error) {
       toast({
-        title: '复制失败',
-        description: '无法复制到剪贴板',
+        title: t('components.unifiedLogger.copyLogsFailed'),
+        description: t('components.unifiedLogger.copyLogsFailedDesc'),
         variant: 'destructive',
       });
     }
@@ -239,7 +242,7 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
             </CardTitle>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-xs">
-                {filteredLogs.length} 条记录
+                {filteredLogs.length} {t('components.unifiedLogger.records')}
               </Badge>
               <Button
                 variant="outline"
@@ -249,7 +252,7 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
                 className="h-7 px-2 text-xs"
               >
                 <Trash2 className="h-3 w-3 mr-1" />
-                清除
+                {t('common.clear')}
               </Button>
             </div>
           </div>
@@ -259,7 +262,7 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
               <div className="flex-1 relative">
                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                 <Input
-                  placeholder="搜索日志..."
+                  placeholder={t('components.unifiedLogger.searchLogs')}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="pl-7 h-7 text-xs"
@@ -271,12 +274,12 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">全部</SelectItem>
-                  <SelectItem value="request">请求</SelectItem>
-                  <SelectItem value="response">响应</SelectItem>
-                  <SelectItem value="hardware">硬件</SelectItem>
-                  <SelectItem value="error">错误</SelectItem>
-                  <SelectItem value="info">信息</SelectItem>
+                  <SelectItem value="all">{t('components.unifiedLogger.all')}</SelectItem>
+                  <SelectItem value="request">{t('components.unifiedLogger.request')}</SelectItem>
+                  <SelectItem value="response">{t('components.unifiedLogger.response')}</SelectItem>
+                  <SelectItem value="hardware">{t('components.unifiedLogger.hardware')}</SelectItem>
+                  <SelectItem value="error">{t('common.error')}</SelectItem>
+                  <SelectItem value="info">{t('components.unifiedLogger.info')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -290,7 +293,9 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <FileText className="h-8 w-8 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">
-                {logs.length === 0 ? '暂无日志记录' : '没有匹配的日志'}
+                {logs.length === 0
+                  ? t('components.unifiedLogger.noLogs')
+                  : t('components.unifiedLogger.noMatchingLogs')}
               </p>
             </div>
           ) : (

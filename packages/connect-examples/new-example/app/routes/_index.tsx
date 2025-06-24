@@ -33,7 +33,7 @@ export default function IndexPage() {
     }
   };
 
-  const deviceDisplayName = currentDevice ? getCurrentDeviceLabel() : '';
+  const deviceDisplayName = currentDevice ? getCurrentDeviceLabel() : 'Unknown';
 
   // 处理 SDK 初始化错误 - 使用 toast 通知
   React.useEffect(() => {

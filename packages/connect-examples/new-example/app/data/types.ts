@@ -75,7 +75,12 @@ export type ChainCategory =
   | 'filecoin'
   | 'nostr'
   | 'lightning'
-  | 'all-network';
+  | 'allnetwork';
+
+export type DeviceMethodCategory = 'device' | 'firmware';
+
+// 联合类型，用于统一处理
+export type AllMethodCategory = ChainCategory | DeviceMethodCategory;
 
 // **统一的方法配置类型** - 极简设计
 export interface UnifiedMethodConfig {
@@ -108,15 +113,28 @@ export type ExecutionStatus =
 // 日志类型
 export type LogType = 'info' | 'success' | 'error' | 'warning';
 
-// 链元数据类型
-export interface ChainMeta {
-  id: ChainCategory;
-}
-
-// 链配置类型（保持兼容）
-export interface ChainConfig extends ChainMeta {
+// 链配置类型 - 简化为统一类型
+export interface ChainConfig {
+  id: AllMethodCategory;
   methods: UnifiedMethodConfig[];
 }
 
-// 标准方法配置类型 - 这是唯一的数据格式
-export type MethodConfig = UnifiedMethodConfig;
+// 模块配置类型 - 用于注册表
+export interface ModuleConfig {
+  id: string;
+  module: {
+    api: UnifiedMethodConfig[];
+    id: AllMethodCategory;
+  };
+}
+
+// 方法注册表接口
+export interface MethodsRegistry {
+  chains: ChainConfig[];
+  methodsByChain: Record<string, UnifiedMethodConfig[]>;
+  allMethods: UnifiedMethodConfig[];
+  getChainMethods: (chainId: string) => UnifiedMethodConfig[];
+  searchMethods: (query: string) => UnifiedMethodConfig[];
+  getChain: (chainId: string) => ChainConfig | undefined;
+  isReady: () => boolean;
+}

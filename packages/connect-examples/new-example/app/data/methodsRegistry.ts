@@ -3,7 +3,7 @@
 // 将所有方法数据合并到一个文件中以优化打包
 // ============================================
 
-import type { UnifiedMethodConfig, ChainConfig, ChainCategory } from './types';
+import type { UnifiedMethodConfig, ChainConfig, ModuleConfig, MethodsRegistry } from './types';
 
 // 静态导入所有方法，确保它们被打包到一个chunk中
 import { bitcoin } from './methods/bitcoin';
@@ -35,20 +35,17 @@ import { nostr } from './methods/nostr';
 import { lightning } from './methods/lightning';
 import { allnetwork } from './methods/allnetwork';
 import { benfen } from './methods/benfen';
+import { device } from './methods/device';
+import { firmware } from './methods/firmware';
 
-// 创建统一的方法注册表接口
-export interface MethodsRegistry {
-  chains: ChainConfig[];
-  methodsByChain: Record<string, UnifiedMethodConfig[]>;
-  allMethods: UnifiedMethodConfig[];
-  getChainMethods: (chainId: string) => UnifiedMethodConfig[];
-  searchMethods: (query: string) => UnifiedMethodConfig[];
-  getChain: (chainId: string) => ChainConfig | undefined;
-  isReady: () => boolean;
-}
+// 设备模块配置
+const deviceModules: ModuleConfig[] = [
+  { id: 'device', module: device },
+  { id: 'firmware', module: firmware },
+];
 
 // 链模块配置
-const chainModules = [
+const chainModules: ModuleConfig[] = [
   // 主要区块链
   { id: 'bitcoin', module: bitcoin },
   { id: 'ethereum', module: ethereum },
@@ -61,7 +58,7 @@ const chainModules = [
   { id: 'ton', module: ton },
   { id: 'cosmos', module: cosmos },
   { id: 'tron', module: tron },
-  { id: 'ripple', module: xrp },
+  { id: 'xrp', module: xrp },
   { id: 'stellar', module: stellar },
   { id: 'neo', module: neo },
   { id: 'nem', module: nem },
@@ -83,17 +80,17 @@ const chainModules = [
   { id: 'allnetwork', module: allnetwork },
 ];
 
-// 构建注册表
-function buildMethodsRegistry(): MethodsRegistry {
+// 构建注册表的通用函数
+function buildRegistry(modules: ModuleConfig[]): MethodsRegistry {
   const chains: ChainConfig[] = [];
   const methodsByChain: Record<string, UnifiedMethodConfig[]> = {};
   const allMethodsList: UnifiedMethodConfig[] = [];
 
-  chainModules.forEach(({ id, module }) => {
+  modules.forEach(({ id, module }) => {
     try {
       // 获取方法数组和链元数据
       const methods = module.api;
-      const chainMetaId = module.id as ChainCategory;
+      const chainMetaId = module.id;
 
       if (Array.isArray(methods) && methods.length > 0 && chainMetaId) {
         // 创建链配置
@@ -106,10 +103,10 @@ function buildMethodsRegistry(): MethodsRegistry {
         methodsByChain[id] = methods;
         allMethodsList.push(...methods);
       } else {
-        console.warn(`Invalid data for chain ${id}:`, { methods, chainMetaId });
+        console.warn(`Invalid data for module ${id}:`, { methods, chainMetaId });
       }
     } catch (error) {
-      console.warn(`Failed to process chain ${id}:`, error);
+      console.warn(`Failed to process module ${id}:`, error);
     }
   });
 
@@ -132,20 +129,21 @@ function buildMethodsRegistry(): MethodsRegistry {
 }
 
 // 创建并导出注册表实例
-export const methodsRegistry = buildMethodsRegistry();
+export const signerMethodsRegistry = buildRegistry(chainModules);
+export const deviceMethodsRegistry = buildRegistry(deviceModules);
 
 // 导出便捷函数
-export const getChainMethods = (chainId: string) => methodsRegistry.getChainMethods(chainId);
-export const searchMethods = (query: string) => methodsRegistry.searchMethods(query);
-export const getAllChains = () => methodsRegistry.chains;
-export const getAllMethods = () => methodsRegistry.allMethods;
-export const getChain = (chainId: string) => methodsRegistry.getChain(chainId);
+export const getChainMethods = (chainId: string) => signerMethodsRegistry.getChainMethods(chainId);
+export const searchMethods = (query: string) => signerMethodsRegistry.searchMethods(query);
+export const getAllChains = () => signerMethodsRegistry.chains;
+export const getAllMethods = () => signerMethodsRegistry.allMethods;
+export const getChain = (chainId: string) => signerMethodsRegistry.getChain(chainId);
 
 // 按类别分组的方法
 export const getMethodsByCategory = () => {
   const categories: Record<string, ChainConfig[]> = {};
 
-  methodsRegistry.chains.forEach(chain => {
+  signerMethodsRegistry.chains.forEach(chain => {
     const category = chain.id;
     if (!categories[category]) {
       categories[category] = [];
@@ -158,11 +156,11 @@ export const getMethodsByCategory = () => {
 
 // 获取统计信息
 export const getRegistryStats = () => {
-  const totalChains = methodsRegistry.chains.length;
-  const totalMethods = methodsRegistry.allMethods.length;
+  const totalChains = signerMethodsRegistry.chains.length;
+  const totalMethods = signerMethodsRegistry.allMethods.length;
   const categoryCounts: Record<string, number> = {};
 
-  methodsRegistry.chains.forEach(chain => {
+  signerMethodsRegistry.chains.forEach(chain => {
     const category = chain.id;
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
   });
@@ -173,6 +171,3 @@ export const getRegistryStats = () => {
     categoryCounts,
   };
 };
-
-// 默认导出
-export default methodsRegistry;

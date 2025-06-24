@@ -1,4 +1,4 @@
-import { methodsRegistry } from './methodsRegistry';
+import { signerMethodsRegistry } from './methodsRegistry';
 import i18n from '../i18n/config';
 import type { Action } from 'kbar';
 
@@ -234,7 +234,7 @@ export const buildSearchActions = (sortMode: SortMode = SortMode.PRIORITY): Acti
   );
 
   // 为每个链创建搜索动作，并处理方法
-  methodsRegistry.chains.forEach(chain => {
+  signerMethodsRegistry.chains.forEach(chain => {
     // 根据链的 ID 确定正确的路由前缀
     let routePrefix: string;
     const chainIdStr = String(chain.id);

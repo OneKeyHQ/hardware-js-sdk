@@ -35,7 +35,7 @@ const defaultUIState = {
 // 创建 UI 状态存储
 export const useUIStore = create<UIState>()(
   persist(
-    (set, get) => ({
+    set => ({
       // 初始状态
       ...defaultUIState,
 
