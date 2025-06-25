@@ -204,11 +204,11 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         />
       </div>
 
-      {/* 主要内容区域 - 自然高度 */}
-      <div className="w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      {/* 主要内容区域 - 固定高度 */}
+      <div className="w-full min-h-[450px] h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-full">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col">
+          <div className="lg:col-span-2 flex flex-col h-full">
             <DeviceInteractionArea
               status={status}
               deviceAction={deviceAction}
@@ -223,14 +223,14 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           </div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col">
+          <div className="lg:col-span-3 flex flex-col h-full">
             <ExecutionPanel
               requestData={storeExecutionParameters}
               onSaveRequest={handleRequestParamsEdit}
               logs={currentExecutionLogs}
               onClearLogs={handleClearExecutionLogs}
               disabled={status === 'loading' || status === 'device-interaction'}
-              className="w-full"
+              className="h-full"
             />
           </div>
         </div>

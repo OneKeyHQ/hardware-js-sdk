@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useToast } from './use-toast';
-import { convertFilesToArrayBuffers } from '../utils/fileConverter';
+import { convertFilesToArrayBuffers } from '../store/hardwareStore';
 import { cancelHardwareOperation } from '../services/hardwareService';
 import type { ExecutionStatus } from '~/data/types';
 import type { UiEvent } from '@onekeyfe/hd-core';

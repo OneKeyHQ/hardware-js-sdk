@@ -306,7 +306,7 @@ export const zh = {
       message: '消息',
       noLogsToShare: '没有可分享的日志',
       records: '记录',
-      description: '查看和管理OneKey设备操作的详细日志',
+      searchPlaceholder: '按内容、类型或消息搜索日志...',
       noLogs: '没有操作日志',
       noLogsDesc: '连接设备并执行操作以在此处查看日志',
       executeOperation: '执行操作',
@@ -647,6 +647,7 @@ export const zh = {
         lines: '行',
         expandLines: '展开 ({{count}} 行)',
         collapseLines: '收起 ({{count}} 行)',
+        scrollToTop: '回到顶部',
       },
       deviceInteractionArea: {
         transferringData: '传输数据',

@@ -320,7 +320,7 @@ export const en = {
       message: 'Message',
       noLogsToShare: 'No logs to share',
       records: 'records',
-      description: 'View detailed logs of OneKey device operations',
+      searchPlaceholder: 'Search logs by content, type, or message...',
       noLogs: 'No Operation Logs',
       noLogsDesc: 'Connect your device and perform operations to see logs here',
       executeOperation: 'Execute Operation',
@@ -675,6 +675,7 @@ export const en = {
         lines: 'lines',
         expandLines: 'Expand ({{count}} lines)',
         collapseLines: 'Collapse ({{count}} lines)',
+        scrollToTop: 'Scroll to top',
       },
       deviceInteractionArea: {
         transferringData: 'Transferring Data',

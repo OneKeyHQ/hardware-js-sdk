@@ -41,8 +41,8 @@ const DeviceMethodExecutePage: React.FC = () => {
       checkNotFound={isMethodNotFound}
     >
       {selectedMethod && (
-        <PageLayout fixedHeight={false}>
-          <div className="px-4 py-3">
+        <PageLayout fixedHeight={true}>
+          <div className="flex-1 flex flex-col px-4 py-3 min-h-0">
             {/* 面包屑导航 */}
             <div className="mb-4">
               <Breadcrumb
@@ -66,6 +66,7 @@ const DeviceMethodExecutePage: React.FC = () => {
 
             {/* 执行器 - 自适应高度 */}
             <MethodExecutor
+              className="h-full"
               methodConfig={selectedMethod}
               executionHandler={handleMethodExecution}
               type={

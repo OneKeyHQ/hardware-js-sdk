@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -43,6 +43,8 @@ interface UnifiedLoggerProps {
   showFilters?: boolean;
   showHeader?: boolean;
   className?: string;
+  externalSearchTerm?: string;
+  externalFilter?: string;
 }
 
 // 内容处理组件
@@ -61,7 +63,7 @@ const SmartContentDisplay: React.FC<{
     const lines = content.split('\n');
     if (lines.length <= 3) {
       return (
-        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
+        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
           {content}
         </pre>
       );
@@ -70,15 +72,15 @@ const SmartContentDisplay: React.FC<{
     const previewContent = lines.slice(0, 3).join('\n') + (lines.length > 3 ? '\n...' : '');
 
     return (
-      <div className="space-y-2">
-        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
+      <div className="space-y-1">
+        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
           {isExpanded ? content : previewContent}
         </pre>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+          className="h-5 px-2 text-xs text-muted-foreground hover:text-foreground"
         >
           {isExpanded ? (
             <>
@@ -98,7 +100,7 @@ const SmartContentDisplay: React.FC<{
 
   // 使用新的JSON查看器
   return (
-    <div className="bg-muted/30 dark:bg-muted/20 p-3 rounded-md">
+    <div className="bg-muted/30 dark:bg-muted/20 p-2 rounded-md">
       <CollapsibleJsonViewer data={content} maxDepth={2} />
     </div>
   );
@@ -111,19 +113,15 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
   showFilters = false,
   showHeader = true,
   className = '',
+  externalSearchTerm = '',
+  externalFilter = '',
 }) => {
   const { toast } = useToast();
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const internalScrollRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const { t } = useTranslation();
 
-  // 自动滚动到底部
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [logs]);
+  const { t } = useTranslation();
 
   // 获取日志类型的配置
   const getLogTypeConfig = (type: LogType) => {
@@ -186,22 +184,53 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
     };
   };
 
-  // 过滤日志
-  const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
+  // 预处理日志数据，缓存标准化结果
+  const normalizedLogs = useMemo(() => {
+    return logs.map(log => {
       const normalizedLog = normalizeLogEntry(log);
-      const matchesFilter = filter === 'all' || log.type === filter;
-      const matchesSearch =
-        searchTerm === '' ||
-        normalizedLog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (typeof normalizedLog.content === 'string' &&
-          normalizedLog.content.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      return matchesFilter && matchesSearch;
+      return {
+        ...log,
+        normalizedTitle: normalizedLog.title,
+        normalizedContent: normalizedLog.content,
+        normalizedTimestamp: normalizedLog.timestamp,
+        // 预计算搜索字符串以提高搜索性能
+        searchableText: [
+          normalizedLog.title,
+          log.description || '',
+          log.message || '',
+          typeof normalizedLog.content === 'string' ? normalizedLog.content : '',
+        ]
+          .join(' ')
+          .toLowerCase(),
+      };
     });
-  }, [logs, filter, searchTerm]);
+  }, [logs]);
+
+  // 过滤和排序日志（倒序：最新的在顶部）
+  const filteredLogs = useMemo(() => {
+    // 使用外部搜索词或内部搜索词
+    const effectiveSearchTerm = (externalSearchTerm || searchTerm).toLowerCase().trim();
+
+    let result = normalizedLogs;
+
+    // 应用类型过滤（优先使用外部过滤器）
+    const effectiveFilter = externalFilter || filter;
+    if (effectiveFilter !== 'all') {
+      result = result.filter(log => log.type === effectiveFilter);
+    }
+
+    // 应用搜索过滤
+    if (effectiveSearchTerm) {
+      result = result.filter(log => log.searchableText.includes(effectiveSearchTerm));
+    }
+
+    // 排序：倒序，最新的在顶部
+    return result.sort((a, b) => {
+      const timestampA = typeof a.timestamp === 'string' ? new Date(a.timestamp) : a.timestamp;
+      const timestampB = typeof b.timestamp === 'string' ? new Date(b.timestamp) : b.timestamp;
+      return timestampB.getTime() - timestampA.getTime();
+    });
+  }, [normalizedLogs, filter, searchTerm, externalSearchTerm, externalFilter]);
 
   // 复制日志内容
   const handleCopyLog = async (log: UnifiedLogEntry) => {
@@ -213,7 +242,7 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
           : JSON.stringify(normalizedLog.content, null, 2)
         : '';
 
-      const logText = `[${normalizedLog.timestamp.toLocaleTimeString()}] [${log.type.toUpperCase()}] ${
+      const logText = `[${normalizedLog.timestamp.toLocaleString()}] [${log.type.toUpperCase()}] ${
         normalizedLog.title
       }\n${log.description || ''}\n${content}`;
 
@@ -259,15 +288,18 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
 
           {showFilters && (
             <div className="flex items-center gap-2 pt-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                <Input
-                  placeholder={t('components.unifiedLogger.searchLogs')}
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-7 h-7 text-xs"
-                />
-              </div>
+              {/* 只有在没有外部搜索时才显示内部搜索框 */}
+              {!externalSearchTerm && (
+                <div className="flex-1 relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                  <Input
+                    placeholder={t('components.unifiedLogger.searchLogs')}
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="pl-7 h-7 text-xs"
+                  />
+                </div>
+              )}
               <Select value={filter} onValueChange={setFilter}>
                 <SelectTrigger className="w-24 h-7 text-xs">
                   <Filter className="h-3 w-3 mr-1" />
@@ -287,8 +319,8 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
         </CardHeader>
       )}
 
-      <CardContent className="p-0 flex flex-col flex-1 min-h-0">
-        <div ref={scrollRef} className={`flex-1 min-h-0 overflow-y-auto space-y-2 p-4`}>
+      <CardContent className="p-0 flex flex-col flex-1 min-h-0 relative">
+        <div ref={internalScrollRef} className="flex-1 min-h-0 overflow-y-auto p-3">
           {filteredLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <FileText className="h-8 w-8 text-muted-foreground mb-2" />
@@ -299,53 +331,57 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
               </p>
             </div>
           ) : (
-            filteredLogs.map(log => {
-              const normalizedLog = normalizeLogEntry(log);
-              const config = getLogTypeConfig(log.type);
-              return (
-                <div
-                  key={log.id}
-                  className={`${config.bgColor} border border-border/30 rounded-lg p-3 space-y-2`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <Badge
-                        className={`${config.badge} text-xs px-2 py-0.5 flex items-center gap-1`}
+            <div className="space-y-2">
+              {/* 移除虚拟化，直接渲染所有日志项 */}
+              {filteredLogs.map(log => {
+                const config = getLogTypeConfig(log.type);
+                return (
+                  <div
+                    key={log.id}
+                    className={`${config.bgColor} border border-border/30 rounded-lg p-2 space-y-1.5`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Badge
+                          className={`${config.badge} text-xs px-1.5 py-0.5 flex items-center gap-1`}
+                        >
+                          {config.icon}
+                          {log.type}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {log.normalizedTimestamp.toLocaleString()}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopyLog(log)}
+                        className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
                       >
-                        {config.icon}
-                        {log.type}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {normalizedLog.timestamp.toLocaleTimeString()}
-                      </span>
+                        <Copy className="h-3 w-3" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopyLog(log)}
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
 
-                  <div className="space-y-1">
-                    <h4 className={`text-sm font-medium ${config.color}`}>{normalizedLog.title}</h4>
-                    {log.description && (
-                      <p className="text-xs text-muted-foreground">{log.description}</p>
+                    <div className="space-y-0.5">
+                      <h4 className={`text-xs font-medium ${config.color}`}>
+                        {log.normalizedTitle}
+                      </h4>
+                      {log.description && (
+                        <p className="text-xs text-muted-foreground">{log.description}</p>
+                      )}
+                    </div>
+
+                    {log.normalizedContent && (
+                      <SmartContentDisplay
+                        content={log.normalizedContent}
+                        type={log.type}
+                        title={log.normalizedTitle}
+                      />
                     )}
                   </div>
-
-                  {normalizedLog.content && (
-                    <SmartContentDisplay
-                      content={normalizedLog.content}
-                      type={log.type}
-                      title={normalizedLog.title}
-                    />
-                  )}
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
       </CardContent>

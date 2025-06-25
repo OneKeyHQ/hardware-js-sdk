@@ -38,72 +38,70 @@ const ChainsIndexPage: React.FC = () => {
   return (
     <ListBoundary title={t('chains.title')} icon={Layers}>
       <PageLayout fixedHeight={true}>
-        <div className="h-full flex flex-col">
-          <div className="flex-1 flex flex-col px-4 py-3 min-h-0">
-            {/* 面包屑导航 + 搜索框 */}
-            <div className="flex-shrink-0 mb-4">
-              <div className="flex items-center justify-between gap-4">
-                <Breadcrumb items={[{ label: t('chains.title'), icon: Layers }]} />
-                <div className="relative w-80">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder={t('chains.searchPlaceholder')}
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+        <div className="flex-1 flex flex-col px-4 py-3 min-h-0">
+          {/* 面包屑导航 + 搜索框 */}
+          <div className="flex-shrink-0 mb-4">
+            <div className="flex items-center justify-between gap-4">
+              <Breadcrumb items={[{ label: t('chains.title'), icon: Layers }]} />
+              <div className="relative w-80">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder={t('chains.searchPlaceholder')}
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
             </div>
+          </div>
 
-            {/* 页面信息 */}
-            <div className="flex-shrink-0 mb-3">
-              <p className="text-sm text-muted-foreground">
-                {t('chains.availableChains', { count: filteredChains.length })}
-              </p>
-            </div>
+          {/* 页面信息 */}
+          <div className="flex-shrink-0 mb-3">
+            <p className="text-sm text-muted-foreground">
+              {t('chains.availableChains', { count: filteredChains.length })}
+            </p>
+          </div>
 
-            {/* 设备连接状态 */}
-            <div className="flex-shrink-0 mb-4">
-              <DeviceNotConnectedState />
-            </div>
+          {/* 设备连接状态 */}
+          <div className="flex-shrink-0 mb-4">
+            <DeviceNotConnectedState />
+          </div>
 
-            {/* 链列表 - 填充剩余空间 */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-4">
-                {filteredChains.map(chain => (
-                  <div
-                    key={chain.id}
-                    className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
-                    onClick={() => handleChainSelect(chain)}
-                    onKeyDown={e => handleKeyDown(e, () => handleChainSelect(chain))}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={t('chains.exploreChain', { chainId: chain.id })}
-                  >
-                    <ChainIcon chainId={chain.id} size={24} />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground text-sm truncate">{chain.id}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {t('chains.methodsCount', {
-                          count: signerMethodsRegistry.getChainMethods(chain.id).length,
-                        })}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          {/* 链列表 - 填充剩余空间 */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-4">
+              {filteredChains.map(chain => (
+                <div
+                  key={chain.id}
+                  className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                  onClick={() => handleChainSelect(chain)}
+                  onKeyDown={e => handleKeyDown(e, () => handleChainSelect(chain))}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={t('chains.exploreChain', { chainId: chain.id })}
+                >
+                  <ChainIcon chainId={chain.id} size={24} />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-foreground text-sm truncate">{chain.id}</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {t('chains.methodsCount', {
+                        count: signerMethodsRegistry.getChainMethods(chain.id).length,
+                      })}
+                    </p>
                   </div>
-                ))}
-              </div>
-
-              {/* 空状态 */}
-              {filteredChains.length === 0 && searchTerm && (
-                <div className="text-center py-8">
-                  <p className="text-sm text-muted-foreground">
-                    {t('chains.noResults', { searchTerm })}
-                  </p>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 </div>
-              )}
+              ))}
             </div>
+
+            {/* 空状态 */}
+            {filteredChains.length === 0 && searchTerm && (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">
+                  {t('chains.noResults', { searchTerm })}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </PageLayout>

@@ -281,37 +281,35 @@ const DeviceMethodsIndexPage: React.FC = () => {
 
   return (
     <PageLayout fixedHeight={true}>
-      <div className="h-full flex flex-col">
-        <div className="flex-1 flex flex-col px-4 py-3 min-h-0">
-          {/* 顶部导航和统计 */}
-          <div className="flex-shrink-0 mb-4">
-            <div className="flex items-center justify-between">
-              <Breadcrumb items={[{ label: t('deviceMethods.title') || 'Device', icon: Cpu }]} />
+      <div className="flex-1 flex flex-col px-4 py-3 min-h-0">
+        {/* 顶部导航和统计 */}
+        <div className="flex-shrink-0 mb-4">
+          <div className="flex items-center justify-between">
+            <Breadcrumb items={[{ label: t('deviceMethods.title') || 'Device', icon: Cpu }]} />
 
-              <div className="text-sm text-muted-foreground">
-                <span className="font-medium">
-                  {t('deviceMethods.totalMethods', { count: totalMethods })}
-                </span>
-                <span className="mx-2">•</span>
-                <span>{t('deviceMethods.totalCategories', { count: categories.length })}</span>
-              </div>
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium">
+                {t('deviceMethods.totalMethods', { count: totalMethods })}
+              </span>
+              <span className="mx-2">•</span>
+              <span>{t('deviceMethods.totalCategories', { count: categories.length })}</span>
             </div>
           </div>
+        </div>
 
-          {/* 设备连接状态 */}
-          <div className="flex-shrink-0 mb-4">
-            <DeviceNotConnectedState />
-          </div>
+        {/* 设备连接状态 */}
+        <div className="flex-shrink-0 mb-4">
+          <DeviceNotConnectedState />
+        </div>
 
-          <div className="flex-shrink-0 mb-4">
-            <Separator />
-          </div>
+        <div className="flex-shrink-0 mb-4">
+          <Separator />
+        </div>
 
-          {/* 分类列表 - 填充剩余空间 */}
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="space-y-3 pb-4">
-              {categories.map(category => renderCategoryCard(category))}
-            </div>
+        {/* 分类列表 - 填充剩余空间 */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="space-y-3 pb-4">
+            {categories.map(category => renderCategoryCard(category))}
           </div>
         </div>
       </div>
