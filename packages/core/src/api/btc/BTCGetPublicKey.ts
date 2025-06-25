@@ -8,7 +8,7 @@ import { getCoinInfo } from './helpers/btcParamsUtils';
 import { BTCPublicKey } from '../../types/api/btcGetPublicKey';
 import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
-import { createExtendedPublicKey } from './helpers/xpubUtils';
+import { createExtendedPublicKey, getVersionBytes } from './helpers/xpubUtils';
 
 export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   hasBundle = false;
@@ -72,6 +72,15 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
       const existsShowDisplay = this.params.some(param => param.show_display);
       if (existsShowDisplay || !this.hasBundle) {
         throw new Error('Goto getPublickey');
+      }
+
+      for (const param of this.params) {
+        const versionBytes = getVersionBytes(param.coin_name, param.script_type);
+        if (!versionBytes) {
+          throw new Error(
+            `Invalid coinName, not support generate xpub for scriptType: ${param.script_type}`
+          );
+        }
       }
 
       const res = await batchGetPublickeys(this.device, this.params, 'secp256k1', 0, {
