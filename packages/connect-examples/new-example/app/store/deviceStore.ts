@@ -478,11 +478,10 @@ export const useDeviceStore = create<DeviceState>()(
       name: 'onekey-device-store',
       version: 12,
 
-      // 持久化日志、配置和 transport 类型
+      // 只持久化日志和配置，其他状态保持会话级别
       partialize: state => ({
         logs: state.logs.map(log => compressLogEntry(log, state.logStorageConfig)),
         logStorageConfig: state.logStorageConfig,
-        transportType: state.transportType,
       }),
 
       // 自定义存储，添加压缩和清理逻辑
@@ -565,11 +564,6 @@ export const useDeviceStore = create<DeviceState>()(
               ...DEFAULT_LOG_CONFIG,
               ...(state.logStorageConfig as Partial<LogStorageConfig>),
             };
-          }
-
-          // 处理 transport 类型
-          if ('transportType' in state && typeof state.transportType === 'string') {
-            merged.transportType = state.transportType as TransportType;
           }
         }
 

@@ -17,7 +17,9 @@ import { Card, CardContent } from './ui/Card';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
-import { useTransport } from '../hooks/useTransport';
+import { useSDK } from '../hooks/useSDK';
+import { useToast } from '../hooks/use-toast';
+import { searchDevices, TransportType } from '../services/hardwareService';
 import {
   Home,
   Smartphone,
@@ -69,12 +71,96 @@ const navigationItems = [
 export function AppSidebar() {
   const location = useLocation();
   const { t } = useTranslation();
-  const { currentDevice, sdkInitState } = useDeviceStore();
-  const { transportType, isConnecting, quickConnect } = useTransport();
+  const {
+    currentDevice,
+    transportType,
+    isConnecting,
+    sdkInitState,
+    setIsConnecting,
+    setConnectedDevices,
+    setCurrentDevice,
+    setDeviceFeatures,
+    setTransportType,
+  } = useDeviceStore();
+
+  const { getSDKInstance } = useSDK();
+  const { toast } = useToast();
 
   // 快速连接设备
   const handleQuickConnect = async () => {
-    await quickConnect();
+    if (!sdkInitState.isInitialized) {
+      toast({
+        title: t('transport.sdkNotReady'),
+        description: t('transport.pleaseWaitForInit'),
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setIsConnecting(true);
+
+    try {
+      // 确保使用持久化的transport设置
+      const savedTransport = localStorage.getItem('preferred-transport');
+      if (savedTransport && savedTransport !== transportType) {
+        // 同步store中的transport类型
+        setTransportType(savedTransport as TransportType);
+      }
+
+      // 搜索设备
+      const searchResult = await searchDevices();
+
+      if (searchResult.success && searchResult.payload) {
+        const devices = searchResult.payload;
+        setConnectedDevices(devices);
+
+        // 自动连接第一个设备
+        if (devices.length > 0) {
+          const targetDevice = devices[0];
+          setCurrentDevice(targetDevice);
+
+          // 获取设备特征信息
+          const sdk = await getSDKInstance();
+          if (targetDevice.connectId && targetDevice.deviceId) {
+            const featuresResult = await sdk.getFeatures(targetDevice.connectId);
+            if (featuresResult.success && featuresResult.payload) {
+              setDeviceFeatures(featuresResult.payload);
+            }
+          }
+
+          toast({
+            title: t('device.connected'),
+            description: `${t('device.connectedTo')} ${
+              targetDevice.label || targetDevice.deviceType
+            }`,
+            variant: 'default',
+          });
+        } else {
+          toast({
+            title: t('transport.noDevicesFound'),
+            description: t('transport.ensureDeviceConnected'),
+            variant: 'warning',
+          });
+        }
+      } else {
+        const errorMessage = searchResult.payload?.error || t('transport.searchDeviceFailed');
+        toast({
+          title: t('transport.searchFailed'),
+          description: errorMessage,
+          variant: 'warning',
+        });
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : t('transport.unknownConnectionError');
+      toast({
+        title: t('transport.connectionTip'),
+        description: errorMessage,
+        variant: 'warning',
+      });
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const getStatusIcon = () => {
