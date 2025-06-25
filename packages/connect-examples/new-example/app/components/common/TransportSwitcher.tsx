@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useSDK } from '../../hooks/useSDK';
 import { useToast } from '../../hooks/use-toast';
+import { useTransportPersistence } from '../../store/persistenceStore';
 import { switchTransport, TransportType, searchDevices } from '../../services/hardwareService';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
@@ -25,18 +26,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     sdkInitState,
   } = useDeviceStore();
 
-  // 从localStorage恢复transport选择
-  React.useEffect(() => {
-    const savedTransport = localStorage.getItem('preferred-transport') as TransportType;
-    if (savedTransport && savedTransport !== transportType) {
-      setTransportType(savedTransport);
-    }
-  });
-
-  // 保存transport选择到localStorage
-  const saveTransportPreference = (transport: TransportType) => {
-    localStorage.setItem('preferred-transport', transport);
-  };
+  const { setTransportPreference } = useTransportPersistence();
   const { getSDKInstance } = useSDK();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -123,8 +113,8 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       // 先更新UI状态
       setTransportType(newTransport);
 
-      // 保存用户选择
-      saveTransportPreference(newTransport);
+      // 保存用户选择到持久化存储
+      setTransportPreference(newTransport);
 
       // 切换传输方式
       const result = await switchTransport(newTransport);

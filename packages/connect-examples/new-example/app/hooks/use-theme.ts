@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useThemePreference } from '../store/uiStore';
+import { useThemePersistence } from '../store/persistenceStore';
 
 type Theme = 'dark' | 'light';
 
 export function useTheme() {
-  const { themePreference, setThemePreference } = useThemePreference();
+  const { preference: themePreference, setThemePreference } = useThemePersistence();
   const [theme, setTheme] = useState<Theme>('dark');
 
   useEffect(() => {
@@ -37,16 +37,10 @@ export function useTheme() {
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setThemePreference(newTheme);
-    // localStorage 兼容性 - 为了兼容旧代码
-    localStorage.setItem('theme', newTheme);
   };
 
   const setThemeMode = (mode: 'light' | 'dark' | 'system') => {
     setThemePreference(mode);
-    // localStorage 兼容性
-    if (mode !== 'system') {
-      localStorage.setItem('theme', mode);
-    }
   };
 
   return {

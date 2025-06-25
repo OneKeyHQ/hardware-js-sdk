@@ -329,17 +329,13 @@ export async function callHardwareAPI(
     } as Unsuccessful;
   }
 }
-
 // 搜索设备
 export async function searchDevices(): Promise<ApiResponse> {
   logRequest('Searching for devices');
 
-  // 获取持久化的transport类型，如果没有则从store获取
-  const savedTransport = localStorage.getItem('preferred-transport') as TransportType;
-  const currentTransport = savedTransport || useDeviceStore.getState().transportType;
-  logInfo(
-    `Using transport type: ${currentTransport} (from ${savedTransport ? 'localStorage' : 'store'})`
-  );
+  // 获取当前transport类型（应该已经在SDK初始化时设置好）
+  const currentTransport = useDeviceStore.getState().transportType;
+  logInfo(`Using transport type: ${currentTransport}`);
 
   // WebUSB 特殊处理
   if (currentTransport === 'webusb' && navigator.usb) {

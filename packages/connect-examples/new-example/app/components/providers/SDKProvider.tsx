@@ -4,6 +4,7 @@ import SDK from '@onekeyfe/hd-web-sdk';
 import { ConnectSettings, CoreApi, UiEvent, UI_REQUEST } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
+import { usePersistenceStore } from '../../store/persistenceStore';
 import { SDKContext } from '../../hooks/useSDK';
 import { setSDKInstanceGetter, submitPin, submitPassphrase } from '../../services/hardwareService';
 import { EDeviceType } from '@onekeyfe/hd-shared';
@@ -61,6 +62,8 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
   const { setDeviceAction, clearDeviceAction, updateSdkInitState } = useDeviceStore();
 
   const initializationRef = useRef<boolean>(false);
+
+  console.log('[SDKProvider] 🚀 SDKProvider初始化开始');
   const setupSDKEventListeners = useCallback(
     (sdk: CoreApi) => {
       console.log('[SDKProvider] 🔧 开始设置SDK事件监听器');
@@ -207,13 +210,38 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         lastInitTime: Date.now(),
       });
 
-      // 配置初始化参数 - 默认webusb
+      // 从持久化存储获取transport设置
+      const preferredTransport = usePersistenceStore.getState().getTransportPreference();
+      console.log('[SDKProvider] 🚀 使用持久化的transport设置:', preferredTransport);
+
+      // 同步到deviceStore
+      const { setTransportType } = useDeviceStore.getState();
+      setTransportType(preferredTransport);
+
+      // 根据transport类型配置SDK环境
+      let sdkEnv: ConnectSettings['env'];
+      switch (preferredTransport) {
+        case 'jsbridge':
+          sdkEnv = 'web';
+          break;
+        case 'emulator':
+          sdkEnv = 'emulator';
+          break;
+        case 'webusb':
+        default:
+          sdkEnv = 'webusb';
+          break;
+      }
+
+      // 配置初始化参数
       const initConfig: Partial<ConnectSettings> = {
         debug: true,
         fetchConfig: true,
-        env: 'webusb',
+        env: sdkEnv,
         connectSrc: CONNECT_SRC,
       };
+
+      console.log('[SDKProvider] ⚙️ SDK初始化配置:', initConfig);
 
       // 执行SDK初始化
       const res = await HardwareWebSdk.init(initConfig);

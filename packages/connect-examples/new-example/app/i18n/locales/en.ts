@@ -631,7 +631,7 @@ export const en = {
         commonParameters: 'Common Parameters',
         methodParameters: 'Method Parameters',
         useEmptyPassphrase: 'useEmptyPassphrase',
-        useEmptyPassphraseDesc: 'Use empty passphrase, skip input dialog',
+        useEmptyPassphraseDesc: 'Use empty passphrase, skip passphrase input dialog',
         usePassphraseState: 'Use passPhraseState',
         usePassphraseStateDesc: 'Saved passphrase state string in device',
         currentlyNoPassphraseState: 'Currently no passphraseState',

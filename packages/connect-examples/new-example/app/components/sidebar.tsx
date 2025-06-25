@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useSDK } from '../hooks/useSDK';
 import { useToast } from '../hooks/use-toast';
-import { searchDevices, TransportType } from '../services/hardwareService';
+import { searchDevices } from '../services/hardwareService';
 import {
   Home,
   Smartphone,
@@ -80,7 +80,6 @@ export function AppSidebar() {
     setConnectedDevices,
     setCurrentDevice,
     setDeviceFeatures,
-    setTransportType,
   } = useDeviceStore();
 
   const { getSDKInstance } = useSDK();
@@ -100,13 +99,6 @@ export function AppSidebar() {
     setIsConnecting(true);
 
     try {
-      // 确保使用持久化的transport设置
-      const savedTransport = localStorage.getItem('preferred-transport');
-      if (savedTransport && savedTransport !== transportType) {
-        // 同步store中的transport类型
-        setTransportType(savedTransport as TransportType);
-      }
-
       // 搜索设备
       const searchResult = await searchDevices();
 

@@ -613,7 +613,7 @@ export const zh = {
         commonParameters: '通用参数',
         methodParameters: '方法参数',
         useEmptyPassphrase: 'useEmptyPassphrase',
-        useEmptyPassphraseDesc: '使用空passphrase，跳过输入弹窗',
+        useEmptyPassphraseDesc: '使用空passphrase，跳过passphrase输入弹窗',
         usePassphraseState: '是否使用passPhraseState',
         usePassphraseStateDesc: '设备中已保存的passphrase状态字符串',
         currentlyNoPassphraseState: '目前无passphraseState',

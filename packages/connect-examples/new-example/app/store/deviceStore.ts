@@ -62,7 +62,7 @@ export interface PersistedLogStorage {
 interface DeviceState {
   // Connection types
   connectionType: string;
-  transportType: TransportType;
+  transportType: TransportType; // 仅用于UI状态，实际持久化在persistenceStore中
   setConnectionType: (type: string) => void;
   setTransportType: (type: TransportType) => void;
 

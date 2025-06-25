@@ -1,123 +1,109 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { useUIPersistence, useThemePersistence } from './persistenceStore';
 
-// UI 状态接口
+// UI 状态接口 - 现在只包含非持久化的状态
 export interface UIState {
-  // 侧边栏状态
-  sidebarCollapsed: boolean;
-
-  // 主题相关
-  themePreference: 'light' | 'dark' | 'system';
-
-  // 用户界面偏好
-  showAdvancedOptions: boolean;
-  compactMode: boolean;
+  // 临时UI状态（不需要持久化）
+  isLoading: boolean;
+  currentModal: string | null;
+  notifications: Array<{ id: string; message: string; type: 'info' | 'warning' | 'error' }>;
 
   // Actions
-  setSidebarCollapsed: (collapsed: boolean) => void;
-  toggleSidebar: () => void;
-  setThemePreference: (theme: 'light' | 'dark' | 'system') => void;
-  setShowAdvancedOptions: (show: boolean) => void;
-  setCompactMode: (compact: boolean) => void;
-
-  // 重置所有设置
-  resetUISettings: () => void;
+  setIsLoading: (loading: boolean) => void;
+  setCurrentModal: (modal: string | null) => void;
+  addNotification: (notification: { message: string; type: 'info' | 'warning' | 'error' }) => void;
+  removeNotification: (id: string) => void;
+  clearNotifications: () => void;
 }
 
-// 默认状态
-const defaultUIState = {
-  sidebarCollapsed: false,
-  themePreference: 'system' as const,
-  showAdvancedOptions: false,
-  compactMode: false,
-};
+// 创建 UI 状态存储 - 只存储临时状态
+export const useUIStore = create<UIState>()(set => ({
+  // 初始状态
+  isLoading: false,
+  currentModal: null,
+  notifications: [],
 
-// 创建 UI 状态存储
-export const useUIStore = create<UIState>()(
-  persist(
-    set => ({
-      // 初始状态
-      ...defaultUIState,
+  // Actions
+  setIsLoading: (loading: boolean) => {
+    set({ isLoading: loading });
+  },
 
-      // 侧边栏操作
-      setSidebarCollapsed: (collapsed: boolean) => {
-        set({ sidebarCollapsed: collapsed });
-      },
+  setCurrentModal: (modal: string | null) => {
+    set({ currentModal: modal });
+  },
 
-      toggleSidebar: () => {
-        set(state => ({ sidebarCollapsed: !state.sidebarCollapsed }));
-      },
+  addNotification: notification => {
+    const id = Date.now().toString();
+    set(state => ({
+      notifications: [...state.notifications, { ...notification, id }],
+    }));
+  },
 
-      // 主题操作
-      setThemePreference: (theme: 'light' | 'dark' | 'system') => {
-        set({ themePreference: theme });
-      },
+  removeNotification: (id: string) => {
+    set(state => ({
+      notifications: state.notifications.filter(n => n.id !== id),
+    }));
+  },
 
-      // 界面偏好操作
-      setShowAdvancedOptions: (show: boolean) => {
-        set({ showAdvancedOptions: show });
-      },
+  clearNotifications: () => {
+    set({ notifications: [] });
+  },
+}));
 
-      setCompactMode: (compact: boolean) => {
-        set({ compactMode: compact });
-      },
-
-      // 重置设置
-      resetUISettings: () => {
-        set(defaultUIState);
-      },
-    }),
-    {
-      name: 'onekey-ui-settings',
-      version: 1,
-
-      // 使用项目规范的存储配置
-      storage: createJSONStorage(() => localStorage),
-
-      // 只持久化需要的字段
-      partialize: state => ({
-        sidebarCollapsed: state.sidebarCollapsed,
-        themePreference: state.themePreference,
-        showAdvancedOptions: state.showAdvancedOptions,
-        compactMode: state.compactMode,
-      }),
-
-      // 水合完成后的回调
-      onRehydrateStorage: () => {
-        return (state, error) => {
-          if (error) {
-            console.warn('UI settings rehydration failed:', error);
-          } else if (state) {
-            console.log('UI settings rehydrated successfully:', {
-              sidebarCollapsed: state.sidebarCollapsed,
-              themePreference: state.themePreference,
-            });
-          }
-        };
-      },
-    }
-  )
-);
-
-// 导出便捷的 hooks
+// 导出便捷的 hooks - 现在使用持久化存储
 export const useSidebarState = () => {
-  const sidebarCollapsed = useUIStore(state => state.sidebarCollapsed);
-  const setSidebarCollapsed = useUIStore(state => state.setSidebarCollapsed);
-  const toggleSidebar = useUIStore(state => state.toggleSidebar);
+  const { uiState, setSidebarCollapsed } = useUIPersistence();
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!uiState.sidebarCollapsed);
+  };
 
   return {
-    sidebarCollapsed,
+    sidebarCollapsed: uiState.sidebarCollapsed,
     setSidebarCollapsed,
     toggleSidebar,
   };
 };
 
 export const useThemePreference = () => {
-  const themePreference = useUIStore(state => state.themePreference);
-  const setThemePreference = useUIStore(state => state.setThemePreference);
+  const { preference, setThemePreference } = useThemePersistence();
 
   return {
-    themePreference,
+    themePreference: preference,
     setThemePreference,
+  };
+};
+
+// 新增：UI偏好设置 hooks
+export const useAdvancedOptions = () => {
+  const { uiState, setShowAdvancedOptions } = useUIPersistence();
+
+  return {
+    showAdvancedOptions: uiState.showAdvancedOptions,
+    setShowAdvancedOptions,
+  };
+};
+
+export const useCompactMode = () => {
+  const { uiState, setCompactMode } = useUIPersistence();
+
+  return {
+    compactMode: uiState.compactMode,
+    setCompactMode,
+  };
+};
+
+// 通知系统 hooks
+export const useNotifications = () => {
+  const notifications = useUIStore(state => state.notifications);
+  const addNotification = useUIStore(state => state.addNotification);
+  const removeNotification = useUIStore(state => state.removeNotification);
+  const clearNotifications = useUIStore(state => state.clearNotifications);
+
+  return {
+    notifications,
+    addNotification,
+    removeNotification,
+    clearNotifications,
   };
 };
