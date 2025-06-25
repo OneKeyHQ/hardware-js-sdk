@@ -2,12 +2,14 @@ import React from 'react';
 import { Card, CardContent } from './Card';
 import { DeviceIcon } from '../icons/DeviceIcon';
 import { useDeviceStore } from '../../store/deviceStore';
+import { useTransportPersistence } from '../../store/persistenceStore';
 import { Button } from './Button';
 import { X, Wifi, Monitor, Signal } from 'lucide-react';
 import { Badge } from './Badge';
 
 export const DeviceStatus: React.FC = () => {
-  const { currentDevice, setCurrentDevice, connectionType, transportType } = useDeviceStore();
+  const { currentDevice, setCurrentDevice } = useDeviceStore();
+  const { preferredType: transportType } = useTransportPersistence();
 
   const handleDisconnect = () => {
     setCurrentDevice(null);
@@ -32,8 +34,8 @@ export const DeviceStatus: React.FC = () => {
   }
 
   const getConnectionTypeDisplay = () => {
-    // 使用 transportType (webusb, lowlevel) 或 fallback 到 connectionType
-    const transport = transportType || connectionType;
+    // 使用 transportType
+    const transport = transportType;
 
     // 规范化传输类型字符串
     const normalizedTransport = transport.toLowerCase();

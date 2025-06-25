@@ -381,6 +381,7 @@ export const zh = {
       submit: '提交',
       deviceInput: '使用设备输入',
       webInput: '使用网页输入',
+      checkDeviceLayout: '请查看设备屏幕上的键盘布局。',
     },
     passphrase: {
       title: '输入Passphrase',

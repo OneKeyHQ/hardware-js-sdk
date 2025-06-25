@@ -52,6 +52,12 @@ export const en = {
       connectId: 'Connection ID',
       transport: 'Transport',
       firmwareVersion: 'Firmware Version',
+      deviceInfo: 'Device Information',
+      bluetoothVersion: 'Bluetooth Version',
+      bootVersion: 'Boot Version',
+      pinInputSupport: 'PIN Input Support',
+      supported: 'Supported',
+      notSupported: 'Not Supported',
     },
     device: {
       status: 'Device Status',
@@ -391,6 +397,7 @@ export const en = {
       submit: 'Submit',
       deviceInput: 'Use device input',
       webInput: 'Use web input',
+      checkDeviceLayout: 'Please check the keyboard layout on your device screen.',
     },
     passphrase: {
       title: 'Enter Passphrase',

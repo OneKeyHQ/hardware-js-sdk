@@ -17,7 +17,8 @@ import { Card, CardContent } from './ui/Card';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
-import { useSDK } from '../hooks/useSDK';
+import { useTransportPersistence } from '../store/persistenceStore';
+import { SDKUtils } from '../utils/hardwareInstance';
 import { useToast } from '../hooks/use-toast';
 import { searchDevices } from '../services/hardwareService';
 import {
@@ -73,7 +74,6 @@ export function AppSidebar() {
   const { t } = useTranslation();
   const {
     currentDevice,
-    transportType,
     isConnecting,
     sdkInitState,
     setIsConnecting,
@@ -82,7 +82,8 @@ export function AppSidebar() {
     setDeviceFeatures,
   } = useDeviceStore();
 
-  const { getSDKInstance } = useSDK();
+  const { preferredType: transportType } = useTransportPersistence();
+
   const { toast } = useToast();
 
   // 快速连接设备
@@ -112,7 +113,7 @@ export function AppSidebar() {
           setCurrentDevice(targetDevice);
 
           // 获取设备特征信息
-          const sdk = await getSDKInstance();
+          const sdk = await SDKUtils.getInstance();
           if (targetDevice.connectId && targetDevice.deviceId) {
             const featuresResult = await sdk.getFeatures(targetDevice.connectId);
             if (featuresResult.success && featuresResult.payload) {

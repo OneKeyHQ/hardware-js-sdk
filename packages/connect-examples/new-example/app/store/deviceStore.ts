@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import LZString from 'lz-string';
-import { DeviceInfo, ApiResponse } from '../types/hardware';
+import { DeviceInfo } from '../types/hardware';
 import type { UnifiedLogEntry } from '../components/common/UnifiedLogger';
-import { TransportType } from '../services/hardwareService';
+
 import { isClassicModelDevice, isTouchModelDevice } from '../utils/deviceTypeUtils';
 import type { IDeviceType, Features } from '@onekeyfe/hd-core';
 import {
@@ -60,12 +60,6 @@ export interface PersistedLogStorage {
 }
 
 interface DeviceState {
-  // Connection types
-  connectionType: string;
-  transportType: TransportType; // 仅用于UI状态，实际持久化在persistenceStore中
-  setConnectionType: (type: string) => void;
-  setTransportType: (type: TransportType) => void;
-
   // SDK initialization state
   sdkInitState: SDKInitializationState;
   setSdkInitState: (state: Partial<SDKInitializationState>) => void;
@@ -88,12 +82,10 @@ interface DeviceState {
   setDeviceFeatures: (features: Features | undefined) => void;
   setIsConnecting: (isConnecting: boolean) => void;
 
-  // Response and logs
-  lastResponse: ApiResponse | null;
+  // Logs management
   logs: UnifiedLogEntry[];
 
-  // Response and log management
-  setLastResponse: (response: ApiResponse | null) => void;
+  // Log management
   addLog: (log: UnifiedLogEntry) => void;
   clearLogs: () => void;
 
@@ -295,13 +287,10 @@ export const useDeviceStore = create<DeviceState>()(
   persist(
     (set, get) => ({
       // Default state
-      connectionType: 'WebUSB',
-      transportType: 'webusb',
       connectedDevices: [],
       currentDevice: null,
       deviceFeatures: undefined,
       isConnecting: false,
-      lastResponse: null,
       logs: [],
       deviceAction: {
         isActive: false,
@@ -315,13 +304,10 @@ export const useDeviceStore = create<DeviceState>()(
       logStorageConfig: DEFAULT_LOG_CONFIG,
 
       // Actions
-      setConnectionType: (type: string) => set({ connectionType: type }),
-      setTransportType: (type: TransportType) => set({ transportType: type }),
       setConnectedDevices: (devices: DeviceInfo[]) => set({ connectedDevices: devices }),
       setCurrentDevice: (device: DeviceInfo | null) => set({ currentDevice: device }),
       setDeviceFeatures: (features: Features | undefined) => set({ deviceFeatures: features }),
       setIsConnecting: (isConnecting: boolean) => set({ isConnecting }),
-      setLastResponse: (response: ApiResponse | null) => set({ lastResponse: response }),
 
       // SDK initialization management
       setSdkInitState: (state: Partial<SDKInitializationState>) =>

@@ -2,6 +2,7 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
+import { useTransportPersistence } from '../store/persistenceStore';
 import { CheckCircle, XCircle, Usb, Wifi, Server, AlertCircle } from 'lucide-react';
 import TransportSwitcher from '../components/common/TransportSwitcher';
 import DeviceIcon from '../components/device/DeviceIcon';
@@ -13,13 +14,14 @@ export default function IndexPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const {
-    transportType,
     currentDevice,
     getCurrentDeviceLabel,
     isCurrentDeviceClassicModel,
     isConnecting,
     sdkInitState,
   } = useDeviceStore();
+
+  const { preferredType: transportType } = useTransportPersistence();
 
   const getTransportIcon = () => {
     switch (transportType) {

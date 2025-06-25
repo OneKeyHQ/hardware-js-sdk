@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
-import { useSDK } from '../../hooks/useSDK';
+import { SDKUtils } from '../../utils/hardwareInstance';
 import { useToast } from '../../hooks/use-toast';
 import { useTransportPersistence } from '../../store/persistenceStore';
-import { switchTransport, TransportType, searchDevices } from '../../services/hardwareService';
+import { switchTransport, searchDevices } from '../../services/hardwareService';
+import type { TransportType } from '../../utils/hardwareInstance';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
 import { Monitor, Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
@@ -17,8 +18,6 @@ interface TransportSwitcherProps {
 const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' }) => {
   const { t } = useTranslation();
   const {
-    transportType,
-    setTransportType,
     setIsConnecting,
     setConnectedDevices,
     setCurrentDevice,
@@ -26,8 +25,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     sdkInitState,
   } = useDeviceStore();
 
-  const { setTransportPreference } = useTransportPersistence();
-  const { getSDKInstance } = useSDK();
+  const { preferredType: transportType, setTransportPreference } = useTransportPersistence();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -79,7 +77,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       setCurrentDevice(targetDevice);
 
       // 获取设备特征信息
-      const sdk = await getSDKInstance();
+      const sdk = await SDKUtils.getInstance();
       if (targetDevice.connectId && targetDevice.deviceId) {
         const featuresResult = await sdk.getFeatures(targetDevice.connectId);
         if (featuresResult.success && featuresResult.payload) {
@@ -110,10 +108,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     setIsConnecting(true);
 
     try {
-      // 先更新UI状态
-      setTransportType(newTransport);
-
-      // 保存用户选择到持久化存储
+      // 保存用户选择到持久化存储（这会自动更新UI状态）
       setTransportPreference(newTransport);
 
       // 切换传输方式

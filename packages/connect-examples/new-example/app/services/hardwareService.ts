@@ -1,11 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { UI_RESPONSE, Success, Unsuccessful, CoreApi } from '@onekeyfe/hd-core';
-import { useDeviceStore } from '../store/deviceStore';
 import { useHardwareStore } from '../store/hardwareStore';
 import { logError, logRequest, logResponse, logInfo } from '../utils/logger';
+import {
+  getCurrentSDKInstance,
+  clearSDKInstanceCache,
+  TransportType,
+} from '../utils/hardwareInstance';
+
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
-export type TransportType = 'webusb' | 'jsbridge' | 'emulator';
 export type HardwareApiMethod = keyof CoreApi;
 
 // WebUSB 类型声明
@@ -29,20 +33,22 @@ declare global {
   }
 }
 
-// 获取SDK实例的函数 - 需要从外部注入
-let getSDKInstanceFunc: (() => Promise<CoreApi>) | null = null;
-
-// 设置SDK实例获取函数
-export function setSDKInstanceGetter(getter: () => Promise<CoreApi>): void {
-  getSDKInstanceFunc = getter;
+// 获取SDK实例的简化函数
+async function getSDKInstance(): Promise<CoreApi> {
+  return getCurrentSDKInstance();
 }
 
-// 获取当前SDK实例
-export async function getSDKInstance(): Promise<CoreApi> {
-  if (!getSDKInstanceFunc) {
-    throw new Error('SDK instance getter not set. Make sure SDKProvider is initialized.');
-  }
-  return getSDKInstanceFunc();
+// 获取SDK实例状态（用于调试）
+export function getSDKInstanceStatus(): {
+  hasCachedInstance: boolean;
+  hasInitPromise: boolean;
+  hasGetter: boolean;
+} {
+  return {
+    hasCachedInstance: true,
+    hasInitPromise: false,
+    hasGetter: true,
+  };
 }
 
 // 切换传输方式
@@ -59,11 +65,20 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
   }
 
   try {
+    // 使用统一的TransportManager进行切换
+    const { TransportManager } = await import('../utils/hardwareInstance');
+
+    // 清除旧的SDK实例缓存
+    clearSDKInstanceCache();
+
+    // 使用统一的transport管理器更新状态
+    TransportManager.setTransport(transport);
+
+    // 获取新的SDK实例（会根据新的transport类型初始化）
     const sdkInstance = await getSDKInstance();
 
+    // 切换transport
     if (transport === 'emulator') {
-      // 对于模拟器，我们使用特殊的初始化方式
-      // 暂时使用web模式，后续可以通过其他方式支持模拟器
       await sdkInstance.switchTransport('emulator');
     } else {
       const envParam = transport === 'webusb' ? 'webusb' : 'web';
@@ -71,7 +86,6 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
     }
 
     logResponse(`Transport switched successfully to ${transport}`);
-    // switchTransport不返回值，所以直接认为成功
     return { success: true, payload: { transport } } as Success<any>;
   } catch (error) {
     const errorMsg = `Transport switch error: ${error}`;
@@ -333,24 +347,34 @@ export async function callHardwareAPI(
 export async function searchDevices(): Promise<ApiResponse> {
   logRequest('Searching for devices');
 
-  // 获取当前transport类型（应该已经在SDK初始化时设置好）
-  const currentTransport = useDeviceStore.getState().transportType;
+  // 使用统一的TransportManager获取当前transport类型
+  const { TransportManager } = await import('../utils/hardwareInstance');
+  const currentTransport = TransportManager.getCurrentTransport();
   logInfo(`Using transport type: ${currentTransport}`);
 
-  // WebUSB 特殊处理
-  if (currentTransport === 'webusb' && navigator.usb) {
+  // WebUSB 特殊处理 - 使用更可靠的 promptWebDeviceAccess 方法
+  if (currentTransport === 'webusb') {
     try {
-      logInfo('Requesting WebUSB device permission');
-      const onekeyFilters = [
-        { vendorId: 0x1209, productId: 0x53c0 },
-        { vendorId: 0x1209, productId: 0x53c1 },
-        { vendorId: 0x1209, productId: 0x53c2 },
-        { vendorId: 0x1209, productId: 0x53c3 },
-        { vendorId: 0x1209, productId: 0x53c4 },
-      ];
+      logInfo('Using promptWebDeviceAccess for WebUSB');
+      const sdkInstance = await getSDKInstance();
+      const promptResponse = await sdkInstance.promptWebDeviceAccess();
 
-      await navigator.usb.requestDevice({ filters: onekeyFilters });
-      logInfo('WebUSB device permission granted');
+      logInfo('promptWebDeviceAccess completed', {
+        success: promptResponse.success,
+        hasDevice: promptResponse.success ? !!promptResponse.payload.device : false,
+      });
+
+      if (promptResponse.success && promptResponse.payload.device) {
+        return {
+          success: true,
+          payload: [promptResponse.payload.device],
+        } as Success<any>;
+      } else {
+        return {
+          success: false,
+          payload: { error: 'No device selected or permission denied' },
+        } as Unsuccessful;
+      }
     } catch (webUsbError) {
       if (
         webUsbError instanceof Error &&
@@ -363,12 +387,17 @@ export async function searchDevices(): Promise<ApiResponse> {
           payload: { error },
         } as Unsuccessful;
       }
-      logError('WebUSB device permission failed', {
+      logError('WebUSB promptWebDeviceAccess failed', {
         webUsbError,
       });
+      return {
+        success: false,
+        payload: { error: `WebUSB access failed: ${webUsbError}` },
+      } as Unsuccessful;
     }
   }
 
+  // 对于其他transport类型，使用标准的searchDevices
   return callHardwareAPI('searchDevices', {});
 }
 
