@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "bytebuffer": "^5.0.1",
-    "long": "^4.0.0",
-    "protobufjs": "^6.11.2"
+    "long": "5.2.5",
+    "protobufjs": "7.4.0"
   }
 }
