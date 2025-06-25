@@ -334,12 +334,9 @@ export async function callHardwareAPI(
 export async function searchDevices(): Promise<ApiResponse> {
   logRequest('Searching for devices');
 
-  // 获取持久化的transport类型，如果没有则从store获取
-  const savedTransport = localStorage.getItem('preferred-transport') as TransportType;
-  const currentTransport = savedTransport || useDeviceStore.getState().transportType;
-  logInfo(
-    `Using transport type: ${currentTransport} (from ${savedTransport ? 'localStorage' : 'store'})`
-  );
+  // 直接从 store 获取 transport 类型
+  const currentTransport = useDeviceStore.getState().transportType;
+  logInfo(`Using transport type: ${currentTransport} (from store)`);
 
   // WebUSB 特殊处理
   if (currentTransport === 'webusb' && navigator.usb) {
