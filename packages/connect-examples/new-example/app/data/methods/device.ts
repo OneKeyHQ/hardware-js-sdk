@@ -149,7 +149,7 @@ const api: UnifiedMethodConfig[] = [
   // === 高级功能 ===
   {
     method: 'deviceSupportFeatures',
-    description: 'Check if device supports specific features',
+    description: 'Check device support features',
     noDeviceIdReq: true,
     presets: [],
   },

@@ -194,8 +194,8 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   return (
     <div className={`h-full flex flex-col ${className}`}>
-      {/* 参数输入区域 */}
-      <div className="flex-shrink-0 mb-3">
+      {/* 参数输入区域 - 自适应高度 */}
+      <div className="flex-shrink-0 mb-2">
         <ParameterInput
           methodConfig={methodConfig}
           selectedPreset={selectedPreset}
@@ -204,11 +204,11 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         />
       </div>
 
-      {/* 主要内容区域 */}
-      <div className="flex-1 min-h-0">
+      {/* 主要内容区域 - 填充剩余空间 */}
+      <div className="flex-1 min-h-0 overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 h-full">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col">
+          <div className="lg:col-span-2 flex flex-col min-h-0">
             <DeviceInteractionArea
               status={status}
               deviceAction={deviceAction}

@@ -1,5 +1,5 @@
 import { deviceMethodsRegistry, signerMethodsRegistry } from '../hooks/useMethodsRegistry';
-import { useUIStore } from '../store/uiStore';
+import { usePersistenceStore } from '../store/persistenceStore';
 import type { Action } from 'kbar';
 
 // 获取基础路径
@@ -20,8 +20,8 @@ const navigateTo = (path: string) => {
 
 // 主题切换函数
 const setTheme = (theme: 'light' | 'dark') => {
-  // 更新 Zustand store
-  useUIStore.getState().setThemePreference(theme);
+  // 使用持久化存储来设置主题偏好
+  usePersistenceStore.getState().setThemePreference(theme);
 };
 
 // 侧边栏切换函数 - 使用键盘事件触发

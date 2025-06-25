@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
+import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
 import { Checkbox } from '../ui/Checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select';
@@ -240,10 +239,15 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   const renderFieldLabel = (field: ParameterField) => (
     <label
       htmlFor={field.name}
-      className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-2"
+      className="text-xs font-medium text-foreground cursor-pointer flex items-center gap-1.5 flex-wrap"
     >
-      {field.label || field.name}
-      {field.required && <span className="text-orange-600">*</span>}
+      <span className="flex items-center gap-1">
+        {field.label || field.name}
+        {field.required && <span className="text-orange-600">*</span>}
+      </span>
+      {field.description && (
+        <span className="text-xs text-muted-foreground font-normal">- {field.description}</span>
+      )}
     </label>
   );
 
@@ -256,13 +260,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const acceptTypes = field.accept || config.accept;
 
     return (
-      <div key={field.name} className="space-y-2">
-        <div className="space-y-1">
-          {renderFieldLabel(field)}
-          {field.description && (
-            <p className="text-xs text-muted-foreground">{field.description}</p>
-          )}
-        </div>
+      <div key={field.name} className="space-y-1.5">
+        {renderFieldLabel(field)}
         <div className="relative">
           <input
             type="file"
@@ -273,7 +272,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             }}
             className="absolute inset-0 w-full h-full opacity-0 z-10"
           />
-          <div className="bg-background border border-border rounded-md px-3 py-2 text-sm hover:bg-muted/50 hover:border-primary cursor-pointer transition-colors select-none">
+          <div className="bg-background border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/50 hover:border-primary cursor-pointer transition-colors select-none">
             {currentValue ? (
               <span className="text-foreground cursor-pointer">{currentValue.name}</span>
             ) : (
@@ -297,8 +296,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       const isDisabled = commonParameters.passphraseState === '';
 
       return (
-        <div key={field.name} className="space-y-2">
-          <div className="flex items-start space-x-3">
+        <div key={field.name} className="space-y-1.5">
+          <div className="flex items-start space-x-2">
             <Checkbox
               id={field.name}
               checked={Boolean(value) && commonParameters.passphraseState !== ''}
@@ -306,12 +305,12 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                 isEditable && !isDisabled && handleParamChange(field.name, checked === true)
               }
               disabled={isDisabled}
-              className="mt-1"
+              className="mt-0.5"
             />
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <label
                 htmlFor={field.name}
-                className={`text-sm font-medium cursor-pointer flex items-center gap-2 ${
+                className={`text-xs font-medium cursor-pointer flex items-center gap-1 ${
                   isDisabled ? 'text-muted-foreground opacity-50' : 'text-foreground'
                 }`}
               >
@@ -335,8 +334,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
     // 通用Checkbox
     return (
-      <div key={field.name} className="space-y-2">
-        <div className="flex items-start space-x-3">
+      <div key={field.name} className="space-y-1.5">
+        <div className="flex items-start space-x-2">
           <Checkbox
             id={field.name}
             checked={Boolean(value)}
@@ -344,14 +343,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
               isEditable && handleParamChange(field.name, checked === true)
             }
             disabled={!isEditable}
-            className="mt-1"
+            className="mt-0.5"
           />
-          <div className="space-y-1">
-            {renderFieldLabel(field)}
-            {field.description && (
-              <p className="text-xs text-muted-foreground">{field.description}</p>
-            )}
-          </div>
+          <div className="space-y-0.5">{renderFieldLabel(field)}</div>
         </div>
       </div>
     );
@@ -371,13 +365,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     };
 
     return (
-      <div key={field.name} className="space-y-2">
-        <div className="space-y-1">
-          {renderFieldLabel(field)}
-          {field.description && (
-            <p className="text-xs text-muted-foreground">{field.description}</p>
-          )}
-        </div>
+      <div key={field.name} className="space-y-1.5">
+        {renderFieldLabel(field)}
         {field.type === 'textarea' ? (
           <textarea
             id={field.name}
@@ -388,8 +377,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             }}
             placeholder={field.placeholder}
             disabled={!isEditable}
-            rows={4}
-            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+            rows={3}
+            className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
         ) : (
           <Input
@@ -404,7 +393,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             }}
             placeholder={field.placeholder}
             disabled={!isEditable}
-            className="bg-background border-border focus:border-primary"
+            className="bg-background border-border focus:border-primary text-xs h-8"
             {...(field.validation && {
               pattern: field.validation.pattern,
               min: field.validation.min,
@@ -424,13 +413,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const isEditable = field.editable !== false;
 
     return (
-      <div key={field.name} className="space-y-2">
-        <div className="space-y-1">
-          {renderFieldLabel(field)}
-          {field.description && (
-            <p className="text-xs text-muted-foreground">{field.description}</p>
-          )}
-        </div>
+      <div key={field.name} className="space-y-1.5">
+        {renderFieldLabel(field)}
         <Select
           value={String(value || '')}
           onValueChange={newValue => isEditable && handleParamChange(field.name, newValue)}
@@ -438,7 +422,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
         >
           <SelectTrigger
             id={field.name}
-            className="bg-background border-border focus:border-primary"
+            className="bg-background border-border focus:border-primary text-xs h-8"
           >
             <SelectValue
               placeholder={field.placeholder || `${t('common.select')}${field.label || field.name}`}
@@ -495,33 +479,20 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   return (
     <Card className="bg-card border border-border/50 shadow-sm">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center justify-between text-base">
-          <span className="text-foreground">
-            {t('components.parameterInput.executionParameters')}
-          </span>
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline" className="text-xs">
-              {methodConfig.method}
-            </Badge>
-          </div>
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 pb-4">
         <div
-          className={`grid grid-cols-1 gap-6 ${
+          className={`grid grid-cols-1 gap-5 ${
             hasMultiplePresets ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
           }`}
         >
           {/* 快捷预设 - 只在有多个预设时显示 */}
           {hasMultiplePresets && (
-            <div className="space-y-3">
-              <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-2">
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-1.5 pt-2">
                 {t('components.parameterInput.quickPresets')}
               </h4>
               <Select value={selectedPreset || ''} onValueChange={handlePresetChange}>
-                <SelectTrigger className="bg-background border-border focus:border-primary">
+                <SelectTrigger className="bg-background border-border focus:border-primary text-xs h-8">
                   <SelectValue placeholder={t('components.parameterInput.selectPreset')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -538,8 +509,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
           )}
 
           {/* 通用参数 */}
-          <div className="space-y-3">
-            <div className="flex items-center border-b border-border/50 pb-2">
+          <div className="space-y-2">
+            <div className="flex items-center border-b border-border/50 pb-1.5 pt-2">
               <h4 className="text-sm font-medium text-foreground mr-2">
                 {t('components.parameterInput.commonParameters')}
               </h4>
@@ -552,26 +523,26 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                     '_blank'
                   )
                 }
-                className="h-5 px-1 text-xs text-muted-foreground hover:text-primary"
+                className="h-4 px-1 text-xs text-muted-foreground hover:text-primary"
               >
-                <ExternalLink className="h-3 w-3" />
+                <ExternalLink className="h-2.5 w-2.5" />
               </Button>
             </div>
-            <div className="space-y-3">{getCommonParameters(t).map(renderParameterField)}</div>
+            <div className="space-y-2">{getCommonParameters(t).map(renderParameterField)}</div>
           </div>
 
           {/* 方法参数 */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-2">
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-1.5 pt-2">
               {t('components.parameterInput.methodParameters')}
               {selectedPreset && (
                 <span className="text-xs text-muted-foreground ml-2">({selectedPreset})</span>
               )}
             </h4>
             {visibleMethodParameters.length > 0 ? (
-              <div className="space-y-3">{visibleMethodParameters.map(renderParameterField)}</div>
+              <div className="space-y-2">{visibleMethodParameters.map(renderParameterField)}</div>
             ) : (
-              <div className="text-center py-4">
+              <div className="text-center py-3">
                 <p className="text-xs text-muted-foreground">
                   {hasBundleParam
                     ? t('components.parameterInput.parametersInBundle')
@@ -588,8 +559,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
         {/* Bundle参数提示 */}
         {hasBundleParam && (
-          <Alert className="border-border bg-muted/20 py-3">
-            <AlertDescription className="text-muted-foreground text-sm">
+          <Alert className="border-border bg-muted/20 py-2">
+            <AlertDescription className="text-muted-foreground text-xs">
               <strong>{t('components.parameterInput.batchMode')}</strong>
               {t('components.parameterInput.batchModeDesc')}
             </AlertDescription>

@@ -32,6 +32,7 @@ body {
     --popover-foreground: 220 13% 18%; /* #2d3748 - Dark text */
     
     /* Primary colors - OneKey green for accents only */
+    --primary: var(--ok-green);
     --primary-foreground: 220 13% 18%; /* Dark text on green */
     
     /* Secondary surfaces */

@@ -59,10 +59,15 @@ const DeviceMethodExecutePage: React.FC = () => {
               </div>
 
               {/* 执行器 - 填充剩余空间 */}
-              <div className="flex-1 min-h-0">
-                {!currentDevice ? (
-                  <DeviceNotConnectedState showFullPage={true} />
-                ) : (
+              <div className="flex-1 min-h-0 flex flex-col">
+                {/* 设备未连接时显示小提示 */}
+                {!currentDevice && (
+                  <div className="flex-shrink-0 mb-3">
+                    <DeviceNotConnectedState showFullPage={false} />
+                  </div>
+                )}
+
+                <div className="flex-1 min-h-0">
                   <MethodExecutor
                     methodConfig={selectedMethod}
                     executionHandler={handleMethodExecution}
@@ -73,7 +78,7 @@ const DeviceMethodExecutePage: React.FC = () => {
                         : 'standard'
                     }
                   />
-                )}
+                </div>
               </div>
             </div>
           </div>

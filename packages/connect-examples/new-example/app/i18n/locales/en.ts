@@ -58,6 +58,7 @@ export const en = {
       pinInputSupport: 'PIN Input Support',
       supported: 'Supported',
       notSupported: 'Not Supported',
+      edit: 'Edit',
     },
     device: {
       status: 'Device Status',
@@ -632,13 +633,12 @@ export const en = {
         cancelling: 'Cancelling',
       },
       parameterInput: {
-        executionParameters: '⚙️ Execution Parameters',
         quickPresets: 'Quick Presets',
         selectPreset: 'Select preset configuration',
         commonParameters: 'Common Parameters',
         methodParameters: 'Method Parameters',
         useEmptyPassphrase: 'useEmptyPassphrase',
-        useEmptyPassphraseDesc: 'Use empty passphrase, skip passphrase input dialog',
+        useEmptyPassphraseDesc: 'Use empty passphrase',
         usePassphraseState: 'Use passPhraseState',
         usePassphraseStateDesc: 'Saved passphrase state string in device',
         currentlyNoPassphraseState: 'Currently no passphraseState',
