@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, ChevronRight, Layers } from 'lucide-react';
+import { Search, Layers, ChevronRight } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
@@ -70,35 +70,37 @@ const ChainsIndexPage: React.FC = () => {
 
             {/* 链列表 - 填充剩余空间 */}
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-4">
+              <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-4">
                 {filteredChains.map(chain => (
                   <div
                     key={chain.id}
-                    className="flex items-center gap-4 p-4 bg-card border border-border rounded cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                    className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
                     onClick={() => handleChainSelect(chain)}
                     onKeyDown={e => handleKeyDown(e, () => handleChainSelect(chain))}
                     tabIndex={0}
                     role="button"
                     aria-label={t('chains.exploreChain', { chainId: chain.id })}
                   >
-                    <ChainIcon chainId={chain.id} size={32} />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-foreground">{chain.id}</h3>
-                      <p className="text-sm text-muted-foreground">
+                    <ChainIcon chainId={chain.id} size={24} />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground text-sm truncate">{chain.id}</h3>
+                      <p className="text-xs text-muted-foreground">
                         {t('chains.methodsCount', {
                           count: signerMethodsRegistry.getChainMethods(chain.id).length,
                         })}
                       </p>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   </div>
                 ))}
               </div>
 
               {/* 空状态 */}
               {filteredChains.length === 0 && searchTerm && (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">{t('chains.noResults', { searchTerm })}</p>
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground">
+                    {t('chains.noResults', { searchTerm })}
+                  </p>
                 </div>
               )}
             </div>

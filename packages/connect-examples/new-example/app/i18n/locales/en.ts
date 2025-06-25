@@ -59,6 +59,7 @@ export const en = {
       supported: 'Supported',
       notSupported: 'Not Supported',
       edit: 'Edit',
+      save: 'Save',
     },
     device: {
       status: 'Device Status',

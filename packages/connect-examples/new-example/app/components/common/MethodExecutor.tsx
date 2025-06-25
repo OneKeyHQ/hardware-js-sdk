@@ -193,9 +193,9 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   );
 
   return (
-    <div className={`h-full flex flex-col ${className}`}>
+    <div className={`flex flex-col ${className}`}>
       {/* 参数输入区域 - 自适应高度 */}
-      <div className="flex-shrink-0 mb-2">
+      <div className="flex-shrink-0 mb-4">
         <ParameterInput
           methodConfig={methodConfig}
           selectedPreset={selectedPreset}
@@ -204,11 +204,11 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         />
       </div>
 
-      {/* 主要内容区域 - 填充剩余空间 */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 h-full">
+      {/* 主要内容区域 - 自然高度 */}
+      <div className="w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col min-h-0">
+          <div className="lg:col-span-2 flex flex-col">
             <DeviceInteractionArea
               status={status}
               deviceAction={deviceAction}
@@ -223,14 +223,14 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           </div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col min-h-0">
+          <div className="lg:col-span-3 flex flex-col">
             <ExecutionPanel
               requestData={storeExecutionParameters}
               onSaveRequest={handleRequestParamsEdit}
               logs={currentExecutionLogs}
               onClearLogs={handleClearExecutionLogs}
               disabled={status === 'loading' || status === 'device-interaction'}
-              className="h-full"
+              className="w-full"
             />
           </div>
         </div>

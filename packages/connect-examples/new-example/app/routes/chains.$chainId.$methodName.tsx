@@ -42,47 +42,40 @@ const ChainMethodExecutePage: React.FC = () => {
       checkNotFound={isMethodNotFound}
     >
       {selectedChain && selectedMethod && (
-        <PageLayout fixedHeight={true}>
-          <div className="h-full flex flex-col">
-            <div className="flex-1 flex flex-col px-4 py-2 min-h-0">
-              {/* 面包屑导航 - 固定高度 */}
-              <div className="flex-shrink-0 mb-3">
-                <Breadcrumb
-                  items={[
-                    {
-                      label: 'Blockchain Methods',
-                      href: '/chains',
-                      icon: Layers,
-                    },
-                    {
-                      label: selectedChain.id,
-                      href: `/chains/${chainId}`,
-                      icon: () => <ChainIcon chainId={selectedChain.id} size={16} />,
-                    },
-                    { label: selectedMethod.method, icon: Settings },
-                  ]}
-                />
-              </div>
-
-              {/* 执行器 - 填充剩余空间 */}
-              <div className="flex-1 min-h-0 flex flex-col">
-                {/* 设备未连接时显示小提示 */}
-                {!currentDevice && (
-                  <div className="flex-shrink-0 mb-3">
-                    <DeviceNotConnectedState showFullPage={false} />
-                  </div>
-                )}
-
-                <div className="flex-1 min-h-0">
-                  <MethodExecutor
-                    methodConfig={selectedMethod}
-                    executionHandler={handleMethodExecution}
-                    className="h-full"
-                    type="standard"
-                  />
-                </div>
-              </div>
+        <PageLayout fixedHeight={false}>
+          <div className="px-4 py-3">
+            {/* 面包屑导航 */}
+            <div className="mb-4">
+              <Breadcrumb
+                items={[
+                  {
+                    label: 'Blockchain Methods',
+                    href: '/chains',
+                    icon: Layers,
+                  },
+                  {
+                    label: selectedChain.id,
+                    href: `/chains/${chainId}`,
+                    icon: () => <ChainIcon chainId={selectedChain.id} size={16} />,
+                  },
+                  { label: selectedMethod.method, icon: Settings },
+                ]}
+              />
             </div>
+
+            {/* 设备未连接时显示小提示 */}
+            {!currentDevice && (
+              <div className="mb-4">
+                <DeviceNotConnectedState showFullPage={false} />
+              </div>
+            )}
+
+            {/* 执行器 - 自适应高度 */}
+            <MethodExecutor
+              methodConfig={selectedMethod}
+              executionHandler={handleMethodExecution}
+              type="standard"
+            />
           </div>
         </PageLayout>
       )}

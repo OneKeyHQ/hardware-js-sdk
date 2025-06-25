@@ -319,7 +319,7 @@ const api: UnifiedMethodConfig[] = [
             type: 'boolean',
             required: false,
             label: 'Show on Device',
-            description: 'Display public key on OneKey device for verification',
+            description: '',
             value: false,
           },
         ],
