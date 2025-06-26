@@ -208,7 +208,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       <div className="w-full min-h-[450px] h-full">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-full">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col h-full">
+          <div className="lg:col-span-2 flex flex-col h-full max-h-[600px] ">
             <DeviceInteractionArea
               status={status}
               deviceAction={deviceAction}
@@ -223,7 +223,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           </div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col h-full">
+          <div className="lg:col-span-3 flex flex-col h-full max-h-[600px] ">
             <ExecutionPanel
               requestData={storeExecutionParameters}
               onSaveRequest={handleRequestParamsEdit}

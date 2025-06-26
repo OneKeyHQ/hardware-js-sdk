@@ -5,8 +5,7 @@ import { devtools } from 'zustand/middleware';
 export interface CommonParametersState {
   useEmptyPassphrase: boolean;
   passphraseState: string;
-  // UI辅助参数
-  usePassphraseState: boolean;
+  // passphraseState 只做会话缓存，页面刷新即丢失
 }
 
 // 完整的硬件状态
@@ -34,7 +33,6 @@ export interface HardwareState {
 const initialCommonParameters: CommonParametersState = {
   useEmptyPassphrase: false,
   passphraseState: '',
-  usePassphraseState: false,
 };
 
 export const useHardwareStore = create<HardwareState>()(
@@ -210,11 +208,6 @@ function calculateExecutionParameters(
     console.log('[HardwareStore] 🔐 useEmptyPassphrase=true，移除passphraseState参数');
     delete cleanParams.passphraseState;
   }
-  if (cleanParams.usePassphraseState === false) {
-    delete cleanParams.passphraseState;
-  }
-
-  delete cleanParams.usePassphraseState; // 移除 UI辅助参数
 
   console.log('[HardwareStore] 📋 计算执行参数:', {
     原始通用参数: commonParams,

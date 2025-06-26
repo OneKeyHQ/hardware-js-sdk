@@ -176,7 +176,7 @@ body {
   
   /* 分界线样式 - 清晰的视觉分隔 */
   .onekey-divider {
-    @apply border-border bg-border/50;
+    @apply border-border bg-border/50 h-px my-10;
   }
   
   /* 导航项样式 - 清晰的选中状态 */
@@ -250,6 +250,74 @@ body {
   code {
     @apply relative rounded-md bg-muted px-[0.4rem] py-[0.25rem] font-mono text-sm font-medium;
     @apply border border-border/50;
+  }
+  
+  /* MDX 内容样式优化 */
+  .prose {
+    /* 基础字体大小和行高 */
+    font-size: 0.9375rem; /* 15px */
+    line-height: 1.6;
+    background-color: transparent; /* Ensure background is transparent */
+  }
+
+  /* Override highlight.js background */
+  .hljs {
+    background-color: transparent !important;
+  }
+
+  .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    @apply text-foreground font-semibold;
+    margin-top: 1.25em;
+    margin-bottom: 0.6em;
+    line-height: 1.2;
+  }
+
+  .prose h1 {
+    font-size: 2rem; /* 32px */
+  }
+
+  .prose h2 {
+    font-size: 1.625rem; /* 26px */
+  }
+
+  .prose h3 {
+    font-size: 1.375rem; /* 22px */
+  }
+
+  .prose h4 {
+    font-size: 1.125rem; /* 18px */
+  }
+
+  .prose p {
+    margin-bottom: 0.8em;
+  }
+
+  .prose ul, .prose ol {
+    margin-top: 0.8em;
+    margin-bottom: 0.8em;
+    padding-left: 1.2em;
+  }
+
+  .prose li {
+    margin-bottom: 0.4em;
+  }
+
+  .prose code {
+    font-size: 0.8125rem; /* 13px */
+    background-color: var(--muted);
+    color: var(--muted-foreground);
+    border: 1px solid var(--border);
+    padding: 0.2em 0.4em;
+    border-radius: 0.3em;
+  }
+
+  .prose pre {
+    @apply bg-muted text-foreground border border-border rounded-lg p-3 text-xs overflow-auto;
+    line-height: 1.4;
+  }
+
+  .prose a {
+    @apply text-primary hover:underline;
   }
   
   /* 滚动条美化 - 适配深色主题 */

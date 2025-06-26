@@ -97,6 +97,7 @@ export const zh = {
       cancelled: '已取消',
       timeout: '超时',
       unknown: '未知',
+      guide: '开发者指南',
     },
     home: {
       title: 'OneKey 硬件钱包 SDK',

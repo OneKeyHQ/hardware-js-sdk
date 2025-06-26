@@ -200,6 +200,7 @@ logStorageConfig: {
 
 ### Design Philosophy
 The OneKey design system is inspired by the elegant, modern interface of the OneKey app-monorepo. It emphasizes:
+
 - **Clear Visual Hierarchy**: Distinct layers with proper elevation and shadows
 - **Elegant Dark/Light Themes**: Sophisticated color palettes with excellent contrast
 - **Subtle Animations**: Smooth transitions that enhance user experience
@@ -1014,3 +1015,20 @@ const ACTION_PRIORITIES = {
 6. **⚡ Performance**: Optimize for responsive user experience
 
 **The project now features advanced search capabilities with intelligent sorting and comprehensive internationalization support while maintaining technical accuracy for blockchain terminology.** 🚀
+
+# OneKey Hardware SDK Example - Passphrase 设计与参数流转规则
+
+## 1. 参数与状态
+- 只暴露 useEmptyPassphrase（主钱包开关）给开发者，UI 不再显示 usePassphraseState。
+- passphraseState 只做会话级别缓存（内存 store），页面刷新即丢失，不做本地持久化。
+- 与硬件交互时，参数只会有 useEmptyPassphrase 或 passphraseState，且两者互斥。
+
+## 2. 典型开发者场景
+1. useEmptyPassphrase = true：主钱包，直接调用，无弹窗。
+2. useEmptyPassphrase = false 且没有 passphraseState：首次进入隐藏钱包，弹窗输入 passphrase，设备返回 passphraseState，存入会话。
+3. useEmptyPassphrase = false 且有 passphraseState：会话内复用隐藏钱包，直接调用，无弹窗。
+
+## 3. 其他说明
+- "保持可访问"功能已移除，不做任何持久化。
+- 代码注释需明确 passphraseState 只做会话缓存。
+- 仅支持开发者调试和演示，不建议用于生产钱包。

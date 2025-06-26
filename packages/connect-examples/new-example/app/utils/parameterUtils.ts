@@ -88,7 +88,7 @@ export function separateParameters(data: Record<string, unknown>): {
   methodParams: Record<string, unknown>;
   commonParams: Record<string, unknown>;
 } {
-  const commonParamNames = ['useEmptyPassphrase', 'passphraseState', 'usePassphraseState'];
+  const commonParamNames = ['useEmptyPassphrase', 'passphraseState'];
   const methodParams: Record<string, unknown> = {};
   const commonParams: Record<string, unknown> = {};
 

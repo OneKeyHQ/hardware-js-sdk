@@ -1,0 +1,111 @@
+## 快速开始 (Web)
+
+按照以下步骤快速上手 OneKey Web SDK。
+
+> **环境准备：**
+>
+> - 支持 WebUSB 的现代浏览器（例如 Chrome、Edge）
+> - 通过 USB 连接的 OneKey 硬件设备
+> - （可选）运行 OneKey Bridge 以支持 JSBridge 回退
+
+---
+
+### 1. 安装
+
+在项目中安装 `@onekeyfe/hd-web-sdk`：
+
+```bash
+# 使用 Yarn
+yarn add @onekeyfe/hd-web-sdk
+
+# 使用 npm
+npm install @onekeyfe/hd-web-sdk
+```
+
+---
+
+### 2. 初始化
+
+在应用启动时初始化 SDK。`connectSrc` 指向安全网桥，用于在沙盒 iframe 中进行底层设备通信。
+
+```ts
+import { HardwareSDK, UI_EVENT } from '@onekeyfe/hd-web-sdk';
+
+async function initializeSDK() {
+  await HardwareSDK.init({
+    connectSrc: 'https://jssdk.onekey.so/',
+    env: 'webusb', // 'webusb' 直连 USB；'jsbridge' 回退
+    debug: true, // 开启调试日志
+  });
+
+  console.log('✅ OneKey SDK 已初始化');
+}
+
+// 可选：全局处理 PIN 和 Passphrase 事件
+HardwareSDK.on(UI_EVENT.REQUEST_PIN, async (_, callback) => {
+  const pin = await showPinDialog();
+  callback(null, pin);
+});
+
+HardwareSDK.on(UI_EVENT.REQUEST_PASSPHRASE, async (_, callback) => {
+  const passphrase = await showPassphraseDialog();
+  callback(null, passphrase);
+});
+
+initializeSDK();
+```
+
+---
+
+### 3. 搜索设备
+
+初始化完成后，搜索并连接第一个可用的 OneKey 设备：
+
+```ts
+async function findAndConnectDevice() {
+  const devices = await HardwareSDK.searchDevices({ timeout: 5000 });
+  if (devices.length === 0) {
+    throw new Error('🔍 未找到 OneKey 设备');
+  }
+  console.log('🔌 已连接设备：', devices[0].features.model);
+  return devices[0];
+}
+
+const device = await findAndConnectDevice();
+```
+
+---
+
+### 4. 获取以太坊地址
+
+设备连接后，可调用任意硬件方法。例如获取 EVM 地址：
+
+```ts
+async function getEthereumAddress(path = "m/44'/60'/0'/0/0") {
+  try {
+    const result = await HardwareSDK.evmGetAddress({
+      path,
+      showOnOneKey: true, // 在设备上确认
+    });
+
+    if (result.success) {
+      console.log('🔑 地址：', result.payload.address);
+    } else {
+      console.error('❌ 错误：', result.payload.error);
+    }
+  } catch (error) {
+    console.error('💥 意外错误：', error);
+  }
+}
+
+const addressInfo = await getEthereumAddress();
+```
+
+---
+
+🎉 **接下来，你可以探索更多功能：**
+
+- 设备管理
+- 固件更新
+- 多链签名
+- 更多精彩内容！

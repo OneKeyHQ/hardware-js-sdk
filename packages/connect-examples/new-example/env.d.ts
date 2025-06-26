@@ -68,4 +68,26 @@ declare module '*.module.css' {
   export default classes;
 }
 
+// Markdown module declarations
+declare module '*.md' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.mdx' {
+  const content: string;
+  export default content;
+}
+
+// Third-party modules without bundled types
+declare module 'react-markdown';
+declare module 'remark-gfm';
+
+// MDX modules under docs alias
+declare module '@docs/*' {
+  import React from 'react';
+  const MDXComponent: React.ComponentType<unknown>;
+  export default MDXComponent;
+}
+
 export {};

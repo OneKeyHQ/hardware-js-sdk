@@ -1,0 +1,29 @@
+import ArchitectureDiagram from '@/components/documentation/ArchitectureDiagram';
+
+## Overview & Architecture
+
+<div className="mb-8 text-textSecondary text-lg leading-relaxed">
+The OneKey SDK is a monorepo that provides a complete suite of tools for communicating with OneKey hardware wallets across different platforms (Web, Desktop, Mobile). Its core design philosophy is to offer a unified and simplified API that automatically handles complex low-level communication protocols, allowing developers to focus on business logic.
+</div>
+
+<div className="mb-8 text-textSecondary text-lg leading-relaxed">
+The architecture diagram below clearly illustrates how applications on different platforms can select the appropriate SDK and how these SDKs utilize various communication layers (Transports) to interact with the hardware.
+</div>
+
+<ArchitectureDiagram />
+
+<div className="onekey-divider" />
+
+### Architecture Explained
+
+- **Application Layer**: This is your application, which can be a Web, React Native, or Native Mobile/Node.js app, depending on your target platform.
+
+- **SDK Abstraction Layer**: We provide three core SDK packages, each optimized for a specific development environment:
+
+  - `@onekeyfe/hd-web-sdk`: Designed for browsers and web-based desktop applications (like Electron). It internally handles both **WebUSB** and **JSBridge** communication methods.
+
+  - `@onekeyfe/hd-ble-sdk`: Specifically for **React Native** applications, used for communicating with hardware via Bluetooth (BLE).
+
+  - `@onekeyfe/hd-common-connect-sdk`: A more generic package suitable for **native mobile applications (iOS/Android)** and **Node.js** backend services. It can handle both Bluetooth (BLE) and native USB (HID) connections.
+
+- **Transport Layer**: These are the low-level modules that implement direct communication with the hardware. The SDK automatically selects the most suitable transport method based on the environment and configuration.

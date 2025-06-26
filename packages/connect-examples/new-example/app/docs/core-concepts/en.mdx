@@ -1,0 +1,90 @@
+import { HardwareSDK, UI_EVENT } from '@onekeyfe/hd-web-sdk';
+
+## Core Concepts
+
+To ensure a robust integration with OneKey hardware, it is crucial to understand the following core concepts. These concepts cover everything from device communication to user interaction.
+
+### Handling UI Events
+
+The OneKey SDK uses an event-driven model to handle operations that require user interaction, such as entering a PIN or Passphrase. Your application **must** listen for and respond to these UI events; otherwise, the hardware operation will not proceed and will eventually time out.
+
+We recommend setting up global event listeners when your application initializes. The core events include:
+
+- `UI_EVENT.REQUEST_PIN`: The hardware is requesting a PIN. Your application should display a PIN entry interface.
+- `UI_EVENT.REQUEST_PASSPHRASE`: The hardware is requesting a Passphrase. Your application should display a Passphrase entry interface.
+- `DEVICE.CONNECT`: A device has been successfully connected.
+- `DEVICE.DISCONNECT`: A device has been disconnected.
+
+### Code Example:
+
+```typescript
+HardwareSDK.on(UI_EVENT.REQUEST_PIN, async (device, callback) => {
+  const pin = await showPinDialog();
+  callback(null, pin);
+});
+
+HardwareSDK.on(UI_EVENT.REQUEST_PASSPHRASE, async (device, callback) => {
+  const passphrase = await showPassphraseDialog();
+  callback(null, passphrase);
+});
+```
+
+### Passphrase (BIP39 Passphrase)
+
+A Passphrase is part of the BIP39 standard that allows you to add an extra password to your mnemonic phrase, creating a completely new set of "hidden wallets." The same mnemonic phrase with different passphrases will derive entirely different account addresses and assets.
+
+**Security Tradeoff:**  
+This is a powerful security feature, but it comes with a risk: **if you forget the Passphrase, you will not be able to access the corresponding hidden wallet, and OneKey cannot help you recover it.** If you don't need it, you can opt to use an empty passphrase, which accesses your main (standard) wallet.
+
+### `passphrase` vs. `passphraseState`
+
+When calling an API that requires a Passphrase, you will encounter the `passphrase` and `passphraseState` parameters. Understanding their difference is crucial:
+
+- `passphrase` (parameter): A string used for a **single** API call. It needs to be passed with every call. Use this when you do not want to cache the passphrase.
+- `passphraseState` (from `getPassphraseState`): An encrypted state value obtained from the device. Once acquired, you can reuse it in subsequent API calls, and the SDK will cache it for up to 10 minutes. This improves user experience by avoiding repeated passphrase entry in a short period.
+- **Relationship:** The `getPassphraseState` method itself requires a `passphrase` as input and returns a reusable `passphraseState`. When you provide both, the SDK will prioritize using `passphraseState`.
+
+#### Code Example: Obtaining and Using `passphraseState`
+
+```typescript
+import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
+
+// 1. (Optional) User enters passphrase
+const userPassphrase = await showPassphraseDialog();
+
+// 2. Get passphraseState from the device
+const state = await HardwareSDK.getPassphraseState({ passphrase: userPassphrase });
+
+// 3. Use the state in subsequent API calls
+const address = await HardwareSDK.evmGetAddress({
+  path: "m/44'/60'/0'/0/0",
+  passphraseState: state,
+});
+```
+
+### PIN Handling
+
+The PIN is the first line of defense to unlock a OneKey hardware device. Similar to the passphrase, any signing operation will trigger a PIN request if the device is locked.
+
+### On-Device vs. Client-Side Entry
+
+PIN entry methods vary depending on the device model:
+
+- **On-Device Entry:** Models like the OneKey Touch and OneKey Pro are equipped with a touchscreen, and users **must** enter the PIN directly on the device. For these devices, your application will not receive a `REQUEST_PIN` event.
+- **Client-Side Entry:** Other models (like the OneKey Classic or Mini) require the PIN to be entered via your application UI. When interacting with these devices, the SDK will emit a `UI_EVENT.REQUEST_PIN` event. You need to show a PIN entry dialog and pass the value back to the SDK via the callback.
+
+#### Code Example: Listening for PIN Events
+
+```ts
+HardwareSDK.on(UI_EVENT.REQUEST_PIN, (device, callback) => {
+  console.log('Device requires PIN:', device.features?.model);
+
+  if (!device.features?.pin_protection_always_on_device) {
+    const pin = await showPinDialog();
+    callback(null, pin);
+  } else {
+    showUserNotification('Please enter your PIN on the OneKey device.');
+    callback(null, '');
+  }
+});
+```

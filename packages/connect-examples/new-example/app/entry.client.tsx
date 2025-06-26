@@ -8,7 +8,7 @@
 // 先导入 shim 以确保 Node.js polyfills 在应用其余部分之前加载
 import './utils/shim.js';
 
-import { StrictMode } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { SDKProvider } from './components/providers/SDKProvider';
@@ -16,6 +16,7 @@ import { I18nProvider } from './i18n/i18n-provider';
 import { CommandPalette } from './components/common/CommandPalette';
 import MainLayout from './components/layout/MainLayout';
 import { Toaster } from './components/ui/Toaster';
+import { useTheme } from './hooks/use-theme';
 
 // Import existing route components
 import IndexPage from './routes/_index';
@@ -27,6 +28,7 @@ import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
 import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
+import GuidePage from './routes/guide';
 
 // Import styles
 import './tailwind.css';
@@ -60,6 +62,14 @@ function handleSpaRedirect() {
 
 // Layout wrapper component
 function RootLayout() {
+  const { theme } = useTheme();
+  useEffect(() => {
+    if (theme === 'dark') {
+      import('highlight.js/styles/github-dark.css');
+    } else {
+      import('highlight.js/styles/github.css');
+    }
+  }, [theme]);
   return (
     <I18nProvider>
       <SDKProvider>
@@ -114,6 +124,10 @@ const router = createBrowserRouter(
         {
           path: 'chains/:chainId/:methodName',
           element: <ChainMethodExecutePage />,
+        },
+        {
+          path: 'guide',
+          element: <GuidePage />,
         },
       ],
     },

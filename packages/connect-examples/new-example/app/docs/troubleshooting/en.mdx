@@ -1,0 +1,39 @@
+## Troubleshooting
+
+### Webpack 5 Polyfill Errors (Buffer / process)
+
+Some SDK dependencies rely on Node.js core modules like `Buffer` and `process`. In older versions of Webpack, these were polyfilled automatically. Webpack 5 removed this behavior, leading to errors like `Buffer is not defined` or `process is not defined`.
+
+To fix this, you need to provide these polyfills in your Webpack configuration. Install the required packages:
+
+```js
+// webpack.config.js
+
+const webpack = require('webpack');
+
+module.exports = {
+  // ... other config
+  plugins: [
+    new webpack.ProvidePlugin({
+      process: 'process/browser',
+      Buffer: ['buffer', 'Buffer'],
+    }),
+  ],
+  resolve: {
+    fallback: {
+      buffer: require.resolve('buffer/'),
+      process: require.resolve('process/browser'),
+      // ... other fallbacks you might need
+    },
+  },
+};
+```
+
+### Device Not Found / Connection Failed
+
+If you are unable to connect to your device, please check the following:
+
+- Is the OneKey device plugged in and unlocked?
+- Are you using a supported browser (Google Chrome is recommended for WebUSB)?
+- (For JSBridge) Is the OneKey Bridge application installed and running?
+- Ensure no other application (like the OneKey desktop app) is currently connected to the device, as it can claim the USB interface.

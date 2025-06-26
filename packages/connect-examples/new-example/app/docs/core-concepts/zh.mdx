@@ -1,0 +1,88 @@
+import { HardwareSDK, UI_EVENT } from '@onekeyfe/hd-web-sdk';
+
+## 核心概念
+
+为了确保与 OneKey 硬件的稳健集成，理解以下核心概念至关重要。这些概念涵盖了从设备通信到用户交互的各个方面。
+
+### 处理 UI 事件
+
+OneKey SDK 使用事件驱动模型来处理需要用户交互的操作，例如输入 PIN 码或 Passphrase。您的应用程序 **必须** 监听并响应这些 UI 事件，否则硬件操作将无法继续并最终超时。
+
+建议在应用初始化时设置全局事件监听器。核心事件包括：
+
+- `UI_EVENT.REQUEST_PIN`：硬件正在请求 PIN 码，您的应用应显示 PIN 输入界面。
+- `UI_EVENT.REQUEST_PASSPHRASE`：硬件正在请求 Passphrase，您的应用应显示 Passphrase 输入界面。
+- `DEVICE.CONNECT`：设备已成功连接。
+- `DEVICE.DISCONNECT`：设备已断开连接。
+
+### 代码示例：
+
+```ts
+HardwareSDK.on(UI_EVENT.REQUEST_PIN, async (device, callback) => {
+  const pin = await showPinDialog();
+  callback(null, pin);
+});
+
+HardwareSDK.on(UI_EVENT.REQUEST_PASSPHRASE, async (device, callback) => {
+  const passphrase = await showPassphraseDialog();
+  callback(null, passphrase);
+});
+```
+
+### Passphrase (BIP39 密码短语)
+
+Passphrase 是 BIP39 标准的一部分，它允许您在助记词基础上添加额外的密码，创建全新的"隐藏钱包"。相同助记词在不同 Passphrase 下会派生出完全不同的地址和资产。
+
+**安全权衡：**  
+这是一个强大的安全功能，但也伴随风险：**如果忘记 Passphrase，将无法访问对应的隐藏钱包，OneKey 也无法帮助恢复。**如果不需要，可使用空 Passphrase 访问主钱包。
+
+### `passphrase` 与 `passphraseState`
+
+在调用需要 Passphrase 的 API 时，会遇到 `passphrase` 和 `passphraseState` 参数。理解它们的区别非常重要：
+
+- `passphrase`（参数）：用于**单次** API 调用的字符串，每次调用都需传递，适用于不缓存 Passphrase 的场景。
+- `passphraseState`（来自 `getPassphraseState`）：从设备获取的加密状态值，可在后续多次调用中复用，SDK 会缓存长达 10 分钟，提升用户体验。
+- **关系：** `getPassphraseState` 方法本身需要一个 `passphrase` 作为输入，返回可复用的 `passphraseState`。当同时提供两者时，SDK 会优先使用 `passphraseState`。
+
+#### 代码示例：获取并使用 `passphraseState`
+
+```ts
+// 1. （可选）用户输入 Passphrase
+const userPassphrase = await showPassphraseDialog();
+
+// 2. 从设备获取 passphraseState
+const state = await HardwareSDK.getPassphraseState({ passphrase: userPassphrase });
+
+// 3. 在后续调用中使用 state
+const address = await HardwareSDK.evmGetAddress({
+  path: "m/44'/60'/0'/0/0",
+  passphraseState: state,
+});
+```
+
+### PIN 码处理
+
+PIN 是解锁 OneKey 硬件设备的第一道防线。类似 Passphrase，当设备锁定时，任何签名操作都会触发 PIN 请求。
+
+### 设备上输入 vs 客户端输入
+
+根据设备型号不同，PIN 输入方式也不同：
+
+- **设备上输入：** 如 OneKey Touch、Pro 等型号配备触摸屏，用户 **必须** 在设备上直接输入 PIN，应用不会收到 `REQUEST_PIN` 事件。
+- **客户端输入：** 如 Classic、Mini 等型号需通过应用界面输入 PIN，SDK 会发出 `UI_EVENT.REQUEST_PIN` 事件，需要弹出输入框并通过回调传值。
+
+#### 代码示例：监听 PIN 事件
+
+```ts
+HardwareSDK.on(UI_EVENT.REQUEST_PIN, (device, callback) => {
+  console.log('设备需要 PIN：', device.features?.model);
+
+  if (!device.features?.pin_protection_always_on_device) {
+    const pin = await showPinDialog();
+    callback(null, pin);
+  } else {
+    showUserNotification('请在 OneKey 设备上输入 PIN。');
+    callback(null, '');
+  }
+});
+```

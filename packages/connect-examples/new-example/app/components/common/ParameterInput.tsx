@@ -29,16 +29,6 @@ const getCommonParameters = (t: (key: string) => string): ParameterField[] => [
     visible: true,
     editable: true,
   },
-  // UI辅助参数
-  {
-    name: 'usePassphraseState',
-    type: 'boolean',
-    label: t('components.parameterInput.usePassphraseState'),
-    description: t('components.parameterInput.usePassphraseStateDesc'),
-    value: false,
-    visible: true,
-    editable: true,
-  },
 ];
 
 const ParameterInput: React.FC<ParameterInputProps> = ({
@@ -63,7 +53,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 获取参数值的统一函数
   const getParameterValue = (field: ParameterField): unknown => {
-    if (field.name === 'useEmptyPassphrase' || field.name === 'usePassphraseState') {
+    if (field.name === 'useEmptyPassphrase') {
       return commonParameters[field.name as keyof typeof commonParameters];
     }
     // 优先使用当前输入的值，如果没有则使用预设值
@@ -89,7 +79,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       })),
     });
 
-    const commonParamNames = ['useEmptyPassphrase', 'usePassphraseState'];
+    const commonParamNames = ['useEmptyPassphrase'];
 
     // 使用统一的预设方式获取参数
     if (selectedPreset && presets) {
@@ -151,16 +141,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 参数变化处理
   const handleParamChange = (paramName: string, value: unknown) => {
-    if (paramName === 'usePassphraseState') {
-      const boolValue = Boolean(value);
-      if (boolValue) setCommonParameter('useEmptyPassphrase', false);
-      setCommonParameter('usePassphraseState', boolValue);
-      return;
-    }
-
     if (paramName === 'useEmptyPassphrase') {
       setCommonParameter('useEmptyPassphrase', Boolean(value));
-      if (value) setCommonParameter('usePassphraseState', false);
       return;
     }
 
@@ -179,10 +161,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
       // 从预设参数中获取值
       preset.parameters.forEach((param: ParameterField) => {
-        if (
-          param.value !== undefined &&
-          !['useEmptyPassphrase', 'passphraseState', 'usePassphraseState'].includes(param.name)
-        ) {
+        if (param.value !== undefined && !['useEmptyPassphrase'].includes(param.name)) {
           // 使用统一的参数处理工具
           newMethodParams[param.name] = parseParameterValue(param.name, param.value);
         }
@@ -291,48 +270,6 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const value = getParameterValue(field);
     const isEditable = field.editable !== false;
 
-    // usePassphraseState特殊处理
-    if (field.name === 'usePassphraseState') {
-      const isDisabled = commonParameters.passphraseState === '';
-
-      return (
-        <div key={field.name} className="space-y-1.5">
-          <div className="flex items-start space-x-2">
-            <Checkbox
-              id={field.name}
-              checked={Boolean(value) && commonParameters.passphraseState !== ''}
-              onCheckedChange={checked =>
-                isEditable && !isDisabled && handleParamChange(field.name, checked === true)
-              }
-              disabled={isDisabled}
-              className="mt-0.5"
-            />
-            <div className="space-y-0.5">
-              <label
-                htmlFor={field.name}
-                className={`text-xs font-medium cursor-pointer flex items-center gap-1 ${
-                  isDisabled ? 'text-muted-foreground opacity-50' : 'text-foreground'
-                }`}
-              >
-                {field.label || field.name}
-                {field.required && <span className="text-orange-600">*</span>}
-              </label>
-              <p
-                className={`text-xs ${
-                  isDisabled ? 'text-muted-foreground opacity-50' : 'text-muted-foreground'
-                }`}
-              >
-                {isDisabled
-                  ? t('components.parameterInput.currentlyNoPassphraseState')
-                  : commonParameters.passphraseState}
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // 通用Checkbox
     return (
       <div key={field.name} className="space-y-1.5">
         <div className="flex items-start space-x-2">

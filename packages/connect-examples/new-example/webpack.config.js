@@ -4,7 +4,9 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const webpack = require('webpack');
 
-module.exports = (env, argv) => {
+module.exports = async (env, argv) => {
+  // Dynamically import ESM-only rehype-highlight
+  const rehypeHighlight = (await import('rehype-highlight')).default;
   const isProduction = argv.mode === 'production';
 
   return {
@@ -20,9 +22,9 @@ module.exports = (env, argv) => {
     },
 
     resolve: {
-      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
+      extensions: ['.tsx', '.ts', '.jsx', '.js', '.json', '.md', '.mdx'],
       alias: {
-        '~': path.resolve(__dirname, 'app'),
+        '@': path.resolve(__dirname, 'app'),
       },
       fallback: {
         // Node.js polyfills for browser
@@ -68,6 +70,31 @@ module.exports = (env, argv) => {
         {
           test: /\.css$/,
           use: ['style-loader', 'css-loader', 'postcss-loader'],
+        },
+        {
+          test: /\.(png|jpg|jpeg|gif|svg|webp|ico)$/,
+          type: 'asset/resource',
+        },
+        {
+          test: /\.mdx?$/,
+          use: [
+            {
+              loader: 'babel-loader',
+              options: {
+                presets: [
+                  ['@babel/preset-env', { targets: 'defaults' }],
+                  ['@babel/preset-react', { runtime: 'automatic' }],
+                  '@babel/preset-typescript',
+                ],
+              },
+            },
+            {
+              loader: '@mdx-js/loader',
+              options: {
+                rehypePlugins: [rehypeHighlight],
+              },
+            },
+          ],
         },
         {
           test: /\.(png|jpg|jpeg|gif|svg|webp|ico)$/,

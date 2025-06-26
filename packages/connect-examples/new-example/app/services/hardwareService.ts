@@ -12,27 +12,6 @@ import {
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
 
-// WebUSB 类型声明
-interface USBDevice {
-  vendorId: number;
-  productId: number;
-}
-
-interface USBDeviceFilter {
-  vendorId: number;
-  productId: number;
-}
-
-interface USB {
-  requestDevice(options: { filters: USBDeviceFilter[] }): Promise<USBDevice>;
-}
-
-declare global {
-  interface Navigator {
-    usb?: USB;
-  }
-}
-
 // 获取SDK实例的简化函数
 async function getSDKInstance(): Promise<CoreApi> {
   return getCurrentSDKInstance();
@@ -290,7 +269,6 @@ export async function callHardwareAPI(
             useHardwareStore
               .getState()
               .setCommonParameter('passphraseState', passphraseResult.payload);
-            useHardwareStore.getState().setCommonParameter('usePassphraseState', true);
           } else {
             logInfo('Device passphrase protection not enabled');
           }
