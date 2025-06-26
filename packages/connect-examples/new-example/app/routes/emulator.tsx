@@ -111,7 +111,7 @@ export default function EmulatorPage() {
 
   return (
     <PageLayout fixedHeight={true}>
-      <div className="flex-1 flex flex-col px-4 py-3 min-h-0">
+      <div className="flex-1 flex flex-col px-4 py-3 min-h-0 h-full">
         {/* 页面标题 */}
         <div className="flex-shrink-0 mb-4">
           <div className="flex items-center gap-3">

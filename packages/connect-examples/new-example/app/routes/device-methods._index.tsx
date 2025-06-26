@@ -281,7 +281,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
 
   return (
     <PageLayout fixedHeight={true}>
-      <div className="flex-1 flex flex-col px-4 py-3 min-h-0">
+      <div className="flex-1 flex flex-col px-4 py-3 min-h-0 h-full">
         {/* 顶部导航和统计 */}
         <div className="flex-shrink-0 mb-4">
           <div className="flex items-center justify-between">

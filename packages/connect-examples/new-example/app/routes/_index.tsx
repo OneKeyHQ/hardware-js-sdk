@@ -1,5 +1,4 @@
 import { Card, CardContent } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
@@ -166,7 +165,9 @@ export default function IndexPage() {
                             <div className="text-xs text-muted-foreground uppercase tracking-wide">
                               {t('common.deviceType')}
                             </div>
-                            <div className="text-sm font-medium">{currentDevice.deviceType}</div>
+                            <div className="text-sm font-medium">
+                              {currentDevice.deviceType.toUpperCase()}
+                            </div>
                           </div>
                           <div className="space-y-1">
                             <div className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -230,11 +231,9 @@ export default function IndexPage() {
                           <span className="text-sm text-muted-foreground">
                             {t('common.pinInputSupport')}
                           </span>
-                          <Badge variant={isCurrentDeviceClassicModel() ? 'default' : 'secondary'}>
-                            {isCurrentDeviceClassicModel()
-                              ? t('common.supported')
-                              : t('common.notSupported')}
-                          </Badge>
+                          {isCurrentDeviceClassicModel()
+                            ? t('common.supported')
+                            : t('common.notSupported')}
                         </div>
                       </div>
                     </div>

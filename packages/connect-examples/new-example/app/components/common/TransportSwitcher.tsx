@@ -190,13 +190,17 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
               size="sm"
               className={`w-full h-14 flex items-center justify-between px-5 py-4 transition-all duration-200 ${
                 transportType === option.type
-                  ? 'bg-gray-900 hover:bg-gray-800 text-white border-gray-700 shadow-md ring-1 ring-gray-600'
-                  : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-200 hover:border-gray-300'
+                  ? 'bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 shadow-md ring-1 ring-blue-200 dark:ring-blue-800'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               } ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="flex items-center space-x-4">
                 <div
-                  className={`${transportType === option.type ? 'text-white' : 'text-gray-600'}`}
+                  className={`${
+                    transportType === option.type
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
                 >
                   {option.icon}
                 </div>
@@ -205,7 +209,9 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
                   {option.description && (
                     <div
                       className={`text-xs ${
-                        transportType === option.type ? 'text-gray-300' : 'text-gray-500'
+                        transportType === option.type
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'text-gray-500 dark:text-gray-400'
                       }`}
                     >
                       {option.description}
@@ -214,7 +220,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
                 </div>
               </div>
               {option.disabled && (
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
                   {t('transport.comingSoon')}
                 </span>
               )}

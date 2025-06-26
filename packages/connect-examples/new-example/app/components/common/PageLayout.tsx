@@ -10,7 +10,7 @@ export function PageLayout({ children, className = '', fixedHeight = false }: Pa
   if (fixedHeight) {
     return (
       <div className={`h-full flex flex-col bg-background ${className}`}>
-        <div className="flex flex-1 overflow-y-auto min-h-0">{children}</div>
+        <div className="flex-1 overflow-y-auto min-h-0">{children}</div>
       </div>
     );
   }

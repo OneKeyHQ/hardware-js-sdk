@@ -42,9 +42,9 @@ const DeviceMethodExecutePage: React.FC = () => {
     >
       {selectedMethod && (
         <PageLayout fixedHeight={true}>
-          <div className="flex-1 flex flex-col px-4 py-3 min-h-0">
+          <div className="flex-1 flex flex-col px-4 py-3 min-h-0 h-full">
             {/* 面包屑导航 */}
-            <div className="mb-4">
+            <div className="flex-shrink-0 mb-4">
               <Breadcrumb
                 items={[
                   {
@@ -59,20 +59,24 @@ const DeviceMethodExecutePage: React.FC = () => {
 
             {/* 设备未连接时显示小提示 */}
             {!currentDevice && (
-              <div className="mb-4">
+              <div className="flex-shrink-0 mb-4">
                 <DeviceNotConnectedState showFullPage={false} />
               </div>
             )}
 
-            {/* 执行器 - 自适应高度 */}
-            <MethodExecutor
-              className="h-full"
-              methodConfig={selectedMethod}
-              executionHandler={handleMethodExecution}
-              type={
-                firmware.api.some(m => m.method === selectedMethod.method) ? 'firmware' : 'standard'
-              }
-            />
+            {/* 执行器 - 填充剩余高度 */}
+            <div className="flex-1 min-h-0">
+              <MethodExecutor
+                className="h-full"
+                methodConfig={selectedMethod}
+                executionHandler={handleMethodExecution}
+                type={
+                  firmware.api.some(m => m.method === selectedMethod.method)
+                    ? 'firmware'
+                    : 'standard'
+                }
+              />
+            </div>
           </div>
         </PageLayout>
       )}

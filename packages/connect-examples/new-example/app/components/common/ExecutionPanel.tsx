@@ -56,7 +56,7 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
   };
 
   return (
-    <div className={`flex flex-col gap-3 h-full ${className}`}>
+    <div className={`flex flex-col gap-3 max-h-[600px] ${className}`}>
       {/* 上部：请求参数编辑区域 - 紧凑设计 */}
       <Card className="bg-card border border-border/50 shadow-sm flex-shrink-0">
         <CardHeader className="pb-2 pt-3">
