@@ -130,10 +130,13 @@ export const supportBatchPublicKey = (
   if (!!options?.includeNode && deviceType === EDeviceType.Pro) {
     return semver.gte(currentVersion, '4.14.0');
   }
+  if (!!options?.includeNode && deviceType === EDeviceType.Touch) {
+    return semver.gte(currentVersion, '4.11.0');
+  }
   if (!!options?.includeNode && DeviceModelToTypes.model_classic1s.includes(deviceType)) {
     return semver.gte(currentVersion, '3.12.0');
   }
-  if (!!options?.includeNode && deviceType === EDeviceType.Classic) {
+  if (!!options?.includeNode && DeviceModelToTypes.model_mini.includes(deviceType)) {
     return semver.gte(currentVersion, '3.10.0');
   }
   if (options?.includeNode) {
