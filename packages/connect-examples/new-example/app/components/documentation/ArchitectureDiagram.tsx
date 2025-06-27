@@ -28,14 +28,21 @@ const customNodeStyles = {
   whiteSpace: 'pre-wrap' as const,
 };
 
-const CustomNode = ({ data }: NodeProps) => (
+// 定义类型，避免 any
+interface CustomNodeData {
+  label: string;
+  backgroundColor: string;
+  color: string;
+  border?: string;
+}
+
+const CustomNode = ({ data }: NodeProps<CustomNodeData>) => (
   <div
     style={{
       ...customNodeStyles,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      background: (data as any).backgroundColor,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      color: (data as any).color,
+      background: data.backgroundColor,
+      color: data.color,
+      border: data.border || customNodeStyles.border,
     }}
   >
     <Handle
@@ -44,8 +51,7 @@ const CustomNode = ({ data }: NodeProps) => (
       isConnectable={false}
       style={{ visibility: 'hidden' }}
     />
-    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-    {(data as any).label}
+    {data.label}
     <Handle
       type="source"
       position={Position.Bottom}
@@ -60,114 +66,126 @@ const nodeTypes = {
 };
 
 const initialNodes: Node[] = [
-  // Applications
+  // Application 层
   {
     id: 'webapp',
     type: 'custom',
-    position: { x: 50, y: 50 },
+    position: { x: 80, y: 40 },
     data: {
-      label: 'Application\n(Web / Desktop)',
-      backgroundColor: 'hsl(var(--primary) / 0.8)',
+      label: 'Web / Desktop App',
+      backgroundColor: 'hsl(var(--primary) / 0.9)',
       color: 'hsl(var(--primary-foreground))',
     },
   },
   {
-    id: 'mobileapp',
+    id: 'rnapp',
     type: 'custom',
-    position: { x: 350, y: 50 },
+    position: { x: 320, y: 40 },
     data: {
-      label: 'Application\n(React Native)',
-      backgroundColor: 'hsl(var(--primary) / 0.8)',
+      label: 'React Native App',
+      backgroundColor: 'hsl(var(--primary) / 0.9)',
       color: 'hsl(var(--primary-foreground))',
     },
   },
   {
     id: 'nativeapp',
     type: 'custom',
-    position: { x: 650, y: 50 },
+    position: { x: 560, y: 40 },
     data: {
-      label: 'Application\n(Native Mobile / Node.js)',
-      backgroundColor: 'hsl(var(--primary) / 0.8)',
+      label: 'Native Mobile / Node.js',
+      backgroundColor: 'hsl(var(--primary) / 0.9)',
       color: 'hsl(var(--primary-foreground))',
     },
   },
-  // SDK Abstraction
+  // Core SDK 层
   {
-    id: 'websdk',
+    id: 'hd-web-sdk',
     type: 'custom',
-    position: { x: 50, y: 160 },
+    position: { x: 80, y: 130 },
     data: {
-      label: '@onekeyfe/hd-web-sdk\n(For Web & Desktop Apps)',
-      backgroundColor: 'hsl(var(--secondary))',
+      label: '@onekeyfe/hd-web-sdk',
+      backgroundColor: 'hsl(var(--secondary) / 0.95)',
       color: 'hsl(var(--secondary-foreground))',
     },
   },
   {
-    id: 'blesdk',
+    id: 'hd-ble-sdk',
     type: 'custom',
-    position: { x: 350, y: 160 },
+    position: { x: 320, y: 130 },
     data: {
-      label: '@onekeyfe/hd-ble-sdk\n(For React Native Apps)',
-      backgroundColor: 'hsl(var(--secondary))',
+      label: '@onekeyfe/hd-ble-sdk',
+      backgroundColor: 'hsl(var(--secondary) / 0.95)',
       color: 'hsl(var(--secondary-foreground))',
     },
   },
   {
-    id: 'nodesdk',
+    id: 'hd-common-connect-sdk',
     type: 'custom',
-    position: { x: 650, y: 160 },
+    position: { x: 560, y: 130 },
     data: {
-      label: '@onekeyfe/hd-common-connect-sdk\n(For Node.js & Native Mobile)',
-      backgroundColor: 'hsl(var(--secondary))',
+      label: '@onekeyfe/hd-common-connect-sdk',
+      backgroundColor: 'hsl(var(--secondary) / 0.95)',
       color: 'hsl(var(--secondary-foreground))',
     },
   },
-  // Low-level Transports
+  // Transport 层
   {
     id: 'webusb',
     type: 'custom',
-    position: { x: -50, y: 300 },
+    position: { x: 20, y: 230 },
     data: {
-      label: 'WebUSB\n(Direct in Chrome/Edge)',
-      backgroundColor: 'hsl(var(--muted))',
-      color: 'hsl(var(--muted-foreground))',
+      label: 'WebUSB',
+      backgroundColor: 'hsl(var(--amber) / 0.25)',
+      color: 'hsl(var(--amber-foreground))',
     },
   },
   {
-    id: 'http',
+    id: 'jsbridge',
     type: 'custom',
-    position: { x: 150, y: 300 },
+    position: { x: 140, y: 230 },
     data: {
-      label: 'JSBridge\n(High Compatibility)',
-      backgroundColor: 'hsl(var(--muted))',
-      color: 'hsl(var(--muted-foreground))',
+      label: 'JSBridge',
+      backgroundColor: 'hsl(var(--amber) / 0.25)',
+      color: 'hsl(var(--amber-foreground))',
     },
   },
   {
     id: 'ble',
     type: 'custom',
-    position: { x: 410, y: 300 },
+    position: { x: 320, y: 230 },
     data: {
-      label: 'Bluetooth (BLE)\n(For Mobile)',
-      backgroundColor: 'hsl(var(--muted))',
-      color: 'hsl(var(--muted-foreground))',
+      label: 'Bluetooth (BLE)',
+      backgroundColor: 'hsl(var(--amber) / 0.25)',
+      color: 'hsl(var(--amber-foreground))',
     },
   },
   {
     id: 'hid',
     type: 'custom',
-    position: { x: 650, y: 300 },
+    position: { x: 560, y: 230 },
     data: {
-      label: 'HID\n(For Node.js USB)',
-      backgroundColor: 'hsl(var(--muted))',
+      label: 'HID (USB)',
+      backgroundColor: 'hsl(var(--amber) / 0.25)',
+      color: 'hsl(var(--amber-foreground))',
+    },
+  },
+  // Protobuf Protocol 层（用虚线框表示）
+  {
+    id: 'protobuf',
+    type: 'custom',
+    position: { x: 320, y: 310 },
+    data: {
+      label: 'Protobuf Protocol\n统一消息编解码',
+      backgroundColor: 'transparent',
       color: 'hsl(var(--muted-foreground))',
+      border: '2px dashed hsl(var(--border) / 0.7)',
     },
   },
   // Hardware
   {
-    id: 'device',
+    id: 'hardware',
     type: 'custom',
-    position: { x: 350, y: 420 },
+    position: { x: 320, y: 400 },
     data: {
       label: 'OneKey Hardware',
       backgroundColor: 'hsl(var(--background))',
@@ -177,24 +195,30 @@ const initialNodes: Node[] = [
 ];
 
 const edgeStyle = { stroke: 'hsl(var(--border))', strokeWidth: 1.5 };
+const dashedEdgeStyle = { stroke: 'hsl(var(--border))', strokeWidth: 1.5, strokeDasharray: '6 4' };
 const initialEdges: Edge[] = [
-  // App -> SDK
-  { id: 'e-webapp-websdk', source: 'webapp', target: 'websdk', style: edgeStyle },
-  { id: 'e-mobileapp-blesdk', source: 'mobileapp', target: 'blesdk', style: edgeStyle },
-  { id: 'e-nativeapp-nodesdk', source: 'nativeapp', target: 'nodesdk', style: edgeStyle },
-
-  // SDK -> Transports
-  { id: 'e-websdk-webusb', source: 'websdk', target: 'webusb', style: edgeStyle },
-  { id: 'e-websdk-http', source: 'websdk', target: 'http', style: edgeStyle },
-  { id: 'e-blesdk-ble', source: 'blesdk', target: 'ble', style: edgeStyle },
-  { id: 'e-nodesdk-ble', source: 'nodesdk', target: 'ble', style: edgeStyle },
-  { id: 'e-nodesdk-hid', source: 'nodesdk', target: 'hid', style: edgeStyle },
-
-  // Transports -> Device
-  { id: 'e-webusb-device', source: 'webusb', target: 'device', style: edgeStyle },
-  { id: 'e-http-device', source: 'http', target: 'device', style: edgeStyle },
-  { id: 'e-ble-device', source: 'ble', target: 'device', style: edgeStyle },
-  { id: 'e-hid-device', source: 'hid', target: 'device', style: edgeStyle },
+  // App -> Core
+  { id: 'e-webapp-websdk', source: 'webapp', target: 'hd-web-sdk', style: edgeStyle },
+  { id: 'e-rnapp-ble', source: 'rnapp', target: 'hd-ble-sdk', style: edgeStyle },
+  {
+    id: 'e-nativeapp-common',
+    source: 'nativeapp',
+    target: 'hd-common-connect-sdk',
+    style: edgeStyle,
+  },
+  // Core -> Transport
+  { id: 'e-websdk-webusb', source: 'hd-web-sdk', target: 'webusb', style: edgeStyle },
+  { id: 'e-websdk-jsbridge', source: 'hd-web-sdk', target: 'jsbridge', style: edgeStyle },
+  { id: 'e-blesdk-ble', source: 'hd-ble-sdk', target: 'ble', style: edgeStyle },
+  { id: 'e-common-ble', source: 'hd-common-connect-sdk', target: 'ble', style: edgeStyle },
+  { id: 'e-common-hid', source: 'hd-common-connect-sdk', target: 'hid', style: edgeStyle },
+  // Transport -> Protobuf
+  { id: 'e-webusb-protobuf', source: 'webusb', target: 'protobuf', style: dashedEdgeStyle },
+  { id: 'e-jsbridge-protobuf', source: 'jsbridge', target: 'protobuf', style: dashedEdgeStyle },
+  { id: 'e-ble-protobuf', source: 'ble', target: 'protobuf', style: dashedEdgeStyle },
+  { id: 'e-hid-protobuf', source: 'hid', target: 'protobuf', style: dashedEdgeStyle },
+  // Protobuf -> Hardware
+  { id: 'e-protobuf-hardware', source: 'protobuf', target: 'hardware', style: edgeStyle },
 ];
 
 export default function ArchitectureDiagram() {

@@ -145,10 +145,10 @@ export default function GuidePage() {
   };
 
   return (
-    <PageLayout>
-      <div className="relative flex flex-col xl:flex-row w-full xl:justify-center">
+    <PageLayout fixedHeight={true}>
+      <div className="relative flex flex-col xl:flex-row w-full mx-auto">
         {/* Main Content */}
-        <div className="flex-1 px-4 md:px-8 py-6 max-w-full xl:max-w-5xl xl:pr-[calc(theme(spacing.64)+theme(spacing.8))] ">
+        <div className="flex-1 px-4 md:px-8 py-6 max-w-full xl:pr-80 xl:h-[calc(100vh-theme(spacing.24))]">
           {SECTIONS.map((section, idx) => (
             <React.Fragment key={section.id}>
               <div
@@ -162,24 +162,29 @@ export default function GuidePage() {
             </React.Fragment>
           ))}
         </div>
-        {/* Sidebar Navigation */}
-        <aside className="xl:fixed xl:top-24 xl:right-[calc((100vw-(theme(maxWidth.5xl)+theme(spacing.8)+theme(spacing.64)))/2)] xl:w-64 p-0 hidden xl:block z-40 xl:h-[calc(100vh-theme(spacing.24))] overflow-y-auto pr-4">
-          <nav className="bg-card/90 border border-border rounded-xl shadow-lg py-3 px-2 backdrop-blur-md">
+
+        {/* Modern Sidebar Navigation */}
+        <aside className="xl:fixed xl:top-24 xl:right-8 xl:w-56 hidden xl:block z-40">
+          <nav className="sticky top-6">
             <ul className="space-y-1">
               {SECTIONS.map(section => (
                 <li key={section.id}>
-                  <button
-                    onClick={() => scrollToSection(section.id)}
+                  <a
+                    href={`#${section.id}`}
+                    onClick={e => {
+                      e.preventDefault();
+                      scrollToSection(section.id);
+                    }}
                     className={cn(
-                      'flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                      'block px-3 py-2 rounded-md text-sm transition-colors',
                       activeSection === section.id
-                        ? 'bg-blue-500/10 text-blue-500 font-semibold'
-                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                        ? 'font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/60'
                     )}
+                    aria-current={activeSection === section.id ? 'section' : undefined}
                   >
-                    <section.icon className="w-4 h-4 opacity-70" />
                     {t(`guide.sections.${section.titleKey}`)}
-                  </button>
+                  </a>
                 </li>
               ))}
             </ul>

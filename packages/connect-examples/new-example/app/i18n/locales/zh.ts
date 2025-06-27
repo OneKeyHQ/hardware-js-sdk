@@ -657,5 +657,27 @@ export const zh = {
         installingFirmwareDesc: '正在安装固件，请勿断开设备...',
       },
     },
+    guide: {
+      title: '开发者指南',
+      sections: {
+        overview: {
+          title: '概览',
+        },
+        quick_start: {
+          title: '快速入门（Web）',
+        },
+        core_concepts: {
+          title: '核心概念',
+        },
+        troubleshooting: {
+          title: '故障排除',
+        },
+        api_reference: {
+          title: 'API Reference',
+          wip: 'API 参考文档即将推出',
+          description: '完整的 API 文档即将在此处发布。',
+        },
+      },
+    },
   },
 };

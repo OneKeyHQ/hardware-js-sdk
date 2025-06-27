@@ -689,6 +689,9 @@ export const en = {
     guide: {
       title: 'Developer Guide',
       sections: {
+        overview: {
+          title: 'Overview',
+        },
         quick_start: {
           title: 'Quick Start (Web)',
         },

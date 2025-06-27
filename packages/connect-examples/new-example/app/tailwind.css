@@ -258,6 +258,12 @@ body {
     font-size: 1rem; /* 16px */
     line-height: 1.7;
     background-color: transparent; /* Ensure background is transparent */
+    color: var(--foreground); /* Explicitly set color for base prose text */
+  }
+
+  /* Ensure prose text color is correct in dark mode */
+  .dark .prose {
+    color: var(--foreground);
   }
 
   /* Override highlight.js background */
