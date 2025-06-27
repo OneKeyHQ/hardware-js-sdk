@@ -1,0 +1,133 @@
+<mxfile host="65bd71144e">
+    <diagram name="OneKey SDK Architecture Diagram" id="onekey_sdk_architecture">
+        <mxGraphModel dx="2305" dy="519" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="webapp" value="Web / Desktop App" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2196F3;fontColor=#FFFFFF;strokeColor=#1976D2;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="40" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="rnapp" value="React Native Mobile App" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2196F3;fontColor=#FFFFFF;strokeColor=#1976D2;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="40" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="nativeapp" value="Native Mobile App" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2196F3;fontColor=#FFFFFF;strokeColor=#1976D2;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="40" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="hd-web-sdk" value="@onekeyfe/hd-web-sdk" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4CAF50;fontColor=#FFFFFF;strokeColor=#388E3C;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="140" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="hd-ble-sdk" value="@onekeyfe/hd-ble-sdk" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4CAF50;fontColor=#FFFFFF;strokeColor=#388E3C;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="140" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="hd-common-connect-sdk" value="@onekeyfe/hd-common-connect-sdk" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4CAF50;fontColor=#FFFFFF;strokeColor=#388E3C;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="140" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="webusb" value="@onekeyfe/hd-transport-webusb" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3CD;fontColor=#FFC107;strokeColor=#FFC107;" parent="1" vertex="1">
+                    <mxGeometry x="-50" y="260" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="http" value="@onekeyfe/hd-transport-http" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3CD;fontColor=#FFC107;strokeColor=#FFC107;" parent="1" vertex="1">
+                    <mxGeometry x="180" y="260" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="ble" value="@onekeyfe/hd-transport-ble" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3CD;fontColor=#FFC107;strokeColor=#FFC107;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="260" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="lowlevel" value="@onekeyfe/hd-transport-lowlevel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3CD;fontColor=#FFC107;strokeColor=#FFC107;" parent="1" vertex="1">
+                    <mxGeometry x="627" y="260" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="protobuf" value="Protobuf Protocol&lt;br&gt;(unified message encoding/decoding)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;fontColor=#424242;strokeColor=#757575;dashed=1;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="350" width="200" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="hardware" value="OneKey Hardware" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;fontColor=#212121;strokeColor=#E0E0E0;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="440" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-webapp-websdk" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#E0E0E0;strokeWidth=1;" parent="1" source="webapp" target="hd-web-sdk" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="160" y="100" as="sourcePoint"/>
+                        <mxPoint x="160" y="140" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-rnapp-ble" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#E0E0E0;strokeWidth=1;" parent="1" source="rnapp" target="hd-ble-sdk" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="420" y="100" as="sourcePoint"/>
+                        <mxPoint x="420" y="140" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-nativeapp-common" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#E0E0E0;strokeWidth=1;" parent="1" source="nativeapp" target="hd-common-connect-sdk" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="680" y="100" as="sourcePoint"/>
+                        <mxPoint x="680" y="140" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-websdk-webusb" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#6c8ebf;strokeWidth=1;fillColor=#dae8fc;" parent="1" source="hd-web-sdk" target="webusb" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="160" y="200" as="sourcePoint"/>
+                        <mxPoint x="100" y="260" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-websdk-http" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#6c8ebf;strokeWidth=1;fillColor=#dae8fc;" parent="1" source="hd-web-sdk" target="http" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="160" y="200" as="sourcePoint"/>
+                        <mxPoint x="280" y="260" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-blesdk-ble" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#6c8ebf;strokeWidth=1;fillColor=#dae8fc;" parent="1" source="hd-ble-sdk" target="ble" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="420" y="200" as="sourcePoint"/>
+                        <mxPoint x="500" y="260" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-common-ble" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#6c8ebf;strokeWidth=1;fillColor=#dae8fc;" parent="1" source="hd-common-connect-sdk" target="ble" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="680" y="200" as="sourcePoint"/>
+                        <mxPoint x="500" y="260" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="590" y="230"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-common-http" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#6c8ebf;strokeWidth=1;fillColor=#dae8fc;" parent="1" source="hd-common-connect-sdk" target="http" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="680" y="200" as="sourcePoint"/>
+                        <mxPoint x="280" y="260" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-common-lowlevel" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#6c8ebf;strokeWidth=1;fillColor=#dae8fc;" parent="1" source="hd-common-connect-sdk" target="lowlevel" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="680" y="200" as="sourcePoint"/>
+                        <mxPoint x="700" y="260" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-webusb-protobuf" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#E0E0E0;strokeWidth=1;dashed=1;" parent="1" source="webusb" target="protobuf" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="100" y="320" as="sourcePoint"/>
+                        <mxPoint x="420" y="350" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-http-protobuf" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#E0E0E0;strokeWidth=1;dashed=1;" parent="1" source="http" target="protobuf" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="280" y="320" as="sourcePoint"/>
+                        <mxPoint x="420" y="350" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-ble-protobuf" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#E0E0E0;strokeWidth=1;dashed=1;" parent="1" source="ble" target="protobuf" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="500" y="320" as="sourcePoint"/>
+                        <mxPoint x="420" y="350" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-lowlevel-protobuf" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#E0E0E0;strokeWidth=1;dashed=1;" parent="1" source="lowlevel" target="protobuf" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="700" y="320" as="sourcePoint"/>
+                        <mxPoint x="420" y="350" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-protobuf-hardware" value="" style="endArrow=block;endFill=1;html=1;rounded=0;strokeColor=#E0E0E0;strokeWidth=1;" parent="1" source="protobuf" target="hardware" edge="1">
+                    <mxGeometry width="160" relative="1" as="geometry">
+                        <mxPoint x="420" y="420" as="sourcePoint"/>
+                        <mxPoint x="420" y="440" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

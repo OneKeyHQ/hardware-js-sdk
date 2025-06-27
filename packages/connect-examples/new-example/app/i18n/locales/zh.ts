@@ -97,7 +97,6 @@ export const zh = {
       cancelled: '已取消',
       timeout: '超时',
       unknown: '未知',
-      guide: '开发者指南',
     },
     home: {
       title: 'OneKey 硬件钱包 SDK',
@@ -629,6 +628,8 @@ export const zh = {
           line2: '• 更新过程中请勿断开设备连接或关闭浏览器',
           line3: '• 建议在更新前备份重要数据',
         },
+        passphraseState: 'PassphraseState',
+        passphraseStateDesc: '使用passphraseState隐藏钱包',
       },
       unifiedLogger: {
         executionLogs: '执行日志',
@@ -655,28 +656,6 @@ export const zh = {
         transferringDataDesc: '正在将固件数据传输到设备...',
         installingFirmware: '安装固件',
         installingFirmwareDesc: '正在安装固件，请勿断开设备...',
-      },
-    },
-    guide: {
-      title: '开发者指南',
-      sections: {
-        overview: {
-          title: '概览',
-        },
-        quick_start: {
-          title: '快速入门（Web）',
-        },
-        core_concepts: {
-          title: '核心概念',
-        },
-        troubleshooting: {
-          title: '故障排除',
-        },
-        api_reference: {
-          title: 'API Reference',
-          wip: 'API 参考文档即将推出',
-          description: '完整的 API 文档即将在此处发布。',
-        },
       },
     },
   },

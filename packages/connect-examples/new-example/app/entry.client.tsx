@@ -28,7 +28,6 @@ import ChainMethodsIndexPage from './routes/chains.$chainId._index';
 import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
 import DeviceMethodsIndexPage from './routes/device-methods._index';
 import DeviceMethodExecutePage from './routes/device-methods.$methodName';
-import GuidePage from './routes/guide';
 
 // Import styles
 import './tailwind.css';
@@ -124,10 +123,6 @@ const router = createBrowserRouter(
         {
           path: 'chains/:chainId/:methodName',
           element: <ChainMethodExecutePage />,
-        },
-        {
-          path: 'guide',
-          element: <GuidePage />,
         },
       ],
     },

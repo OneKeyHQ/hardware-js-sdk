@@ -25,7 +25,6 @@ import {
   CheckCircle,
   XCircle,
   Server,
-  BookOpen,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -62,11 +61,6 @@ const navigationItems = [
     title: 'common.logs',
     url: '/logs',
     icon: FileText,
-  },
-  {
-    title: 'common.guide',
-    url: '/guide',
-    icon: BookOpen,
   },
 ];
 

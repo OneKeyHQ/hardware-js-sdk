@@ -61,7 +61,6 @@ export const en = {
       edit: 'Edit',
       save: 'Save',
       clear: 'Clear',
-      guide: 'Guide',
     },
     device: {
       status: 'Device Status',
@@ -659,7 +658,7 @@ export const en = {
           line3: '• Recommend backing up important data before updating',
         },
         passphraseState: 'PassphraseState',
-        passphraseStateDesc: 'The passphrase state for advanced wallet access',
+        passphraseStateDesc: 'Use passphraseState for hidden wallet',
       },
       unifiedLogger: {
         executionLogs: 'Execution Logs',
@@ -686,28 +685,6 @@ export const en = {
         transferringDataDesc: 'Transferring firmware data to device...',
         installingFirmware: 'Installing Firmware',
         installingFirmwareDesc: 'Installing firmware, please do not disconnect device...',
-      },
-    },
-    guide: {
-      title: 'Developer Guide',
-      sections: {
-        overview: {
-          title: 'Overview',
-        },
-        quick_start: {
-          title: 'Quick Start (Web)',
-        },
-        core_concepts: {
-          title: 'Core Concepts',
-        },
-        troubleshooting: {
-          title: 'Troubleshooting',
-        },
-        api_reference: {
-          title: 'API Reference',
-          wip: 'API Reference is coming soon',
-          description: 'The full API documentation will be available here soon.',
-        },
       },
     },
   },
