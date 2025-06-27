@@ -66,11 +66,11 @@ const nodeTypes = {
 };
 
 const initialNodes: Node[] = [
-  // Application 层
+  // Application Layer
   {
     id: 'webapp',
     type: 'custom',
-    position: { x: 80, y: 40 },
+    position: { x: 60, y: 40 },
     data: {
       label: 'Web / Desktop App',
       backgroundColor: 'hsl(var(--primary) / 0.9)',
@@ -90,18 +90,18 @@ const initialNodes: Node[] = [
   {
     id: 'nativeapp',
     type: 'custom',
-    position: { x: 560, y: 40 },
+    position: { x: 580, y: 40 },
     data: {
-      label: 'Native Mobile / Node.js',
+      label: 'Native Mobile App',
       backgroundColor: 'hsl(var(--primary) / 0.9)',
       color: 'hsl(var(--primary-foreground))',
     },
   },
-  // Core SDK 层
+  // SDK Layer
   {
     id: 'hd-web-sdk',
     type: 'custom',
-    position: { x: 80, y: 130 },
+    position: { x: 60, y: 140 },
     data: {
       label: '@onekeyfe/hd-web-sdk',
       backgroundColor: 'hsl(var(--secondary) / 0.95)',
@@ -111,7 +111,7 @@ const initialNodes: Node[] = [
   {
     id: 'hd-ble-sdk',
     type: 'custom',
-    position: { x: 320, y: 130 },
+    position: { x: 320, y: 140 },
     data: {
       label: '@onekeyfe/hd-ble-sdk',
       backgroundColor: 'hsl(var(--secondary) / 0.95)',
@@ -121,30 +121,30 @@ const initialNodes: Node[] = [
   {
     id: 'hd-common-connect-sdk',
     type: 'custom',
-    position: { x: 560, y: 130 },
+    position: { x: 580, y: 140 },
     data: {
       label: '@onekeyfe/hd-common-connect-sdk',
       backgroundColor: 'hsl(var(--secondary) / 0.95)',
       color: 'hsl(var(--secondary-foreground))',
     },
   },
-  // Transport 层
+  // Transport Layer
   {
     id: 'webusb',
     type: 'custom',
-    position: { x: 20, y: 230 },
+    position: { x: 0, y: 260 },
     data: {
-      label: 'WebUSB',
+      label: '@onekeyfe/hd-transport-webusb',
       backgroundColor: 'hsl(var(--amber) / 0.25)',
       color: 'hsl(var(--amber-foreground))',
     },
   },
   {
-    id: 'jsbridge',
+    id: 'http',
     type: 'custom',
-    position: { x: 140, y: 230 },
+    position: { x: 180, y: 260 },
     data: {
-      label: 'JSBridge',
+      label: '@onekeyfe/hd-transport-http',
       backgroundColor: 'hsl(var(--amber) / 0.25)',
       color: 'hsl(var(--amber-foreground))',
     },
@@ -152,40 +152,40 @@ const initialNodes: Node[] = [
   {
     id: 'ble',
     type: 'custom',
-    position: { x: 320, y: 230 },
+    position: { x: 400, y: 260 },
     data: {
-      label: 'Bluetooth (BLE)',
+      label: '@onekeyfe/hd-transport-ble',
       backgroundColor: 'hsl(var(--amber) / 0.25)',
       color: 'hsl(var(--amber-foreground))',
     },
   },
   {
-    id: 'hid',
+    id: 'lowlevel',
     type: 'custom',
-    position: { x: 560, y: 230 },
+    position: { x: 600, y: 260 },
     data: {
-      label: 'HID (USB)',
+      label: '@onekeyfe/hd-transport-lowlevel',
       backgroundColor: 'hsl(var(--amber) / 0.25)',
       color: 'hsl(var(--amber-foreground))',
     },
   },
-  // Protobuf Protocol 层（用虚线框表示）
+  // Protocol Layer
   {
     id: 'protobuf',
     type: 'custom',
-    position: { x: 320, y: 310 },
+    position: { x: 320, y: 350 },
     data: {
-      label: 'Protobuf Protocol\n统一消息编解码',
+      label: 'Protobuf Protocol\n(unified message encoding/decoding)',
       backgroundColor: 'transparent',
       color: 'hsl(var(--muted-foreground))',
       border: '2px dashed hsl(var(--border) / 0.7)',
     },
   },
-  // Hardware
+  // Hardware Layer
   {
     id: 'hardware',
     type: 'custom',
-    position: { x: 320, y: 400 },
+    position: { x: 320, y: 440 },
     data: {
       label: 'OneKey Hardware',
       backgroundColor: 'hsl(var(--background))',
@@ -197,7 +197,7 @@ const initialNodes: Node[] = [
 const edgeStyle = { stroke: 'hsl(var(--border))', strokeWidth: 1.5 };
 const dashedEdgeStyle = { stroke: 'hsl(var(--border))', strokeWidth: 1.5, strokeDasharray: '6 4' };
 const initialEdges: Edge[] = [
-  // App -> Core
+  // App -> SDK
   { id: 'e-webapp-websdk', source: 'webapp', target: 'hd-web-sdk', style: edgeStyle },
   { id: 'e-rnapp-ble', source: 'rnapp', target: 'hd-ble-sdk', style: edgeStyle },
   {
@@ -206,17 +206,23 @@ const initialEdges: Edge[] = [
     target: 'hd-common-connect-sdk',
     style: edgeStyle,
   },
-  // Core -> Transport
+  // SDK -> Transport
   { id: 'e-websdk-webusb', source: 'hd-web-sdk', target: 'webusb', style: edgeStyle },
-  { id: 'e-websdk-jsbridge', source: 'hd-web-sdk', target: 'jsbridge', style: edgeStyle },
+  { id: 'e-websdk-http', source: 'hd-web-sdk', target: 'http', style: edgeStyle },
   { id: 'e-blesdk-ble', source: 'hd-ble-sdk', target: 'ble', style: edgeStyle },
   { id: 'e-common-ble', source: 'hd-common-connect-sdk', target: 'ble', style: edgeStyle },
-  { id: 'e-common-hid', source: 'hd-common-connect-sdk', target: 'hid', style: edgeStyle },
+  { id: 'e-common-http', source: 'hd-common-connect-sdk', target: 'http', style: edgeStyle },
+  {
+    id: 'e-common-lowlevel',
+    source: 'hd-common-connect-sdk',
+    target: 'lowlevel',
+    style: edgeStyle,
+  },
   // Transport -> Protobuf
   { id: 'e-webusb-protobuf', source: 'webusb', target: 'protobuf', style: dashedEdgeStyle },
-  { id: 'e-jsbridge-protobuf', source: 'jsbridge', target: 'protobuf', style: dashedEdgeStyle },
+  { id: 'e-http-protobuf', source: 'http', target: 'protobuf', style: dashedEdgeStyle },
   { id: 'e-ble-protobuf', source: 'ble', target: 'protobuf', style: dashedEdgeStyle },
-  { id: 'e-hid-protobuf', source: 'hid', target: 'protobuf', style: dashedEdgeStyle },
+  { id: 'e-lowlevel-protobuf', source: 'lowlevel', target: 'protobuf', style: dashedEdgeStyle },
   // Protobuf -> Hardware
   { id: 'e-protobuf-hardware', source: 'protobuf', target: 'hardware', style: edgeStyle },
 ];
@@ -241,14 +247,18 @@ export default function ArchitectureDiagram() {
   return (
     <>
       <div className="relative w-full h-[450px] bg-muted/30 border border-border/50 rounded-lg not-prose overflow-hidden">
-        <ReactFlow {...flowProps}>
-          <Background />
-        </ReactFlow>
+        <ReactFlow {...flowProps} />
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-2 right-2 h-8 w-8"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            window.open(
+              window.location.href + '?diagram=fullscreen',
+              '_blank',
+              'width=1200,height=800'
+            );
+          }}
           aria-label="Maximize diagram"
         >
           <Maximize className="h-4 w-4" />

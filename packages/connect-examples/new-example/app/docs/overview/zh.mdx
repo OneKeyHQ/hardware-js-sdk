@@ -2,9 +2,16 @@ import ArchitectureDiagram from '@/components/documentation/ArchitectureDiagram'
 
 ## 概述与架构
 
-OneKey SDK 是一个 monorepo 项目，它提供了一套完整的工具，用于在不同平台（Web、桌面、移动端）与 OneKey 硬件钱包进行通信。它的核心设计理念是提供一个统一且简化的 API，自动处理底层复杂的通信协议，让开发者可以专注于业务逻辑的实现。
+OneKey SDK 是一个 monorepo 项目，提供了跨平台（Web、桌面、移动端）与 OneKey 硬件钱包通信的统一工具集。其核心设计理念是通过统一且简化的 API，自动处理底层复杂的通信协议，让开发者专注于业务逻辑。
 
-下面的架构图清晰地展示了不同平台下的应用如何选择对应的 SDK，以及这些 SDK 如何利用不同的通信层（Transports）与硬件进行交互。
+**集成流程：**
+- **选择适合平台和环境的 transport**（如 WebUSB、HTTP(JSBridge/Bridge)、BLE、HID、Lowlevel 等）。
+- **选择对应的 SDK**：
+  - Web/桌面端用 `@onekeyfe/hd-web-sdk`
+  - React Native 用 `@onekeyfe/hd-ble-sdk`
+  - 原生移动端用 `@onekeyfe/hd-common-connect-sdk`（需手动选择 transport）
+
+下方架构图清晰展示了不同平台的应用如何选择合适的 SDK 和 transport，以及这些 SDK 如何通过不同通信层与硬件交互。
 
 <ArchitectureDiagram />
 
@@ -12,14 +19,18 @@ OneKey SDK 是一个 monorepo 项目，它提供了一套完整的工具，用�
 
 ### 架构解析
 
-- **应用层 (Application)**: 这是您的应用程序，根据目标平台的不同，您可以构建 Web、React Native 或原生移动/Node.js 应用。
+- **应用层**：您的应用（Web、React Native 或原生移动），根据目标平台选择。
+- **SDK 层**：OneKey 提供三大核心 SDK 包，分别针对不同开发环境：
+  - `@onekeyfe/hd-web-sdk`：适用于浏览器和基于 Web 技术的桌面应用（如 Electron），内部处理 **WebUSB** 和 **JSBridge**。
+  - `@onekeyfe/hd-ble-sdk`：适用于 **React Native** 应用，通过蓝牙（BLE）与硬件通信。
+  - `@onekeyfe/hd-common-connect-sdk`：适用于 **原生移动应用 (iOS/Android)**，可处理 BLE、HTTP(JSBridge)、Lowlevel 等多种 transport。
+- **传输层**：实现与硬件直接通信的底层模块，SDK 会自动选择或允许手动指定最合适的 transport：
+  - `@onekeyfe/hd-transport-webusb`
+  - `@onekeyfe/hd-transport-http`
+  - `@onekeyfe/hd-transport-ble`
+  - `@onekeyfe/hd-transport-hid`
+  - `@onekeyfe/hd-transport-lowlevel`
+- **协议层**：Protobuf Protocol（统一消息编解码）
+- **硬件层**：OneKey 硬件钱包
 
-- **SDK 抽象层 (SDK Abstraction)**: 我们提供了三个核心的 SDK 包，每个都针对特定的开发环境进行了优化：
-
-  - `@onekeyfe/hd-web-sdk`: 专为浏览器和基于 Web 技术的桌面应用（如 Electron）设计。它内部处理了 **WebUSB** 和 **JSBridge** 两种通信方式。
-
-  - `@onekeyfe/hd-ble-sdk`: 专为 **React Native** 应用设计，用于通过蓝牙（BLE）与硬件通信。
-
-  - `@onekeyfe/hd-common-connect-sdk`: 一个更通用的包，适用于 **原生移动应用 (iOS/Android)** 和 **Node.js** 后端服务。它能够处理蓝牙（BLE）和原生 USB (HID) 连接。
-
-- **传输层 (Transports)**: 这是实现与硬件直接通信的底层模块。SDK 会根据环境和配置自动选择最合适的传输方式。
+> 详细文档请参考 [OneKey 硬件 SDK 官方文档](https://developer.onekey.so/connect-to-hardware/page-1/started)

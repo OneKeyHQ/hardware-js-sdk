@@ -1,15 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/common/PageLayout';
-import {
-  Book,
-  Rocket,
-  Wrench,
-  HelpCircle,
-  FileCode,
-  Lightbulb,
-  type LucideIcon,
-} from 'lucide-react';
+import { Book, Rocket, Wrench, FileCode, Lightbulb, type LucideIcon } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 import QuickStartEn from '../docs/quick-start/en.mdx';
@@ -43,7 +35,6 @@ const SECTIONS: GuideSection[] = [
     icon: Wrench,
     component: TroubleshootingSection,
   },
-  { id: 'api-reference', titleKey: 'api_reference.title', icon: FileCode, component: ApiSection },
 ];
 
 function OverviewSection() {
@@ -89,23 +80,6 @@ function TroubleshootingSection() {
     <section className="mb-16">
       <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs">
         <Doc />
-      </div>
-    </section>
-  );
-}
-
-function ApiSection() {
-  const { t } = useTranslation();
-  return (
-    <section className="mb-16">
-      <div className="text-center py-12">
-        <HelpCircle className="mx-auto h-12 w-12 text-muted-foreground/50" />
-        <h3 className="mt-4 text-lg font-medium text-foreground">
-          {t('guide.sections.api_reference.wip')}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('guide.sections.api_reference.description')}
-        </p>
       </div>
     </section>
   );

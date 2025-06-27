@@ -1,52 +1,50 @@
-## Quick Start (Web)
+## Quick Start
 
-Follow these steps to get up and running with the OneKey Web SDK.
+Follow these steps to get started with the OneKey SDK on your platform.
 
 > **Prerequisites:**
->
-> - A modern browser with WebUSB support (e.g., Chrome, Edge)
-> - A OneKey hardware device connected via USB
+> - A modern browser (for WebUSB) or a supported mobile/desktop environment
+> - A OneKey hardware device
 > - (Optional) OneKey Bridge running for JSBridge fallback
 
 ---
 
 ### 1. Installation
 
-Install the `@onekeyfe/hd-web-sdk` package in your project:
+Install the SDK for your platform:
 
 ```bash
-# Using Yarn
-yarn add @onekeyfe/hd-web-sdk
-
-# Using npm
+# Web/Desktop
 npm install @onekeyfe/hd-web-sdk
+# React Native
+npm install @onekeyfe/hd-ble-sdk
+# Native Mobile
+npm install @onekeyfe/hd-common-connect-sdk
 ```
 
 ---
 
 ### 2. Initialization
 
-Initialize the SDK once at the start of your application lifecycle. The `connectSrc` parameter points to the secure bridge that handles low-level device communication in a sandboxed iframe.
+Initialize the SDK at the start of your application. Example for Web:
 
 ```ts
 import { HardwareSDK, UI_EVENT } from '@onekeyfe/hd-web-sdk';
 
 async function initializeSDK() {
   await HardwareSDK.init({
-    connectSrc: 'https://jssdk.onekey.so/',
-    env: 'webusb', // 'webusb' for direct USB; 'jsbridge' for JSBridge fallback
-    debug: true, // Enable debug logging
+    connectSrc: 'https://jssdk.onekey.so/1.0.30/',
+    env: 'webusb', // or 'jsbridge' for JSBridge fallback
+    debug: true,
   });
-
   console.log('✅ OneKey SDK Initialized');
 }
 
-// Optional: handle PIN and Passphrase events globally
+// Handle PIN and Passphrase events globally
 HardwareSDK.on(UI_EVENT.REQUEST_PIN, async (_, callback) => {
   const pin = await showPinDialog();
   callback(null, pin);
 });
-
 HardwareSDK.on(UI_EVENT.REQUEST_PASSPHRASE, async (_, callback) => {
   const passphrase = await showPassphraseDialog();
   callback(null, passphrase);
@@ -59,15 +57,13 @@ initializeSDK();
 
 ### 3. Search for Devices
 
-After initialization, search and connect to the first available OneKey device:
-
 ```ts
 async function findAndConnectDevice() {
   const devices = await HardwareSDK.searchDevices({ timeout: 5000 });
   if (devices.length === 0) {
-    throw new Error('🔍 No OneKey devices found');
+    throw new Error('No OneKey devices found');
   }
-  console.log('🔌 Connected to device:', devices[0].features.model);
+  console.log('Connected to device:', devices[0].features.model);
   return devices[0];
 }
 
@@ -76,36 +72,24 @@ const device = await findAndConnectDevice();
 
 ---
 
-### 4. Fetch an Ethereum Address
-
-Once connected, you can invoke any supported hardware method. For example, to retrieve an EVM address:
+### 4. Fetch an Address (Ethereum Example)
 
 ```ts
 async function getEthereumAddress(path = "m/44'/60'/0'/0/0") {
-  try {
-    const result = await HardwareSDK.evmGetAddress({
-      path,
-      showOnOneKey: true, // Prompt user on device to confirm
-    });
-
-    if (result.success) {
-      console.log('🔑 Address:', result.payload.address);
-    } else {
-      console.error('❌ Error:', result.payload.error);
-    }
-  } catch (error) {
-    console.error('💥 Unexpected error:', error);
+  const result = await HardwareSDK.evmGetAddress({
+    path,
+    showOnOneKey: true,
+  });
+  if (result.success) {
+    console.log('Address:', result.payload.address);
+  } else {
+    console.error('Error:', result.payload.error);
   }
 }
 
-const addressInfo = await getEthereumAddress();
+await getEthereumAddress();
 ```
 
 ---
 
-🎉 **You are now ready to explore additional methods:**
-
-- Device management
-- Firmware updates
-- Multi-chain signing
-- And more!
+> For more details and platform-specific guides, see the [official documentation](https://developer.onekey.so/connect-to-hardware/page-1/started)
