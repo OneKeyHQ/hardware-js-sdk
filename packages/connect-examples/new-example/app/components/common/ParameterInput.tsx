@@ -10,6 +10,7 @@ import type { ParameterField, UnifiedMethodConfig } from '../../data/types';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { Alert, AlertDescription } from '../ui/Alert';
 import { parseParameterValue } from '../../utils/parameterUtils';
+import type { CommonParametersState } from '../../store/hardwareStore';
 
 interface ParameterInputProps {
   methodConfig: UnifiedMethodConfig;
@@ -29,6 +30,15 @@ const getCommonParameters = (t: (key: string) => string): ParameterField[] => [
     visible: true,
     editable: true,
   },
+  {
+    name: 'passphraseState',
+    type: 'string',
+    label: t('components.parameterInput.passphraseState'),
+    description: t('components.parameterInput.passphraseStateDesc'),
+    value: '',
+    visible: true,
+    editable: true,
+  },
 ];
 
 const ParameterInput: React.FC<ParameterInputProps> = ({
@@ -44,6 +54,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     setCommonParameter,
     setMethodParameter,
     setMethodParameters,
+    setCommonParameters,
   } = useHardwareStore();
 
   // 获取预设值
@@ -53,7 +64,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 获取参数值的统一函数
   const getParameterValue = (field: ParameterField): unknown => {
-    if (field.name === 'useEmptyPassphrase') {
+    if (['useEmptyPassphrase', 'passphraseState'].includes(field.name)) {
       return commonParameters[field.name as keyof typeof commonParameters];
     }
     // 优先使用当前输入的值，如果没有则使用预设值
@@ -141,8 +152,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 参数变化处理
   const handleParamChange = (paramName: string, value: unknown) => {
-    if (paramName === 'useEmptyPassphrase') {
-      setCommonParameter('useEmptyPassphrase', Boolean(value));
+    if (paramName === 'useEmptyPassphrase' || paramName === 'passphraseState') {
+      setCommonParameter(paramName as keyof typeof commonParameters, value);
       return;
     }
 
@@ -158,15 +169,29 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const preset = presets.find(p => p.title === presetTitle);
     if (preset && preset.parameters) {
       const newMethodParams: Record<string, unknown> = {};
+      const newCommonParams: Partial<CommonParametersState> = {};
 
       // 从预设参数中获取值
       preset.parameters.forEach((param: ParameterField) => {
-        if (param.value !== undefined && !['useEmptyPassphrase'].includes(param.name)) {
-          // 使用统一的参数处理工具
-          newMethodParams[param.name] = parseParameterValue(param.name, param.value);
+        if (param.value !== undefined) {
+          // 显式处理通用参数
+          if (param.name === 'useEmptyPassphrase') {
+            newCommonParams.useEmptyPassphrase = Boolean(param.value);
+          } else if (param.name === 'passphraseState') {
+            newCommonParams.passphraseState = String(param.value);
+          } else {
+            // 普通方法参数
+            newMethodParams[param.name] = parseParameterValue(param.name, param.value);
+          }
         }
       });
       setMethodParameters(newMethodParams);
+      // 更新通用参数到 store，这将覆盖当前手动输入的值
+      // 这里的处理逻辑是：如果预设包含了common参数，则直接应用。
+      // 如果用户后续手动修改了，会再次覆盖。
+      if (Object.keys(newCommonParams).length > 0) {
+        setCommonParameters(newCommonParams);
+      }
     }
     onPresetChange(presetTitle);
   };

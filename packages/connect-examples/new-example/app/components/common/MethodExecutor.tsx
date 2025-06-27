@@ -9,6 +9,7 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 import { separateParameters } from '../../utils/parameterUtils';
 import type { UnifiedMethodConfig } from '~/data/types';
+import type { CommonParametersState } from '../../store/hardwareStore';
 // 导入子组件
 import ParameterInput from './ParameterInput';
 import DeviceInteractionArea from './DeviceInteractionArea';
@@ -160,10 +161,20 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   const handleParamChange = useCallback(
     (paramName: string, value: unknown) => {
       // 同时更新 useMethodParameters 和 hardwareStore
-      setParameter(paramName, value);
-      setMethodParameter(paramName, value);
+      setParameter(paramName, value); // 这会更新 useMethodParameters 的本地状态
+
+      // 直接从 store 获取 setCommonParameter 和 setMethodParameter
+      const { setCommonParameter, setMethodParameter } = useHardwareStore.getState();
+
+      const commonParamNames = ['useEmptyPassphrase', 'passphraseState']; // 定义通用参数名
+
+      if (commonParamNames.includes(paramName)) {
+        setCommonParameter(paramName as keyof CommonParametersState, value); // 更新通用参数
+      } else {
+        setMethodParameter(paramName, value); // 更新方法参数
+      }
     },
-    [setParameter, setMethodParameter]
+    [setParameter] // 依赖项只需 setParameter，因为 setCommonParameter/setMethodParameter 是从 getState() 获取的
   );
 
   // 处理参数编辑请求
@@ -208,7 +219,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       <div className="w-full min-h-[450px] h-full">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-full">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col h-full max-h-[600px] ">
+          <div className="lg:col-span-2 flex flex-col h-full max-h-[650px] ">
             <DeviceInteractionArea
               status={status}
               deviceAction={deviceAction}
@@ -223,7 +234,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           </div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col h-full max-h-[600px] ">
+          <div className="lg:col-span-3 flex flex-col h-full max-h-[650px] ">
             <ExecutionPanel
               requestData={storeExecutionParameters}
               onSaveRequest={handleRequestParamsEdit}

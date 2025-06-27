@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { UI_RESPONSE, Success, Unsuccessful, CoreApi } from '@onekeyfe/hd-core';
-import { useHardwareStore } from '../store/hardwareStore';
 import { logError, logRequest, logResponse, logInfo } from '../utils/logger';
 import {
   getCurrentSDKInstance,
   clearSDKInstanceCache,
   TransportType,
 } from '../utils/hardwareInstance';
+import { useHardwareStore, CommonParametersState } from '../store/hardwareStore';
 
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
@@ -255,28 +255,41 @@ export async function callHardwareAPI(
 
     const { connectId, deviceId } = params;
 
-    // 对于需要passphrase检查的方法，自动获取passphraseState
+    // FOR EXAMPLE APP: 如果参数中没有 passphraseState (或者为空)，则尝试从设备获取
+    // app-monorepo 的逻辑更复杂，这里简化以满足 example 的需求
     if (connectId && METHODS_REQUIRING_PASSPHRASE_CHECK.includes(method)) {
-      logInfo(`Checking passphrase state for method: ${method}`);
-
-      // 检查参数中是否已经有passphraseState
-      if (!params.passphraseState) {
+      // 只有当 params.passphraseState 是空字符串、undefined 或 null 时才尝试获取
+      if (
+        params.passphraseState === '' ||
+        params.passphraseState === undefined ||
+        params.passphraseState === null
+      ) {
+        logInfo(
+          `PassphraseState is empty in params for method: ${method}, attempting to fetch from device.`
+        );
         try {
           const passphraseResult = await getPassphraseState(connectId as string);
-          if (passphraseResult.success && passphraseResult.payload) {
-            logInfo(`Passphrase state obtained: ${passphraseResult.payload}`);
+          if (passphraseResult.success && typeof passphraseResult.payload === 'string') {
+            logInfo(`Passphrase state obtained from device: ${passphraseResult.payload}`);
             params.passphraseState = passphraseResult.payload;
+            // IMPORTANT: Update the store's commonParameter so the UI reflects the fetched value
             useHardwareStore
               .getState()
               .setCommonParameter('passphraseState', passphraseResult.payload);
           } else {
-            logInfo('Device passphrase protection not enabled');
+            logInfo('Device passphrase protection not enabled or failed to get state from device.');
+            // Ensure passphraseState is explicitly an empty string if not enabled/fetched
+            params.passphraseState = '';
+            useHardwareStore.getState().setCommonParameter('passphraseState', '');
           }
         } catch (passphraseError) {
-          logError('Failed to get passphrase state');
+          logError('Failed to get passphrase state from device', { passphraseError });
+          // In case of error, ensure it's an empty string to avoid unexpected behavior
+          params.passphraseState = '';
+          useHardwareStore.getState().setCommonParameter('passphraseState', '');
         }
       } else {
-        logInfo(`Using existing passphrase state: ${params.passphraseState}`);
+        logInfo(`Using existing passphrase state from params: ${params.passphraseState}`);
       }
     }
 
@@ -284,6 +297,7 @@ export async function callHardwareAPI(
       connectId,
       deviceId,
       hasPassphraseState: !!params.passphraseState,
+      useEmptyPassphrase: params.useEmptyPassphrase, // Log this for debugging
     });
 
     const methodFunc = sdk[method] as (...args: any[]) => Promise<ApiResponse>;

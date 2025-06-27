@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { submitPassphrase } from '../../services/hardwareService';
+import { submitPassphrase, cancelHardwareOperation } from '../../services/hardwareService';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Alert, AlertDescription } from '../ui/Alert';
-import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface PassphraseDialogProps {
   isOpen: boolean;
@@ -36,11 +36,10 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
 
   const handleCancel = async () => {
     try {
-      await submitPassphrase('', false);
+      await cancelHardwareOperation();
+    } finally {
       resetState();
       onClose();
-    } catch (error) {
-      console.error('Passphrase取消失败:', error);
     }
   };
 
@@ -71,7 +70,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
   const isFormValid = passphrase && passphrase === confirmPassphrase;
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
+    <Dialog open={isOpen} onOpenChange={handleCancel}>
       <DialogContent
         className="w-96 bg-background p-6 max-w-sm mx-auto"
         onPointerDownOutside={e => e.preventDefault()}
@@ -88,9 +87,8 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
         </div>
 
         {/* 警告提示 - 简化 */}
-        <Alert className="mb-3 bg-orange-50 border-orange-200 py-2 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-800 text-xs">
+        <Alert className="mb-3 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 py-2 flex items-center gap-2">
+          <AlertDescription className="text-orange-800 dark:text-orange-200 text-xs">
             {t('passphrase.warningMessage', 'Passphrase 遗失将无法恢复')}
           </AlertDescription>
         </Alert>

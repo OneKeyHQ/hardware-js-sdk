@@ -658,6 +658,8 @@ export const en = {
           line2: '• Do not disconnect device or close browser during update process',
           line3: '• Recommend backing up important data before updating',
         },
+        passphraseState: 'PassphraseState',
+        passphraseStateDesc: 'The passphrase state for advanced wallet access',
       },
       unifiedLogger: {
         executionLogs: 'Execution Logs',
