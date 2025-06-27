@@ -51,7 +51,7 @@ function OverviewSection() {
   const Doc = i18n.language.startsWith('zh') ? OverviewZh : OverviewEn;
   return (
     <section className="mb-16">
-      <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs text-foreground">
+      <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs">
         <Doc />
       </div>
     </section>
@@ -63,7 +63,7 @@ function QuickStartSection() {
   const Doc = i18n.language.startsWith('zh') ? QuickStartZh : QuickStartEn;
   return (
     <section className="mb-16">
-      <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs text-foreground">
+      <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs">
         <Doc />
       </div>
     </section>
@@ -75,7 +75,7 @@ function CoreConceptsSection() {
   const Doc = i18n.language.startsWith('zh') ? CoreConceptsZh : CoreConceptsEn;
   return (
     <section className="mb-16">
-      <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs text-foreground">
+      <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs">
         <Doc />
       </div>
     </section>
@@ -87,7 +87,7 @@ function TroubleshootingSection() {
   const Doc = i18n.language.startsWith('zh') ? TroubleshootingZh : TroubleshootingEn;
   return (
     <section className="mb-16">
-      <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs text-foreground">
+      <div className="prose prose-slate dark:prose-invert lg:prose-lg max-w-none hljs">
         <Doc />
       </div>
     </section>
@@ -148,7 +148,7 @@ export default function GuidePage() {
     <PageLayout>
       <div className="relative flex flex-col xl:flex-row w-full xl:justify-center">
         {/* Main Content */}
-        <div className="flex-1 px-4 md:px-8 py-6 max-w-full xl:max-w-5xl xl:mr-8">
+        <div className="flex-1 px-4 md:px-8 py-6 max-w-full xl:max-w-5xl xl:pr-[calc(theme(spacing.64)+theme(spacing.8))] ">
           {SECTIONS.map((section, idx) => (
             <React.Fragment key={section.id}>
               <div
@@ -162,8 +162,8 @@ export default function GuidePage() {
             </React.Fragment>
           ))}
         </div>
-        {/* Floating "On This Page" Navigation */}
-        <aside className="xl:sticky xl:top-24 w-full xl:w-56 p-0 hidden xl:block z-40 h-fit">
+        {/* Sidebar Navigation */}
+        <aside className="xl:fixed xl:top-24 xl:right-[calc((100vw-(theme(maxWidth.5xl)+theme(spacing.8)+theme(spacing.64)))/2)] xl:w-64 p-0 hidden xl:block z-40 xl:h-[calc(100vh-theme(spacing.24))] overflow-y-auto pr-4">
           <nav className="bg-card/90 border border-border rounded-xl shadow-lg py-3 px-2 backdrop-blur-md">
             <ul className="space-y-1">
               {SECTIONS.map(section => (
@@ -173,7 +173,7 @@ export default function GuidePage() {
                     className={cn(
                       'flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                       activeSection === section.id
-                        ? 'bg-primary/10 text-primary font-semibold'
+                        ? 'bg-blue-500/10 text-blue-500 font-semibold'
                         : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                     )}
                   >

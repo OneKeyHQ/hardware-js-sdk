@@ -255,8 +255,8 @@ body {
   /* MDX 内容样式优化 */
   .prose {
     /* 基础字体大小和行高 */
-    font-size: 0.9375rem; /* 15px */
-    line-height: 1.6;
+    font-size: 1rem; /* 16px */
+    line-height: 1.7;
     background-color: transparent; /* Ensure background is transparent */
   }
 
@@ -267,43 +267,43 @@ body {
 
   .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
     @apply text-foreground font-semibold;
-    margin-top: 1.25em;
-    margin-bottom: 0.6em;
+    margin-top: 1.5em;
+    margin-bottom: 0.8em;
     line-height: 1.2;
   }
 
   .prose h1 {
-    font-size: 2rem; /* 32px */
+    font-size: 2.25rem; /* 36px */
   }
 
   .prose h2 {
-    font-size: 1.625rem; /* 26px */
+    font-size: 1.875rem; /* 30px */
   }
 
   .prose h3 {
-    font-size: 1.375rem; /* 22px */
+    font-size: 1.5rem; /* 24px */
   }
 
   .prose h4 {
-    font-size: 1.125rem; /* 18px */
+    font-size: 1.25rem; /* 20px */
   }
 
   .prose p {
-    margin-bottom: 0.8em;
+    margin-bottom: 1em;
   }
 
   .prose ul, .prose ol {
-    margin-top: 0.8em;
-    margin-bottom: 0.8em;
-    padding-left: 1.2em;
+    margin-top: 1em;
+    margin-bottom: 1em;
+    padding-left: 1.5em;
   }
 
   .prose li {
-    margin-bottom: 0.4em;
+    margin-bottom: 0.5em;
   }
 
   .prose code {
-    font-size: 0.8125rem; /* 13px */
+    font-size: 0.875rem; /* 14px */
     background-color: var(--muted);
     color: var(--muted-foreground);
     border: 1px solid var(--border);
@@ -312,12 +312,12 @@ body {
   }
 
   .prose pre {
-    @apply bg-muted text-foreground border border-border rounded-lg p-3 text-xs overflow-auto;
-    line-height: 1.4;
+    @apply bg-muted text-foreground border border-border rounded-lg p-4 text-sm overflow-auto;
+    line-height: 1.5;
   }
 
   .prose a {
-    @apply text-primary hover:underline;
+    @apply text-blue-500 hover:underline;
   }
   
   /* 滚动条美化 - 适配深色主题 */
@@ -367,7 +367,7 @@ body {
   }
   
   .onekey-badge.success {
-    @apply bg-primary/10 text-primary border border-primary/20;
+    @apply bg-blue-500/10 text-blue-500 border border-blue-500/20;
   }
   
   .onekey-badge.warning {
