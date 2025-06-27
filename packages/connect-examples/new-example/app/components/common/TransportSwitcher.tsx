@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
@@ -28,6 +28,31 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
   const { preferredType: transportType, setTransportPreference } = useTransportPersistence();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [bridgeUnavailable, setBridgeUnavailable] = useState(false);
+
+  // 检测bridge状态 - 等待SDK初始化完成后再检查
+  useEffect(() => {
+    const checkBridge = async () => {
+      // 只有在SDK初始化完成后才检查bridge状态
+      if (!sdkInitState.isInitialized) {
+        return;
+      }
+
+      try {
+        const sdkInstance = await SDKUtils.getInstance();
+        const result = await sdkInstance.checkBridgeStatus();
+
+        // 只有在bridge不可用时才设置状态
+        setBridgeUnavailable(!result.success);
+      } catch (error) {
+        // 检查失败时认为bridge不可用
+        setBridgeUnavailable(true);
+      }
+    };
+
+    // 当SDK初始化状态改变时检查bridge
+    void checkBridge();
+  }, [sdkInitState.isInitialized]);
 
   const transportOptions: Array<{
     type: TransportType | 'webble';
@@ -226,8 +251,8 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
               )}
             </Button>
 
-            {/* JSBridge 下载提示 */}
-            {option.type === 'jsbridge' && option.needsBridge && (
+            {/* JSBridge 下载提示 - 只有在bridge不可用时才显示 */}
+            {option.type === 'jsbridge' && option.needsBridge && bridgeUnavailable && (
               <div className="ml-8 flex items-center space-x-1.5 text-xs text-gray-500">
                 <Info className="h-3 w-3" />
                 <span>{t('transport.needsBridge')}</span>
