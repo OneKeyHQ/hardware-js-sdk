@@ -6,7 +6,7 @@ import {
   clearSDKInstanceCache,
   TransportType,
 } from '../utils/hardwareInstance';
-import { useHardwareStore, CommonParametersState } from '../store/hardwareStore';
+import { useHardwareStore } from '../store/hardwareStore';
 
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;

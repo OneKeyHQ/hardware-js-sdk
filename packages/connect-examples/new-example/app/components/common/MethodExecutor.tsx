@@ -40,7 +40,6 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
   const {
     executionParameters: storeExecutionParameters,
     getExecutionParameters,
-    setMethodParameter,
     setMethodParameters,
   } = useHardwareStore();
 
