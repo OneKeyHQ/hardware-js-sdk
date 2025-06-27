@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageLayout } from '../components/common/PageLayout';
-import { Book, Rocket, Wrench, FileCode, Lightbulb, type LucideIcon } from 'lucide-react';
+import { Book, Rocket, Wrench, Lightbulb, type LucideIcon } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 import QuickStartEn from '../docs/quick-start/en.mdx';
