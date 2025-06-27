@@ -54,6 +54,7 @@
   "title__address_test_batch": "批量地址测试",
   "title__publickey_test_single": "单个公钥测试",
   "title__publickey_test_batch": "批量公钥测试",
+  "title__publickey_test_batch_soft": "批量公钥测试（SDK 派生 Xpub）",
   "title__address_variant_test_single": "单个变种地址测试",
   "title__address_variant_test_batch": "批量变种地址测试",
 
@@ -98,7 +99,7 @@
   "label__device_boardloader_version": "Boardloader 版本",
   "label__device_bluetooth_version": "蓝牙版本",
   "label__device_device_statue": "设备模式",
-  
+
   "label__device_bootloader_statue": "Bootloader 状态",
   "label__device_firmware_status": "开机状态",
 

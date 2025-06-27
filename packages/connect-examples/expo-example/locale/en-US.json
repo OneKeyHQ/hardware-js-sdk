@@ -54,6 +54,7 @@
   "title__address_test_batch": "Batch Address Test",
   "title__publickey_test_single": "Single Pubkey Test",
   "title__publickey_test_batch": "Batch Pubkey Test",
+  "title__publickey_test_batch_soft": "Batch Pubkey Test (SDK Derived Xpub)",
   "title__address_variant_test_single": "Single Variant Address Test",
   "title__address_variant_test_batch": "Batch Variant Address Test",
 

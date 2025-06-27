@@ -32,3 +32,18 @@ export const batchTestCases: PubkeyBatchTestCase[] = [
   ...batchPubkeyTestCount18Three,
   ...batchPubkeyTestCount24Three,
 ];
+
+const filterByTitle = (item: PubkeyBatchTestCase) =>
+  item.data.filter(item => item.title.includes('btcGetPublicKey-xpub'));
+
+export const batchSoftTestCases: PubkeyBatchTestCase[] = [
+  ...batchPubkeyTestCount12One.map(item => ({ ...item, data: filterByTitle(item) })),
+  ...batchPubkeyTestCount18One.map(item => ({ ...item, data: filterByTitle(item) })),
+  ...batchPubkeyTestCount24One.map(item => ({ ...item, data: filterByTitle(item) })),
+  ...batchPubkeyTestCount12Two.map(item => ({ ...item, data: filterByTitle(item) })),
+  ...batchPubkeyTestCount18Two.map(item => ({ ...item, data: filterByTitle(item) })),
+  ...batchPubkeyTestCount24Two.map(item => ({ ...item, data: filterByTitle(item) })),
+  ...batchPubkeyTestCount12Three.map(item => ({ ...item, data: filterByTitle(item) })),
+  ...batchPubkeyTestCount18Three.map(item => ({ ...item, data: filterByTitle(item) })),
+  ...batchPubkeyTestCount24Three.map(item => ({ ...item, data: filterByTitle(item) })),
+];

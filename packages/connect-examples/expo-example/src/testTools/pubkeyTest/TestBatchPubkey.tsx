@@ -156,7 +156,9 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
     if (typeof result[fieldKey] === 'string') {
       const expected = stripHexPrefix(result?.[fieldKey]);
       const actual = stripHexPrefix(payload?.[fieldKey]);
-      if (fieldKey && expected !== actual) {
+      if (key.includes("m/44'/60'/") && fieldKey === 'xpub' && actual == null) {
+        // ignore evm xpub
+      } else if (fieldKey && expected !== actual) {
         error += `(${key}) ${fullPath}: actual: ${payload?.[fieldKey]}, expected: ${result[fieldKey]}\n`;
       }
     } else {

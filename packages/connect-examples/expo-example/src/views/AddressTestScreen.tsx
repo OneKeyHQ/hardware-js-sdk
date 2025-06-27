@@ -13,15 +13,12 @@ import {
 import {
   batchTestCases as batchPubkeyTestCases,
   testCases as pubkeyTestCases,
+  batchSoftTestCases as batchSoftPubkeyTestCases,
 } from '../testTools/pubkeyTest/data';
 import {
   batchTestCases as batchVariantAddressTestCases,
   testCases as addressVariantTestCases,
 } from '../testTools/addressTest/dataVariant';
-import {
-  batchTestCases as batchVariantPubkeyTestCases,
-  testCases as pubkeyVariantTestCases,
-} from '../testTools/pubkeyTest/dataVariant';
 import PageView from '../components/ui/Page';
 import PanelView from '../components/ui/Panel';
 import { MnemonicAddressValidation } from '../testTools/addressTest/MnemonicAddressValidation';
@@ -59,6 +56,12 @@ export default function AddressTestScreen() {
               <TestBatchPubkey
                 title={intl.formatMessage({ id: 'title__publickey_test_batch' })}
                 testCases={batchPubkeyTestCases}
+              />
+            </PanelView>
+            <PanelView>
+              <TestBatchPubkey
+                title={intl.formatMessage({ id: 'title__publickey_test_batch_soft' })}
+                testCases={batchSoftPubkeyTestCases}
               />
             </PanelView>
 
