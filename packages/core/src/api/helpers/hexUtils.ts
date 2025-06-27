@@ -1,3 +1,5 @@
+import BigNumber from 'bignumber.js';
+
 export const hasHexPrefix = (str: string): boolean => str.slice(0, 2).toLowerCase() === '0x';
 
 // remove hex prefix
@@ -79,4 +81,31 @@ export function hexToBytes(hex: string): Uint8Array {
     array[i] = byte;
   }
   return array;
+}
+
+export function parseChainId(chainId: string | number | undefined): number {
+  if (!chainId) {
+    return 0;
+  }
+
+  if (typeof chainId === 'string') {
+    if (chainId.trim() === '') {
+      return 0;
+    }
+
+    if (chainId.match(/^[0-9]+$/)) {
+      return new BigNumber(chainId, 10).toNumber();
+    }
+    if (chainId.startsWith('0x') || chainId.match(/^[0-9a-fA-F]+$/)) {
+      return new BigNumber(chainId, 16).toNumber();
+    }
+
+    throw new Error(`Invalid chainId ${chainId}`);
+  }
+
+  if (typeof chainId === 'number') {
+    return new BigNumber(chainId).toNumber();
+  }
+
+  throw new Error(`Invalid chainId ${chainId}`);
 }

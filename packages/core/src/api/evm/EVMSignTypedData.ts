@@ -13,7 +13,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
+import { formatAnyHex, parseChainId, stripHexStartZeroes } from '../helpers/hexUtils';
 import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
 import {
   DeviceModelToTypes,
@@ -217,7 +217,7 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
         gasToken: data.message.gasToken,
         refundReceiver: data.message.refundReceiver,
         nonce: formatAnyHex(new BigNumber(data.message.nonce).toString(16)),
-        chain_id: new BigNumber(data.domain.chainId ?? '0x', 16).toNumber(),
+        chain_id: parseChainId(data.domain.chainId),
         verifyingContract: data.domain.verifyingContract,
       };
       response = await typedCall(

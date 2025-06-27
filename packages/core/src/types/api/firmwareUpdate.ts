@@ -25,7 +25,7 @@ export declare function firmwareUpdate(
   params: Params<FirmwareUpdateBinaryParams> & { rebootOnSuccess?: boolean }
 ): Response<PROTO.Success>;
 
-type IPlatform = 'native' | 'desktop' | 'ext' | 'web' | 'webEmbed';
+type IPlatform = 'native' | 'desktop' | 'ext' | 'web' | 'web-embed';
 type Platform = { platform: IPlatform };
 
 export declare function firmwareUpdateV2(
