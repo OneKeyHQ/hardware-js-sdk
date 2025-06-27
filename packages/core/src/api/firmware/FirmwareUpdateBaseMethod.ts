@@ -306,9 +306,9 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
       let progress: number;
       if (totalSize !== undefined && processedSize !== undefined) {
         currentFileProcessed = processedSize + chunkEnd;
-        progress = Math.min(Math.floor((currentFileProcessed / totalSize) * 100), 100);
+        progress = Math.min(Math.ceil((currentFileProcessed / totalSize) * 100), 99);
       } else {
-        progress = Math.min(Math.round(((i + 1) / totalChunks) * 100), 100);
+        progress = Math.min(Math.ceil(((i + 1) / totalChunks) * 100), 99);
       }
 
       const writeRes = await this.emmcFileWriteWithRetry(
