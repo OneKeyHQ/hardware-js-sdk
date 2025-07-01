@@ -42,6 +42,10 @@ const devicePacketStates = new Map<string, PacketAssemblyState>();
 // Service UUIDs to scan for - using constants from hd-shared
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
 
+// Pre-normalized characteristic identifiers for fast comparison
+const NORMALIZED_WRITE_UUID = '0002';
+const NORMALIZED_NOTIFY_UUID = '0003';
+
 // Initialize Noble
 async function initializeNoble(): Promise<void> {
   if (noble) return;
@@ -307,29 +311,14 @@ async function discoverServicesAndCharacteristics(
           let writeCharacteristic: Characteristic | null = null;
           let notifyCharacteristic: Characteristic | null = null;
 
-          // Helper function to normalize UUID for comparison
-          const normalizeUuid = (uuid: string): string => {
-            // If it's already a short UUID (4 characters), return as is
-            if (uuid.length === 4) {
-              return uuid.toLowerCase();
-            }
-            // If it's a full UUID, extract the short part (first 8 characters without hyphens)
-            const cleaned = uuid.replace(/-/g, '');
-            if (cleaned.length >= 8) {
-              return cleaned.substring(4, 8).toLowerCase(); // Extract the service-specific part
-            }
-            return uuid.toLowerCase();
-          };
-
-          const expectedWriteUuid = normalizeUuid(ONEKEY_WRITE_CHARACTERISTIC_UUID);
-          const expectedNotifyUuid = normalizeUuid(ONEKEY_NOTIFY_CHARACTERISTIC_UUID);
-
+          // Find characteristics by extracting the distinguishing part of UUID
           for (const characteristic of characteristics) {
-            const normalizedCharUuid = normalizeUuid(characteristic.uuid);
+            const uuid = characteristic.uuid.replace(/-/g, '').toLowerCase();
+            const uuidKey = uuid.length >= 8 ? uuid.substring(4, 8) : uuid;
 
-            if (normalizedCharUuid === expectedWriteUuid) {
+            if (uuidKey === NORMALIZED_WRITE_UUID) {
               writeCharacteristic = characteristic;
-            } else if (normalizedCharUuid === expectedNotifyUuid) {
+            } else if (uuidKey === NORMALIZED_NOTIFY_UUID) {
               notifyCharacteristic = characteristic;
             }
           }
