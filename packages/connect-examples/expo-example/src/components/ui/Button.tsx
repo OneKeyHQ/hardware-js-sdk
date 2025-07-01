@@ -158,13 +158,12 @@ const ButtonComponent = ButtonFrame.styleable<IButtonProps>((props, ref) => {
 
   const { py, px, borderRadius, textVariant } = getSizeStyles(size);
 
-  const { sharedFrameStyles, iconColor, color } = getSharedButtonStyles({
+  const { sharedFrameStyles, color } = getSharedButtonStyles({
     variant,
     disabled,
     loading,
   }) as {
     sharedFrameStyles: ISharedFrameStylesProps;
-    iconColor: ColorTokens;
     color: ColorTokens;
   };
 

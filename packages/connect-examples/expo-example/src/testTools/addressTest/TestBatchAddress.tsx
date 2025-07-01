@@ -112,7 +112,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
   const fullOriginDataRef = useRef(passphraseTestCase);
   const originDataRef = useRef(passphraseTestCase);
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initTestCase: () => {
       const testCase = currentTestCase;
       const currentTestCases = testCase?.data?.map((item, index) => {
@@ -279,7 +279,11 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
             ))}
           </Picker>
 
-          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+          <TestRunnerOptionButtons
+            onStop={stopTest}
+            onStart={beginTest}
+            onRetryFailed={retryFailedTasks}
+          />
           <ExportReportView />
         </Stack>
       </>
@@ -289,6 +293,7 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       currentTestCase?.name,
       findTestCase,
       passphrase,
+      retryFailedTasks,
       stopTest,
       testCaseList,
       testDescription,

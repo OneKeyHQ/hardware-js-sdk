@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useContext } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
@@ -146,9 +146,10 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
 
   const currentPassphrase = useRef<string | undefined>('');
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initTestCase: () => {
       const testCase = currentTestCase;
+
       const currentTestCases = testCase?.data?.map((item, index) => {
         const key = `${item.method}-${index}`;
 
@@ -224,12 +225,6 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
         error,
       });
     },
-    removeHardwareListener: sdk => {
-      if (hardwareUiEventListener) {
-        sdk.off(UI_EVENT, hardwareUiEventListener);
-      }
-      return Promise.resolve();
-    },
   });
 
   const contentMemo = useMemo(
@@ -239,6 +234,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
           {testDescription}
         </Text>
         {!!passphrase && <Text paddingVertical="$2">Passphrase:「{passphrase}」</Text>}
+
         <Stack flex={1} flexDirection="row" flexWrap="wrap" gap="$2">
           <Picker
             style={{ width: 200 }}
@@ -255,21 +251,27 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
             onToggle={setShowOnOneKey}
             vertical
           />
-          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+
+          <TestRunnerOptionButtons
+            onStop={stopTest}
+            onStart={beginTest}
+            onRetryFailed={retryFailedTasks}
+          />
           <ExportReportView />
         </Stack>
       </>
     ),
     [
-      beginTest,
-      currentTestCase?.name,
-      findTestCase,
-      intl,
+      testDescription,
       passphrase,
+      currentTestCase?.name,
+      testCaseList,
+      intl,
       showOnOneKey,
       stopTest,
-      testCaseList,
-      testDescription,
+      beginTest,
+      retryFailedTasks,
+      findTestCase,
     ]
   );
 

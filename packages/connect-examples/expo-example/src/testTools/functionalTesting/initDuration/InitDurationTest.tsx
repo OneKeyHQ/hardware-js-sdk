@@ -94,7 +94,7 @@ function ExecuteView() {
   const [intervalTime, setIntervalTime] = useState(1000);
   const [testCount, setTestCount] = useState(10);
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
       if (hardwareUiEventListener) {
         sdk.off(UI_EVENT, hardwareUiEventListener);
@@ -206,13 +206,17 @@ function ExecuteView() {
           />
 
           <XStack flexWrap="wrap">
-            <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+            <TestRunnerOptionButtons
+              onStop={stopTest}
+              onStart={beginTest}
+              onRetryFailed={retryFailedTasks}
+            />
             <ExportReportView />
           </XStack>
         </Stack>
       </YStack>
     ),
-    [beginTest, intervalTime, intl, stopTest, testCount]
+    [beginTest, intervalTime, intl, retryFailedTasks, stopTest, testCount]
   );
 
   return contentMemo;
