@@ -8,35 +8,15 @@ import {
 } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
 import type EventEmitter from 'events';
+// Import DesktopAPI type from hd-transport-electron
+import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
 
 const { parseConfigure, buildBuffers, receiveOne, check } = transport;
 
 // Noble BLE specific API interface
 declare global {
   interface Window {
-    desktopApi?: {
-      // Existing BLE methods
-      onBleSelect: (callback: (devices: Array<{ id: string; name: string }>) => void) => () => void;
-      stopBleScan: () => void;
-      selectBleDevice: (deviceId: string) => void;
-      preSelectDevice?: (uuid: string) => void;
-      clearPreSelect?: () => void;
-
-      // Noble BLE specific methods
-      nobleBle?: {
-        enumerate: () => Promise<{ id: string; name: string }[]>;
-        getDevice: (uuid: string) => Promise<{ id: string; name: string } | null>;
-        connect: (uuid: string) => Promise<void>;
-        disconnect: (uuid: string) => Promise<void>;
-        subscribe: (uuid: string) => Promise<void>;
-        unsubscribe: (uuid: string) => Promise<void>;
-        write: (uuid: string, data: string) => Promise<void>;
-        onNotification: (callback: (deviceId: string, data: string) => void) => () => void;
-        onDeviceDisconnected: (
-          callback: (device: { id: string; name: string }) => void
-        ) => () => void;
-      };
-    };
+    desktopApi?: DesktopAPI;
   }
 }
 
