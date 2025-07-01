@@ -12,6 +12,8 @@ import {
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
   ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   isHeaderChunk,
+  ERRORS,
+  HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
 import { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import type { WebContents, IpcMainInvokeEvent } from 'electron';
@@ -46,6 +48,80 @@ const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
 const NORMALIZED_WRITE_UUID = '0002';
 const NORMALIZED_NOTIFY_UUID = '0003';
 
+// Packet processing result types
+interface PacketProcessResult {
+  isComplete: boolean;
+  completePacket?: string;
+  error?: string;
+}
+
+// Process incoming BLE notification data with proper packet reassembly
+function processNotificationData(deviceId: string, data: Buffer): PacketProcessResult {
+  // Get or initialize packet state for this device
+  let packetState = devicePacketStates.get(deviceId);
+  if (!packetState) {
+    packetState = { bufferLength: 0, buffer: [], packetCount: 0 };
+    devicePacketStates.set(deviceId, packetState);
+  }
+
+  try {
+    if (isHeaderChunk(data)) {
+      // Validate header chunk
+      if (data.length < 9) {
+        return { isComplete: false, error: 'Invalid header chunk: too short' };
+      }
+
+      // Generate message ID for this packet sequence
+      const messageId = `${deviceId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Reset packet state for new message
+      packetState.bufferLength = data.readInt32BE(5);
+      packetState.buffer = [...data.subarray(3)];
+      packetState.packetCount = 1;
+      packetState.messageId = messageId;
+
+      // Validate expected length is reasonable
+      if (packetState.bufferLength <= 0) {
+        resetPacketState(packetState);
+        return { isComplete: false, error: 'Invalid packet length in header' };
+      }
+    } else {
+      // Validate we have an active packet session
+      if (packetState.bufferLength === 0) {
+        return { isComplete: false, error: 'Received data chunk without header' };
+      }
+
+      // Increment packet counter and append data
+      packetState.packetCount += 1;
+      packetState.buffer = packetState.buffer.concat([...data]);
+    }
+
+    // Check if packet is complete
+    if (packetState.buffer.length - COMMON_HEADER_SIZE >= packetState.bufferLength) {
+      const completeBuffer = Buffer.from(packetState.buffer);
+      const hexString = completeBuffer.toString('hex');
+
+      // Reset packet state for next message
+      resetPacketState(packetState);
+
+      return { isComplete: true, completePacket: hexString };
+    }
+
+    return { isComplete: false };
+  } catch (error) {
+    resetPacketState(packetState);
+    return { isComplete: false, error: `Packet processing error: ${error}` };
+  }
+}
+
+// Reset packet state to clean state
+function resetPacketState(packetState: PacketAssemblyState): void {
+  packetState.bufferLength = 0;
+  packetState.buffer = [];
+  packetState.packetCount = 0;
+  packetState.messageId = undefined;
+}
+
 // Initialize Noble
 async function initializeNoble(): Promise<void> {
   if (noble) return;
@@ -58,7 +134,7 @@ async function initializeNoble(): Promise<void> {
     // Wait for Bluetooth to be ready
     await new Promise<void>((resolve, reject) => {
       if (!noble) {
-        reject(new Error('Noble not initialized'));
+        reject(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not initialized'));
         return;
       }
 
@@ -68,7 +144,12 @@ async function initializeNoble(): Promise<void> {
       }
 
       const timeout = setTimeout(() => {
-        reject(new Error('Bluetooth initialization timeout'));
+        reject(
+          ERRORS.TypedError(
+            HardwareErrorCode.BlePermissionError,
+            'Bluetooth initialization timeout'
+          )
+        );
       }, 10000);
 
       const onStateChange = (state: string) => {
@@ -84,7 +165,7 @@ async function initializeNoble(): Promise<void> {
           if (noble) {
             noble.removeListener('stateChange', onStateChange);
           }
-          reject(new Error(`Bluetooth is ${state}`));
+          reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError, `Bluetooth is ${state}`));
         }
       };
 
@@ -177,7 +258,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
   }
 
   if (!noble) {
-    throw new Error('Noble not available');
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
   }
 
   logger?.info('[NobleBLE] Starting device enumeration');
@@ -189,7 +270,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
     const devices: DeviceInfo[] = [];
 
     if (!noble) {
-      reject(new Error('Noble not available'));
+      reject(ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available'));
       return;
     }
 
@@ -207,7 +288,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
       if (error) {
         clearTimeout(timeout);
         logger?.error('[NobleBLE] Failed to start scanning:', error);
-        reject(error);
+        reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
         return;
       }
 
@@ -280,12 +361,12 @@ async function discoverServicesAndCharacteristics(
     peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error: string, services: Service[]) => {
       if (error) {
         logger?.error('[NobleBLE] Service discovery failed:', error);
-        reject(new Error(error));
+        reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error));
         return;
       }
 
       if (!services || services.length === 0) {
-        reject(new Error('No OneKey services found'));
+        reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found'));
         return;
       }
 
@@ -298,7 +379,7 @@ async function discoverServicesAndCharacteristics(
         (error: string, characteristics: Characteristic[]) => {
           if (error) {
             logger?.error('[NobleBLE] Characteristic discovery failed:', error);
-            reject(new Error(error));
+            reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error));
             return;
           }
 
@@ -335,7 +416,12 @@ async function discoverServicesAndCharacteristics(
               'notify:',
               !!notifyCharacteristic
             );
-            reject(new Error('Required characteristics not found'));
+            reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.BleCharacteristicNotFound,
+                'Required characteristics not found'
+              )
+            );
             return;
           }
 
@@ -350,7 +436,7 @@ async function discoverServicesAndCharacteristics(
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
   const peripheral = discoveredDevices.get(deviceId);
   if (!peripheral) {
-    throw new Error(`Device ${deviceId} not found`);
+    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${deviceId} not found`);
   }
 
   logger?.info('[NobleBLE] Connecting to device:', deviceId);
@@ -398,7 +484,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error('Connection timeout'));
+      reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'Connection timeout'));
     }, 15000); // Increased timeout for connection
 
     peripheral.connect((error: string) => {
@@ -406,7 +492,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
       if (error) {
         logger?.error('[NobleBLE] Connection failed:', error);
-        reject(new Error(error));
+        reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error));
         return;
       }
 
@@ -463,7 +549,7 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
   if (!peripheral || !characteristics) {
     const error = `Device ${deviceId} not connected or characteristics not available`;
     logger?.error('[NobleBLE] writeData failed:', error);
-    throw new Error(error);
+    throw ERRORS.TypedError(HardwareErrorCode.TransportNotFound, error);
   }
 
   const { write: writeCharacteristic } = characteristics;
@@ -474,7 +560,10 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
     buffer = Buffer.from(hexData, 'hex');
   } catch (error) {
     logger?.error('[NobleBLE] Hex conversion failed:', error);
-    throw new Error(`Failed to convert hex data: ${error}`);
+    throw ERRORS.TypedError(
+      HardwareErrorCode.BleWriteCharacteristicError,
+      `Failed to convert hex data: ${error}`
+    );
   }
 
   logger?.info('[NobleBLE] Writing data:', {
@@ -489,7 +578,7 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
       writeCharacteristic.write(buffer, true, (error: string) => {
         if (error) {
           logger?.error('[NobleBLE] Single packet write failed:', error);
-          reject(new Error(error));
+          reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error));
           return;
         }
         resolve();
@@ -516,7 +605,7 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
       writeCharacteristic.write(chunk, false, (error: string) => {
         if (error) {
           logger?.error(`[NobleBLE] Chunk ${chunkIndex} write failed:`, error);
-          reject(new Error(error));
+          reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error));
           return;
         }
         resolve();
@@ -552,7 +641,10 @@ async function subscribeNotifications(
   const characteristics = deviceCharacteristics.get(deviceId);
 
   if (!peripheral || !characteristics) {
-    throw new Error(`Device ${deviceId} not connected or characteristics not available`);
+    throw ERRORS.TypedError(
+      HardwareErrorCode.TransportNotFound,
+      `Device ${deviceId} not connected or characteristics not available`
+    );
   }
 
   const { notify: notifyCharacteristic } = characteristics;
@@ -599,76 +691,28 @@ async function subscribeNotifications(
     notifyCharacteristic.subscribe((error: string) => {
       if (error) {
         logger?.error('[NobleBLE] Notification subscription failed:', error);
-        reject(new Error(error));
+        reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyError, error));
         return;
       }
 
       logger?.info('[NobleBLE] Notification subscription successful');
       subscribedDevices.set(deviceId, true);
 
-      // Set up data handler with proper packet reassembly
+      // Set up data handler with robust packet reassembly
       notifyCharacteristic.on('data', (data: Buffer) => {
-        try {
-          // Get or initialize packet state for this device
-          let packetState = devicePacketStates.get(deviceId);
-          if (!packetState) {
-            packetState = { bufferLength: 0, buffer: [], packetCount: 0 };
-            devicePacketStates.set(deviceId, packetState);
-          }
+        const result = processNotificationData(deviceId, data);
 
-          // Check if this is a header chunk
-          if (isHeaderChunk(data)) {
-            // Generate message ID for this packet sequence
-            const messageId = `${deviceId}-${Date.now()}-${Math.random()
-              .toString(36)
-              .substr(2, 9)}`;
+        if (result.error) {
+          logger?.error('[NobleBLE] Packet processing error:', result.error);
+          return;
+        }
 
-            // Reset packet state for new message
-            packetState.bufferLength = data.readInt32BE(5);
-            packetState.buffer = [...data.subarray(3)]; // Start with header data (skip first 3 bytes)
-            packetState.packetCount = 1; // Reset counter for new message
-            packetState.messageId = messageId;
-          } else {
-            // Check if we have a valid packet state with expected length
-            if (packetState.bufferLength === 0) {
-              logger?.error('[NobleBLE] Received data chunk without header, ignoring');
-              return; // Ignore orphaned data chunks
-            }
-
-            // Increment packet counter for data chunks
-            packetState.packetCount += 1;
-
-            // Append data chunk to buffer
-            packetState.buffer = packetState.buffer.concat([...data]);
-          }
-
-          // Check if we have received the complete packet
-          if (packetState.buffer.length - COMMON_HEADER_SIZE >= packetState.bufferLength) {
-            const completeBuffer = Buffer.from(packetState.buffer);
-            const hexString = completeBuffer.toString('hex');
-
-            logger?.info('[NobleBLE] Packet complete:', {
-              deviceId,
-              packets: packetState.packetCount,
-              length: completeBuffer.length,
-            });
-
-            // Reset packet state for next message
-            packetState.bufferLength = 0;
-            packetState.buffer = [];
-            packetState.packetCount = 0;
-
-            // Send complete packet to callback
-            callback(hexString);
-          }
-        } catch (error) {
-          logger?.error('[NobleBLE] Notification data processing error:', error);
-          // Reset packet state on error
-          const packetState = devicePacketStates.get(deviceId);
-          if (packetState) {
-            packetState.bufferLength = 0;
-            packetState.buffer = [];
-          }
+        if (result.isComplete && result.completePacket) {
+          logger?.info('[NobleBLE] Packet complete:', {
+            deviceId,
+            length: result.completePacket.length / 2,
+          });
+          callback(result.completePacket);
         }
       });
 
