@@ -77,6 +77,26 @@ export default class ElectronBleTransport {
   // Disconnect listener cleanup functions
   private disconnectCleanups: Map<string, () => void> = new Map();
 
+  // Clean up all device state and listeners - unified cleanup function
+  private cleanupDeviceState(deviceId: string): void {
+    this.connectedDevices.delete(deviceId);
+    this.dataBuffers.delete(deviceId);
+
+    // Clean up notification listener
+    const notifyCleanup = this.notificationCleanups.get(deviceId);
+    if (notifyCleanup) {
+      notifyCleanup();
+      this.notificationCleanups.delete(deviceId);
+    }
+
+    // Clean up disconnect listener
+    const disconnectCleanup = this.disconnectCleanups.get(deviceId);
+    if (disconnectCleanup) {
+      disconnectCleanup();
+      this.disconnectCleanups.delete(deviceId);
+    }
+  }
+
   init(logger: any, emitter?: EventEmitter) {
     this.Log = logger;
     this.emitter = emitter;
@@ -161,21 +181,7 @@ export default class ElectronBleTransport {
       const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
         (disconnectedDevice: any) => {
           if (disconnectedDevice.id === uuid) {
-            this.connectedDevices.delete(uuid);
-            this.dataBuffers.delete(uuid);
-
-            // Clean up listeners
-            const notifyCleanup = this.notificationCleanups.get(uuid);
-            if (notifyCleanup) {
-              notifyCleanup();
-              this.notificationCleanups.delete(uuid);
-            }
-
-            const disconnectCleanup = this.disconnectCleanups.get(uuid);
-            if (disconnectCleanup) {
-              disconnectCleanup();
-              this.disconnectCleanups.delete(uuid);
-            }
+            this.cleanupDeviceState(uuid);
 
             // Trigger disconnect event
             this.emitter?.emit('device-disconnect', {
@@ -210,46 +216,18 @@ export default class ElectronBleTransport {
           await window.desktopApi.nobleBle.unsubscribe(id);
         }
 
-        // Clean up notification listener
-        const cleanup = this.notificationCleanups.get(id);
-        if (cleanup) {
-          cleanup();
-          this.notificationCleanups.delete(id);
-        }
-
-        // Clean up disconnect listener
-        const disconnectCleanup = this.disconnectCleanups.get(id);
-        if (disconnectCleanup) {
-          disconnectCleanup();
-          this.disconnectCleanups.delete(id);
-        }
-
         // Disconnect device
         if (window.desktopApi?.nobleBle) {
           await window.desktopApi.nobleBle.disconnect(id);
         }
 
-        // Clean up local state
-        this.connectedDevices.delete(id);
-        this.dataBuffers.delete(id);
+        // Clean up all device state
+        this.cleanupDeviceState(id);
       }
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE release failed:', error);
       // Clean up local state even if release fails
-      this.connectedDevices.delete(id);
-      this.dataBuffers.delete(id);
-
-      const cleanup = this.notificationCleanups.get(id);
-      if (cleanup) {
-        cleanup();
-        this.notificationCleanups.delete(id);
-      }
-
-      const disconnectCleanup = this.disconnectCleanups.get(id);
-      if (disconnectCleanup) {
-        disconnectCleanup();
-        this.disconnectCleanups.delete(id);
-      }
+      this.cleanupDeviceState(id);
     }
   }
 
