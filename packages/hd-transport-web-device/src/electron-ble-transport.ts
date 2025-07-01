@@ -45,6 +45,13 @@ export type BleAcquireInput = {
   forceCleanRunPromise?: boolean;
 };
 
+// Packet processing result interface
+interface PacketProcessResult {
+  isComplete: boolean;
+  completePacket?: string;
+  error?: string;
+}
+
 export default class ElectronBleTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
@@ -82,7 +89,6 @@ export default class ElectronBleTransport {
       );
     }
 
-    console.log('=====>LOG: ', this.Log);
     this.Log?.debug('[Transport] Noble BLE Transport initialized');
   }
 
@@ -95,16 +101,12 @@ export default class ElectronBleTransport {
   listen() {}
 
   async enumerate(): Promise<{ id: string; name: string }[]> {
-    this.Log?.debug('[Transport] Starting Noble BLE enumerate');
-
     try {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE API not available');
       }
 
       const devices = await window.desktopApi.nobleBle.enumerate();
-      this.Log?.debug('[Transport] Noble BLE enumerate completed:', devices);
-
       return devices;
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE enumerate failed:', error);
@@ -119,12 +121,9 @@ export default class ElectronBleTransport {
       throw ERRORS.TypedError(HardwareErrorCode.BleRequiredUUID);
     }
 
-    this.Log?.debug('[Transport] Acquiring Noble BLE device:', uuid);
-
     // Force clean running Promise
     if (forceCleanRunPromise && this.runPromise) {
       this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleForceCleanRunPromise));
-      this.Log?.debug('[Transport] Force clean Noble BLE run promise:', forceCleanRunPromise);
     }
 
     try {
@@ -162,7 +161,6 @@ export default class ElectronBleTransport {
       const disconnectCleanup = window.desktopApi.nobleBle.onDeviceDisconnected(
         (disconnectedDevice: any) => {
           if (disconnectedDevice.id === uuid) {
-            this.Log?.debug('[Transport] Noble BLE device disconnected:', uuid);
             this.connectedDevices.delete(uuid);
             this.dataBuffers.delete(uuid);
 
@@ -197,7 +195,6 @@ export default class ElectronBleTransport {
         connectId: device.id,
       });
 
-      this.Log?.debug('[Transport] Noble BLE device acquired successfully:', uuid);
       return { uuid, path: uuid };
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE acquire failed:', error);
@@ -206,8 +203,6 @@ export default class ElectronBleTransport {
   }
 
   async release(id: string) {
-    this.Log?.debug('[Transport] Releasing Noble BLE device:', id);
-
     try {
       if (this.connectedDevices.has(id)) {
         // Unsubscribe from notifications
@@ -238,8 +233,6 @@ export default class ElectronBleTransport {
         this.connectedDevices.delete(id);
         this.dataBuffers.delete(id);
       }
-
-      this.Log?.debug('[Transport] Noble BLE device released:', id);
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE release failed:', error);
       // Clean up local state even if release fails
@@ -262,68 +255,19 @@ export default class ElectronBleTransport {
 
   // Handle notification data from Noble BLE
   private handleNotificationData(deviceId: string, hexData: string): void {
-    try {
-      // Ensure hexData is a valid string
-      if (typeof hexData !== 'string') {
-        this.Log?.error('[Transport] Invalid hexData type:', typeof hexData, hexData);
-        return;
-      }
+    const result = this.processNotificationPacket(deviceId, hexData);
 
-      // Remove any whitespace and validate hex format
-      const cleanHexData = hexData.replace(/\s+/g, '');
-      if (!/^[0-9A-Fa-f]*$/.test(cleanHexData)) {
-        this.Log?.error('[Transport] Invalid hex data format:', cleanHexData);
-        return;
-      }
-
-      // Convert hex string to Uint8Array
-      const hexMatch = cleanHexData.match(/.{1,2}/g);
-      if (!hexMatch) {
-        this.Log?.error('[Transport] Failed to parse hex data:', cleanHexData);
-        return;
-      }
-
-      const data = new Uint8Array(hexMatch.map(byte => parseInt(byte, 16)));
-
-      this.Log?.debug('[Transport] Received Noble BLE notification:', deviceId, data);
-
-      const bufferState = this.dataBuffers.get(deviceId);
-      if (!bufferState) {
-        this.Log?.error('[Transport] No buffer state for device:', deviceId);
-        return;
-      }
-
-      if (isHeaderChunk(data)) {
-        // Read buffer length from header (big-endian 32-bit integer at offset 5)
-        const dataView = new DataView(data.buffer);
-        bufferState.bufferLength = dataView.getInt32(5, false); // false = big-endian
-        bufferState.buffer = [...data.subarray(3)];
-      } else {
-        bufferState.buffer = bufferState.buffer.concat([...data]);
-      }
-
-      if (bufferState.buffer.length - COMMON_HEADER_SIZE >= bufferState.bufferLength) {
-        // Complete packet received
-        const completeBuffer = new Uint8Array(bufferState.buffer);
-        this.Log?.debug('[Transport] Noble BLE complete packet received, resolving Promise');
-
-        // Reset buffer state
-        bufferState.bufferLength = 0;
-        bufferState.buffer = [];
-
-        // Convert to hex string for processing
-        const hexString = Array.from(completeBuffer)
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-
-        if (this.runPromise) {
-          this.runPromise.resolve(hexString);
-        }
-      }
-    } catch (error) {
-      this.Log?.error('[Transport] Noble BLE notification processing error:', error);
+    if (result.error) {
+      this.Log?.error('[Transport] Packet processing error:', result.error);
       if (this.runPromise) {
         this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError));
+      }
+      return;
+    }
+
+    if (result.isComplete && result.completePacket) {
+      if (this.runPromise) {
+        this.runPromise.resolve(result.completePacket);
       }
     }
   }
@@ -335,7 +279,6 @@ export default class ElectronBleTransport {
 
     const forceRun = name === 'Initialize' || name === 'Cancel';
 
-    this.Log?.debug('[Transport] Noble BLE call this.runPromise', this.runPromise);
     if (this.runPromise && !forceRun) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportCallInProgress);
     }
@@ -361,29 +304,10 @@ export default class ElectronBleTransport {
 
     const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
 
-    this.Log?.debug('[Transport] Noble BLE buildBuffers result:', {
-      bufferCount: buffers.length,
-      buffersInfo: buffers.map((buffer, index) => {
-        const bufferExists = !!buffer;
-        const hasToString = typeof buffer?.toString === 'function';
-
-        return {
-          index,
-          bufferExists,
-          hasToString,
-          bufferType: buffer?.constructor?.name,
-          bufferLimit: buffer?.limit,
-          bufferOffset: buffer?.offset,
-        };
-      }),
-    });
-
     try {
       if (!window.desktopApi?.nobleBle) {
         throw new Error('Noble BLE write API not available');
       }
-
-      this.Log?.debug('[Transport] Noble BLE preparing to write', buffers.length, 'buffers');
 
       // Write each buffer to the device
       for (let i = 0; i < buffers.length; i++) {
@@ -397,23 +321,13 @@ export default class ElectronBleTransport {
         // Use ByteBuffer's toString('hex') method directly, similar to other transports
         const hexString = buffer.toString('hex');
 
-        this.Log?.debug(`[Transport] Noble BLE writing buffer ${i + 1}/${buffers.length}:`, {
-          bufferSize: buffer.limit,
-          hexLength: hexString.length,
-          firstBytes: `${hexString.substring(0, 32)}...`,
-        });
-
         if (hexString.length === 0) {
           this.Log?.error(`[Transport] Noble BLE buffer ${i + 1} generated empty hex string`);
           throw new Error(`Buffer ${i + 1} is empty`);
         }
 
         await window.desktopApi.nobleBle.write(uuid, hexString);
-
-        this.Log?.debug(`[Transport] Noble BLE buffer ${i + 1} write completed`);
       }
-
-      this.Log?.debug('[Transport] Noble BLE all buffers written, waiting for response');
 
       // Wait for response
       const response = await this.runPromise.promise;
@@ -422,14 +336,72 @@ export default class ElectronBleTransport {
         throw new Error('Returning data is not string.');
       }
 
-      this.Log?.debug('[Transport] Noble BLE receive data:', response);
       const jsonData = receiveOne(messages, response);
       return check.call(jsonData);
     } catch (e) {
-      this.Log?.debug('[Transport] Noble BLE call error:', e);
+      this.Log?.error('[Transport] Noble BLE call error:', e);
       throw e;
     } finally {
       this.runPromise = null;
+    }
+  }
+
+  // Process hex data from notification with validation and packet reassembly
+  private processNotificationPacket(deviceId: string, hexData: string): PacketProcessResult {
+    try {
+      // Validate input
+      if (typeof hexData !== 'string') {
+        return { isComplete: false, error: 'Invalid hexData type' };
+      }
+
+      // Clean and validate hex format
+      const cleanHexData = hexData.replace(/\s+/g, '');
+      if (!/^[0-9A-Fa-f]*$/.test(cleanHexData)) {
+        return { isComplete: false, error: 'Invalid hex data format' };
+      }
+
+      // Convert hex string to Uint8Array
+      const hexMatch = cleanHexData.match(/.{1,2}/g);
+      if (!hexMatch) {
+        return { isComplete: false, error: 'Failed to parse hex data' };
+      }
+
+      const data = new Uint8Array(hexMatch.map(byte => parseInt(byte, 16)));
+
+      // Get buffer state
+      const bufferState = this.dataBuffers.get(deviceId);
+      if (!bufferState) {
+        return { isComplete: false, error: 'No buffer state for device' };
+      }
+
+      // Process header or data chunk
+      if (isHeaderChunk(data)) {
+        const dataView = new DataView(data.buffer);
+        bufferState.bufferLength = dataView.getInt32(5, false);
+        bufferState.buffer = [...data.subarray(3)];
+      } else {
+        bufferState.buffer = bufferState.buffer.concat([...data]);
+      }
+
+      // Check if packet is complete
+      if (bufferState.buffer.length - COMMON_HEADER_SIZE >= bufferState.bufferLength) {
+        const completeBuffer = new Uint8Array(bufferState.buffer);
+
+        // Reset buffer state
+        bufferState.bufferLength = 0;
+        bufferState.buffer = [];
+
+        // Convert to hex string
+        const hexString = Array.from(completeBuffer)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+
+        return { isComplete: true, completePacket: hexString };
+      }
+
+      return { isComplete: false };
+    } catch (error) {
+      return { isComplete: false, error: `Packet processing error: ${error}` };
     }
   }
 }
