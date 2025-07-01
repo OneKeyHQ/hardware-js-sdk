@@ -48,6 +48,19 @@ const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
 const NORMALIZED_WRITE_UUID = '0002';
 const NORMALIZED_NOTIFY_UUID = '0003';
 
+// Timeout and interval constants
+const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
+const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
+const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
+const CONNECTION_TIMEOUT = 15000; // 15 seconds for device connection
+const CHUNK_WRITE_DELAY = 10; // 10ms delay between chunk writes
+
+// BLE packet size constants
+const BLE_PACKET_SIZE = 192; // Use Android packet size as default for desktop
+
+// Validation limits
+const MIN_HEADER_LENGTH = 9; // Minimum header chunk length
+
 // Packet processing result types
 interface PacketProcessResult {
   isComplete: boolean;
@@ -67,7 +80,7 @@ function processNotificationData(deviceId: string, data: Buffer): PacketProcessR
   try {
     if (isHeaderChunk(data)) {
       // Validate header chunk
-      if (data.length < 9) {
+      if (data.length < MIN_HEADER_LENGTH) {
         return { isComplete: false, error: 'Invalid header chunk: too short' };
       }
 
@@ -150,7 +163,7 @@ async function initializeNoble(): Promise<void> {
             'Bluetooth initialization timeout'
           )
         );
-      }, 10000);
+      }, BLUETOOTH_INIT_TIMEOUT);
 
       const onStateChange = (state: string) => {
         logger?.info('[NobleBLE] Bluetooth state:', state);
@@ -281,7 +294,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
       }
       logger?.info('[NobleBLE] Scan completed, found devices:', devices.length);
       resolve(devices);
-    }, 5000); // Increased timeout for better discovery
+    }, DEVICE_SCAN_TIMEOUT);
 
     // Start scanning for OneKey service UUIDs
     noble.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
@@ -310,12 +323,12 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
       };
 
       // Check for devices periodically
-      const interval = setInterval(checkDevices, 500);
+      const interval = setInterval(checkDevices, DEVICE_CHECK_INTERVAL);
 
       // Clean up interval when timeout occurs
       setTimeout(() => {
         clearInterval(interval);
-      }, 5000);
+      }, DEVICE_SCAN_TIMEOUT);
     });
   });
 }
@@ -485,7 +498,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'Connection timeout'));
-    }, 15000); // Increased timeout for connection
+    }, CONNECTION_TIMEOUT);
 
     peripheral.connect((error: string) => {
       clearTimeout(timeout);
@@ -537,9 +550,6 @@ async function disconnectDevice(deviceId: string): Promise<void> {
     });
   });
 }
-
-// BLE packet size constants (similar to React Native)
-const BLE_PACKET_SIZE = 192; // Use Android packet size as default for desktop
 
 // Write data to device with chunking support
 async function writeData(deviceId: string, hexData: string): Promise<void> {
@@ -627,7 +637,7 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
 
     // Small delay between chunks to avoid overwhelming the device
     if (i < chunks.length - 1) {
-      await delay(10);
+      await delay(CHUNK_WRITE_DELAY);
     }
   }
 }
