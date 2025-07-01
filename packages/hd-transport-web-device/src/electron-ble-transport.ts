@@ -263,8 +263,27 @@ export default class ElectronBleTransport {
   // Handle notification data from Noble BLE
   private handleNotificationData(deviceId: string, hexData: string): void {
     try {
+      // Ensure hexData is a valid string
+      if (typeof hexData !== 'string') {
+        this.Log?.error('[Transport] Invalid hexData type:', typeof hexData, hexData);
+        return;
+      }
+
+      // Remove any whitespace and validate hex format
+      const cleanHexData = hexData.replace(/\s+/g, '');
+      if (!/^[0-9A-Fa-f]*$/.test(cleanHexData)) {
+        this.Log?.error('[Transport] Invalid hex data format:', cleanHexData);
+        return;
+      }
+
       // Convert hex string to Uint8Array
-      const data = new Uint8Array(hexData.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+      const hexMatch = cleanHexData.match(/.{1,2}/g);
+      if (!hexMatch) {
+        this.Log?.error('[Transport] Failed to parse hex data:', cleanHexData);
+        return;
+      }
+
+      const data = new Uint8Array(hexMatch.map(byte => parseInt(byte, 16)));
 
       this.Log?.debug('[Transport] Received Noble BLE notification:', deviceId, data);
 
