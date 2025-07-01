@@ -298,23 +298,11 @@ async function discoverServicesAndCharacteristics(
             return;
           }
 
-          // Log all discovered characteristics for debugging
-          logger?.info('[NobleBLE] Discovered characteristics:', characteristics?.length || 0);
-          characteristics?.forEach((char, index) => {
-            logger?.info(`[NobleBLE] Characteristic ${index}:`, {
-              uuid: char.uuid,
-              properties: char.properties,
-            });
+          // Log discovered characteristics summary
+          logger?.info('[NobleBLE] Discovered characteristics:', {
+            count: characteristics?.length || 0,
+            uuids: characteristics?.map(c => c.uuid) || [],
           });
-
-          logger?.info(
-            '[NobleBLE] Looking for write UUID:',
-            ONEKEY_WRITE_CHARACTERISTIC_UUID.toLowerCase()
-          );
-          logger?.info(
-            '[NobleBLE] Looking for notify UUID:',
-            ONEKEY_NOTIFY_CHARACTERISTIC_UUID.toLowerCase()
-          );
 
           let writeCharacteristic: Characteristic | null = null;
           let notifyCharacteristic: Characteristic | null = null;
@@ -336,26 +324,20 @@ async function discoverServicesAndCharacteristics(
           const expectedWriteUuid = normalizeUuid(ONEKEY_WRITE_CHARACTERISTIC_UUID);
           const expectedNotifyUuid = normalizeUuid(ONEKEY_NOTIFY_CHARACTERISTIC_UUID);
 
-          logger?.info('[NobleBLE] Normalized expected write UUID:', expectedWriteUuid);
-          logger?.info('[NobleBLE] Normalized expected notify UUID:', expectedNotifyUuid);
-
           for (const characteristic of characteristics) {
             const normalizedCharUuid = normalizeUuid(characteristic.uuid);
-            logger?.info(
-              '[NobleBLE] Checking characteristic UUID:',
-              characteristic.uuid,
-              '-> normalized:',
-              normalizedCharUuid
-            );
 
             if (normalizedCharUuid === expectedWriteUuid) {
               writeCharacteristic = characteristic;
-              logger?.info('[NobleBLE] Found write characteristic');
             } else if (normalizedCharUuid === expectedNotifyUuid) {
               notifyCharacteristic = characteristic;
-              logger?.info('[NobleBLE] Found notify characteristic');
             }
           }
+
+          logger?.info('[NobleBLE] Characteristic discovery result:', {
+            writeFound: !!writeCharacteristic,
+            notifyFound: !!notifyCharacteristic,
+          });
 
           if (!writeCharacteristic || !notifyCharacteristic) {
             logger?.error(
@@ -486,8 +468,6 @@ const BLE_PACKET_SIZE = 192; // Use Android packet size as default for desktop
 
 // Write data to device with chunking support
 async function writeData(deviceId: string, hexData: string): Promise<void> {
-  logger?.info('[NobleBLE] writeData called for device:', deviceId, 'data length:', hexData.length);
-
   const peripheral = connectedDevices.get(deviceId);
   const characteristics = deviceCharacteristics.get(deviceId);
 
@@ -503,35 +483,26 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
   let buffer: Buffer;
   try {
     buffer = Buffer.from(hexData, 'hex');
-    logger?.info('[NobleBLE] Converted hex to buffer:', {
-      hexLength: hexData.length,
-      bufferLength: buffer.length,
-      firstBytes: buffer.subarray(0, Math.min(16, buffer.length)).toString('hex'),
-    });
   } catch (error) {
     logger?.error('[NobleBLE] Hex conversion failed:', error);
     throw new Error(`Failed to convert hex data: ${error}`);
   }
 
-  logger?.debug('[NobleBLE] Writing data to device:', deviceId, 'total length:', buffer.length);
+  logger?.info('[NobleBLE] Writing data:', {
+    deviceId,
+    dataLength: buffer.length,
+    firstBytes: buffer.subarray(0, 8).toString('hex'),
+  });
 
   // If data is small enough, send directly
   if (buffer.length <= BLE_PACKET_SIZE) {
-    logger?.info('[NobleBLE] Sending single packet:', {
-      deviceId,
-      packetSize: buffer.length,
-      data: `${buffer.toString('hex').substring(0, 32)}...`,
-    });
-
     return new Promise((resolve, reject) => {
       writeCharacteristic.write(buffer, true, (error: string) => {
         if (error) {
-          logger?.error('[NobleBLE] Single packet write (without response) failed:', error);
+          logger?.error('[NobleBLE] Single packet write failed:', error);
           reject(new Error(error));
           return;
         }
-
-        logger?.info('[NobleBLE] Single packet write (without response) successful');
         resolve();
       });
     });
@@ -548,30 +519,20 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
     offset += chunkSize;
   }
 
-  logger?.debug('[NobleBLE] Splitting data into', chunks.length, 'chunks');
+  logger?.info('[NobleBLE] Splitting into chunks:', chunks.length);
 
   // Helper function to write a single chunk
-  const writeChunk = (chunk: Buffer, chunkIndex: number, totalChunks: number): Promise<void> => {
-    safeLog(
-      logger,
-      'debug',
-      `[NobleBLE] Writing chunk ${chunkIndex}/${totalChunks}, size:`,
-      chunk.length
-    );
-
-    return new Promise<void>((resolve, reject) => {
+  const writeChunk = (chunk: Buffer, chunkIndex: number): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
       writeCharacteristic.write(chunk, false, (error: string) => {
         if (error) {
-          safeLog(logger, 'error', `[NobleBLE] Write chunk ${chunkIndex} failed:`, error);
+          logger?.error(`[NobleBLE] Chunk ${chunkIndex} write failed:`, error);
           reject(new Error(error));
           return;
         }
-
-        safeLog(logger, 'debug', `[NobleBLE] Write chunk ${chunkIndex} successful`);
         resolve();
       });
     });
-  };
 
   // Helper function for delay
   const delay = (ms: number): Promise<void> =>
@@ -583,17 +544,14 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
     const chunkIndex = i + 1;
-    const totalChunks = chunks.length;
 
-    await writeChunk(chunk, chunkIndex, totalChunks);
+    await writeChunk(chunk, chunkIndex);
 
     // Small delay between chunks to avoid overwhelming the device
     if (i < chunks.length - 1) {
       await delay(10);
     }
   }
-
-  logger?.debug('[NobleBLE] All chunks written successfully');
 }
 
 // Subscribe to notifications
@@ -662,12 +620,6 @@ async function subscribeNotifications(
       // Set up data handler with proper packet reassembly
       notifyCharacteristic.on('data', (data: Buffer) => {
         try {
-          logger?.info('[NobleBLE] Received notification data (RAW):', {
-            deviceId,
-            dataLength: data.length,
-            hexData: `${data.toString('hex').substring(0, 64)}...`,
-          });
-
           // Get or initialize packet state for this device
           let packetState = devicePacketStates.get(deviceId);
           if (!packetState) {
@@ -687,23 +639,10 @@ async function subscribeNotifications(
             packetState.buffer = [...data.subarray(3)]; // Start with header data (skip first 3 bytes)
             packetState.packetCount = 1; // Reset counter for new message
             packetState.messageId = messageId;
-
-            logger?.info('[NobleBLE] Header chunk received:', {
-              deviceId,
-              packetCount: packetState.packetCount,
-              expectedLength: packetState.bufferLength,
-              headerSize: packetState.buffer.length,
-              firstBytes: data.subarray(0, 10).toString('hex'),
-            });
           } else {
             // Check if we have a valid packet state with expected length
             if (packetState.bufferLength === 0) {
-              logger?.error('[NobleBLE] Received data chunk without header, ignoring:', {
-                deviceId,
-                packetCount: packetState.packetCount,
-                chunkSize: data.length,
-                firstBytes: data.subarray(0, 10).toString('hex'),
-              });
+              logger?.error('[NobleBLE] Received data chunk without header, ignoring');
               return; // Ignore orphaned data chunks
             }
 
@@ -712,15 +651,6 @@ async function subscribeNotifications(
 
             // Append data chunk to buffer
             packetState.buffer = packetState.buffer.concat([...data]);
-
-            logger?.info('[NobleBLE] Data chunk received:', {
-              deviceId,
-              packetCount: packetState.packetCount,
-              chunkSize: data.length,
-              totalBufferSize: packetState.buffer.length,
-              expectedLength: packetState.bufferLength,
-              firstBytes: data.subarray(0, 10).toString('hex'),
-            });
           }
 
           // Check if we have received the complete packet
@@ -728,17 +658,15 @@ async function subscribeNotifications(
             const completeBuffer = Buffer.from(packetState.buffer);
             const hexString = completeBuffer.toString('hex');
 
-            logger?.info('[NobleBLE] Complete packet assembled:', {
+            logger?.info('[NobleBLE] Packet complete:', {
               deviceId,
-              totalPackets: packetState.packetCount,
-              totalLength: completeBuffer.length,
-              expectedLength: packetState.bufferLength + COMMON_HEADER_SIZE,
+              packets: packetState.packetCount,
+              length: completeBuffer.length,
             });
 
             // Reset packet state for next message
             packetState.bufferLength = 0;
             packetState.buffer = [];
-            // Reset packet count for next message
             packetState.packetCount = 0;
 
             // Send complete packet to callback
