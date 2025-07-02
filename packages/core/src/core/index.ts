@@ -343,7 +343,8 @@ const onCallDevice = async (
         // Check Device passphrase State
         const passphraseStateSafety = await device.checkPassphraseStateSafety(
           method.payload?.passphraseState,
-          method.payload?.useEmptyPassphrase
+          method.payload?.useEmptyPassphrase,
+          method.payload?.skipPassphraseCheck
         );
 
         // Double check, handles the special case of Touch/Pro
@@ -775,7 +776,7 @@ const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => 
   if (
     features?.passphrase_protection === true &&
     (method.payload.passphraseState == null || method.payload.passphraseState === '') &&
-    !method.payload.useEmptyPassphrase
+    (!method.payload.useEmptyPassphrase || !method.payload.skipPassphraseCheck)
   ) {
     DevicePool.clearDeviceCache(method.payload.connectId);
     throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);

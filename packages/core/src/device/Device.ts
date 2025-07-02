@@ -735,13 +735,21 @@ export class Device extends EventEmitter {
     return res.message;
   }
 
-  async checkPassphraseStateSafety(passphraseState?: string, useEmptyPassphraseState?: boolean) {
+  async checkPassphraseStateSafety(
+    passphraseState?: string,
+    useEmptyPassphraseState?: boolean,
+    skipPassphraseCheck?: boolean
+  ) {
     if (!this.features) return false;
     const { passphraseState: newPassphraseState, unlockedAttachPin } =
       await getPassphraseStateWithRefreshDeviceInfo(this, {
         expectPassphraseState: passphraseState,
         onlyMainPin: useEmptyPassphraseState,
       });
+
+    if (skipPassphraseCheck) {
+      return true;
+    }
 
     // Main wallet and unlock Attach Pin, throw safe error
     const mainWalletUseAttachPin = unlockedAttachPin && useEmptyPassphraseState;
