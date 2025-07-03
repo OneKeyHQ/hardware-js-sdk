@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { ChevronDown, ChevronUp, Edit, Copy } from 'lucide-react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/use-toast';
 import JsonEditor, { JsonEditorRef } from './JsonEditor';
 import UnifiedLogger, { UnifiedLogEntry } from './UnifiedLogger';

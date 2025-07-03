@@ -11,36 +11,26 @@ import './utils/shim.js';
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
-import { SDKProvider } from './components/providers/SDKProvider.jsx';
-import { I18nProvider } from './i18n/i18n-provider.jsx';
-import { CommandPalette } from './components/common/CommandPalette.jsx';
-import MainLayout from './components/layout/MainLayout.jsx';
-import { Toaster } from './components/ui/Toaster.jsx';
-import { useTheme } from './hooks/use-theme.js';
+import { SDKProvider } from './components/providers/SDKProvider';
+import { I18nProvider } from './i18n/i18n-provider';
+import { CommandPalette } from './components/common/CommandPalette';
+import MainLayout from './components/layout/MainLayout';
+import { Toaster } from './components/ui/Toaster';
+import { useTheme } from './hooks/use-theme';
 
 // Import existing route components
-import IndexPage from './routes/_index.jsx';
-import LogsPage from './routes/logs.jsx';
-import EmulatorPage from './routes/emulator.jsx';
+import IndexPage from './routes/_index';
+import LogsPage from './routes/logs';
+import EmulatorPage from './routes/emulator';
 
-import ChainsIndexPage from './routes/chains._index.jsx';
-import ChainMethodsIndexPage from './routes/chains.$chainId._index.jsx';
-import ChainMethodExecutePage from './routes/chains.$chainId.$methodName.jsx';
-import DeviceMethodsIndexPage from './routes/device-methods._index.jsx';
-import DeviceMethodExecutePage from './routes/device-methods.$methodName.jsx';
+import ChainsIndexPage from './routes/chains._index';
+import ChainMethodsIndexPage from './routes/chains.$chainId._index';
+import ChainMethodExecutePage from './routes/chains.$chainId.$methodName';
+import DeviceMethodsIndexPage from './routes/device-methods._index';
+import DeviceMethodExecutePage from './routes/device-methods.$methodName';
 
 // Import styles
 import './tailwind.css';
-
-// Declare global variable for TypeScript
-declare global {
-  interface Window {
-    __isClient: boolean;
-  }
-}
-
-// Mark as client-side rendering
-window.__isClient = true;
 
 // 根据环境确定 basename
 const basename = process.env.NODE_ENV === 'production' ? '/exampleV2' : '';

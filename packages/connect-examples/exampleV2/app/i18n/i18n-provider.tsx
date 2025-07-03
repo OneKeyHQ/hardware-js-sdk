@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { I18nextProvider, initReactI18next } from 'node_modules/react-i18next';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 import i18n, { i18nConfig } from './config';
 import LanguageDetector from 'i18next-browser-languagedetector';
 

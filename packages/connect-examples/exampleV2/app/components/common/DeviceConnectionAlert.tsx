@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '../ui/Card';
 import { useDeviceStore } from '../../store/deviceStore';
 

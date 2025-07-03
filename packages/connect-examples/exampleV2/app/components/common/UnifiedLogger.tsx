@@ -17,7 +17,7 @@ import {
   Inbox,
   FileText,
 } from 'lucide-react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/use-toast';
 import CollapsibleJsonViewer from './CollapsibleJsonViewer';
 

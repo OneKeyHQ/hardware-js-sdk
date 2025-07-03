@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { submitPin } from '../../services/hardwareService';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/Dialog';
 import { Button } from '../ui/Button';

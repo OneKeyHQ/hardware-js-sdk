@@ -10,7 +10,7 @@ import {
   useKBar,
   type ActionImpl,
 } from 'kbar';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { getSearchActions } from '../../data/searchActions';
 
 // 平台检测工具

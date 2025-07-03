@@ -8,7 +8,7 @@ import {
 } from './ui/dropdown-menu';
 import { Moon, Sun, Globe, ExternalLink } from 'lucide-react';
 import { useTheme } from '../hooks/use-theme';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { SearchTrigger } from './common/CommandPalette';
 import { SidebarTrigger } from './ui/sidebar';
 

@@ -14,7 +14,7 @@ import {
 import { Badge } from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
 import { Link, useLocation } from 'react-router-dom';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
 import {

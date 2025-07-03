@@ -1,5 +1,5 @@
 import { Card, CardContent } from '../components/ui/Card';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
 import { CheckCircle, XCircle, Usb, Wifi, Server, AlertCircle } from 'lucide-react';

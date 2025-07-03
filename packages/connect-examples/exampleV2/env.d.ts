@@ -8,7 +8,6 @@ declare global {
   // 添加 Buffer 到 window 对象的类型声明
   interface Window {
     Buffer: typeof Buffer;
-    __isClient: boolean;
   }
 
   // 环境变量类型

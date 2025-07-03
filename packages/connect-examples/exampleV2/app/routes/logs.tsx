@@ -7,7 +7,7 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { PageLayout } from '../components/common/PageLayout';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   Dialog,

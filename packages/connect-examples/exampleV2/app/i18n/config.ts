@@ -1,5 +1,5 @@
 import i18n, { InitOptions, use } from 'i18next';
-import { initReactI18next } from 'node_modules/react-i18next';
+import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import { locales } from './locales';
 
