@@ -118,10 +118,6 @@ module.exports = async (env, argv) => {
               ignore: ['**/index.html'], // 忽略 index.html，因为 HtmlWebpackPlugin 会处理它
             },
           },
-          {
-            from: 'app/assets',
-            to: 'assets', // This will copy to dist/assets
-          },
         ],
       }),
       new webpack.ProvidePlugin({
