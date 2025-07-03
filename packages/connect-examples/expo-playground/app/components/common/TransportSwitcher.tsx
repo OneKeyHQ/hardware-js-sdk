@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
 import { SDKUtils } from '../../utils/hardwareInstance';

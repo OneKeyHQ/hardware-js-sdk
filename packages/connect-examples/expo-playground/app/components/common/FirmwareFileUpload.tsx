@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Upload, File, X, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';

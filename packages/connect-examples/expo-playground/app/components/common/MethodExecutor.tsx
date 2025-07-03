@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useState, useMemo } from 'react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/use-toast';
 import { useMethodParameters } from '../../hooks/useMethodParameters';
 import { useMethodExecution } from '../../hooks/useMethodExecution';

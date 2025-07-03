@@ -1,5 +1,5 @@
 import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/Dialog';
 import { Alert, AlertDescription } from '../ui/Alert';

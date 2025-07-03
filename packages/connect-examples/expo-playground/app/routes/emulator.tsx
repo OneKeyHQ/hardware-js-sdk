@@ -14,7 +14,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { useState } from 'react';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../components/common/PageLayout';
 

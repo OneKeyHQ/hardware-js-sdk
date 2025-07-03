@@ -1,6 +1,6 @@
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { useTranslation } from 'node_modules/react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Search, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useDeviceStore } from '../../store/deviceStore';
 import { searchDevices } from '../../services/hardwareService';
