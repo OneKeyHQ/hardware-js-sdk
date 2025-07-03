@@ -73,12 +73,12 @@ jobs:
         run: yarn build
       - name: Build New Example
         run: COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn build
-        working-directory: packages/connect-examples/new-example
+        working-directory: packages/connect-examples/exampleV2
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: new-example-build
-          path: packages/connect-examples/new-example/dist
+          name: exampleV2-build
+          path: packages/connect-examples/exampleV2/dist
 
   deploy:
     runs-on: ubuntu-latest
@@ -100,8 +100,8 @@ jobs:
       - name: Download New Example Artifact
         uses: actions/download-artifact@v4
         with:
-          name: new-example-build
-          path: deploy/new-example
+          name: exampleV2-build
+          path: deploy/exampleV2
       - name: Setup Expo as Root and create routing
         run: |
           # Create expo-example subdirectory and copy all build files
@@ -144,7 +144,7 @@ jobs:
       - name: Add SPA fallback for client-side routing
         run: |
           # 为各子应用创建简单的 SPA 回退 404.html
-          cp deploy/new-example/index.html deploy/new-example/404.html
+          cp deploy/exampleV2/index.html deploy/exampleV2/404.html
           cp deploy/expo-example/index.html deploy/expo-example/404.html
 
           # 复制统一的路由分发器模板到根目录

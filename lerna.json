@@ -2,7 +2,7 @@
   "packages": [
     "packages/*",
     "packages/connect-examples/expo-example",
-    "packages/connect-examples/new-example"
+    "packages/connect-examples/exampleV2"
   ],
   "npmClient": "yarn",
   "useWorkspaces": true,

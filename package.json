@@ -12,7 +12,7 @@
       "packages/*",
       "packages/connect-examples/expo-example",
       "packages/connect-examples/electron-example",
-      "packages/connect-examples/new-example"
+      "packages/connect-examples/exampleV2"
     ],
     "nohoist": [
       "**/electron",
@@ -37,7 +37,7 @@
     "example:web": "CONNECT_SRC=https://localhost:8087 && cd ./packages/connect-examples/expo-example && yarn start",
     "example:desktop": "cd ./packages/connect-examples/electron-example && yarn dev",
     "build:example:desktop": "cd ./packages/connect-examples/electron-example && yarn make",
-    "example:new": "cd ./packages/connect-examples/new-example && yarn start",
+    "example:v2": "cd ./packages/connect-examples/exampleV2 && yarn start",
     "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
     "dev:ble": "cd ./packages/hd-ble-sdk && yarn dev",
     "dev:common": "cd ./packages/hd-common-connect-sdk && yarn dev",
