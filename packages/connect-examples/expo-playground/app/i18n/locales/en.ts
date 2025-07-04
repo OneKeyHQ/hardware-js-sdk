@@ -578,20 +578,10 @@ export const en = {
       },
       devices: {
         pro: {
-          description: 'Full-featured hardware wallet with touchscreen',
-          features: {
-            touchscreen: 'Touchscreen interface',
-            fullFeature: 'Complete functionality',
-            modern: 'Modern design'
-          }
+          description: 'Full-featured hardware wallet with touchscreen'
         },
         classic: {
-          description: 'Essential hardware wallet with button interface',
-          features: {
-            buttonBased: 'Button-based operation',
-            essential: 'Essential features only',
-            reliable: 'Proven reliability'
-          }
+          description: 'Essential hardware wallet with button interface'
         }
       },
       device: {

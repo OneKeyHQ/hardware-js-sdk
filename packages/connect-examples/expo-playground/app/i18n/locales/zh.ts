@@ -558,20 +558,10 @@ export const zh = {
       },
       devices: {
         pro: {
-          description: '功能齐全的硬件钱包，配备触摸屏',
-          features: {
-            touchscreen: '触摸屏界面',
-            fullFeature: '完整功能',
-            modern: '现代设计'
-          }
+          description: '功能齐全的硬件钱包，配备触摸屏'
         },
         classic: {
-          description: '基本款硬件钱包，采用按键界面',
-          features: {
-            buttonBased: '按键操作',
-            essential: '核心功能',
-            reliable: '稳定可靠'
-          }
+          description: '基本款硬件钱包，采用按键界面'
         }
       },
       device: {

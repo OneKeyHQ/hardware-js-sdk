@@ -183,11 +183,7 @@ const EmulatorPage: React.FC = () => {
       name: 'OneKey Pro',
       description: t('emulator.devices.pro.description'),
       image: proWhiteImg,
-      features: [
-        t('emulator.devices.pro.features.touchscreen'),
-        t('emulator.devices.pro.features.fullFeature'),
-        t('emulator.devices.pro.features.modern'),
-      ],
+      features: [],
       commands: {
         vnc: 'bash build-emu.sh pro-emu',
         x11: 'bash build-emu.sh pro-emu --x11',
@@ -198,11 +194,7 @@ const EmulatorPage: React.FC = () => {
       name: 'OneKey Classic 1s',
       description: t('emulator.devices.classic.description'),
       image: classic1sImg,
-      features: [
-        t('emulator.devices.classic.features.buttonBased'),
-        t('emulator.devices.classic.features.essential'),
-        t('emulator.devices.classic.features.reliable'),
-      ],
+      features: [],
       commands: {
         vnc: 'bash build-emu.sh 1s-emu',
         x11: 'bash build-emu.sh 1s-emu --x11',
@@ -295,28 +287,28 @@ const EmulatorPage: React.FC = () => {
           className="flex-1 overflow-y-auto"
         >
           {/* 现代化的页面标题 */}
-          <motion.div variants={itemVariants} className="text-center py-6">
+          <motion.div variants={itemVariants} className="text-center py-4">
             <div className="max-w-4xl mx-auto">
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-3">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
                 {t('emulator.title')}
               </h1>
-              <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl mx-auto">
+              <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl mx-auto">
                 {t('emulator.subtitle')}
               </p>
             </div>
           </motion.div>
 
           {/* 优雅的进度指示器 */}
-          <motion.div variants={itemVariants} className="pb-8">
+          <motion.div variants={itemVariants} className="pb-6">
             <div className="max-w-4xl mx-auto">
-              <div className="flex justify-between items-start mb-6">
+              <div className="flex justify-between items-start mb-4">
                 {steps.map((step, index) => {
                   const Icon = step.icon;
                   return (
                     <div key={step.id} className="flex flex-col items-center flex-1 relative">
                       <motion.div
                         className={`
-                          w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-500 mb-3 relative z-10
+                          w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all duration-500 mb-2 relative z-10
                           ${
                             step.status === 'completed'
                               ? 'bg-slate-900 dark:bg-slate-100 border-slate-900 dark:border-slate-100 text-white dark:text-slate-900 shadow-lg'
@@ -329,9 +321,9 @@ const EmulatorPage: React.FC = () => {
                         transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                       >
                         {step.status === 'completed' ? (
-                          <CheckCircle className="h-5 w-5" />
+                          <CheckCircle className="h-4 w-4" />
                         ) : (
-                          <Icon className="h-5 w-5" />
+                          <Icon className="h-4 w-4" />
                         )}
                       </motion.div>
                       <div className="text-center">
@@ -356,7 +348,7 @@ const EmulatorPage: React.FC = () => {
                       </div>
                       {index < steps.length - 1 && (
                         <motion.div
-                          className={`absolute top-6 left-1/2 w-full h-px ${
+                          className={`absolute top-5 left-1/2 w-full h-px ${
                             currentStep > index
                               ? 'bg-slate-900 dark:bg-slate-100'
                               : 'bg-slate-200 dark:bg-slate-700'
@@ -374,17 +366,17 @@ const EmulatorPage: React.FC = () => {
 
               {/* 当前步骤信息和资源链接 */}
               <div className="text-center">
-                <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
+                <p className="text-slate-500 dark:text-slate-400 text-sm mb-3">
                   第 {currentStep + 1} 步，共 {steps.length} 步
                 </p>
 
                 {/* 开发资源快捷链接 */}
-                <div className="inline-flex items-center bg-slate-50 dark:bg-slate-800/50 rounded-lg px-4 py-2 space-x-4">
+                <div className="inline-flex items-center bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-700/50 rounded-lg px-3 py-2 space-x-3 border border-slate-200/50 dark:border-slate-600/50">
                   <button
                     onClick={() =>
                       window.open('https://github.com/Johnwanzi/onekey-docker', '_blank')
                     }
-                    className="inline-flex items-center space-x-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                    className="inline-flex items-center space-x-1.5 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors font-medium"
                   >
                     <GitBranch className="h-4 w-4" />
                     <span>Git仓库</span>
@@ -397,7 +389,7 @@ const EmulatorPage: React.FC = () => {
                         description: t('emulator.docInProgressDesc'),
                       });
                     }}
-                    className="inline-flex items-center space-x-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                    className="inline-flex items-center space-x-1.5 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors font-medium"
                   >
                     <Code className="h-4 w-4" />
                     <span>文档</span>
@@ -408,7 +400,9 @@ const EmulatorPage: React.FC = () => {
           </motion.div>
 
           {/* 步骤内容 - 现代化设计 */}
-          <div className="relative overflow-hidden min-h-[400px] max-w-4xl mx-auto">
+          <div className={`relative overflow-hidden max-w-4xl mx-auto ${
+            currentStep === 3 ? 'min-h-[600px]' : currentStep === 2 ? 'min-h-[450px]' : 'min-h-[350px]'
+          }`}>
             <AnimatePresence custom={direction}>
               {/* 步骤 0: 下载设置脚本 */}
               {currentStep === 0 && (
@@ -533,11 +527,11 @@ const EmulatorPage: React.FC = () => {
                               </motion.div>
                             )}
 
-                            <div className="text-center space-y-3">
+                            <div className="text-center space-y-2">
                               <img
                                 src={device.image}
                                 alt={device.name}
-                                className="h-16 w-auto mx-auto object-contain"
+                                className="h-14 w-auto mx-auto object-contain"
                               />
                               <div>
                                 <h3 className="font-semibold text-sm">{device.name}</h3>
@@ -545,24 +539,13 @@ const EmulatorPage: React.FC = () => {
                                   {device.description}
                                 </p>
                               </div>
-                              <div className="space-y-1">
-                                {device.features.slice(0, 2).map((feature, index) => (
-                                  <div
-                                    key={index}
-                                    className="flex items-center justify-center space-x-1 text-xs"
-                                  >
-                                    <CheckCircle className="h-2 w-2 text-slate-600 dark:text-slate-400" />
-                                    <span>{feature}</span>
-                                  </div>
-                                ))}
-                              </div>
                             </div>
                           </motion.div>
                         ))}
                       </div>
 
                       {/* 明确的下一步按钮 */}
-                      <div className="flex justify-between items-center pt-4">
+                      <div className="flex justify-between items-center pt-3">
                         <div className="text-xs text-muted-foreground">
                           Select a device type to continue
                         </div>
@@ -619,10 +602,10 @@ const EmulatorPage: React.FC = () => {
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {/* VNC 模式 */}
                         <motion.div
-                          className="border border-border rounded-lg p-4 space-y-3"
+                          className="border border-border rounded-lg p-3 space-y-2"
                           whileHover={{ scale: 1.01 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                         >
@@ -665,7 +648,7 @@ const EmulatorPage: React.FC = () => {
 
                         {/* X11 模式 */}
                         <motion.div
-                          className="border border-border rounded-lg p-4 space-y-3"
+                          className="border border-border rounded-lg p-3 space-y-2"
                           whileHover={{ scale: 1.01 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                         >
@@ -769,10 +752,10 @@ const EmulatorPage: React.FC = () => {
                       </div>
 
                       <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-                        <h4 className="font-semibold mb-3 text-sm text-slate-900 dark:text-slate-100 text-center">
+                        <h4 className="font-semibold mb-2 text-sm text-slate-900 dark:text-slate-100 text-center">
                           {t('emulator.nextSteps')}
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                           {/* 第一步 */}
                           <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
                             <div className="flex items-center space-x-2 mb-2">
