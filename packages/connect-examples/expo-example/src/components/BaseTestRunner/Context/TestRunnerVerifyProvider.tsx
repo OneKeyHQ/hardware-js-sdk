@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { selectAtom } from 'jotai/utils';
-import { VerifyState } from '../types';
+import { TestCaseDataWithKey, VerifyState } from '../types';
 
 export type ItemVerifyState = { verify: VerifyState; error?: string; ext?: any };
 
@@ -28,3 +28,11 @@ export const setItemVerifyStateAtom = atom(
     }));
   }
 );
+
+// 失败任务
+const failedTasksAtom = atom<TestCaseDataWithKey[]>([]);
+export const setFailedTasksAtom = atom(null, (get, set, failedTasks: TestCaseDataWithKey[]) => {
+  set(failedTasksAtom, failedTasks);
+});
+
+export const getFailedTasksAtom = atom(get => get(failedTasksAtom));

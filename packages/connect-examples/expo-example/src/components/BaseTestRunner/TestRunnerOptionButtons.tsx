@@ -1,26 +1,50 @@
-import { useContext } from 'react';
+import React, { useContext } from 'react';
 import { useIntl } from 'react-intl';
+import { useAtomValue } from 'jotai';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
 import { Button } from '../ui/Button';
+import { getFailedTasksAtom } from './Context/TestRunnerVerifyProvider';
+
+function ReportFailedTasks<T>({ onRetryFailed }: { onRetryFailed?: () => void }) {
+  const failedTasks = useAtomValue(getFailedTasksAtom);
+  const { runnerState } = useContext(TestRunnerContext);
+
+  if (
+    onRetryFailed &&
+    failedTasks?.length &&
+    (runnerState === 'done' || runnerState === 'stopped')
+  ) {
+    return (
+      <Button variant="destructive" onPress={onRetryFailed}>
+        重试失败任务
+      </Button>
+    );
+  }
+
+  return null;
+}
 
 export default function TestRunnerOptionButtons({
   onStop: stop,
   onStart: start,
+  onRetryFailed,
 }: {
   onStop: () => void;
   onStart: () => void;
+  onRetryFailed?: () => void;
 }) {
   const runnerInfo = useContext(TestRunnerContext);
   const intl = useIntl();
 
   return (
     <>
-      {runnerInfo.runnerDone !== false ? (
+      {runnerInfo.runnerState !== 'running' ? (
         <Button variant="primary" onPress={start}>
           {intl.formatMessage({ id: 'action__start_test' })}
         </Button>
       ) : null}
-      {runnerInfo.runnerDone === false ? (
+      <ReportFailedTasks onRetryFailed={onRetryFailed} />
+      {runnerInfo.runnerState === 'running' ? (
         <Button variant="destructive" onPress={stop}>
           {intl.formatMessage({ id: 'action__stop_test' })}
         </Button>

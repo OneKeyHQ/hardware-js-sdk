@@ -251,7 +251,7 @@ function ExecuteView() {
   const currentPassphrase = useRef<string | undefined>('');
   const currentPassphraseState = useRef<string | undefined>('');
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
       if (hardwareUiEventListener) {
         sdk.off(UI_EVENT, hardwareUiEventListener);
@@ -458,11 +458,15 @@ function ExecuteView() {
           value={showOnOneKey}
           onToggle={setShowOnOneKey}
         />
-        <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+        <TestRunnerOptionButtons
+          onStop={stopTest}
+          onStart={beginTest}
+          onRetryFailed={retryFailedTasks}
+        />
         <ExportReportView />
       </Stack>
     ),
-    [beginTest, intl, mnemonic, passphraseInputMemo, showOnOneKey, stopTest]
+    [beginTest, intl, mnemonic, passphraseInputMemo, retryFailedTasks, showOnOneKey, stopTest]
   );
 
   return contentMemo;

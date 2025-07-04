@@ -1,6 +1,6 @@
 import { memo, useContext, useEffect, useMemo, useCallback } from 'react';
 
-import { Stack, Text, XStack } from 'tamagui';
+import { Stack, Text, XStack, YStack } from 'tamagui';
 import { useAtomValue } from 'jotai';
 import { FlatList } from 'react-native';
 
@@ -93,11 +93,13 @@ export function TestRunnerResultView({ renderResultView }: TestRunnerResultViewP
   );
 
   return (
-    <FlatList<TestCaseDataWithKey>
-      data={itemValues}
-      renderItem={renderItem}
-      keyExtractor={item => item.$key}
-      contentContainerStyle={{ width: '100%' }}
-    />
+    <YStack>
+      <FlatList<TestCaseDataWithKey>
+        data={itemValues}
+        renderItem={renderItem}
+        keyExtractor={item => item.$key}
+        contentContainerStyle={{ width: '100%' }}
+      />
+    </YStack>
   );
 }
