@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(node:*)",
+      "Bash(npm --version)",
+      "Bash(rm:*)",
+      "Bash(yarn install:*)",
+      "Bash(yarn start:*)",
+      "Bash(yarn run:*)",
+      "Bash(yarn --cwd /Users/caikaisheng/Documents/GitHub/wabicai-js-sdk/packages/connect-examples/expo-playground run)",
+      "Bash(yarn --cwd /Users/caikaisheng/Documents/GitHub/wabicai-js-sdk/packages/connect-examples/expo-playground start)",
+      "Bash(yarn:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)"
+    ],
+    "deny": []
+  }
+}

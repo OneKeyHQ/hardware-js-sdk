@@ -511,13 +511,98 @@ export const zh = {
     emulator: {
       title: '硬件模拟器',
       subtitle: '使用 Docker 快速启动 OneKey 硬件模拟器进行开发测试',
+      hero: {
+        title: '无需物理设备即可测试硬件钱包',
+        subtitle: '5分钟内开始编码',
+        promise: '快速设置 • 无需硬件 • 完整功能'
+      },
+      flow: {
+        browser: '浏览器',
+        docker: 'Docker',
+        virtual: '虚拟设备',
+        app: '您的应用'
+      },
+      progressTitle: '设置进度',
+      steps: {
+        title: '简单的4步流程',
+        subtitle: '几分钟内启动模拟器',
+        setup: {
+          title: '下载脚本',
+          description: '克隆模拟器代码仓库',
+          longDescription: '首先，我们需要下载模拟器设置脚本。此仓库包含运行 OneKey 硬件模拟器所需的所有 Docker 配置和启动脚本。'
+        },
+        device: {
+          title: '选择设备',
+          description: '选择要模拟的设备类型'
+        },
+        launch: {
+          title: '启动模拟器',
+          description: '启动选择的模拟器'
+        },
+        connect: {
+          title: '连接应用',
+          description: '准备开始开发'
+        }
+      },
+      step1: {
+        title: '下载脚本',
+        description: '一行命令克隆模拟器仓库'
+      },
+      step2: {
+        title: '选择设备',
+        description: '选择 OneKey Pro 或 Classic 1s 模拟器'
+      },
+      step3: {
+        title: '开始编码',
+        description: '连接到您的应用并开始开发'
+      },
+      devices: {
+        pro: {
+          description: '功能齐全的硬件钱包，配备触摸屏',
+          features: {
+            touchscreen: '触摸屏界面',
+            fullFeature: '完整功能',
+            modern: '现代设计'
+          }
+        },
+        classic: {
+          description: '基本款硬件钱包，采用按键界面',
+          features: {
+            buttonBased: '按键操作',
+            essential: '核心功能',
+            reliable: '稳定可靠'
+          }
+        }
+      },
+      device: {
+        pro: {
+          description: '功能齐全的硬件钱包，配备触摸屏'
+        },
+        classic: {
+          description: '基本款硬件钱包，采用按键界面'
+        }
+      },
       quickStart: '快速开始',
       cloneRepo: '克隆 Git 仓库',
+      cloneRepository: '克隆代码仓库',
       startEmulator: '启动模拟器',
       connectToApp: '连接到应用',
       downloadScript: '下载模拟器脚本',
       scriptDescription: '包含所有平台的一键启动脚本',
-      vncMode: 'VNC 模式（推荐）',
+      startCommands: '启动',
+      selectMode: '选择您偏好的连接模式',
+      launchingDevice: '正在启动',
+      selectLaunchMode: '请在下方选择您偏好的启动模式',
+      recommended: '推荐',
+      copied: '已复制！',
+      copiedDesc: '命令已复制到剪贴板',
+      copyFailed: '复制命令失败',
+      copyFailedDesc: '无法复制到剪贴板',
+      copyCommand: '复制命令',
+      congratulations: '恭喜！',
+      emulatorReady: '您的模拟器已准备就绪，可以开始开发',
+      nextSteps: '后续步骤',
+      vncMode: 'VNC 模式',
       vncDescription: '所有平台通用，启动后访问 http://localhost:6088/vnc.html',
       x11Mode: 'X11 模式',
       x11Description: '仅限 Linux，原生窗口显示',
@@ -528,8 +613,11 @@ export const zh = {
         step3: '开始使用完整的硬件钱包功能进行开发测试',
       },
       developmentResources: '开发资源',
+      resourcesDescription: '开发相关的有用链接和文档',
       gitRepo: 'Git 仓库',
+      gitRepoDesc: '源代码和设置脚本',
       documentation: '详细文档',
+      docDesc: '完整的开发指南',
       comingSoon: '即将发布',
       docInProgress: '文档正在完善中',
       docInProgressDesc: '详细文档即将发布，敬请期待',

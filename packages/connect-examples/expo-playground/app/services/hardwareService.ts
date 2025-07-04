@@ -353,7 +353,7 @@ export async function searchDevices(): Promise<ApiResponse> {
 
       logInfo('promptWebDeviceAccess completed', {
         success: promptResponse.success,
-        hasDevice: promptResponse.success ? !!promptResponse.payload.device : false,
+        payload: promptResponse.payload,
       });
 
       if (promptResponse.success && promptResponse.payload.device) {
@@ -364,7 +364,10 @@ export async function searchDevices(): Promise<ApiResponse> {
       } else {
         return {
           success: false,
-          payload: { error: 'No device selected or permission denied' },
+          payload: {
+            error:
+              (promptResponse.payload as any).error || 'No device selected or permission denied',
+          },
         } as Unsuccessful;
       }
     } catch (webUsbError) {

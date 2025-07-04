@@ -1,349 +1,854 @@
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
-import {
-  GitBranch,
-  ExternalLink,
-  Copy,
-  CheckCircle,
-  Monitor,
-  Smartphone,
-  Settings,
-  Code,
-  Zap,
-  Eye,
-} from 'lucide-react';
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useToast } from '../hooks/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Monitor,
+  Container,
+  Globe,
+  Terminal,
+  CheckCircle,
+  Copy,
+  ExternalLink,
+  GitBranch,
+  Code,
+  ArrowRight,
+  Package,
+  Rocket,
+  Shield,
+  ChevronLeft,
+  Play,
+  Badge,
+} from 'lucide-react';
+
+import { Button } from '../components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { PageLayout } from '../components/common/PageLayout';
+import { Breadcrumb } from '../components/ui/Breadcrumb';
+import { useToast } from '../hooks/use-toast';
 
 // 导入设备图片
 import proWhiteImg from '../assets/deviceMockup/pro-white.png';
 import classic1sImg from '../assets/deviceMockup/classic1s.png';
+import Confetti from 'react-confetti';
 
-export default function EmulatorPage() {
+// 优化的动画配置
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.4,
+      ease: [0.4, 0, 0.2, 1],
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -16,
+    transition: {
+      duration: 0.3,
+      ease: [0.4, 0, 1, 1],
+    },
+  },
+};
+
+const cardHoverVariants = {
+  hover: {
+    scale: 1.01,
+    y: -2,
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 25,
+    },
+  },
+  tap: {
+    scale: 0.99,
+  },
+};
+
+const slideVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 50 : -50,
+    opacity: 0,
+  }),
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    zIndex: 0,
+    x: direction < 0 ? 50 : -50,
+    opacity: 0,
+  }),
+};
+
+// 模拟器步骤类型
+interface EmulatorStep {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  status: 'pending' | 'active' | 'completed';
+}
+
+// 设备类型
+interface DeviceType {
+  id: 'pro' | 'classic';
+  name: string;
+  description: string;
+  image: string;
+  features: string[];
+  commands: {
+    vnc: string;
+    x11: string;
+  };
+}
+
+const EmulatorPage: React.FC = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
-  const [hoveredDevice, setHoveredDevice] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  const copyToClipboard = async (text: string, commandType: string) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [selectedDevice, setSelectedDevice] = useState<'pro' | 'classic' | null>(null);
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [direction, setDirection] = useState(0);
+
+  // 优化的步骤配置 - 减少绿色使用
+  const steps: EmulatorStep[] = [
+    {
+      id: 'setup',
+      title: t('emulator.steps.setup.title'),
+      description: t('emulator.steps.setup.description'),
+      icon: Package,
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-50 dark:bg-blue-950/50',
+      borderColor: 'border-blue-200 dark:border-blue-800',
+      status: currentStep === 0 ? 'active' : currentStep > 0 ? 'completed' : 'pending',
+    },
+    {
+      id: 'device',
+      title: t('emulator.steps.device.title'),
+      description: t('emulator.steps.device.description'),
+      icon: Monitor,
+      color: 'text-indigo-600 dark:text-indigo-400',
+      bgColor: 'bg-indigo-50 dark:bg-indigo-950/50',
+      borderColor: 'border-indigo-200 dark:border-indigo-800',
+      status: currentStep === 1 ? 'active' : currentStep > 1 ? 'completed' : 'pending',
+    },
+    {
+      id: 'launch',
+      title: t('emulator.steps.launch.title'),
+      description: t('emulator.steps.launch.description'),
+      icon: Rocket,
+      color: 'text-purple-600 dark:text-purple-400',
+      bgColor: 'bg-purple-50 dark:bg-purple-950/50',
+      borderColor: 'border-purple-200 dark:border-purple-800',
+      status: currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : 'pending',
+    },
+    {
+      id: 'connect',
+      title: t('emulator.steps.connect.title'),
+      description: t('emulator.steps.connect.description'),
+      icon: Shield,
+      color: 'text-teal-600 dark:text-teal-400',
+      bgColor: 'bg-teal-50 dark:bg-teal-950/50',
+      borderColor: 'border-teal-200 dark:border-teal-800',
+      status: currentStep === 3 ? 'active' : currentStep > 3 ? 'completed' : 'pending',
+    },
+  ];
+
+  // 设备配置
+  const devices: DeviceType[] = [
+    {
+      id: 'pro',
+      name: 'OneKey Pro',
+      description: t('emulator.devices.pro.description'),
+      image: proWhiteImg,
+      features: [
+        t('emulator.devices.pro.features.touchscreen'),
+        t('emulator.devices.pro.features.fullFeature'),
+        t('emulator.devices.pro.features.modern'),
+      ],
+      commands: {
+        vnc: 'bash build-emu.sh pro-emu',
+        x11: 'bash build-emu.sh pro-emu --x11',
+      },
+    },
+    {
+      id: 'classic',
+      name: 'OneKey Classic 1s',
+      description: t('emulator.devices.classic.description'),
+      image: classic1sImg,
+      features: [
+        t('emulator.devices.classic.features.buttonBased'),
+        t('emulator.devices.classic.features.essential'),
+        t('emulator.devices.classic.features.reliable'),
+      ],
+      commands: {
+        vnc: 'bash build-emu.sh 1s-emu',
+        x11: 'bash build-emu.sh 1s-emu --x11',
+      },
+    },
+  ];
+
+  const cloneCommand = 'git clone https://github.com/Johnwanzi/onekey-docker.git';
+
+  // 回退到上一步
+  const goBack = () => {
+    if (currentStep > 0) {
+      setDirection(-1);
+      setCurrentStep(currentStep - 1);
+      if (currentStep === 1) {
+        setSelectedDevice(null);
+      }
+    }
+  };
+
+  // 继续到下一步（无需复制）
+  const continueToNext = () => {
+    setDirection(1);
+    if (currentStep === 0) {
+      setCurrentStep(1);
+    } else if (currentStep === 1 && selectedDevice) {
+      setCurrentStep(2);
+    }
+  };
+
+  // 复制命令到剪贴板
+  const copyToClipboard = async (text: string, commandId: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedCommand(commandType);
+      setCopiedCommand(commandId);
       toast({
-        title: '已复制',
-        description: '命令已复制到剪贴板',
+        title: t('emulator.copied'),
+        description: t('emulator.copiedDesc'),
       });
+
+      // 根据命令类型推进步骤
+      if ((commandId.includes('vnc') || commandId.includes('x11')) && currentStep === 2) {
+        setTimeout(() => {
+          setDirection(1);
+          setCurrentStep(3);
+          setShowConfetti(true);
+          setTimeout(() => setShowConfetti(false), 3000);
+        }, 500);
+      }
+
       setTimeout(() => setCopiedCommand(null), 2000);
     } catch (error) {
       toast({
-        title: 'Copy failed',
-        description: '请手动复制命令',
+        title: t('emulator.copyFailed'),
+        description: t('emulator.copyFailedDesc'),
         variant: 'destructive',
       });
     }
   };
 
-  const commands = {
-    clone: 'git clone https://github.com/Johnwanzi/onekey-docker.git',
-    proVnc: 'bash build-emu.sh pro-emu',
-    classicVnc: 'bash build-emu.sh 1s-emu',
-    proX11: 'bash build-emu.sh pro-emu --x11',
-    classicX11: 'bash build-emu.sh 1s-emu --x11',
+  // 设备选择处理
+  const handleDeviceSelect = (deviceId: 'pro' | 'classic') => {
+    setSelectedDevice(deviceId);
   };
-
-  const CommandBlock = ({
-    command,
-    commandKey,
-    title,
-    description,
-  }: {
-    command: string;
-    commandKey: string;
-    title: string;
-    description?: string;
-  }) => (
-    <div className="bg-gray-50 dark:bg-gray-700/30 rounded-md p-3 border border-gray-200 dark:border-gray-600/50">
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</span>
-          {description && (
-            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
-              {description.includes('http://localhost:6088/vnc.html') ? (
-                <>
-                  {description.split('http://localhost:6088/vnc.html')[0]}
-                  <a
-                    href="http://localhost:6088/vnc.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline"
-                  >
-                    http://localhost:6088/vnc.html
-                  </a>
-                  {description.split('http://localhost:6088/vnc.html')[1]}
-                </>
-              ) : (
-                description
-              )}
-            </p>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 hover:bg-gray-100 dark:hover:bg-gray-600/50"
-          onClick={() => copyToClipboard(command, commandKey)}
-        >
-          {copiedCommand === commandKey ? (
-            <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
-          ) : (
-            <Copy className="h-3.5 w-3.5 text-gray-500 dark:text-gray-300" />
-          )}
-        </Button>
-      </div>
-      <code className="text-xs font-mono text-gray-800 dark:text-gray-200 break-all block bg-white dark:bg-gray-800/50 p-2 rounded border border-gray-200 dark:border-gray-600/30">
-        {command}
-      </code>
-    </div>
-  );
 
   return (
     <PageLayout fixedHeight={true}>
+      {/* 庆祝动画 */}
+      {showConfetti && (
+        <div className="fixed inset-0 pointer-events-none z-50">
+          <Confetti
+            width={window.innerWidth}
+            height={window.innerHeight}
+            recycle={false}
+            numberOfPieces={200}
+          />
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col px-4 py-3 min-h-0 h-full">
-        {/* 页面标题 */}
-        <div className="flex-shrink-0 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-700/60 border border-gray-200 dark:border-gray-600/50">
-              <Monitor className="h-4 w-4 text-gray-600 dark:text-gray-200" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-50">
+        {/* 面包屑导航 */}
+        <div className="flex-shrink-0 mb-3">
+          <Breadcrumb items={[{ label: t('emulator.title'), icon: Container }]} />
+        </div>
+
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="flex-1 overflow-y-auto"
+        >
+          {/* 现代化的页面标题 */}
+          <motion.div variants={itemVariants} className="text-center py-6">
+            <div className="max-w-4xl mx-auto">
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-3">
                 {t('emulator.title')}
               </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-300">{t('emulator.subtitle')}</p>
+              <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl mx-auto">
+                {t('emulator.subtitle')}
+              </p>
             </div>
-          </div>
-        </div>
+          </motion.div>
 
-        {/* 主要内容 - 填充剩余空间 */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="pb-4">
-            {/* 快速开始 */}
-            <Card className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-600/50">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-gray-50 text-lg">
-                  <Zap className="h-4 w-4 text-blue-500" />
-                  {t('emulator.quickStart')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {/* 步骤1: 克隆仓库 */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
-                      1
-                    </div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                      {t('emulator.cloneRepo')}
-                    </h3>
-                  </div>
-                  <CommandBlock
-                    command={commands.clone}
-                    commandKey="clone"
-                    title={t('emulator.downloadScript')}
-                    description={t('emulator.scriptDescription')}
-                  />
-                </div>
-
-                {/* 步骤2: 选择模拟器类型 */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
-                      2
-                    </div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                      {t('emulator.startEmulator')}
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* OneKey Pro */}
-                    <div className="space-y-2 relative">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Monitor className="h-3.5 w-3.5 text-gray-500 dark:text-gray-300" />
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          OneKey Pro
-                        </span>
-                        <div className="relative">
-                          <Eye
-                            className="h-3.5 w-3.5 text-gray-400 dark:text-gray-400 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                            onMouseEnter={() => setHoveredDevice('pro')}
-                            onMouseLeave={() => setHoveredDevice(null)}
-                          />
-                          {/* 设备图片悬浮显示 */}
-                          {hoveredDevice === 'pro' && (
-                            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50 bg-white dark:bg-gray-700 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 w-24 h-32">
-                              <img
-                                src={proWhiteImg}
-                                alt="OneKey Pro"
-                                className="w-full h-full object-contain"
-                              />
-                              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white dark:bg-gray-700 border-r border-b border-gray-200 dark:border-gray-600 rotate-45"></div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <CommandBlock
-                        command={commands.proVnc}
-                        commandKey="proVnc"
-                        title={t('emulator.vncMode')}
-                        description={t('emulator.vncDescription')}
-                      />
-
-                      <CommandBlock
-                        command={commands.proX11}
-                        commandKey="proX11"
-                        title={t('emulator.x11Mode')}
-                        description={t('emulator.x11Description')}
-                      />
-                    </div>
-
-                    {/* OneKey Classic 1s */}
-                    <div className="space-y-2 relative">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Smartphone className="h-3.5 w-3.5 text-gray-500 dark:text-gray-300" />
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          OneKey Classic 1s
-                        </span>
-                        <div className="relative">
-                          <Eye
-                            className="h-3.5 w-3.5 text-gray-400 dark:text-gray-400 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                            onMouseEnter={() => setHoveredDevice('classic')}
-                            onMouseLeave={() => setHoveredDevice(null)}
-                          />
-                          {/* 设备图片悬浮显示 */}
-                          {hoveredDevice === 'classic' && (
-                            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50 bg-white dark:bg-gray-700 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 w-24 h-32">
-                              <img
-                                src={classic1sImg}
-                                alt="OneKey Classic 1s"
-                                className="w-full h-full object-contain"
-                              />
-                              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white dark:bg-gray-700 border-r border-b border-gray-200 dark:border-gray-600 rotate-45"></div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <CommandBlock
-                        command={commands.classicVnc}
-                        commandKey="classicVnc"
-                        title={t('emulator.vncMode')}
-                        description={t('emulator.vncDescription')}
-                      />
-
-                      <CommandBlock
-                        command={commands.classicX11}
-                        commandKey="classicX11"
-                        title={t('emulator.x11Mode')}
-                        description={t('emulator.x11Description')}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 步骤3: 连接模拟器 */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
-                      3
-                    </div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                      {t('emulator.connectToApp')}
-                    </h3>
-                  </div>
-
-                  <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-md p-3">
-                    <div className="flex items-start gap-2">
-                      <Settings className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                          {t('emulator.connectionInstructions')}
-                        </div>
-                        <ol className="text-xs text-blue-800 dark:text-blue-200 space-y-0.5 list-decimal list-inside">
-                          <li>{t('emulator.connectionSteps.step1')}</li>
-                          <li>{t('emulator.connectionSteps.step2')}</li>
-                          <li>{t('emulator.connectionSteps.step3')}</li>
-                        </ol>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 开发资源和说明 */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Code className="h-4 w-4 text-gray-500 dark:text-gray-300" />
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                      {t('emulator.developmentResources')}
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="justify-start gap-2 bg-gray-50 dark:bg-gray-700/40 border-gray-200 dark:border-gray-600/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 text-gray-900 dark:text-gray-100"
-                      onClick={() =>
-                        window.open('https://github.com/Johnwanzi/onekey-docker', '_blank')
-                      }
-                    >
-                      <GitBranch className="h-3.5 w-3.5" />
-                      {t('emulator.gitRepo')}
-                      <ExternalLink className="h-3 w-3 ml-auto" />
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="justify-start gap-2 bg-gray-50 dark:bg-gray-700/40 border-gray-200 dark:border-gray-600/50 hover:bg-gray-100 dark:hover:bg-gray-600/50 text-gray-900 dark:text-gray-100"
-                      onClick={() => {
-                        toast({
-                          title: t('emulator.docInProgress'),
-                          description: t('emulator.docInProgressDesc'),
-                        });
-                      }}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      {t('emulator.documentation')}
-                      <Badge
-                        variant="secondary"
-                        className="ml-auto text-xs bg-gray-200 dark:bg-gray-600/50 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-500"
+          {/* 优雅的进度指示器 */}
+          <motion.div variants={itemVariants} className="pb-8">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex justify-between items-start mb-6">
+                {steps.map((step, index) => {
+                  const Icon = step.icon;
+                  return (
+                    <div key={step.id} className="flex flex-col items-center flex-1 relative">
+                      <motion.div
+                        className={`
+                          w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-500 mb-3 relative z-10
+                          ${
+                            step.status === 'completed'
+                              ? 'bg-slate-900 dark:bg-slate-100 border-slate-900 dark:border-slate-100 text-white dark:text-slate-900 shadow-lg'
+                              : step.status === 'active'
+                              ? 'bg-white dark:bg-slate-900 border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100 shadow-xl ring-4 ring-slate-900/10 dark:ring-slate-100/10'
+                              : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500'
+                          }
+                        `}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                       >
-                        {t('emulator.comingSoon')}
-                      </Badge>
-                    </Button>
-                  </div>
-
-                  <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-600/50 rounded-md p-3 mt-3">
-                    <div className="text-xs text-gray-600 dark:text-gray-200 space-y-1">
-                      <div>
-                        <strong>VNC 模式</strong>：{t('emulator.vncModeNote')}
+                        {step.status === 'completed' ? (
+                          <CheckCircle className="h-5 w-5" />
+                        ) : (
+                          <Icon className="h-5 w-5" />
+                        )}
+                      </motion.div>
+                      <div className="text-center">
+                        <div
+                          className={`text-xs font-semibold mb-1 ${
+                            step.status === 'active'
+                              ? 'text-slate-900 dark:text-slate-100'
+                              : 'text-slate-500 dark:text-slate-400'
+                          }`}
+                        >
+                          {step.title}
+                        </div>
+                        <div
+                          className={`text-xs ${
+                            step.status === 'active'
+                              ? 'text-slate-600 dark:text-slate-400'
+                              : 'text-slate-400 dark:text-slate-500'
+                          }`}
+                        >
+                          {step.description}
+                        </div>
                       </div>
-                      <div>
-                        <strong>X11 模式</strong>：{t('emulator.x11ModeNote')}
-                      </div>
+                      {index < steps.length - 1 && (
+                        <motion.div
+                          className={`absolute top-6 left-1/2 w-full h-px ${
+                            currentStep > index
+                              ? 'bg-slate-900 dark:bg-slate-100'
+                              : 'bg-slate-200 dark:bg-slate-700'
+                          }`}
+                          style={{ zIndex: 0 }}
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: currentStep > index ? 1 : 0 }}
+                          transition={{ duration: 0.6, ease: 'easeInOut' }}
+                        />
+                      )}
                     </div>
-                  </div>
+                  );
+                })}
+              </div>
+
+              {/* 当前步骤信息和资源链接 */}
+              <div className="text-center">
+                <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
+                  第 {currentStep + 1} 步，共 {steps.length} 步
+                </p>
+
+                {/* 开发资源快捷链接 */}
+                <div className="inline-flex items-center bg-slate-50 dark:bg-slate-800/50 rounded-lg px-4 py-2 space-x-4">
+                  <button
+                    onClick={() =>
+                      window.open('https://github.com/Johnwanzi/onekey-docker', '_blank')
+                    }
+                    className="inline-flex items-center space-x-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  >
+                    <GitBranch className="h-4 w-4" />
+                    <span>Git仓库</span>
+                  </button>
+                  <div className="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
+                  <button
+                    onClick={() => {
+                      toast({
+                        title: t('emulator.docInProgress'),
+                        description: t('emulator.docInProgressDesc'),
+                      });
+                    }}
+                    className="inline-flex items-center space-x-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                  >
+                    <Code className="h-4 w-4" />
+                    <span>文档</span>
+                  </button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* 步骤内容 - 现代化设计 */}
+          <div className="relative overflow-hidden min-h-[400px] max-w-4xl mx-auto">
+            <AnimatePresence custom={direction}>
+              {/* 步骤 0: 下载设置脚本 */}
+              {currentStep === 0 && (
+                <motion.div
+                  key="step-0"
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className="absolute inset-0"
+                  transition={{
+                    x: { type: 'spring', stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.15 },
+                  }}
+                >
+                  <Card className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center space-x-2 text-lg">
+                        <Package className="h-4 w-4 text-slate-700 dark:text-slate-300" />
+                        <span>{steps[0].title}</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-muted-foreground text-sm">
+                        {t('emulator.steps.setup.longDescription')}
+                      </p>
+
+                      <div className="bg-card border border-border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-medium text-sm">
+                            {t('emulator.cloneRepository')}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(cloneCommand, 'clone')}
+                            className="h-8 px-3 text-xs"
+                          >
+                            {copiedCommand === 'clone' ? (
+                              <CheckCircle className="h-3 w-3 text-slate-700 dark:text-slate-300" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                        <div className="bg-muted rounded-md p-3">
+                          <code className="text-xs font-mono">{cloneCommand}</code>
+                        </div>
+                      </div>
+
+                      {/* 明确的下一步按钮 */}
+                      <div className="flex justify-between items-center pt-2">
+                        <div className="text-xs text-muted-foreground">Clone Repo to local</div>
+                        <Button
+                          onClick={continueToNext}
+                          className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 border-0"
+                        >
+                          <ArrowRight className="h-4 w-4 mr-1" />
+                          Continue
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* 步骤 1: 选择设备 */}
+              {currentStep === 1 && (
+                <motion.div
+                  key="step-1"
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className="absolute inset-0"
+                  transition={{
+                    x: { type: 'spring', stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.15 },
+                  }}
+                >
+                  <Card className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center space-x-2 text-lg">
+                          <Monitor className="h-4 w-4 text-slate-700 dark:text-slate-300" />
+                          <span>{steps[1].title}</span>
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" onClick={goBack}>
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          Back
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {devices.map(device => (
+                          <motion.div
+                            key={device.id}
+                            variants={cardHoverVariants}
+                            whileHover="hover"
+                            whileTap="tap"
+                            onClick={() => handleDeviceSelect(device.id)}
+                            className={`
+                              relative cursor-pointer rounded-lg border-2 p-4 transition-all duration-200
+                              ${
+                                selectedDevice === device.id
+                                  ? 'border-slate-800 bg-slate-50 dark:bg-slate-800/50'
+                                  : 'border-border bg-card hover:border-slate-300 dark:hover:border-slate-600'
+                              }
+                            `}
+                          >
+                            {selectedDevice === device.id && (
+                              <motion.div
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-slate-800 dark:bg-slate-200 rounded-full flex items-center justify-center"
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                              >
+                                <CheckCircle className="h-3 w-3 text-white dark:text-slate-800" />
+                              </motion.div>
+                            )}
+
+                            <div className="text-center space-y-3">
+                              <img
+                                src={device.image}
+                                alt={device.name}
+                                className="h-16 w-auto mx-auto object-contain"
+                              />
+                              <div>
+                                <h3 className="font-semibold text-sm">{device.name}</h3>
+                                <p className="text-muted-foreground text-xs">
+                                  {device.description}
+                                </p>
+                              </div>
+                              <div className="space-y-1">
+                                {device.features.slice(0, 2).map((feature, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center justify-center space-x-1 text-xs"
+                                  >
+                                    <CheckCircle className="h-2 w-2 text-slate-600 dark:text-slate-400" />
+                                    <span>{feature}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      {/* 明确的下一步按钮 */}
+                      <div className="flex justify-between items-center pt-4">
+                        <div className="text-xs text-muted-foreground">
+                          Select a device type to continue
+                        </div>
+                        <Button
+                          onClick={continueToNext}
+                          disabled={!selectedDevice}
+                          className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 disabled:bg-slate-400 text-white dark:text-slate-900 border-0"
+                        >
+                          <ArrowRight className="h-4 w-4 mr-1" />
+                          Continue
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* 步骤 2: 启动模拟器 */}
+              {currentStep === 2 && selectedDevice && (
+                <motion.div
+                  key="step-2"
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className="absolute inset-0"
+                  transition={{
+                    x: { type: 'spring', stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.15 },
+                  }}
+                >
+                  <Card className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center space-x-2 text-lg">
+                          <Rocket className="h-4 w-4 text-slate-700 dark:text-slate-300" />
+                          <span>{steps[2].title}</span>
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" onClick={goBack}>
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          Back
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="text-center">
+                        <h3 className="text-sm font-semibold mb-1">
+                          {t('emulator.launchingDevice')}{' '}
+                          {devices.find(d => d.id === selectedDevice)?.name}
+                        </h3>
+                        <p className="text-muted-foreground text-xs">
+                          {t('emulator.selectLaunchMode')}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* VNC 模式 */}
+                        <motion.div
+                          className="border border-border rounded-lg p-4 space-y-3"
+                          whileHover={{ scale: 1.01 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <Globe className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                            <span className="font-medium text-sm">{t('emulator.vncMode')}</span>
+                            <Badge className="text-xs py-0 px-2">{t('emulator.recommended')}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {t('emulator.vncDescription')}
+                          </p>
+                          <div className="bg-muted rounded-md p-2">
+                            <code className="text-xs font-mono break-all">
+                              {devices.find(d => d.id === selectedDevice)?.commands.vnc}
+                            </code>
+                          </div>
+                          <Button
+                            onClick={() =>
+                              copyToClipboard(
+                                devices.find(d => d.id === selectedDevice)?.commands.vnc || '',
+                                `${selectedDevice}-vnc`
+                              )
+                            }
+                            size="sm"
+                            className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 border-0"
+                          >
+                            {copiedCommand === `${selectedDevice}-vnc` ? (
+                              <>
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                {t('emulator.copied')}
+                              </>
+                            ) : (
+                              <>
+                                <Play className="h-3 w-3 mr-1" />
+                                Launch VNC Mode
+                              </>
+                            )}
+                          </Button>
+                        </motion.div>
+
+                        {/* X11 模式 */}
+                        <motion.div
+                          className="border border-border rounded-lg p-4 space-y-3"
+                          whileHover={{ scale: 1.01 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <Terminal className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                            <span className="font-medium text-sm">{t('emulator.x11Mode')}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {t('emulator.x11Description')}
+                          </p>
+                          <div className="bg-muted rounded-md p-2">
+                            <code className="text-xs font-mono break-all">
+                              {devices.find(d => d.id === selectedDevice)?.commands.x11}
+                            </code>
+                          </div>
+                          <Button
+                            onClick={() =>
+                              copyToClipboard(
+                                devices.find(d => d.id === selectedDevice)?.commands.x11 || '',
+                                `${selectedDevice}-x11`
+                              )
+                            }
+                            size="sm"
+                            className="w-full bg-slate-700 hover:bg-slate-600 dark:bg-slate-300 dark:hover:bg-slate-200 text-white dark:text-slate-900 border-0"
+                          >
+                            {copiedCommand === `${selectedDevice}-x11` ? (
+                              <>
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                {t('emulator.copied')}
+                              </>
+                            ) : (
+                              <>
+                                <Play className="h-3 w-3 mr-1" />
+                                Launch X11 Mode
+                              </>
+                            )}
+                          </Button>
+                        </motion.div>
+                      </div>
+
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground">
+                          Copy and run one of the commands above to start your emulator
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* 步骤 3: 连接到应用 */}
+              {currentStep === 3 && (
+                <motion.div
+                  key="step-3"
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className="absolute inset-0"
+                  transition={{
+                    x: { type: 'spring', stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.15 },
+                  }}
+                >
+                  <Card className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center space-x-2 text-lg">
+                          <Shield className="h-4 w-4 text-slate-700 dark:text-slate-300" />
+                          <span>{steps[3].title}</span>
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" onClick={goBack}>
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          Back
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="text-center space-y-3">
+                        <motion.div
+                          className="flex items-center justify-center w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full mx-auto border border-slate-200 dark:border-slate-700"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.2 }}
+                        >
+                          <CheckCircle className="h-6 w-6 text-slate-700 dark:text-slate-300" />
+                        </motion.div>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 }}
+                        >
+                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                            {t('emulator.congratulations')}
+                          </h3>
+                          <p className="text-slate-600 dark:text-slate-400 text-sm">
+                            {t('emulator.emulatorReady')}
+                          </p>
+                        </motion.div>
+                      </div>
+
+                      <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                        <h4 className="font-semibold mb-3 text-sm text-slate-900 dark:text-slate-100 text-center">
+                          {t('emulator.nextSteps')}
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {/* 第一步 */}
+                          <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <span className="flex items-center justify-center w-5 h-5 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 rounded-full text-xs font-medium">
+                                1
+                              </span>
+                              <h5 className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                访问模拟器界面
+                              </h5>
+                            </div>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
+                              VNC模式，在浏览器中查看
+                            </p>
+                            <button
+                              onClick={() =>
+                                window.open('http://localhost:6088/vnc.html', '_blank')
+                              }
+                              className="w-full inline-flex items-center justify-center space-x-1 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-md py-2 px-3 transition-colors"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              <span>打开 localhost:6088</span>
+                            </button>
+                          </div>
+
+                          {/* 第二步 */}
+                          <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <span className="flex items-center justify-center w-5 h-5 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 rounded-full text-xs font-medium">
+                                2
+                              </span>
+                              <h5 className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                切换连接方式
+                              </h5>
+                            </div>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
+                              在首页选择模拟器传输方式
+                            </p>
+                            <button
+                              onClick={() => navigate('/')}
+                              className="w-full inline-flex items-center justify-center space-x-1 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-md py-2 px-3 transition-colors"
+                            >
+                              <ArrowRight className="h-3 w-3" />
+                              <span>返回首页</span>
+                            </button>
+                          </div>
+
+                          {/* 第三步 */}
+                          <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <span className="flex items-center justify-center w-5 h-5 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 rounded-full text-xs font-medium">
+                                3
+                              </span>
+                              <h5 className="text-xs font-medium text-slate-900 dark:text-slate-100">
+                                开始开发测试
+                              </h5>
+                            </div>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                              使用完整的硬件钱包功能进行开发和测试
+                            </p>
+                            <div className="mt-2 flex items-center justify-center">
+                              <CheckCircle className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
       </div>
     </PageLayout>
   );
-}
+};
+
+EmulatorPage.displayName = 'EmulatorPage';
+export default EmulatorPage;

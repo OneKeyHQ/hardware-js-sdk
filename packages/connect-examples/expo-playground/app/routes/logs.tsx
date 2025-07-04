@@ -103,7 +103,7 @@ const LogsPage: React.FC = () => {
 
   return (
     <PageLayout fixedHeight={true}>
-      <div className="flex-1 flex flex-col px-6 py-4 space-y-4 min-h-0">
+      <div className="flex-1 flex flex-col space-y-4 min-h-0 w-full">
         {/* 面包屑导航 + 操作按钮 */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">

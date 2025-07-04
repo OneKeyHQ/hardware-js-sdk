@@ -54,8 +54,8 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
 
     if (typeof value === 'string') {
       return (
-        <div className="flex items-start gap-2 group">
-          <span className="text-orange-600 dark:text-orange-400 break-words whitespace-pre-wrap flex-1">
+        <div className="flex items-start gap-2 group min-w-0">
+          <span className="text-orange-600 dark:text-orange-400 break-words whitespace-pre-wrap min-w-0 flex-1 overflow-hidden">
             &quot;{value}&quot;
           </span>
           <Button
@@ -88,7 +88,7 @@ const CollapsibleJsonViewer: React.FC<CollapsibleJsonViewerProps> = ({
   };
 
   return (
-    <div className="font-mono text-sm break-words whitespace-pre-wrap">{renderValue(data)}</div>
+    <div className="font-mono text-sm break-words whitespace-pre-wrap min-w-0 overflow-hidden">{renderValue(data)}</div>
   );
 };
 
@@ -161,7 +161,7 @@ const ObjectViewer: React.FC<{
 
           return (
             <div key={key} className="py-1">
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2 min-w-0">
                 {shouldShowExpander ? (
                   <Button
                     variant="ghost"
@@ -183,7 +183,7 @@ const ObjectViewer: React.FC<{
                 </span>
                 <span className="text-gray-600 dark:text-gray-400">:</span>
                 {(!shouldShowExpander || (!isExpanded && !shouldAutoExpand)) && (
-                  <div className="flex-1 inline-flex items-start">
+                  <div className="flex-1 inline-flex items-start min-w-0">
                     {isExpandable ? (
                       <span className="text-gray-500 italic">{'{ ... }'}</span>
                     ) : isArrayExpandable ? (
@@ -191,11 +191,13 @@ const ObjectViewer: React.FC<{
                         [{(value as unknown[]).length} items]
                       </span>
                     ) : (
-                      <CollapsibleJsonViewer
-                        data={value}
-                        currentDepth={currentDepth + 1}
-                        maxDepth={maxDepth}
-                      />
+                      <div className="min-w-0 flex-1">
+                        <CollapsibleJsonViewer
+                          data={value}
+                          currentDepth={currentDepth + 1}
+                          maxDepth={maxDepth}
+                        />
+                      </div>
                     )}
                     {index < keys.length - 1 && (
                       <span className="text-gray-600 dark:text-gray-400">,</span>

@@ -531,13 +531,98 @@ export const en = {
     emulator: {
       title: 'Hardware Emulator',
       subtitle: 'Use Docker to quickly start OneKey hardware emulator for development testing',
+      hero: {
+        title: 'Test Hardware Wallets Without Physical Devices',
+        subtitle: 'Start coding in under 5 minutes',
+        promise: 'Quick Setup • No Hardware Required • Full Functionality'
+      },
+      flow: {
+        browser: 'Browser',
+        docker: 'Docker',
+        virtual: 'Virtual Device', 
+        app: 'Your App'
+      },
+      progressTitle: 'Setup Progress',
+      steps: {
+        title: 'Simple 3-Step Process',
+        subtitle: 'Get your emulator running in minutes',
+        setup: {
+          title: 'Download Scripts',
+          description: 'Clone the emulator repository',
+          longDescription: 'First, we need to download the emulator setup scripts. This repository contains all the Docker configurations and startup scripts needed to run OneKey hardware emulators.'
+        },
+        device: {
+          title: 'Choose Device',
+          description: 'Select device type to emulate'
+        },
+        launch: {
+          title: 'Launch Emulator',
+          description: 'Start your chosen emulator'
+        },
+        connect: {
+          title: 'Connect to App',
+          description: 'Ready for development'
+        }
+      },
+      step1: {
+        title: 'Download Scripts',
+        description: 'Clone the emulator repository with one command'
+      },
+      step2: {
+        title: 'Choose Device',
+        description: 'Select OneKey Pro or Classic 1s emulator'
+      },
+      step3: {
+        title: 'Start Coding',
+        description: 'Connect to your app and start development'
+      },
+      devices: {
+        pro: {
+          description: 'Full-featured hardware wallet with touchscreen',
+          features: {
+            touchscreen: 'Touchscreen interface',
+            fullFeature: 'Complete functionality',
+            modern: 'Modern design'
+          }
+        },
+        classic: {
+          description: 'Essential hardware wallet with button interface',
+          features: {
+            buttonBased: 'Button-based operation',
+            essential: 'Essential features only',
+            reliable: 'Proven reliability'
+          }
+        }
+      },
+      device: {
+        pro: {
+          description: 'Full-featured hardware wallet with touchscreen'
+        },
+        classic: {
+          description: 'Essential hardware wallet with button interface'
+        }
+      },
       quickStart: 'Quick Start',
       cloneRepo: 'Clone Git Repository',
+      cloneRepository: 'Clone Repository',
       startEmulator: 'Start Emulator',
       connectToApp: 'Connect to Application',
       downloadScript: 'Download emulator script',
       scriptDescription: 'Contains one-click startup scripts for all platforms',
-      vncMode: 'VNC Mode (Recommended)',
+      startCommands: 'Start',
+      selectMode: 'Choose your preferred connection mode',
+      launchingDevice: 'Launching',
+      selectLaunchMode: 'Choose your preferred launch mode below',
+      recommended: 'Recommended',
+      copied: 'Copied!',
+      copiedDesc: 'Command copied to clipboard',
+      copyFailed: 'Failed to copy command',
+      copyFailedDesc: 'Unable to copy to clipboard',
+      copyCommand: 'Copy Command',
+      congratulations: 'Congratulations!',
+      emulatorReady: 'Your emulator is ready for development',
+      nextSteps: 'Next Steps',
+      vncMode: 'VNC Mode',
       vncDescription:
         'Universal for all platforms, access http://localhost:6088/vnc.html after startup',
       x11Mode: 'X11 Mode',
@@ -549,8 +634,11 @@ export const en = {
         step3: 'Start using full hardware wallet functionality for development testing',
       },
       developmentResources: 'Development Resources',
+      resourcesDescription: 'Helpful links and documentation for development',
       gitRepo: 'Git Repository',
+      gitRepoDesc: 'Source code and setup scripts',
       documentation: 'Detailed Documentation',
+      docDesc: 'Complete development guide',
       comingSoon: 'Coming soon',
       docInProgress: 'Documentation in progress',
       docInProgressDesc: 'Detailed documentation will be released soon, stay tuned',

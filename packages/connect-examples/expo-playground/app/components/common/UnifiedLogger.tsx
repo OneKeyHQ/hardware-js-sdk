@@ -63,7 +63,7 @@ const SmartContentDisplay: React.FC<{
     const lines = content.split('\n');
     if (lines.length <= 3) {
       return (
-        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
+        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-2 rounded-md whitespace-pre-wrap break-words min-w-0 overflow-hidden">
           {content}
         </pre>
       );
@@ -73,7 +73,7 @@ const SmartContentDisplay: React.FC<{
 
     return (
       <div className="space-y-1">
-        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-2 rounded-md overflow-x-auto whitespace-pre-wrap break-words">
+        <pre className="text-xs bg-muted/30 dark:bg-muted/20 p-2 rounded-md whitespace-pre-wrap break-words min-w-0 overflow-hidden">
           {isExpanded ? content : previewContent}
         </pre>
         <Button
@@ -100,7 +100,7 @@ const SmartContentDisplay: React.FC<{
 
   // 使用新的JSON查看器
   return (
-    <div className="bg-muted/30 dark:bg-muted/20 p-2 rounded-md">
+    <div className="bg-muted/30 dark:bg-muted/20 p-2 rounded-md min-w-0 overflow-hidden">
       <CollapsibleJsonViewer data={content} maxDepth={2} />
     </div>
   );
