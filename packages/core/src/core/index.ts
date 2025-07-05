@@ -356,6 +356,9 @@ const onCallDevice = async (
             ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
           );
         }
+
+        // close pin popup window
+        postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW));
       }
 
       // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.

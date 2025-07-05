@@ -166,7 +166,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
         if (e instanceof HardwareError) {
           return Promise.reject(e);
         }
-        console.log('auto go to bootloader mode failed: ', e);
+        Log.log('auto go to bootloader mode failed: ', e);
         return Promise.reject(
           ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateAutoEnterBootFailure)
         );

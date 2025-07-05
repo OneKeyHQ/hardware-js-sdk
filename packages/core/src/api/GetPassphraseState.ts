@@ -17,19 +17,11 @@ export default class GetPassphraseState extends BaseMethod {
       this.device
     );
 
-    console.log('=====>>>>>> GetPassphraseState run passphraseState: ', passphraseState);
-    console.log('=====>>>>>> GetPassphraseState run newSession: ', newSession);
-    console.log(
-      '=====>>>>>> GetPassphraseState run features: ',
-      this.device.features.passphrase_protection
-    );
-
     const { features } = this.device;
 
     // refresh device info
     if (features && features.passphrase_protection === true) {
       if (!newSession) {
-        console.log('=====>>>>>> GetPassphraseState run tryFixInternalState', newSession);
         if (passphraseState && features.device_id) {
           this.device.tryFixInternalState(passphraseState, features.device_id, features.session_id);
         }

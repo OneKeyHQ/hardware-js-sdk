@@ -93,7 +93,6 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
 
   // Attach to pin try to fix internal state
   if (newSession && passphraseState && features?.device_id) {
-    console.log('=====>>>>>> run updateInternalState newSession:', newSession);
     device.updateInternalState(passphraseState, features.device_id, newSession);
   }
 
@@ -121,7 +120,6 @@ export const getPassphraseState = async (
   options?: {
     expectPassphraseState?: string;
     onlyMainPin?: boolean;
-    // createAttachPinWallet?: boolean;
   }
 ): Promise<{
   passphraseState: string | undefined;
@@ -134,20 +132,10 @@ export const getPassphraseState = async (
   const firmwareVersion = getDeviceFirmwareVersion(features);
   const deviceType = getDeviceType(features);
 
-  if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.14.0')) {
-    console.log(
-      '=====>>>>>> getPassphraseState begin: ',
-      options?.onlyMainPin,
-      options?.expectPassphraseState
-    );
-
+  if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.15.0')) {
     const { message, type } = await commands.typedCall('GetPassphraseState', 'PassphraseState', {
       passphrase_state: options?.onlyMainPin ? undefined : options?.expectPassphraseState,
-      // allow_create_attach_pin: options?.createAttachPinWallet,
-      // _only_main_pin: options?.onlyMainPin,
     });
-
-    console.log('=====>>>>>> getPassphraseState end: result ', message);
 
     // @ts-expect-error
     if (type === 'CallMethodError') {

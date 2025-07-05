@@ -410,8 +410,7 @@ export class Device extends EventEmitter {
     }
     payload.passphrase_state = options?.passphraseState;
 
-    // Log.debug('initialize payload:', payload);
-    console.log('=====>>>>>> initialize device begin: ', payload, {
+    Log.debug('Initialize device begin:', payload, {
       deviceId: options?.deviceId,
       passphraseState: options?.passphraseState,
       initSession: options?.initSession,
@@ -429,7 +428,7 @@ export class Device extends EventEmitter {
         }),
       ]);
 
-      console.log('=====>>>>>> initialize device end: ', message);
+      Log.debug('Initialize device end: ', message);
       this._updateFeatures(message, options?.initSession);
       await TransportManager.reconfigure(this.features);
     } catch (error) {
@@ -756,7 +755,7 @@ export class Device extends EventEmitter {
     const useErrorAttachPin =
       unlockedAttachPin && passphraseState && passphraseState !== newPassphraseState;
 
-    console.log('=====>>>>>> checkPassphraseStateSafety passphraseState: ', {
+    Log.debug('Check passphrase state safety: ', {
       passphraseState,
       newPassphraseState,
       unlockedAttachPin,
