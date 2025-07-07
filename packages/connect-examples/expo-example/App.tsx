@@ -26,8 +26,7 @@ const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTesting
 const linking = {
   prefixes: [
     // 为不同的部署环境设置 URL 前缀
-    'https://wabicai.github.io/',
-    'https://example.onekey-test.com/',
+    'https://example.onekeytest.com/',
     'http://localhost:19006/',
     ExpoLinking.createURL('/'),
   ],
