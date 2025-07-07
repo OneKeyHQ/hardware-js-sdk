@@ -7,6 +7,7 @@ import {
   TransportType,
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
+import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
 
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
@@ -145,83 +146,6 @@ export async function getPassphraseState(
     } as Unsuccessful;
   }
 }
-
-// 需要passphrase检查的方法列表
-const METHODS_REQUIRING_PASSPHRASE_CHECK = [
-  'evmGetAddress',
-  'evmGetPublicKey',
-  'evmSignMessage',
-  'evmSignTransaction',
-  'evmSignTypedData',
-  'btcGetAddress',
-  'btcGetPublicKey',
-  'btcSignMessage',
-  'btcSignTransaction',
-  'cosmosGetAddress',
-  'cosmosGetPublicKey',
-  'starcoinGetAddress',
-  'starcoinGetPublicKey',
-  'cardanoGetAddress',
-  'cardanoGetPublicKey',
-  'solGetAddress',
-  'aptosGetAddress',
-  'aptosGetPublicKey',
-  'nearGetAddress',
-  'polkadotGetAddress',
-  'stellarGetAddress',
-  'xrpGetAddress',
-  'tronGetAddress',
-  'tonGetAddress',
-  'suiGetAddress',
-  'suiGetPublicKey',
-  'filecoinGetAddress',
-  'confluxGetAddress',
-  'kaspaGetAddress',
-  'nervosGetAddress',
-  'nemGetAddress',
-  'nexaGetAddress',
-  'algoGetAddress',
-  'dnxGetAddress',
-  'scdoGetAddress',
-  'alephiumGetAddress',
-  // 以及其他签名方法
-  'cosmosSignTransaction',
-  'starcoinSignMessage',
-  'starcoinSignTransaction',
-  'cardanoSignMessage',
-  'cardanoSignTransaction',
-  'solSignTransaction',
-  'aptosSignMessage',
-  'aptosSignTransaction',
-  'nearSignTransaction',
-  'polkadotSignTransaction',
-  'stellarSignTransaction',
-  'xrpSignTransaction',
-  'tronSignMessage',
-  'tronSignTransaction',
-  'tonSignMessage',
-  'tonSignProof',
-  'suiSignMessage',
-  'suiSignTransaction',
-  'filecoinSignTransaction',
-  'confluxSignMessage',
-  'confluxSignTransaction',
-  'kaspaSignTransaction',
-  'nervosSignTransaction',
-  'nemSignTransaction',
-  'nexaSignTransaction',
-  'algoSignTransaction',
-  'dnxSignTransaction',
-  'scdoSignMessage',
-  'scdoSignTransaction',
-  'alephiumSignMessage',
-  'alephiumSignTransaction',
-  'nostrGetPublicKey',
-  'nostrSignEvent',
-  'nostrSignSchnorr',
-  'nostrEncryptMessage',
-  'nostrDecryptMessage',
-];
 
 // 统一的 SDK 方法调用抽象
 export async function callHardwareAPI(

@@ -24,7 +24,7 @@ module.exports = async (env, argv) => {
     resolve: {
       extensions: ['.tsx', '.ts', '.jsx', '.js', '.json', '.md', '.mdx'],
       alias: {
-        '@': path.resolve(__dirname, 'app'),
+        '~': path.resolve(__dirname, 'app'),
       },
       fallback: {
         // Node.js polyfills for browser

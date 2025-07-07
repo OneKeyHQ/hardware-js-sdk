@@ -11,6 +11,7 @@ import { useHardwareStore } from '../../store/hardwareStore';
 import { Alert, AlertDescription } from '../ui/Alert';
 import { parseParameterValue } from '../../utils/parameterUtils';
 import type { CommonParametersState } from '../../store/hardwareStore';
+import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../../utils/constants';
 
 interface ParameterInputProps {
   methodConfig: UnifiedMethodConfig;
@@ -19,27 +20,37 @@ interface ParameterInputProps {
   onParamChange?: (paramName: string, value: unknown) => void;
 }
 
-// 通用配置函数
-const getCommonParameters = (t: (key: string) => string): ParameterField[] => [
-  {
-    name: 'useEmptyPassphrase',
-    type: 'boolean',
-    label: t('components.parameterInput.useEmptyPassphrase'),
-    description: t('components.parameterInput.useEmptyPassphraseDesc'),
-    value: false,
-    visible: true,
-    editable: true,
-  },
-  {
-    name: 'passphraseState',
-    type: 'string',
-    label: t('components.parameterInput.passphraseState'),
-    description: t('components.parameterInput.passphraseStateDesc'),
-    value: '',
-    visible: true,
-    editable: true,
-  },
-];
+// 需要passphrase检查的方法列表
+
+// 通用配置函数 - 只在需要时显示passphrase参数
+const getCommonParameters = (t: (key: string) => string, methodName: string): ParameterField[] => {
+  const needsPassphrase = METHODS_REQUIRING_PASSPHRASE_CHECK.includes(methodName);
+
+  if (!needsPassphrase) {
+    return [];
+  }
+
+  return [
+    {
+      name: 'useEmptyPassphrase',
+      type: 'boolean',
+      label: t('components.parameterInput.useEmptyPassphrase'),
+      description: '', // 移除描述以节省空间
+      value: false,
+      visible: true,
+      editable: true,
+    },
+    {
+      name: 'passphraseState',
+      type: 'string',
+      label: t('components.parameterInput.passphraseState'),
+      description: '', // 移除描述以节省空间
+      value: '',
+      visible: true,
+      editable: true,
+    },
+  ];
+};
 
 const ParameterInput: React.FC<ParameterInputProps> = ({
   methodConfig,
@@ -239,18 +250,18 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     return getConfigByPattern();
   };
 
-  // 渲染通用标签
+  // 渲染通用标签 - 紧凑版本
   const renderFieldLabel = (field: ParameterField) => (
     <label
       htmlFor={field.name}
-      className="text-xs font-medium text-foreground cursor-pointer flex items-center gap-1.5 flex-wrap"
+      className="text-xs font-medium text-foreground cursor-pointer flex items-center gap-1"
     >
-      <span className="flex items-center gap-1">
-        {field.label || field.name}
-        {field.required && <span className="text-orange-600">*</span>}
-      </span>
+      {field.label || field.name}
+      {field.required && <span className="text-orange-600">*</span>}
       {field.description && (
-        <span className="text-xs text-muted-foreground font-normal">- {field.description}</span>
+        <span className="text-xs text-muted-foreground font-normal ml-1">
+          ({field.description})
+        </span>
       )}
     </label>
   );
@@ -439,30 +450,28 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
   const hasPresets = presets && presets.length > 0;
   const hasMultiplePresets = presets && presets.length > 1;
 
+  const commonParams = getCommonParameters(t, methodConfig.method);
+  const hasCommonParams = commonParams.length > 0;
+
   return (
     <Card className="bg-card border border-border/50 shadow-sm">
-      <CardContent className="space-y-3 pb-4">
-        <div
-          className={`grid grid-cols-1 gap-5 ${
-            hasMultiplePresets ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
-          }`}
-        >
-          {/* 快捷预设 - 只在有多个预设时显示 */}
+      <CardContent className="space-y-3 pb-3">
+        {/* 优化的紧凑布局 */}
+        <div className="space-y-3">
+          {/* 预设选择器 - 如果有多个预设则显示在顶部 */}
           {hasMultiplePresets && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-1.5 pt-2">
-                {t('components.parameterInput.quickPresets')}
-              </h4>
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-foreground min-w-0 flex-shrink-0">
+                {t('components.parameterInput.selectPreset')}:
+              </label>
               <Select value={selectedPreset || ''} onValueChange={handlePresetChange}>
-                <SelectTrigger className="bg-background border-border focus:border-primary text-xs h-8">
+                <SelectTrigger className="bg-background border-border focus:border-primary text-xs h-8 flex-1">
                   <SelectValue placeholder={t('components.parameterInput.selectPreset')} />
                 </SelectTrigger>
                 <SelectContent>
                   {presets.map(preset => (
                     <SelectItem key={preset.title} value={preset.title}>
-                      <div>
-                        <div className="font-medium">{preset.title}</div>
-                      </div>
+                      {preset.title}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -470,58 +479,65 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             </div>
           )}
 
-          {/* 通用参数 */}
-          <div className="space-y-2">
-            <div className="flex items-center border-b border-border/50 pb-1.5 pt-2">
-              <h4 className="text-sm font-medium text-foreground mr-2">
-                {t('components.parameterInput.commonParameters')}
-              </h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  window.open(
-                    'https://developer.onekey.so/connect-to-hardware/page-1/common-params',
-                    '_blank'
-                  )
-                }
-                className="h-4 px-1 text-xs text-muted-foreground hover:text-primary"
-              >
-                <ExternalLink className="h-2.5 w-2.5" />
-              </Button>
-            </div>
-            <div className="space-y-2">{getCommonParameters(t).map(renderParameterField)}</div>
-          </div>
-
-          {/* 方法参数 */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-foreground border-b border-border/50 pb-1.5 pt-2">
-              {t('components.parameterInput.methodParameters')}
-              {selectedPreset && (
-                <span className="text-xs text-muted-foreground ml-2">({selectedPreset})</span>
-              )}
-            </h4>
-            {visibleMethodParameters.length > 0 ? (
-              <div className="space-y-2">{visibleMethodParameters.map(renderParameterField)}</div>
-            ) : (
-              <div className="text-center py-3">
-                <p className="text-xs text-muted-foreground">
-                  {hasBundleParam
-                    ? t('components.parameterInput.parametersInBundle')
-                    : hasPresets && selectedPreset
-                    ? t('components.parameterInput.noAdditionalParams')
-                    : hasPresets
-                    ? t('components.parameterInput.selectPresetFirst')
-                    : t('components.parameterInput.noAdditionalParams')}
-                </p>
+          {/* 参数区域 - 使用更紧凑的2列布局 */}
+          <div className={`grid grid-cols-1 gap-4 ${hasCommonParams ? 'md:grid-cols-2' : ''}`}>
+            {/* 通用参数 - 只在需要passphrase的方法中显示 */}
+            {hasCommonParams && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1">
+                  <h4 className="text-sm font-medium text-foreground">
+                    {t('components.parameterInput.commonParameters')}
+                  </h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      window.open(
+                        'https://developer.onekey.so/connect-to-hardware/page-1/common-params',
+                        '_blank'
+                      )
+                    }
+                    className="h-4 px-1 text-xs text-muted-foreground hover:text-primary"
+                  >
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </Button>
+                </div>
+                <div className="space-y-2">{commonParams.map(renderParameterField)}</div>
               </div>
             )}
+
+            {/* 方法参数 */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-medium text-foreground">
+                  {t('components.parameterInput.methodParameters')}
+                </h4>
+                {selectedPreset && (
+                  <span className="text-xs text-muted-foreground">({selectedPreset})</span>
+                )}
+              </div>
+              {visibleMethodParameters.length > 0 ? (
+                <div className="space-y-2">{visibleMethodParameters.map(renderParameterField)}</div>
+              ) : (
+                <div className="text-center py-2">
+                  <p className="text-xs text-muted-foreground">
+                    {hasBundleParam
+                      ? t('components.parameterInput.parametersInBundle')
+                      : hasPresets && selectedPreset
+                      ? t('components.parameterInput.noAdditionalParams')
+                      : hasPresets
+                      ? t('components.parameterInput.selectPresetFirst')
+                      : t('components.parameterInput.noAdditionalParams')}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Bundle参数提示 */}
+        {/* Bundle参数提示 - 更紧凑 */}
         {hasBundleParam && (
-          <Alert className="border-border bg-muted/20 py-2">
+          <Alert className="border-border bg-muted/20 py-1.5">
             <AlertDescription className="text-muted-foreground text-xs">
               <strong>{t('components.parameterInput.batchMode')}</strong>
               {t('components.parameterInput.batchModeDesc')}
