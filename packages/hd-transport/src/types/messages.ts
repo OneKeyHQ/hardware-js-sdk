@@ -2793,8 +2793,6 @@ export type DeviceEraseSector = {
 // GetPassphraseState
 export type GetPassphraseState = {
   passphrase_state?: string;
-  _only_main_pin?: boolean;
-  allow_create_attach_pin?: boolean;
 };
 
 // PassphraseState
