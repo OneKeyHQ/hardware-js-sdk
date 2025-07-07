@@ -48,7 +48,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   // 使用新的 Hooks
   const { currentDevice, deviceModel, deviceTheme, isConnected } = useDeviceInfo();
-  const { progressData } = useFirmwareProgress();
+  const { progressData, reset: resetFirmwareProgress } = useFirmwareProgress();
 
   // 参数管理
   const {
@@ -152,10 +152,9 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     
     // 如果是固件更新，重置固件进度状态
     if (type === 'firmware') {
-      const { reset } = useFirmwareProgress();
-      reset();
+      resetFirmwareProgress();
     }
-  }, [status, handleCancel, resetExecution, resetParameters, type, useFirmwareProgress]);
+  }, [status, handleCancel, resetExecution, resetParameters, type, resetFirmwareProgress]);
 
   // 清空当前执行日志（只影响显示，不影响全局日志）
   const handleClearExecutionLogs = useCallback(() => {

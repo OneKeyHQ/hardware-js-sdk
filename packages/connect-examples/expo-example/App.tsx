@@ -3,8 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TamaguiProvider, PortalProvider, Text, Stack, Card, YStack } from 'tamagui';
 import { Toast, ToastProvider, ToastViewport, useToastState } from '@tamagui/toast';
-import { TamaguiProvider, PortalProvider, Text, Stack, Card, YStack } from 'tamagui';
-import { Toast, ToastProvider, ToastViewport, useToastState } from '@tamagui/toast';
 import * as ExpoLinking from 'expo-linking';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
