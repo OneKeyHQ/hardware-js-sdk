@@ -5,8 +5,10 @@
   "tab__address_test": "地址测试",
   "tab__security_check": "安全检查",
   "tab__functional_testing": "功能测试",
+  "tab__attach_to_pin_testing": "Attach to Pin 测试",
 
   "action__search_device": "搜索设备",
+  "action__search_device_webusb": "搜索 WebUSB 设备",
   "action__clean_device": "断开连接",
   "action__connect_device": "连接设备",
   "action__confirm": "确认",
@@ -22,6 +24,7 @@
   "action__pick_file": "选择文件",
   "action__export_report": "导出报告",
   "action__switch_device": "切换到设备输入",
+  "action__switch_device_attach_pin": "切换到设备输入 PIN",
   "action__update_restart": "重启并安装更新",
 
   "action__start_test": "开始测试",
@@ -45,6 +48,7 @@
   "title__hardware_api_test": "硬件 API 测试",
   "title__updating": "正在更新",
   "title__input_pin": "输入 PIN",
+  "title__input_passphrase": "输入 Passphrase",
 
   "title__device_info": "设备信息",
   "title__device_firmware_update": "设备固件更新",

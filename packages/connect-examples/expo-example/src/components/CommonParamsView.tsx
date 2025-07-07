@@ -65,6 +65,11 @@ export default function CommonParamsView() {
           value={!!commonParams.skipWebDevicePrompt}
           onToggle={value => handleSetParam('skipWebDevicePrompt', value)}
         />
+        <SwitchInput
+          label="skipPassphraseCheck"
+          value={!!commonParams.skipPassphraseCheck}
+          onToggle={value => handleSetParam('skipPassphraseCheck', value)}
+        />
       </Stack>
     </PanelView>
   );

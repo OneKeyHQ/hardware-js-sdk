@@ -18,6 +18,7 @@ export interface UiResponsePassphrase {
   payload: {
     value: string;
     passphraseOnDevice?: boolean;
+    attachPinOnDevice?: boolean;
     save?: boolean;
   };
 }

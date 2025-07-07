@@ -137,6 +137,11 @@ export const HardwareErrorCode = {
   DeviceBusy: 117,
 
   /**
+   * Device check unlock type not match error
+   */
+  DeviceCheckUnlockTypeError: 118,
+
+  /**
    * Not initialized
    */
   NotInitialized: 200,
@@ -432,6 +437,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DeviceDetectInBootloaderMode]: 'Device in bootloader mode',
   [HardwareErrorCode.NotAllowInBootloaderMode]: 'Device not allow in bootloader mode',
   [HardwareErrorCode.DeviceBusy]: 'Device is busy',
+  [HardwareErrorCode.DeviceCheckUnlockTypeError]: 'Device check unlock type not match error',
   /**
    * Node Errors
    */

@@ -5,4 +5,5 @@ export const enum Routes {
   AddressTest = 'address-test',
   SecurityCheck = 'security-check',
   FunctionalTesting = 'functional-testing',
+  AttachToPinTestingScreen = 'attach-to-pin-testing',
 }

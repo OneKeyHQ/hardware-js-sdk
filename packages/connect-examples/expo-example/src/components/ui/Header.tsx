@@ -18,6 +18,7 @@ const menuItems: MenuItem[] = [
   { route: Routes.AddressTest, labelId: 'tab__address_test' },
   { route: Routes.SecurityCheck, labelId: 'tab__security_check' },
   { route: Routes.FunctionalTesting, labelId: 'tab__functional_testing' },
+  { route: Routes.AttachToPinTestingScreen, labelId: 'tab__attach_to_pin_testing' },
 ];
 
 // 菜单按钮组件

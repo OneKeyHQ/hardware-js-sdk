@@ -1,7 +1,8 @@
 import React, { lazy, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { TamaguiProvider, PortalProvider, Text, Stack, Card } from 'tamagui';
+import { TamaguiProvider, PortalProvider, Text, Stack, Card, YStack } from 'tamagui';
+import { Toast, ToastProvider, ToastViewport, useToastState } from '@tamagui/toast';
 import * as ExpoLinking from 'expo-linking';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,6 +22,7 @@ const FirmwareScreen = lazy(() => import('./src/views/FirmwareScreen'));
 const AddressTestScreen = lazy(() => import('./src/views/AddressTestScreen'));
 const SecurityCheckScreen = lazy(() => import('./src/views/SecurityCheckScreen'));
 const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTestingScreen'));
+const AttachToPinTestingScreen = lazy(() => import('./src/views/AttachToPinTestingScreen'));
 
 // React Navigation v6 linking 配置
 const linking = {
@@ -72,6 +74,10 @@ function NavigationContent() {
         <StackNavigator.Screen
           name={Routes.FunctionalTesting}
           component={FunctionalTestingScreen}
+        />
+        <StackNavigator.Screen
+          name={Routes.AttachToPinTestingScreen}
+          component={AttachToPinTestingScreen}
         />
       </StackNavigator.Navigator>
     </NavigationContainer>
@@ -147,6 +153,34 @@ function AppSafeAreaContent({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ToastView() {
+  const currentToast = useToastState();
+
+  if (!currentToast || currentToast.isHandledNatively) return null;
+
+  return (
+    <Toast
+      animation="quick"
+      key={currentToast.id}
+      duration={currentToast.duration}
+      enterStyle={{ opacity: 0, transform: [{ translateY: 100 }] }}
+      exitStyle={{ opacity: 0, transform: [{ translateY: 100 }] }}
+      transform={[{ translateY: 0 }]}
+      opacity={1}
+      scale={1}
+      viewportName={currentToast.viewportName}
+      backgroundColor="$bgApp"
+      borderWidth={1}
+      borderColor="$borderColor"
+    >
+      <YStack>
+        <Toast.Title>{currentToast.title}</Toast.Title>
+        {!!currentToast.message && <Toast.Description>{currentToast.message}</Toast.Description>}
+      </YStack>
+    </Toast>
+  );
+}
+
 // 声明全局变量类型
 declare global {
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -160,16 +194,20 @@ export default function App() {
   return (
     <TamaguiProviderWrapperMemo>
       <SafeAreaProvider>
-        <AppSafeAreaContent>
-          <SDKProvider>
-            <AppIntlProvider>
+        {/* <AppSafeAreaContent> */}
+        <SDKProvider>
+          <AppIntlProvider>
+            <ToastProvider burntOptions={{ from: 'bottom' }}>
               <UpdateTip />
               <MediaProvider>
                 <NavigationContentMemo />
               </MediaProvider>
-            </AppIntlProvider>
-          </SDKProvider>
-        </AppSafeAreaContent>
+              <ToastView />
+              <ToastViewport bottom={20} right={20} />
+            </ToastProvider>
+          </AppIntlProvider>
+        </SDKProvider>
+        {/* </AppSafeAreaContent> */}
       </SafeAreaProvider>
     </TamaguiProviderWrapperMemo>
   );

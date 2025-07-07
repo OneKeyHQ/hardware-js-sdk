@@ -236,6 +236,7 @@ type MethodParams = {
   methodName: keyof CoreApi;
   params: Parameters<CoreApi[keyof CoreApi]>[0];
   _originRequestParams: AllNetworkAddressParams;
+  _originalIndex: number;
 };
 
 export default class AllNetworkGetAddress extends BaseMethod<
@@ -267,9 +268,11 @@ export default class AllNetworkGetAddress extends BaseMethod<
   generateMethodName({
     network,
     payload,
+    originalIndex,
   }: {
     network: INetwork;
     payload: AllNetworkAddressParams;
+    originalIndex: number;
   }): MethodParams {
     const { name: networkName, coin } = networkAliases[network] || {
       name: network,
@@ -287,6 +290,7 @@ export default class AllNetworkGetAddress extends BaseMethod<
         originPayload: payload,
       },
       _originRequestParams: payload,
+      _originalIndex: originalIndex,
     };
   }
 
@@ -355,11 +359,12 @@ export default class AllNetworkGetAddress extends BaseMethod<
     const responses: AllNetworkAddress[] = [];
     const resultMap: Record<string, AllNetworkAddress> = {};
     const { bundle } = this.payload as AllNetworkGetAddressParams;
-    const methodReduceParams = bundle
-      .map(param =>
+    const methodGroups = bundle
+      .map((param, index) =>
         this.generateMethodName({
           network: param.network,
           payload: param,
+          originalIndex: index,
         })
       )
       .reduce((acc, cur) => {
@@ -370,27 +375,20 @@ export default class AllNetworkGetAddress extends BaseMethod<
         return acc;
       }, {} as Record<keyof CoreApi, MethodParams[]>);
 
-    const methodParamsArray = Object.values(methodReduceParams);
-
-    const generateResponseKey = (payload: CommonResponseParams) =>
-      `${payload.path}-${payload.network}-${payload.chainName}-${payload.prefix}`;
-
-    for (let i = 0; i < methodParamsArray.length; i++) {
-      const methodParams = methodParamsArray[i];
-      const { methodName } = methodParams[0];
-
-      const params = {
-        bundle: methodParams.map(param => ({
+    let i = 0;
+    for (const [methodName, params] of Object.entries(methodGroups)) {
+      const methodParams = {
+        bundle: params.map(param => ({
           ...param.params,
         })),
       };
 
       // call method
-      const response = await this.callMethod(methodName, params);
+      const response = await this.callMethod(methodName as keyof CoreApi, methodParams);
 
-      for (let i = 0; i < methodParams.length; i++) {
-        const { _originRequestParams } = methodParams[i];
-        const responseKey = generateResponseKey(_originRequestParams);
+      for (let i = 0; i < params.length; i++) {
+        const { _originRequestParams, _originalIndex } = params[i];
+        const responseKey = `${_originalIndex}`;
         resultMap[responseKey] = {
           ..._originRequestParams,
           ...response[i],
@@ -401,11 +399,11 @@ export default class AllNetworkGetAddress extends BaseMethod<
         const progress = Math.round(((i + 1) / this.payload.bundle.length) * 100);
         this.postMessage(createUiMessage(UI_REQUEST.DEVICE_PROGRESS, { progress }));
       }
+      i++;
     }
 
-    for (const param of bundle) {
-      const responseKey = generateResponseKey(param);
-      responses.push(resultMap[responseKey]);
+    for (let i = 0; i < bundle.length; i++) {
+      responses.push(resultMap[i]);
     }
 
     return Promise.resolve(responses);

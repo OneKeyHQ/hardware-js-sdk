@@ -37,6 +37,11 @@ export interface CommonParams {
    * Skip web device prompt
    */
   skipWebDevicePrompt?: boolean;
+
+  /**
+   * Skip passphrase check
+   */
+  skipPassphraseCheck?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

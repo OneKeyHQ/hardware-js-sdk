@@ -7,7 +7,8 @@ import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
 import { EDeviceType } from '@onekeyfe/hd-shared';
-import type { Device, IDeviceListInstance } from '../../components/DeviceList';
+import { useAtomValue, useSetAtom } from 'jotai';
+import type { IDeviceListInstance } from '../../components/DeviceList';
 import PageView from '../../components/ui/Page';
 import PanelView from '../../components/ui/Panel';
 import { Button } from '../../components/ui/Button';
@@ -22,6 +23,7 @@ import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDevi
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
+import { selectDeviceAtom } from '../../atoms/deviceAtoms';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
 type UpdateState = {
@@ -381,17 +383,13 @@ function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultiple
 }
 
 interface FirmwareUpdateProps {
-  selectDevice: Device | undefined;
   onReconnectDevice: () => void;
   onDisconnectDevice: () => void;
 }
-function FirmwareUpdate({
-  selectDevice,
-  onDisconnectDevice,
-  onReconnectDevice,
-}: FirmwareUpdateProps) {
+function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdateProps) {
   const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
+  const selectDevice = useAtomValue(selectDeviceAtom);
   const [features, setFeatures] = useState<Features | undefined>(undefined);
   const [onekeyFeatures, setOnekeyFeatures] = useState<OnekeyFeatures | undefined>(undefined);
   const [connecting, setConnecting] = useState<boolean>(false);
@@ -771,15 +769,14 @@ function FirmwareUpdate({
 }
 
 export default function FirmwareScreen() {
-  const [selectedDevice, setSelectedDevice] = useState<Device | undefined>(undefined);
+  const setSelectedDevice = useSetAtom(selectDeviceAtom);
   const deviceListInstanceRef = useRef<IDeviceListInstance>(null);
 
   return (
     <PageView>
       <Stack padding="$2">
-        <DeviceList ref={deviceListInstanceRef} onSelected={setSelectedDevice} disableSaveDevice />
+        <DeviceList ref={deviceListInstanceRef} disableSaveDevice />
         <FirmwareUpdate
-          selectDevice={selectedDevice}
           onDisconnectDevice={() => setSelectedDevice(undefined)}
           onReconnectDevice={() => {
             deviceListInstanceRef.current?.searchDevices();

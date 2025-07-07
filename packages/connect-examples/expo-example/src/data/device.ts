@@ -71,6 +71,11 @@ const api: PlaygroundProps[] = [
     noDeviceIdReq: true,
   },
   {
+    method: 'deviceUnlock',
+    description: 'unlock device',
+    noDeviceIdReq: true,
+  },
+  {
     method: 'deviceSupportFeatures',
     description: 'Check if a device supports a feature',
     noDeviceIdReq: true,

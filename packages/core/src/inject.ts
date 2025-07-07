@@ -138,6 +138,8 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'getPassphraseState' }),
   deviceCancel: (connectId, params) => call({ ...params, connectId, method: 'deviceCancel' }),
   deviceLock: (connectId, params) => call({ ...params, connectId, method: 'deviceLock' }),
+  deviceUnlock: (connectId, params) =>
+    call({ ...params, useEmptyPassphrase: true, connectId, method: 'deviceUnlock' }),
 
   getNextU2FCounter: (connectId, params) =>
     call({ ...params, connectId, method: 'getNextU2FCounter' }),

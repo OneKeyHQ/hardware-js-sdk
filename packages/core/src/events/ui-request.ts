@@ -66,7 +66,7 @@ export type UiRequestDeviceAction = {
   type: typeof UI_REQUEST.REQUEST_PIN;
   payload: {
     device: Device;
-    type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry';
+    type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry' | 'ButtonRequest_AttachPin';
   };
 };
 
@@ -80,6 +80,7 @@ export interface UiRequestPassphrase {
   payload: {
     device: Device;
     passphraseState?: string;
+    existsAttachPinUser?: boolean;
   };
 }
 
