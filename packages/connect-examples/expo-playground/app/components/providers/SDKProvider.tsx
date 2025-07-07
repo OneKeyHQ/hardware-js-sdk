@@ -32,7 +32,7 @@ export interface FirmwareProgressData {
   progressType: 'transferData' | 'installingFirmware';
 }
 
-const useFirmwareProgressStore = create<{
+export const useFirmwareProgressStore = create<{
   progressData: FirmwareProgressData | null;
   setProgressData: (data: FirmwareProgressData | null) => void;
   reset: () => void;
@@ -62,6 +62,8 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         // 处理设备动作状态
         if (message.type === UI_REQUEST.CLOSE_UI_WINDOW) {
           clearDeviceAction();
+          // 重置固件进度状态
+          useFirmwareProgressStore.getState().reset();
         } else if (message.type) {
           setDeviceAction({
             isActive: true,

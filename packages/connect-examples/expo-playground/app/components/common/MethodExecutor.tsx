@@ -149,7 +149,13 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     resetParameters();
     // 重置执行开始时间，清空执行日志显示
     setExecutionStartTime(null);
-  }, [status, handleCancel, resetExecution, resetParameters]);
+    
+    // 如果是固件更新，重置固件进度状态
+    if (type === 'firmware') {
+      const { reset } = useFirmwareProgress();
+      reset();
+    }
+  }, [status, handleCancel, resetExecution, resetParameters, type, useFirmwareProgress]);
 
   // 清空当前执行日志（只影响显示，不影响全局日志）
   const handleClearExecutionLogs = useCallback(() => {

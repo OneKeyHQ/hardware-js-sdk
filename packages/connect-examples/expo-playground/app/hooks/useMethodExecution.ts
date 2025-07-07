@@ -4,6 +4,7 @@ import { convertFilesToArrayBuffers } from '../store/hardwareStore';
 import { cancelHardwareOperation } from '../services/hardwareService';
 import type { ExecutionStatus } from '~/data/types';
 import type { UiEvent } from '@onekeyfe/hd-core';
+import { useFirmwareProgressStore } from '../components/providers/SDKProvider';
 
 interface UseMethodExecutionOptions {
   type?: 'standard' | 'firmware';
@@ -38,6 +39,14 @@ export function useMethodExecution({
   onError,
 }: UseMethodExecutionOptions = {}): UseMethodExecutionReturn {
   const { toast } = useToast();
+
+  // 固件进度重置函数
+  const resetFirmwareProgressStore = useCallback(() => {
+    if (type === 'firmware') {
+      // 直接访问store而不是hook
+      useFirmwareProgressStore.getState().reset();
+    }
+  }, [type]);
 
   // 状态管理
   const [status, setStatus] = useState<ExecutionStatus>('idle');
@@ -74,6 +83,9 @@ export function useMethodExecution({
           setStatus('error');
           onError?.(JSON.stringify(result));
 
+          // 固件更新失败时也重置进度状态
+          resetFirmwareProgressStore();
+
           toast({
             title: '执行失败',
             description: JSON.stringify(result),
@@ -86,6 +98,9 @@ export function useMethodExecution({
         setStatus('success');
         onResult?.(result);
 
+        // 如果是固件更新，重置固件进度状态
+        resetFirmwareProgressStore();
+
         toast({
           title: '执行成功',
           description: `方法执行完成 (${duration}ms)`,
@@ -95,6 +110,9 @@ export function useMethodExecution({
         setStatus('error');
         onError?.(errorMessage);
 
+        // 如果是固件更新，执行异常时也重置进度状态
+        resetFirmwareProgressStore();
+
         toast({
           title: '执行异常',
           description: errorMessage,
@@ -102,7 +120,7 @@ export function useMethodExecution({
         });
       }
     },
-    [type, onResult, onError, toast]
+    [type, onResult, onError, toast, resetFirmwareProgressStore]
   );
 
   // 取消操作
@@ -122,6 +140,9 @@ export function useMethodExecution({
             setStatus('idle');
             setDeviceAction(null);
             setIsCancelling(false);
+
+            // 如果是固件更新被取消，重置固件进度状态
+            resetFirmwareProgressStore();
 
             toast({
               title: '操作已取消',
@@ -145,7 +166,7 @@ export function useMethodExecution({
         });
       }
     },
-    [status, toast]
+    [status, toast, resetFirmwareProgressStore]
   );
 
   // 重置状态
@@ -154,11 +175,14 @@ export function useMethodExecution({
     setDeviceAction(null);
     setIsCancelling(false);
 
+    // 如果是固件更新，重置固件进度状态
+    resetFirmwareProgressStore();
+
     toast({
       title: '状态重置',
       description: '已重置到初始状态',
     });
-  }, [toast]);
+  }, [resetFirmwareProgressStore, toast]);
 
   return {
     // 状态

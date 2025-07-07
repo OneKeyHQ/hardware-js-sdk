@@ -78,8 +78,8 @@ const api: UnifiedMethodConfig[] = [
             label: 'Platform',
             options: [
               { label: 'Web', value: 'web' },
-              { label: 'Desktop', value: 'desktop' },
-              { label: 'Mobile', value: 'mobile' },
+              // { label: 'Desktop', value: 'desktop' },
+              // { label: 'Mobile', value: 'mobile' },
             ],
             value: 'web',
           },
@@ -119,8 +119,8 @@ const api: UnifiedMethodConfig[] = [
             label: 'Platform',
             options: [
               { label: 'Web', value: 'web' },
-              { label: 'Desktop', value: 'desktop' },
-              { label: 'Mobile', value: 'mobile' },
+              // { label: 'Desktop', value: 'desktop' },
+              // { label: 'Mobile', value: 'mobile' },
             ],
             value: 'web',
           },
