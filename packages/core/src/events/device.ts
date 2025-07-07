@@ -44,6 +44,10 @@ export interface DeviceButtonRequestPayload extends Omit<PROTO.ButtonRequest, 'c
   code?: PROTO.ButtonRequest['code'] | 'ButtonRequest_FirmwareUpdate';
 }
 
+export type PassphraseRequestPayload = {
+  existsAttachPinUser?: boolean;
+};
+
 export interface DeviceButtonRequest {
   type: typeof DEVICE.BUTTON;
   payload: DeviceButtonRequestPayload & { device: Device | null };

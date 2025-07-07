@@ -35,6 +35,7 @@ import { deviceSupportFeatures } from './deviceSupportFeatures';
 import { deviceFullyUploadResource } from './deviceFullyUploadResource';
 import { deviceUpdateBootloader } from './deviceUpdateBootloader';
 import { deviceLock } from './deviceLock';
+import { deviceUnlock } from './deviceUnlock';
 import { deviceCancel } from './deviceCancel';
 
 import { getNextU2FCounter } from './getNextU2FCounter';
@@ -214,6 +215,7 @@ export type CoreApi = {
   deviceFullyUploadResource: typeof deviceFullyUploadResource;
   deviceUpdateBootloader: typeof deviceUpdateBootloader;
   deviceLock: typeof deviceLock;
+  deviceUnlock: typeof deviceUnlock;
   deviceCancel: typeof deviceCancel;
   getNextU2FCounter: typeof getNextU2FCounter;
   setU2FCounter: typeof setU2FCounter;

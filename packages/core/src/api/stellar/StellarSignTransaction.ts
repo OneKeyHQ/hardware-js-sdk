@@ -194,9 +194,6 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
         this.operations.push(transformed);
       }
     });
-
-    console.log('StellarSignTransactionParams', this.params);
-    console.log('StellarSignTransactionOperations', this.operations);
   }
 
   processTxRequest = async (operations: any, index: number): Promise<StellarSignedTx> => {

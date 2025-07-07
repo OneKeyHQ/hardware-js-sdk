@@ -3021,7 +3021,8 @@
             "ButtonRequest_Success": 17,
             "ButtonRequest_Warning": 18,
             "ButtonRequest_PassphraseEntry": 19,
-            "ButtonRequest_PinEntry": 20
+            "ButtonRequest_PinEntry": 20,
+            "ButtonRequest_AttachPin": 8000
           }
         }
       }
@@ -3071,6 +3072,10 @@
           "options": {
             "deprecated": true
           }
+        },
+        "exists_attach_pin_user": {
+          "type": "bool",
+          "id": 8000
         }
       }
     },
@@ -3090,6 +3095,10 @@
         "on_device": {
           "type": "bool",
           "id": 3
+        },
+        "on_device_attach_pin": {
+          "type": "bool",
+          "id": 8000
         }
       }
     },
@@ -6051,6 +6060,10 @@
         "derive_cardano": {
           "type": "bool",
           "id": 3
+        },
+        "passphrase_state": {
+          "type": "string",
+          "id": 8000
         }
       }
     },
@@ -6429,6 +6442,14 @@
         "onekey_se04_state": {
           "type": "OneKeySEState",
           "id": 624
+        },
+        "attach_to_pin_user": {
+          "type": "bool",
+          "id": 625
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 626
         }
       },
       "nested": {
@@ -7530,6 +7551,30 @@
           "rule": "required",
           "type": "uint32",
           "id": 1
+        }
+      }
+    },
+    "GetPassphraseState": {
+      "fields": {
+        "passphrase_state": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "PassphraseState": {
+      "fields": {
+        "passphrase_state": {
+          "type": "string",
+          "id": 1
+        },
+        "session_id": {
+          "type": "bytes",
+          "id": 2
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 3
         }
       }
     },
@@ -12144,7 +12189,9 @@
         "MessageType_ListResDir": 10023,
         "MessageType_FileInfoList": 10024,
         "MessageType_OnekeyGetFeatures": 10025,
-        "MessageType_OnekeyFeatures": 10026
+        "MessageType_OnekeyFeatures": 10026,
+        "MessageType_GetPassphraseState": 10028,
+        "MessageType_PassphraseState": 10029
       }
     },
     "google": {
