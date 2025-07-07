@@ -52,7 +52,8 @@
     "debug:watcher": "node ./scripts/monitor.js"
   },
   "resolutions": {
-    "pbkdf2": "3.1.3"
+    "pbkdf2": "3.1.3",
+    "es-iterator-helpers": "1.0.15"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",
