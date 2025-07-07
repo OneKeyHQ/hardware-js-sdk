@@ -91,11 +91,6 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
     }
   );
 
-  // Attach to pin try to fix internal state
-  if (newSession && passphraseState && features?.device_id) {
-    device.updateInternalState(passphraseState, features.device_id, newSession);
-  }
-
   const isModeT =
     getDeviceType(features) === EDeviceType.Touch || getDeviceType(features) === EDeviceType.Pro;
 
@@ -109,6 +104,17 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   if (needRefreshWithLocked || needRefreshWithPassphrase) {
     // refresh device state
     await device.getFeatures();
+  }
+
+  // Attach to pin try to fix internal state
+  if (features?.device_id) {
+    device.updateInternalState(
+      features.passphrase_protection ?? false,
+      passphraseState,
+      features.device_id,
+      newSession,
+      features.session_id
+    );
   }
 
   return { passphraseState, newSession, unlockedAttachPin };

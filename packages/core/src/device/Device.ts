@@ -314,42 +314,38 @@ export class Device extends EventEmitter {
     return deviceSessionCache[usePassKey];
   }
 
-  tryFixInternalState(state: string, deviceId: string, sessionId: string | null = null) {
-    Log.debug(
-      'tryFixInternalState session param: ',
-      `device_id: ${deviceId}`,
-      `passphraseState: ${state}`,
-      `sessionId: ${sessionId}`
-    );
-
-    const key = `${deviceId}`;
-    const session = deviceSessionCache[key];
-    if (session) {
-      deviceSessionCache[this.generateStateKey(deviceId, state)] = session;
-      delete deviceSessionCache[key];
-    } else if (sessionId) {
-      deviceSessionCache[this.generateStateKey(deviceId, state)] = sessionId;
-    }
-    Log.debug('tryFixInternalState session cache: ', deviceSessionCache);
-  }
-
   // attach to pin to fix internal state
-  updateInternalState(state: string, deviceId: string, sessionId: string | null = null) {
+  updateInternalState(
+    enablePassphrase: boolean,
+    passphraseState: string | undefined,
+    deviceId: string,
+    sessionId: string | null = null,
+    featuresSessionId: string | null = null
+  ) {
     Log.debug(
       'updateInternalState session param: ',
       `device_id: ${deviceId}`,
-      `passphraseState: ${state}`,
-      `sessionId: ${sessionId}`
+      `enablePassphrase: ${enablePassphrase}`,
+      `passphraseState: ${passphraseState}`,
+      `sessionId: ${sessionId}`,
+      `featuresSessionId: ${featuresSessionId}`
     );
 
-    if (sessionId) {
-      deviceSessionCache[this.generateStateKey(deviceId, state)] = sessionId;
-      // delete the old sessionId
-      const oldKey = `${deviceId}`;
-      if (deviceSessionCache[oldKey]) {
-        delete deviceSessionCache[oldKey];
+    if (enablePassphrase) {
+      // update the sessionId
+      if (sessionId) {
+        deviceSessionCache[this.generateStateKey(deviceId, passphraseState)] = sessionId;
+      } else if (featuresSessionId) {
+        deviceSessionCache[this.generateStateKey(deviceId, passphraseState)] = featuresSessionId;
       }
     }
+
+    // delete the old sessionId
+    const oldKey = `${deviceId}`;
+    if (deviceSessionCache[oldKey]) {
+      delete deviceSessionCache[oldKey];
+    }
+
     Log.debug('updateInternalState session cache: ', deviceSessionCache);
   }
 
