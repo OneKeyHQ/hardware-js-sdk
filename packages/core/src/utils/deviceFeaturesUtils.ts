@@ -109,11 +109,11 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (
   // Attach to pin try to fix internal state
   if (features?.device_id) {
     device.updateInternalState(
-      features.passphrase_protection ?? false,
+      device.features?.passphrase_protection ?? false,
       passphraseState,
-      features.device_id,
+      device.features?.device_id ?? '',
       newSession,
-      features.session_id
+      device.features?.session_id
     );
   }
 

@@ -298,13 +298,13 @@ export class Device extends EventEmitter {
   }
 
   getInternalState(_deviceId?: string) {
+    Log.debug('getInternalState session cache: ', deviceSessionCache);
     Log.debug(
       'getInternalState session param: ',
       `device_id: ${_deviceId}`,
       `features.device_id: ${this.features?.device_id}`,
       `passphraseState: ${this.passphraseState}`
     );
-    Log.debug('getInternalState session cache: ', deviceSessionCache);
 
     const deviceId = _deviceId || this.features?.device_id;
     if (!deviceId) return undefined;
@@ -406,10 +406,11 @@ export class Device extends EventEmitter {
     }
     payload.passphrase_state = options?.passphraseState;
 
-    Log.debug('Initialize device begin:', payload, {
+    Log.debug('Initialize device begin:', {
       deviceId: options?.deviceId,
       passphraseState: options?.passphraseState,
       initSession: options?.initSession,
+      InitializePayload: payload,
     });
 
     try {
