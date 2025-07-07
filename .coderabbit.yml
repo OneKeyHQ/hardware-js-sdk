@@ -4,3 +4,4 @@ reviews:
   # 或者基于特定条件忽略
   ignore_patterns:
     - "connect-examples/expo-playground/**"
+    - "packages/connect-examples/expo-playground/**"
