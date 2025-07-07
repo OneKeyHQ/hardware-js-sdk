@@ -56,26 +56,26 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
   };
 
   return (
-    <div className={`flex flex-col gap-3 ${className}`}>
-      {/* 上部：请求参数编辑区域 - 紧凑设计 */}
+    <div className={`flex flex-col gap-2 ${className}`}>
+      {/* 上部：请求参数编辑区域 - 极致紧凑设计 */}
       <Card className="bg-card border border-border/50 shadow-sm flex-shrink-0">
-        <CardHeader className="pb-2 pt-3">
+        <CardHeader className="pb-1 pt-2 px-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Edit className="h-3.5 w-3.5" />
+            <CardTitle className="text-xs font-medium text-foreground flex items-center gap-1">
+              <Edit className="h-3 w-3" />
               {t('components.executionPanel.requestParameters')}
             </CardTitle>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsParamsCollapsed(!isParamsCollapsed)}
-                className="h-6 px-1.5 text-xs"
+                className="h-5 px-1 text-xs"
               >
                 {isParamsCollapsed ? (
-                  <ChevronDown className="h-3 w-3" />
+                  <ChevronDown className="h-2.5 w-2.5" />
                 ) : (
-                  <ChevronUp className="h-3 w-3" />
+                  <ChevronUp className="h-2.5 w-2.5" />
                 )}
               </Button>
               <Button
@@ -83,9 +83,9 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 size="sm"
                 onClick={handleCopyParams}
                 disabled={disabled}
-                className="h-6 px-2 text-xs"
+                className="h-5 px-1.5 text-xs"
               >
-                <Copy className="h-3 w-3 mr-1" />
+                <Copy className="h-2.5 w-2.5 mr-0.5" />
                 {copied ? t('common.copied') : t('common.copy')}
               </Button>
               <Button
@@ -93,16 +93,16 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 size="sm"
                 onClick={() => setIsEditing(true)}
                 disabled={disabled}
-                className="h-6 px-2 text-xs"
+                className="h-5 px-1.5 text-xs"
               >
-                <Edit className="h-3 w-3 mr-1" />
+                <Edit className="h-2.5 w-2.5 mr-0.5" />
                 {t('common.edit')}
               </Button>
             </div>
           </div>
         </CardHeader>
         {!isParamsCollapsed && (
-          <CardContent className="pt-0 pb-3">
+          <CardContent className="pt-0 pb-2 px-2">
             <JsonEditor
               ref={jsonEditorRef}
               data={requestData}

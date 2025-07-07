@@ -204,8 +204,8 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
 
   return (
     <div className={`flex flex-col ${className}`}>
-      {/* 参数输入区域 - 自适应高度 */}
-      <div className="flex-shrink-0 mb-4">
+      {/* 参数输入区域 - 紧凑布局 */}
+      <div className="flex-shrink-0 mb-2">
         <ParameterInput
           methodConfig={methodConfig}
           selectedPreset={selectedPreset}
@@ -214,11 +214,11 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
         />
       </div>
 
-      {/* 主要内容区域 - 固定高度 */}
-      <div className="w-full min-h-[450px] h-full">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-full">
+      {/* 主要内容区域 - 紧凑高度 */}
+      <div className="w-full min-h-[380px] h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 h-full">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col h-full max-h-[650px] ">
+          <div className="lg:col-span-2 flex flex-col h-full max-h-[520px]">
             <DeviceInteractionArea
               status={status}
               deviceAction={deviceAction}
@@ -233,7 +233,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           </div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col h-full max-h-[650px] ">
+          <div className="lg:col-span-3 flex flex-col h-full max-h-[520px]">
             <ExecutionPanel
               requestData={storeExecutionParameters}
               onSaveRequest={handleRequestParamsEdit}

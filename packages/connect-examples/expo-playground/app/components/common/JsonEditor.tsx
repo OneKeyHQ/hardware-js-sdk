@@ -88,18 +88,18 @@ const JsonEditor = forwardRef<JsonEditorRef, JsonEditorProps>(
       <>
         {data ? (
           <div className="relative">
-            <pre className="bg-gradient-to-br from-muted/20 to-muted/40 p-4 rounded-xl text-xs overflow-auto max-h-80 border border-border/30 text-foreground font-mono leading-relaxed shadow-sm">
+            <pre className="bg-gradient-to-br from-muted/20 to-muted/40 p-2 rounded-lg text-xs overflow-auto max-h-32 border border-border/30 text-foreground font-mono leading-tight shadow-sm">
               {JSON.stringify(data, null, 2)}
             </pre>
-            <div className="absolute top-2 right-2 opacity-60 hover:opacity-100 transition-opacity">
-              <span className="text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded-md">
+            <div className="absolute top-1 right-1 opacity-60 hover:opacity-100 transition-opacity">
+              <span className="text-xs text-muted-foreground bg-background/80 px-1.5 py-0.5 rounded-sm">
                 JSON
               </span>
             </div>
           </div>
         ) : (
-          <div className="bg-muted/20 p-8 rounded-xl text-center border-2 border-dashed border-border/30">
-            <p className="text-muted-foreground text-sm">{t('components.jsonEditor.noData')}</p>
+          <div className="bg-muted/20 p-4 rounded-lg text-center border-2 border-dashed border-border/30">
+            <p className="text-muted-foreground text-xs">{t('components.jsonEditor.noData')}</p>
           </div>
         )}
 

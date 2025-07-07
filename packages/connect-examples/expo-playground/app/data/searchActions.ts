@@ -2,10 +2,11 @@ import { deviceMethodsRegistry, signerMethodsRegistry } from '../hooks/useMethod
 import { usePersistenceStore } from '../store/persistenceStore';
 import type { Action } from 'kbar';
 
-// 获取基础路径
+// 获取基础路径 - 与项目配置保持一致
 const getBasename = () => {
   if (typeof window === 'undefined') return '';
-  return window.location.pathname.includes('/hardware-js-sdk') ? '/hardware-js-sdk' : '';
+  // 统一使用环境变量，与 entry.client.tsx 和 webpack.config.js 保持一致
+  return process.env.NODE_ENV === 'production' ? '/expo-playground' : '';
 };
 
 // 导航函数 - 使用 React Router 的编程式导航
