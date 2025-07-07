@@ -250,19 +250,11 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     return getConfigByPattern();
   };
 
-  // 渲染通用标签 - 紧凑版本
+  // 渲染通用标签 - 只显示字段名称
   const renderFieldLabel = (field: ParameterField) => (
-    <label
-      htmlFor={field.name}
-      className="text-xs font-medium text-foreground cursor-pointer flex items-center gap-1"
-    >
-      {field.label || field.name}
+    <label htmlFor={field.name} className="text-xs font-medium text-foreground cursor-pointer">
+      {field.name}
       {field.required && <span className="text-orange-600">*</span>}
-      {field.description && (
-        <span className="text-xs text-muted-foreground font-normal ml-1">
-          ({field.description})
-        </span>
-      )}
     </label>
   );
 
@@ -275,26 +267,28 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const acceptTypes = field.accept || config.accept;
 
     return (
-      <div key={field.name} className="space-y-1.5">
-        {renderFieldLabel(field)}
-        <div className="relative">
-          <input
-            type="file"
-            accept={acceptTypes}
-            onChange={e => {
-              const file = e.target.files?.[0] || null;
-              handleParamChange(field.name, file);
-            }}
-            className="absolute inset-0 w-full h-full opacity-0 z-10"
-          />
-          <div className="bg-background border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/50 hover:border-primary cursor-pointer transition-colors select-none">
-            {currentValue ? (
-              <span className="text-foreground cursor-pointer">{currentValue.name}</span>
-            ) : (
-              <span className="text-muted-foreground cursor-pointer">
-                {t('components.parameterInput.selectFirmwareFile', { title: config.title })}
-              </span>
-            )}
+      <div key={field.name} className="flex items-center gap-2">
+        <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
+        <div className="flex-1 min-w-0">
+          <div className="relative">
+            <input
+              type="file"
+              accept={acceptTypes}
+              onChange={e => {
+                const file = e.target.files?.[0] || null;
+                handleParamChange(field.name, file);
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 z-10"
+            />
+            <div className="bg-background border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/50 hover:border-primary cursor-pointer transition-colors select-none">
+              {currentValue ? (
+                <span className="text-foreground cursor-pointer">{currentValue.name}</span>
+              ) : (
+                <span className="text-muted-foreground cursor-pointer">
+                  {t('components.parameterInput.selectFirmwareFile', { title: config.title })}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -307,8 +301,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const isEditable = field.editable !== false;
 
     return (
-      <div key={field.name} className="space-y-1.5">
-        <div className="flex items-start space-x-2">
+      <div key={field.name} className="flex items-center gap-2">
+        <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
+        <div className="flex-1 min-w-0">
           <Checkbox
             id={field.name}
             checked={Boolean(value)}
@@ -316,9 +311,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
               isEditable && handleParamChange(field.name, checked === true)
             }
             disabled={!isEditable}
-            className="mt-0.5"
           />
-          <div className="space-y-0.5">{renderFieldLabel(field)}</div>
         </div>
       </div>
     );
@@ -338,44 +331,46 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     };
 
     return (
-      <div key={field.name} className="space-y-1.5">
-        {renderFieldLabel(field)}
-        {field.type === 'textarea' ? (
-          <textarea
-            id={field.name}
-            value={getDisplayValue(value)}
-            onChange={e => {
-              if (!isEditable) return;
-              handleParamChange(field.name, e.target.value);
-            }}
-            placeholder={field.placeholder}
-            disabled={!isEditable}
-            rows={3}
-            className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        ) : (
-          <Input
-            id={field.name}
-            type={type}
-            value={String(value || '')}
-            onChange={e => {
-              if (!isEditable) return;
-              const newValue =
-                type === 'number' && e.target.value ? Number(e.target.value) : e.target.value;
-              handleParamChange(field.name, newValue);
-            }}
-            placeholder={field.placeholder}
-            disabled={!isEditable}
-            className="bg-background border-border focus:border-primary text-xs h-8"
-            {...(field.validation && {
-              pattern: field.validation.pattern,
-              min: field.validation.min,
-              max: field.validation.max,
-              minLength: field.validation.min,
-              maxLength: field.validation.max,
-            })}
-          />
-        )}
+      <div key={field.name} className="flex items-center gap-2">
+        <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
+        <div className="flex-1 min-w-0">
+          {field.type === 'textarea' ? (
+            <textarea
+              id={field.name}
+              value={getDisplayValue(value)}
+              onChange={e => {
+                if (!isEditable) return;
+                handleParamChange(field.name, e.target.value);
+              }}
+              placeholder={field.placeholder}
+              disabled={!isEditable}
+              rows={3}
+              className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          ) : (
+            <Input
+              id={field.name}
+              type={type}
+              value={String(value || '')}
+              onChange={e => {
+                if (!isEditable) return;
+                const newValue =
+                  type === 'number' && e.target.value ? Number(e.target.value) : e.target.value;
+                handleParamChange(field.name, newValue);
+              }}
+              placeholder={field.placeholder}
+              disabled={!isEditable}
+              className="bg-background border-border focus:border-primary text-xs h-7"
+              {...(field.validation && {
+                pattern: field.validation.pattern,
+                min: field.validation.min,
+                max: field.validation.max,
+                minLength: field.validation.min,
+                maxLength: field.validation.max,
+              })}
+            />
+          )}
+        </div>
       </div>
     );
   };
@@ -386,40 +381,44 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const isEditable = field.editable !== false;
 
     return (
-      <div key={field.name} className="space-y-1.5">
-        {renderFieldLabel(field)}
-        <Select
-          value={String(value || '')}
-          onValueChange={newValue => isEditable && handleParamChange(field.name, newValue)}
-          disabled={!isEditable}
-        >
-          <SelectTrigger
-            id={field.name}
-            className="bg-background border-border focus:border-primary text-xs h-8"
+      <div key={field.name} className="flex items-center gap-2">
+        <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
+        <div className="flex-1 min-w-0">
+          <Select
+            value={String(value || '')}
+            onValueChange={newValue => isEditable && handleParamChange(field.name, newValue)}
+            disabled={!isEditable}
           >
-            <SelectValue
-              placeholder={field.placeholder || `${t('common.select')}${field.label || field.name}`}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {field.options?.map(option => {
-              // 支持字符串和对象两种格式
-              if (typeof option === 'string') {
-                return (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                );
-              } else {
-                return (
-                  <SelectItem key={option.value} value={option.value}>
-                    {String(option.label)}
-                  </SelectItem>
-                );
-              }
-            })}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              id={field.name}
+              className="bg-background border-border focus:border-primary text-xs h-7"
+            >
+              <SelectValue
+                placeholder={
+                  field.placeholder || `${t('common.select')}${field.label || field.name}`
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {field.options?.map(option => {
+                // 支持字符串和对象两种格式
+                if (typeof option === 'string') {
+                  return (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  );
+                } else {
+                  return (
+                    <SelectItem key={option.value} value={option.value}>
+                      {String(option.label)}
+                    </SelectItem>
+                  );
+                }
+              })}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     );
   };
@@ -455,17 +454,17 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   return (
     <Card className="bg-card border border-border/50 shadow-sm">
-      <CardContent className="space-y-3 pb-3">
+      <CardContent className="space-y-2 pb-2 pt-2">
         {/* 优化的紧凑布局 */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {/* 预设选择器 - 如果有多个预设则显示在顶部 */}
           {hasMultiplePresets && (
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-foreground min-w-0 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-foreground min-w-0 flex-shrink-0">
                 {t('components.parameterInput.selectPreset')}:
               </label>
               <Select value={selectedPreset || ''} onValueChange={handlePresetChange}>
-                <SelectTrigger className="bg-background border-border focus:border-primary text-xs h-8 flex-1">
+                <SelectTrigger className="bg-background border-border focus:border-primary text-xs h-7 flex-1">
                   <SelectValue placeholder={t('components.parameterInput.selectPreset')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -479,13 +478,13 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             </div>
           )}
 
-          {/* 参数区域 - 使用更紧凑的2列布局 */}
-          <div className={`grid grid-cols-1 gap-4 ${hasCommonParams ? 'md:grid-cols-2' : ''}`}>
+          {/* 参数区域 - 紧凑两列布局 */}
+          <div className={`grid grid-cols-1 gap-2 ${hasCommonParams ? 'md:grid-cols-2' : ''}`}>
             {/* 通用参数 - 只在需要passphrase的方法中显示 */}
             {hasCommonParams && (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <div className="flex items-center gap-1">
-                  <h4 className="text-sm font-medium text-foreground">
+                  <h4 className="text-xs font-medium text-foreground">
                     {t('components.parameterInput.commonParameters')}
                   </h4>
                   <Button
@@ -497,19 +496,19 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                         '_blank'
                       )
                     }
-                    className="h-4 px-1 text-xs text-muted-foreground hover:text-primary"
+                    className="h-3 px-1 text-xs text-muted-foreground hover:text-primary"
                   >
-                    <ExternalLink className="h-2.5 w-2.5" />
+                    <ExternalLink className="h-2 w-2" />
                   </Button>
                 </div>
-                <div className="space-y-2">{commonParams.map(renderParameterField)}</div>
+                <div className="space-y-1">{commonParams.map(renderParameterField)}</div>
               </div>
             )}
 
             {/* 方法参数 */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                <h4 className="text-sm font-medium text-foreground">
+                <h4 className="text-xs font-medium text-foreground">
                   {t('components.parameterInput.methodParameters')}
                 </h4>
                 {selectedPreset && (
@@ -517,9 +516,9 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
                 )}
               </div>
               {visibleMethodParameters.length > 0 ? (
-                <div className="space-y-2">{visibleMethodParameters.map(renderParameterField)}</div>
+                <div className="space-y-1">{visibleMethodParameters.map(renderParameterField)}</div>
               ) : (
-                <div className="text-center py-2">
+                <div className="text-center py-1">
                   <p className="text-xs text-muted-foreground">
                     {hasBundleParam
                       ? t('components.parameterInput.parametersInBundle')
@@ -537,7 +536,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
         {/* Bundle参数提示 - 更紧凑 */}
         {hasBundleParam && (
-          <Alert className="border-border bg-muted/20 py-1.5">
+          <Alert className="border-border bg-muted/20 py-1">
             <AlertDescription className="text-muted-foreground text-xs">
               <strong>{t('components.parameterInput.batchMode')}</strong>
               {t('components.parameterInput.batchModeDesc')}
