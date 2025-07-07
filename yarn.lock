@@ -7095,7 +7095,7 @@
 
 "@tamagui/toast@1.90.2":
   version "1.90.2"
-  resolved "https://registry.npmjs.org/@tamagui/toast/-/toast-1.90.2.tgz#85fc1fb4dea5336d22f128f2b5c8eea8f3434afd"
+  resolved "https://registry.yarnpkg.com/@tamagui/toast/-/toast-1.90.2.tgz#85fc1fb4dea5336d22f128f2b5c8eea8f3434afd"
   integrity sha512-4qk3r/qaW3XEbt0V+V7U+4Er13935FUy3nPVZTjHGKE1mWEQF6yf1MRyyDS8mGwrl8J5FDXrvjug+LjQB9r9Yw==
   dependencies:
     "@tamagui/animate-presence" "1.90.2"
