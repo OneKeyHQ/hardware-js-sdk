@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'benfenGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -35,7 +35,6 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'benfenGetPublicKey',
-    description: 'Get PublicKey',
     presupposes: [
       {
         title: 'Get PublicKey',
@@ -67,7 +66,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'benfenSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',
@@ -81,7 +80,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'benfenSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',

@@ -24,18 +24,40 @@ const SecurityCheckScreen = lazy(() => import('./src/views/SecurityCheckScreen')
 const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTestingScreen'));
 const AttachToPinTestingScreen = lazy(() => import('./src/views/AttachToPinTestingScreen'));
 
-const prefix = ExpoLinking.createURL('/');
-
-const routeConfig = {};
-
+// React Navigation v6 linking 配置
 const linking = {
-  prefixes: [prefix],
-  routeConfig,
+  prefixes: [
+    // 为不同的部署环境设置 URL 前缀
+    'https://example.onekeytest.com/',
+    'http://localhost:19006/',
+    ExpoLinking.createURL('/'),
+  ],
+  config: {
+    initialRouteName: Routes.Payload,
+    screens: {
+      [Routes.Payload]: 'expo-example/api-payload',
+      [Routes.FirmwareUpdateTest]: 'expo-example/firmware-update-test',
+      [Routes.PassphraseTest]: 'expo-example/passphrase-test',
+      [Routes.AddressTest]: 'expo-example/address-test',
+      [Routes.SecurityCheck]: 'expo-example/security-check',
+      [Routes.FunctionalTesting]: 'expo-example/functional-testing',
+    },
+  },
 };
 
 // Create a native stack navigator
 const StackNavigator = createNativeStackNavigator();
 function NavigationContent() {
+  // 处理从 404 页面重定向过来的路径
+  useEffect(() => {
+    const redirectPath = sessionStorage.getItem('redirectPath');
+    if (redirectPath) {
+      sessionStorage.removeItem('redirectPath');
+      // 使用 window.history.replaceState 替换当前历史记录
+      window.history.replaceState(null, '', redirectPath);
+    }
+  }, []);
+
   return (
     <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
       <StackNavigator.Navigator
@@ -157,6 +179,14 @@ function ToastView() {
       </YStack>
     </Toast>
   );
+}
+
+// 声明全局变量类型
+declare global {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const __COMMIT_SHA__: string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const __BUILD_TIME__: string;
 }
 
 // Main App

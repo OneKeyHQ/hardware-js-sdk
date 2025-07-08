@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'cardanoGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -120,7 +120,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoGetPublicKey',
-    description: 'Get PublicKey',
+
     presupposes: [
       {
         title: 'Get PublicKey',
@@ -178,7 +178,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',
@@ -232,7 +232,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',

@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'suiGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -35,7 +35,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'suiGetPublicKey',
-    description: 'Get PublicKey',
+
     presupposes: [
       {
         title: 'Get PublicKey',
@@ -67,7 +67,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'suiSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',
@@ -80,7 +80,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'suiSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',

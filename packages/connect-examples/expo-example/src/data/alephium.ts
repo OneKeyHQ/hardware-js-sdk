@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'alephiumGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -42,7 +42,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'alephiumSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Alephium',
@@ -80,7 +80,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'alephiumSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Native Transfer',

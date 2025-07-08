@@ -1,4 +1,4 @@
-import { Stack, Group, H3, YGroup, ListItem, Sheet, XStack } from 'tamagui';
+import { Stack, Group, H3, YGroup, ListItem, Sheet, XStack, Text } from 'tamagui';
 import { useNavigation, useRoute } from '@react-navigation/core';
 import { Menu } from '@tamagui/lucide-icons';
 
@@ -95,6 +95,39 @@ const SheetContent = memo(
 );
 SheetContent.displayName = 'SheetContent';
 
+// 版本信息组件
+const VersionInfo = memo(() => {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const commitSha = typeof __COMMIT_SHA__ !== 'undefined' ? __COMMIT_SHA__ : 'dev';
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const buildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'unknown';
+
+  // 只在生产环境显示
+  if (process.env.NODE_ENV !== 'production') {
+    return null;
+  }
+
+  // 格式化日期为 YYYYMMDD 格式
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}${month}${day}`;
+    } catch {
+      return 'unknown';
+    }
+  };
+
+  return (
+    <Text fontSize="$2" color="$gray10" marginLeft="$2">
+      {commitSha} {formatDate(buildTime)}
+    </Text>
+  );
+});
+VersionInfo.displayName = 'VersionInfo';
+
 const HeaderView = () => {
   const media = useMedia();
   const route = useRoute();
@@ -138,7 +171,10 @@ const HeaderView = () => {
       padding="$3"
       justifyContent="space-between"
     >
-      <H3>Hardware Example</H3>
+      <XStack alignItems="center">
+        <H3>Hardware Example</H3>
+        <VersionInfo />
+      </XStack>
 
       <XStack minHeight={40} gap="$2">
         <MenuButtons visibleItems={visibleItems} currentRoute={route.name} navigate={navigate} />

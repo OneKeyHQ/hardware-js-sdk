@@ -15,9 +15,7 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "headers": {
       "Permissions-Policy": "usb=(self)"
     },
@@ -33,12 +31,10 @@
       "package": "com.onekey.dev.hardware.example"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "webpack",
+      "baseUrl": "/expo-example/"
     },
-    "plugins": [
-      "expo-image-picker",
-      "expo-document-picker",
-      "expo-localization"
-    ]
+    "plugins": ["expo-image-picker", "expo-document-picker", "expo-localization"]
   }
 }

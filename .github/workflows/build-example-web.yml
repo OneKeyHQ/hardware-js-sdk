@@ -1,43 +1,162 @@
-name: build-deploy-example-web
+name: Build and Deploy Examples
 
 on: workflow_dispatch
 
+env:
+  COMMIT_SHORT_SHA: ${{ github.sha }}
+
 jobs:
-  deploy:
+  build_expo:
     runs-on: ubuntu-latest
-    env:
-      TEST_ENDPOINT: hardware-example.onekeytest.com
-      PROJECT_PATH: packages/connect-examples/expo-example
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Environment
+
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Install Package
+      - name: Install Dependencies
         run: |
           yarn
           yarn bootstrap
+      - name: Build All Packages
+        run: yarn build
+      - name: Build Expo Example
+        run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
+        working-directory: packages/connect-examples/expo-example
 
-      - name: Build Target
+      - name: Add commit info to build output
         run: |
-          yarn build
+          # 先备份原始构建产物到临时目录
+          mkdir -p temp-build
+          cp -r web-build/* temp-build/ 2>/dev/null || true
+          # 创建带有 commit id 的子目录
+          mkdir -p web-build/commits/${{ env.COMMIT_SHORT_SHA }}
+          # 复制备份的构建产物到带有 commit id 的目录
+          cp -r temp-build/* web-build/commits/${{ env.COMMIT_SHORT_SHA }}/
+          # 创建一个 commit 信息文件
+          echo '{"commit": "${{ env.COMMIT_SHORT_SHA }}", "fullCommit": "${{ github.sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > web-build/commits/${{ env.COMMIT_SHORT_SHA }}/commit-info.json
+          # 为 commit 版本也创建 404.html
+          cp web-build/commits/${{ env.COMMIT_SHORT_SHA }}/index.html web-build/commits/${{ env.COMMIT_SHORT_SHA }}/404.html
+          # 清理临时目录
+          rm -rf temp-build
+        working-directory: packages/connect-examples/expo-example
 
-      - name: Build Web App
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-build
+          path: packages/connect-examples/expo-example/web-build
+
+  build_new_example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install Dependencies
         run: |
-          yarn expo export:web
-        working-directory: ${{ env.PROJECT_PATH }}
+          yarn
+          yarn bootstrap
+      - name: Build All Packages
+        run: yarn build
+      - name: Build New Example
+        run: COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn build
+        working-directory: packages/connect-examples/expo-playground
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-playground-build
+          path: packages/connect-examples/expo-playground/dist
 
-      - name: Copy index.html to 404.html for Github Pages deployment (client-side routing)
-        run: cp web-build/index.html web-build/404.html
-        working-directory: ${{ env.PROJECT_PATH }}
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build_expo, build_new_example]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - name: Deploy Github Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: Setup Deploy Directory
+        run: mkdir -p deploy
+      - name: Download Expo Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: expo-build
+          path: deploy/temp-expo
+      - name: Download New Example Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: expo-playground-build
+          path: deploy/expo-playground
+      - name: Setup Expo as Root and create routing
+        run: |
+          # Create expo-example subdirectory and copy all build files
+          mkdir -p deploy/expo-example
+          cp -r deploy/temp-expo/* deploy/expo-example/
+
+          # Debug: List files in expo-example directory
+          echo "=== Files in deploy/expo-example ==="
+          find deploy/expo-example -type f -name "*.json" -o -name "favicon*" -o -name "*.ico" | head -10
+
+          # Copy all favicon-related files to root path
+          # Handle various favicon formats that Expo might generate
+          favicon_count=0
+          find deploy/expo-example -name "favicon*" -type f | while read file; do
+            filename=$(basename "$file")
+            cp "$file" "deploy/$filename"
+            echo "✅ Copied favicon: $filename"
+            favicon_count=$((favicon_count + 1))
+          done
+
+          if [ $favicon_count -eq 0 ]; then
+            echo "⚠️  No favicon files found in build output"
+          fi
+
+          # Copy manifest.json to root path for PWA support
+          if [ -f "deploy/expo-example/manifest.json" ]; then
+            cp deploy/expo-example/manifest.json deploy/manifest.json
+            echo "✅ Copied manifest.json to root"
+            echo "=== Generated manifest.json content ==="
+            cat deploy/manifest.json | head -10
+          else
+            # Use fallback manifest.json if Expo didn't generate one
+            cp .github/templates/manifest.json deploy/manifest.json
+            echo "⚠️  Used fallback manifest.json (Expo didn't generate one)"
+          fi
+
+          # Clean up temp directory
+          rm -rf deploy/temp-expo
+
+      - name: Add SPA fallback for client-side routing
+        run: |
+          # 为各子应用创建简单的 SPA 回退 404.html
+          cp deploy/expo-playground/index.html deploy/expo-playground/404.html
+          cp deploy/expo-example/index.html deploy/expo-example/404.html
+
+          # 复制统一的路由分发器模板到根目录
+          cp .github/templates/404.html deploy/404.html
+
+          # 验证部署结构
+          echo "=== Deployment Structure ==="
+          find deploy -name "*.html" -o -name "manifest.json" -o -name "favicon*" | sort
+      - name: Deploy to Github Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./${{ env.PROJECT_PATH }}/web-build
-          cname: ${{ env.TEST_ENDPOINT }}
+          publish_dir: ./deploy
+          cname: example.onekey-test.com
           force_orphan: true

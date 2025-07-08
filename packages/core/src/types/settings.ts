@@ -14,7 +14,15 @@ export type ConnectSettings = {
   priority: number;
   trustedHost: boolean;
   supportedBrowser?: boolean;
-  env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native' | 'webusb' | 'lowlevel';
+  env:
+    | 'node'
+    | 'web'
+    | 'webextension'
+    | 'electron'
+    | 'react-native'
+    | 'webusb'
+    | 'lowlevel'
+    | 'emulator';
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;

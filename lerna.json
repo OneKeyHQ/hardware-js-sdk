@@ -1,7 +1,8 @@
 {
   "packages": [
     "packages/*",
-    "packages/connect-examples/expo-example"
+    "packages/connect-examples/expo-example",
+    "packages/connect-examples/expo-playground"
   ],
   "npmClient": "yarn",
   "useWorkspaces": true,

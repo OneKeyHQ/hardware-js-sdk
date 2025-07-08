@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Hardware SDK Examples</title>
+  <script>
+    // 简化的路由分发器
+    (function() {
+      const path = window.location.pathname;
+      const search = window.location.search;
+      const hash = window.location.hash;
+      const fullUrl = search + hash;
+      
+      console.log('Route dispatcher: handling path', path);
+      
+      // 智能路由分发逻辑 - 保持原始URL不变，让SPA自己处理路由
+      if (path.startsWith('/expo-playground/')) {
+        // expo-playground 的子路由，保存原始路径信息
+        if (path !== '/expo-playground/' && path !== '/expo-playground') {
+          console.log('Handling expo-playground sub-route:', path);
+          // 保存完整的原始URL到sessionStorage供应用恢复路由
+          sessionStorage.setItem('spa_redirect_url', path + fullUrl);
+          // 重定向到应用首页，让React Router处理路由恢复
+          window.location.replace('/expo-playground/');
+          return;
+        }
+        return;
+      }
+      
+      if (path.startsWith('/expo-example/')) {
+        // expo-example 的子路由，保存原始路径信息  
+        if (path !== '/expo-example/' && path !== '/expo-example') {
+          console.log('Handling expo-example sub-route:', path);
+          // 保存完整的原始URL到sessionStorage供应用恢复路由
+          sessionStorage.setItem('spa_redirect_url', path + fullUrl);
+          // 重定向到应用首页，让React Navigation处理路由恢复
+          window.location.replace('/expo-example/');
+          return;
+        }
+        return;
+      }
+      
+      // 根路径或其他未匹配路径，重定向到 expo-example 首页
+      if (path === '/' || path === '' || !path.startsWith('/expo-example/') && !path.startsWith('/expo-playground/')) {
+        console.log('Route dispatcher: redirecting to expo-example');
+        window.location.replace('/expo-example/api-payload' + fullUrl);
+        return;
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
+    <h2>Hardware SDK Examples</h2>
+    <p>Choose an example to explore:</p>
+    <ul style="list-style: none; padding: 0; max-width: 400px; margin: 20px auto;">
+      <li style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+        <a href="/expo-example/" style="color: #007bff; text-decoration: none; display: block;">
+          <strong>Expo Example</strong>
+          <br>
+          <small style="color: #666;">React Native Web with Expo SDK</small>
+        </a>
+      </li>
+      <li style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+        <a href="/expo-playground/" style="color: #007bff; text-decoration: none; display: block;">
+          <strong>OneKey Developer Portal</strong>
+          <br>
+          <small style="color: #666;">Modern React with Webpack</small>
+        </a>
+      </li>
+    </ul>
+    <p style="margin-top: 30px; font-size: 14px; color: #666;">
+      Current path: <code id="current-path"></code>
+    </p>
+    <script>
+      document.getElementById('current-path').textContent = window.location.pathname;
+    </script>
+  </div>
+</body>
+</html> 
