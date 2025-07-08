@@ -158,5 +158,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./deploy
-          cname: example.onekey-test.com
+          cname: hardware-example.onekeytest.com
           force_orphan: true
