@@ -51,6 +51,7 @@ const NORMALIZED_NOTIFY_UUID = '0003';
 // Timeout and interval constants
 const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
 const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
+const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for fast targeted scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const CONNECTION_TIMEOUT = 15000; // 15 seconds for device connection
 const CHUNK_WRITE_DELAY = 10; // 10ms delay between chunk writes
@@ -260,8 +261,74 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
     peripheral
   );
 
-  // Cache the device
+  // Cache the device in both maps
   discoveredDevices.set(peripheral.id, peripheral);
+}
+
+// Perform targeted scan for a specific device ID
+async function performTargetedScan(targetDeviceId: string): Promise<Peripheral | null> {
+  if (!noble) {
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
+  }
+
+  // First check if we have a recent cached peripheral\n  const cachedDevice = deviceCache.get(targetDeviceId);\n  if (cachedDevice && (Date.now() - cachedDevice.lastSeen) < 30000) { // 30 seconds cache\n    logger?.info('[NobleBLE] Using cached device for fast connection:', targetDeviceId);\n    \n    // Use cached device if it was successful before\n    if (cachedDevice.connectionSuccess) {\n      discoveredDevices.set(targetDeviceId, cachedDevice.peripheral);\n      return cachedDevice.peripheral;\n    }\n  }\n\n  logger?.info('[NobleBLE] Starting targeted scan for device:', targetDeviceId);
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      if (noble) {
+        noble.stopScanning();
+      }
+      logger?.info('[NobleBLE] Targeted scan timeout for device:', targetDeviceId);
+      resolve(null);
+    }, FAST_SCAN_TIMEOUT);
+
+    // Set up discovery handler for target device
+    const onDiscover = (peripheral: Peripheral) => {
+      if (peripheral.id === targetDeviceId) {
+        clearTimeout(timeout);
+        if (noble) {
+          noble.stopScanning();
+        }
+
+        // Cache the found device
+        discoveredDevices.set(peripheral.id, peripheral);
+
+        logger?.info('[NobleBLE] Target device found:', {
+          id: peripheral.id,
+          name: peripheral.advertisement?.localName || 'Unknown',
+        });
+
+        // Clean up listener
+        if (noble) {
+          noble.removeListener('discover', onDiscover);
+        }
+
+        resolve(peripheral);
+      }
+    };
+
+    // Add discovery listener
+    if (noble) {
+      noble.on('discover', onDiscover);
+    }
+
+    // Start scanning
+    if (noble) {
+      noble.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
+        if (error) {
+          clearTimeout(timeout);
+          if (noble) {
+            noble.removeListener('discover', onDiscover);
+          }
+          logger?.error('[NobleBLE] Failed to start targeted scan:', error);
+          reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
+          return;
+        }
+
+        logger?.info('[NobleBLE] Targeted scan started for device:', targetDeviceId);
+      });
+    }
+  });
 }
 
 // Enumerate devices
@@ -350,19 +417,36 @@ async function stopScanning(): Promise<void> {
   });
 }
 
-// Get device info
+// Get device info - supports both discovered and direct connection modes
 function getDevice(deviceId: string): DeviceInfo | null {
+  // First check if device was discovered through scanning
   const peripheral = discoveredDevices.get(deviceId);
-  if (!peripheral) {
-    return null;
+  if (peripheral) {
+    const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
+    return {
+      id: peripheral.id,
+      name: deviceName,
+      state: peripheral.state || 'disconnected',
+    };
   }
 
-  const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
+  // If not discovered, check if it's already connected (direct connection mode)
+  const connectedPeripheral = connectedDevices.get(deviceId);
+  if (connectedPeripheral) {
+    const deviceName = connectedPeripheral.advertisement?.localName || 'Unknown Device';
+    return {
+      id: connectedPeripheral.id,
+      name: deviceName,
+      state: connectedPeripheral.state || 'connected',
+    };
+  }
 
+  // For direct connection mode, return a placeholder device info
+  // This allows the connection process to proceed without prior discovery
   return {
-    id: peripheral.id,
-    name: deviceName,
-    state: peripheral.state || 'disconnected',
+    id: deviceId,
+    name: 'OneKey Device',
+    state: 'disconnected',
   };
 }
 
@@ -445,9 +529,40 @@ async function discoverServicesAndCharacteristics(
   });
 }
 
-// Connect to device
+// Connect to device - supports both discovered and direct connection modes
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
-  const peripheral = discoveredDevices.get(deviceId);
+  let peripheral = discoveredDevices.get(deviceId);
+
+  // If device not discovered, try a targeted scan for this specific device
+  if (!peripheral) {
+    logger?.info('[NobleBLE] Device not discovered, attempting targeted scan for:', deviceId);
+
+    // Initialize Noble if not already done
+    if (!noble) {
+      await initializeNoble();
+    }
+
+    if (!noble) {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
+    }
+
+    // Perform a targeted scan to find the specific device
+    try {
+      const foundPeripheral = await performTargetedScan(deviceId);
+      if (!foundPeripheral) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotFound,
+          `Device ${deviceId} not found even after targeted scan`
+        );
+      }
+      peripheral = foundPeripheral;
+    } catch (error) {
+      logger?.error('[NobleBLE] Targeted scan failed:', error);
+      throw error;
+    }
+  }
+
+  // At this point, peripheral is guaranteed to be defined
   if (!peripheral) {
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device ${deviceId} not found`);
   }
@@ -500,7 +615,9 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, 'Connection timeout'));
     }, CONNECTION_TIMEOUT);
 
-    peripheral.connect((error: string) => {
+    // TypeScript type assertion - peripheral is guaranteed to be defined at this point
+    const connectedPeripheral = peripheral!;
+    connectedPeripheral.connect((error: string) => {
       clearTimeout(timeout);
 
       if (error) {
@@ -510,13 +627,13 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       }
 
       logger?.info('[NobleBLE] Connected to device:', deviceId);
-      connectedDevices.set(deviceId, peripheral);
+      connectedDevices.set(deviceId, connectedPeripheral);
 
       // Set up unified disconnect listener
-      setupDisconnectListener(peripheral, deviceId, webContents);
+      setupDisconnectListener(connectedPeripheral, deviceId, webContents);
 
       // Discover services and characteristics
-      discoverServicesAndCharacteristics(peripheral)
+      discoverServicesAndCharacteristics(connectedPeripheral)
         .then(characteristics => {
           deviceCharacteristics.set(deviceId, characteristics);
           logger?.info('[NobleBLE] Device ready for communication:', deviceId);
@@ -525,7 +642,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
         .catch(error => {
           logger?.error('[NobleBLE] Service/characteristic discovery failed:', error);
           // Disconnect on failure
-          peripheral.disconnect();
+          connectedPeripheral.disconnect();
           reject(error);
         });
     });
