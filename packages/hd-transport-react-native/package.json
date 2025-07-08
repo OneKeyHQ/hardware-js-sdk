@@ -19,8 +19,8 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^1.0.39-alpha.1",
-    "@onekeyfe/hd-transport": "^1.0.39-alpha.1",
+    "@onekeyfe/hd-shared": "1.0.39-alpha.1",
+    "@onekeyfe/hd-transport": "1.0.39-alpha.1",
     "@onekeyfe/react-native-ble-utils": "^0.1.4",
     "react-native-ble-plx": "3.5.0"
   }
