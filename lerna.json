@@ -5,6 +5,5 @@
     "packages/connect-examples/expo-playground"
   ],
   "npmClient": "yarn",
-  "useWorkspaces": true,
   "version": "independent"
 }

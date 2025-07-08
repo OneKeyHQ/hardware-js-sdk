@@ -20,8 +20,8 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^1.0.39-alpha.1",
-    "@onekeyfe/hd-transport": "^1.0.39-alpha.1"
+    "@onekeyfe/hd-shared": "1.0.39-alpha.1",
+    "@onekeyfe/hd-transport": "1.0.39-alpha.1"
   },
   "devDependencies": {
     "@types/w3c-web-usb": "^1.0.6",
