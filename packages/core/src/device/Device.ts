@@ -405,6 +405,7 @@ export class Device extends EventEmitter {
       payload.derive_cardano = true;
     }
     payload.passphrase_state = options?.passphraseState;
+    payload.is_contains_attach = true;
 
     Log.debug('Initialize device begin:', {
       deviceId: options?.deviceId,
@@ -733,14 +734,14 @@ export class Device extends EventEmitter {
 
   async checkPassphraseStateSafety(
     passphraseState?: string,
-    useEmptyPassphraseState?: boolean,
+    useEmptyPassphrase?: boolean,
     skipPassphraseCheck?: boolean
   ) {
     if (!this.features) return false;
     const { passphraseState: newPassphraseState, unlockedAttachPin } =
       await getPassphraseStateWithRefreshDeviceInfo(this, {
         expectPassphraseState: passphraseState,
-        onlyMainPin: useEmptyPassphraseState,
+        onlyMainPin: useEmptyPassphrase,
       });
 
     if (skipPassphraseCheck) {
@@ -748,7 +749,7 @@ export class Device extends EventEmitter {
     }
 
     // Main wallet and unlock Attach Pin, throw safe error
-    const mainWalletUseAttachPin = unlockedAttachPin && useEmptyPassphraseState;
+    const mainWalletUseAttachPin = unlockedAttachPin && useEmptyPassphrase;
     const useErrorAttachPin =
       unlockedAttachPin && passphraseState && passphraseState !== newPassphraseState;
 
@@ -756,7 +757,7 @@ export class Device extends EventEmitter {
       passphraseState,
       newPassphraseState,
       unlockedAttachPin,
-      useEmptyPassphraseState,
+      useEmptyPassphrase,
     });
 
     if (mainWalletUseAttachPin || useErrorAttachPin) {

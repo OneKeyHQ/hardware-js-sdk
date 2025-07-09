@@ -7554,6 +7554,25 @@
         }
       }
     },
+    "UnLockDevice": {
+      "fields": {}
+    },
+    "UnLockDeviceResponse": {
+      "fields": {
+        "unlocked": {
+          "type": "bool",
+          "id": 1
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 2
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
     "GetPassphraseState": {
       "fields": {
         "passphrase_state": {
@@ -12191,7 +12210,9 @@
         "MessageType_OnekeyGetFeatures": 10025,
         "MessageType_OnekeyFeatures": 10026,
         "MessageType_GetPassphraseState": 10028,
-        "MessageType_PassphraseState": 10029
+        "MessageType_PassphraseState": 10029,
+        "MessageType_UnLockDevice": 10030,
+        "MessageType_UnLockDeviceResponse": 10031
       }
     },
     "google": {

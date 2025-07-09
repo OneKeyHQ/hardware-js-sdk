@@ -776,13 +776,16 @@ export const cancel = (context: CoreContext, connectId?: string) => {
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
-  if (
-    features?.passphrase_protection === true &&
-    (method.payload.passphraseState == null || method.payload.passphraseState === '') &&
-    (!method.payload.useEmptyPassphrase || !method.payload.skipPassphraseCheck)
-  ) {
-    DevicePool.clearDeviceCache(method.payload.connectId);
-    throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
+  if (features?.passphrase_protection === true) {
+    const hasNoPassphraseState =
+      method.payload.passphraseState == null || method.payload.passphraseState === '';
+    const shouldRequirePassphrase =
+      !method.payload.useEmptyPassphrase && !method.payload.skipPassphraseCheck;
+
+    if (hasNoPassphraseState && shouldRequirePassphrase) {
+      DevicePool.clearDeviceCache(method.payload.connectId);
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
+    }
   }
 
   if (features?.passphrase_protection === false && method.payload.passphraseState) {
