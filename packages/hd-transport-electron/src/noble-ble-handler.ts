@@ -41,6 +41,10 @@ interface PacketAssemblyState {
 }
 const devicePacketStates = new Map<string, PacketAssemblyState>();
 
+// Track recent write operations to detect pairing rejection
+const recentWriteOperations = new Map<string, number>(); // deviceId -> timestamp
+const WRITE_DISCONNECT_THRESHOLD = 1000; // 1 second
+
 // Service UUIDs to scan for - using constants from hd-shared
 const ONEKEY_SERVICE_UUIDS = [ONEKEY_SERVICE_UUID];
 
@@ -205,6 +209,7 @@ function cleanupDeviceState(deviceId: string): void {
   notificationCallbacks.delete(deviceId);
   devicePacketStates.delete(deviceId);
   subscribedDevices.delete(deviceId);
+  recentWriteOperations.delete(deviceId);
   logger?.info('[NobleBLE] Device state cleaned up:', deviceId);
 }
 
@@ -215,6 +220,17 @@ function handleDeviceDisconnect(deviceId: string, webContents: WebContents): voi
   // Get device info before cleanup
   const peripheral = connectedDevices.get(deviceId);
   const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
+
+  // Check if this is a pairing rejection (write completed but device disconnected quickly)
+  const recentWriteTime = recentWriteOperations.get(deviceId);
+  const now = Date.now();
+  const isPairingRejection = recentWriteTime && now - recentWriteTime < WRITE_DISCONNECT_THRESHOLD;
+
+  if (isPairingRejection) {
+    logger?.info('[NobleBLE] Pairing rejection detected, sending error notification');
+    // Send pairing rejection error directly to transport
+    webContents.send(EOneKeyBleMessageKeys.NOBLE_BLE_NOTIFICATION, deviceId, 'PAIRING_REJECTED');
+  }
 
   // Clean up device state
   cleanupDeviceState(deviceId);
@@ -708,6 +724,8 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
           reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error));
           return;
         }
+        // Record successful write time for pairing rejection detection
+        recentWriteOperations.set(deviceId, Date.now());
         resolve();
       });
     });
@@ -757,6 +775,9 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
       await delay(CHUNK_WRITE_DELAY);
     }
   }
+
+  // Record successful write time for pairing rejection detection
+  recentWriteOperations.set(deviceId, Date.now());
 }
 
 // Subscribe to notifications

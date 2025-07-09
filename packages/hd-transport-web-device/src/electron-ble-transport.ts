@@ -213,6 +213,15 @@ export default class ElectronBleTransport {
 
   // Handle notification data from Noble BLE
   private handleNotificationData(deviceId: string, hexData: string): void {
+    // Check for pairing rejection
+    if (hexData === 'PAIRING_REJECTED') {
+      this.Log?.debug('[Transport] Pairing rejection detected for device:', deviceId);
+      if (this.runPromise) {
+        this.runPromise.reject(ERRORS.TypedError(HardwareErrorCode.BleDeviceBondedCanceled));
+      }
+      return;
+    }
+
     const result = this.processNotificationPacket(deviceId, hexData);
 
     if (result.error) {
