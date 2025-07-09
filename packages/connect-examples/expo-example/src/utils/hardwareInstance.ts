@@ -18,7 +18,7 @@ const getStoredConnectionType = async (): Promise<ConnectionType | null> => {
     const value = await getItem(CONNECTION_TYPE_STORE_KEY);
     return value as ConnectionType | null;
   } catch (error) {
-    console.log(error);
+    console.log('Error getting stored connection type:', error);
     return null;
   }
 };
@@ -48,6 +48,7 @@ export const getHardwareSDKInstance = memoizee(
         const storedConnectionType = await getStoredConnectionType();
         const isDesktopWebBleEnv = storedConnectionType === 'desktop-web-ble';
 
+        console.log('isDesktopWebBleEnv: =====> ', isDesktopWebBleEnv, storedConnectionType);
         HardwareSDK = await importSdk({
           useCommonSdk: isDesktopWebBleEnv,
         });
