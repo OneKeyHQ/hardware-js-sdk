@@ -2200,6 +2200,7 @@ export type Initialize = {
   _skip_passphrase?: boolean;
   derive_cardano?: boolean;
   passphrase_state?: string;
+  is_contains_attach?: boolean;
 };
 
 // GetFeatures
@@ -2788,6 +2789,16 @@ export type FileInfoList = {
 // DeviceEraseSector
 export type DeviceEraseSector = {
   sector: number;
+};
+
+// UnLockDevice
+export type UnLockDevice = {};
+
+// UnLockDeviceResponse
+export type UnLockDeviceResponse = {
+  unlocked?: boolean;
+  unlocked_attach_pin?: boolean;
+  passphrase_protection?: boolean;
 };
 
 // GetPassphraseState
@@ -4584,6 +4595,8 @@ export type MessageType = {
   FileInfo: FileInfo;
   FileInfoList: FileInfoList;
   DeviceEraseSector: DeviceEraseSector;
+  UnLockDevice: UnLockDevice;
+  UnLockDeviceResponse: UnLockDeviceResponse;
   GetPassphraseState: GetPassphraseState;
   PassphraseState: PassphraseState;
   MoneroRctKeyPublic: MoneroRctKeyPublic;
