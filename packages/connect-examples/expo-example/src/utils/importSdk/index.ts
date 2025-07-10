@@ -5,7 +5,6 @@ interface ISdkImportOptions {
 }
 
 export const importSdk = async (options?: ISdkImportOptions) => {
-  console.log('importSdk: ', options);
   if (options?.useCommonSdk) {
     return (await import('@onekeyfe/hd-common-connect-sdk')).default as unknown as CoreApi;
   }
