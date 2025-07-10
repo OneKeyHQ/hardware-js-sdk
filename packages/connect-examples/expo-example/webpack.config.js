@@ -10,32 +10,22 @@ module.exports = async function (env, argv) {
   // 设置 publicPath 为 GitHub Pages 的路径
   if (process.env.NODE_ENV === 'production') {
     config.output.publicPath = '/expo-example/';
+  } else {
+    // 开发环境使用根路径
+    config.output.publicPath = '/';
   }
 
   // 配置 SPA 路由支持
   if (config.devServer) {
+    // 开发环境配置
     config.devServer.historyApiFallback = {
-      index: '/expo-example/',
+      index: '/',
       rewrites: [
-        // 处理 expo-example 的路由
         {
           from: /^\/expo-example\/.*$/,
-          to: '/expo-example/index.html',
+          to: '/',
         },
       ],
-    };
-  } else {
-    // 为生产环境配置 historyApiFallback
-    config.devServer = {
-      historyApiFallback: {
-        index: '/expo-example/',
-        rewrites: [
-          {
-            from: /^\/expo-example\/.*$/,
-            to: '/expo-example/index.html',
-          },
-        ],
-      },
     };
   }
 

@@ -169,3 +169,44 @@ yarn update-protobuf  # Updates protobuf definitions in hd-transport
 
 ### Docker Development Environment
 The project includes Docker support for consistent development environments across different platforms.
+
+## Expo-Example Routing Configuration
+
+### Overview
+The `connect-examples/expo-example` app uses React Navigation with URL linking support. Routes are configured with `/expo-example/` prefix for production deployment compatibility.
+
+### Route Structure
+All routes are defined with the `/expo-example/` prefix:
+- `expo-example/api-payload` - Main testing interface
+- `expo-example/firmware-update-test` - Firmware update testing
+- `expo-example/passphrase-test` - Passphrase testing
+- `expo-example/address-test` - Address generation testing
+- `expo-example/security-check` - Security validation
+- `expo-example/functional-testing` - Functional testing suite
+
+### Webpack Configuration Logic
+
+**Development Environment:**
+- `publicPath = '/'` - Static assets served from root
+- `historyApiFallback` rewrites `/expo-example/*` → `/`
+- Users access: `http://localhost:19006/expo-example/api-payload`
+- Webpack devServer handles URL rewriting, React Navigation handles routing
+
+**Production Environment:**
+- `publicPath = '/expo-example/'` - Static assets served from `/expo-example/`
+- No devServer configuration needed (handled by deployment server)
+- Users access: `https://example.onekeytest.com/expo-example/api-payload`
+- GitHub Pages serves static files, React Navigation handles routing
+
+### Key Configuration Files
+- **Webpack Config:** `packages/connect-examples/expo-example/webpack.config.js`
+- **App Entry:** `packages/connect-examples/expo-example/App.tsx`
+- **Route Definitions:** `packages/connect-examples/expo-example/src/route.ts`
+
+### URL Linking Configuration
+The app supports deep linking with prefixes:
+- `https://example.onekeytest.com/` (production)
+- `http://localhost:19006/` (development)
+- Expo linking URLs
+
+This configuration ensures the app works correctly in both development and production environments while maintaining consistent routing patterns.

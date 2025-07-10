@@ -222,7 +222,9 @@ const DeviceMethodsIndexPage: React.FC = () => {
         </div>
 
         <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-          {method.description}
+          {method.description?.startsWith('methodDescriptions.')
+            ? t(method.description)
+            : method.description}
         </p>
       </div>
     );

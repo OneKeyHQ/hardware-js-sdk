@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, DeviceMethodCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'firmwareUpdateV2',
-    description: 'compatible with all devices',
+    description: 'methodDescriptions.firmwareUpdateV2',
     noDeviceIdReq: true,
     presets: [
       {
@@ -106,7 +106,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'firmwareUpdateV3',
-    description: 'pro deivce & bootloader > 4.12.0 only',
+    description: 'methodDescriptions.firmwareUpdateV3',
     noDeviceIdReq: true,
     presets: [
       {
@@ -178,25 +178,25 @@ const api: UnifiedMethodConfig[] = [
   // === 固件信息检查 ===
   {
     method: 'checkFirmwareRelease',
-    description: 'Check firmware release information',
+    description: 'methodDescriptions.checkFirmwareRelease',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'checkBLEFirmwareRelease',
-    description: 'Check BLE firmware release information',
+    description: 'methodDescriptions.checkBLEFirmwareRelease',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'checkBootloaderRelease',
-    description: 'Check bootloader release information',
+    description: 'methodDescriptions.checkBootloaderRelease',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'checkAllFirmwareRelease',
-    description: 'Check all firmware release information',
+    description: 'methodDescriptions.checkAllFirmwareRelease',
     noDeviceIdReq: true,
     presets: [
       {
@@ -216,13 +216,13 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'checkBridgeRelease',
-    description: 'Check bridge release information',
+    description: 'methodDescriptions.checkBridgeRelease',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'checkBridgeStatus',
-    description: 'Check bridge connection status',
+    description: 'methodDescriptions.checkBridgeStatus',
     noDeviceIdReq: true,
     presets: [],
   },
@@ -231,19 +231,19 @@ const api: UnifiedMethodConfig[] = [
 
   {
     method: 'deviceUpdateBootloader',
-    description: 'Update device bootloader',
+    description: 'methodDescriptions.deviceUpdateBootloader',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'deviceRebootToBootloader',
-    description: 'Reboot device to bootloader mode',
+    description: 'methodDescriptions.deviceRebootToBootloader',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'deviceRebootToBoardloader',
-    description: 'Reboot to boardloader mode(pro & touch only)',
+    description: 'methodDescriptions.deviceRebootToBoardloader',
     noDeviceIdReq: true,
     presets: [],
   },

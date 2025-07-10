@@ -268,56 +268,95 @@ export async function searchDevices(): Promise<ApiResponse> {
   const currentTransport = TransportManager.getCurrentTransport();
   logInfo(`Using transport type: ${currentTransport}`);
 
-  // WebUSB 特殊处理 - 使用更可靠的 promptWebDeviceAccess 方法
-  if (currentTransport === 'webusb') {
-    try {
-      logInfo('Using promptWebDeviceAccess for WebUSB');
-      const sdkInstance = await getSDKInstance();
-      const promptResponse = await sdkInstance.promptWebDeviceAccess();
+  try {
+    const sdkInstance = await getSDKInstance();
 
-      logInfo('promptWebDeviceAccess completed', {
-        success: promptResponse.success,
-        payload: promptResponse.payload,
-      });
+    // 先切换到对应的transport
+    if (currentTransport === 'emulator') {
+      await sdkInstance.switchTransport('emulator');
+    } else if (currentTransport === 'webusb') {
+      await sdkInstance.switchTransport('webusb');
+    } else {
+      await sdkInstance.switchTransport('web');
+    }
 
-      if (promptResponse.success && promptResponse.payload.device) {
-        return {
-          success: true,
-          payload: [promptResponse.payload.device],
-        } as Success<any>;
-      } else {
+    // WebUSB 特殊处理 - 先请求设备权限，然后调用searchDevices
+    if (currentTransport === 'webusb') {
+      try {
+        logInfo('Requesting WebUSB device permission');
+
+        // 导入WebUSB过滤器
+        const { ONEKEY_WEBUSB_FILTER } = await import('@onekeyfe/hd-shared');
+
+        // 先请求设备权限
+        const connectedDevice = await window.navigator.usb.requestDevice({
+          filters: ONEKEY_WEBUSB_FILTER,
+        });
+
+        if (!connectedDevice) {
+          throw new Error('No device selected');
+        }
+
+        logInfo('WebUSB device permission granted', { device: connectedDevice });
+
+        // 然后调用SDK的searchDevices
+        const response = await sdkInstance.searchDevices();
+
+        if (response.success && response.payload) {
+          logResponse('WebUSB devices found', response.payload);
+          return response;
+        } else {
+          return {
+            success: false,
+            payload: {
+              error: response.payload?.error || 'No devices found',
+            },
+          } as Unsuccessful;
+        }
+      } catch (webUsbError) {
+        if (
+          webUsbError instanceof Error &&
+          (webUsbError.name === 'NotFoundError' ||
+            webUsbError.message.includes('No device selected') ||
+            webUsbError.message.includes('User cancelled'))
+        ) {
+          const error = '用户取消选择设备';
+          logInfo('User canceled device selection');
+          return {
+            success: false,
+            payload: { error },
+          } as Unsuccessful;
+        }
+        logError('WebUSB device request failed', { webUsbError });
         return {
           success: false,
-          payload: {
-            error:
-              (promptResponse.payload as any).error || 'No device selected or permission denied',
-          },
+          payload: { error: `WebUSB access failed: ${webUsbError}` },
         } as Unsuccessful;
       }
-    } catch (webUsbError) {
-      if (
-        webUsbError instanceof Error &&
-        (webUsbError.name === 'NotFoundError' || webUsbError.message.includes('No device selected'))
-      ) {
-        const error = '用户取消选择设备';
-        logInfo('User canceled device selection');
-        return {
-          success: false,
-          payload: { error },
-        } as Unsuccessful;
-      }
-      logError('WebUSB promptWebDeviceAccess failed', {
-        webUsbError,
-      });
+    }
+
+    // 对于其他transport类型，使用标准的searchDevices
+    const response = await sdkInstance.searchDevices();
+
+    if (response.success && response.payload) {
+      logResponse('Devices found', response.payload);
+      return response;
+    } else {
       return {
         success: false,
-        payload: { error: `WebUSB access failed: ${webUsbError}` },
+        payload: {
+          error: response.payload?.error || 'No devices found',
+        },
       } as Unsuccessful;
     }
+  } catch (error) {
+    const errorMsg = `Device search error: ${error}`;
+    logError(errorMsg, { currentTransport, error });
+    return {
+      success: false,
+      payload: { error: errorMsg },
+    } as Unsuccessful;
   }
-
-  // 对于其他transport类型，使用标准的searchDevices
-  return callHardwareAPI('searchDevices', {});
 }
 
 // 导出 hd-core 的标准类型和常量

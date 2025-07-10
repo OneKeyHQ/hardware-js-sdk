@@ -24,7 +24,8 @@ function getSDKEnv(transport: TransportType): ConnectSettings['env'] {
       return 'emulator';
     case 'webusb':
     default:
-      return 'webusb';
+      // 对于WebUSB，使用 'web' 环境配置，这与expo-example保持一致
+      return 'web';
   }
 }
 

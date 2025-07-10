@@ -251,7 +251,9 @@ export const buildSearchActions = (
         actions.push({
           id: `method-${chain.id}-${method.method}`,
           name: actionName,
-          subtitle: method.description,
+          subtitle: method.description?.startsWith('methodDescriptions.')
+            ? t(method.description)
+            : method.description,
           section: sectionName,
           keywords: `${chain.id} ${method.method} ${method.description}`,
           perform: () => navigateTo(`${routePrefix}/${method.method}`),
