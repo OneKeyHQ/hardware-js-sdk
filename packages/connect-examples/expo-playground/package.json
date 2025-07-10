@@ -1,6 +1,6 @@
 {
   "name": "onekeyexample",
-  "version": "1.0.39-alpha.2",
+  "version": "1.0.39-alpha.3",
   "private": true,
   "sideEffects": [
     "app/utils/shim.js",
