@@ -1,4 +1,11 @@
-import { ForwardedRef, forwardRef, useCallback, useContext, useEffect, useImperativeHandle } from 'react';
+import {
+  ForwardedRef,
+  forwardRef,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+} from 'react';
 
 import { ListItem, Stack, Text, View, XStack } from 'tamagui';
 import { FlatList, Platform } from 'react-native';

@@ -632,7 +632,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     }, CONNECTION_TIMEOUT);
 
     // TypeScript type assertion - peripheral is guaranteed to be defined at this point
-    const connectedPeripheral = peripheral!;
+    const connectedPeripheral = peripheral as Peripheral;
     connectedPeripheral.connect((error: string) => {
       clearTimeout(timeout);
 
