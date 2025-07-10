@@ -11,12 +11,17 @@ import {
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
 import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-transport';
-import { createDeferred, Deferred, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  createDeferred,
+  Deferred,
+  ERRORS,
+  HardwareErrorCode,
+  isOnekeyDevice,
+} from '@onekeyfe/hd-shared';
 import type EventEmitter from 'events';
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
-  isOnekeyDevice,
   getBluetoothServiceUuids,
   getInfosForServiceUuid,
   IOS_PACKET_LENGTH,

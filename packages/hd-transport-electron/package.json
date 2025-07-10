@@ -21,7 +21,7 @@
   },
   "sideEffects": false,
   "peerDependencies": {
-    "@onekeyfe/hd-transport-web-device": "^1.0.39-alpha.3",
+    "@onekeyfe/hd-transport-web-device": "^1.0.39-alpha.5",
     "electron": ">=25.0.0",
     "electron-log": ">=4.0.0"
   },

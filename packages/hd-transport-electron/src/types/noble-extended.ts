@@ -3,7 +3,7 @@
  * Supplements @types/noble with additional interfaces
  */
 
-import type { Peripheral, Characteristic, Advertisement } from '@abandonware/noble';
+import type { Peripheral, Characteristic } from '@abandonware/noble';
 
 // Device info interface for our API
 export interface DeviceInfo {
@@ -38,17 +38,6 @@ export interface Logger {
   info(message: string, ...args: any[]): void;
   debug(message: string, ...args: any[]): void;
   error(message: string, ...args: any[]): void;
-}
-
-// Error callback type
-export type ErrorCallback = (error: string) => void;
-
-// Data callback type
-export type DataCallback = (data: string) => void;
-
-// Helper function to safely get device name from advertisement
-export function getDeviceName(advertisement: Advertisement): string {
-  return advertisement.localName || 'Unknown Device';
 }
 
 // Safe logger utility
