@@ -57,7 +57,8 @@
     "es-iterator-helpers": "1.0.15",
     "wrap-ansi": "7.0.0",
     "**/node-gyp": "10.0.1",
-    "cross-spawn": "7.0.5"
+    "cross-spawn": "7.0.5",
+    "glob": "^10.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",
