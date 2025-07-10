@@ -3,7 +3,8 @@
   "compilerOptions": {
     "outDir": "./dist",
     "types": [
-      "w3c-web-usb"
+      "w3c-web-usb",
+      "web-bluetooth"
     ]
   },
   "include": ["./src"]

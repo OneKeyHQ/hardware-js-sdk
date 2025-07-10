@@ -1,18 +1,10 @@
-import {
-  screen,
-  app,
-  BrowserWindow,
-  session,
-  ipcMain,
-  USBDevice,
-  SerialPort,
-  HIDDevice,
-} from 'electron';
+import { screen, app, BrowserWindow, session, ipcMain } from 'electron';
 import path from 'path';
 import isDevelopment from 'electron-is-dev';
 import { format as formatUrl } from 'url';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
+import { initNobleBleSupport } from '@onekeyfe/hd-transport-electron';
 import initProcess, { restartBridge } from './process';
 import { ipcMessageKeys } from './config';
 
@@ -88,6 +80,7 @@ function createMainWindow() {
       spellcheck: false,
       webviewTag: true,
       webSecurity: !isDevelopment,
+      // @ts-expect-error
       nativeWindowOpen: true,
       allowRunningInsecureContent: isDevelopment,
       // webview injected js needs isolation=false, because property can not be exposeInMainWorld() when isolation enabled.
@@ -261,6 +254,12 @@ function createMainWindow() {
         // browserWindow.minimize(); // hide window and minimize to Docker
       }
     }
+  });
+
+  initNobleBleSupport(browserWindow.webContents);
+
+  ipcMain.on(ipcMessageKeys.APP_RESTART, () => {
+    browserWindow?.reload();
   });
 
   return browserWindow;

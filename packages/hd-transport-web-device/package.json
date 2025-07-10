@@ -1,15 +1,9 @@
 {
-  "name": "@onekeyfe/hd-shared",
+  "name": "@onekeyfe/hd-transport-web-device",
   "version": "1.0.39-alpha.5",
-  "description": "Hardware SDK's shared tool library",
-  "keywords": [
-    "Hardware-SDK",
-    "shared",
-    "utils"
-  ],
-  "author": "Leon <lixiao.dev@gmail.com>",
+  "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
-  "license": "ISC",
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "publishConfig": {
@@ -24,5 +18,13 @@
     "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-shared": "^1.0.39-alpha.5",
+    "@onekeyfe/hd-transport": "^1.0.39-alpha.5"
+  },
+  "devDependencies": {
+    "@types/w3c-web-usb": "^1.0.6",
+    "@types/web-bluetooth": "^0.0.17"
   }
 }

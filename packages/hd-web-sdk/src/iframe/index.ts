@@ -1,6 +1,6 @@
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import WebusbTransport from '@onekeyfe/hd-transport-webusb';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
+import { WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import {
   PostMessageEvent,
   IFRAME,
@@ -28,6 +28,12 @@ import { isExtensionWhitelisted, isOriginWhitelisted } from '..';
 
 let _core: Core | undefined;
 const Log = getLogger(LoggerNames.Iframe);
+
+const getTransport = (env: ConnectSettings['env']) => {
+  if (env === 'webusb') return WebUsbTransport;
+  if (env === 'emulator') return EmulatorTransport;
+  return HttpTransport;
+};
 
 const handleMessage = (event: PostMessageEvent) => {
   if (event.source === window || !event.data) return;
@@ -67,18 +73,7 @@ export async function init(payload: IFrameInit['payload']) {
   Log.enabled = !!settings.debug;
 
   try {
-    let Transport;
-    switch (settings.env) {
-      case 'webusb':
-        Transport = WebusbTransport;
-        break;
-      case 'emulator':
-        Transport = EmulatorTransport;
-        break;
-      default:
-        Transport = HttpTransport;
-        break;
-    }
+    const Transport = getTransport(settings.env);
     _core = await initCore(settings, Transport);
     _core?.on(CORE_EVENT, messages => sendMessage(messages, false));
   } catch (error) {
@@ -121,18 +116,7 @@ export async function init(payload: IFrameInit['payload']) {
 
 export const switchCoreTransport = (env: ConnectSettings['env']) => {
   if (_core) {
-    let Transport;
-    switch (env) {
-      case 'webusb':
-        Transport = WebusbTransport;
-        break;
-      case 'emulator':
-        Transport = EmulatorTransport;
-        break;
-      default:
-        Transport = HttpTransport;
-        break;
-    }
+    const Transport = getTransport(env);
     switchTransport({
       env,
       Transport,

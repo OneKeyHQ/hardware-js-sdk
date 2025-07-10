@@ -22,6 +22,8 @@ interface DeviceInfo {
 export default class WebUsbTransport {
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  name = 'WebUsbTransport';
+
   stopped = false;
 
   configured = false;
