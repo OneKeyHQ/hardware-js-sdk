@@ -6064,6 +6064,10 @@
         "passphrase_state": {
           "type": "string",
           "id": 8000
+        },
+        "is_contains_attach": {
+          "type": "bool",
+          "id": 8001
         }
       }
     },
