@@ -49,3 +49,34 @@ declare module '*.module.css' {
   const classes: { [key: string]: string };
   export default classes;
 }
+
+// WebUSB 类型声明
+interface Navigator {
+  usb?: {
+    requestDevice(options: USBDeviceRequestOptions): Promise<USBDevice>;
+    getDevices(): Promise<USBDevice[]>;
+  };
+}
+
+interface USBDeviceRequestOptions {
+  filters: USBDeviceFilter[];
+}
+
+interface USBDeviceFilter {
+  vendorId?: number;
+  productId?: number;
+  classCode?: number;
+  subclassCode?: number;
+  protocolCode?: number;
+}
+
+interface USBDevice {
+  vendorId: number;
+  productId: number;
+  deviceClass: number;
+  deviceSubclass: number;
+  deviceProtocol: number;
+  productName?: string;
+  manufacturerName?: string;
+  serialNumber?: string;
+}

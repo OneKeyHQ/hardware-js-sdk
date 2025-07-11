@@ -7,7 +7,7 @@ import { useHardwareStore } from '../../store/hardwareStore';
 import { submitPin, submitPassphrase } from '../../services/hardwareService';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
-import { logData, logInfo } from '../../utils/logger';
+import { logData, logInfo, logError } from '../../utils/logger';
 import { SDKUtils } from '../../utils/hardwareInstance';
 import { create } from 'zustand';
 
@@ -153,7 +153,10 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
       // 使用统一的TransportManager初始化transport状态
       SDKUtils.transport.initializeTransport();
 
-      // 使用统一的SDK工具初始化
+      // 获取当前的transport类型
+      const currentTransport = SDKUtils.transport.getCurrentTransport();
+      
+      // 使用统一的SDK工具初始化，会根据当前transport类型自动选择合适的SDK
       const sdkInstance = await SDKUtils.getInstance();
       setupSDKEventListeners(sdkInstance);
 
@@ -163,6 +166,8 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         error: null,
         lastInitTime: Date.now(),
       });
+
+      logInfo(`SDK initialized successfully with transport: ${currentTransport}`);
     } catch (error) {
       updateSdkInitState({
         isInitialized: false,
@@ -170,6 +175,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         error: t('sdk.initFailed', { error: String(error) }),
         lastInitTime: Date.now(),
       });
+      logError('SDK initialization failed:', { error });
       throw error;
     }
   }, [updateSdkInitState, setupSDKEventListeners, t]);

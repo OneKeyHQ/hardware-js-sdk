@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'lnurlAuth',
-    description: 'LNURL Auth',
+    description: 'methodDescriptions.lnurlAuth',
     presets: [
       {
         title: 'LNURL Auth',

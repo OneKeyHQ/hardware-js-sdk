@@ -84,7 +84,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'solSignOffchainMessage',
-    description: 'Sign Offchain Message',
+    description: 'methodDescriptions.solSignOffchainMessage',
     presets: [
       {
         title: 'Sign Offchain Message',

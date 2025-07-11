@@ -515,7 +515,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'tonSignProof',
-    description: 'Sign Proof',
+    description: 'methodDescriptions.tonSignProof',
     presets: [
       {
         title: 'Sign Proof',

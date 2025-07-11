@@ -2,6 +2,11 @@ export const en = {
   translation: {
     pageTitle: 'OneKey Device Management Tool',
     pageSubtitle: 'Search Devices',
+    // 添加头部标题翻译
+    header: {
+      title: 'OneKey Developer Portal',
+      version: 'Version',
+    },
     common: {
       device: 'Device',
       chainMethods: 'Signer',
@@ -239,6 +244,122 @@ export const en = {
       methodsCount: '{{count}} methods',
       noResults: 'No blockchains found for "{{searchTerm}}"',
       exploreChain: 'Explore {{chainId}} methods',
+    },
+    // 添加方法描述翻译
+    methodDescriptions: {
+      btcGetAddress: 'Get address for your account.',
+      btcGetPublicKey: 'Get public key for your account.',
+      btcSignMessage: 'Sign a message with your private key.',
+      btcSignPsbt: 'Sign a PSBT (Partially Signed Bitcoin Transaction).',
+      btcSignTransaction: 'Sign a transaction with your private key.',
+      btcVerifyMessage: 'Verify a message signature.',
+      alephiumGetAddress: 'Get address for your account.',
+      alephiumSignMessage: 'Sign a message with your private key.',
+      alephiumSignTransaction: 'Sign a transaction with your private key.',
+      algoGetAddress: 'Get address for your account.',
+      algoSignTransaction: 'Sign a transaction with your private key.',
+      allNetworkGetAddress: 'Get address for your account.',
+      aptosGetAddress: 'Get address for your account.',
+      aptosGetPublicKey: 'Get public key for your account.',
+      aptosSignMessage: 'Sign a message with your private key.',
+      aptosSignTransaction: 'Sign a transaction with your private key.',
+      benfenGetAddress: 'Get address for your account.',
+      benfenGetPublicKey: 'Get public key for your account.',
+      benfenSignMessage: 'Sign a message with your private key.',
+      benfenSignTransaction: 'Sign a transaction with your private key.',
+      cardanoGetAddress: 'Get address for your account.',
+      cardanoGetPublicKey: 'Get public key for your account.',
+      cardanoSignMessage: 'Sign a message with your private key.',
+      cardanoSignTransaction: 'Sign a transaction with your private key.',
+      checkAllFirmwareRelease: 'Check all firmware release information',
+      checkBLEFirmwareRelease: 'Check BLE firmware release information',
+      checkBootloaderRelease: 'Check bootloader release information',
+      checkBridgeRelease: 'Check bridge release information',
+      checkBridgeStatus: 'Check bridge connection status',
+      checkFirmwareRelease: 'Check firmware release information',
+      confluxGetAddress: 'Get address for your account.',
+      confluxSignMessage: 'Sign a message with your private key.',
+      confluxSignMessageCIP23: 'Sign Message CIP23',
+      confluxSignTransaction: 'Sign a transaction with your private key.',
+      cosmosGetAddress: 'Get address for your account.',
+      cosmosGetPublicKey: 'Get public key for your account.',
+      cosmosSignTransaction: 'Sign a transaction with your private key.',
+      deviceCancel: 'Cancel device operation',
+      deviceChangePin: 'Change pin of a device',
+      deviceLock: 'Lock device',
+      deviceRebootToBoardloader: 'Reboot to boardloader mode(pro & touch only)',
+      deviceRebootToBootloader: 'Reboot device to bootloader mode',
+      deviceSettings: 'Configure device settings',
+      deviceSupportFeatures: 'Check device support features',
+      deviceUpdateBootloader: 'Update device bootloader',
+      deviceVerify: 'Verify device authenticity',
+      deviceWipe: 'Wipe device(DANGER: This will erase all data)',
+      dnxGetAddress: 'Get address for your account.',
+      dnxSignTransaction: 'Sign a transaction with your private key.',
+      evmGetAddress: 'Get a EVM address for your account.',
+      evmGetPublicKey: 'Get a EVM public key for your account.',
+      evmSignMessage: 'Sign a message with your EVM account.',
+      evmSignMessageEIP712: 'Sign a message with your EVM account. \nClassic and Mini firmware versions greater than 2.1.8 and less than 2.2.0 are available',
+      evmSignTransaction: 'Sign a transaction with your EVM account.',
+      evmSignTypedData: 'Sign a typed data with your EVM account.',
+      evmVerifyMessage: 'Verify a message with your EVM account.',
+      filecoinGetAddress: 'Get address for your account.',
+      filecoinSignTransaction: 'Sign a transaction with your private key.',
+      firmwareUpdateV2: 'compatible with all devices',
+      firmwareUpdateV3: 'pro deivce & bootloader > 4.12.0 only',
+      getFeatures: 'Get features of a device',
+      getLogs: 'Get device logs',
+      getNextU2FCounter: 'Get next U2F counter value',
+      getOnekeyFeatures: 'Get OneKey specific features of a device',
+      getPassphraseState: 'Get passphrase state of a device',
+      kaspaGetAddress: 'Get address for your account.',
+      kaspaSignTransaction: 'Sign a transaction with your private key.',
+      lnurlAuth: 'LNURL Auth',
+      nearGetAddress: 'Get address for your account.',
+      nearSignTransaction: 'Sign a transaction with your private key.',
+      nemGetAddress: 'Get address for your account.',
+      nemSignTransaction: 'Sign a transaction with your private key.',
+      neoGetAddress: 'Get address for your account.',
+      neoSignTransaction: 'Sign a transaction with your private key.',
+      nervosGetAddress: 'Get address for your account.',
+      nervosSignTransaction: 'Sign a transaction with your private key.',
+      nexaGetAddress: 'Get address for your account.',
+      nexaSignTransaction: 'Sign a transaction with your private key.',
+      nostrDecryptMessage: 'Decrypt message',
+      nostrEncryptMessage: 'Encrypt message',
+      nostrGetPublicKey: 'Get a Nostr public key for your account.',
+      nostrSignEvent: 'Sign a Nostr event.',
+      nostrSignSchnorr: 'Sign schnorr',
+      polkadotGetAddress: 'Get address for your account.',
+      polkadotSignTransaction: 'Sign a transaction with your private key.',
+      scdoGetAddress: 'Get address for your account.',
+      scdoSignMessage: 'Sign a message with your private key.',
+      scdoSignTransaction: 'Sign a transaction with your private key.',
+      searchDevices: 'Search for devices',
+      setU2FCounter: 'Set U2F counter value',
+      solGetAddress: 'Get address for your account.',
+      solSignMessage: 'Sign a message with your private key.',
+      solSignOffchainMessage: 'Sign Offchain Message',
+      solSignTransaction: 'Sign a transaction with your private key.',
+      starcoinGetAddress: 'Get address for your account.',
+      starcoinGetPublicKey: 'Get public key for your account.',
+      starcoinSignMessage: 'Sign a message with your private key.',
+      starcoinSignTransaction: 'Sign a transaction with your private key.',
+      starcoinVerifyMessage: 'Verify a message signature.',
+      stellarGetAddress: 'Get address for your account.',
+      stellarSignTransaction: 'Sign a transaction with your private key.',
+      suiGetAddress: 'Get address for your account.',
+      suiGetPublicKey: 'Get public key for your account.',
+      suiSignMessage: 'Sign a message with your private key.',
+      suiSignTransaction: 'Sign a transaction with your private key.',
+      tonGetAddress: 'Get address for your account.',
+      tonSignMessage: 'Sign a message with your private key.',
+      tonSignProof: 'Sign Proof',
+      tronGetAddress: 'Get address for your account.',
+      tronSignMessage: 'Sign a message with your private key.',
+      tronSignTransaction: 'Sign a transaction with your private key.',
+      xrpGetAddress: 'Get address for your account.',
+      xrpSignTransaction: 'Sign a transaction with your private key.',
     },
     deviceOperations: {
       deviceStatus: {
@@ -534,13 +655,13 @@ export const en = {
       hero: {
         title: 'Test Hardware Wallets Without Physical Devices',
         subtitle: 'Start coding in under 5 minutes',
-        promise: 'Quick Setup • No Hardware Required • Full Functionality'
+        promise: 'Quick Setup • No Hardware Required • Full Functionality',
       },
       flow: {
         browser: 'Browser',
         docker: 'Docker',
-        virtual: 'Virtual Device', 
-        app: 'Your App'
+        virtual: 'Virtual Device',
+        app: 'Your App',
       },
       progressTitle: 'Setup Progress',
       steps: {
@@ -549,48 +670,49 @@ export const en = {
         setup: {
           title: 'Download Scripts',
           description: 'Clone the emulator repository',
-          longDescription: 'First, we need to download the emulator setup scripts. This repository contains all the Docker configurations and startup scripts needed to run OneKey hardware emulators.'
+          longDescription:
+            'First, we need to download the emulator setup scripts. This repository contains all the Docker configurations and startup scripts needed to run OneKey hardware emulators.',
         },
         device: {
           title: 'Choose Device',
-          description: 'Select device type to emulate'
+          description: 'Select device type to emulate',
         },
         launch: {
           title: 'Launch Emulator',
-          description: 'Start your chosen emulator'
+          description: 'Start your chosen emulator',
         },
         connect: {
           title: 'Connect to App',
-          description: 'Ready for development'
-        }
+          description: 'Ready for development',
+        },
       },
       step1: {
         title: 'Download Scripts',
-        description: 'Clone the emulator repository with one command'
+        description: 'Clone the emulator repository with one command',
       },
       step2: {
         title: 'Choose Device',
-        description: 'Select OneKey Pro or Classic 1s emulator'
+        description: 'Select OneKey Pro or Classic 1s emulator',
       },
       step3: {
         title: 'Start Coding',
-        description: 'Connect to your app and start development'
+        description: 'Connect to your app and start development',
       },
       devices: {
         pro: {
-          description: 'Full-featured hardware wallet with touchscreen'
+          description: 'Full-featured hardware wallet with touchscreen',
         },
         classic: {
-          description: 'Essential hardware wallet with button interface'
-        }
+          description: 'Essential hardware wallet with button interface',
+        },
       },
       device: {
         pro: {
-          description: 'Full-featured hardware wallet with touchscreen'
+          description: 'Full-featured hardware wallet with touchscreen',
         },
         classic: {
-          description: 'Essential hardware wallet with button interface'
-        }
+          description: 'Essential hardware wallet with button interface',
+        },
       },
       quickStart: 'Quick Start',
       cloneRepo: 'Clone Git Repository',

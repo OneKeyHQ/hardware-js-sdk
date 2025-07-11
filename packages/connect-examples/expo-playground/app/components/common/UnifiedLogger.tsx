@@ -198,7 +198,11 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
           normalizedLog.title,
           log.description || '',
           log.message || '',
-          typeof normalizedLog.content === 'string' ? normalizedLog.content : '',
+          typeof normalizedLog.content === 'string'
+            ? normalizedLog.content
+            : normalizedLog.content
+            ? JSON.stringify(normalizedLog.content)
+            : '',
         ]
           .join(' ')
           .toLowerCase(),

@@ -57,12 +57,16 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
     // 获取新的SDK实例（会根据新的transport类型初始化）
     const sdkInstance = await getSDKInstance();
 
-    // 切换transport
+    // 根据不同的transport类型调用不同的切换方法
     if (transport === 'emulator') {
+      // 模拟器模式
       await sdkInstance.switchTransport('emulator');
+    } else if (transport === 'webusb') {
+      // WebUSB模式
+      await sdkInstance.switchTransport('webusb');
     } else {
-      const envParam = transport === 'webusb' ? 'webusb' : 'web';
-      await sdkInstance.switchTransport(envParam);
+      // JSBridge模式
+      await sdkInstance.switchTransport('web');
     }
 
     logResponse(`Transport switched successfully to ${transport}`);
@@ -105,7 +109,7 @@ export async function submitPassphrase(
 
   try {
     const sdkInstance = await getSDKInstance();
-    await sdkInstance.uiResponse({
+    sdkInstance.uiResponse({
       type: UI_RESPONSE.RECEIVE_PASSPHRASE,
       payload: {
         value: passphrase || '',
@@ -268,56 +272,98 @@ export async function searchDevices(): Promise<ApiResponse> {
   const currentTransport = TransportManager.getCurrentTransport();
   logInfo(`Using transport type: ${currentTransport}`);
 
-  // WebUSB 特殊处理 - 使用更可靠的 promptWebDeviceAccess 方法
-  if (currentTransport === 'webusb') {
-    try {
-      logInfo('Using promptWebDeviceAccess for WebUSB');
-      const sdkInstance = await getSDKInstance();
-      const promptResponse = await sdkInstance.promptWebDeviceAccess();
+  try {
+    const sdkInstance = await getSDKInstance();
 
-      logInfo('promptWebDeviceAccess completed', {
-        success: promptResponse.success,
-        payload: promptResponse.payload,
-      });
+    // 先切换到对应的transport
+    if (currentTransport === 'emulator') {
+      await sdkInstance.switchTransport('emulator');
+    } else if (currentTransport === 'webusb') {
+      await sdkInstance.switchTransport('webusb');
+    } else {
+      await sdkInstance.switchTransport('web');
+    }
 
-      if (promptResponse.success && promptResponse.payload.device) {
-        return {
-          success: true,
-          payload: [promptResponse.payload.device],
-        } as Success<any>;
-      } else {
+    let response: ApiResponse;
+
+    // WebUSB 使用 promptWebDeviceAccess，其他使用 searchDevices
+    if (currentTransport === 'webusb') {
+      try {
+        logInfo('Prompting WebUSB device access');
+
+        // 使用SDK的promptWebDeviceAccess方法
+        const promptResponse = await sdkInstance.promptWebDeviceAccess();
+
+        if (promptResponse.success && promptResponse.payload?.device) {
+          // 将单个设备包装成数组格式，保持与searchDevices返回格式一致
+          response = {
+            success: true,
+            payload: [promptResponse.payload.device],
+          } as Success<any>;
+          logResponse('WebUSB device selected successfully', {
+            deviceInfo: promptResponse.payload.device,
+          });
+        } else {
+          response = {
+            success: false,
+            payload: {
+              error:
+                !promptResponse.success && 'error' in promptResponse.payload
+                  ? promptResponse.payload.error
+                  : 'No device selected',
+            },
+          } as Unsuccessful;
+        }
+      } catch (webUsbError) {
+        if (
+          webUsbError instanceof Error &&
+          (webUsbError.name === 'NotFoundError' ||
+            webUsbError.message.includes('No device selected') ||
+            webUsbError.message.includes('User cancelled'))
+        ) {
+          const error = '用户取消选择设备';
+          logInfo('User canceled device selection');
+          return {
+            success: false,
+            payload: { error },
+          } as Unsuccessful;
+        }
+        logError('WebUSB device access failed', { webUsbError });
         return {
           success: false,
-          payload: {
-            error:
-              (promptResponse.payload as any).error || 'No device selected or permission denied',
-          },
+          payload: { error: `WebUSB access failed: ${webUsbError}` },
         } as Unsuccessful;
       }
-    } catch (webUsbError) {
-      if (
-        webUsbError instanceof Error &&
-        (webUsbError.name === 'NotFoundError' || webUsbError.message.includes('No device selected'))
-      ) {
-        const error = '用户取消选择设备';
-        logInfo('User canceled device selection');
-        return {
-          success: false,
-          payload: { error },
-        } as Unsuccessful;
-      }
-      logError('WebUSB promptWebDeviceAccess failed', {
-        webUsbError,
+    } else {
+      // 对于其他transport类型，使用标准的searchDevices
+      response = await sdkInstance.searchDevices();
+    }
+
+    if (response.success && response.payload) {
+      logResponse('Devices found', {
+        count: Array.isArray(response.payload) ? response.payload.length : 1,
+        devices: Array.isArray(response.payload)
+          ? response.payload.map(d => d.connectId || 'unknown')
+          : ['single device'],
       });
+      return response;
+    } else {
+      const errorPayload = response.payload as any;
       return {
         success: false,
-        payload: { error: `WebUSB access failed: ${webUsbError}` },
+        payload: {
+          error: errorPayload?.error || 'No devices found',
+        },
       } as Unsuccessful;
     }
+  } catch (error) {
+    const errorMsg = `Device search error: ${error}`;
+    logError(errorMsg, { currentTransport, error });
+    return {
+      success: false,
+      payload: { error: errorMsg },
+    } as Unsuccessful;
   }
-
-  // 对于其他transport类型，使用标准的searchDevices
-  return callHardwareAPI('searchDevices', {});
 }
 
 // 导出 hd-core 的标准类型和常量

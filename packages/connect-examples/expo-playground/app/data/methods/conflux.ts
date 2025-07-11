@@ -86,7 +86,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'confluxSignMessageCIP23',
-    description: 'Sign Message CIP23',
+    description: 'methodDescriptions.confluxSignMessageCIP23',
     presets: [
       {
         title: 'Sign Message',

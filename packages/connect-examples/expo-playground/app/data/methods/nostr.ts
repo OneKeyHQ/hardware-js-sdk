@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'nostrGetPublicKey',
-    description: 'Get a Nostr public key for your account.',
+    description: 'methodDescriptions.nostrGetPublicKey',
     presets: [
       {
         title: 'Get Nostr Public Key',
@@ -56,7 +56,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'nostrSignEvent',
-    description: 'Sign a Nostr event.',
+    description: 'methodDescriptions.nostrSignEvent',
     presets: [
       {
         title: 'Sign simple note',
@@ -110,7 +110,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'nostrEncryptMessage',
-    description: 'Encrypt message',
+    description: 'methodDescriptions.nostrEncryptMessage',
     presets: [
       {
         title: 'Encrypt message',
@@ -149,7 +149,7 @@ const api: UnifiedMethodConfig[] = [
 
   {
     method: 'nostrEncryptMessage',
-    description: 'Encrypt message',
+    description: 'methodDescriptions.nostrEncryptMessage',
     presets: [
       {
         title: 'Encrypt message',
@@ -188,7 +188,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'nostrDecryptMessage',
-    description: 'Decrypt message',
+    description: 'methodDescriptions.nostrDecryptMessage',
     presets: [
       {
         title: 'Decrypt message',
@@ -227,7 +227,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'nostrSignSchnorr',
-    description: 'Sign schnorr',
+    description: 'methodDescriptions.nostrSignSchnorr',
     presets: [
       {
         title: 'Sign schnorr',

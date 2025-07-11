@@ -4,26 +4,26 @@ const api: UnifiedMethodConfig[] = [
   // === 基础操作 ===
   {
     method: 'searchDevices',
-    description: 'Search for devices',
+    description: 'methodDescriptions.searchDevices',
     noConnIdReq: true,
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'getFeatures',
-    description: 'Get features of a device',
+    description: 'methodDescriptions.getFeatures',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'getOnekeyFeatures',
-    description: 'Get OneKey specific features of a device',
+    description: 'methodDescriptions.getOnekeyFeatures',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'getPassphraseState',
-    description: 'Get passphrase state of a device',
+    description: 'methodDescriptions.getPassphraseState',
     noDeviceIdReq: true,
     presets: [],
   },
@@ -31,7 +31,7 @@ const api: UnifiedMethodConfig[] = [
   // === 设备管理 ===
   {
     method: 'deviceSettings',
-    description: 'Configure device settings',
+    description: 'methodDescriptions.deviceSettings',
     noDeviceIdReq: true,
     presets: [
       {
@@ -129,19 +129,19 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'deviceChangePin',
-    description: 'Change pin of a device',
+    description: 'methodDescriptions.deviceChangePin',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'deviceLock',
-    description: 'Lock device',
+    description: 'methodDescriptions.deviceLock',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'deviceCancel',
-    description: 'Cancel device operation',
+    description: 'methodDescriptions.deviceCancel',
     noDeviceIdReq: true,
     presets: [],
   },
@@ -149,13 +149,13 @@ const api: UnifiedMethodConfig[] = [
   // === 高级功能 ===
   {
     method: 'deviceSupportFeatures',
-    description: 'Check device support features',
+    description: 'methodDescriptions.deviceSupportFeatures',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'deviceVerify',
-    description: 'Verify device authenticity',
+    description: 'methodDescriptions.deviceVerify',
     noDeviceIdReq: true,
     presets: [
       {
@@ -175,7 +175,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'getLogs',
-    description: 'Get device logs',
+    description: 'methodDescriptions.getLogs',
     noDeviceIdReq: true,
     presets: [],
   },
@@ -183,7 +183,7 @@ const api: UnifiedMethodConfig[] = [
   // === U2F 功能 ===
   {
     method: 'setU2FCounter',
-    description: 'Set U2F counter value',
+    description: 'methodDescriptions.setU2FCounter',
     noDeviceIdReq: true,
     presets: [
       {
@@ -203,13 +203,13 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'getNextU2FCounter',
-    description: 'Get next U2F counter value',
+    description: 'methodDescriptions.getNextU2FCounter',
     noDeviceIdReq: true,
     presets: [],
   },
   {
     method: 'deviceWipe',
-    description: 'Wipe device(DANGER: This will erase all data)',
+    description: 'methodDescriptions.deviceWipe',
     noDeviceIdReq: true,
     presets: [],
   },

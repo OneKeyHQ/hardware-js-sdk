@@ -100,7 +100,7 @@ export function AppSidebar() {
             <img src={onekeyLogo} alt="OneKey" className="w-8 h-8 object-contain" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-base">OneKey Developer Portal</span>
+            <span className="font-bold text-base">{t('header.title')}</span>
             <span className="text-sm text-muted-foreground font-medium">Hardware JS SDK</span>
           </div>
         </div>
@@ -267,7 +267,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <div className="py-3 px-2">
           <div className="text-center space-y-1">
-            <div className="text-sm font-bold text-foreground">OneKey Developer Portal</div>
+            <div className="text-sm font-bold text-foreground">{t('header.title')}</div>
             <div className="text-xs text-muted-foreground font-mono">
               v{VERSION} • {COMMIT_SHA.slice(0, 8)}
             </div>

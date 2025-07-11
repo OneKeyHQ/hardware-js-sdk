@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { TransportType } from '../services/hardwareService';
+import { TransportType } from '../utils/hardwareInstance';
 
 // 所有持久化数据的类型定义
 export interface PersistenceState {

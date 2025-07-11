@@ -3,7 +3,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'evmGetAddress',
-    description: 'Get a EVM address for your account.',
+    description: 'methodDescriptions.evmGetAddress',
     presets: [
       {
         title: 'Get EVM Address',
@@ -64,7 +64,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'evmGetPublicKey',
-    description: 'Get a EVM public key for your account.',
+    description: 'methodDescriptions.evmGetPublicKey',
     presets: [
       {
         title: 'Get EVM Public Key',
@@ -117,7 +117,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'evmSignMessage',
-    description: 'Sign a message with your EVM account.',
+    description: 'methodDescriptions.evmSignMessage',
     presets: [
       {
         title: 'Sign Message',
@@ -160,8 +160,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'evmSignMessageEIP712',
-    description:
-      'Sign a message with your EVM account. \nClassic and Mini firmware versions greater than 2.1.8 and less than 2.2.0 are available',
+    description: 'methodDescriptions.evmSignMessageEIP712',
     deprecated: true,
     presets: [
       {
@@ -197,7 +196,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'evmSignTransaction',
-    description: 'Sign a transaction with your EVM account.',
+    description: 'methodDescriptions.evmSignTransaction',
     presets: [
       {
         title: 'Sign Transaction',
@@ -558,7 +557,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'evmSignTypedData',
-    description: 'Sign a typed data with your EVM account.',
+    description: 'methodDescriptions.evmSignTypedData',
     presets: [
       {
         title: 'Sign Normal',
@@ -974,7 +973,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'evmVerifyMessage',
-    description: 'Verify a message with your EVM account.',
+    description: 'methodDescriptions.evmVerifyMessage',
     presets: [
       {
         title: 'Verify Message',

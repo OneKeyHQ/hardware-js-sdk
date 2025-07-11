@@ -17,8 +17,6 @@ interface DeviceNotConnectedStateProps {
 export function DeviceNotConnectedState({
   className = '',
   showFullPage = false,
-  title,
-  description,
 }: DeviceNotConnectedStateProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -118,10 +116,10 @@ export function DeviceNotConnectedState({
           {/* 标题和描述 */}
           <div className="space-y-2">
             <h2 className="text-xl font-semibold text-orange-900 dark:text-orange-100">
-              {title || t('device.connectionRequired')}
+              {t('device.connectionRequired')}
             </h2>
             <p className="text-orange-700 dark:text-orange-300 text-sm max-w-sm mx-auto">
-              {description || t('device.pleaseConnectFirst')}
+              {t('device.pleaseConnectFirst')}
             </p>
           </div>
 
@@ -156,10 +154,10 @@ export function DeviceNotConnectedState({
             </div>
             <div>
               <p className="text-xs font-medium text-orange-900 dark:text-orange-100">
-                {title || t('device.connectionRequired')}
+                {t('device.connectionRequired')}
               </p>
               <p className="text-xs text-orange-700 dark:text-orange-300">
-                {description || t('device.pleaseConnectFirst')}
+                {t('device.pleaseConnectFirst')}
               </p>
             </div>
           </div>

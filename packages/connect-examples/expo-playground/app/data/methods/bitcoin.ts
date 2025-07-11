@@ -2,7 +2,7 @@ import type { UnifiedMethodConfig, ChainCategory } from '../types';
 const api: UnifiedMethodConfig[] = [
   {
     method: 'btcGetAddress',
-    description: 'Get a Bitcoin address for your account.',
+    description: 'methodDescriptions.btcGetAddress',
     presets: [
       {
         title: 'Get Bitcoin Address',
@@ -293,7 +293,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'btcGetPublicKey',
-    description: 'Get a Bitcoin public key for your account.',
+    description: 'methodDescriptions.btcGetPublicKey',
     presets: [
       {
         title: 'Get Bitcoin Public Key',
@@ -584,7 +584,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'btcSignMessage',
-    description: 'Sign a message with your Bitcoin private key.',
+    description: 'methodDescriptions.btcSignMessage',
     presets: [
       {
         title: 'Sign Message (Native Segwit)',
@@ -923,7 +923,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'btcSignPsbt',
-    description: 'Sign psbt.',
+    description: 'methodDescriptions.btcSignPsbt',
     presets: [
       {
         title: 'Sign psbt on testnet',
@@ -979,7 +979,7 @@ const api: UnifiedMethodConfig[] = [
             label: 'PSBT',
             description: 'Partially Signed Bitcoin Transaction',
             value:
-              '70736274ff01007002000000010de21538513d44100cf27cfbed0303884f808074749463526a976400ca3b5bc80000000000ffffffff02ec9d020000000000096a07626162796c6f6e54bd340a00000000225120ec47ecd23739768f3e3b9fa3ee03b7bea57cfdc316acb9c45157f017465b764a000000000001012be0e1380a00000000225120192c3e1ca8308fe262f7a953b9466753df7624a44fb352e4315b4c50423269474215c150929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac05e528cd4c722bd7e2e07b5d127e642031cec10a723c9cd2c8e29cc2e064dcc79fd790120f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b2ad20374601b4c400b31f3aa78dc16b4e4d589c1284118e2476d83f0c39743881032cad2023b29f89b45f4af41588dcaf0ca572ada32872a88224f311373917f1b37d08d1ac204b15848e495a3a62283daaadb3f458a00859fe48e321f0121ebabbdd6698f9faba208242640732773249312c47ca7bdb50ca79f15f2ecc32b9c83ceebba44fb74df7ba20cbdd028cfe32c1c1f2d84bfec71e19f92df509bba7b8ad31ca6c1a134fe09204ba20d3c79b99ac4d265c2f97ac11e3232c07a598b020cf56c6f055472c893c0967aeba20d45c70d28f169e1f0c7f4a78e2bc73497afe585b70aa897955989068f3350aaaba20de13fc96ea6899acbdc5db3afaa683f62fe35b60ff6eb723dad28a11d2b12f8cba20e36200aaa8dce9453567bba108bdc51f7f1174b97a65e4dc4402fc5de779d41cba20f178fcce82f95c524b53b077e6180bd2d779a9057fdff4255a0af95af918cee0ba569cc02116f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b21900fc885a5e560000800100008000000080000000000000000001172050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0000000',
+              '70736274ff01007002000000010de21538513d44100cf27cfbed0303884f808074749463526a976400ca3b5bc80000000000ffffffff02ec9d020000000000096a07626162796c6f6e54bd340a00000000225120ec47ecd23739768f3e3b9fa3ee03b7bea57cfdc316acb9c45157f017465b764a000000000001012be0e1380a00000000225120192c3e1ca8308fe262f7a953b9466753df7624a44fb352e4315b4c50423269474215c150929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac05e528cd4c722bd7e2e07b5d127e642031cec10a723c9cd2c8e29cc2e064dcc79fd790120f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b2ad20374601b4c400b31f3aa78dc16b4e4d589c1284118e2476d83f0c39743881032cad2023b29f89b45f4af41588dcaf0ca572ada32872a88224f311373917f1b37d08d1ac204b15848e495a3a62283daaadb3f458a00859fe48e321f0121ebabbdd6698f9faba208242640732773249312c47ca7bdb50ca79f15f2ecc32b9c83ceebba44fb74df7ba20cbdd028cfe32c1c1f2d84bfec71e19f92df509bba7b8ad31ca6c1a134fe09204ba20d3c79b99ac4d265c2f97ac11e3232c07a598b020cf56c6f055472c893c0967aeba20d45c70d28f169e1f0c7f4a78e2bc73497afe585b70aa897955989068f3350aaaba20de13fc96ea6899acbdc5db3afaa683f62fe35b60ff6eb723dad28a11d2b12f8cba20e36200aaa8dce9453567bba108bdc51f7f1174b97a65e4dc4402fc5de779d41cba20f178fcce82f95c524b53b077e6180bd2d779a9057fdff4255a0af95af918cee0ba569cc02116f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b21900fc885a5e5600008001000080000000800000000000000000011720f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b20001012bd968000000000000225120c3f45119b701bc0384b45e064a4abbea7949c8c492e278f0f594a1fd83f148972116f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b21900fc885a5e5600008001000080000000800000000000000000011720f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b20001012bd968000000000000225120c3f45119b701bc0384b45e064a4abbea7949c8c492e278f0f594a1fd83f148972116f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b21900fc885a5e5600008001000080000000800000000000000000011720f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b2000000010520f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b22107f4b1f1ca7515d009aee696ec84ee76e901139c6ad80269ebe7e6b6e8f42ae7b21900fc885a5e560000800100008000000080000000000000000000',
           },
           {
             name: 'coin',
@@ -995,7 +995,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'btcSignTransaction',
-    description: 'Sign a Bitcoin transaction with your Bitcoin private key.',
+    description: 'methodDescriptions.btcSignTransaction',
     presets: [
       {
         title: 'Sign Transaction',
@@ -1168,7 +1168,7 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'btcVerifyMessage',
-    description: 'Verify a message signed with a Bitcoin private key.',
+    description: 'methodDescriptions.btcVerifyMessage',
     presets: [
       {
         title: 'Verify Message',
