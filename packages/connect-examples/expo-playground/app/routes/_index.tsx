@@ -5,7 +5,7 @@ import { useTransportPersistence } from '../store/persistenceStore';
 import { CheckCircle, XCircle, Usb, Wifi, Server, AlertCircle } from 'lucide-react';
 import TransportSwitcher from '../components/common/TransportSwitcher';
 import DeviceIcon from '../components/device/DeviceIcon';
-import deviceList from '../assets/device-list2.png';
+import deviceList from '../assets/device_list.png';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../components/common/PageLayout';
 import React from 'react';
