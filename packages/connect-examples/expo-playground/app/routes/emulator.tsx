@@ -400,9 +400,15 @@ const EmulatorPage: React.FC = () => {
           </motion.div>
 
           {/* 步骤内容 - 现代化设计 */}
-          <div className={`relative overflow-hidden max-w-4xl mx-auto ${
-            currentStep === 3 ? 'min-h-[600px]' : currentStep === 2 ? 'min-h-[450px]' : 'min-h-[350px]'
-          }`}>
+          <div
+            className={`relative overflow-hidden max-w-4xl mx-auto ${
+              currentStep === 3
+                ? 'min-h-[420px]'
+                : currentStep === 2
+                ? 'min-h-[450px]'
+                : 'min-h-[350px]'
+            }`}
+          >
             <AnimatePresence custom={direction}>
               {/* 步骤 0: 下载设置脚本 */}
               {currentStep === 0 && (

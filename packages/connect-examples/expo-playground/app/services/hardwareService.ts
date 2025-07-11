@@ -57,12 +57,16 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
     // 获取新的SDK实例（会根据新的transport类型初始化）
     const sdkInstance = await getSDKInstance();
 
-    // 切换transport
+    // 根据不同的transport类型调用不同的切换方法
     if (transport === 'emulator') {
+      // 模拟器模式
       await sdkInstance.switchTransport('emulator');
+    } else if (transport === 'webusb') {
+      // WebUSB模式
+      await sdkInstance.switchTransport('webusb');
     } else {
-      const envParam = transport === 'webusb' ? 'webusb' : 'web';
-      await sdkInstance.switchTransport(envParam);
+      // JSBridge模式
+      await sdkInstance.switchTransport('web');
     }
 
     logResponse(`Transport switched successfully to ${transport}`);
@@ -105,7 +109,7 @@ export async function submitPassphrase(
 
   try {
     const sdkInstance = await getSDKInstance();
-    await sdkInstance.uiResponse({
+    sdkInstance.uiResponse({
       type: UI_RESPONSE.RECEIVE_PASSPHRASE,
       payload: {
         value: passphrase || '',
@@ -280,36 +284,33 @@ export async function searchDevices(): Promise<ApiResponse> {
       await sdkInstance.switchTransport('web');
     }
 
-    // WebUSB 特殊处理 - 先请求设备权限，然后调用searchDevices
+    let response: ApiResponse;
+
+    // WebUSB 使用 promptWebDeviceAccess，其他使用 searchDevices
     if (currentTransport === 'webusb') {
       try {
-        logInfo('Requesting WebUSB device permission');
+        logInfo('Prompting WebUSB device access');
 
-        // 导入WebUSB过滤器
-        const { ONEKEY_WEBUSB_FILTER } = await import('@onekeyfe/hd-shared');
+        // 使用SDK的promptWebDeviceAccess方法
+        const promptResponse = await sdkInstance.promptWebDeviceAccess();
 
-        // 先请求设备权限
-        const connectedDevice = await window.navigator.usb.requestDevice({
-          filters: ONEKEY_WEBUSB_FILTER,
-        });
-
-        if (!connectedDevice) {
-          throw new Error('No device selected');
-        }
-
-        logInfo('WebUSB device permission granted', { device: connectedDevice });
-
-        // 然后调用SDK的searchDevices
-        const response = await sdkInstance.searchDevices();
-
-        if (response.success && response.payload) {
-          logResponse('WebUSB devices found', response.payload);
-          return response;
+        if (promptResponse.success && promptResponse.payload?.device) {
+          // 将单个设备包装成数组格式，保持与searchDevices返回格式一致
+          response = {
+            success: true,
+            payload: [promptResponse.payload.device],
+          } as Success<any>;
+          logResponse('WebUSB device selected successfully', {
+            deviceInfo: promptResponse.payload.device,
+          });
         } else {
-          return {
+          response = {
             success: false,
             payload: {
-              error: response.payload?.error || 'No devices found',
+              error:
+                !promptResponse.success && 'error' in promptResponse.payload
+                  ? promptResponse.payload.error
+                  : 'No device selected',
             },
           } as Unsuccessful;
         }
@@ -327,25 +328,31 @@ export async function searchDevices(): Promise<ApiResponse> {
             payload: { error },
           } as Unsuccessful;
         }
-        logError('WebUSB device request failed', { webUsbError });
+        logError('WebUSB device access failed', { webUsbError });
         return {
           success: false,
           payload: { error: `WebUSB access failed: ${webUsbError}` },
         } as Unsuccessful;
       }
+    } else {
+      // 对于其他transport类型，使用标准的searchDevices
+      response = await sdkInstance.searchDevices();
     }
 
-    // 对于其他transport类型，使用标准的searchDevices
-    const response = await sdkInstance.searchDevices();
-
     if (response.success && response.payload) {
-      logResponse('Devices found', response.payload);
+      logResponse('Devices found', {
+        count: Array.isArray(response.payload) ? response.payload.length : 1,
+        devices: Array.isArray(response.payload)
+          ? response.payload.map(d => d.connectId || 'unknown')
+          : ['single device'],
+      });
       return response;
     } else {
+      const errorPayload = response.payload as any;
       return {
         success: false,
         payload: {
-          error: response.payload?.error || 'No devices found',
+          error: errorPayload?.error || 'No devices found',
         },
       } as Unsuccessful;
     }
