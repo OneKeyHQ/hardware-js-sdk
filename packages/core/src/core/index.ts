@@ -655,6 +655,8 @@ const ensureConnected = async (
         }
         if (
           [
+            HardwareErrorCode.BlePoweredOff,
+            HardwareErrorCode.BleUnsupported,
             HardwareErrorCode.BlePermissionError,
             HardwareErrorCode.BleLocationError,
             HardwareErrorCode.BleLocationServicesDisabled,

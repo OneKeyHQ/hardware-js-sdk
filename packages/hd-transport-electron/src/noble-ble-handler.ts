@@ -163,27 +163,31 @@ async function initializeNoble(): Promise<void> {
 
       const timeout = setTimeout(() => {
         reject(
-          ERRORS.TypedError(
-            HardwareErrorCode.BlePermissionError,
-            'Bluetooth initialization timeout'
-          )
+          ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Bluetooth initialization timeout')
         );
       }, BLUETOOTH_INIT_TIMEOUT);
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        if (noble) {
+          noble.removeListener('stateChange', onStateChange);
+        }
+      };
 
       const onStateChange = (state: string) => {
         logger?.info('[NobleBLE] Bluetooth state:', state);
         if (state === 'poweredOn') {
-          clearTimeout(timeout);
-          if (noble) {
-            noble.removeListener('stateChange', onStateChange);
-          }
+          cleanup();
           resolve();
-        } else if (state === 'poweredOff' || state === 'unsupported') {
-          clearTimeout(timeout);
-          if (noble) {
-            noble.removeListener('stateChange', onStateChange);
-          }
-          reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError, `Bluetooth is ${state}`));
+        } else if (state === 'poweredOff') {
+          cleanup();
+          reject(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
+        } else if (state === 'unsupported') {
+          cleanup();
+          reject(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
+        } else if (state === 'unauthorized') {
+          cleanup();
+          reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
         }
       };
 

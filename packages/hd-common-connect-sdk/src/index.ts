@@ -19,6 +19,8 @@ import HardwareSdk, {
   DEVICE_EVENT,
   DEVICE,
   LowLevelCoreApi,
+  createUiMessage,
+  UI_REQUEST,
 } from '@onekeyfe/hd-core';
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
@@ -144,6 +146,19 @@ const call = async (params: any) => {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
       Log.debug('response: ', response);
+
+      if (!response.success) {
+        console.log('response.payload?.code: ', response.payload?.code);
+        if (response.payload?.code === HardwareErrorCode.BleUnsupported) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED), false);
+        }
+        if (response.payload?.code === HardwareErrorCode.BlePoweredOff) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF), false);
+        }
+        if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION), false);
+        }
+      }
 
       return response;
     }
