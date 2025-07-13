@@ -977,6 +977,8 @@ export default class Core extends EventEmitter {
         break;
       }
 
+      case UI_REQUEST.BLUETOOTH_UNSUPPORTED:
+      case UI_REQUEST.BLUETOOTH_POWERED_OFF:
       case UI_REQUEST.BLUETOOTH_PERMISSION:
       case UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
       case UI_REQUEST.LOCATION_PERMISSION:
