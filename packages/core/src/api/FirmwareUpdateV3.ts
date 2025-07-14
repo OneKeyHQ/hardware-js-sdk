@@ -289,6 +289,8 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           HardwareErrorCode.ActionCancelled,
           HardwareErrorCode.BleDeviceNotBonded,
           HardwareErrorCode.BleServiceNotFound,
+          HardwareErrorCode.BlePoweredOff,
+          HardwareErrorCode.BleUnsupported,
           HardwareErrorCode.BlePermissionError,
           HardwareErrorCode.BleLocationError,
           HardwareErrorCode.BleDeviceBondError,

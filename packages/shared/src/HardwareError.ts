@@ -299,6 +299,8 @@ export const HardwareErrorCode = {
   BleDeviceBondedCanceled: 718,
   BlePeerRemovedPairingInformation: 719,
   BleDeviceDisconnected: 720,
+  BlePoweredOff: 721,
+  BleUnsupported: 722,
 
   /**
    * Hardware runtiome errors
@@ -511,6 +513,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.BleCharacteristicNotifyChangeFailure]: 'Characteristic Notify Change Failure',
   [HardwareErrorCode.BleTransportCallCanceled]: 'Ble Transport call canceled',
   [HardwareErrorCode.BleDeviceDisconnected]: 'Device disconnected',
+  [HardwareErrorCode.BlePoweredOff]: 'Bluetooth is turned off',
+  [HardwareErrorCode.BleUnsupported]: 'Bluetooth is not supported on this device',
 
   /**
    * Runtime Error

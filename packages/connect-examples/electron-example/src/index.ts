@@ -1,9 +1,10 @@
-import { screen, app, BrowserWindow, session, ipcMain } from 'electron';
+import { screen, app, BrowserWindow, session, ipcMain, shell } from 'electron';
 import path from 'path';
 import isDevelopment from 'electron-is-dev';
 import { format as formatUrl } from 'url';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
+import { exec } from 'child_process';
 import { initNobleBleSupport } from '@onekeyfe/hd-transport-electron';
 import initProcess, { restartBridge } from './process';
 import { ipcMessageKeys } from './config';
@@ -297,6 +298,49 @@ ipcMain.on(ipcMessageKeys.APP_RELOAD_BRIDGE_PROCESS, () => {
   restartBridge();
 });
 
+// Simplified Bluetooth System API Implementation
+class BluetoothSystemManager {
+  openBluetoothSettings(): void {
+    try {
+      if (process.platform === 'darwin') {
+        exec('open "/System/Library/PreferencePanes/Bluetooth.prefPane"');
+      } else if (process.platform === 'win32') {
+        shell.openExternal('ms-settings:bluetooth');
+      } else {
+        log.warn('Opening Bluetooth settings not supported on this platform');
+      }
+    } catch (error) {
+      log.error('Failed to open Bluetooth settings:', error);
+    }
+  }
+
+  openPrivacySettings(): void {
+    try {
+      if (process.platform === 'darwin') {
+        exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth"');
+      } else if (process.platform === 'win32') {
+        shell.openExternal('ms-settings:privacy-bluetooth');
+      } else {
+        log.warn('Opening privacy settings not supported on this platform');
+      }
+    } catch (error) {
+      log.error('Failed to open privacy settings:', error);
+    }
+  }
+}
+
+// Create global instance
+const bluetoothManager = new BluetoothSystemManager();
+
+// Register simplified IPC handlers for Bluetooth system API
+ipcMain.handle('bluetooth-open-bluetooth-settings', () => {
+  bluetoothManager.openBluetoothSettings();
+});
+
+ipcMain.handle('bluetooth-open-privacy-settings', () => {
+  bluetoothManager.openPrivacySettings();
+});
+
 // 配置 GitHub 发布提供者
 autoUpdater.setFeedURL({
   provider: 'github',
@@ -324,7 +368,7 @@ app.on('ready', () => {
   }, 5000);
 });
 
-// wuit when all windows are closed, except on macOS. There, it's common
+// quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q
 app.on('window-all-closed', (event: Event) => {

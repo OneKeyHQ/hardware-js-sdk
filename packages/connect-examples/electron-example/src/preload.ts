@@ -5,6 +5,13 @@ import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
 import type { DesktopAPI as BaseDesktopAPI, NobleBleAPI } from '@onekeyfe/hd-transport-electron';
 import { ipcMessageKeys } from './config';
 
+// Simplified Bluetooth system API - only for opening settings
+export interface BluetoothSystemAPI {
+  // System integration
+  openBluetoothSettings: () => void;
+  openPrivacySettings: () => void;
+}
+
 // Extend the base DesktopAPI with this specific application's needs
 export interface DesktopAPI extends BaseDesktopAPI {
   restart: () => void;
@@ -17,6 +24,9 @@ export interface DesktopAPI extends BaseDesktopAPI {
 
   // Make nobleBle required for this app
   nobleBle: NobleBleAPI;
+
+  // Simplified Bluetooth system management
+  bluetoothSystem: BluetoothSystemAPI;
 }
 
 declare global {
@@ -97,6 +107,14 @@ const desktopApi = {
         ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, subscription);
       };
     },
+  },
+
+  // Simplified Bluetooth system management
+  bluetoothSystem: {
+    // Open Bluetooth settings when Bluetooth is off
+    openBluetoothSettings: () => ipcRenderer.invoke('bluetooth-open-bluetooth-settings'),
+    // Open Privacy & Security settings for Bluetooth permission
+    openPrivacySettings: () => ipcRenderer.invoke('bluetooth-open-privacy-settings'),
   },
 };
 

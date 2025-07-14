@@ -18,6 +18,9 @@ export const UI_REQUEST = {
   DEVICE_PROGRESS: 'ui-device_progress',
 
   BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
+  BLUETOOTH_UNSUPPORTED: 'ui-bluetooth_unsupported',
+  BLUETOOTH_POWERED_OFF: 'ui-bluetooth_powered_off',
+
   BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
     'ui-bluetooth_characteristic_notify_change_failure',
   LOCATION_PERMISSION: 'ui-location_permission',
@@ -47,6 +50,8 @@ export interface UiRequestWithoutPayload {
   type:
     | typeof UI_REQUEST.CLOSE_UI_WINDOW
     | typeof UI_REQUEST.BLUETOOTH_PERMISSION
+    | typeof UI_REQUEST.BLUETOOTH_UNSUPPORTED
+    | typeof UI_REQUEST.BLUETOOTH_POWERED_OFF
     | typeof UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE
     | typeof UI_REQUEST.LOCATION_PERMISSION
     | typeof UI_REQUEST.LOCATION_SERVICE_PERMISSION

@@ -2,6 +2,7 @@ import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-tra
 import {
   ERRORS,
   HardwareErrorCode,
+  HardwareErrorCodeMessage,
   Deferred,
   createDeferred,
   isHeaderChunk,
@@ -57,6 +58,41 @@ export default class ElectronBleTransport {
   // Disconnect listener cleanup functions
   private disconnectCleanups: Map<string, () => void> = new Map();
 
+  // Handle bluetooth related errors with proper error code mapping
+  private handleBluetoothError(error: any): never {
+    if (error && typeof error === 'object') {
+      // Check for specific bluetooth error codes
+      if ('code' in error) {
+        if (error.code === HardwareErrorCode.BlePoweredOff) {
+          throw ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
+        }
+        if (error.code === HardwareErrorCode.BleUnsupported) {
+          throw ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
+        }
+        if (error.code === HardwareErrorCode.BlePermissionError) {
+          throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+        }
+      }
+      // Check for error message containing bluetooth state related text using predefined messages
+      const errorMessage = error.message || String(error);
+      const poweredOffMessage = HardwareErrorCodeMessage[HardwareErrorCode.BlePoweredOff];
+      const unsupportedMessage = HardwareErrorCodeMessage[HardwareErrorCode.BleUnsupported];
+      const permissionMessage = HardwareErrorCodeMessage[HardwareErrorCode.BlePermissionError];
+
+      if (errorMessage.includes(poweredOffMessage) || errorMessage.includes('poweredOff')) {
+        throw ERRORS.TypedError(HardwareErrorCode.BlePoweredOff);
+      }
+      if (errorMessage.includes(unsupportedMessage) || errorMessage.includes('unsupported')) {
+        throw ERRORS.TypedError(HardwareErrorCode.BleUnsupported);
+      }
+      if (errorMessage.includes(permissionMessage) || errorMessage.includes('unauthorized')) {
+        throw ERRORS.TypedError(HardwareErrorCode.BlePermissionError);
+      }
+    }
+
+    throw error;
+  }
+
   // Clean up all device state and listeners - unified cleanup function
   private cleanupDeviceState(deviceId: string): void {
     this.connectedDevices.delete(deviceId);
@@ -110,7 +146,7 @@ export default class ElectronBleTransport {
       return devices;
     } catch (error) {
       this.Log?.error('[Transport] Noble BLE enumerate failed:', error);
-      throw error;
+      this.handleBluetoothError(error);
     }
   }
 
@@ -138,8 +174,12 @@ export default class ElectronBleTransport {
       }
 
       // Connect to device
-      await window.desktopApi.nobleBle.connect(uuid);
-      this.connectedDevices.add(uuid);
+      try {
+        await window.desktopApi.nobleBle.connect(uuid);
+        this.connectedDevices.add(uuid);
+      } catch (error) {
+        this.handleBluetoothError(error);
+      }
 
       // Initialize data buffer for this device
       this.dataBuffers.set(uuid, { buffer: [], bufferLength: 0 });
