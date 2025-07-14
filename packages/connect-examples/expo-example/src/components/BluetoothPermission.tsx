@@ -80,13 +80,13 @@ const openSystemSettings = () => {
 
 // 主组件
 export const BluetoothPermission = memo<IBluetoothPermissionProps>(
-  ({ 
-    open, 
-    errorType, 
-    onOpenChange, 
-    onRequestPermission, 
-    onOpenSettings, 
-    onCancel 
+  ({
+    open,
+    errorType,
+    onOpenChange,
+    onRequestPermission,
+    onOpenSettings,
+    onCancel,
   }: IBluetoothPermissionProps) => {
     const intl = useIntl();
     const media = useMedia();
@@ -155,10 +155,7 @@ export const BluetoothPermission = memo<IBluetoothPermissionProps>(
       }
     }, [primaryAction, errorType, onOpenChange]);
 
-    const secondaryButtonText = useMemo(
-      () => intl.formatMessage({ id: 'action__cancel' }),
-      [intl]
-    );
+    const secondaryButtonText = useMemo(() => intl.formatMessage({ id: 'action__cancel' }), [intl]);
 
     const handleSecondaryAction = useCallback(() => {
       onCancel();
@@ -207,7 +204,10 @@ export const BluetoothPermission = memo<IBluetoothPermissionProps>(
                 {errorType === 'powered_off' ? (
                   <Settings size={48} color="$colorWarning" />
                 ) : (
-                  <Bluetooth size={48} color={errorType === 'unsupported' ? "$colorCritical" : "$colorInfo"} />
+                  <Bluetooth
+                    size={48}
+                    color={errorType === 'unsupported' ? '$colorCritical' : '$colorInfo'}
+                  />
                 )}
               </YStack>
 

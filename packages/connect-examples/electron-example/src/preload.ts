@@ -24,7 +24,7 @@ export interface DesktopAPI extends BaseDesktopAPI {
 
   // Make nobleBle required for this app
   nobleBle: NobleBleAPI;
-  
+
   // Simplified Bluetooth system management
   bluetoothSystem: BluetoothSystemAPI;
 }
