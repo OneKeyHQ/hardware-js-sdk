@@ -1,30 +1,28 @@
-import React, { useState } from 'react';
-import {
-  Info,
-  Download,
-  Copy,
-  CheckCircle,
-  Cpu,
-  Settings,
-  Zap,
-  Shield,
-  Monitor,
-  Package,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Hash,
-} from 'lucide-react';
+import React from 'react';
+import { Info, Download, Copy, Monitor } from 'lucide-react';
 
 import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { Button } from '../components/ui/Button';
-import { Separator } from '../components/ui/Separator';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { useDeviceStore } from '../store/deviceStore';
 import { useToast } from '../hooks/use-toast';
 import { useTranslation } from 'react-i18next';
+
+// 定义设备组结构类型
+interface DeviceGroup {
+  fields: string[];
+}
+
+interface DeviceSection {
+  title: string;
+  groups: DeviceGroup[];
+}
+
+interface DeviceSections {
+  deviceInfo: DeviceSection;
+  seInfo: DeviceSection;
+}
 
 const DeviceInfoPage: React.FC = () => {
   const { toast } = useToast();
@@ -32,10 +30,13 @@ const DeviceInfoPage: React.FC = () => {
   const { t } = useTranslation();
 
   // 获取字段值的辅助函数 - 整合 onekeyFeatures 和 features
-  const getFieldValue = (field: string) => {
-    const onekeyValue = currentDevice?.onekeyFeatures?.[field];
-    const featuresValue = currentDevice?.features?.[field];
-    return onekeyValue || featuresValue || '--';
+  const getFieldValue = (field: string): string => {
+    const onekeyValue =
+      currentDevice?.onekeyFeatures?.[field as keyof typeof currentDevice.onekeyFeatures];
+    const featuresValue = currentDevice?.features?.[field as keyof typeof currentDevice.features];
+    const value = onekeyValue || featuresValue || '--';
+    // 确保返回字符串类型
+    return String(value);
   };
 
   // 格式化当前时间
@@ -65,88 +66,123 @@ const DeviceInfoPage: React.FC = () => {
     }
   };
 
-
-
   // 简化的设备信息结构 - 按相关类型分组
-  const deviceSections = {
+  const deviceSections: DeviceSections = {
     deviceInfo: {
       title: t('deviceInfo.deviceInfo'),
       groups: [
         // 基本信息组
         {
-          fields: ['onekey_device_type', 'onekey_serial_no', 'onekey_se_type']
+          fields: ['onekey_device_type', 'onekey_serial_no', 'onekey_se_type'],
         },
         // 板子信息组
         {
-          fields: ['onekey_board_version', 'onekey_board_hash', 'onekey_board_build_id']
+          fields: ['onekey_board_version', 'onekey_board_hash', 'onekey_board_build_id'],
         },
         // Boot 信息组
         {
-          fields: ['onekey_boot_version', 'onekey_boot_hash', 'onekey_boot_build_id', 'onekey_boot_url']
+          fields: [
+            'onekey_boot_version',
+            'onekey_boot_hash',
+            'onekey_boot_build_id',
+            'onekey_boot_url',
+          ],
         },
         // 固件信息组
         {
-          fields: ['onekey_firmware_version', 'onekey_firmware_hash', 'onekey_firmware_build_id', 'onekey_firmware_url']
+          fields: [
+            'onekey_firmware_version',
+            'onekey_firmware_hash',
+            'onekey_firmware_build_id',
+            'onekey_firmware_url',
+          ],
         },
         // 蓝牙信息组
         {
-          fields: ['onekey_ble_version', 'onekey_ble_hash', 'onekey_ble_build_id', 'onekey_ble_url', 'onekey_ble_name']
-        }
-      ]
+          fields: [
+            'onekey_ble_version',
+            'onekey_ble_hash',
+            'onekey_ble_build_id',
+            'onekey_ble_url',
+            'onekey_ble_name',
+          ],
+        },
+      ],
     },
     seInfo: {
       title: t('deviceInfo.seInfo'),
       groups: [
         // SE01 信息组
         {
-          fields: ['onekey_se01_version', 'onekey_se01_hash', 'onekey_se01_build_id', 'onekey_se01_state']
+          fields: [
+            'onekey_se01_version',
+            'onekey_se01_hash',
+            'onekey_se01_build_id',
+            'onekey_se01_state',
+          ],
         },
         // SE01 Boot 信息组
         {
-          fields: ['onekey_se01_boot_version', 'onekey_se01_boot_hash', 'onekey_se01_boot_build_id']
+          fields: [
+            'onekey_se01_boot_version',
+            'onekey_se01_boot_hash',
+            'onekey_se01_boot_build_id',
+          ],
         },
         // SE02 信息组
         {
-          fields: ['onekey_se02_version', 'onekey_se02_hash', 'onekey_se02_build_id', 'onekey_se02_state']
+          fields: [
+            'onekey_se02_version',
+            'onekey_se02_hash',
+            'onekey_se02_build_id',
+            'onekey_se02_state',
+          ],
         },
         // SE02 Boot 信息组
         {
-          fields: ['onekey_se02_boot_version', 'onekey_se02_boot_hash', 'onekey_se02_boot_build_id']
+          fields: [
+            'onekey_se02_boot_version',
+            'onekey_se02_boot_hash',
+            'onekey_se02_boot_build_id',
+          ],
         },
         // SE03 信息组
         {
-          fields: ['onekey_se03_version', 'onekey_se03_hash', 'onekey_se03_build_id', 'onekey_se03_state']
+          fields: [
+            'onekey_se03_version',
+            'onekey_se03_hash',
+            'onekey_se03_build_id',
+            'onekey_se03_state',
+          ],
         },
         // SE03 Boot 信息组
         {
-          fields: ['onekey_se03_boot_version', 'onekey_se03_boot_hash', 'onekey_se03_boot_build_id']
+          fields: [
+            'onekey_se03_boot_version',
+            'onekey_se03_boot_hash',
+            'onekey_se03_boot_build_id',
+          ],
         },
         // SE04 信息组
         {
-          fields: ['onekey_se04_version', 'onekey_se04_hash', 'onekey_se04_build_id', 'onekey_se04_state']
+          fields: [
+            'onekey_se04_version',
+            'onekey_se04_hash',
+            'onekey_se04_build_id',
+            'onekey_se04_state',
+          ],
         },
         // SE04 Boot 信息组
         {
-          fields: ['onekey_se04_boot_version', 'onekey_se04_boot_hash', 'onekey_se04_boot_build_id']
-        }
-      ]
-    }
+          fields: [
+            'onekey_se04_boot_version',
+            'onekey_se04_boot_hash',
+            'onekey_se04_boot_build_id',
+          ],
+        },
+      ],
+    },
   };
-
-  // 所有字段的扁平列表
-  const allFields = Object.values(deviceSections).flatMap(section => 
-    section.groups.flatMap(group => group.fields)
-  );
-
-  // 用于导出的字段配置
-  const allDeviceFields = Object.entries(deviceSections).flatMap(([sectionKey, section]) => 
-    section.groups.flatMap(group => 
-      group.fields.map(field => ({ 
-        key: field, 
-        category: section.title 
-      }))
-    )
-  );
 
   // 导出设备信息
   const exportDeviceInfo = () => {
@@ -162,12 +198,12 @@ const DeviceInfoPage: React.FC = () => {
     markdown.push('');
 
     // 按照新的分类导出
-    Object.entries(deviceSections).forEach(([sectionKey, section]) => {
+    Object.values(deviceSections).forEach(section => {
       markdown.push(`## ${section.title}`);
       markdown.push('');
-      
-      section.groups.forEach(group => {
-        group.fields.forEach(field => {
+
+      section.groups.forEach((group: DeviceGroup) => {
+        group.fields.forEach((field: string) => {
           const value = getFieldValue(field);
           markdown.push(`**${field}**: ${value}`);
         });
@@ -199,32 +235,43 @@ const DeviceInfoPage: React.FC = () => {
     });
   };
 
+  // 处理键盘事件
+  const handleKeyPress = (event: React.KeyboardEvent, text: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      copyToClipboard(text);
+    }
+  };
+
   // 渲染字段的组件 - 紧凑版本
   const renderField = (field: string, value: string) => {
     const isEmpty = value === '--';
-    
+
     return (
       <div
         key={field}
+        role={isEmpty ? undefined : 'button'}
+        tabIndex={isEmpty ? undefined : 0}
         onClick={() => !isEmpty && copyToClipboard(value)}
+        onKeyDown={e => !isEmpty && handleKeyPress(e, value)}
         className={`group relative p-2 rounded transition-all duration-200 ${
           isEmpty
             ? 'bg-muted/5 text-muted-foreground cursor-default'
-            : 'bg-background hover:bg-accent/30 cursor-pointer'
+            : 'bg-background hover:bg-accent/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50'
         }`}
         title={isEmpty ? `${field} - No data` : `${field}: ${value} (click to copy)`}
       >
         <div className="flex justify-between items-start mb-1">
-          <span className="text-xs font-bold text-foreground">
-            {field}
-          </span>
+          <span className="text-xs font-bold text-foreground">{field}</span>
           {!isEmpty && (
             <Copy className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           )}
         </div>
-        <div className={`text-xs font-mono leading-tight font-medium ${
-          isEmpty ? 'text-muted-foreground italic' : 'text-foreground'
-        } ${value.length > 30 ? 'break-all' : ''}`}>
+        <div
+          className={`text-xs font-mono leading-tight font-medium ${
+            isEmpty ? 'text-muted-foreground italic' : 'text-foreground'
+          } ${value.length > 30 ? 'break-all' : ''}`}
+        >
           {isEmpty ? 'Not available' : value}
         </div>
       </div>
@@ -232,24 +279,23 @@ const DeviceInfoPage: React.FC = () => {
   };
 
   // 渲染组的组件 - 紧凑边框容器
-  const renderGroup = (group: any, groupIndex: number) => {
+  const renderGroup = (group: DeviceGroup, groupIndex: number) => {
     return (
       <div key={groupIndex} className="border border-border/40 rounded-lg p-2 bg-card/30 mb-2">
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5">
-          {group.fields.map((field: string) => 
-            renderField(field, getFieldValue(field))
-          )}
+          {group.fields.map((field: string) => renderField(field, getFieldValue(field)))}
         </div>
       </div>
     );
   };
 
   // 渲染区域的组件 - 紧凑分组版本
-  const renderSection = (sectionKey: string, section: any) => {
-    const totalFields = section.groups.flatMap((group: any) => group.fields).length;
-    const fieldsWithValues = section.groups.flatMap((group: any) => group.fields)
+  const renderSection = (sectionKey: string, section: DeviceSection) => {
+    const totalFields = section.groups.flatMap((group: DeviceGroup) => group.fields).length;
+    const fieldsWithValues = section.groups
+      .flatMap((group: DeviceGroup) => group.fields)
       .filter((field: string) => getFieldValue(field) !== '--').length;
-    
+
     return (
       <div key={sectionKey} className="space-y-2">
         <div className="flex items-center justify-between">
@@ -258,9 +304,9 @@ const DeviceInfoPage: React.FC = () => {
             {fieldsWithValues}/{totalFields}
           </Badge>
         </div>
-        
+
         <div className="space-y-2">
-          {section.groups.map((group: any, groupIndex: number) => 
+          {section.groups.map((group: DeviceGroup, groupIndex: number) =>
             renderGroup(group, groupIndex)
           )}
         </div>
@@ -307,7 +353,7 @@ const DeviceInfoPage: React.FC = () => {
             {/* 分类显示 */}
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="space-y-4 pb-2">
-                {Object.entries(deviceSections).map(([sectionKey, section]) => 
+                {Object.entries(deviceSections).map(([sectionKey, section]) =>
                   renderSection(sectionKey, section)
                 )}
               </div>
@@ -321,8 +367,8 @@ const DeviceInfoPage: React.FC = () => {
               </div>
               <h2 className="text-xl font-semibold mb-2 text-foreground">No Device Connected</h2>
               <p className="text-sm leading-relaxed">
-                Connect a OneKey device to view detailed information about firmware, 
-                security elements, and technical specifications.
+                Connect a OneKey device to view detailed information about firmware, security
+                elements, and technical specifications.
               </p>
             </div>
           </div>
