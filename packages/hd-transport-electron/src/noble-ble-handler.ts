@@ -161,22 +161,12 @@ async function checkBluetoothAvailability(): Promise<{
   unsupported: boolean;
   initialized: boolean;
 }> {
-  logger?.info('[NobleBLE] bluetoothState:', JSON.stringify(bluetoothState));
-
   // Use existing initializeNoble which already handles bluetooth state
   if (!bluetoothState.initialized) {
-    logger?.info('[NobleBLE] 🔍 checkBluetoothAvailability: initializing Noble');
     await initializeNoble();
   }
 
   const currentState = noble?.state || 'unknown';
-
-  logger?.info(
-    '[NobleBLE] 🔍 checkBluetoothAvailability: bluetoothState.available:',
-    bluetoothState.available,
-    'currentState:',
-    currentState
-  );
 
   return {
     available: bluetoothState.available,
@@ -1001,7 +991,6 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
 
 // Setup IPC handlers
 export function setupNobleBleHandlers(webContents: WebContents): void {
-  console.log('NOBLE_LOCAL_VERSION: ', 3);
   try {
     // @ts-ignore – electron-log is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
