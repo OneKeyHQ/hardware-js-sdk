@@ -2,16 +2,27 @@ import { Card, CardContent } from '../components/ui/Card';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
-import { CheckCircle, XCircle, Usb, Wifi, Server, AlertCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  XCircle,
+  Usb,
+  Wifi,
+  Server,
+  AlertCircle,
+  Info,
+  ChevronRight,
+} from 'lucide-react';
 import TransportSwitcher from '../components/common/TransportSwitcher';
 import DeviceIcon from '../components/device/DeviceIcon';
 import deviceList from '../assets/device_list.png';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../components/common/PageLayout';
+import { useNavigate } from 'react-router-dom';
 import React from 'react';
 export default function IndexPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const {
     currentDevice,
     getCurrentDeviceLabel,
@@ -184,9 +195,21 @@ export default function IndexPage() {
 
                     {/* 设备信息 - 剩余空间填充 */}
                     <div className="flex-1">
-                      <h3 className="font-semibold text-lg mb-4 text-foreground">
-                        {t('common.deviceInfo')}
-                      </h3>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-lg text-foreground">
+                          {t('common.deviceInfo')}
+                        </h3>
+                        {/* 优化的设备详情按钮 */}
+                        <button
+                          onClick={() => navigate('/device-info')}
+                          className="group flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-300 border border-blue-200/50 hover:border-blue-300/70 dark:border-blue-800/50 dark:hover:border-blue-700/70 shadow-sm hover:shadow-lg backdrop-blur-sm"
+                          title="View Complete Device Information"
+                        >
+                          <Info className="w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12" />
+                          <span className="text-sm font-medium">View Details</span>
+                          <ChevronRight className="w-4 h-4 transition-all duration-300 group-hover:translate-x-1" />
+                        </button>
+                      </div>
 
                       <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                         <div className="flex items-center justify-between">

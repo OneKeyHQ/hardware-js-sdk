@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   Wrench,
+  Info,
 } from 'lucide-react';
 
 import { Badge } from '../components/ui/Badge';
@@ -19,6 +20,8 @@ import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { Breadcrumb } from '../components/ui/Breadcrumb';
 import { CollapsibleTrigger, CollapsibleContent } from '../components/ui/Collapsible';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { useDeviceStore } from '../store/deviceStore';
 
 import { device } from '../data/methods/device';
 import { firmware } from '../data/methods/firmware';
@@ -39,6 +42,7 @@ interface MethodCategory {
 const DeviceMethodsIndexPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { currentDevice } = useDeviceStore();
 
   // 折叠状态管理
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
@@ -311,6 +315,7 @@ const DeviceMethodsIndexPage: React.FC = () => {
         {/* 分类列表 - 填充剩余空间 */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="space-y-3 pb-4">
+            {/* 方法分类 */}
             {categories.map(category => renderCategoryCard(category))}
           </div>
         </div>
