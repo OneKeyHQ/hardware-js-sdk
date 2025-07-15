@@ -1,4 +1,4 @@
-import type { IDeviceType, Features } from '@onekeyfe/hd-core';
+import type { IDeviceType, Features, OnekeyFeatures } from '@onekeyfe/hd-core';
 
 export interface DeviceInfo {
   connectId: string;
@@ -9,6 +9,7 @@ export interface DeviceInfo {
   label?: string;
   path?: string;
   features?: Features;
+  onekeyFeatures?: OnekeyFeatures;
 }
 
 export interface SearchDeviceInfo {
