@@ -66,6 +66,12 @@ export const en = {
       edit: 'Edit',
       save: 'Save',
       clear: 'Clear',
+      deviceInfo: 'Device Information',
+      seInfo: 'Device SE Information',
+    },
+    deviceInfo: {
+      deviceInfo: 'Device Information',
+      seInfo: 'Device SE Information',
     },
     device: {
       status: 'Device Status',
@@ -299,7 +305,8 @@ export const en = {
       evmGetAddress: 'Get a EVM address for your account.',
       evmGetPublicKey: 'Get a EVM public key for your account.',
       evmSignMessage: 'Sign a message with your EVM account.',
-      evmSignMessageEIP712: 'Sign a message with your EVM account. \nClassic and Mini firmware versions greater than 2.1.8 and less than 2.2.0 are available',
+      evmSignMessageEIP712:
+        'Sign a message with your EVM account. \nClassic and Mini firmware versions greater than 2.1.8 and less than 2.2.0 are available',
       evmSignTransaction: 'Sign a transaction with your EVM account.',
       evmSignTypedData: 'Sign a typed data with your EVM account.',
       evmVerifyMessage: 'Verify a message with your EVM account.',
@@ -735,8 +742,7 @@ export const en = {
       emulatorReady: 'Your emulator is ready for development',
       nextSteps: 'Next Steps',
       vncMode: 'VNC Mode',
-      vncDescription:
-        'Universal for all platforms, access http://localhost:6088/vnc.html after startup',
+      vncDescription: 'For all platforms, access http://localhost:6088/vnc.html after startup',
       x11Mode: 'X11 Mode',
       x11Description: 'Linux only, native window display',
       connectionInstructions: 'Switch connection method on homepage',

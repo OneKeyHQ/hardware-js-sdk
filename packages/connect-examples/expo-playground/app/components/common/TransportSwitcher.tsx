@@ -99,7 +99,6 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     try {
       // 自动选择第一个设备进行连接
       const targetDevice = devices[0];
-      setCurrentDevice(targetDevice);
 
       // 获取设备特征信息
       const sdk = await SDKUtils.getInstance();
@@ -107,7 +106,30 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
         const featuresResult = await sdk.getFeatures(targetDevice.connectId);
         if (featuresResult.success && featuresResult.payload) {
           setDeviceFeatures(featuresResult.payload);
+          
+          // 获取OneKey特定的features
+          const onekeyFeaturesResult = await sdk.getOnekeyFeatures(targetDevice.connectId);
+          if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
+            // 更新设备信息，包含onekeyFeatures
+            const updatedDevice = {
+              ...targetDevice,
+              features: featuresResult.payload,
+              onekeyFeatures: onekeyFeaturesResult.payload,
+            };
+            setCurrentDevice(updatedDevice);
+          } else {
+            // 即使获取onekeyFeatures失败，也设置基本的设备信息
+            const updatedDevice = {
+              ...targetDevice,
+              features: featuresResult.payload,
+            };
+            setCurrentDevice(updatedDevice);
+          }
+        } else {
+          setCurrentDevice(targetDevice);
         }
+      } else {
+        setCurrentDevice(targetDevice);
       }
     } catch (error) {
       console.error('Auto connection error:', error);

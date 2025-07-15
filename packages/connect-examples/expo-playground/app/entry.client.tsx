@@ -21,6 +21,7 @@ import { useTheme } from './hooks/use-theme';
 import IndexPage from './routes/_index';
 import LogsPage from './routes/logs';
 import EmulatorPage from './routes/emulator';
+import DeviceInfoPage from './routes/device-info';
 
 import ChainsIndexPage from './routes/chains._index';
 import ChainMethodsIndexPage from './routes/chains.$chainId._index';
@@ -90,6 +91,10 @@ const router = createBrowserRouter(
         {
           path: 'emulator',
           element: <EmulatorPage />,
+        },
+        {
+          path: 'device-info',
+          element: <DeviceInfoPage />,
         },
 
         {

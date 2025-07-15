@@ -5,10 +5,10 @@ import {
   getCurrentSDKInstance,
   clearSDKInstanceCache,
   TransportType,
+  TransportManager,
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
 import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
-
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
@@ -45,9 +45,6 @@ export async function switchTransport(transport: TransportType): Promise<ApiResp
   }
 
   try {
-    // 使用统一的TransportManager进行切换
-    const { TransportManager } = await import('../utils/hardwareInstance');
-
     // 清除旧的SDK实例缓存
     clearSDKInstanceCache();
 
@@ -267,8 +264,6 @@ export async function callHardwareAPI(
 export async function searchDevices(): Promise<ApiResponse> {
   logRequest('Searching for devices');
 
-  // 使用统一的TransportManager获取当前transport类型
-  const { TransportManager } = await import('../utils/hardwareInstance');
   const currentTransport = TransportManager.getCurrentTransport();
   logInfo(`Using transport type: ${currentTransport}`);
 
