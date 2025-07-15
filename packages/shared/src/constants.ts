@@ -27,6 +27,7 @@ export enum EOneKeyBleMessageKeys {
 
   // BLE connection status related
   BLE_DEVICE_DISCONNECTED = '$onekey-ble-device-disconnected',
+  BLE_AVAILABILITY_CHECK = '$onekey-ble-availability-check',
 
   // Noble BLE related (for direct BLE communication)
   NOBLE_BLE_ENUMERATE = '$onekey-noble-ble-enumerate',
