@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-electron",
-  "version": "1.0.39-alpha.6",
+  "version": "1.0.39-alpha.7",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
@@ -26,7 +26,7 @@
     "electron-log": ">=4.0.0"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^1.0.39-alpha.6"
+    "@onekeyfe/hd-shared": "^1.0.39-alpha.7"
   },
   "devDependencies": {
     "@types/web-bluetooth": "^0.0.17",
