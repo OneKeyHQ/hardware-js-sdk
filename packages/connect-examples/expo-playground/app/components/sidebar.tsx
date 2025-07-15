@@ -13,7 +13,7 @@ import {
 } from './ui/sidebar';
 import { Badge } from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation , useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../store/deviceStore';
 import { useTransportPersistence } from '../store/persistenceStore';
@@ -25,6 +25,7 @@ import {
   CheckCircle,
   XCircle,
   Server,
+  Info,
 } from 'lucide-react';
 import { getDeviceLabel } from '@onekeyfe/hd-core';
 import packageJson from '../../package.json';
@@ -68,6 +69,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { t } = useTranslation();
   const { currentDevice } = useDeviceStore();
+  const navigate = useNavigate();
 
   const { preferredType: transportType } = useTransportPersistence();
 
@@ -128,6 +130,17 @@ export function AppSidebar() {
                           {getStatusText()}
                         </Badge>
                       </div>
+                      {/* 设备详情按钮 - 优化设计 */}
+                      <button
+                        onClick={() => navigate('/device-info')}
+                        className="group relative flex items-center gap-2 px-3 py-2 rounded-lg bg-background hover:bg-accent text-foreground hover:text-accent-foreground border border-border hover:border-border transition-all duration-200 hover:shadow-sm"
+                        title="View Device Details"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Info className="w-4 h-4 transition-transform group-hover:scale-105" />
+                          <span className="text-xs font-semibold">Details</span>
+                        </div>
+                      </button>
                     </div>
 
                     {/* 设备信息 */}
