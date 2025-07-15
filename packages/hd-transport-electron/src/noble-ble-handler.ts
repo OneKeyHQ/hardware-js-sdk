@@ -236,9 +236,6 @@ async function initializeNoble(): Promise<void> {
       }
 
       if (noble.state === 'poweredOn') {
-        bluetoothState.available = true;
-        bluetoothState.unsupported = false;
-        bluetoothState.initialized = true;
         resolve();
         return;
       }
@@ -260,24 +257,15 @@ async function initializeNoble(): Promise<void> {
         logger?.info('[NobleBLE] Bluetooth state:', state);
 
         if (state === 'poweredOn') {
-          bluetoothState.available = true;
-          bluetoothState.unsupported = false;
-          bluetoothState.initialized = true;
           cleanup();
           resolve();
         } else if (state === 'unsupported') {
-          bluetoothState.available = false;
-          bluetoothState.unsupported = true;
-          bluetoothState.initialized = true;
           cleanup();
           reject(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
         } else if (state === 'poweredOff') {
           cleanup();
           reject(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
         } else if (state === 'unauthorized') {
-          bluetoothState.available = false;
-          bluetoothState.unsupported = false;
-          bluetoothState.initialized = true;
           cleanup();
           reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
         }
@@ -1003,6 +991,7 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
 
 // Setup IPC handlers
 export function setupNobleBleHandlers(webContents: WebContents): void {
+  console.log('NOBLE_LOCAL_VERSION: ', 3);
   try {
     // @ts-ignore – electron-log is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
