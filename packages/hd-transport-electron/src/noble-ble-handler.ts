@@ -25,6 +25,17 @@ import { safeLog } from './types/noble-extended';
 let noble: NobleModule | null = null;
 let logger: Logger | null = null;
 
+// Bluetooth state management
+const bluetoothState: {
+  available: boolean;
+  unsupported: boolean;
+  initialized: boolean;
+} = {
+  available: false,
+  unsupported: false,
+  initialized: false,
+};
+
 // Device cache and connection state
 const discoveredDevices = new Map<string, Peripheral>();
 const connectedDevices = new Map<string, Peripheral>();
@@ -140,6 +151,23 @@ function resetPacketState(packetState: PacketAssemblyState): void {
   packetState.messageId = undefined;
 }
 
+// Check Bluetooth availability
+async function checkBluetoothAvailability(): Promise<boolean> {
+  logger?.info('[NobleBLE] bluetoothState:', JSON.stringify(bluetoothState));
+
+  // Use existing initializeNoble which already handles bluetooth state
+  if (!bluetoothState.initialized) {
+    logger?.info('[NobleBLE] 🔍 checkBluetoothAvailability: initializing Noble');
+    await initializeNoble();
+  }
+
+  logger?.info(
+    '[NobleBLE] 🔍 checkBluetoothAvailability: bluetoothState.available:',
+    bluetoothState.available
+  );
+  return bluetoothState.available;
+}
+
 // Initialize Noble
 async function initializeNoble(): Promise<void> {
   if (noble) return;
@@ -157,6 +185,9 @@ async function initializeNoble(): Promise<void> {
       }
 
       if (noble.state === 'poweredOn') {
+        bluetoothState.available = true;
+        bluetoothState.unsupported = false;
+        bluetoothState.initialized = true;
         resolve();
         return;
       }
@@ -176,16 +207,30 @@ async function initializeNoble(): Promise<void> {
 
       const onStateChange = (state: string) => {
         logger?.info('[NobleBLE] Bluetooth state:', state);
+
+        // Update bluetooth state tracking
         if (state === 'poweredOn') {
+          bluetoothState.available = true;
+          bluetoothState.unsupported = false;
+          bluetoothState.initialized = true;
           cleanup();
           resolve();
-        } else if (state === 'poweredOff') {
-          cleanup();
-          reject(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
         } else if (state === 'unsupported') {
+          bluetoothState.available = false;
+          bluetoothState.unsupported = true;
+          bluetoothState.initialized = true;
           cleanup();
           reject(ERRORS.TypedError(HardwareErrorCode.BleUnsupported));
+        } else if (state === 'poweredOff') {
+          bluetoothState.available = false;
+          bluetoothState.unsupported = false;
+          bluetoothState.initialized = true;
+          cleanup();
+          reject(ERRORS.TypedError(HardwareErrorCode.BlePoweredOff));
         } else if (state === 'unauthorized') {
+          bluetoothState.available = false;
+          bluetoothState.unsupported = false;
+          bluetoothState.initialized = true;
           cleanup();
           reject(ERRORS.TypedError(HardwareErrorCode.BlePermissionError));
         }
@@ -202,6 +247,8 @@ async function initializeNoble(): Promise<void> {
     logger?.info('[NobleBLE] Noble initialized successfully');
   } catch (error) {
     logger?.error('[NobleBLE] Failed to initialize Noble:', error);
+    bluetoothState.unsupported = true;
+    bluetoothState.initialized = true;
     throw error;
   }
 }
@@ -981,6 +1028,18 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         await unsubscribeNotifications(deviceId);
       }
     );
+
+    // Handle Bluetooth availability check request
+    ipcMain.handle(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK, async () => {
+      try {
+        const isAvailable = await checkBluetoothAvailability();
+        safeLog(logger, 'info', 'Bluetooth availability check completed:', isAvailable);
+        return isAvailable;
+      } catch (error) {
+        safeLog(logger, 'error', 'Bluetooth availability check failed:', error);
+        return false;
+      }
+    });
 
     // Cleanup on app quit
     webContents.on('destroyed', () => {

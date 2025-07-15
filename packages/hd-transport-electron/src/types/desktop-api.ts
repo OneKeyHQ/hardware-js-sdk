@@ -14,6 +14,7 @@ export interface NobleBleAPI {
   write: (uuid: string, data: string) => Promise<void>;
   onNotification: (callback: (deviceId: string, data: string) => void) => () => void;
   onDeviceDisconnected: (callback: (device: { id: string; name: string }) => void) => () => void;
+  checkAvailability: () => Promise<boolean>;
 }
 
 // Base Desktop API interface - contains only Noble BLE functionality

@@ -107,6 +107,7 @@ const desktopApi = {
         ipcRenderer.removeListener(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, subscription);
       };
     },
+    checkAvailability: () => ipcRenderer.invoke(EOneKeyBleMessageKeys.BLE_AVAILABILITY_CHECK),
   },
 
   // Simplified Bluetooth system management
