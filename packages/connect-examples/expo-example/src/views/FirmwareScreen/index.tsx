@@ -3,10 +3,10 @@ import { Checkbox, type CheckedState, H5, Label, Stack, Text, XStack } from 'tam
 import { Check as CheckIcon } from '@tamagui/lucide-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
+import { getFirmwareType, type Features, type OnekeyFeatures } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 import { useAtomValue, useSetAtom } from 'jotai';
 import type { IDeviceListInstance } from '../../components/DeviceList';
 import PageView from '../../components/ui/Page';
@@ -686,6 +686,15 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
                   field={intl.formatMessage({ id: 'label__device_device_statue' })}
                   value={intl.formatMessage({
                     id: getDeviceMode(features),
+                  })}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_firmware_type' })}
+                  value={intl.formatMessage({
+                    id:
+                      getFirmwareType(features) === EFirmwareType.BitcoinOnly
+                        ? 'label__device_firmware_type_bitcoin_only'
+                        : 'label__device_firmware_type_universal',
                   })}
                 />
               </Stack>

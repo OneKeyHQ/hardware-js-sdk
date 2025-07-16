@@ -1,8 +1,10 @@
 import { isEmpty } from 'lodash';
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { Enum_Capability } from '@onekeyfe/hd-transport';
 import { DeviceModelToTypes } from '../types';
 
 import type { Features, IDeviceModel, IDeviceType, IVersionRange } from '../types';
+import { existCapability } from './capabilitieUtils';
 
 /**
  * get device type by features
@@ -157,8 +159,8 @@ export const getFirmwareType = (features: Features | undefined) => {
     return EFirmwareType.BitcoinOnly;
   }
   // old firmware
-  return features.capabilities.length > 0 &&
-    !features.capabilities.includes('Capability_Bitcoin_like')
+  return features?.capabilities?.length > 0 &&
+    !existCapability(features, Enum_Capability.Capability_Bitcoin_like)
     ? EFirmwareType.BitcoinOnly
     : EFirmwareType.Universal;
 };
