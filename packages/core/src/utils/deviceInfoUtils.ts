@@ -1,5 +1,5 @@
 import { isEmpty } from 'lodash';
-import { EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 import { DeviceModelToTypes } from '../types';
 
 import type { Features, IDeviceModel, IDeviceType, IVersionRange } from '../types';
@@ -147,4 +147,18 @@ export const getMethodVersionRange = (
   }
 
   return versionRange;
+};
+
+export const getFirmwareType = (features: Features | undefined) => {
+  if (!features) {
+    return EFirmwareType.Universal;
+  }
+  if (features.fw_vendor === 'OneKey Bitcoin-only') {
+    return EFirmwareType.BitcoinOnly;
+  }
+  // old firmware
+  return features.capabilities.length > 0 &&
+    !features.capabilities.includes('Capability_Bitcoin_like')
+    ? EFirmwareType.BitcoinOnly
+    : EFirmwareType.Universal;
 };
