@@ -10,6 +10,7 @@ export {
   getDeviceUUID,
   getDeviceLabel,
   getMethodVersionRange,
+  getFirmwareType,
 } from './deviceInfoUtils';
 export {
   getDeviceBoardloaderVersion,
