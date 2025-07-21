@@ -182,7 +182,10 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
   checkSupportDelegateContractLockPeriod() {
     const { delegate_resource_contract } = this.params.contract;
     this.checkFeatureVersionLimit(
-      () => !!delegate_resource_contract && delegate_resource_contract.lock_period != null,
+      () =>
+        !!delegate_resource_contract &&
+        delegate_resource_contract.lock_period !== undefined &&
+        delegate_resource_contract.lock_period !== null,
       () => this.supportDelegateResourceLockPeriodVersionRange()
     );
   }
