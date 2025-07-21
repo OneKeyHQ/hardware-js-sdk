@@ -29,6 +29,7 @@ export type TronDelegateResourceContract = {
   balance?: number;
   receiverAddress?: string;
   lock?: boolean;
+  lockPeriod?: number;
 };
 
 export type TronUnDelegateResourceContract = {

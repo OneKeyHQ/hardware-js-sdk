@@ -67,6 +67,7 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
             balance: tx.contract.delegateResourceContract.balance,
             receiver_address: tx.contract.delegateResourceContract.receiverAddress,
             lock: tx.contract.delegateResourceContract.lock,
+            lock_period: tx.contract.delegateResourceContract.lockPeriod,
           },
         };
       }
@@ -170,8 +171,25 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
     );
   }
 
+  supportDelegateResourceLockPeriodVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.15.0',
+      },
+    };
+  }
+
+  checkSupportDelegateContractLockPeriod() {
+    const { delegate_resource_contract } = this.params.contract;
+    this.checkFeatureVersionLimit(
+      () => !!delegate_resource_contract && delegate_resource_contract.lock_period != null,
+      () => this.supportDelegateResourceLockPeriodVersionRange()
+    );
+  }
+
   async run() {
     this.checkFixDataTypeSupportVoteWitnessError();
+    this.checkSupportDelegateContractLockPeriod();
 
     const response = await this.device.commands.typedCall('TronSignTx', 'TronSignedTx', {
       ...this.params,
