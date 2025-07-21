@@ -11509,6 +11509,10 @@
                 "lock": {
                   "type": "bool",
                   "id": 5
+                },
+                "lock_period": {
+                  "type": "uint64",
+                  "id": 6
                 }
               }
             },
