@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@types/web-bluetooth": "^0.0.17",
-    "electron": "^25.0.0",
+    "electron": "^28.3.2",
     "typescript": "^5.3.3"
   }
 }
