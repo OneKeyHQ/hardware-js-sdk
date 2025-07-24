@@ -15,6 +15,7 @@ export const UI_REQUEST = {
     'ui-request_select_device_in_bootloader_for_web_device',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
+  CLOSE_UI_PIN_WINDOW: 'ui-close_pin_window',
   DEVICE_PROGRESS: 'ui-device_progress',
 
   BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
@@ -49,6 +50,7 @@ export const UI_REQUEST = {
 export interface UiRequestWithoutPayload {
   type:
     | typeof UI_REQUEST.CLOSE_UI_WINDOW
+    | typeof UI_REQUEST.CLOSE_UI_PIN_WINDOW
     | typeof UI_REQUEST.BLUETOOTH_PERMISSION
     | typeof UI_REQUEST.BLUETOOTH_UNSUPPORTED
     | typeof UI_REQUEST.BLUETOOTH_POWERED_OFF
