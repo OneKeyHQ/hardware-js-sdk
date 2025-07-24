@@ -169,10 +169,6 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
 
       testExecutionRef.current = (async () => {
         try {
-          if (!retryFailedOnly) {
-            setFailedTasks?.([]);
-            clearItemVerifyState?.();
-          }
           stableContext.setRunnerLogs?.([]);
           if (!SDK) return;
           SDK.removeAllListeners(UI_EVENT);
@@ -217,12 +213,25 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
 
           let initTestCaseRes = await initTestCase(context, SDK);
 
-          const failedTasks = store.get(getFailedTasksAtom);
-          if (retryFailedOnly && failedTasks && failedTasks.length > 0) {
+          // 获取当前存储的失败任务
+          const failedTasksState = store.get(getFailedTasksAtom);
+          const currentTestId = initTestCaseRes?.title || 'Test';
+
+          if (
+            retryFailedOnly &&
+            failedTasksState.tasks.length > 0 &&
+            failedTasksState.testId === currentTestId
+          ) {
+            // 重试模式：只有当失败任务属于当前测试时才使用
             initTestCaseRes = {
-              title: `${initTestCaseRes?.title || 'Test'} - 重试失败任务`,
-              data: failedTasks,
+              title: `${currentTestId} - 重试失败任务`,
+              data: failedTasksState.tasks,
             };
+            // 在重试模式下不清理验证状态，保持之前的结果显示
+          } else {
+            // 正常模式或失败任务不属于当前测试：清理失败任务和验证状态，开始全新测试
+            setFailedTasks?.([], currentTestId);
+            clearItemVerifyState?.();
           }
 
           if (!initTestCaseRes) return;
@@ -230,7 +239,11 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
           const { title, data: currentTestCases } = initTestCaseRes;
           stableContext.setRunnerTestCaseTitle?.(title);
           stableContext.setItemValues?.(currentTestCases);
-          clearItemVerifyState?.();
+
+          // 只在非重试模式下清理验证状态
+          if (!retryFailedOnly) {
+            clearItemVerifyState?.();
+          }
 
           for (let itemIndex = 0; itemIndex < currentTestCases.length; itemIndex++) {
             const item = currentTestCases[itemIndex];
@@ -346,8 +359,10 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
               }
             });
 
-            setFailedTasks?.(failedItems);
-            console.log(`收集到 ${failedItems.length} 个失败任务`);
+            // 存储失败任务时包含测试ID
+            const testId = title || 'Test';
+            setFailedTasks?.(failedItems, testId);
+            console.log(`收集到 ${failedItems.length} 个失败任务，测试ID: ${testId}`);
           }
 
           endTestRunner();

@@ -29,10 +29,22 @@ export const setItemVerifyStateAtom = atom(
   }
 );
 
-// 失败任务
-const failedTasksAtom = atom<TestCaseDataWithKey[]>([]);
-export const setFailedTasksAtom = atom(null, (get, set, failedTasks: TestCaseDataWithKey[]) => {
-  set(failedTasksAtom, failedTasks);
-});
+// 失败任务，包含测试标识符
+export type FailedTasksState = {
+  testId: string;
+  tasks: TestCaseDataWithKey[];
+};
+
+const failedTasksAtom = atom<FailedTasksState>({ testId: '', tasks: [] });
+
+export const setFailedTasksAtom = atom(
+  null,
+  (get, set, failedTasks: TestCaseDataWithKey[], testId?: string) => {
+    set(failedTasksAtom, {
+      testId: testId || '',
+      tasks: failedTasks,
+    });
+  }
+);
 
 export const getFailedTasksAtom = atom(get => get(failedTasksAtom));
