@@ -358,7 +358,7 @@ const onCallDevice = async (
         }
 
         // close pin popup window
-        postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_WINDOW));
+        postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
       }
 
       // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
