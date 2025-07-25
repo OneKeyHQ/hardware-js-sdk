@@ -106,6 +106,14 @@ export type AllNetworkAddress = CommonResponseParams & {
 
 export type AllNetworkGetAddressParams = {
   bundle: AllNetworkAddressParams[];
+
+  // callback params
+  callbackId?: string;
+  loopMode?: boolean;
+  onLoopItemResponse?: (
+    data?: AllNetworkAddress,
+    error?: { message: string; code?: number }
+  ) => void;
 };
 
 export declare function allNetworkGetAddress(

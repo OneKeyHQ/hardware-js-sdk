@@ -1010,6 +1010,13 @@ export default class Core extends EventEmitter {
         cancel(this.getCoreContext(), message.payload.connectId);
         break;
       }
+      case IFRAME.CALLBACK: {
+        Log.log('callback message: ', message);
+        // 回调消息应该直接转发给外层环境处理
+        // core层不应该直接执行回调，而是通过postMessage转发
+        postMessage(message);
+        break;
+      }
       default:
         break;
     }

@@ -54,9 +54,9 @@ const StackNavigator = createNativeStackNavigator();
 function NavigationContent() {
   // 处理从 404 页面重定向过来的路径
   useEffect(() => {
-    const redirectPath = sessionStorage.getItem('redirectPath');
+    const redirectPath = sessionStorage?.getItem('redirectPath');
     if (redirectPath) {
-      sessionStorage.removeItem('redirectPath');
+      sessionStorage?.removeItem('redirectPath');
       // 使用 window.history.replaceState 替换当前历史记录
       window.history.replaceState(null, '', redirectPath);
     }

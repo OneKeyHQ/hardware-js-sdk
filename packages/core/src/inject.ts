@@ -2,6 +2,37 @@ import { EventEmitter } from 'events';
 import { CallMethod } from './events';
 import { CoreApi } from './types/api';
 
+// 定义回调函数类型
+type CallbackFunction = (data?: any, error?: { message: string; code?: number }) => void;
+
+// 回调管理器
+const callbackManager = new Map<string, CallbackFunction>();
+
+// 生成唯一ID
+const generateCallbackId = () =>
+  `callback_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+// 注册回调
+const registerCallback = (id: string, callback: CallbackFunction) => {
+  callbackManager.set(id, callback);
+};
+
+// 执行回调
+const executeCallback = (id: string, ...args: any[]) => {
+  const callback = callbackManager.get(id);
+  if (callback) {
+    callback(...args);
+  }
+};
+
+// 清理回调
+const cleanupCallback = (id: string) => {
+  callbackManager.delete(id);
+};
+
+// 导出回调管理函数供外部使用
+export { executeCallback, cleanupCallback };
+
 export interface InjectApi {
   call: CallMethod;
   eventEmitter: EventEmitter;
@@ -145,8 +176,27 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'getNextU2FCounter' }),
   setU2FCounter: (connectId, params) => call({ ...params, connectId, method: 'setU2FCounter' }),
 
-  allNetworkGetAddress: (connectId, deviceId, params) =>
-    call({ ...params, connectId, deviceId, method: 'allNetworkGetAddress' }),
+  allNetworkGetAddress: (connectId, deviceId, params) => {
+    const { loopMode, onLoopItemResponse, ...restParams } = params;
+
+    if (!loopMode || !onLoopItemResponse) {
+      return call({ ...restParams, connectId, deviceId, method: 'allNetworkGetAddress' });
+    }
+
+    const callbackId = generateCallbackId();
+    registerCallback(callbackId, onLoopItemResponse);
+
+    return call({
+      ...restParams,
+      connectId,
+      deviceId,
+      method: 'allNetworkGetAddress',
+      callbackId,
+      loopMode: true,
+    }).finally(() => {
+      cleanupCallback(callbackId);
+    });
+  },
 
   evmGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'evmGetAddress' }),

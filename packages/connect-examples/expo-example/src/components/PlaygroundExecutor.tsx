@@ -41,11 +41,44 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
 
       let requestParams;
       try {
+        const rawParams = await onAcquireParams();
         requestParams = {
           ...commonParams,
           retryCount: 1,
-          ...(await onAcquireParams()),
+          ...rawParams,
         };
+
+        // 处理带回调的特殊方法
+        if (method === 'allNetworkGetAddress' && 'loopMode' in rawParams && rawParams.loopMode) {
+          // 提供一个默认的回调函数，显示实时进度
+          let callbackCount = 0;
+          // @ts-expect-error
+          requestParams.onLoopItemResponse = (data: any, error: any) => {
+            callbackCount += 1;
+            const timestamp = new Date().toISOString();
+            console.log(`[${timestamp}] Callback ${callbackCount}:`, { data, error });
+
+            // 在UI中显示实时进度
+            onExecute(
+              JSON.stringify(
+                {
+                  type: 'realtime_callback',
+                  callbackIndex: callbackCount,
+                  timestamp,
+                  success: !error,
+                  address: data?.payload?.address || data?.address,
+                  path: data?.path,
+                  network: data?.network,
+                  error: error?.message,
+                  data,
+                  rawError: error,
+                },
+                null,
+                2
+              )
+            );
+          };
+        }
       } catch (error) {
         requestParams = {
           ...commonParams,

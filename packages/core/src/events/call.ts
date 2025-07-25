@@ -58,6 +58,17 @@ export interface IFrameSwitchTransportMessage {
   payload: { env: ConnectSettings['env'] };
 }
 
+export interface IFrameCallbackMessage {
+  event: typeof IFRAME.CALLBACK;
+  type: typeof IFRAME.CALLBACK;
+  payload: {
+    callbackId: string;
+    data?: any;
+    error?: any;
+    finished?: boolean;
+  };
+}
+
 export const RESPONSE_EVENT = 'RESPONSE_EVENT';
 
 export interface MethodResponseMessage {

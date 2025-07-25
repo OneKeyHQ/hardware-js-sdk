@@ -358,7 +358,13 @@ export default class AllNetworkGetAddress extends BaseMethod<
   async run() {
     const responses: AllNetworkAddress[] = [];
     const resultMap: Record<string, AllNetworkAddress> = {};
-    const { bundle } = this.payload as AllNetworkGetAddressParams;
+    const { bundle, callbackId } = this.payload as AllNetworkGetAddressParams;
+    console.log('==========>>>>>> callbackId', callbackId);
+
+    if (callbackId) {
+      return this.runWithCallback(callbackId);
+    }
+
     const methodGroups = bundle
       .map((param, index) =>
         this.generateMethodName({
@@ -407,6 +413,68 @@ export default class AllNetworkGetAddress extends BaseMethod<
     }
 
     return Promise.resolve(responses);
+  }
+
+  private async runWithCallback(callbackId: string) {
+    try {
+      // 获取所有需要处理的请求
+      const allResults: any[] = [];
+      const bundle = this.payload.bundle || [this.payload];
+
+      // 逐个处理请求并触发回调
+      for (let i = 0; i < bundle.length; i++) {
+        const item = bundle[i];
+
+        try {
+          // 临时设置payload为单个item
+          const originalPayload = this.payload;
+          this.payload = { bundle: [item] };
+
+          // 执行单个请求
+          const result = '123';
+          // delay 1s
+          // eslint-disable-next-line no-promise-executor-return
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          const singleResult = Array.isArray(result) ? result[0] : result;
+          allResults.push(singleResult);
+
+          // 恢复原始payload
+          this.payload = originalPayload;
+
+          // 发送进度回调
+          this.sendCallback(callbackId, singleResult, null, false);
+        } catch (error) {
+          // 发送错误回调
+          this.sendCallback(callbackId, null, error, i === bundle.length - 1);
+          throw error;
+        }
+      }
+
+      // 发送完成回调
+      this.sendCallback(callbackId, allResults, null, true);
+
+      // 返回最终结果
+      return bundle.length > 1 ? allResults : allResults[0];
+    } catch (error) {
+      // 发送最终错误回调
+      this.sendCallback(callbackId, null, error, true);
+      throw error;
+    }
+  }
+
+  private sendCallback(callbackId: string, data: any, error: any, finished: boolean) {
+    // 发送回调消息
+    this.postMessage({
+      event: IFRAME.CALLBACK,
+      type: IFRAME.CALLBACK,
+      payload: {
+        callbackId,
+        data,
+        error: error ? { message: error.message, code: error.code } : null,
+        finished,
+      },
+    });
   }
 }
 
