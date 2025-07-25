@@ -112,8 +112,14 @@ function processNotificationData(deviceId: string, data: Buffer): PacketProcessR
       packetState.packetCount = 1;
       packetState.messageId = messageId;
 
-      // Validate expected length is reasonable
-      if (packetState.bufferLength <= 0) {
+      // Only validate for negative lengths (which would be invalid)
+      if (packetState.bufferLength < 0) {
+        logger?.error('[NobleBLE] Invalid negative packet length detected:', {
+          length: packetState.bufferLength,
+          dataLength: data.length,
+          rawHeader: data.subarray(0, Math.min(16, data.length)).toString('hex'),
+          lengthBytes: data.subarray(5, 9).toString('hex'),
+        });
         resetPacketState(packetState);
         return { isComplete: false, error: 'Invalid packet length in header' };
       }
