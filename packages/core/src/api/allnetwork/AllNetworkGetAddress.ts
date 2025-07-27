@@ -358,10 +358,9 @@ export default class AllNetworkGetAddress extends BaseMethod<
   async run() {
     const responses: AllNetworkAddress[] = [];
     const resultMap: Record<string, AllNetworkAddress> = {};
-    const { bundle, callbackId } = this.payload as AllNetworkGetAddressParams;
-    console.log('==========>>>>>> callbackId', callbackId);
+    const { bundle, callbackId, loopMode } = this.payload as AllNetworkGetAddressParams;
 
-    if (callbackId) {
+    if (loopMode && callbackId) {
       return this.runWithCallback(callbackId);
     }
 
@@ -416,63 +415,52 @@ export default class AllNetworkGetAddress extends BaseMethod<
   }
 
   private async runWithCallback(callbackId: string) {
-    try {
-      // 获取所有需要处理的请求
-      const allResults: any[] = [];
-      const bundle = this.payload.bundle || [this.payload];
+    const allResults: AllNetworkAddress[] = [];
+    const bundle = this.payload.bundle || [this.payload];
 
-      // 逐个处理请求并触发回调
-      for (let i = 0; i < bundle.length; i++) {
-        const item = bundle[i];
+    for (let i = 0; i < bundle.length; i++) {
+      const item = bundle[i];
 
-        try {
-          // 临时设置payload为单个item
-          const originalPayload = this.payload;
-          this.payload = { bundle: [item] };
+      try {
+        const methodParams = this.generateMethodName({
+          network: item.network,
+          payload: item,
+          originalIndex: i,
+        });
 
-          // 执行单个请求
-          const result = '123';
-          // delay 1s
-          // eslint-disable-next-line no-promise-executor-return
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        const singleMethodParams = {
+          bundle: [methodParams.params],
+        };
 
-          const singleResult = Array.isArray(result) ? result[0] : result;
-          allResults.push(singleResult);
+        const response = await this.callMethod(methodParams.methodName, singleMethodParams);
 
-          // 恢复原始payload
-          this.payload = originalPayload;
+        const singleResult = {
+          ...item,
+          ...response[0],
+        };
+        allResults.push(singleResult);
 
-          // 发送进度回调
-          this.sendCallback(callbackId, singleResult, null, false);
-        } catch (error) {
-          // 发送错误回调
-          this.sendCallback(callbackId, null, error, i === bundle.length - 1);
-          throw error;
-        }
+        this.sendItemCallback(callbackId, singleResult, null, i);
+      } catch (error: any) {
+        this.sendItemCallback(callbackId, null, error, i);
+        throw error;
       }
-
-      // 发送完成回调
-      this.sendCallback(callbackId, allResults, null, true);
-
-      // 返回最终结果
-      return bundle.length > 1 ? allResults : allResults[0];
-    } catch (error) {
-      // 发送最终错误回调
-      this.sendCallback(callbackId, null, error, true);
-      throw error;
     }
+
+    return allResults;
   }
 
-  private sendCallback(callbackId: string, data: any, error: any, finished: boolean) {
-    // 发送回调消息
+  private sendItemCallback(callbackId: string, data: any, error: any, itemIndex: number) {
     this.postMessage({
       event: IFRAME.CALLBACK,
       type: IFRAME.CALLBACK,
       payload: {
         callbackId,
-        data,
+        data: {
+          ...data,
+          index: itemIndex,
+        },
         error: error ? { message: error.message, code: error.code } : null,
-        finished,
       },
     });
   }

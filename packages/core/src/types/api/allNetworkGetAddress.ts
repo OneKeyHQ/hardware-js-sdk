@@ -35,13 +35,6 @@ export type INetwork =
   | 'benfen'
   | 'neo';
 
-export type CommonResponseParams = {
-  path: string;
-  network: INetwork;
-  chainName?: string;
-  prefix?: string;
-};
-
 export type AllNetworkAddressParams = {
   path: string | number[];
   network: INetwork;
@@ -91,7 +84,7 @@ type AllNetworkAddressPayload =
       xpubSegwit: string;
     };
 
-export type AllNetworkAddress = CommonResponseParams & {
+export type AllNetworkAddress = AllNetworkAddressParams & {
   success: boolean;
   payload?:
     | AllNetworkAddressPayload

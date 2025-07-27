@@ -65,7 +65,6 @@ export interface IFrameCallbackMessage {
     callbackId: string;
     data?: any;
     error?: any;
-    finished?: boolean;
   };
 }
 

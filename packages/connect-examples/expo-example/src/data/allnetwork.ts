@@ -422,73 +422,21 @@ const api: PlaygroundProps[] = [
       },
     ],
   },
-  {
-    method: 'allNetworkGetAddress',
-    description: 'Get addresses with real-time callback for each generated address',
-    presupposes: [
-      {
-        title: 'Callback Demo - Multiple Networks',
-        value: {
-          bundle: [
-            {
-              network: 'btc',
-              path: "m/44'/0'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              network: 'evm',
-              path: "m/44'/60'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              network: 'sol',
-              path: "m/44'/501'/0'/0'",
-              showOnOneKey: false,
-            },
-            {
-              network: 'ada',
-              path: "m/1852'/1815'/0'",
-              showOnOneKey: false,
-            },
-            {
-              network: 'cosmos',
-              path: "m/44'/118'/0'/0/0",
-              prefix: 'cosmos',
-              showOnOneKey: false,
-            },
-          ],
-          loopMode: true,
-        },
-      },
-      {
-        title: 'Callback Demo - Bitcoin Batch',
-        value: {
-          bundle: [
-            ...Array.from({ length: 5 }, (_, i) => ({
-              network: 'btc',
-              path: `m/44'/0'/0'/0/${i}`,
-              showOnOneKey: false,
-            })),
-          ],
-          loopMode: true,
-        },
-      },
-      {
-        title: 'Callback Demo - Ethereum Batch',
-        value: {
-          bundle: [
-            ...Array.from({ length: 3 }, (_, i) => ({
-              network: 'evm',
-              path: `m/44'/60'/0'/0/${i}`,
-              chainName: '1',
-              showOnOneKey: false,
-            })),
-          ],
-          loopMode: true,
-        },
-      },
-    ],
-  },
 ];
+
+api.push({
+  method: 'allNetworkGetAddress',
+  description: 'Get addresses with real-time callback for each generated address',
+  presupposes: api[0].presupposes?.map(item => ({
+    ...item,
+    value: {
+      ...item.value,
+      bundle: item.value.bundle.map((item: any) => ({
+        ...item,
+      })),
+      loopMode: true,
+    },
+  })),
+});
 
 export default api;

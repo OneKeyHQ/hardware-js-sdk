@@ -55,8 +55,7 @@ export const getHardwareSDKInstance = memoizee(
         console.log(HardwareSDK);
 
         if (Platform.OS === 'web') {
-          // settings.connectSrc = CONNECT_SRC;
-          settings.connectSrc = 'https://localhost:8087/';
+          settings.connectSrc = CONNECT_SRC;
           settings.env = isDesktopWebBleEnv ? 'desktop-web-ble' : 'web';
           settings.preRelease = true;
           HardwareLowLevelSDK = await importLowLevelSDK();
