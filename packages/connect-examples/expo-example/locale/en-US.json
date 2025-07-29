@@ -3,9 +3,11 @@
   "tab__firmware_update": "Firmware Update",
   "tab__passphrase_test": "Passphrase Test",
   "tab__address_test": "Address Test",
+  "tab__slip39_test": "SLIP39 Test",
   "tab__security_check": "Security Check",
   "tab__functional_testing": "Functional testing",
   "tab__attach_to_pin_testing": "Attach to Pin Testing",
+  "tab__chain_method_test": "Chain Method Test",
 
   "action__search_device": "Search Device",
   "action__search_device_webusb": "Search Device WebUSB",

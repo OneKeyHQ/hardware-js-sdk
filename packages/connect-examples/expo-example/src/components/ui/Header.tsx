@@ -16,9 +16,11 @@ const menuItems: MenuItem[] = [
   { route: Routes.FirmwareUpdateTest, labelId: 'tab__firmware_update' },
   { route: Routes.PassphraseTest, labelId: 'tab__passphrase_test' },
   { route: Routes.AddressTest, labelId: 'tab__address_test' },
+  { route: Routes.SLIP39Test, labelId: 'tab__slip39_test' },
   { route: Routes.SecurityCheck, labelId: 'tab__security_check' },
   { route: Routes.FunctionalTesting, labelId: 'tab__functional_testing' },
   { route: Routes.AttachToPinTestingScreen, labelId: 'tab__attach_to_pin_testing' },
+  { route: Routes.ChainMethodTest, labelId: 'tab__chain_method_test' },
 ];
 
 // 菜单按钮组件

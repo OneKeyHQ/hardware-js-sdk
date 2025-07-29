@@ -70,6 +70,7 @@
     "@rollup/plugin-commonjs": "^22.0.0",
     "@rollup/plugin-json": "^4.1.0",
     "@rollup/plugin-typescript": "^8.3.2",
+    "@types/bchaddrjs": "^0.4.3",
     "@types/jest": "^27.5.1",
     "@types/node": "^18.18.8",
     "@types/shelljs": "^0.8.11",

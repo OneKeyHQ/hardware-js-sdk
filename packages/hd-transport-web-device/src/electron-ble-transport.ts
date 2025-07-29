@@ -7,7 +7,6 @@ import {
   createDeferred,
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
-import ByteBuffer from 'bytebuffer';
 import type EventEmitter from 'events';
 // Import DesktopAPI type from hd-transport-electron
 import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';
@@ -309,7 +308,7 @@ export default class ElectronBleTransport {
       this.Log?.debug('[Transport] Noble BLE call', 'name:', name, 'data:', data);
     }
 
-    const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
+    const buffers = buildBuffers(messages, name, data);
 
     try {
       if (!window.desktopApi?.nobleBle) {

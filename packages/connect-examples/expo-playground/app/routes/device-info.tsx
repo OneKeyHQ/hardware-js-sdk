@@ -5,9 +5,9 @@ import { PageLayout } from '../components/common/PageLayout';
 import { DeviceNotConnectedState } from '../components/common/DeviceNotConnectedState';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { useDeviceStore } from '../store/deviceStore';
 import { useToast } from '../hooks/use-toast';
 import { useTranslation } from 'react-i18next';
+import { useDeviceStore } from '../store/deviceStore';
 
 // 定义设备组结构类型
 interface DeviceGroup {
@@ -34,11 +34,23 @@ const DeviceInfoPage: React.FC = () => {
     const onekeyValue =
       currentDevice?.onekeyFeatures?.[field as keyof typeof currentDevice.onekeyFeatures];
     const featuresValue = currentDevice?.features?.[field as keyof typeof currentDevice.features];
-    const value = onekeyValue || featuresValue || '--';
-    // 确保返回字符串类型
+    const value = onekeyValue || featuresValue;
+
+    // Convert value to string
+    if (value === null || value === undefined) {
+      return '--';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
     return String(value);
   };
-
   // 格式化当前时间
   const formatCurrentTime = (timestamp: number) => {
     const formatter = new Intl.DateTimeFormat('en-US', {
@@ -260,6 +272,7 @@ const DeviceInfoPage: React.FC = () => {
             : 'bg-background hover:bg-accent/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50'
         }`}
         title={isEmpty ? `${field} - No data` : `${field}: ${value} (click to copy)`}
+        aria-label={isEmpty ? `${field} - No data` : `Copy ${field}: ${value}`}
       >
         <div className="flex justify-between items-start mb-1">
           <span className="text-xs font-bold text-foreground">{field}</span>

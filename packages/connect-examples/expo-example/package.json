@@ -39,6 +39,7 @@
     "@tamagui/toast": "1.90.2",
     "@ton/core": "^0.57.0",
     "asyncstorage-down": "^4.2.0",
+    "bchaddrjs": "^0.5.2",
     "bitcoinjs-lib": "^6.1.5",
     "bn.js": "^5.2.1",
     "buffer": "^6.0.3",
@@ -92,6 +93,7 @@
     "@types/react-native": "~0.73.0",
     "@types/w3c-web-usb": "^1.0.6",
     "babel-plugin-transform-inline-environment-variables": "^0.4.4",
+    "tsx": "^4.20.3",
     "typescript": "^5.3.3"
   },
   "resolutions": {

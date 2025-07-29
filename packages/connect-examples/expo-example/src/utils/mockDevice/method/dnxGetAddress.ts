@@ -14,6 +14,34 @@ function base58xmrCheck(checksumSize: number) {
   );
 }
 
+/**
+ * 抽离的核心逻辑：从 seed 生成 DNX 地址
+ * 可以被 SLIP39 直接调用，避免助记词转换
+ */
+export function generateDnxAddressFromSeed(seed: Buffer, path: string): string {
+  const keyPair = deriveKeyPairWithPath(seed, path, 'ed25519');
+  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
+
+  if (!privateKeyArray || !publicKeyArray) {
+    throw new Error('privateKey or publicKey is undefined');
+  }
+
+  const privateKey = Buffer.from(privateKeyArray);
+  const publicKey = Buffer.from(publicKeyArray);
+
+  const { sec: secretSpendKey, pub: publicSpendKey } = generateKeys(privateKey);
+  const { sec: secretViewKey, pub: publicViewKey } = generateKeys(fastHash(secretSpendKey));
+
+  const config = getConfig('dnxmainnet');
+  const rawAddress = Buffer.concat([
+    encodeVarint(config.CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX[0]) as any,
+    publicSpendKey,
+    publicViewKey,
+  ]);
+
+  return base58xmrCheck(config.ADDRESS_CHECKSUM_SIZE).encode(rawAddress as any);
+}
+
 export default function dnxGetAddress(
   connectId: string,
   deviceId: string,
@@ -28,56 +56,20 @@ export default function dnxGetAddress(
       path: string;
     }> {
   const { path, mnemonic, passphrase } = params;
-
   const seed = mnemonicToSeed(mnemonic, passphrase);
-  const keyPair = deriveKeyPairWithPath(seed, path, 'ed25519');
 
-  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
-
-  if (!privateKeyArray || !publicKeyArray) {
+  try {
+    const address = generateDnxAddressFromSeed(seed, path);
+    return {
+      success: true,
+      payload: { address, path },
+    };
+  } catch (error) {
     return {
       success: false,
       payload: {
-        error: 'privateKey or publicKey is undefined',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
-
-  const privateKey = Buffer.from(privateKeyArray);
-  const publicKey = Buffer.from(publicKeyArray);
-
-  // console.log('privateKey', privateKey.toString('hex'));
-  // console.log('publicKey', publicKey.toString('hex'));
-
-  const { sec: secretSpendKey, pub: publicSpendKey } = generateKeys(privateKey);
-
-  // console.log('secretSpendKey', secretSpendKey.toString('hex'));
-  // console.log('publicSpendKey', publicSpendKey.toString('hex'));
-
-  // supports only deterministic wallet
-  const { sec: secretViewKey, pub: publicViewKey } = generateKeys(fastHash(secretSpendKey));
-
-  // console.log('secretViewKey', secretViewKey.toString('hex'));
-  // console.log('publicViewKey', publicViewKey.toString('hex'));
-
-  const config = getConfig('dnxmainnet');
-
-  const rawAddress = Buffer.concat([
-    // @ts-expect-error
-    encodeVarint(config.CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX[0]),
-    publicSpendKey,
-    publicViewKey,
-  ]);
-
-  // console.log('rawAddress', rawAddress.toString('hex'));
-
-  const address = base58xmrCheck(config.ADDRESS_CHECKSUM_SIZE).encode(rawAddress);
-
-  return {
-    success: true,
-    payload: {
-      address,
-      path,
-    },
-  };
 }

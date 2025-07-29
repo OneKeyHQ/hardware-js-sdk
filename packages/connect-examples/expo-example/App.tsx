@@ -1,5 +1,5 @@
 import React, { lazy, useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { LinkingOptions, NavigationContainer, ParamListBase } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TamaguiProvider, PortalProvider, Text, Stack, Card, YStack } from 'tamagui';
 import { Toast, ToastProvider, ToastViewport, useToastState } from '@tamagui/toast';
@@ -23,9 +23,11 @@ const AddressTestScreen = lazy(() => import('./src/views/AddressTestScreen'));
 const SecurityCheckScreen = lazy(() => import('./src/views/SecurityCheckScreen'));
 const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTestingScreen'));
 const AttachToPinTestingScreen = lazy(() => import('./src/views/AttachToPinTestingScreen'));
+const SLIP39TestScreen = lazy(() => import('./src/views/SLIP39TestScreen'));
+const ChainMethodTestScreen = lazy(() => import('./src/views/ChainMethodTestScreen'));
 
 // React Navigation v6 linking 配置
-const linking = {
+const linking: LinkingOptions<ParamListBase> = {
   prefixes: [
     // 为不同的部署环境设置 URL 前缀
     'https://example.onekeytest.com/',
@@ -41,6 +43,8 @@ const linking = {
       [Routes.AddressTest]: 'expo-example/address-test',
       [Routes.SecurityCheck]: 'expo-example/security-check',
       [Routes.FunctionalTesting]: 'expo-example/functional-testing',
+      [Routes.SLIP39Test]: 'expo-example/slip39-test',
+      [Routes.ChainMethodTest]: 'expo-example/chain-method-test',
     },
   },
 };
@@ -79,6 +83,8 @@ function NavigationContent() {
           name={Routes.AttachToPinTestingScreen}
           component={AttachToPinTestingScreen}
         />
+        <StackNavigator.Screen name={Routes.SLIP39Test} component={SLIP39TestScreen} />
+        <StackNavigator.Screen name={Routes.ChainMethodTest} component={ChainMethodTestScreen} />
       </StackNavigator.Navigator>
     </NavigationContainer>
   );

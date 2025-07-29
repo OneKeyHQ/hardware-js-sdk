@@ -6,4 +6,6 @@ export const enum Routes {
   SecurityCheck = 'security-check',
   FunctionalTesting = 'functional-testing',
   AttachToPinTestingScreen = 'attach-to-pin-testing',
+  SLIP39Test = 'slip39-test',
+  ChainMethodTest = 'chain-method-test',
 }
