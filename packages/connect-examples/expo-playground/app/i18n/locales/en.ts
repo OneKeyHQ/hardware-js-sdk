@@ -66,7 +66,6 @@ export const en = {
       edit: 'Edit',
       save: 'Save',
       clear: 'Clear',
-      deviceInfo: 'Device Information',
       seInfo: 'Device SE Information',
     },
     deviceInfo: {
