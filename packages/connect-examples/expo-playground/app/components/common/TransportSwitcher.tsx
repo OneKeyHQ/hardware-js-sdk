@@ -155,6 +155,49 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     setIsConnecting(true);
 
     try {
+      // 对于WebUSB，直接在用户点击时请求权限，避免异步调用链导致用户手势上下文丢失
+      if (newTransport === 'webusb') {
+        // 保存用户选择到持久化存储
+        setTransportPreference(newTransport);
+
+        // 直接调用SDK的promptWebDeviceAccess，在用户手势上下文中执行
+        const sdkInstance = await SDKUtils.getInstance();
+        
+        // 先切换到webusb模式
+        await sdkInstance.switchTransport('webusb');
+        
+        // 直接请求WebUSB设备权限
+        const promptResponse = await sdkInstance.promptWebDeviceAccess();
+
+        if (promptResponse.success && promptResponse.payload?.device) {
+          const devices = [promptResponse.payload.device] as DeviceInfo[];
+          setConnectedDevices(devices);
+
+          // 自动连接设备
+          await handleDeviceConnection(devices);
+
+          toast({
+            title: t('transport.connectionSuccessful'),
+            description: t('transport.webusb.deviceConnected'),
+            variant: 'default',
+          });
+        } else {
+          const errorMessage = 
+            !promptResponse.success && 'error' in promptResponse.payload
+              ? promptResponse.payload.error
+              : t('transport.webusb.noDeviceSelected');
+          
+          toast({
+            title: t('transport.webusb.permissionFailed'),
+            description: errorMessage,
+            variant: 'warning',
+          });
+          setConnectedDevices([]);
+        }
+        return;
+      }
+
+      // 对于其他transport类型，使用原有逻辑
       // 保存用户选择到持久化存储（这会自动更新UI状态）
       setTransportPreference(newTransport);
 
@@ -205,6 +248,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
         description: errorMessage,
         variant: 'warning',
       });
+      setConnectedDevices([]);
     } finally {
       setIsLoading(false);
       setIsConnecting(false);

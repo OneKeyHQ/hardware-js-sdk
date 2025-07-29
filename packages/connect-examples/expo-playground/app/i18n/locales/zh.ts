@@ -545,6 +545,9 @@ export const zh = {
     transport: {
       webusb: {
         description: '推荐，直接连接',
+        deviceConnected: 'WebUSB设备连接成功',
+        noDeviceSelected: '未选择设备',
+        permissionFailed: 'WebUSB权限请求失败',
       },
       jsbridge: {
         description: '稳定兼容',
@@ -560,6 +563,7 @@ export const zh = {
       pleaseWaitForInit: '请等待SDK初始化完成后再切换传输方式',
       switchFailed: '切换传输方式失败',
       connectionFailed: '连接失败',
+      connectionSuccessful: '连接成功',
       noDevicesFound: '未找到设备',
       ensureDeviceConnected: '请确保设备已连接并解锁',
       searchFailed: '搜索失败',

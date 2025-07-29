@@ -558,6 +558,9 @@ export const en = {
     transport: {
       webusb: {
         description: 'Recommended, direct connection',
+        deviceConnected: 'WebUSB device connected successfully',
+        noDeviceSelected: 'No device selected',
+        permissionFailed: 'WebUSB permission failed',
       },
       jsbridge: {
         description: 'Stable compatibility',
@@ -574,6 +577,7 @@ export const en = {
         'Please wait for SDK initialization to complete before switching transport methods',
       switchFailed: 'Failed to switch transport method',
       connectionFailed: 'Connection failed',
+      connectionSuccessful: 'Connection successful',
       noDevicesFound: 'No devices found',
       ensureDeviceConnected: 'Please ensure the device is connected and unlocked',
       searchFailed: 'Search failed',
