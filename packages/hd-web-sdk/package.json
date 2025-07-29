@@ -5,7 +5,7 @@
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
   "type": "commonjs",
-  "main": "build/onekey-js-sdk.js",
+  "main": "build/onekey-js-sdk.min.js",
   "types": "dist/index.d.ts",
   "publishConfig": {
     "access": "public"
