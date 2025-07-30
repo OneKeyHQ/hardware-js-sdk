@@ -8,8 +8,12 @@ import { TestCaseDataWithKey } from './types';
 import {
   ItemVerifyState,
   selectedItemVerifyStateAtom as createSelectedItemVerifyStateAtom,
+  createTestRunnerAtoms,
 } from './Context/TestRunnerVerifyProvider';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
+
+// 自定义状态管理器类型
+type CustomStateManager = ReturnType<typeof createTestRunnerAtoms>;
 
 export type TestItemViewProps = {
   item: TestCaseDataWithKey;
@@ -17,12 +21,16 @@ export type TestItemViewProps = {
     item: TestCaseDataWithKey,
     itemVerifyState: ItemVerifyState
   ) => React.ReactNode;
+  stateManager?: CustomStateManager;
 };
 
-const TestItemView = ({ item, renderResultView }: TestItemViewProps) => {
+const TestItemView = ({ item, renderResultView, stateManager }: TestItemViewProps) => {
   const selectedItemVerifyStateAtom = useMemo(
-    () => createSelectedItemVerifyStateAtom(item.$key),
-    [item.$key]
+    () =>
+      stateManager
+        ? stateManager.selectedItemVerifyStateAtom(item.$key)
+        : createSelectedItemVerifyStateAtom(item.$key),
+    [item.$key, stateManager]
   );
   const itemVerifyState = useAtomValue(selectedItemVerifyStateAtom);
 
@@ -81,15 +89,22 @@ const TestItemViewMemo = memo(TestItemView);
 export type TestRunnerResultViewProps = Omit<TestItemViewProps, 'item'>;
 
 // eslint-disable-next-line react/prop-types
-export function TestRunnerResultView({ renderResultView }: TestRunnerResultViewProps) {
+export function TestRunnerResultView({
+  renderResultView, // eslint-disable-line react/prop-types
+  stateManager, // eslint-disable-line react/prop-types
+}: TestRunnerResultViewProps) {
   const { itemValues } = useContext(TestRunnerContext);
 
   const renderItem = useCallback(
     // eslint-disable-next-line react/no-unused-prop-types
     ({ item }: { item: TestCaseDataWithKey }) => (
-      <TestItemViewMemo renderResultView={renderResultView} item={item} />
+      <TestItemViewMemo
+        renderResultView={renderResultView}
+        item={item}
+        stateManager={stateManager}
+      />
     ),
-    [renderResultView]
+    [renderResultView, stateManager]
   );
 
   return (

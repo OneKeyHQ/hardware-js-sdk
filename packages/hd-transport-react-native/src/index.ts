@@ -570,7 +570,7 @@ export default class ReactNativeBleTransport {
       this.Log.debug('transport-react-native', 'call-', ' name: ', name, ' data: ', data);
     }
 
-    const buffers = buildBuffers(messages, name, data) as Array<ByteBuffer>;
+    const buffers = buildBuffers(messages, name, data);
 
     async function writeChunkedData(
       buffers: ByteBuffer[],

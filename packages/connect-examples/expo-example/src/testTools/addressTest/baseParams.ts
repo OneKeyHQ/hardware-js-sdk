@@ -120,9 +120,11 @@ export const baseParams = {
   tonGetAddress: {
     path: `m/44'/607'/${INDEX_MARK}'`,
     showOnOneKey: false,
-    walletVersion: 3,
+    walletVersion: 3, // V4R2
     isBounceable: false,
     isTestnetOnly: false,
+    workchain: 0, // BASECHAIN
+    walletId: 698983191, // 默认walletId
   },
   tronGetAddress: {
     path: `m/44'/195'/0'/0/${INDEX_MARK}`,

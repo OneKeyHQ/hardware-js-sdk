@@ -9,6 +9,21 @@ function publicKeyToAddress(publicKey: Uint8Array): string {
   return deriveAddress(pub);
 }
 
+/**
+ * 抽离的核心逻辑：从 seed 生成 XRP 地址
+ * 可以被 SLIP39 直接调用，避免助记词转换
+ */
+export function generateXrpAddressFromSeed(seed: Buffer, path: string): string {
+  const keyPair = deriveKeyPairWithPath(seed, path, 'secp256k1');
+  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
+
+  if (!privateKeyArray || !publicKeyArray) {
+    throw new Error('privateKey or publicKey is undefined');
+  }
+
+  return publicKeyToAddress(publicKeyArray);
+}
+
 export default function xrpGetAddress(
   connectId: string,
   deviceId: string,
@@ -23,28 +38,20 @@ export default function xrpGetAddress(
       path: string;
     }> {
   const { path, mnemonic, passphrase } = params;
-
   const seed = mnemonicToSeed(mnemonic, passphrase);
-  const keyPair = deriveKeyPairWithPath(seed, path, 'secp256k1');
 
-  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
-
-  if (!privateKeyArray || !publicKeyArray) {
+  try {
+    const address = generateXrpAddressFromSeed(seed, path);
+    return {
+      success: true,
+      payload: { address, path },
+    };
+  } catch (error) {
     return {
       success: false,
       payload: {
-        error: 'privateKey or publicKey is undefined',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
-
-  const address = publicKeyToAddress(publicKeyArray);
-
-  return {
-    success: true,
-    payload: {
-      address,
-      path,
-    },
-  };
 }

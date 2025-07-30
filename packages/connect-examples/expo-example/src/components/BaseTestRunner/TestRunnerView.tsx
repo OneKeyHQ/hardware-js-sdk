@@ -5,13 +5,10 @@ import { TestRunnerResultView } from './TestRunnerResultView';
 import type { TestRunnerResultViewProps } from './TestRunnerResultView';
 import { TestRunnerContext, TestRunnerProvider } from './Context/TestRunnerProvider';
 import AutoWrapperTextArea from '../ui/AutoWrapperTextArea';
+import { createTestRunnerAtoms } from './Context/TestRunnerVerifyProvider';
 
-type TestRunnerInfoProps = {
-  title: string;
-};
-function TestRunnerInfoView({ title }: TestRunnerInfoProps) {
-  return <Text fontWeight="bold">{title}</Text>;
-}
+// 自定义状态管理器类型
+type CustomStateManager = ReturnType<typeof createTestRunnerAtoms>;
 
 function TestRunnerPrepareDataLogView() {
   const { runnerLogs } = useContext(TestRunnerContext);
@@ -25,21 +22,22 @@ function TestRunnerPrepareDataLogView() {
 
 export type TestRunnerViewProps<T> = {
   renderExecuteView: () => React.ReactNode;
-} & TestRunnerResultViewProps &
-  TestRunnerInfoProps;
+  isShowLogDetail?: boolean;
+  stateManager?: CustomStateManager;
+} & TestRunnerResultViewProps;
 
 export function TestRunnerView<T>({
-  title,
   renderExecuteView,
   renderResultView,
+  isShowLogDetail = true,
+  stateManager,
 }: TestRunnerViewProps<T>) {
   return (
     <TestRunnerProvider>
       <YStack gap="$1">
-        <TestRunnerInfoView title={title} />
         {renderExecuteView()}
-        <TestRunnerPrepareDataLogView />
-        <TestRunnerResultView renderResultView={renderResultView} />
+        {isShowLogDetail && <TestRunnerPrepareDataLogView />}
+        <TestRunnerResultView renderResultView={renderResultView} stateManager={stateManager} />
       </YStack>
     </TestRunnerProvider>
   );

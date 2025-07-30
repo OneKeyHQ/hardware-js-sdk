@@ -16,7 +16,11 @@ import {
   setFailedTasksAtom,
   setItemVerifyStateAtom,
   itemVerifyStateAtom,
+  createTestRunnerAtoms,
 } from './Context/TestRunnerVerifyProvider';
+
+// 自定义状态管理器类型
+type CustomStateManager = ReturnType<typeof createTestRunnerAtoms>;
 
 type RunnerContext = {
   deviceFeatures: Features;
@@ -26,6 +30,9 @@ type RunnerContext = {
 };
 
 type RunnerConfig<T> = {
+  // 可选的自定义状态管理器
+  stateManager?: CustomStateManager;
+
   initHardwareListener?: (sdk: CoreApi) => Promise<void>;
   prepareRunner?: (
     connectId: string,
@@ -80,6 +87,7 @@ type RunnerConfig<T> = {
 
 export function useRunnerTest<T>(config: RunnerConfig<T>) {
   const {
+    stateManager,
     initTestCase,
     initHardwareListener,
     prepareRunner,
@@ -121,9 +129,16 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     ]
   );
 
-  const setItemVerifyState = useSetAtom(setItemVerifyStateAtom);
-  const clearItemVerifyState = useSetAtom(clearItemVerifyStateAtom);
-  const setFailedTasks = useSetAtom(setFailedTasksAtom);
+  // 使用自定义状态管理器或默认状态管理器
+  const setItemVerifyState = useSetAtom(
+    stateManager ? stateManager.setItemVerifyStateAtom : setItemVerifyStateAtom
+  );
+  const clearItemVerifyState = useSetAtom(
+    stateManager ? stateManager.clearItemVerifyStateAtom : clearItemVerifyStateAtom
+  );
+  const setFailedTasks = useSetAtom(
+    stateManager ? stateManager.setFailedTasksAtom : setFailedTasksAtom
+  );
   const store = useStore();
 
   const running = useRef<boolean>(false);
@@ -137,13 +152,14 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     stableContext.setRunnerState?.('stopped');
     stableContext.callbacks?.onRunnerStateChange?.('stopped');
 
-    clearItemVerifyState?.();
-    stableContext.setItemValues?.([]);
+    // 注意：不清理 itemValues 和 itemVerifyState，保留已显示的测试结果
+    // clearItemVerifyState?.();
+    // stableContext.setItemValues?.([]);
     if (SDK) {
       SDK.cancel();
       removeHardwareListener?.(SDK);
     }
-  }, [stableContext, clearItemVerifyState, SDK, removeHardwareListener]);
+  }, [stableContext, SDK, removeHardwareListener]);
 
   const endTestRunner = useCallback(() => {
     running.current = false;
@@ -217,7 +233,9 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
 
           let initTestCaseRes = await initTestCase(context, SDK);
 
-          const failedTasks = store.get(getFailedTasksAtom);
+          const failedTasks = store.get(
+            stateManager ? stateManager.getFailedTasksAtom : getFailedTasksAtom
+          );
           if (retryFailedOnly && failedTasks && failedTasks.length > 0) {
             initTestCaseRes = {
               title: `${initTestCaseRes?.title || 'Test'} - 重试失败任务`,
@@ -369,6 +387,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       prepareRunner,
       initTestCase,
       store,
+      stateManager,
       clearItemVerifyState,
       endTestRunner,
       setFailedTasks,

@@ -24,12 +24,28 @@ function publicKeyToAddress(publicKey: Uint8Array, prefix: string): string {
   return encodeAddress(prefix, ENexaAddressType.PayToScriptTemplate, Buffer.from(scriptPubKey));
 }
 
+/**
+ * 抽离的核心逻辑：从 seed 生成 Nexa 地址
+ * 可以被 SLIP39 直接调用，避免助记词转换
+ */
+export function generateNexaAddressFromSeed(seed: Buffer, path: string, prefix = 'nexa'): string {
+  const keyPair = deriveKeyPairWithPath(seed, path, 'secp256k1');
+  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
+
+  if (!privateKeyArray || !publicKeyArray) {
+    throw new Error('privateKey or publicKey is undefined');
+  }
+
+  return publicKeyToAddress(publicKeyArray, prefix);
+}
+
 export default function nexaGetAddress(
   connectId: string,
   deviceId: string,
   params: NexaGetAddressParams & {
     mnemonic: string;
     passphrase?: string;
+    path: string;
   }
 ):
   | Unsuccessful
@@ -38,30 +54,20 @@ export default function nexaGetAddress(
       path: string;
     }> {
   const { path, mnemonic, passphrase, prefix } = params;
-
   const seed = mnemonicToSeed(mnemonic, passphrase);
-  // @ts-expect-error
-  const keyPair = deriveKeyPairWithPath(seed, path, 'secp256k1');
 
-  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
-
-  if (!privateKeyArray || !publicKeyArray) {
+  try {
+    const address = generateNexaAddressFromSeed(seed, path, prefix ?? 'nexa');
+    return {
+      success: true,
+      payload: { address, path },
+    };
+  } catch (error) {
     return {
       success: false,
       payload: {
-        error: 'privateKey or publicKey is undefined',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
-
-  const address = publicKeyToAddress(publicKeyArray, prefix ?? 'nexa');
-
-  return {
-    success: true,
-    payload: {
-      address,
-      // @ts-expect-error
-      path,
-    },
-  };
 }

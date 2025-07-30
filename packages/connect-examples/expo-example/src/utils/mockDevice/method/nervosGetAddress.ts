@@ -9,10 +9,8 @@ import { addHexPrefix } from '../../hexstring';
 function publicKeyToAddress(publicKey: Uint8Array): string {
   const publicKeyHex = addHexPrefix(bytesToHex(publicKey)) ?? '';
   const blake160 = new utils.CKBHasher().update(publicKeyHex).digestHex().slice(0, 42);
-  console.log('blake160', blake160);
 
   const config = getConfig();
-
   const template = config.SCRIPTS.SECP256K1_BLAKE160;
 
   if (!template) {
@@ -35,6 +33,7 @@ export default function nervosGetAddress(
   params: NervosGetAddressParams & {
     mnemonic: string;
     passphrase?: string;
+    path: string;
   }
 ):
   | Unsuccessful
@@ -45,7 +44,6 @@ export default function nervosGetAddress(
   const { path, mnemonic, passphrase } = params;
 
   const seed = mnemonicToSeed(mnemonic, passphrase);
-  // @ts-expect-error
   const keyPair = deriveKeyPairWithPath(seed, path, 'secp256k1');
 
   const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
@@ -66,8 +64,23 @@ export default function nervosGetAddress(
     success: true,
     payload: {
       address,
-      // @ts-expect-error
       path,
     },
   };
+}
+
+/**
+ * 抽离的核心逻辑：从 seed 生成 Nervos 地址
+ * 可以被 SLIP39 直接调用，避免助记词转换
+ */
+export function generateNervosAddressFromSeed(seed: Buffer, path: string): string {
+  const keyPair = deriveKeyPairWithPath(seed, path, 'secp256k1');
+  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
+
+  if (!privateKeyArray || !publicKeyArray) {
+    throw new Error('privateKey or publicKey is undefined');
+  }
+
+  const publicKey = publicKeyArray.slice(1);
+  return publicKeyToAddress(publicKeyArray);
 }
