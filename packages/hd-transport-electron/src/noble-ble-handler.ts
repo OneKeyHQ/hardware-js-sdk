@@ -75,7 +75,7 @@ const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
 const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for fast targeted scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
-const CONNECTION_TIMEOUT = 15000; // 15 seconds for device connection
+const CONNECTION_TIMEOUT = 3000; // 15 seconds for device connection
 const CHUNK_WRITE_DELAY = 10; // 10ms delay between chunk writes
 
 // BLE packet size constants
@@ -372,16 +372,7 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
     return;
   }
 
-  logger?.info(
-    '[NobleBLE] Discovered OneKey device:',
-    {
-      id: peripheral.id,
-      name: deviceName,
-      rssi: peripheral.rssi,
-      serviceUuids: peripheral.advertisement?.serviceUuids,
-    },
-    peripheral
-  );
+  logger?.info('[NobleBLE] Discovered OneKey device:', deviceName);
 
   // Cache the device in both maps
   discoveredDevices.set(peripheral.id, peripheral);
