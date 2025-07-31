@@ -41,6 +41,7 @@ export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 export { default as cipherKeyValue } from './CipherKeyValue';
 
 export { default as allNetworkGetAddress } from './allnetwork/AllNetworkGetAddress';
+export { default as allNetworkGetAddressByLoop } from './allnetwork/AllNetworkGetAddressByLoop';
 
 export { default as btcGetAddress } from './btc/BTCGetAddress';
 export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';

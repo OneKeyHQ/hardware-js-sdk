@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { CallMethod } from './events';
 import { CoreApi } from './types/api';
+import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
 
 type CallbackFunction = (data?: any, error?: { message: string; code?: number }) => void;
 
@@ -169,25 +170,28 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'getNextU2FCounter' }),
   setU2FCounter: (connectId, params) => call({ ...params, connectId, method: 'setU2FCounter' }),
 
-  allNetworkGetAddress: (connectId, deviceId, params) => {
-    const { loopMode, onLoopItemResponse, ...restParams } = params;
-
-    if (!loopMode || !onLoopItemResponse) {
-      return call({ ...restParams, connectId, deviceId, method: 'allNetworkGetAddress' });
-    }
+  allNetworkGetAddress: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'allNetworkGetAddress' }),
+  allNetworkGetAddressByLoop: (connectId, deviceId, params) => {
+    const { onLoopItemResponse, onAllItemsResponse, ...restParams } = params;
 
     const callbackId = generateCallbackId();
     registerCallback(callbackId, onLoopItemResponse);
+
+    const callbackIdFinish = generateCallbackId();
+    registerCallback(callbackIdFinish, (data?: AllNetworkAddress[]) => {
+      onAllItemsResponse?.(data);
+      cleanupCallback(callbackIdFinish);
+      cleanupCallback(callbackId);
+    });
 
     return call({
       ...restParams,
       connectId,
       deviceId,
-      method: 'allNetworkGetAddress',
+      method: 'allNetworkGetAddressByLoop',
       callbackId,
-      loopMode: true,
-    }).finally(() => {
-      cleanupCallback(callbackId);
+      callbackIdFinish,
     });
   },
 

@@ -52,7 +52,7 @@ import { getSynchronize } from '../utils/getSynchronize';
 
 const Log = getLogger(LoggerNames.Core);
 
-type CoreContext = ReturnType<Core['getCoreContext']>;
+export type CoreContext = ReturnType<Core['getCoreContext']>;
 
 function hasDeriveCardano(method: BaseMethod): boolean {
   if (
@@ -195,6 +195,11 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
+  // 等待之前的 callback 任务完成（确保设备不会并发调用）
+  if (method.connectId) {
+    await context.waitForCallbackTasks(method.connectId);
+  }
+
   await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
   const task = requestQueue.createTask(method);
@@ -225,6 +230,7 @@ const onCallDevice = async (
 
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
+  method.context = context;
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
@@ -240,6 +246,10 @@ const onCallDevice = async (
   );
 
   try {
+    if (method.connectId) {
+      await context.waitForCallbackTasks(method.connectId);
+    }
+
     await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
@@ -710,6 +720,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       // }
       // setPrePendingCallPromise(device?.interruptionFromUser());
       // requestQueue.abortRequestsByConnectId(connectId);
+
+      // cancel callback tasks
+      requestQueue.cancelCallbackTasks(connectId);
+
       const requestIds = requestQueue.getRequestTasksId();
       Log.debug(
         `Cancel Api connect requestQueues: length:${requestIds.length} requestIds:${requestIds.join(
@@ -947,7 +961,7 @@ const removeUiPromise = (promise: Deferred<any>) => {
 export default class Core extends EventEmitter {
   private requestQueue = new RequestQueue();
 
-  // 上一个请求的 promise 完成，后续需要清理的工作，需要在下一次请求前完成
+  // background task
   private prePendingCallPromise: Promise<void> | undefined;
 
   private methodSynchronize = getSynchronize();
@@ -960,6 +974,13 @@ export default class Core extends EventEmitter {
       setPrePendingCallPromise: (promise: Promise<void> | undefined) => {
         this.prePendingCallPromise = promise;
       },
+      // callback 任务管理
+      registerCallbackTask: (connectId: string, callbackPromise: Deferred<any>) => {
+        this.requestQueue.registerPendingCallbackTask(connectId, callbackPromise);
+      },
+      waitForCallbackTasks: (connectId: string) =>
+        this.requestQueue.waitForPendingCallbackTasks(connectId),
+      cancelCallbackTasks: (connectId: string) => this.requestQueue.cancelCallbackTasks(connectId),
     };
   }
 
@@ -1012,8 +1033,6 @@ export default class Core extends EventEmitter {
       }
       case IFRAME.CALLBACK: {
         Log.log('callback message: ', message);
-        // 回调消息应该直接转发给外层环境处理
-        // core层不应该直接执行回调，而是通过postMessage转发
         postMessage(message);
         break;
       }

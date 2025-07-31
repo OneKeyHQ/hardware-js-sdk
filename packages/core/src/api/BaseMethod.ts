@@ -13,6 +13,7 @@ import { DeviceFirmwareRange, KnownDevice } from '../types';
 import { CoreMessage, createFirmwareMessage, createUiMessage, DEVICE, FIRMWARE } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
 import { getDeviceFirmwareVersion, getLogger, getMethodVersionRange, LoggerNames } from '../utils';
+import type { CoreContext } from '../core';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -97,6 +98,8 @@ export abstract class BaseMethod<Params = undefined> {
 
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
+
+  context?: CoreContext;
 
   constructor(message: { id?: number; payload: any }) {
     const { payload } = message;

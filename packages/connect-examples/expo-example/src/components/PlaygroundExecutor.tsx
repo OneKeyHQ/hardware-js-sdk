@@ -48,9 +48,13 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
           ...rawParams,
         };
 
-        if (method === 'allNetworkGetAddress' && 'loopMode' in rawParams && rawParams.loopMode) {
+        if (method === 'allNetworkGetAddressByLoop') {
           // @ts-expect-error
           requestParams.onLoopItemResponse = (data: any, error: any) => {
+            onExecute(JSON.stringify({ data, error }, null, 2));
+          };
+          // @ts-expect-error
+          requestParams.onAllItemsResponse = (data: any) => {
             onExecute(JSON.stringify(data, null, 2));
           };
         }

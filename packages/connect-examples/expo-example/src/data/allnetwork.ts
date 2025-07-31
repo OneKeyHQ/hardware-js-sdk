@@ -425,17 +425,10 @@ const api: PlaygroundProps[] = [
 ];
 
 api.push({
-  method: 'allNetworkGetAddress',
+  method: 'allNetworkGetAddressByLoop',
   description: 'Get addresses with real-time callback for each generated address',
   presupposes: api[0].presupposes?.map(item => ({
     ...item,
-    value: {
-      ...item.value,
-      bundle: item.value.bundle.map((item: any) => ({
-        ...item,
-      })),
-      loopMode: true,
-    },
   })),
 });
 

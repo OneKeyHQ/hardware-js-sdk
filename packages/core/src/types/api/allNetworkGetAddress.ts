@@ -35,6 +35,13 @@ export type INetwork =
   | 'benfen'
   | 'neo';
 
+export type CommonResponseParams = {
+  path: string;
+  network: INetwork;
+  chainName?: string;
+  prefix?: string;
+};
+
 export type AllNetworkAddressParams = {
   path: string | number[];
   network: INetwork;
@@ -99,14 +106,16 @@ export type AllNetworkAddress = AllNetworkAddressParams & {
 
 export type AllNetworkGetAddressParams = {
   bundle: AllNetworkAddressParams[];
+};
 
-  // callback params
+export type AllNetworkGetAddressParamsByLoop = {
   callbackId?: string;
-  loopMode?: boolean;
-  onLoopItemResponse?: (
+  callbackIdFinish?: string;
+  onLoopItemResponse: (
     data?: AllNetworkAddress,
     error?: { message: string; code?: number }
   ) => void;
+  onAllItemsResponse: (data?: AllNetworkAddress[]) => void;
 };
 
 export declare function allNetworkGetAddress(
@@ -114,3 +123,9 @@ export declare function allNetworkGetAddress(
   deviceId: string,
   params: CommonParams & AllNetworkGetAddressParams
 ): Response<AllNetworkAddress[]>;
+
+export declare function allNetworkGetAddressByLoop(
+  connectId: string,
+  deviceId: string,
+  params: CommonParams & AllNetworkGetAddressParamsByLoop
+): Response<string[]>;

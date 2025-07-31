@@ -43,7 +43,7 @@ import { setU2FCounter } from './setU2FCounter';
 
 import { cipherKeyValue } from './cipherKeyValue';
 
-import { allNetworkGetAddress } from './allNetworkGetAddress';
+import { allNetworkGetAddress, allNetworkGetAddressByLoop } from './allNetworkGetAddress';
 
 import { evmGetAddress } from './evmGetAddress';
 import { evmGetPublicKey } from './evmGetPublicKey';
@@ -230,6 +230,7 @@ export type CoreApi = {
    * All network function
    */
   allNetworkGetAddress: typeof allNetworkGetAddress;
+  allNetworkGetAddressByLoop: typeof allNetworkGetAddressByLoop;
 
   /**
    * EVM function

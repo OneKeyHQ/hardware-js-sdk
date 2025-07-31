@@ -13,6 +13,8 @@ export type RequestTask = {
 export default class RequestQueue {
   private requestQueue = new Map<number, RequestTask>();
 
+  private pendingCallbackTasks = new Map<string, Deferred<void>>();
+
   // 生成唯一请求ID
   public generateRequestId = (method?: BaseMethod) => {
     if (method && method.responseID != null) {
@@ -103,5 +105,29 @@ export default class RequestQueue {
   // 删除请求
   public releaseTask(requestId: number) {
     this.requestQueue.delete(requestId);
+  }
+
+  public registerPendingCallbackTask(connectId: string, callbackPromise: Deferred<void>) {
+    this.pendingCallbackTasks.set(connectId, callbackPromise);
+
+    callbackPromise.promise.finally(() => {
+      Log.debug(`Callback task completed for connectId: ${connectId}`);
+      this.pendingCallbackTasks.delete(connectId);
+    });
+  }
+
+  public async waitForPendingCallbackTasks(connectId: string): Promise<void> {
+    const pendingTask = this.pendingCallbackTasks.get(connectId);
+    if (pendingTask) {
+      Log.debug(`Waiting for pending callback task to complete for connectId: ${connectId}`);
+      await pendingTask.promise;
+    }
+  }
+
+  public cancelCallbackTasks(connectId: string) {
+    const pendingTask = this.pendingCallbackTasks.get(connectId);
+    if (pendingTask) {
+      pendingTask.resolve();
+    }
   }
 }

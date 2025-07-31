@@ -151,6 +151,8 @@ export class Device extends EventEmitter {
 
   passphraseState: string | undefined = undefined;
 
+  pendingCallbackPromise?: Deferred<void>;
+
   constructor(descriptor: DeviceDescriptor) {
     super();
     this.originalDescriptor = descriptor;
@@ -264,6 +266,18 @@ export class Device extends EventEmitter {
       (this.isUsedHere() && !this.keepSession && this.mainId) ||
       (this.mainId && DataManager.isBleConnect(env))
     ) {
+      // wait for callback tasks to complete before releasing device
+      if (this.pendingCallbackPromise) {
+        try {
+          Log.debug(
+            'Waiting for callback tasks to complete before releasing device (in release method)'
+          );
+          await this.pendingCallbackPromise.promise;
+        } catch (error) {
+          Log.error('Error waiting for callback tasks in release method:', error);
+        }
+      }
+
       if (this.commands) {
         this.commands.dispose(false);
         if (this.commands.callPromise) {
