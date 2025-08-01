@@ -1,3 +1,4 @@
+import { HardwareErrorCode, HardwareErrorCodeMessage } from '@onekeyfe/hd-shared';
 import { CoreApi } from '../../types';
 
 import type {
@@ -46,8 +47,15 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
         })),
       };
 
+      if (this.abortController?.signal.aborted) {
+        throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
+      }
       // call method
       const response = await this.callMethod(methodName as keyof CoreApi, methodParams);
+
+      if (this.abortController?.signal.aborted) {
+        throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
+      }
 
       for (let i = 0; i < params.length; i++) {
         const { _originRequestParams, _originalIndex } = params[i];

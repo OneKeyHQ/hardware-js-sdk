@@ -1,5 +1,10 @@
 import semver from 'semver';
-import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import {
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+  HardwareErrorCodeMessage,
+} from '@onekeyfe/hd-shared';
 
 import { serializedPath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -14,10 +19,11 @@ import type {
 import { PROTO } from '../../constants';
 
 import { findMethod } from '../utils';
-import { IFRAME } from '../../events';
+import { DEVICE, IFRAME } from '../../events';
 import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
-import { Device } from '../../device/Device';
+import { Device, DeviceEvents } from '../../device/Device';
 import { UI_REQUEST } from '../../constants/ui-request';
+import { onDeviceButtonHandler } from '../../core';
 
 const Mainnet = 'mainnet';
 
@@ -246,9 +252,13 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     chain_name?: string;
   }[]
 > {
+  abortController: AbortController | null = null;
+
   init() {
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
+
+    this.useDevicePassphraseState = false;
 
     // check payload
     validateParams(this.payload, [{ name: 'bundle', type: 'array' }]);
@@ -317,6 +327,28 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     try {
       method.init();
       method.setDevice?.(this.device);
+      method.context = this.context;
+
+      const onSignalAbort = () => {
+        this.abortController?.abort(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
+      };
+
+      const _onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
+        if (
+          request.code === 'ButtonRequest_PinEntry' ||
+          request.code === 'ButtonRequest_AttachPin'
+        ) {
+          onSignalAbort();
+        } else {
+          onDeviceButtonHandler(device, request);
+        }
+      };
+
+      // pro pin event
+      this.device.on(DEVICE.BUTTON, _onDeviceButtonHandler);
+      // classic pin event
+      this.device.on(DEVICE.PIN, onSignalAbort);
+      this.device.on(DEVICE.PASSPHRASE, onSignalAbort);
 
       preCheckDeviceSupport(this.device, method);
 
@@ -357,7 +389,23 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
   abstract getAllNetworkAddress(): Promise<AllNetworkAddress[]>;
 
   async run() {
-    return Promise.resolve(this.getAllNetworkAddress());
+    if (!this.device.features?.unlocked) {
+      // unlock device
+      const features = await this.device.unlockDevice();
+      if (features.passphrase_protection) {
+        // check passphrase state
+        await this.device.checkPassphraseStateSafety();
+      }
+    }
+
+    this.abortController = new AbortController();
+
+    return Promise.resolve(this.getAllNetworkAddress()).catch(e => {
+      if (e instanceof HardwareError && e.errorCode === HardwareErrorCode.RepeatUnlocking) {
+        throw ERRORS.TypedError(HardwareErrorCode.RepeatUnlocking, e.message);
+      }
+      throw e;
+    });
   }
 }
 
@@ -393,9 +441,7 @@ function handleSkippableHardwareError(
 
   if (e instanceof HardwareError && e.errorCode !== HardwareErrorCode.RuntimeError) {
     const { errorCode } = e;
-    if (errorCode === HardwareErrorCode.CallMethodInvalidParameter) {
-      error = e;
-    } else if (errorCode === HardwareErrorCode.CallMethodNeedUpgradeFirmware) {
+    if (errorCode === HardwareErrorCode.CallMethodNeedUpgradeFirmware) {
       error = e;
     } else if (errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
       error = e;

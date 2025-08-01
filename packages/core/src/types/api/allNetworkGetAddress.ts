@@ -1,4 +1,4 @@
-import type { CommonParams, Response } from '../params';
+import type { CommonParams, Response, Unsuccessful } from '../params';
 import type { CardanoAddressParameters } from './cardano';
 
 export type INetwork =
@@ -108,14 +108,11 @@ export type AllNetworkGetAddressParams = {
   bundle: AllNetworkAddressParams[];
 };
 
-export type AllNetworkGetAddressParamsByLoop = {
+export type AllNetworkGetAddressParamsByLoop = AllNetworkGetAddressParams & {
   callbackId?: string;
   callbackIdFinish?: string;
-  onLoopItemResponse: (
-    data?: AllNetworkAddress,
-    error?: { message: string; code?: number }
-  ) => void;
-  onAllItemsResponse: (data?: AllNetworkAddress[]) => void;
+  onLoopItemResponse: (data?: AllNetworkAddress) => void;
+  onAllItemsResponse: (data?: AllNetworkAddress[], error?: Unsuccessful) => void;
 };
 
 export declare function allNetworkGetAddress(
@@ -128,4 +125,5 @@ export declare function allNetworkGetAddressByLoop(
   connectId: string,
   deviceId: string,
   params: CommonParams & AllNetworkGetAddressParamsByLoop
-): Response<string[]>;
+  // only return empty array
+): Response<AllNetworkAddress[]>;

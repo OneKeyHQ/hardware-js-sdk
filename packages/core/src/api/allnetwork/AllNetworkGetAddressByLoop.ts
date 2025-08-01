@@ -1,4 +1,10 @@
-import { createDeferred } from '@onekeyfe/hd-shared';
+import {
+  createDeferred,
+  ERRORS,
+  HardwareError,
+  HardwareErrorCode,
+  HardwareErrorCodeMessage,
+} from '@onekeyfe/hd-shared';
 import type {
   AllNetworkAddress,
   AllNetworkGetAddressParamsByLoop,
@@ -6,6 +12,7 @@ import type {
 
 import { IFRAME } from '../../events';
 import AllNetworkGetAddressBase from './AllNetworkGetAddressBase';
+import { Unsuccessful } from '../../types';
 
 export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase {
   async getAllNetworkAddress() {
@@ -43,51 +50,91 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
       for (let i = 0; i < bundle.length; i++) {
         const item = bundle[i];
 
-        try {
-          const methodParams = this.generateMethodName({
-            network: item.network,
-            payload: item,
-            originalIndex: i,
-          });
-
-          const singleMethodParams = {
-            bundle: [methodParams.params],
-          };
-
-          const response = await this.callMethod(methodParams.methodName, singleMethodParams);
-
-          const singleResult = {
-            ...item,
-            ...response[0],
-          };
-          allResults.push(singleResult);
-
-          this.sendItemCallback(callbackId, singleResult, null, i);
-        } catch (error: any) {
-          this.sendItemCallback(callbackId, null, error, i);
-          // continue to process other items, do not throw error
-          console.error(`Error processing item ${i}:`, error);
+        if (this.abortController?.signal.aborted) {
+          throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
         }
+
+        const methodParams = this.generateMethodName({
+          network: item.network,
+          payload: item,
+          originalIndex: i,
+        });
+
+        const singleMethodParams = {
+          bundle: [methodParams.params],
+        };
+
+        const response = await this.callMethod(methodParams.methodName, singleMethodParams);
+
+        if (this.abortController?.signal.aborted) {
+          throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
+        }
+
+        const singleResult = {
+          ...item,
+          ...response[0],
+        };
+        allResults.push(singleResult);
+
+        this.sendItemCallback(callbackId, singleResult, i);
       }
 
-      this.sendFinishCallback(callbackIdFinish, allResults);
+      this.sendFinishCallback({
+        callbackId: callbackIdFinish,
+        data: allResults,
+      });
+    } catch (error: any) {
+      let errorCode = error.errorCode || error.code;
+      let errorMessage = error.message;
+
+      if (error instanceof HardwareError) {
+        errorCode = error.errorCode;
+        errorMessage = error.message;
+      } else if (error.message === HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]) {
+        errorCode = HardwareErrorCode.RepeatUnlocking;
+        errorMessage = error.message;
+      } else {
+        const hardwareError = ERRORS.TypedError(HardwareErrorCode.RuntimeError, error.message);
+        errorCode = hardwareError.errorCode;
+        errorMessage = hardwareError.message;
+      }
+
+      this.sendFinishCallback({
+        callbackId,
+        error: {
+          success: false,
+          payload: {
+            error: errorMessage,
+            code: errorCode,
+          },
+        },
+      });
     } finally {
       this.context?.cancelCallbackTasks(this.payload.connectId);
     }
   }
 
-  private sendFinishCallback(callbackId: string, data: AllNetworkAddress[]) {
+  private sendFinishCallback({
+    callbackId,
+    data,
+    error,
+  }: {
+    callbackId: string;
+    data?: AllNetworkAddress[];
+    error?: Unsuccessful;
+  }) {
     this.postMessage({
       event: IFRAME.CALLBACK,
       type: IFRAME.CALLBACK,
       payload: {
         callbackId,
         data,
+        error,
       },
     });
   }
 
-  private sendItemCallback(callbackId: string, data: any, error: any, itemIndex: number) {
+  private sendItemCallback(callbackId: string, data: any, itemIndex: number) {
     this.postMessage({
       event: IFRAME.CALLBACK,
       type: IFRAME.CALLBACK,
@@ -97,7 +144,6 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
           ...data,
           index: itemIndex,
         },
-        error: error ? { message: error.message, code: error.code } : null,
       },
     });
   }

@@ -195,7 +195,7 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
-  // 等待之前的 callback 任务完成（确保设备不会并发调用）
+  // wait for previous callback tasks to complete (ensure device does not call concurrently)
   if (method.connectId) {
     await context.waitForCallbackTasks(method.connectId);
   }
@@ -857,7 +857,7 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
   callback(null, uiResp.payload);
 };
 
-const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
+export const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
   postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
 
   if (request.code === 'ButtonRequest_PinEntry' || request.code === 'ButtonRequest_AttachPin') {
