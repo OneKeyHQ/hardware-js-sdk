@@ -141,6 +141,12 @@ const api: PlaygroundProps[] = [
               prefix: 'osmosis',
               showOnOneKey: false,
             },
+                {
+              network: 'terra',
+              path: "m/44'/330'/0'/0/X",
+              prefix: 'terra',
+              showOnOneKey: false,
+            },
             {
               network: 'dynex',
               path: "m/44'/29538'/0'/0'/0'",
