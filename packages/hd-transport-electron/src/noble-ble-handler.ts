@@ -14,6 +14,7 @@ import {
   isHeaderChunk,
   ERRORS,
   HardwareErrorCode,
+  wait,
 } from '@onekeyfe/hd-shared';
 import { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import type { WebContents, IpcMainInvokeEvent } from 'electron';
@@ -46,6 +47,9 @@ const deviceCharacteristics = new Map<string, CharacteristicPair>();
 const notificationCallbacks = new Map<string, (data: string) => void>();
 const subscribedDevices = new Map<string, boolean>(); // Track subscription status
 
+// 🔒 Add subscription operation state tracking to prevent race conditions
+const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' | 'idle'>();
+
 // Packet reassembly state for each device
 interface PacketAssemblyState {
   bufferLength: number;
@@ -71,7 +75,7 @@ const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
 const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for fast targeted scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
-const CONNECTION_TIMEOUT = 15000; // 15 seconds for device connection
+const CONNECTION_TIMEOUT = 3000; // 15 seconds for device connection
 const CHUNK_WRITE_DELAY = 10; // 10ms delay between chunk writes
 
 // BLE packet size constants
@@ -112,8 +116,14 @@ function processNotificationData(deviceId: string, data: Buffer): PacketProcessR
       packetState.packetCount = 1;
       packetState.messageId = messageId;
 
-      // Validate expected length is reasonable
-      if (packetState.bufferLength <= 0) {
+      // Only validate for negative lengths (which would be invalid)
+      if (packetState.bufferLength < 0) {
+        logger?.error('[NobleBLE] Invalid negative packet length detected:', {
+          length: packetState.bufferLength,
+          dataLength: data.length,
+          rawHeader: data.subarray(0, Math.min(16, data.length)).toString('hex'),
+          lengthBytes: data.subarray(5, 9).toString('hex'),
+        });
         resetPacketState(packetState);
         return { isComplete: false, error: 'Invalid packet length in header' };
       }
@@ -299,12 +309,19 @@ function cleanupDeviceState(deviceId: string): void {
   devicePacketStates.delete(deviceId);
   subscribedDevices.delete(deviceId);
   recentWriteOperations.delete(deviceId);
+  // 🔒 Clear operation state
+  subscriptionOperations.delete(deviceId);
   logger?.info('[NobleBLE] Device state cleaned up:', deviceId);
 }
 
 // Handle device disconnection - unified handler for all disconnect scenarios
 function handleDeviceDisconnect(deviceId: string, webContents: WebContents): void {
-  logger?.info('[NobleBLE] Device disconnected:', deviceId);
+  logger?.error('[NobleBLE] ⚠️  DEVICE DISCONNECT DETECTED:', {
+    deviceId,
+    hasPeripheral: connectedDevices.has(deviceId),
+    hasCharacteristics: deviceCharacteristics.has(deviceId),
+    stackTrace: new Error().stack?.split('\n').slice(1, 5),
+  });
 
   // Get device info before cleanup
   const peripheral = connectedDevices.get(deviceId);
@@ -355,16 +372,7 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
     return;
   }
 
-  logger?.info(
-    '[NobleBLE] Discovered OneKey device:',
-    {
-      id: peripheral.id,
-      name: deviceName,
-      rssi: peripheral.rssi,
-      serviceUuids: peripheral.advertisement?.serviceUuids,
-    },
-    peripheral
-  );
+  logger?.info('[NobleBLE] Discovered OneKey device:', deviceName);
 
   // Cache the device in both maps
   discoveredDevices.set(peripheral.id, peripheral);
@@ -636,6 +644,15 @@ async function discoverServicesAndCharacteristics(
 
 // Connect to device - supports both discovered and direct connection modes
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+  logger?.info('[NobleBLE] Connect device request:', {
+    deviceId,
+    hasDiscovered: discoveredDevices.has(deviceId),
+    hasConnected: connectedDevices.has(deviceId),
+    hasCharacteristics: deviceCharacteristics.has(deviceId),
+    totalDiscovered: discoveredDevices.size,
+    totalConnected: connectedDevices.size,
+  });
+
   let peripheral = discoveredDevices.get(deviceId);
 
   // If device not discovered, try a targeted scan for this specific device
@@ -688,19 +705,45 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     // Check if we already have characteristics for this device
     if (deviceCharacteristics.has(deviceId)) {
       logger?.info('[NobleBLE] Device characteristics already available');
-      // Clean up existing notification state to avoid conflicts
-      const existingCallback = notificationCallbacks.get(deviceId);
-      if (existingCallback) {
-        logger?.info('[NobleBLE] Cleaning up existing notification state');
-        const existingCharacteristics = deviceCharacteristics.get(deviceId);
-        if (existingCharacteristics) {
-          existingCharacteristics.notify.removeAllListeners('data');
-        }
-        notificationCallbacks.delete(deviceId);
-        devicePacketStates.delete(deviceId);
-        subscribedDevices.delete(deviceId);
+
+      // ⚠️ CRITICAL FIX: Check for ongoing subscription operations to prevent race conditions
+      const ongoingOperation = subscriptionOperations.get(deviceId);
+      if (ongoingOperation && ongoingOperation !== 'idle') {
+        logger?.info(
+          '[NobleBLE] Device has ongoing subscription operation:',
+          ongoingOperation,
+          'waiting...'
+        );
+        // Wait for ongoing operation to complete
+        await wait(100);
+        // Retry connection after waiting
+        return connectDevice(deviceId, webContents);
       }
-      return;
+
+      // Don't clean up notification state if device is already properly connected
+      // The existing notification subscription is still valid and working
+      const hasActiveSubscription = subscribedDevices.has(deviceId);
+      const hasCallback = notificationCallbacks.has(deviceId);
+
+      if (hasActiveSubscription && hasCallback) {
+        logger?.info(
+          '[NobleBLE] Device already has active notification subscription, reusing connection'
+        );
+        return;
+      }
+
+      // Only clean up if subscription is broken
+      logger?.info(
+        '[NobleBLE] Found orphaned characteristics without active subscription, cleaning up'
+      );
+      const existingCharacteristics = deviceCharacteristics.get(deviceId);
+      if (existingCharacteristics) {
+        existingCharacteristics.notify.removeAllListeners('data');
+      }
+      notificationCallbacks.delete(deviceId);
+      devicePacketStates.delete(deviceId);
+      subscribedDevices.delete(deviceId);
+      // Continue to re-setup the connection properly
     }
 
     // Discover services and characteristics
@@ -888,6 +931,9 @@ async function subscribeNotifications(
 
   logger?.info('[NobleBLE] Subscribing to notifications for device:', deviceId);
 
+  // 🔒 Set operation state to prevent race conditions
+  subscriptionOperations.set(deviceId, 'subscribing');
+
   // Check if already subscribed at the characteristic level
   if (subscribedDevices.get(deviceId)) {
     logger?.info('[NobleBLE] Device already subscribed to characteristic, updating callback only');
@@ -903,6 +949,8 @@ async function subscribeNotifications(
       messageId: undefined,
     });
 
+    // 🔒 Clear operation state
+    subscriptionOperations.set(deviceId, 'idle');
     return Promise.resolve();
   }
 
@@ -925,15 +973,22 @@ async function subscribeNotifications(
 
   return new Promise((resolve, reject) => {
     // Subscribe to notifications only if not already subscribed
+    logger?.info('[NobleBLE] 🔄 Starting subscription process...', { deviceId });
+
     notifyCharacteristic.subscribe((error: string) => {
       if (error) {
-        logger?.error('[NobleBLE] Notification subscription failed:', error);
+        logger?.error('[NobleBLE] ❌ Notification subscription failed:', error);
+        // 🔒 Clear operation state on error
+        subscriptionOperations.set(deviceId, 'idle');
         reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyError, error));
         return;
       }
 
-      logger?.info('[NobleBLE] Notification subscription successful');
+      logger?.info('[NobleBLE] ✅ Notification subscription successful');
       subscribedDevices.set(deviceId, true);
+
+      // 🔒 Clear operation state on success
+      subscriptionOperations.set(deviceId, 'idle');
 
       // Set up data handler with robust packet reassembly
       notifyCharacteristic.on('data', (data: Buffer) => {
@@ -971,6 +1026,9 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
 
   logger?.info('[NobleBLE] Unsubscribing from notifications for device:', deviceId);
 
+  // 🔒 Set operation state to prevent race conditions
+  subscriptionOperations.set(deviceId, 'unsubscribing');
+
   return new Promise<void>(resolve => {
     notifyCharacteristic.unsubscribe((error: string) => {
       if (error) {
@@ -984,6 +1042,9 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
       notificationCallbacks.delete(deviceId);
       devicePacketStates.delete(deviceId);
       subscribedDevices.delete(deviceId);
+
+      // 🔒 Clear operation state
+      subscriptionOperations.set(deviceId, 'idle');
       resolve();
     });
   });
@@ -1028,6 +1089,12 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     ipcMain.handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_CONNECT,
       async (_event: IpcMainInvokeEvent, deviceId: string) => {
+        logger?.info('[NobleBLE] IPC CONNECT request received:', {
+          deviceId,
+          hasPeripheral: connectedDevices.has(deviceId),
+          hasCharacteristics: deviceCharacteristics.has(deviceId),
+          totalConnectedDevices: connectedDevices.size,
+        });
         await connectDevice(deviceId, webContents);
       }
     );
@@ -1109,6 +1176,9 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
       notificationCallbacks.clear();
       devicePacketStates.clear();
       subscribedDevices.clear();
+
+      // Clear operation states
+      subscriptionOperations.clear();
     });
 
     safeLog(logger, 'info', 'Noble BLE IPC handlers setup completed');
