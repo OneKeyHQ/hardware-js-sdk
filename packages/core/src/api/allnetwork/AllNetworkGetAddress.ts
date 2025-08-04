@@ -77,6 +77,7 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
       responses.push(resultMap[i]);
     }
 
+    this.abortController = null;
     return Promise.resolve(responses);
   }
 }

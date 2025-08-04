@@ -111,6 +111,7 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
       });
     } finally {
       this.context?.cancelCallbackTasks(this.payload.connectId);
+      this.abortController = null;
     }
   }
 

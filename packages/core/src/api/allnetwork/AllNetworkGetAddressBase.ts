@@ -19,7 +19,7 @@ import type {
 import { PROTO } from '../../constants';
 
 import { findMethod } from '../utils';
-import { DEVICE, IFRAME } from '../../events';
+import { createUiMessage, DEVICE, IFRAME } from '../../events';
 import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 import { Device, DeviceEvents } from '../../device/Device';
 import { UI_REQUEST } from '../../constants/ui-request';
@@ -258,8 +258,6 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     this.checkDeviceId = true;
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
-    this.useDevicePassphraseState = false;
-
     // check payload
     validateParams(this.payload, [{ name: 'bundle', type: 'array' }]);
 
@@ -330,6 +328,7 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       method.context = this.context;
 
       const onSignalAbort = () => {
+        console.log('=====>>>>> onSignalAbort');
         this.abortController?.abort(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
       };
 
@@ -396,11 +395,12 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
         // check passphrase state
         await this.device.checkPassphraseStateSafety();
       }
+      this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
     }
 
     this.abortController = new AbortController();
 
-    return Promise.resolve(this.getAllNetworkAddress()).catch(e => {
+    return this.getAllNetworkAddress().catch(e => {
       if (e instanceof HardwareError && e.errorCode === HardwareErrorCode.RepeatUnlocking) {
         throw ERRORS.TypedError(HardwareErrorCode.RepeatUnlocking, e.message);
       }
