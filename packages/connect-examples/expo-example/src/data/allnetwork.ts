@@ -143,7 +143,7 @@ const api: PlaygroundProps[] = [
             },
                 {
               network: 'terra',
-              path: "m/44'/330'/0'/0/X",
+              path: "m/44'/330'/0'/0/0",
               prefix: 'terra',
               showOnOneKey: false,
             },
