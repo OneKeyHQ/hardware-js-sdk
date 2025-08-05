@@ -26,7 +26,8 @@
     "electron-log": ">=4.0.0"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "^1.1.2"
+    "@onekeyfe/hd-shared": "^1.1.2",
+    "p-retry": "^6.2.1"
   },
   "devDependencies": {
     "@types/web-bluetooth": "^0.0.17",
