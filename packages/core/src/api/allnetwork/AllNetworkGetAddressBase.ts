@@ -388,15 +388,15 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
   abstract getAllNetworkAddress(): Promise<AllNetworkAddress[]>;
 
   async run() {
-    if (!this.device.features?.unlocked) {
-      // unlock device
-      const features = await this.device.unlockDevice();
-      if (features.passphrase_protection) {
-        // check passphrase state
-        await this.device.checkPassphraseStateSafety();
-      }
-      this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+    // if (!this.device.features?.unlocked) {
+    // unlock device
+    const features = await this.device.unlockDevice();
+    if (features.passphrase_protection) {
+      // check passphrase state
+      await this.device.checkPassphraseStateSafety();
     }
+    this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
+    // }
 
     this.abortController = new AbortController();
 

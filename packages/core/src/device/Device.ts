@@ -778,6 +778,7 @@ export class Device extends EventEmitter {
       }
 
       const featuresRes = await this.commands.typedCall('GetFeatures', 'Features');
+      this._updateFeatures(featuresRes.message);
       return Promise.resolve(featuresRes.message);
     }
 
@@ -793,6 +794,7 @@ export class Device extends EventEmitter {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'unlock device error');
     }
     const res = await this.commands.typedCall('GetFeatures', 'Features');
+    this._updateFeatures(res.message);
     return Promise.resolve(res.message);
   }
 
