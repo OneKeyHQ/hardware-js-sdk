@@ -69,13 +69,13 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       icon: <Usb className="h-4 w-4" />,
       description: t('transport.webusb.description'),
     },
-    {
-      type: 'jsbridge',
-      label: 'JSBridge',
-      icon: <Monitor className="h-4 w-4" />,
-      description: t('transport.jsbridge.description'),
-      needsBridge: true,
-    },
+    // {
+    //   type: 'jsbridge',
+    //   label: 'JSBridge',
+    //   icon: <Monitor className="h-4 w-4" />,
+    //   description: t('transport.jsbridge.description'),
+    //   needsBridge: true,
+    // },
     {
       type: 'emulator',
       label: t('common.emulator'),
@@ -106,7 +106,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
         const featuresResult = await sdk.getFeatures(targetDevice.connectId);
         if (featuresResult.success && featuresResult.payload) {
           setDeviceFeatures(featuresResult.payload);
-          
+
           // 获取OneKey特定的features
           const onekeyFeaturesResult = await sdk.getOnekeyFeatures(targetDevice.connectId);
           if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
@@ -155,18 +155,15 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     setIsConnecting(true);
 
     try {
-      // 对于WebUSB，直接在用户点击时请求权限，避免异步调用链导致用户手势上下文丢失
+      // 对于WebUSB，必须在用户手势上下文中立即调用requestDevice
       if (newTransport === 'webusb') {
         // 保存用户选择到持久化存储
         setTransportPreference(newTransport);
 
-        // 直接调用SDK的promptWebDeviceAccess，在用户手势上下文中执行
+        // 获取SDK实例（应该已经初始化，所以这个调用应该是同步的）
         const sdkInstance = await SDKUtils.getInstance();
-        
-        // 先切换到webusb模式
         await sdkInstance.switchTransport('webusb');
-        
-        // 直接请求WebUSB设备权限
+        // 立即请求WebUSB设备权限，不要在此之前进行任何可能破坏用户手势上下文的异步操作
         const promptResponse = await sdkInstance.promptWebDeviceAccess();
 
         if (promptResponse.success && promptResponse.payload?.device) {
@@ -182,11 +179,11 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
             variant: 'default',
           });
         } else {
-          const errorMessage = 
+          const errorMessage =
             !promptResponse.success && 'error' in promptResponse.payload
               ? promptResponse.payload.error
               : t('transport.webusb.noDeviceSelected');
-          
+
           toast({
             title: t('transport.webusb.permissionFailed'),
             description: errorMessage,
@@ -279,15 +276,15 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
               disabled={option.disabled || isLoading || !sdkInitState.isInitialized}
               variant="outline"
               size="sm"
-              className={`w-full h-14 flex items-center justify-between px-5 py-4 transition-all duration-200 ${
+              className={`w-full min-h-12 sm:min-h-14 flex items-center justify-between px-3 sm:px-4 lg:px-5 py-2 sm:py-3 lg:py-4 transition-all duration-200 ${
                 transportType === option.type
                   ? 'bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 shadow-md ring-1 ring-blue-200 dark:ring-blue-800'
                   : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               } ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4 flex-1 min-w-0 overflow-hidden">
                 <div
-                  className={`${
+                  className={`flex-shrink-0 ${
                     transportType === option.type
                       ? 'text-blue-600 dark:text-blue-400'
                       : 'text-gray-600 dark:text-gray-400'
@@ -295,23 +292,45 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
                 >
                   {option.icon}
                 </div>
-                <div className="text-left">
-                  <div className="text-sm font-medium">{option.label}</div>
+                <div className="text-left flex-1 min-w-0 overflow-hidden">
+                  <div
+                    className="text-xs sm:text-sm font-medium"
+                    title={option.label}
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {option.label}
+                  </div>
                   {option.description && (
                     <div
-                      className={`text-xs ${
+                      className={`text-xs leading-tight mt-0.5 ${
                         transportType === option.type
                           ? 'text-blue-600 dark:text-blue-400'
                           : 'text-gray-500 dark:text-gray-400'
                       }`}
                     >
-                      {option.description}
+                      <div
+                        title={option.description}
+                        className="description-text"
+                        style={{
+                          overflow: 'hidden',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical' as const,
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {option.description}
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
               {option.disabled && (
-                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0 ml-1 sm:ml-2">
                   {t('transport.comingSoon')}
                 </span>
               )}

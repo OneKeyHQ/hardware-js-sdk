@@ -251,6 +251,12 @@ export const HardwareErrorCode = {
   ForbiddenKeyPath: 416,
 
   /**
+   * Defective firmware detected
+   * @params:{ serialNo: string?, seVersion: string?, deviceType: string? }
+   */
+  DefectiveFirmware: 417,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -474,6 +480,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
     'Please use OneKey desktop client to update the firmware',
   [HardwareErrorCode.DeviceNotSupportMethod]: 'Device not support this method',
   [HardwareErrorCode.ForbiddenKeyPath]: 'Forbidden key path',
+  [HardwareErrorCode.DefectiveFirmware]: 'Device firmware is defective, please update immediately',
 
   /**
    * Network Errors
@@ -587,40 +594,116 @@ export const CreateErrorByMessage = (message: string): HardwareError => {
   return new HardwareError(message);
 };
 
-const createNewFirmwareUnReleaseHardwareError = (currentVersion: string, requireVersion: string) =>
-  TypedError(
+const createNewFirmwareUnReleaseHardwareError = (
+  currentVersion: string,
+  requireVersion: string,
+  methodName?: string
+) => {
+  const methodInfo = methodName ? ` for method '${methodName}'` : '';
+  return TypedError(
     HardwareErrorCode.NewFirmwareUnRelease,
-    'Device firmware version is too low, please update to the latest version',
-    { current: currentVersion, require: requireVersion }
+    `Device firmware version is too low${methodInfo}, please update to the latest version`,
+    { current: currentVersion, require: requireVersion, method: methodName }
   );
+};
 
-const createNeedUpgradeFirmwareHardwareError = (currentVersion: string, requireVersion: string) =>
-  TypedError(
+const createNeedUpgradeFirmwareHardwareError = (
+  currentVersion: string,
+  requireVersion: string,
+  methodName?: string
+) => {
+  const methodInfo = methodName ? ` for method '${methodName}'` : '';
+  return TypedError(
     HardwareErrorCode.CallMethodNeedUpgradeFirmware,
-    `Device firmware version is too low, please update to ${requireVersion}`,
-    { current: currentVersion, require: requireVersion }
+    `Device firmware version is too low${methodInfo}, please update to ${requireVersion}`,
+    { current: currentVersion, require: requireVersion, method: methodName }
   );
+};
 
 const createNewFirmwareForceUpdateHardwareError = (
   connectId: string | undefined,
-  deviceId: string | undefined
-) =>
-  TypedError(
-    HardwareErrorCode.NewFirmwareForceUpdate,
-    'Device firmware version is too low, please update to the latest version',
-    { connectId, deviceId }
-  );
+  deviceId: string | undefined,
+  versionType?: 'firmware' | 'ble' | 'both',
+  currentVersions?: {
+    firmware?: string;
+    ble?: string;
+  }
+) => {
+  let message = 'Device firmware version is too low, please update to the latest version';
 
-const createDeprecatedHardwareError = (currentVersion: string, deprecatedVersion: string) =>
-  TypedError(
+  if (versionType === 'firmware') {
+    const currentFirmware = currentVersions?.firmware
+      ? ` (current: ${currentVersions.firmware})`
+      : '';
+    message = `Device firmware version is too low${currentFirmware}, please update the firmware to the latest version`;
+  } else if (versionType === 'ble') {
+    const currentBle = currentVersions?.ble ? ` (current: ${currentVersions.ble})` : '';
+    message = `Device BLE firmware version is too low${currentBle}, please update the BLE firmware to the latest version`;
+  } else if (versionType === 'both') {
+    const currentFirmware = currentVersions?.firmware
+      ? ` firmware: ${currentVersions.firmware}`
+      : '';
+    const currentBle = currentVersions?.ble ? ` BLE: ${currentVersions.ble}` : '';
+    const currentInfo =
+      currentFirmware || currentBle
+        ? ` (current -${currentFirmware}${currentFirmware && currentBle ? ',' : ''}${currentBle})`
+        : '';
+    message = `Device firmware and BLE firmware versions are too low${currentInfo}, please update both to the latest versions`;
+  } else if (currentVersions?.firmware || currentVersions?.ble) {
+    const currentFirmware = currentVersions?.firmware
+      ? ` firmware: ${currentVersions.firmware}`
+      : '';
+    const currentBle = currentVersions?.ble ? ` BLE: ${currentVersions.ble}` : '';
+    const currentInfo =
+      currentFirmware || currentBle
+        ? ` (current -${currentFirmware}${currentFirmware && currentBle ? ',' : ''}${currentBle})`
+        : '';
+    message = `Device firmware version is too low${currentInfo}, please update to the latest version`;
+  }
+
+  return TypedError(HardwareErrorCode.NewFirmwareForceUpdate, message, {
+    connectId,
+    deviceId,
+    versionType,
+    currentVersions,
+  });
+};
+
+const createDeprecatedHardwareError = (
+  currentVersion: string,
+  deprecatedVersion: string,
+  methodName?: string
+) => {
+  const methodInfo = methodName ? ` Method '${methodName}'` : 'This method';
+  return TypedError(
     HardwareErrorCode.CallMethodDeprecated,
-    `Device firmware version is too high, this method has been deprecated in ${deprecatedVersion}`,
-    { current: currentVersion, deprecated: deprecatedVersion }
+    `Device firmware version is too high. ${methodInfo} has been deprecated in ${deprecatedVersion}`,
+    { current: currentVersion, deprecated: deprecatedVersion, method: methodName }
   );
+};
+
+const createDefectiveFirmwareError = (
+  serialNo: string,
+  seVersion: string,
+  deviceType: string,
+  connectId?: string,
+  deviceId?: string
+) => {
+  const message = `Defective firmware detected (Serial: ${serialNo}, SE: ${seVersion}). Please update immediately.`;
+
+  return TypedError(HardwareErrorCode.DefectiveFirmware, message, {
+    serialNo,
+    seVersion,
+    deviceType,
+    connectId,
+    deviceId,
+  });
+};
 
 export {
   createNewFirmwareUnReleaseHardwareError,
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createDeprecatedHardwareError,
+  createDefectiveFirmwareError,
 };

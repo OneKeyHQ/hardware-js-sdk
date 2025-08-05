@@ -568,7 +568,7 @@ export const en = {
         description: 'Development testing',
       },
       webble: {
-        description: 'Bluetooth connection',
+        description: 'Bluetooth',
       },
       comingSoon: 'Coming soon',
       sdkNotReady: 'SDK not ready',

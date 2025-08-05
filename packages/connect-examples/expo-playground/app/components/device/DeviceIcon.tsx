@@ -22,7 +22,7 @@ const DeviceIcon: React.FC<DeviceIconProps> = ({ deviceType, size = 'md', classN
       <img
         src={getDeviceImagePath(deviceType)}
         alt={deviceType}
-        className={`${sizeClasses[size]} object-contain`}
+        className={`${sizeClasses[size]} object-contain mx-auto`}
         onError={e => {
           // 如果图片加载失败，使用一个通用的设备图标
           const target = e.target as HTMLImageElement;

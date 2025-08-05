@@ -69,10 +69,10 @@ export default function IndexPage() {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{t('home.subtitle')}</p>
           </div>
 
-          {/* 主要内容区域 - 等高布局 */}
-          <div className="grid lg:grid-cols-3 gap-8 items-stretch mb-12">
+          {/* 主要内容区域 - 响应式布局 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 items-stretch mb-12">
             {/* 左侧：设备连接控制 */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 w-full">
               <Card className="bg-card border border-border/50 shadow-sm h-full relative">
                 {/* 卡片右上角状态指示器 */}
                 {sdkInitState.isInitializing && (
@@ -104,24 +104,44 @@ export default function IndexPage() {
                   </div>
                 )}
 
-                <CardContent className="p-8 h-full flex flex-col">
-                  <div className="space-y-8 flex-1">
+                <CardContent className="p-4 sm:p-6 lg:p-8 h-full flex flex-col">
+                  <div className="space-y-4 sm:space-y-6 lg:space-y-8 flex-1">
                     {/* 连接状态 */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {currentDevice ? (
-                            <CheckCircle className="h-5 w-5 text-primary" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-muted-foreground" />
-                          )}
-                          <div>
-                            <h3 className="font-semibold text-base text-foreground">
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="flex items-start justify-start">
+                        <div className="flex items-start gap-2 sm:gap-3 w-full min-w-0">
+                          <div className="flex-shrink-0 mt-0.5">
+                            {currentDevice ? (
+                              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                            ) : (
+                              <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <h3
+                              className="font-semibold text-sm sm:text-base text-foreground leading-tight"
+                              title={
+                                currentDevice ? t('device.connected') : t('device.disconnected')
+                              }
+                              style={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
                               {currentDevice ? t('device.connected') : t('device.disconnected')}
                             </h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              {getTransportIcon()}
-                              <p className="text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5 sm:gap-2 mt-1 min-w-0">
+                              <div className="flex-shrink-0">{getTransportIcon()}</div>
+                              <p
+                                className="text-xs sm:text-sm text-muted-foreground flex-1 min-w-0"
+                                title={transportType || t('device.notSelected')}
+                                style={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
                                 {transportType || t('device.notSelected')}
                               </p>
                             </div>
@@ -131,11 +151,21 @@ export default function IndexPage() {
                     </div>
 
                     {/* 连接方式选择 */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-base text-foreground">
+                    <div className="space-y-3 sm:space-y-4">
+                      <h4
+                        className="font-medium text-sm sm:text-base text-foreground"
+                        title={t('device.selectConnection')}
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {t('device.selectConnection')}
                       </h4>
-                      <TransportSwitcher />
+                      <div className="w-full overflow-hidden">
+                        <TransportSwitcher />
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -143,11 +173,11 @@ export default function IndexPage() {
             </div>
 
             {/* 右侧：设备详细信息展示 */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 w-full min-w-0">
               {currentDevice ? (
                 /* 已连接设备的详细信息 */
                 <Card className="bg-card border border-border/50 shadow-sm h-full">
-                  <CardContent className="p-8 h-full flex flex-col">
+                  <CardContent className="p-4 sm:p-6 lg:p-8 h-full flex flex-col">
                     {/* 设备主要信息 */}
                     <div className="flex items-center gap-8 mb-8">
                       <div className="flex-shrink-0">
