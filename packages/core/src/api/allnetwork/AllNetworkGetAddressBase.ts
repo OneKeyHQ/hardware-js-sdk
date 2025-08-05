@@ -24,6 +24,7 @@ import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 import { Device, DeviceEvents } from '../../device/Device';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
+import { DevicePool } from '../../device/DevicePool';
 
 const Mainnet = 'mainnet';
 
@@ -388,15 +389,18 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
   abstract getAllNetworkAddress(): Promise<AllNetworkAddress[]>;
 
   async run() {
-    // if (!this.device.features?.unlocked) {
-    // unlock device
-    const features = await this.device.unlockDevice();
-    if (features.passphrase_protection) {
-      // check passphrase state
-      await this.device.checkPassphraseStateSafety();
+    // check passphrase state
+    const passphraseStateSafety = await this.device.checkPassphraseStateSafety(
+      this.payload.passphraseState,
+      this.payload.useEmptyPassphrase
+    );
+
+    if (!passphraseStateSafety) {
+      DevicePool.clearDeviceCache(this.payload.connectId);
+      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError));
     }
+
     this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
-    // }
 
     this.abortController = new AbortController();
 

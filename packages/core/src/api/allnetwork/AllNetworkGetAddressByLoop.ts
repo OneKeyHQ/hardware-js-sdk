@@ -100,7 +100,7 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
       }
 
       this.sendFinishCallback({
-        callbackId,
+        callbackId: callbackIdFinish,
         error: {
           success: false,
           payload: {
