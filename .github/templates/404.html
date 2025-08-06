@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <title>Hardware SDK Examples</title>
   <script>
     // 简化的路由分发器
-    (function() {
+    (function () {
       const path = window.location.pathname;
       const search = window.location.search;
       const hash = window.location.hash;
       const fullUrl = search + hash;
-      
+
       console.log('Route dispatcher: handling path', path);
-      
+
       // 智能路由分发逻辑 - 保持原始URL不变，让SPA自己处理路由
       if (path.startsWith('/expo-playground/')) {
         // expo-playground 的子路由，保存原始路径信息
@@ -26,9 +27,9 @@
         }
         return;
       }
-      
+
       if (path.startsWith('/expo-example/')) {
-        // expo-example 的子路由，保存原始路径信息  
+        // expo-example 的子路由，保存原始路径信息
         if (path !== '/expo-example/' && path !== '/expo-example') {
           console.log('Handling expo-example sub-route:', path);
           // 保存完整的原始URL到sessionStorage供应用恢复路由
@@ -39,16 +40,17 @@
         }
         return;
       }
-      
-      // 根路径或其他未匹配路径，重定向到 expo-example 首页
-      if (path === '/' || path === '' || !path.startsWith('/expo-example/') && !path.startsWith('/expo-playground/')) {
-        console.log('Route dispatcher: redirecting to expo-example');
-        window.location.replace('/expo-example/api-payload' + fullUrl);
+
+      // 根路径或其他未匹配路径，重定向到 expo-playground 首页
+      if (path === '/' || path === '') {
+        console.log('Route dispatcher: redirecting to expo-playground');
+        window.location.replace('/expo-playground' + fullUrl);
         return;
       }
     })();
   </script>
 </head>
+
 <body>
   <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
     <h2>Hardware SDK Examples</h2>
@@ -77,4 +79,5 @@
     </script>
   </div>
 </body>
-</html> 
+
+</html>

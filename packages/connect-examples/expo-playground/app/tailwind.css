@@ -176,7 +176,7 @@ body {
 
   /* 分界线样式 - 清晰的视觉分隔 */
   .onekey-divider {
-    @apply border-border bg-border/50 h-px my-10;
+    @apply border-border bg-border/50 h-px my-5;
   }
 
   /* 导航项样式 - 清晰的选中状态 */

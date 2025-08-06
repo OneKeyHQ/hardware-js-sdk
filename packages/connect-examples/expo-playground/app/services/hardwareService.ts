@@ -281,58 +281,9 @@ export async function searchDevices(): Promise<ApiResponse> {
 
     let response: ApiResponse;
 
-    // WebUSB 使用 promptWebDeviceAccess，其他使用 searchDevices
-    if (currentTransport === 'webusb') {
-      try {
-        logInfo('Prompting WebUSB device access');
-
-        // 使用SDK的promptWebDeviceAccess方法
-        const promptResponse = await sdkInstance.promptWebDeviceAccess();
-
-        if (promptResponse.success && promptResponse.payload?.device) {
-          // 将单个设备包装成数组格式，保持与searchDevices返回格式一致
-          response = {
-            success: true,
-            payload: [promptResponse.payload.device],
-          } as Success<any>;
-          logResponse('WebUSB device selected successfully', {
-            deviceInfo: promptResponse.payload.device,
-          });
-        } else {
-          response = {
-            success: false,
-            payload: {
-              error:
-                !promptResponse.success && 'error' in promptResponse.payload
-                  ? promptResponse.payload.error
-                  : 'No device selected',
-            },
-          } as Unsuccessful;
-        }
-      } catch (webUsbError) {
-        if (
-          webUsbError instanceof Error &&
-          (webUsbError.name === 'NotFoundError' ||
-            webUsbError.message.includes('No device selected') ||
-            webUsbError.message.includes('User cancelled'))
-        ) {
-          const error = '用户取消选择设备';
-          logInfo('User canceled device selection');
-          return {
-            success: false,
-            payload: { error },
-          } as Unsuccessful;
-        }
-        logError('WebUSB device access failed', { webUsbError });
-        return {
-          success: false,
-          payload: { error: `WebUSB access failed: ${webUsbError}` },
-        } as Unsuccessful;
-      }
-    } else {
-      // 对于其他transport类型，使用标准的searchDevices
-      response = await sdkInstance.searchDevices();
-    }
+    // 对于所有transport类型，使用标准的searchDevices
+    // WebUSB设备授权已经在TransportSwitcher中处理
+    response = await sdkInstance.searchDevices();
 
     if (response.success && response.payload) {
       logResponse('Devices found', {

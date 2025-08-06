@@ -556,10 +556,10 @@ export const en = {
     },
     transport: {
       webusb: {
-        description: 'Recommended, direct connection',
+        description: 'Recommended',
         deviceConnected: 'WebUSB device connected successfully',
         noDeviceSelected: 'No device selected',
-        permissionFailed: 'WebUSB permission failed',
+        notSupported: 'WebUSB is not supported in this browser',
       },
       jsbridge: {
         description: 'Stable compatibility',

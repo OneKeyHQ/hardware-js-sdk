@@ -7,8 +7,6 @@ import {
   ERRORS,
   HardwareError,
   HardwareErrorCode,
-} from '@onekeyfe/hd-shared';
-import {
   createDeprecatedHardwareError,
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,

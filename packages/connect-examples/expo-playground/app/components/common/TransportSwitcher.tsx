@@ -9,7 +9,9 @@ import { switchTransport, searchDevices } from '../../services/hardwareService';
 import type { TransportType } from '../../utils/hardwareInstance';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
-import { Monitor, Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
+import { Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+import { UI_RESPONSE } from '@onekeyfe/hd-core';
 
 interface TransportSwitcherProps {
   className?: string;
@@ -136,6 +138,79 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     }
   };
 
+  // Simple WebUSB error handling
+  const showWebUsbError = (error: unknown) => {
+    let message = t('transport.connectionFailed');
+
+    if (error instanceof Error) {
+      if (error.message.includes('not supported')) {
+        message = t('transport.webusb.notSupported');
+      } else if (error.name === 'NotFoundError' || error.message.includes('No device selected')) {
+        message = t('transport.webusb.noDeviceSelected');
+      }
+    }
+
+    toast({
+      title: t('transport.connectionFailed'),
+      description: message,
+      variant: 'destructive',
+    });
+    setConnectedDevices([]);
+  };
+
+  // WebUSB-specific handler that must be called directly in user gesture
+  const handleWebUsbConnect = async () => {
+    try {
+      // Check WebUSB support and request device
+      if (!navigator.usb) throw new Error(t('transport.webusb.notSupported'));
+
+      const device = await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+      if (!device) throw new Error(t('transport.webusb.noDeviceSelected'));
+
+      // Switch transport
+      setTransportPreference('webusb');
+      const result = await switchTransport('webusb');
+      if (!result.success) {
+        return toast({
+          title: t('transport.connectionFailed'),
+          description: result.payload?.error || t('transport.switchFailed'),
+          variant: 'warning',
+        });
+      }
+
+      // Notify SDK and search devices
+      const sdkInstance = await SDKUtils.getInstance();
+      sdkInstance.uiResponse({
+        type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+        payload: { deviceId: device.serialNumber ?? '' },
+      });
+
+      const searchResult = await searchDevices();
+      if (searchResult.success && searchResult.payload) {
+        const devices = searchResult.payload as DeviceInfo[];
+        setConnectedDevices(devices);
+        await handleDeviceConnection(devices);
+        toast({
+          title: t('transport.connectionSuccessful'),
+          description: t('transport.webusb.deviceConnected'),
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: t('transport.searchFailed'),
+          description: searchResult.payload?.error || t('transport.searchDeviceFailed'),
+          variant: 'warning',
+        });
+        setConnectedDevices([]);
+      }
+    } catch (error) {
+      showWebUsbError(error);
+    } finally {
+      setIsLoading(false);
+      setIsConnecting(false);
+    }
+  };
+
   const handleTransportSwitch = async (newTransport: TransportType) => {
     // 检查SDK是否已初始化
     if (!sdkInitState.isInitialized) {
@@ -155,47 +230,13 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     setIsConnecting(true);
 
     try {
-      // 对于WebUSB，必须在用户手势上下文中立即调用requestDevice
+      // Special handling for WebUSB - must call requestDevice directly in user gesture
       if (newTransport === 'webusb') {
-        // 保存用户选择到持久化存储
-        setTransportPreference(newTransport);
-
-        // 获取SDK实例（应该已经初始化，所以这个调用应该是同步的）
-        const sdkInstance = await SDKUtils.getInstance();
-        await sdkInstance.switchTransport('webusb');
-        // 立即请求WebUSB设备权限，不要在此之前进行任何可能破坏用户手势上下文的异步操作
-        const promptResponse = await sdkInstance.promptWebDeviceAccess();
-
-        if (promptResponse.success && promptResponse.payload?.device) {
-          const devices = [promptResponse.payload.device] as DeviceInfo[];
-          setConnectedDevices(devices);
-
-          // 自动连接设备
-          await handleDeviceConnection(devices);
-
-          toast({
-            title: t('transport.connectionSuccessful'),
-            description: t('transport.webusb.deviceConnected'),
-            variant: 'default',
-          });
-        } else {
-          const errorMessage =
-            !promptResponse.success && 'error' in promptResponse.payload
-              ? promptResponse.payload.error
-              : t('transport.webusb.noDeviceSelected');
-
-          toast({
-            title: t('transport.webusb.permissionFailed'),
-            description: errorMessage,
-            variant: 'warning',
-          });
-          setConnectedDevices([]);
-        }
+        await handleWebUsbConnect();
         return;
       }
 
-      // 对于其他transport类型，使用原有逻辑
-      // 保存用户选择到持久化存储（这会自动更新UI状态）
+      // For other transport types, use the standard flow
       setTransportPreference(newTransport);
 
       // 切换传输方式

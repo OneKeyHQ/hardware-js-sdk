@@ -155,7 +155,7 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
 
       // 获取当前的transport类型
       const currentTransport = SDKUtils.transport.getCurrentTransport();
-      
+
       // 使用统一的SDK工具初始化，会根据当前transport类型自动选择合适的SDK
       const sdkInstance = await SDKUtils.getInstance();
       setupSDKEventListeners(sdkInstance);

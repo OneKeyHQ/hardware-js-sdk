@@ -543,10 +543,10 @@ export const zh = {
     },
     transport: {
       webusb: {
-        description: '推荐，直接连接',
+        description: '推荐',
         deviceConnected: 'WebUSB设备连接成功',
         noDeviceSelected: '未选择设备',
-        permissionFailed: 'WebUSB权限请求失败',
+        notSupported: '此浏览器不支持WebUSB',
       },
       jsbridge: {
         description: '稳定兼容',
