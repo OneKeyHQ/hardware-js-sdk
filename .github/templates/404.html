@@ -41,42 +41,26 @@
         return;
       }
 
-      // 根路径或其他未匹配路径，重定向到 expo-playground 首页
-      if (path === '/' || path === '') {
-        console.log('Route dispatcher: redirecting to expo-playground');
-        window.location.replace('/expo-playground' + fullUrl);
-        return;
-      }
+      // 所有其他路径都重定向到 expo-playground
+      console.log('Route dispatcher: redirecting', path, 'to expo-playground');
+      window.location.replace('/expo-playground' + fullUrl);
     })();
   </script>
 </head>
 
 <body>
-  <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
-    <h2>Hardware SDK Examples</h2>
-    <p>Choose an example to explore:</p>
-    <ul style="list-style: none; padding: 0; max-width: 400px; margin: 20px auto;">
-      <li style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
-        <a href="/expo-example/" style="color: #007bff; text-decoration: none; display: block;">
-          <strong>Expo Example</strong>
-          <br>
-          <small style="color: #666;">React Native Web with Expo SDK</small>
-        </a>
-      </li>
-      <li style="margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
-        <a href="/expo-playground/" style="color: #007bff; text-decoration: none; display: block;">
-          <strong>OneKey Developer Portal</strong>
-          <br>
-          <small style="color: #666;">Modern React with Webpack</small>
-        </a>
-      </li>
-    </ul>
-    <p style="margin-top: 30px; font-size: 14px; color: #666;">
-      Current path: <code id="current-path"></code>
+  <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 100px;">
+    <h2>OneKey Hardware SDK</h2>
+    <p>Redirecting to Developer Portal...</p>
+    <div style="margin: 30px 0;">
+      <a href="/expo-playground/"
+        style="color: #007bff; text-decoration: none; padding: 15px 30px; border: 2px solid #007bff; border-radius: 8px; display: inline-block; font-weight: bold;">
+        Go to Developer Portal
+      </a>
+    </div>
+    <p style="font-size: 14px; color: #666; margin-top: 20px;">
+      If you are not redirected automatically, click the button above.
     </p>
-    <script>
-      document.getElementById('current-path').textContent = window.location.pathname;
-    </script>
   </div>
 </body>
 
