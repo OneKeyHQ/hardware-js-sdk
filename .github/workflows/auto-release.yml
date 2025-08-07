@@ -1,0 +1,192 @@
+name: Auto Release with AI Changelog
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name to create release for (e.g., v1.2.3)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (skip actual release creation)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    outputs:
+      should_create_release: ${{ steps.check.outputs.should_create_release }}
+      version: ${{ steps.check.outputs.version }}
+      is_prerelease: ${{ steps.check.outputs.is_prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if release should be created
+        id: check
+        run: |
+          # Get tag name from event or input
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          else
+            TAG_NAME="${{ github.ref_name }}"
+          fi
+
+          # Extract version from tag (remove 'v' prefix)
+          VERSION=${TAG_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this is a prerelease version (contains -)
+          if [[ "$VERSION" =~ - ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "should_create_release=false" >> $GITHUB_OUTPUT
+            echo "🔍 Detected prerelease version: $VERSION - skipping release creation"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "should_create_release=true" >> $GITHUB_OUTPUT
+            echo "🔍 Detected stable version: $VERSION - will create release"
+          fi
+
+          # Check if release already exists
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "should_create_release=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Release $TAG_NAME already exists - skipping"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-release:
+    needs: check-release
+    if: needs.check-release.outputs.should_create_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: |
+          echo "📦 Installing project dependencies..."
+          yarn install --frozen-lockfile
+
+          echo "🤖 Installing Google GenAI SDK for changelog generation..."
+          npm install @google/genai --legacy-peer-deps
+
+          echo "✅ Dependencies installed successfully"
+
+      - name: Validate Environment
+        run: |
+          echo "🔍 Validating environment variables..."
+
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "⚠️ GEMINI_API_KEY not set - will use fallback changelog generation"
+          else
+            echo "✅ GEMINI_API_KEY is configured"
+          fi
+
+          if [ -z "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "❌ GITHUB_TOKEN is required but not set"
+            exit 1
+          else
+            echo "✅ GITHUB_TOKEN is configured"
+          fi
+
+          echo "✅ Environment validation complete"
+
+      - name: Create Complete Release
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.check-release.outputs.version }}
+          IS_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          ACTION_URL: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          echo "🚀 Starting release creation for v$VERSION"
+          echo "📋 Dry run mode: $IS_DRY_RUN"
+          echo "🔗 Action URL: $ACTION_URL"
+
+          # Use the complete release workflow
+          node -e "
+          const { ChangelogGenerator } = require('./scripts/changelog-generator.js');
+
+          async function main() {
+            try {
+              console.log('🔧 Initializing changelog generator...');
+              const generator = new ChangelogGenerator(process.env.GEMINI_API_KEY);
+
+              const options = {
+                isDryRun: process.env.IS_DRY_RUN === 'true',
+                actionUrl: process.env.ACTION_URL,
+                owner: process.env.REPO_OWNER,
+                repo: process.env.REPO_NAME
+              };
+
+              console.log('📋 Options:', JSON.stringify(options, null, 2));
+
+              const tagName = 'v' + process.env.VERSION;
+              console.log('🏷️ Creating release for tag:', tagName);
+
+              const result = await generator.createCompleteRelease(tagName, options);
+
+              if (result.success) {
+                console.log('✅ Release workflow completed successfully');
+                if (result.releaseResult && result.releaseResult.releaseUrl) {
+                  console.log(\`🔗 Release URL: \${result.releaseResult.releaseUrl}\`);
+                }
+              } else {
+                console.log(\`⏭️ Skipped: \${result.reason}\`);
+              }
+            } catch (error) {
+              console.error('❌ Release workflow failed:', error.message);
+              process.exit(1);
+            }
+          }
+
+          main();
+          "
+
+      - name: Upload Dry-run Artifacts
+        if: github.event.inputs.dry_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-dry-run-files
+          path: |
+            release-*.md
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Commit CHANGELOG.md updates
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          # Check if there are any changes to commit
+          if git diff --quiet CHANGELOG.md; then
+            echo "📋 No changes to CHANGELOG.md"
+          else
+            echo "📝 Committing CHANGELOG.md updates"
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add CHANGELOG.md
+            git commit -m "chore: update CHANGELOG.md for v${{ needs.check-release.outputs.version }} [skip ci]"
+            git push origin onekey
+            echo "✅ Committed CHANGELOG.md update"
+          fi

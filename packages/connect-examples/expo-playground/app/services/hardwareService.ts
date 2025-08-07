@@ -279,11 +279,9 @@ export async function searchDevices(): Promise<ApiResponse> {
       await sdkInstance.switchTransport('web');
     }
 
-    let response: ApiResponse;
-
     // 对于所有transport类型，使用标准的searchDevices
     // WebUSB设备授权已经在TransportSwitcher中处理
-    response = await sdkInstance.searchDevices();
+    const response = await sdkInstance.searchDevices();
 
     if (response.success && response.payload) {
       logResponse('Devices found', {
