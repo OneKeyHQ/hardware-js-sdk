@@ -34,7 +34,7 @@
     "update-protobuf": "lerna run update:protobuf --scope=@onekeyfe/hd-transport",
     "update-version": "lerna version --no-git-tag-version",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
-    "example:web": "CONNECT_SRC=https://localhost:8087 && cd ./packages/connect-examples/expo-example && yarn start",
+    "example:web": "export CONNECT_SRC=https://localhost:8087 && cd ./packages/connect-examples/expo-example && yarn start",
     "example:desktop": "cd ./packages/connect-examples/electron-example && yarn dev",
     "build:example:desktop": "cd ./packages/connect-examples/electron-example && yarn make",
     "example:v2": "cd ./packages/connect-examples/expo-playground && yarn start",
