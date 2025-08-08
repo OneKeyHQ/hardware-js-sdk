@@ -13,7 +13,7 @@ jobs:
       - name: Setup Environment
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '22'
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Install Package

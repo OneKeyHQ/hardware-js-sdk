@@ -1,4 +1,4 @@
-name: publish-npm-package
+name: Publish NPM Packages & Create Release
 
 on: workflow_dispatch
 
@@ -7,30 +7,31 @@ permissions:
   id-token: write
 
 jobs:
-  publish:
+  publish-and-release:
     runs-on: ubuntu-latest
-    environment: production
-    outputs:
-      version: ${{ steps.version-info.outputs.version }}
-      is_prerelease: ${{ steps.version-info.outputs.is_prerelease }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
           cache: 'yarn'
 
       - name: Install dependencies
         run: |
+          echo "📦 Installing dependencies..."
           yarn
           yarn bootstrap
 
-      - name: Build Target
-        run: yarn build
+      - name: Build packages
+        run: |
+          echo "🔨 Building packages..."
+          yarn build
 
       - name: Get version information
         id: version-info
@@ -53,13 +54,63 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          echo "📦 Publishing packages to NPM"
+          echo "📦 Publishing packages to NPM..."
           yarn publish-packages --yes --no-verify-access
+          echo "✅ Packages published successfully"
 
-      - name: Create Git Tag
+      - name: Check Release Strategy
         run: |
           VERSION=${{ steps.version-info.outputs.version }}
-          echo "🏷️ Creating tag: v$VERSION"
-          git tag -a "v$VERSION" -m "Release v$VERSION"
-          git push origin "v$VERSION"
-          echo "✅ Tag v$VERSION created successfully"
+          IS_PRERELEASE=${{ steps.version-info.outputs.is_prerelease }}
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "📦 Prerelease version detected: $VERSION"
+            echo "⏭️ Skipping Git tag and GitHub release creation"
+            echo "✅ Only NPM publication completed"
+          else
+            echo "🚀 Stable version detected: $VERSION"
+            echo "📋 Will create Git tag and GitHub release"
+          fi
+
+      - name: Create Git Tag
+        if: steps.version-info.outputs.is_prerelease == 'false'
+        run: |
+          VERSION=${{ steps.version-info.outputs.version }}
+          TAG_NAME="v$VERSION"
+          echo "🏷️ Creating tag: $TAG_NAME"
+
+          git config --local user.email "${{ github.actor }}@users.noreply.github.com"
+          git config --local user.name "${{ github.actor }}"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
+          echo "✅ Tag $TAG_NAME created successfully"
+
+      - name: Create GitHub Release
+        if: steps.version-info.outputs.is_prerelease == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.version-info.outputs.version }}
+          TAG_NAME="v$VERSION"
+
+          echo "🚀 Creating GitHub release for $TAG_NAME"
+
+          # Wait a moment for the tag to be available
+          sleep 5
+
+          # Check if release already exists
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "⚠️ Release $TAG_NAME already exists"
+            exit 0
+          fi
+
+          # Create stable release with auto-generated notes
+          echo "📦 Creating stable release..."
+          gh release create "$TAG_NAME" \
+            --title "Release $TAG_NAME" \
+            --generate-notes \
+            --verify-tag \
+            --latest
+
+          echo "✅ GitHub release created successfully"
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME"
