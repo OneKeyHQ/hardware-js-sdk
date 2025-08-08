@@ -86,15 +86,16 @@ module.exports = async function (env, argv) {
   );
 
   if (definePluginIndex !== -1) {
-    // 修改现有的 DefinePlugin
-    const existingPlugin = config.plugins[definePluginIndex];
-    config.plugins[definePluginIndex] = new webpack.DefinePlugin({
-      ...existingPlugin.definitions,
+    // 追加新的 DefinePlugin，避免依赖内部字段
+    const defs = {
       __COMMIT_SHA__: JSON.stringify(commitSha),
       __BUILD_TIME__: JSON.stringify(buildTime),
       'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
-      'process.env.CONNECT_SRC': JSON.stringify(connectSrc),
-    });
+    };
+    if (connectSrc !== undefined) {
+      defs['process.env.CONNECT_SRC'] = JSON.stringify(connectSrc);
+    }
+    config.plugins.push(new webpack.DefinePlugin(defs));
   } else {
     // 添加新的 DefinePlugin
     config.plugins.push(
@@ -102,7 +103,9 @@ module.exports = async function (env, argv) {
         __COMMIT_SHA__: JSON.stringify(commitSha),
         __BUILD_TIME__: JSON.stringify(buildTime),
         'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
-        'process.env.CONNECT_SRC': JSON.stringify(connectSrc),
+        ...(connectSrc !== undefined
+          ? { 'process.env.CONNECT_SRC': JSON.stringify(connectSrc) }
+          : {}),
       })
     );
   }
