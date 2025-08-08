@@ -6,22 +6,5 @@
   ],
   "npmClient": "yarn",
   "useWorkspaces": true,
-  "version": "independent",
-  "command": {
-    "publish": {
-      "conventionalCommits": true,
-      "message": "chore(release): publish packages [skip ci]",
-      "registry": "https://registry.npmjs.org"
-    },
-    "version": {
-      "allowBranch": [
-        "onekey",
-        "main",
-        "master"
-      ],
-      "conventionalCommits": true,
-      "message": "chore(release): version packages [skip ci]",
-      "push": false
-    }
-  }
+  "version": "independent"
 }
