@@ -251,6 +251,9 @@ async function initializeNoble(): Promise<void> {
         return;
       }
 
+      // Setup persistent state listener before initialization
+      setupPersistentStateListener();
+
       const timeout = setTimeout(() => {
         reject(
           ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Bluetooth initialization timeout')
@@ -289,9 +292,6 @@ async function initializeNoble(): Promise<void> {
     noble.on('discover', (peripheral: Peripheral) => {
       handleDeviceDiscovered(peripheral);
     });
-
-    // Setup persistent state listener after initialization
-    setupPersistentStateListener();
 
     logger?.info('[NobleBLE] Noble initialized successfully');
   } catch (error) {
