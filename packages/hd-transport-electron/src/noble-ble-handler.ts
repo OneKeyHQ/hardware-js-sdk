@@ -1222,6 +1222,7 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
 // Setup IPC handlers
 export function setupNobleBleHandlers(webContents: WebContents): void {
   try {
+    console.log('NOBLE_VERSION_771');
     // @ts-ignore – electron-log is only available at runtime
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     logger = require('electron-log') as Logger;
