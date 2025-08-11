@@ -24,7 +24,7 @@
     "@onekeyfe/hd-core": "^1.1.4-alpha.2",
     "@onekeyfe/hd-shared": "^1.1.4-alpha.2",
     "@onekeyfe/hd-transport-http": "^1.1.4-alpha.2",
-    "@onekeyfe/hd-transport-web-device": "^1.1.4"
+    "@onekeyfe/hd-transport-web-device": "^1.1.4-alpha.2"
   },
   "devDependencies": {
     "@babel/plugin-proposal-optional-chaining": "^7.17.12",
