@@ -251,6 +251,12 @@ export const HardwareErrorCode = {
   ForbiddenKeyPath: 416,
 
   /**
+   * Repeat unlocking
+   * all network get address by loop need repeat unlocking
+   */
+  RepeatUnlocking: 417,
+
+  /**
    * Netword request error
    */
   NetworkError: 500,
@@ -474,6 +480,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
     'Please use OneKey desktop client to update the firmware',
   [HardwareErrorCode.DeviceNotSupportMethod]: 'Device not support this method',
   [HardwareErrorCode.ForbiddenKeyPath]: 'Forbidden key path',
+  [HardwareErrorCode.RepeatUnlocking]: 'Repeat unlocking',
 
   /**
    * Network Errors

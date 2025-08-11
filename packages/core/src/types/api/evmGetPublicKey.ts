@@ -14,6 +14,7 @@ export type EVMGetPublicKeyParams = {
   path: string | number[];
   showOnOneKey?: boolean;
   chainId?: number;
+  useBatch?: boolean;
 };
 
 export declare function evmGetPublicKey(
