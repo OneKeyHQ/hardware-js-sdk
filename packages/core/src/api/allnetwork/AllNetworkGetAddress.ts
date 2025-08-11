@@ -18,7 +18,7 @@ type MethodParams = {
 };
 
 export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
-  async getAllNetworkAddress() {
+  async getAllNetworkAddress(rootFingerprint: number) {
     const responses: AllNetworkAddress[] = [];
     const resultMap: Record<string, AllNetworkAddress> = {};
     const { bundle } = this.payload as AllNetworkGetAddressParams;
@@ -51,7 +51,11 @@ export default class AllNetworkGetAddress extends AllNetworkGetAddressBase {
         throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
       }
       // call method
-      const response = await this.callMethod(methodName as keyof CoreApi, methodParams);
+      const response = await this.callMethod(
+        methodName as keyof CoreApi,
+        methodParams,
+        rootFingerprint
+      );
 
       if (this.abortController?.signal.aborted) {
         throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);

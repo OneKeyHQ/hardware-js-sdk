@@ -6,7 +6,7 @@ import {
   HardwareErrorCodeMessage,
 } from '@onekeyfe/hd-shared';
 
-import { serializedPath } from '../helpers/pathUtils';
+import { serializedPath, toHardened } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { CoreApi } from '../../types';
@@ -306,7 +306,8 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     methodName: keyof CoreApi,
     params: any & {
       bundle: (any & { _originRequestParams: CommonResponseParams })[];
-    }
+    },
+    rootFingerprint: number
   ) {
     const method: BaseMethod = findMethod({
       event: IFRAME.CALL,
@@ -329,7 +330,6 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       method.context = this.context;
 
       const onSignalAbort = () => {
-        console.log('=====>>>>> onSignalAbort');
         this.abortController?.abort(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
       };
 
@@ -361,7 +361,10 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       result = response.map((item, index) => ({
         ...params.bundle[index]._originRequestParams,
         success: true,
-        payload: item,
+        payload: {
+          ...item,
+          rootFingerprint,
+        },
       }));
     } catch (e: any) {
       const error = handleSkippableHardwareError(e, this.device, method);
@@ -386,25 +389,25 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
     return result;
   }
 
-  abstract getAllNetworkAddress(): Promise<AllNetworkAddress[]>;
+  abstract getAllNetworkAddress(rootFingerprint: number): Promise<AllNetworkAddress[]>;
 
   async run() {
-    // check passphrase state
-    const passphraseStateSafety = await this.device.checkPassphraseStateSafety(
-      this.payload.passphraseState,
-      this.payload.useEmptyPassphrase
-    );
-
-    if (!passphraseStateSafety) {
-      DevicePool.clearDeviceCache(this.payload.connectId);
-      return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError));
-    }
+    const res = await this.device.commands.typedCall('GetPublicKey', 'PublicKey', {
+      address_n: [toHardened(44), toHardened(1), toHardened(0)],
+      coin_name: 'Testnet',
+      script_type: 'SPENDADDRESS',
+      show_display: false,
+    });
 
     this.postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
 
+    if (res.message.root_fingerprint == null) {
+      throw ERRORS.TypedError(HardwareErrorCode.CallMethodInvalidParameter);
+    }
+
     this.abortController = new AbortController();
 
-    return this.getAllNetworkAddress().catch(e => {
+    return this.getAllNetworkAddress(res.message.root_fingerprint).catch(e => {
       if (e instanceof HardwareError && e.errorCode === HardwareErrorCode.RepeatUnlocking) {
         throw ERRORS.TypedError(HardwareErrorCode.RepeatUnlocking, e.message);
       }

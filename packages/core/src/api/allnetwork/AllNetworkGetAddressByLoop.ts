@@ -15,7 +15,7 @@ import AllNetworkGetAddressBase from './AllNetworkGetAddressBase';
 import { Unsuccessful } from '../../types';
 
 export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase {
-  async getAllNetworkAddress() {
+  async getAllNetworkAddress(rootFingerprint: number) {
     const { callbackId, callbackIdFinish } = this.payload as AllNetworkGetAddressParamsByLoop;
     if (!callbackId) {
       throw new Error('callbackId is required');
@@ -27,7 +27,12 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
     const bundle = this.payload.bundle || [this.payload];
 
     // process callbacks in background
-    const callbackPromise = this.processCallbacksInBackground(bundle, callbackId, callbackIdFinish);
+    const callbackPromise = this.processCallbacksInBackground(
+      bundle,
+      rootFingerprint,
+      callbackId,
+      callbackIdFinish
+    );
     this.device.pendingCallbackPromise = createDeferred(callbackPromise);
 
     // register to context for scheduling management
@@ -41,6 +46,7 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
 
   private async processCallbacksInBackground(
     bundle: any[],
+    rootFingerprint: number,
     callbackId: string,
     callbackIdFinish: string
   ): Promise<void> {
@@ -64,7 +70,11 @@ export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase
           bundle: [methodParams.params],
         };
 
-        const response = await this.callMethod(methodParams.methodName, singleMethodParams);
+        const response = await this.callMethod(
+          methodParams.methodName,
+          singleMethodParams,
+          rootFingerprint
+        );
 
         if (this.abortController?.signal.aborted) {
           throw new Error(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);

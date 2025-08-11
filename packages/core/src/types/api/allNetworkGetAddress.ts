@@ -94,7 +94,7 @@ type AllNetworkAddressPayload =
 export type AllNetworkAddress = AllNetworkAddressParams & {
   success: boolean;
   payload?:
-    | AllNetworkAddressPayload
+    | (AllNetworkAddressPayload & { rootFingerprint: number })
     | {
         error: string;
         code: number;
