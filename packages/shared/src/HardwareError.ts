@@ -12,7 +12,38 @@ type ErrorCodeUnion = ValueOf<typeof HardwareErrorCode>;
 
 function fillStringWithArguments(value: string, object: object) {
   if (typeof value !== 'string') return value;
-  return value.replace(/\{([^}]+)\}/g, (_, arg: string) => (object as unknown as any)[arg] || '?');
+  // Avoid regex with potential catastrophic backtracking by parsing manually in linear time
+  if (value.indexOf('{') === -1) return value;
+  let result = '';
+  let i = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dict = object as any;
+  while (i < value.length) {
+    const open = value.indexOf('{', i);
+    if (open === -1) {
+      result += value.slice(i);
+      break;
+    }
+    const close = value.indexOf('}', open + 1);
+    if (close === -1) {
+      // No matching closing brace; append the rest as-is
+      result += value.slice(i);
+      break;
+    }
+    // Append text before the placeholder
+    result += value.slice(i, open);
+    const key = value.slice(open + 1, close);
+    if (key.length === 0) {
+      // Keep '{}' unchanged to match original regex behavior
+      result += '{}';
+    } else {
+      const replacement = dict[key];
+      // Preserve original semantics: falsy values fallback to '?'
+      result += replacement ? String(replacement) : '?';
+    }
+    i = close + 1;
+  }
+  return result;
 }
 
 export class HardwareError extends Error {
