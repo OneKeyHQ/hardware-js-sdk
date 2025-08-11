@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@onekeyfe/hd-shared": "^1.1.4-alpha.2",
-    "@onekeyfe/hd-transport": "^1.1.2",
+    "@onekeyfe/hd-transport": "^1.1.4-alpha.2",
     "axios": "^0.27.2",
     "bignumber.js": "^9.0.2",
     "bytebuffer": "^5.0.1",

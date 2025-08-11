@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@onekeyfe/hd-shared": "^1.1.4-alpha.2",
-    "@onekeyfe/hd-transport": "^1.1.2",
+    "@onekeyfe/hd-transport": "^1.1.4-alpha.2",
     "@onekeyfe/react-native-ble-utils": "^0.1.4",
     "react-native-ble-plx": "3.5.0"
   }
