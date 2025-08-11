@@ -678,6 +678,7 @@ const ensureConnected = async (
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
+            HardwareErrorCode.SelectDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
