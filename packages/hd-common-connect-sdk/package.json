@@ -25,6 +25,6 @@
     "@onekeyfe/hd-transport-emulator": "^1.1.4-alpha.2",
     "@onekeyfe/hd-transport-http": "^1.1.4-alpha.2",
     "@onekeyfe/hd-transport-lowlevel": "^1.1.4-alpha.2",
-    "@onekeyfe/hd-transport-web-device": "^1.1.4"
+    "@onekeyfe/hd-transport-web-device": "^1.1.4-alpha.2"
   }
 }

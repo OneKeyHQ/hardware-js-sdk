@@ -21,11 +21,11 @@
   },
   "sideEffects": false,
   "peerDependencies": {
-    "@onekeyfe/hd-transport-web-device": "^1.0.39-alpha.5",
     "electron": ">=25.0.0",
     "electron-log": ">=4.0.0"
   },
   "dependencies": {
+    "@onekeyfe/hd-transport-web-device": "^1.1.4-alpha.2",
     "@onekeyfe/hd-shared": "^1.1.4-alpha.2"
   },
   "devDependencies": {
