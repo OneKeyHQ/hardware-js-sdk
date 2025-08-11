@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@onekeyfe/hd-shared": "^1.1.4-alpha.2",
-    "@onekeyfe/hd-transport": "^1.1.4-alpha.2"
+    "@onekeyfe/hd-transport": "^1.1.4-alpha.2",
+    "@onekeyfe/hd-transport-electron": "^1.1.4-alpha.2"
   },
   "devDependencies": {
     "@types/w3c-web-usb": "^1.0.6",
