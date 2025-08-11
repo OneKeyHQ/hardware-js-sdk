@@ -289,7 +289,6 @@ export const HardwareErrorCode = {
 
   /**
    * Defective firmware detected
-   * @params:{ serialNo: string?, seVersion: string?, deviceType: string? }
    */
   DefectiveFirmware: 418,
 
