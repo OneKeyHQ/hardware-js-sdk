@@ -873,6 +873,17 @@ export const zh = {
         installingFirmware: '安装固件',
         installingFirmwareDesc: '正在安装固件，请勿断开设备...',
       },
+      webusb: {
+        authorize: {
+          title: '授权 WebUSB',
+          description:
+            '您的设备已切换到引导模式（bootloader）以应用更新。Chrome 将其视为新的 USB 设备。请授权以继续固件更新。',
+          tip: '请确保设备已连接。如果未弹出选择器，尝试更换 USB 接口或重新连接数据线。',
+          selectButton: '选择设备',
+          selecting: '正在选择...',
+          troubleshooting: '如果关闭此弹窗或取消选择，更新将暂停。准备好后可再次打开此弹窗继续。',
+        },
+      },
     },
   },
 };

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { UI_RESPONSE, Success, Unsuccessful, CoreApi } from '@onekeyfe/hd-core';
 import { logError, logRequest, logResponse, logInfo } from '../utils/logger';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 import {
   getCurrentSDKInstance,
   clearSDKInstanceCache,
@@ -279,8 +280,30 @@ export async function searchDevices(): Promise<ApiResponse> {
       await sdkInstance.switchTransport('web');
     }
 
+    // For WebUSB, ensure device is authorized in the browser before searching
+    if (currentTransport === 'webusb') {
+      try {
+        if (!navigator?.usb) {
+          throw new Error('WebUSB not supported by this browser');
+        }
+        const authorized = (await navigator.usb.getDevices?.()) ?? [];
+        if (!authorized.length) {
+          logInfo('No authorized WebUSB devices yet. Prompting user for device access...');
+          await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+        }
+      } catch (e) {
+        const msg = `WebUSB authorization cancelled or failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`;
+        logError(msg);
+        return {
+          success: false,
+          payload: { error: msg },
+        } as Unsuccessful;
+      }
+    }
+
     // 对于所有transport类型，使用标准的searchDevices
-    // WebUSB设备授权已经在TransportSwitcher中处理
     const response = await sdkInstance.searchDevices();
 
     if (response.success && response.payload) {
