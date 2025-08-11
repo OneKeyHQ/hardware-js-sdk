@@ -58,7 +58,7 @@ import { getSynchronize } from '../utils/getSynchronize';
 
 const Log = getLogger(LoggerNames.Core);
 
-type CoreContext = ReturnType<Core['getCoreContext']>;
+export type CoreContext = ReturnType<Core['getCoreContext']>;
 
 function hasDeriveCardano(method: BaseMethod): boolean {
   if (
@@ -201,6 +201,11 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
+  // wait for previous callback tasks to complete (ensure device does not call concurrently)
+  if (method.connectId) {
+    await context.waitForCallbackTasks(method.connectId);
+  }
+
   await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
   const task = requestQueue.createTask(method);
@@ -231,6 +236,7 @@ const onCallDevice = async (
 
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
+  method.context = context;
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
@@ -246,6 +252,10 @@ const onCallDevice = async (
   );
 
   try {
+    if (method.connectId) {
+      await context.waitForCallbackTasks(method.connectId);
+    }
+
     await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
@@ -726,6 +736,7 @@ const ensureConnected = async (
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
+            HardwareErrorCode.SelectDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
@@ -768,6 +779,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       // }
       // setPrePendingCallPromise(device?.interruptionFromUser());
       // requestQueue.abortRequestsByConnectId(connectId);
+
+      // cancel callback tasks
+      requestQueue.cancelCallbackTasks(connectId);
+
       const requestIds = requestQueue.getRequestTasksId();
       Log.debug(
         `Cancel Api connect requestQueues: length:${requestIds.length} requestIds:${requestIds.join(
@@ -901,7 +916,7 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
   callback(null, uiResp.payload);
 };
 
-const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
+export const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
   postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
 
   if (request.code === 'ButtonRequest_PinEntry' || request.code === 'ButtonRequest_AttachPin') {
@@ -1005,7 +1020,7 @@ const removeUiPromise = (promise: Deferred<any>) => {
 export default class Core extends EventEmitter {
   private requestQueue = new RequestQueue();
 
-  // 上一个请求的 promise 完成，后续需要清理的工作，需要在下一次请求前完成
+  // background task
   private prePendingCallPromise: Promise<void> | undefined;
 
   private methodSynchronize = getSynchronize();
@@ -1018,6 +1033,13 @@ export default class Core extends EventEmitter {
       setPrePendingCallPromise: (promise: Promise<void> | undefined) => {
         this.prePendingCallPromise = promise;
       },
+      // callback 任务管理
+      registerCallbackTask: (connectId: string, callbackPromise: Deferred<any>) => {
+        this.requestQueue.registerPendingCallbackTask(connectId, callbackPromise);
+      },
+      waitForCallbackTasks: (connectId: string) =>
+        this.requestQueue.waitForPendingCallbackTasks(connectId),
+      cancelCallbackTasks: (connectId: string) => this.requestQueue.cancelCallbackTasks(connectId),
     };
   }
 
@@ -1066,6 +1088,11 @@ export default class Core extends EventEmitter {
       case IFRAME.CANCEL: {
         Log.log('cancel API: ', message);
         cancel(this.getCoreContext(), message.payload.connectId);
+        break;
+      }
+      case IFRAME.CALLBACK: {
+        Log.log('callback message: ', message);
+        postMessage(message);
         break;
       }
       default:

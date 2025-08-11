@@ -41,11 +41,23 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
 
       let requestParams;
       try {
+        const rawParams = await onAcquireParams();
         requestParams = {
           ...commonParams,
           retryCount: 1,
-          ...(await onAcquireParams()),
+          ...rawParams,
         };
+
+        if (method === 'allNetworkGetAddressByLoop') {
+          // @ts-expect-error
+          requestParams.onLoopItemResponse = (data: any, error: any) => {
+            onExecute(JSON.stringify({ data, error }, null, 2));
+          };
+          // @ts-expect-error
+          requestParams.onAllItemsResponse = (data: any) => {
+            onExecute(JSON.stringify(data, null, 2));
+          };
+        }
       } catch (error) {
         requestParams = {
           ...commonParams,

@@ -21,6 +21,7 @@ import HardwareSdk, {
   DEVICE,
   UI_REQUEST,
   whitelist,
+  executeCallback,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
@@ -71,6 +72,12 @@ const handleMessage = async (message: CoreMessage) => {
         eventEmitter.emit(message.type, message.payload);
       }
       break;
+
+    case IFRAME.CALLBACK: {
+      const { callbackId, data, error } = message.payload;
+      executeCallback(callbackId, data, error);
+      break;
+    }
 
     default:
       Log.warn('No need to be captured message', message.event);

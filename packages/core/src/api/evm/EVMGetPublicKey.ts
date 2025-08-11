@@ -13,6 +13,8 @@ import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneKey[]> {
   hasBundle = false;
 
+  confirmShowOnOneKey = false;
+
   useBatch = false;
 
   init() {
@@ -20,9 +22,13 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
     this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
-    this.useBatch = this.payload?.bundle?.every(
-      (item: EVMGetPublicKeyParams) => item.showOnOneKey !== true
+
+    this.confirmShowOnOneKey = this.payload?.bundle?.some(
+      (item: EVMGetPublicKeyParams) => !!item.showOnOneKey
     );
+
+    this.useBatch = !this.confirmShowOnOneKey && this.hasBundle && this.payload.useBatch;
+
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
 
     // check payload
@@ -66,7 +72,7 @@ export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneK
   async run() {
     const responses: EVMPublicKey[] = [];
 
-    if (this.useBatch && this.hasBundle && supportBatchPublicKey(this.device?.features)) {
+    if (this.useBatch && supportBatchPublicKey(this.device?.features)) {
       try {
         const res = await batchGetPublickeys(this.device, this.params, 'secp256k1', 60, {
           includeNode: false,

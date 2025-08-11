@@ -2,7 +2,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { CosmosAddress, CosmosGetPublicKeyParams } from '../../types';
+import type { CosmosAddress, CosmosGetPublicKeyParams } from '../../types';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 
 export default class CosmosGetPublicKey extends BaseMethod<any> {

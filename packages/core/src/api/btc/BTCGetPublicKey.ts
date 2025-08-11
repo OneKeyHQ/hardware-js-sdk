@@ -1,4 +1,5 @@
 import type { GetPublicKey } from '@onekeyfe/hd-transport';
+import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getScriptType, isTaprootPath, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -121,6 +122,18 @@ export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
         });
       }
     } catch (error) {
+      if (error instanceof HardwareError) {
+        const { errorCode } = error;
+        if (
+          errorCode === HardwareErrorCode.PinCancelled ||
+          errorCode === HardwareErrorCode.ActionCancelled ||
+          errorCode === HardwareErrorCode.ResponseUnexpectTypeError ||
+          errorCode === HardwareErrorCode.PinInvalid
+        ) {
+          throw error;
+        }
+      }
+
       // clear responses
       responses = [];
 
