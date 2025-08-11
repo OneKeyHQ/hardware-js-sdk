@@ -654,48 +654,30 @@ const createNeedUpgradeFirmwareHardwareError = (
 const createNewFirmwareForceUpdateHardwareError = (
   connectId: string | undefined,
   deviceId: string | undefined,
-  versionType?: 'firmware' | 'ble' | 'both',
+  versionTypes?: ('firmware' | 'ble')[],
   currentVersions?: {
     firmware?: string;
     ble?: string;
   }
 ) => {
-  let message = 'Device firmware version is too low, please update to the latest version';
+  const types = versionTypes || [];
+  const typeMap = { firmware: 'firmware', ble: 'BLE firmware' };
+  const requiredTypes = types.filter(type => type in typeMap);
 
-  if (versionType === 'firmware') {
-    const currentFirmware = currentVersions?.firmware
-      ? ` (current: ${currentVersions.firmware})`
-      : '';
-    message = `Device firmware version is too low${currentFirmware}, please update the firmware to the latest version`;
-  } else if (versionType === 'ble') {
-    const currentBle = currentVersions?.ble ? ` (current: ${currentVersions.ble})` : '';
-    message = `Device BLE firmware version is too low${currentBle}, please update the BLE firmware to the latest version`;
-  } else if (versionType === 'both') {
-    const currentFirmware = currentVersions?.firmware
-      ? ` firmware: ${currentVersions.firmware}`
-      : '';
-    const currentBle = currentVersions?.ble ? ` BLE: ${currentVersions.ble}` : '';
-    const currentInfo =
-      currentFirmware || currentBle
-        ? ` (current -${currentFirmware}${currentFirmware && currentBle ? ',' : ''}${currentBle})`
-        : '';
-    message = `Device firmware and BLE firmware versions are too low${currentInfo}, please update both to the latest versions`;
-  } else if (currentVersions?.firmware || currentVersions?.ble) {
-    const currentFirmware = currentVersions?.firmware
-      ? ` firmware: ${currentVersions.firmware}`
-      : '';
-    const currentBle = currentVersions?.ble ? ` BLE: ${currentVersions.ble}` : '';
-    const currentInfo =
-      currentFirmware || currentBle
-        ? ` (current -${currentFirmware}${currentFirmware && currentBle ? ',' : ''}${currentBle})`
-        : '';
-    message = `Device firmware version is too low${currentInfo}, please update to the latest version`;
-  }
+  const getVersionInfo = () => {
+    const versions = [];
+    if (currentVersions?.firmware) versions.push(`firmware version: ${currentVersions.firmware}`);
+    if (currentVersions?.ble) versions.push(`BLE version: ${currentVersions.ble}`);
+    return versions.length > 0 ? ` (${versions.join(', ')})` : '';
+  };
+
+  const getTypeDescription = () => requiredTypes.map(type => typeMap[type]).join(' and ');
+  const message = `Device ${getTypeDescription()} version is too low. ${getVersionInfo()}`;
 
   return TypedError(HardwareErrorCode.NewFirmwareForceUpdate, message, {
     connectId,
     deviceId,
-    versionType,
+    versionTypes,
     currentVersions,
   });
 };

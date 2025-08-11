@@ -288,28 +288,19 @@ const onCallDevice = async (
           };
 
           // Provide more specific error message based on which version check failed
-          if (newVersionStatus === 'required' && bleVersionStatus === 'required') {
-            throw createNewFirmwareForceUpdateHardwareError(
-              method.connectId,
-              method.deviceId,
-              'both',
-              currentVersions
-            );
-          } else if (newVersionStatus === 'required') {
-            throw createNewFirmwareForceUpdateHardwareError(
-              method.connectId,
-              method.deviceId,
-              'firmware',
-              currentVersions
-            );
-          } else {
-            throw createNewFirmwareForceUpdateHardwareError(
-              method.connectId,
-              method.deviceId,
-              'ble',
-              currentVersions
-            );
+          const requiredUpdates: ('firmware' | 'ble')[] = [];
+          if (newVersionStatus === 'required') {
+            requiredUpdates.push('firmware');
           }
+          if (bleVersionStatus === 'required') {
+            requiredUpdates.push('ble');
+          }
+          throw createNewFirmwareForceUpdateHardwareError(
+            method.connectId,
+            method.deviceId,
+            requiredUpdates,
+            currentVersions
+          );
         }
 
         if (versionRange) {
