@@ -34,7 +34,7 @@
     "update-protobuf": "lerna run update:protobuf --scope=@onekeyfe/hd-transport",
     "update-version": "lerna version --no-git-tag-version",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
-    "example:web": "CONNECT_SRC=https://localhost:8087 && cd ./packages/connect-examples/expo-example && yarn start",
+    "example:web": "cd ./packages/connect-examples/expo-example && cross-env CONNECT_SRC=https://localhost:8087 yarn start",
     "example:desktop": "cd ./packages/connect-examples/electron-example && yarn dev",
     "build:example:desktop": "cd ./packages/connect-examples/electron-example && yarn make",
     "example:v2": "cd ./packages/connect-examples/expo-playground && yarn start",
@@ -59,7 +59,7 @@
     "**/node-gyp": "10.0.1",
     "cross-spawn": "7.0.5",
     "brace-expansion": "^2.0.2",
-    "parse-url": "^6.0.3"
+    "parse-url": "8.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",

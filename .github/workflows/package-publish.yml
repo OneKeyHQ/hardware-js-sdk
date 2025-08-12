@@ -1,25 +1,87 @@
-name: publish-npm-package
+name: publish-npm-packages
 
 on: workflow_dispatch
 
+permissions:
+  contents: write
+  id-token: write
+
 jobs:
-  package-publish:
+  publish-and-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          node-version: '20.x'
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-      - name: Install Package
+
+      - name: Install dependencies
         run: |
+          echo "📦 Installing dependencies..."
           yarn
           yarn bootstrap
-      - name: Build Target
+
+      - name: Build packages
         run: |
+          echo "🔨 Building packages..."
           yarn build
-      - name: Publish
+
+      - name: Get version information
+        id: version-info
+        run: |
+          # Get version from core package (assuming independent versioning)
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "📦 Package version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this is a prerelease version (contains -)
+          if [[ "$VERSION" =~ - ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "📦 Detected prerelease version: $VERSION"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "📦 Detected stable version: $VERSION"
+          fi
+
+      - name: Publish to NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          echo "📦 Publishing packages to NPM..."
           yarn publish-packages -y --no-verify-access
+          echo "✅ Packages published successfully"
+
+      - name: Publication Summary
+        run: |
+          VERSION=${{ steps.version-info.outputs.version }}
+          IS_PRERELEASE=${{ steps.version-info.outputs.is_prerelease }}
+
+          echo "✅ NPM publication completed successfully"
+          echo "� Published version: $VERSION"
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "📦 Prerelease version published to NPM"
+            echo "⏭️ Skipping GitHub release creation for prerelease"
+          else
+            echo "🚀 Stable version published to NPM"
+            echo "🎯 Will automatically create GitHub release..."
+          fi
+
+    outputs:
+      version: ${{ steps.version-info.outputs.version }}
+      is_prerelease: ${{ steps.version-info.outputs.is_prerelease }}
+
+  create-github-release:
+    needs: publish-and-release
+    if: needs.publish-and-release.outputs.is_prerelease == 'false'
+    uses: ./.github/workflows/github-release.yml
+    with:
+      version: ${{ needs.publish-and-release.outputs.version }}
+      is_prerelease: false
+    secrets: inherit

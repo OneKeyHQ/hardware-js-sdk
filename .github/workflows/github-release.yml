@@ -1,0 +1,192 @@
+name: github-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.3). Leave empty to auto-detect from core package.'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        type: string
+      is_prerelease:
+        description: 'Whether this is a prerelease version'
+        required: true
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Get version information
+        id: version-info
+        run: |
+          # Determine version source (workflow_call vs workflow_dispatch)
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+            # Called from another workflow
+            VERSION="${{ inputs.version }}"
+            IS_PRERELEASE="${{ inputs.is_prerelease }}"
+            echo "📦 Using version from calling workflow: $VERSION"
+            echo "📦 Prerelease flag from calling workflow: $IS_PRERELEASE"
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
+            # Manual workflow_dispatch with version
+            VERSION="${{ github.event.inputs.version }}"
+            echo "📦 Using manually provided version: $VERSION"
+            # Check prerelease status
+            if [[ "$VERSION" =~ - ]] || [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          else
+            # Manual workflow_dispatch without version - auto-detect
+            VERSION=$(node -p "require('./packages/core/package.json').version")
+            echo "📦 Auto-detected version from core package: $VERSION"
+            # Check prerelease status
+            if [[ "$VERSION" =~ - ]] || [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          TAG_NAME="v$VERSION"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "📦 Will create as prerelease"
+          else
+            echo "📦 Will create as stable release"
+          fi
+
+      - name: Check if tag exists
+        id: check-tag
+        run: |
+          TAG_NAME="${{ steps.version-info.outputs.tag_name }}"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag $TAG_NAME already exists"
+          else
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Tag $TAG_NAME does not exist, will create"
+          fi
+
+      - name: Create Git Tag
+        if: steps.check-tag.outputs.tag_exists == 'false'
+        run: |
+          TAG_NAME="${{ steps.version-info.outputs.tag_name }}"
+          VERSION="${{ steps.version-info.outputs.version }}"
+
+          echo "🏷️ Creating tag: $TAG_NAME"
+
+          git config --local user.email "${{ github.actor }}@users.noreply.github.com"
+          git config --local user.name "${{ github.actor }}"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
+
+          echo "✅ Tag $TAG_NAME created successfully"
+
+      - name: Check if release exists
+        id: check-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ steps.version-info.outputs.tag_name }}"
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "release_exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Release $TAG_NAME already exists"
+          else
+            echo "release_exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Release $TAG_NAME does not exist, will create"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check-release.outputs.release_exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ steps.version-info.outputs.tag_name }}"
+          VERSION="${{ steps.version-info.outputs.version }}"
+          IS_PRERELEASE="${{ steps.version-info.outputs.is_prerelease }}"
+          IS_DRAFT="${{ github.event.inputs.draft }}"
+
+          echo "🚀 Creating GitHub release for $TAG_NAME"
+
+          # Wait a moment for the tag to be available (if just created)
+          sleep 3
+
+          # Build release command
+          RELEASE_CMD="gh release create \"$TAG_NAME\" --title \"Release $TAG_NAME\" --generate-notes --verify-tag"
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            RELEASE_CMD="$RELEASE_CMD --prerelease"
+            echo "📦 Creating prerelease..."
+          else
+            RELEASE_CMD="$RELEASE_CMD --latest"
+            echo "📦 Creating stable release..."
+          fi
+
+          if [ "$IS_DRAFT" = "true" ]; then
+            RELEASE_CMD="$RELEASE_CMD --draft"
+            echo "📝 Creating as draft..."
+          fi
+
+          # Execute the command
+          eval $RELEASE_CMD
+
+          echo "✅ GitHub release created successfully"
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME"
+
+      - name: Release Summary
+        run: |
+          TAG_NAME="${{ steps.version-info.outputs.tag_name }}"
+          VERSION="${{ steps.version-info.outputs.version }}"
+          IS_PRERELEASE="${{ steps.version-info.outputs.is_prerelease }}"
+          TAG_EXISTS="${{ steps.check-tag.outputs.tag_exists }}"
+          RELEASE_EXISTS="${{ steps.check-release.outputs.release_exists }}"
+
+          echo "📋 Release Summary:"
+          echo "   Version: $VERSION"
+          echo "   Tag: $TAG_NAME"
+          echo "   Prerelease: $IS_PRERELEASE"
+          echo "   Tag existed: $TAG_EXISTS"
+          echo "   Release existed: $RELEASE_EXISTS"
+
+          if [ "$TAG_EXISTS" = "false" ] && [ "$RELEASE_EXISTS" = "false" ]; then
+            echo "✅ Successfully created new tag and release"
+          elif [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "false" ]; then
+            echo "✅ Successfully created release for existing tag"
+          elif [ "$TAG_EXISTS" = "false" ] && [ "$RELEASE_EXISTS" = "true" ]; then
+            echo "⚠️ Created tag but release already existed"
+          else
+            echo "ℹ️ Both tag and release already existed"
+          fi

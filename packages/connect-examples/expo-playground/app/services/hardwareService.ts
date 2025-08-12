@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { UI_RESPONSE, Success, Unsuccessful, CoreApi } from '@onekeyfe/hd-core';
 import { logError, logRequest, logResponse, logInfo } from '../utils/logger';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 import {
   getCurrentSDKInstance,
   clearSDKInstanceCache,
@@ -279,60 +280,31 @@ export async function searchDevices(): Promise<ApiResponse> {
       await sdkInstance.switchTransport('web');
     }
 
-    let response: ApiResponse;
-
-    // WebUSB 使用 promptWebDeviceAccess，其他使用 searchDevices
+    // For WebUSB, ensure device is authorized in the browser before searching
     if (currentTransport === 'webusb') {
       try {
-        logInfo('Prompting WebUSB device access');
-
-        // 使用SDK的promptWebDeviceAccess方法
-        const promptResponse = await sdkInstance.promptWebDeviceAccess();
-
-        if (promptResponse.success && promptResponse.payload?.device) {
-          // 将单个设备包装成数组格式，保持与searchDevices返回格式一致
-          response = {
-            success: true,
-            payload: [promptResponse.payload.device],
-          } as Success<any>;
-          logResponse('WebUSB device selected successfully', {
-            deviceInfo: promptResponse.payload.device,
-          });
-        } else {
-          response = {
-            success: false,
-            payload: {
-              error:
-                !promptResponse.success && 'error' in promptResponse.payload
-                  ? promptResponse.payload.error
-                  : 'No device selected',
-            },
-          } as Unsuccessful;
+        if (!navigator?.usb) {
+          throw new Error('WebUSB not supported by this browser');
         }
-      } catch (webUsbError) {
-        if (
-          webUsbError instanceof Error &&
-          (webUsbError.name === 'NotFoundError' ||
-            webUsbError.message.includes('No device selected') ||
-            webUsbError.message.includes('User cancelled'))
-        ) {
-          const error = '用户取消选择设备';
-          logInfo('User canceled device selection');
-          return {
-            success: false,
-            payload: { error },
-          } as Unsuccessful;
+        const authorized = (await navigator.usb.getDevices?.()) ?? [];
+        if (!authorized.length) {
+          logInfo('No authorized WebUSB devices yet. Prompting user for device access...');
+          await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
         }
-        logError('WebUSB device access failed', { webUsbError });
+      } catch (e) {
+        const msg = `WebUSB authorization cancelled or failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`;
+        logError(msg);
         return {
           success: false,
-          payload: { error: `WebUSB access failed: ${webUsbError}` },
+          payload: { error: msg },
         } as Unsuccessful;
       }
-    } else {
-      // 对于其他transport类型，使用标准的searchDevices
-      response = await sdkInstance.searchDevices();
     }
+
+    // 对于所有transport类型，使用标准的searchDevices
+    const response = await sdkInstance.searchDevices();
 
     if (response.success && response.payload) {
       logResponse('Devices found', {

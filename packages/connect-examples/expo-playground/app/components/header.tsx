@@ -81,7 +81,7 @@ export function SiteHeader() {
             {/* 外部链接 */}
             <Button variant="ghost" size="sm" asChild>
               <a
-                href="https://help.onekey.so/hc"
+                href="https://developer.onekey.so/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="gap-2"

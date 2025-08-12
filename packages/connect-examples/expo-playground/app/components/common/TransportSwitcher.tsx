@@ -9,7 +9,9 @@ import { switchTransport, searchDevices } from '../../services/hardwareService';
 import type { TransportType } from '../../utils/hardwareInstance';
 import { DeviceInfo } from '../../types/hardware';
 import { Button } from '../ui/Button';
-import { Monitor, Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
+import { Signal, ExternalLink, Info, Usb, Server } from 'lucide-react';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+import { UI_RESPONSE } from '@onekeyfe/hd-core';
 
 interface TransportSwitcherProps {
   className?: string;
@@ -69,13 +71,13 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
       icon: <Usb className="h-4 w-4" />,
       description: t('transport.webusb.description'),
     },
-    {
-      type: 'jsbridge',
-      label: 'JSBridge',
-      icon: <Monitor className="h-4 w-4" />,
-      description: t('transport.jsbridge.description'),
-      needsBridge: true,
-    },
+    // {
+    //   type: 'jsbridge',
+    //   label: 'JSBridge',
+    //   icon: <Monitor className="h-4 w-4" />,
+    //   description: t('transport.jsbridge.description'),
+    //   needsBridge: true,
+    // },
     {
       type: 'emulator',
       label: t('common.emulator'),
@@ -106,7 +108,7 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
         const featuresResult = await sdk.getFeatures(targetDevice.connectId);
         if (featuresResult.success && featuresResult.payload) {
           setDeviceFeatures(featuresResult.payload);
-          
+
           // 获取OneKey特定的features
           const onekeyFeaturesResult = await sdk.getOnekeyFeatures(targetDevice.connectId);
           if (onekeyFeaturesResult.success && onekeyFeaturesResult.payload) {
@@ -136,6 +138,79 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     }
   };
 
+  // Simple WebUSB error handling
+  const showWebUsbError = (error: unknown) => {
+    let message = t('transport.connectionFailed');
+
+    if (error instanceof Error) {
+      if (error.message.includes('not supported')) {
+        message = t('transport.webusb.notSupported');
+      } else if (error.name === 'NotFoundError' || error.message.includes('No device selected')) {
+        message = t('transport.webusb.noDeviceSelected');
+      }
+    }
+
+    toast({
+      title: t('transport.connectionFailed'),
+      description: message,
+      variant: 'destructive',
+    });
+    setConnectedDevices([]);
+  };
+
+  // WebUSB-specific handler that must be called directly in user gesture
+  const handleWebUsbConnect = async () => {
+    try {
+      // Check WebUSB support and request device
+      if (!navigator.usb) throw new Error(t('transport.webusb.notSupported'));
+
+      const device = await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+      if (!device) throw new Error(t('transport.webusb.noDeviceSelected'));
+
+      // Switch transport
+      setTransportPreference('webusb');
+      const result = await switchTransport('webusb');
+      if (!result.success) {
+        return toast({
+          title: t('transport.connectionFailed'),
+          description: result.payload?.error || t('transport.switchFailed'),
+          variant: 'warning',
+        });
+      }
+
+      // Notify SDK and search devices
+      const sdkInstance = await SDKUtils.getInstance();
+      sdkInstance.uiResponse({
+        type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+        payload: { deviceId: device.serialNumber ?? '' },
+      });
+
+      const searchResult = await searchDevices();
+      if (searchResult.success && searchResult.payload) {
+        const devices = searchResult.payload as DeviceInfo[];
+        setConnectedDevices(devices);
+        await handleDeviceConnection(devices);
+        toast({
+          title: t('transport.connectionSuccessful'),
+          description: t('transport.webusb.deviceConnected'),
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: t('transport.searchFailed'),
+          description: searchResult.payload?.error || t('transport.searchDeviceFailed'),
+          variant: 'warning',
+        });
+        setConnectedDevices([]);
+      }
+    } catch (error) {
+      showWebUsbError(error);
+    } finally {
+      setIsLoading(false);
+      setIsConnecting(false);
+    }
+  };
+
   const handleTransportSwitch = async (newTransport: TransportType) => {
     // 检查SDK是否已初始化
     if (!sdkInitState.isInitialized) {
@@ -155,50 +230,13 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
     setIsConnecting(true);
 
     try {
-      // 对于WebUSB，直接在用户点击时请求权限，避免异步调用链导致用户手势上下文丢失
+      // Special handling for WebUSB - must call requestDevice directly in user gesture
       if (newTransport === 'webusb') {
-        // 保存用户选择到持久化存储
-        setTransportPreference(newTransport);
-
-        // 直接调用SDK的promptWebDeviceAccess，在用户手势上下文中执行
-        const sdkInstance = await SDKUtils.getInstance();
-        
-        // 先切换到webusb模式
-        await sdkInstance.switchTransport('webusb');
-        
-        // 直接请求WebUSB设备权限
-        const promptResponse = await sdkInstance.promptWebDeviceAccess();
-
-        if (promptResponse.success && promptResponse.payload?.device) {
-          const devices = [promptResponse.payload.device] as DeviceInfo[];
-          setConnectedDevices(devices);
-
-          // 自动连接设备
-          await handleDeviceConnection(devices);
-
-          toast({
-            title: t('transport.connectionSuccessful'),
-            description: t('transport.webusb.deviceConnected'),
-            variant: 'default',
-          });
-        } else {
-          const errorMessage = 
-            !promptResponse.success && 'error' in promptResponse.payload
-              ? promptResponse.payload.error
-              : t('transport.webusb.noDeviceSelected');
-          
-          toast({
-            title: t('transport.webusb.permissionFailed'),
-            description: errorMessage,
-            variant: 'warning',
-          });
-          setConnectedDevices([]);
-        }
+        await handleWebUsbConnect();
         return;
       }
 
-      // 对于其他transport类型，使用原有逻辑
-      // 保存用户选择到持久化存储（这会自动更新UI状态）
+      // For other transport types, use the standard flow
       setTransportPreference(newTransport);
 
       // 切换传输方式
@@ -279,15 +317,15 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
               disabled={option.disabled || isLoading || !sdkInitState.isInitialized}
               variant="outline"
               size="sm"
-              className={`w-full h-14 flex items-center justify-between px-5 py-4 transition-all duration-200 ${
+              className={`w-full min-h-12 sm:min-h-14 flex items-center justify-between px-3 sm:px-4 lg:px-5 py-2 sm:py-3 lg:py-4 transition-all duration-200 ${
                 transportType === option.type
                   ? 'bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 shadow-md ring-1 ring-blue-200 dark:ring-blue-800'
                   : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               } ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4 flex-1 min-w-0 overflow-hidden">
                 <div
-                  className={`${
+                  className={`flex-shrink-0 ${
                     transportType === option.type
                       ? 'text-blue-600 dark:text-blue-400'
                       : 'text-gray-600 dark:text-gray-400'
@@ -295,23 +333,45 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
                 >
                   {option.icon}
                 </div>
-                <div className="text-left">
-                  <div className="text-sm font-medium">{option.label}</div>
+                <div className="text-left flex-1 min-w-0 overflow-hidden">
+                  <div
+                    className="text-xs sm:text-sm font-medium"
+                    title={option.label}
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {option.label}
+                  </div>
                   {option.description && (
                     <div
-                      className={`text-xs ${
+                      className={`text-xs leading-tight mt-0.5 ${
                         transportType === option.type
                           ? 'text-blue-600 dark:text-blue-400'
                           : 'text-gray-500 dark:text-gray-400'
                       }`}
                     >
-                      {option.description}
+                      <div
+                        title={option.description}
+                        className="description-text"
+                        style={{
+                          overflow: 'hidden',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical' as const,
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {option.description}
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
               {option.disabled && (
-                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0 ml-1 sm:ml-2">
                   {t('transport.comingSoon')}
                 </span>
               )}
