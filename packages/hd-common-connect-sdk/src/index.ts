@@ -21,6 +21,7 @@ import HardwareSdk, {
   LowLevelCoreApi,
   createUiMessage,
   UI_REQUEST,
+  executeCallback,
 } from '@onekeyfe/hd-core';
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
@@ -92,6 +93,11 @@ function handleMessage(message: CoreMessage) {
         eventEmitter.emit(message.type, message.payload);
       }
       break;
+    case IFRAME.CALLBACK: {
+      const { callbackId, data, error } = message.payload;
+      executeCallback(callbackId, data, error);
+      break;
+    }
     default:
       Log.log('No need to be captured message', message.event);
   }

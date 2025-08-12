@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CoreApi, UiEvent, UI_REQUEST } from '@onekeyfe/hd-core';
+import { CoreApi, UiEvent, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useHardwareStore } from '../../store/hardwareStore';
 
 import { submitPin, submitPassphrase } from '../../services/hardwareService';
 import { EDeviceType } from '@onekeyfe/hd-shared';
 import GlobalDialogManager from '../global/GlobalDialogManager';
+import WebUsbAuthorizeDialog from '../global/WebUsbAuthorizeDialog';
 import { logData, logInfo, logError } from '../../utils/logger';
 import { SDKUtils } from '../../utils/hardwareInstance';
 import { create } from 'zustand';
@@ -51,6 +52,8 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
   const { t } = useTranslation();
   const { setDeviceAction, clearDeviceAction, updateSdkInitState } = useDeviceStore();
   const initializationRef = useRef<boolean>(false);
+  const [webUsbModalOpen, setWebUsbModalOpen] = React.useState(false);
+  const lastSdkRef = useRef<CoreApi | null>(null);
 
   const setupSDKEventListeners = useCallback(
     (sdkInstance: CoreApi) => {
@@ -102,6 +105,12 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
           case 'ui-close_window':
             window.globalDialogManager?.closeAllDialogs();
             break;
+
+          case UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: {
+            // Open modal; actual requestDevice() will be called in button onClick handler to satisfy user gesture
+            setWebUsbModalOpen(true);
+            break;
+          }
 
           case 'ui-firmware-progress':
             if (message.payload && typeof message.payload === 'object') {
@@ -155,9 +164,10 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
 
       // 获取当前的transport类型
       const currentTransport = SDKUtils.transport.getCurrentTransport();
-      
+
       // 使用统一的SDK工具初始化，会根据当前transport类型自动选择合适的SDK
       const sdkInstance = await SDKUtils.getInstance();
+      lastSdkRef.current = sdkInstance;
       setupSDKEventListeners(sdkInstance);
 
       updateSdkInitState({
@@ -200,6 +210,25 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
     <>
       {children}
       <GlobalDialogManager />
+      <WebUsbAuthorizeDialog
+        open={webUsbModalOpen}
+        onOpenChange={setWebUsbModalOpen}
+        onSuccess={device => {
+          logInfo('WebUSB device selected for bootloader (modal)', {
+            serialNumber: device?.serialNumber ?? '',
+            vendorId: device?.vendorId,
+            productId: device?.productId,
+          });
+          lastSdkRef.current?.uiResponse({
+            type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+            payload: { deviceId: device?.serialNumber ?? '' },
+          });
+        }}
+        onCancel={() => {
+          logError('WebUSB bootloader authorization cancelled by user');
+          lastSdkRef.current?.cancel();
+        }}
+      />
     </>
   );
 };

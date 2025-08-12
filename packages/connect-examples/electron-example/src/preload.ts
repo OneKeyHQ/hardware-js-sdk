@@ -46,6 +46,8 @@ ipcRenderer.on(ipcMessageKeys.INJECT_ONEKEY_DESKTOP_GLOBALS, (_, globals) => {
   try {
     contextBridge.exposeInMainWorld('ONEKEY_DESKTOP_GLOBALS', globals);
   } catch (error) {
+    // @ts-expect-error
+    window.ONEKEY_DESKTOP_GLOBALS = globals;
     // Fallback for development or when contextBridge is not available
     console.warn('Failed to expose ONEKEY_DESKTOP_GLOBALS via contextBridge:', error);
   }

@@ -556,10 +556,10 @@ export const en = {
     },
     transport: {
       webusb: {
-        description: 'Recommended, direct connection',
+        description: 'Recommended',
         deviceConnected: 'WebUSB device connected successfully',
         noDeviceSelected: 'No device selected',
-        permissionFailed: 'WebUSB permission failed',
+        notSupported: 'WebUSB is not supported in this browser',
       },
       jsbridge: {
         description: 'Stable compatibility',
@@ -568,7 +568,7 @@ export const en = {
         description: 'Development testing',
       },
       webble: {
-        description: 'Bluetooth connection',
+        description: 'Bluetooth',
       },
       comingSoon: 'Coming soon',
       sdkNotReady: 'SDK not ready',
@@ -894,6 +894,18 @@ export const en = {
         transferringDataDesc: 'Transferring firmware data to device...',
         installingFirmware: 'Installing Firmware',
         installingFirmwareDesc: 'Installing firmware, please do not disconnect device...',
+      },
+      webusb: {
+        authorize: {
+          title: 'Authorize WebUSB',
+          description:
+            'Your device switched to bootloader mode to apply the update. Chrome treats this as a new USB device. Please authorize it to continue the firmware update.',
+          tip: 'Ensure your device is connected. If the chooser doesn’t appear, try a different USB port or reconnect the cable.',
+          selectButton: 'Select Device',
+          selecting: 'Selecting...',
+          troubleshooting:
+            'If you close this dialog or dismiss the chooser, the update will pause. Reopen this dialog to continue when ready.',
+        },
       },
     },
   },

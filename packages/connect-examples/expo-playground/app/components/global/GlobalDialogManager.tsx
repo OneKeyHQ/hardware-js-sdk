@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import PinDialog from "./PinDialog";
-import PassphraseDialog from "./PassphraseDialog";
+import React, { useState } from 'react';
+import PinDialog from './PinDialog';
+import PassphraseDialog from './PassphraseDialog';
 
 // 声明全局弹窗管理器类型
 declare global {
@@ -19,12 +19,12 @@ const GlobalDialogManager: React.FC = () => {
   const [passphraseDialogOpen, setPassphraseDialogOpen] = useState(false);
 
   const handlePinClose = () => {
-    console.log("[GlobalDialogManager] 🚪 关闭PIN弹窗");
+    console.log('[GlobalDialogManager] 🚪 关闭PIN弹窗');
     setPinDialogOpen(false);
   };
 
   const handlePassphraseClose = () => {
-    console.log("[GlobalDialogManager] 🚪 关闭Passphrase弹窗");
+    console.log('[GlobalDialogManager] 🚪 关闭Passphrase弹窗');
     setPassphraseDialogOpen(false);
   };
 
@@ -33,15 +33,15 @@ const GlobalDialogManager: React.FC = () => {
     // 将弹窗控制方法挂载到window对象，供SDKProvider调用
     window.globalDialogManager = {
       showPinDialog: () => {
-        console.log("[GlobalDialogManager] 📱 显示PIN输入弹窗");
+        console.log('[GlobalDialogManager] 📱 显示PIN输入弹窗');
         setPinDialogOpen(true);
       },
       showPassphraseDialog: () => {
-        console.log("[GlobalDialogManager] 📱 显示passPhrase弹窗");
+        console.log('[GlobalDialogManager] 📱 显示passPhrase弹窗');
         setPassphraseDialogOpen(true);
       },
       closeAllDialogs: () => {
-        console.log("[GlobalDialogManager] 🚪 关闭所有弹窗");
+        console.log('[GlobalDialogManager] 🚪 关闭所有弹窗');
         setPinDialogOpen(false);
         setPassphraseDialogOpen(false);
       },
@@ -56,10 +56,7 @@ const GlobalDialogManager: React.FC = () => {
   return (
     <>
       <PinDialog isOpen={pinDialogOpen} onClose={handlePinClose} />
-      <PassphraseDialog
-        isOpen={passphraseDialogOpen}
-        onClose={handlePassphraseClose}
-      />
+      <PassphraseDialog isOpen={passphraseDialogOpen} onClose={handlePassphraseClose} />
     </>
   );
 };

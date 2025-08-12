@@ -14,6 +14,7 @@ import { Check } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { Features } from '@onekeyfe/hd-transport';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
@@ -113,22 +114,23 @@ function DeviceListFC(
     selectDevice(undefined);
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));
 
-    let response;
+    // Use unified searchDevices approach for all transport types
+    // WebUSB authorization is now handled internally by the SDK
     if (connectionType === 'webusb') {
-      const promptResponse = await sdk.promptWebDeviceAccess();
-      response = promptResponse.success
-        ? { payload: [promptResponse.payload.device] }
-        : { payload: [] };
-    } else {
-      response = await sdk.searchDevices();
+      try {
+        await window?.navigator?.usb?.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+      } catch (error) {
+        console.warn('WebUSB request device failed:', error);
+      }
     }
+    const response = await sdk.searchDevices();
     const foundDevices = (response.payload as unknown as Device[]) ?? [];
     setDeviceActions({ type: 'setList', payload: foundDevices });
     if (Platform.OS === 'web' && foundDevices?.length) {
       const device = foundDevices[0];
       selectDevice(device);
     }
-  }, [intl, sdk, selectDevice, connectionType, setDeviceActions]);
+  }, [intl, sdk, selectDevice, setDeviceActions, connectionType]);
 
   const deviceCancel = useCallback(() => {
     if (!sdk) return alert(intl.formatMessage({ id: 'tip__sdk_not_ready' }));

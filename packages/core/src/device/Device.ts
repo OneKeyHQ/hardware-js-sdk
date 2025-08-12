@@ -1,4 +1,5 @@
 import EventEmitter from 'events';
+import semver from 'semver';
 import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
@@ -16,6 +17,7 @@ import {
   getDeviceType,
   getDeviceUUID,
   getLogger,
+  getMethodVersionRange,
   LoggerNames,
 } from '../utils';
 import {
@@ -28,6 +30,7 @@ import type DeviceConnector from './DeviceConnector';
 import { DeviceCommands, PassphrasePromptResponse } from './DeviceCommands';
 
 import {
+  type DeviceFirmwareRange,
   EOneKeyDeviceMode,
   type Device as DeviceTyped,
   type Features,
@@ -43,6 +46,7 @@ import {
 import { PROTO } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
+import { toHardened } from '../api/helpers/pathUtils';
 
 export type InitOptions = {
   initSession?: boolean;
@@ -150,6 +154,8 @@ export class Device extends EventEmitter {
   keepSession = false;
 
   passphraseState: string | undefined = undefined;
+
+  pendingCallbackPromise?: Deferred<void>;
 
   constructor(descriptor: DeviceDescriptor) {
     super();
@@ -264,6 +270,18 @@ export class Device extends EventEmitter {
       (this.isUsedHere() && !this.keepSession && this.mainId) ||
       (this.mainId && DataManager.isBleConnect(env))
     ) {
+      // wait for callback tasks to complete before releasing device
+      if (this.pendingCallbackPromise) {
+        try {
+          Log.debug(
+            'Waiting for callback tasks to complete before releasing device (in release method)'
+          );
+          await this.pendingCallbackPromise.promise;
+        } catch (error) {
+          Log.error('Error waiting for callback tasks in release method:', error);
+        }
+      }
+
       if (this.commands) {
         this.commands.dispose(false);
         if (this.commands.callPromise) {
@@ -730,6 +748,54 @@ export class Device extends EventEmitter {
   async lockDevice() {
     const res = await this.commands.typedCall('LockDevice', 'Success', {});
     return res.message;
+  }
+
+  supportUnlockVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.15.0',
+      },
+    };
+  }
+
+  async unlockDevice() {
+    const firmwareVersion = getDeviceFirmwareVersion(this.features)?.join('.');
+    const versionRange = getMethodVersionRange(
+      this.features,
+      type => this.supportUnlockVersionRange()[type]
+    );
+
+    if (versionRange && semver.gte(firmwareVersion, versionRange.min)) {
+      const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
+      if (this.features) {
+        this.features.unlocked = res.message.unlocked == null ? null : res.message.unlocked;
+        this.features.unlocked_attach_pin =
+          res.message.unlocked_attach_pin == null ? undefined : res.message.unlocked_attach_pin;
+        this.features.passphrase_protection =
+          res.message.passphrase_protection == null ? null : res.message.passphrase_protection;
+
+        return Promise.resolve(this.features);
+      }
+
+      const featuresRes = await this.commands.typedCall('GetFeatures', 'Features');
+      this._updateFeatures(featuresRes.message);
+      return Promise.resolve(featuresRes.message);
+    }
+
+    const { type } = await this.commands.typedCall('GetAddress', 'Address', {
+      address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
+      coin_name: 'Testnet',
+      script_type: 'SPENDADDRESS',
+      show_display: false,
+    });
+
+    // @ts-expect-error
+    if (type === 'CallMethodError') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'unlock device error');
+    }
+    const res = await this.commands.typedCall('GetFeatures', 'Features');
+    this._updateFeatures(res.message);
+    return Promise.resolve(res.message);
   }
 
   async checkPassphraseStateSafety(

@@ -3,17 +3,19 @@ import EventEmitter from 'events';
 import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
-  createDeprecatedHardwareError,
-  createNeedUpgradeFirmwareHardwareError,
-  createNewFirmwareForceUpdateHardwareError,
-  createNewFirmwareUnReleaseHardwareError,
   Deferred,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
+  createDeprecatedHardwareError,
+  createNeedUpgradeFirmwareHardwareError,
+  createNewFirmwareForceUpdateHardwareError,
+  createNewFirmwareUnReleaseHardwareError,
+  createDefectiveFirmwareError,
 } from '@onekeyfe/hd-shared';
 import {
   getDeviceFirmwareVersion,
+  getDeviceBLEFirmwareVersion,
   enableLog,
   getLogger,
   LoggerNames,
@@ -21,6 +23,10 @@ import {
   wait,
   getMethodVersionRange,
 } from '../utils';
+import {
+  findDefectiveBatchDevice,
+  getDefectiveDeviceInfo,
+} from '../utils/findDefectiveBatchDevice';
 import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
@@ -52,7 +58,7 @@ import { getSynchronize } from '../utils/getSynchronize';
 
 const Log = getLogger(LoggerNames.Core);
 
-type CoreContext = ReturnType<Core['getCoreContext']>;
+export type CoreContext = ReturnType<Core['getCoreContext']>;
 
 function hasDeriveCardano(method: BaseMethod): boolean {
   if (
@@ -195,6 +201,11 @@ const onCallDevice = async (
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
+  // wait for previous callback tasks to complete (ensure device does not call concurrently)
+  if (method.connectId) {
+    await context.waitForCallbackTasks(method.connectId);
+  }
+
   await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
   const task = requestQueue.createTask(method);
@@ -225,6 +236,7 @@ const onCallDevice = async (
 
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
+  method.context = context;
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
@@ -240,6 +252,10 @@ const onCallDevice = async (
   );
 
   try {
+    if (method.connectId) {
+      await context.waitForCallbackTasks(method.connectId);
+    }
+
     await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
 
     const inner = async (): Promise<void> => {
@@ -251,35 +267,87 @@ const onCallDevice = async (
 
       if (device.features) {
         await DataManager.checkAndReloadData();
+
+        // 检测故障固件设备
+        if (findDefectiveBatchDevice(device.features)) {
+          const defectiveInfo = getDefectiveDeviceInfo(device.features);
+          if (defectiveInfo) {
+            throw createDefectiveFirmwareError(
+              defectiveInfo.serialNo,
+              defectiveInfo.seVersion || 'Unknown',
+              defectiveInfo.deviceType,
+              method.connectId,
+              method.deviceId
+            );
+          }
+        }
+
         const newVersionStatus = DataManager.getFirmwareStatus(device.features);
         const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
+
+        const currentFirmwareVersion = getDeviceFirmwareVersion(device.features).join('.');
+        const currentBleVersion = getDeviceBLEFirmwareVersion(device.features).join('.');
         if (
           (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
           method.skipForceUpdateCheck === false
         ) {
-          throw createNewFirmwareForceUpdateHardwareError(method.connectId, method.deviceId);
+          // Get current version information for error reporting
+          const currentVersions = {
+            firmware: currentFirmwareVersion,
+            ble: currentBleVersion,
+          };
+
+          // Provide more specific error message based on which version check failed
+          const requiredUpdates: ('firmware' | 'ble')[] = [];
+          if (newVersionStatus === 'required') {
+            requiredUpdates.push('firmware');
+          }
+          if (bleVersionStatus === 'required') {
+            requiredUpdates.push('ble');
+          }
+          throw createNewFirmwareForceUpdateHardwareError(
+            method.connectId,
+            method.deviceId,
+            requiredUpdates,
+            currentVersions
+          );
         }
 
         if (versionRange) {
-          const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
-          if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
+          if (
+            semver.valid(versionRange.min) &&
+            semver.lt(currentFirmwareVersion, versionRange.min)
+          ) {
             if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw createNewFirmwareUnReleaseHardwareError(currentVersion, versionRange.min);
+              throw createNewFirmwareUnReleaseHardwareError(
+                currentFirmwareVersion,
+                versionRange.min,
+                method.name
+              );
             }
 
             return Promise.reject(
-              createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min)
+              createNeedUpgradeFirmwareHardwareError(
+                currentFirmwareVersion,
+                versionRange.min,
+                method.name
+              )
             );
           }
           if (
             versionRange.max &&
             semver.valid(versionRange.max) &&
-            semver.gte(currentVersion, versionRange.max)
+            semver.gte(currentFirmwareVersion, versionRange.max)
           ) {
-            return Promise.reject(createDeprecatedHardwareError(currentVersion, versionRange.max));
+            return Promise.reject(
+              createDeprecatedHardwareError(currentFirmwareVersion, versionRange.max, method.name)
+            );
           }
         } else if (method.strictCheckDeviceSupport) {
-          throw ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod);
+          throw ERRORS.TypedError(
+            HardwareErrorCode.DeviceNotSupportMethod,
+            `Method '${method.name}' is not supported by this device`
+          );
         }
       }
 
@@ -668,6 +736,7 @@ const ensureConnected = async (
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
+            HardwareErrorCode.SelectDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
@@ -710,6 +779,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       // }
       // setPrePendingCallPromise(device?.interruptionFromUser());
       // requestQueue.abortRequestsByConnectId(connectId);
+
+      // cancel callback tasks
+      requestQueue.cancelCallbackTasks(connectId);
+
       const requestIds = requestQueue.getRequestTasksId();
       Log.debug(
         `Cancel Api connect requestQueues: length:${requestIds.length} requestIds:${requestIds.join(
@@ -843,7 +916,7 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
   callback(null, uiResp.payload);
 };
 
-const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
+export const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
   postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
 
   if (request.code === 'ButtonRequest_PinEntry' || request.code === 'ButtonRequest_AttachPin') {
@@ -947,7 +1020,7 @@ const removeUiPromise = (promise: Deferred<any>) => {
 export default class Core extends EventEmitter {
   private requestQueue = new RequestQueue();
 
-  // 上一个请求的 promise 完成，后续需要清理的工作，需要在下一次请求前完成
+  // background task
   private prePendingCallPromise: Promise<void> | undefined;
 
   private methodSynchronize = getSynchronize();
@@ -960,6 +1033,13 @@ export default class Core extends EventEmitter {
       setPrePendingCallPromise: (promise: Promise<void> | undefined) => {
         this.prePendingCallPromise = promise;
       },
+      // callback 任务管理
+      registerCallbackTask: (connectId: string, callbackPromise: Deferred<any>) => {
+        this.requestQueue.registerPendingCallbackTask(connectId, callbackPromise);
+      },
+      waitForCallbackTasks: (connectId: string) =>
+        this.requestQueue.waitForPendingCallbackTasks(connectId),
+      cancelCallbackTasks: (connectId: string) => this.requestQueue.cancelCallbackTasks(connectId),
     };
   }
 
@@ -1008,6 +1088,11 @@ export default class Core extends EventEmitter {
       case IFRAME.CANCEL: {
         Log.log('cancel API: ', message);
         cancel(this.getCoreContext(), message.payload.connectId);
+        break;
+      }
+      case IFRAME.CALLBACK: {
+        Log.log('callback message: ', message);
+        postMessage(message);
         break;
       }
       default:

@@ -1,6 +1,11 @@
 import { HardwareError } from '@onekeyfe/hd-shared';
 import { Unsuccessful } from '../types/params';
-import { IFrameCallMessage, IFrameCancelMessage, IFrameSwitchTransportMessage } from './call';
+import {
+  IFrameCallMessage,
+  IFrameCancelMessage,
+  IFrameSwitchTransportMessage,
+  IFrameCallbackMessage,
+} from './call';
 import { DeviceEventMessage } from './device';
 import { IFrameEventMessage } from './iframe';
 import { UiEventMessage } from './ui-request';
@@ -18,6 +23,7 @@ export type CoreMessage = {
   | IFrameCallMessage
   | IFrameCancelMessage
   | IFrameSwitchTransportMessage
+  | IFrameCallbackMessage
   | UiResponseMessage
   | UiEventMessage
   | DeviceEventMessage
