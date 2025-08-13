@@ -1,6 +1,7 @@
+/* eslint-disable no-bitwise */
 import { PolkadotGetAddressParams } from '@onekeyfe/hd-core';
 import { hdLedger, encodeAddress } from '@polkadot/util-crypto';
-import { mnemonicToSeed, deriveKeyPairWithPath } from '../helper';
+import { deriveKeyPairWithPath } from '../helper';
 
 /**
  * 抽离的核心逻辑：从 seed 生成 Polkadot 地址
@@ -33,8 +34,7 @@ export function generatePolkadotAddressFromMnemonic(
   prefix = 0,
   passphrase = ''
 ): string {
-  // hdLedger只接受2个参数：mnemonic和path
-  const secret = hdLedger(mnemonic, path);
+  const secret = hdLedger(mnemonic, path, passphrase);
   return encodeAddress(secret.publicKey, prefix);
 }
 
@@ -53,8 +53,7 @@ export default function polkadotGetAddress(
     const pathStr = Array.isArray(path) ? path.join('/') : path;
 
     // 使用抽离的函数，先转换助记词为seed
-    const seed = mnemonicToSeed(mnemonic, passphrase);
-    const address = generatePolkadotAddressFromSeed(seed, pathStr, prefix);
+    const address = generatePolkadotAddressFromMnemonic(mnemonic, pathStr, prefix, passphrase);
 
     return {
       success: true,
