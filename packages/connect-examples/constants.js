@@ -1,5 +1,3 @@
-import { getConnectSrc } from '../../../constants';
-
 /**
  * OneKey Hardware SDK Connect Source Configuration
  *
@@ -11,4 +9,4 @@ import { getConnectSrc } from '../../../constants';
  * - "dev": "CONNECT_SRC=https://localhost:8087 webpack serve --mode=development"
  * - "start": "webpack serve --mode=development" (uses CDN)
  */
-export const CONNECT_SRC = getConnectSrc();
+export const getConnectSrc = () => process.env.CONNECT_SRC || `https://jssdk.onekey.so/1.1.3/`;

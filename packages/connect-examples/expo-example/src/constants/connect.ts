@@ -1,4 +1,4 @@
-import packageJson from '../../package.json';
+// eslint-disable-next-line import/no-relative-packages
+import { getConnectSrc } from '../../../constants';
 
-export const CONNECT_SRC =
-  process.env.CONNECT_SRC || `https://jssdk.onekey.so/${packageJson.version}/`;
+export const CONNECT_SRC = getConnectSrc();
