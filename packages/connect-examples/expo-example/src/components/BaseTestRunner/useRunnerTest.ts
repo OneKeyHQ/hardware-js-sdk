@@ -71,6 +71,17 @@ type RunnerConfig<T> = {
     payload: Unsuccessful | Success<any>;
     skipVerify?: boolean;
   }>;
+  preCheckResponse?: (
+    method: string,
+    requestParams: any,
+    item: TestCaseDataWithKey<T>,
+    itemIndex: number,
+    res: Unsuccessful | Success<any>
+  ) => Promise<{
+    error: string | undefined;
+    verifyState?: VerifyState;
+    ext?: any;
+  }>;
   processResponse: (
     response: any,
     item: TestCaseDataWithKey<T>,
@@ -95,6 +106,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     prepareRunnerTestCaseDelay,
     generateRequestParams,
     processRequest,
+    preCheckResponse,
     processResponse,
     removeHardwareListener,
     processRunnerDone,
@@ -313,7 +325,19 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
               let error: string | undefined = '';
               let ext: any;
 
-              if (!res.success && !skipVerify) {
+              if (preCheckResponse) {
+                const result = await preCheckResponse(method, requestParams, item, itemIndex, res);
+                error = result.error;
+                ext = result.ext;
+
+                if (result.verifyState) {
+                  verifyState = result.verifyState;
+                } else if (isEmpty(error)) {
+                  verifyState = 'success';
+                } else {
+                  verifyState = 'fail';
+                }
+              } else if (!res.success && !skipVerify) {
                 if (res.payload?.code === 802 || res.payload?.code === 803) {
                   verifyState = 'skip';
                 } else {
