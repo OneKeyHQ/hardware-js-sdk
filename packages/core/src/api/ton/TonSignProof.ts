@@ -8,8 +8,9 @@ import { TonSignProofParams } from '../../types';
 
 export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
   init() {
+    this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     // init params
     validateParams(this.payload, [
@@ -42,7 +43,7 @@ export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
 
   getVersionRange() {
     return {
-      pro: {
+      model_touch: {
         min: '4.10.0',
       },
       model_classic1s: {

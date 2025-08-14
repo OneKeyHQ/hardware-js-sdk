@@ -16,7 +16,7 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -65,7 +65,7 @@ export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
       const publicKeyRes = await batchGetPublickeys(this.device, this.params, 'ed25519', 784);
       for (let i = 0; i < this.params.length; i++) {
         const param = this.params[i];
-        const publicKey = publicKeyRes.message.public_keys[i];
+        const publicKey = publicKeyRes.public_keys[i];
         let address: string | undefined;
 
         if (this.shouldConfirm) {

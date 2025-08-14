@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
@@ -156,7 +156,9 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
     if (typeof result[fieldKey] === 'string') {
       const expected = stripHexPrefix(result?.[fieldKey]);
       const actual = stripHexPrefix(payload?.[fieldKey]);
-      if (fieldKey && expected !== actual) {
+      if (key.includes("m/44'/60'/") && fieldKey === 'xpub' && actual == null) {
+        // ignore evm xpub
+      } else if (fieldKey && expected !== actual) {
         error += `(${key}) ${fullPath}: actual: ${payload?.[fieldKey]}, expected: ${result[fieldKey]}\n`;
       }
     } else {
@@ -204,7 +206,7 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
   const fullOriginDataRef = useRef(passphraseTestCase);
   const originDataRef = useRef(passphraseTestCase);
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initTestCase: () => {
       const testCase = currentTestCase;
       const currentTestCases = testCase?.data?.map((item, index) => {
@@ -337,19 +339,24 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
               <Picker.Item key={`${index}`} label={testCase} value={testCase} />
             ))}
           </Picker>
-          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+          <TestRunnerOptionButtons
+            onStop={stopTest}
+            onStart={beginTest}
+            onRetryFailed={retryFailedTasks}
+          />
           <ExportReportView />
         </XStack>
       </>
     ),
     [
-      currentTestCase?.name,
-      findTestCase,
+      testDescription,
       passphrase,
+      currentTestCase?.name,
+      testCaseList,
       stopTest,
       beginTest,
-      testCaseList,
-      testDescription,
+      retryFailedTasks,
+      findTestCase,
     ]
   );
 

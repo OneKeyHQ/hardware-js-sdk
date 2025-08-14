@@ -27,7 +27,7 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
   const { sdk } = useContext(HardwareSDKContext);
   const { selectedDevice } = useDevice();
   const { commonParams } = useCommonParams();
-  const [isLoading, setIsLoading] = useState(false);
+  // const [isLoading, setIsLoading] = useState(false);
 
   const executeMethod = useCallback(async () => {
     try {
@@ -37,15 +37,27 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
       // @ts-expect-error
       const deviceId = selectedDevice?.features?.deviceId ?? '';
       const { method } = methodPayload;
-      setIsLoading(true);
+      // setIsLoading(true);
 
       let requestParams;
       try {
+        const rawParams = await onAcquireParams();
         requestParams = {
           ...commonParams,
           retryCount: 1,
-          ...(await onAcquireParams()),
+          ...rawParams,
         };
+
+        if (method === 'allNetworkGetAddressByLoop') {
+          // @ts-expect-error
+          requestParams.onLoopItemResponse = (data: any, error: any) => {
+            onExecute(JSON.stringify({ data, error }, null, 2));
+          };
+          // @ts-expect-error
+          requestParams.onAllItemsResponse = (data: any) => {
+            onExecute(JSON.stringify(data, null, 2));
+          };
+        }
       } catch (error) {
         requestParams = {
           ...commonParams,
@@ -74,12 +86,13 @@ const PlaygroundExecutor: React.FC<PlaygroundExecutorProps> = ({
       // Adjust according to your error type
       onExecute(JSON.stringify({ error: error.message }, null, 2));
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false);
     }
   }, [sdk, intl, selectedDevice, methodPayload, onExecute, commonParams, onAcquireParams]);
 
   return (
-    <Button id="try_it_out" variant="primary" onPress={executeMethod} loading={isLoading}>
+    // <Button id="try_it_out" variant="primary" onPress={executeMethod} loading={isLoading}>
+    <Button id="try_it_out" variant="primary" onPress={executeMethod}>
       {intl.formatMessage({ id: 'action__try_it' })}
     </Button>
   );

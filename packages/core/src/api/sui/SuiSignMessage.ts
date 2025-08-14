@@ -8,7 +8,7 @@ import { stripHexPrefix } from '../helpers/hexUtils';
 export default class SuiSignMessage extends BaseMethod<HardwareSuiSignMessage> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     // check payload
     validateParams(this.payload, [

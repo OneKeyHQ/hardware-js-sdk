@@ -47,7 +47,7 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
 
@@ -227,6 +227,9 @@ export default class CardanoSignTransaction extends BaseMethod<any> {
     },
     touch: {
       min: '4.10.0',
+    },
+    classic: {
+      min: '3.10.0',
     },
   });
 

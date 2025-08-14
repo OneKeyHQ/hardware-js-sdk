@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'tronGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -35,7 +35,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'tronSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',
@@ -48,7 +48,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'tronSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',
@@ -126,6 +126,45 @@ const api: PlaygroundProps[] = [
                 unfreezeBalance: 100,
                 resource: 0,
               },
+            },
+          },
+        },
+      },
+      {
+        title: 'Sign Transaction Vote',
+        value: {
+          path: "m/44'/195'/0'/0/0",
+          transaction: {
+            refBlockBytes: 'f37c',
+            refBlockHash: 'aadfb347dabb84de',
+            feeLimit: 1000000,
+            expiration: 1657770198000,
+            timestamp: 1657770139291,
+            contract: {
+              voteWitnessContract: {
+                votes: [
+                  {
+                    voteAddress: 'TXrs7yxQLNzig7J9EbKhoEiUp6kWpdWKnD',
+                    voteCount: 100,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        title: 'Sign Transaction Cancel AllUnfreeze V2',
+        value: {
+          path: "m/44'/195'/0'/0/0",
+          transaction: {
+            refBlockBytes: 'f37c',
+            refBlockHash: 'aadfb347dabb84de',
+            feeLimit: 1000000,
+            expiration: 1657770198000,
+            timestamp: 1657770139291,
+            contract: {
+              cancelAllUnfreezeV2Contract: {},
             },
           },
         },

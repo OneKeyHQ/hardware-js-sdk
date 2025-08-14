@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'cardanoGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -120,7 +120,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoGetPublicKey',
-    description: 'Get PublicKey',
+
     presupposes: [
       {
         title: 'Get PublicKey',
@@ -178,7 +178,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Sign Transaction',
@@ -206,6 +206,12 @@ const api: PlaygroundProps[] = [
               address:
                 'addr1qxfzjswzujgvn70cwpkxdal5dddtasjrljmx8upgzlaehqa2vx9039emchclmwwfmwtar32lp4x558nr8wa3f26rkn7qwne3ad',
               amount: '2613231',
+              tokenBundle: [
+                {
+                  policyId: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6',
+                  tokenAmounts: [{ assetNameBytes: '4d494e', amount: '27828472' }],
+                },
+              ],
             },
             {
               addressParameters: {
@@ -214,12 +220,6 @@ const api: PlaygroundProps[] = [
                 stakingPath: "m/1852'/1815'/0'/2/0",
               },
               amount: '1222487',
-              tokenBundle: [
-                {
-                  policyId: '29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6',
-                  tokenAmounts: [{ assetNameBytes: '4d494e', amount: '27828472' }],
-                },
-              ],
             },
           ],
           fee: '177513',
@@ -232,7 +232,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'cardanoSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Sign Message',

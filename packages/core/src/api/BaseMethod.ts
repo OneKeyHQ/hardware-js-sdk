@@ -1,3 +1,9 @@
+import semver from 'semver';
+import {
+  createNeedUpgradeFirmwareHardwareError,
+  ERRORS,
+  HardwareErrorCode,
+} from '@onekeyfe/hd-shared';
 import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
@@ -6,7 +12,8 @@ import DeviceConnector from '../device/DeviceConnector';
 import { DeviceFirmwareRange, KnownDevice } from '../types';
 import { CoreMessage, createFirmwareMessage, createUiMessage, DEVICE, FIRMWARE } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
-import { getLogger, LoggerNames } from '../utils';
+import { getDeviceFirmwareVersion, getLogger, getMethodVersionRange, LoggerNames } from '../utils';
+import type { CoreContext } from '../core';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -52,8 +59,9 @@ export abstract class BaseMethod<Params = undefined> {
 
   /**
    * 不允许的设备模式。如果当前设备模式在该数组中，则抛出异常。
+   * NOT_INITIALIZE, BOOTLOADER, SEEDLESS
    */
-  notAllowDeviceMode: string[];
+  allowDeviceMode: string[];
 
   /**
    * 依赖的设备模式
@@ -91,6 +99,8 @@ export abstract class BaseMethod<Params = undefined> {
   // @ts-expect-error: strictPropertyInitialization
   postMessage: (message: CoreMessage) => void;
 
+  context?: CoreContext;
+
   constructor(message: { id?: number; payload: any }) {
     const { payload } = message;
     this.name = payload.method;
@@ -99,7 +109,7 @@ export abstract class BaseMethod<Params = undefined> {
     this.connectId = payload.connectId || '';
     this.deviceId = payload.deviceId || '';
     this.useDevice = true;
-    this.notAllowDeviceMode = [UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
   }
 
@@ -113,7 +123,7 @@ export abstract class BaseMethod<Params = undefined> {
 
   setDevice(device: Device) {
     this.device = device;
-    this.connectId = device.originalDescriptor.path;
+    // this.connectId = device.originalDescriptor.path;
   }
 
   checkFirmwareRelease() {
@@ -146,6 +156,39 @@ export abstract class BaseMethod<Params = undefined> {
         device: this.device.toMessageObject(),
       })
     );
+  }
+
+  protected checkFeatureVersionLimit(
+    checkCondition: () => boolean,
+    getVersionRange: () => DeviceFirmwareRange,
+    options?: {
+      strictCheckDeviceSupport?: boolean;
+    }
+  ) {
+    if (!checkCondition()) {
+      return;
+    }
+
+    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
+    const versionRange = getMethodVersionRange(
+      this.device.features,
+      type => getVersionRange()[type]
+    );
+
+    if (!versionRange) {
+      if (options?.strictCheckDeviceSupport) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotSupportMethod,
+          'Device does not support this method'
+        );
+      }
+      // Equipment that does not need to be repaired
+      return;
+    }
+
+    if (semver.valid(firmwareVersion) && semver.lt(firmwareVersion, versionRange.min)) {
+      throw createNeedUpgradeFirmwareHardwareError(firmwareVersion, versionRange.min);
+    }
   }
 
   /**

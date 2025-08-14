@@ -10,7 +10,13 @@ import {
   LoggerNames,
   getLogger,
 } from '../../utils';
-import { DEVICE, CoreMessage, createUiMessage, UI_REQUEST } from '../../events';
+import {
+  DEVICE,
+  CoreMessage,
+  createUiMessage,
+  UI_REQUEST,
+  IFirmwareUpdateProgressType,
+} from '../../events';
 import { PROTO } from '../../constants';
 import type { Device } from '../../device/Device';
 import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
@@ -21,8 +27,9 @@ import { DevicePool } from '../../device/DevicePool';
 
 const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
+const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
 
-const Log = getLogger(LoggerNames.Core);
+const Log = getLogger(LoggerNames.Method);
 
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
@@ -34,12 +41,14 @@ const postConfirmationMessage = (device: Device) => {
 const postProgressMessage = (
   device: Device,
   progress: number,
+  progressType: IFirmwareUpdateProgressType,
   postMessage: (message: CoreMessage) => void
 ) => {
   postMessage(
     createUiMessage(UI_REQUEST.FIRMWARE_PROGRESS, {
       device: device.toMessageObject() as KnownDevice,
       progress,
+      progressType,
     })
   );
 };
@@ -99,11 +108,11 @@ export const uploadFirmware = async (
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
     }
     postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
-    postProgressMessage(device, 0, postMessage);
+    postProgressMessage(device, 0, 'installingFirmware', postMessage);
     const { message, type } = await typedCall('FirmwareUpload', 'Success', {
       payload,
     });
-    postProgressMessage(device, 100, postMessage);
+    postProgressMessage(device, 100, 'installingFirmware', postMessage);
 
     await waitBleInstall(updateType);
     if (type !== 'Success') {
@@ -143,7 +152,12 @@ export const uploadFirmware = async (
       const chunk = payload.slice(start, end);
 
       if (start > 0) {
-        postProgressMessage(device, Math.round((start / length) * 100), postMessage);
+        postProgressMessage(
+          device,
+          Math.round((start / length) * 100),
+          'transferData',
+          postMessage
+        );
       }
 
       response = await typedCall('FirmwareUpload', ['FirmwareRequest', 'Success'], {
@@ -155,7 +169,7 @@ export const uploadFirmware = async (
       }
     }
 
-    postProgressMessage(device, 100, postMessage);
+    postProgressMessage(device, 100, 'transferData', postMessage);
 
     await waitBleInstall(updateType);
     return response.message;
@@ -198,7 +212,7 @@ const newTouchUpdateProcess = async (
     );
     // @ts-expect-error
     offset += writeRes.message.processed_byte;
-    postProgressMessage(device, progress, postMessage);
+    postProgressMessage(device, progress, 'transferData', postMessage);
   }
 
   postConfirmationMessage(device);
@@ -210,6 +224,59 @@ const newTouchUpdateProcess = async (
     path: filePath,
     reboot_on_success: rebootOnSuccess,
   });
+
+  if (
+    response.type === 'Success' &&
+    (response as any)?.message?.message === FIRMWARE_UPDATE_CONFIRM
+  ) {
+    const timeout = 2 * 60 * 1000;
+    // eslint-disable-next-line no-constant-condition
+    // Check if timeout exceeded
+    const startTime = Date.now();
+    const isBleReconnect = DataManager.isBleConnect(env);
+    while (Date.now() - startTime < timeout) {
+      try {
+        if (isBleReconnect) {
+          try {
+            await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
+            const typedCall = device.getCommands().typedCall.bind(device.getCommands());
+            await Promise.race([
+              typedCall('Initialize', 'Features', {}),
+              new Promise((_, reject) => {
+                setTimeout(() => {
+                  reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
+                }, 3000);
+              }),
+            ]);
+          } catch (e) {
+            // ignore error because of device is not connected
+            Log.log('catch Bluetooth error when device is restarting: ', e);
+          }
+        } else {
+          const deviceDiff = await device.deviceConnector?.enumerate();
+          const devicesDescriptor = deviceDiff?.descriptors ?? [];
+          const { deviceList } = await DevicePool.getDevices(
+            devicesDescriptor,
+            device.originalDescriptor.id
+          );
+          if (deviceList.length === 1) {
+            device.updateFromCache(deviceList[0]);
+            await device.acquire();
+            device.commands.disposed = false;
+            device.getCommands().mainId = device.mainId ?? '';
+          }
+        }
+        const typedCall = device.getCommands().typedCall.bind(device.getCommands());
+        await typedCall('GetFeatures', 'Features', {});
+        DevicePool.resetState();
+        break;
+      } catch (error) {
+        console.error('Device reconnect failed: ', error);
+        Log.error('Device reconnect failed:', error);
+        await wait(1000);
+      }
+    }
+  }
   return response;
 };
 
@@ -243,7 +310,7 @@ const emmcFileWriteWithRetry = async (
           throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
         }
       }
-      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write chunk once error');
+      throw ERRORS.TypedError(HardwareErrorCode.EmmcFileWriteFirmwareError, 'transfer data error');
     }
     return writeRes;
   };
@@ -257,14 +324,20 @@ const emmcFileWriteWithRetry = async (
       Log.error(`emmcWrite error: `, error);
       retryCount--;
       if (retryCount === 0) {
-        throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'emmc file write firmware error');
+        throw ERRORS.TypedError(
+          HardwareErrorCode.EmmcFileWriteFirmwareError,
+          'transfer data error'
+        );
       }
       const env = DataManager.getSettings('env');
       if (DataManager.isBleConnect(env)) {
         await wait(3000);
         await device.deviceConnector?.acquire(device.originalDescriptor.id, null, true);
         await device.initialize();
-      } else if (error.message.indexOf(SESSION_ERROR) > -1) {
+      } else if (
+        error?.message?.indexOf(SESSION_ERROR) > -1 ||
+        error?.response?.data?.indexOf(SESSION_ERROR) > -1
+      ) {
         const deviceDiff = await device.deviceConnector?.enumerate();
         const devicesDescriptor = deviceDiff?.descriptors ?? [];
         const { deviceList } = await DevicePool.getDevices(devicesDescriptor, undefined);
@@ -278,6 +351,8 @@ const emmcFileWriteWithRetry = async (
     }
   }
 };
+
+const INIT_DATA_CHUNK_SIZE = 16 * 1024;
 
 const processResourceRequest = async (
   typedCall: TypedCall,
@@ -311,7 +386,6 @@ const processResourceRequest = async (
 };
 
 // Fixed size
-const INIT_DATA_CHUNK_SIZE = 16 * 1024;
 export const updateResource = async (
   typedCall: TypedCall,
   fileName: string,
@@ -354,10 +428,10 @@ export const updateResources = async (
     }
 
     progress += stepProgress;
-    postProgressMessage(device, Math.floor(progress), postMessage);
+    postProgressMessage(device, Math.floor(progress), 'installingFirmware', postMessage);
   }
 
-  postProgressMessage(device, 100, postMessage);
+  postProgressMessage(device, 100, 'installingFirmware', postMessage);
   postProgressTip(device, 'UpdateSysResourceSuccess', postMessage);
   return true;
 };
@@ -369,11 +443,11 @@ export const updateBootloader = async (
   source: ArrayBuffer
 ) => {
   postProgressTip(device, 'UpdateBootloader', postMessage);
-  postProgressMessage(device, Math.floor(0), postMessage);
+  postProgressMessage(device, Math.floor(0), 'installingFirmware', postMessage);
   await updateResource(typedCall, 'bootloader.bin', source, () => {
     postProcessingMessage('resource', postMessage);
   });
-  postProgressMessage(device, Math.floor(100), postMessage);
+  postProgressMessage(device, Math.floor(100), 'installingFirmware', postMessage);
   postProgressTip(device, 'UpdateBootloaderSuccess', postMessage);
   return true;
 };

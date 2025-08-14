@@ -6,11 +6,6 @@ import {
 import semver from 'semver';
 import BigNumber from 'bignumber.js';
 import { isEmpty } from 'lodash';
-import {
-  createNeedUpgradeFirmwareHardwareError,
-  ERRORS,
-  HardwareErrorCode,
-} from '@onekeyfe/hd-shared';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -25,8 +20,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   initState: string | null = null;
 
   init() {
+    this.strictCheckDeviceSupport = true;
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     // init params
     validateParams(this.payload, [
@@ -86,7 +82,7 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
 
   getVersionRange() {
     return {
-      pro: {
+      model_touch: {
         min: '4.10.0',
       },
       model_classic1s: {
@@ -99,6 +95,9 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
     return {
       pro: {
         min: '4.10.2',
+      },
+      model_classic1s: {
+        min: '3.10.0',
       },
     };
   }
@@ -126,36 +125,15 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       pro: {
         min: '4.10.1',
       },
+      model_classic1s: {
+        min: '3.10.0',
+      },
     };
-  }
-
-  private checkFirmwareVersion(
-    checkCondition: () => boolean,
-    getVersionRange: () => DeviceFirmwareRange
-  ) {
-    if (!checkCondition()) {
-      return;
-    }
-
-    const firmwareVersion = getDeviceFirmwareVersion(this.device.features)?.join('.');
-    const versionRange = getMethodVersionRange(
-      this.device.features,
-      type => getVersionRange()[type]
-    );
-
-    if (!versionRange) {
-      // Equipment that does not need to be repaired
-      return;
-    }
-
-    if (semver.valid(firmwareVersion) && semver.lt(firmwareVersion, versionRange.min)) {
-      throw createNeedUpgradeFirmwareHardwareError(firmwareVersion, versionRange.min);
-    }
   }
 
   checkFixCommentError() {
     const { comment, jettonAmount } = this.payload;
-    this.checkFirmwareVersion(
+    this.checkFeatureVersionLimit(
       () => !isEmpty(comment) && jettonAmount !== null && jettonAmount !== undefined,
       () => this.getFixCommentErrorVersionRange()
     );
@@ -166,12 +144,15 @@ export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
       pro: {
         min: '4.13.0',
       },
+      model_classic1s: {
+        min: '3.12.0',
+      },
     };
   }
 
   checkFixInitStateError() {
     const { initState, signingMessageRepr } = this.payload;
-    this.checkFirmwareVersion(
+    this.checkFeatureVersionLimit(
       () => !isEmpty(initState) && !isEmpty(signingMessageRepr),
       () => this.getFixInitStateErrorVersionRange()
     );

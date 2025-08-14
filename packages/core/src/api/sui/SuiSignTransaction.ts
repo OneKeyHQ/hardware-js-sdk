@@ -15,7 +15,7 @@ type SuiSignTx = Omit<HardwareSuiSignTx, 'data_initial_chunk' | 'data_length'> &
 export default class SuiSignTransaction extends BaseMethod<SuiSignTx> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     // check payload
     validateParams(this.payload, [

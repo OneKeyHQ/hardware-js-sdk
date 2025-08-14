@@ -15,9 +15,13 @@ export const UI_REQUEST = {
     'ui-request_select_device_in_bootloader_for_web_device',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
+  CLOSE_UI_PIN_WINDOW: 'ui-close_pin_window',
   DEVICE_PROGRESS: 'ui-device_progress',
 
   BLUETOOTH_PERMISSION: 'ui-bluetooth_permission',
+  BLUETOOTH_UNSUPPORTED: 'ui-bluetooth_unsupported',
+  BLUETOOTH_POWERED_OFF: 'ui-bluetooth_powered_off',
+
   BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
     'ui-bluetooth_characteristic_notify_change_failure',
   LOCATION_PERMISSION: 'ui-location_permission',
@@ -30,12 +34,26 @@ export const UI_REQUEST = {
   PREVIOUS_ADDRESS_RESULT: 'ui-previous_address_result',
 
   WEB_DEVICE_PROMPT_ACCESS_PERMISSION: 'ui-web_device_prompt_access_permission',
+
+  BOOTLOADER: 'ui-device_bootloader_mode',
+  NOT_IN_BOOTLOADER: 'ui-device_not_in_bootloader_mode',
+  REQUIRE_MODE: 'ui-device_require_mode',
+  NOT_INITIALIZE: 'ui-device_not_initialized',
+  SEEDLESS: 'ui-device_seedless',
+  FIRMWARE_OLD: 'ui-device_firmware_old',
+  FIRMWARE_NOT_SUPPORTED: 'ui-device_firmware_unsupported',
+  FIRMWARE_NOT_COMPATIBLE: 'ui-device_firmware_not_compatible',
+  FIRMWARE_NOT_INSTALLED: 'ui-device_firmware_not_installed',
+  NOT_USE_ONEKEY_DEVICE: 'ui-device_please_use_onekey_device',
 } as const;
 
 export interface UiRequestWithoutPayload {
   type:
     | typeof UI_REQUEST.CLOSE_UI_WINDOW
+    | typeof UI_REQUEST.CLOSE_UI_PIN_WINDOW
     | typeof UI_REQUEST.BLUETOOTH_PERMISSION
+    | typeof UI_REQUEST.BLUETOOTH_UNSUPPORTED
+    | typeof UI_REQUEST.BLUETOOTH_POWERED_OFF
     | typeof UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE
     | typeof UI_REQUEST.LOCATION_PERMISSION
     | typeof UI_REQUEST.LOCATION_SERVICE_PERMISSION
@@ -55,7 +73,7 @@ export type UiRequestDeviceAction = {
   type: typeof UI_REQUEST.REQUEST_PIN;
   payload: {
     device: Device;
-    type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry';
+    type?: PROTO.PinMatrixRequestType | 'ButtonRequest_PinEntry' | 'ButtonRequest_AttachPin';
   };
 };
 
@@ -69,6 +87,7 @@ export interface UiRequestPassphrase {
   payload: {
     device: Device;
     passphraseState?: string;
+    existsAttachPinUser?: boolean;
   };
 }
 
@@ -87,11 +106,20 @@ export interface UiRequestSelectDeviceInBootloaderForWebDevice {
   };
 }
 
+export interface FirmwareProcessing {
+  type: typeof UI_REQUEST.FIRMWARE_PROCESSING;
+  payload: {
+    type: 'firmware' | 'ble' | 'bootloader' | 'resource';
+  };
+}
+
+export type IFirmwareUpdateProgressType = 'transferData' | 'installingFirmware';
 export interface FirmwareProgress {
   type: typeof UI_REQUEST.FIRMWARE_PROGRESS;
   payload: {
     device: Device;
     progress: number;
+    progressType: IFirmwareUpdateProgressType;
   };
 }
 
@@ -128,10 +156,44 @@ export type UiEvent =
   | UiRequestPassphraseOnDevice
   | UiRequestPassphrase
   | UiRequestSelectDeviceInBootloaderForWebDevice
+  | FirmwareProcessing
+  | UiRequestSelectDeviceInBootloaderForWebDevice
   | FirmwareProgress
   | FirmwareTip
   | DeviceProgress
   | PreviousAddressResult;
+
+export enum FirmwareUpdateTipMessage {
+  CheckLatestUiResource = 'CheckLatestUiResource',
+
+  StartDownloadFirmware = 'StartDownloadFirmware',
+  FinishDownloadFirmware = 'FinishDownloadFirmware',
+  DownloadLatestUiResource = 'DownloadLatestUiResource',
+  DownloadFirmware = 'DownloadFirmware',
+  DownloadBleFirmware = 'DownloadBleFirmware',
+  DownloadLatestBootloaderResource = 'DownloadLatestBootloaderResource',
+
+  DownloadLatestUiResourceSuccess = 'DownloadLatestUiResourceSuccess',
+  DownloadFirmwareSuccess = 'DownloadFirmwareSuccess',
+  DownloadBleFirmwareSuccess = 'DownloadBleFirmwareSuccess',
+  DownloadLatestBootloaderResourceSuccess = 'DownloadLatestBootloaderResourceSuccess',
+
+  AutoRebootToBootloader = 'AutoRebootToBootloader',
+  GoToBootloaderSuccess = 'GoToBootloaderSuccess',
+  SelectDeviceInBootloaderForWebDevice = 'SelectDeviceInBootloaderForWebDevice',
+  ConfirmOnDevice = 'ConfirmOnDevice',
+  FirmwareEraseSuccess = 'FirmwareEraseSuccess',
+  StartTransferData = 'StartTransferData',
+  InstallingFirmware = 'InstallingFirmware',
+  UpdateBootloader = 'UpdateBootloader',
+  UpdateBootloaderSuccess = 'UpdateBootloaderSuccess',
+  UpdateSysResource = 'UpdateSysResource',
+  UpdateSysResourceSuccess = 'UpdateSysResourceSuccess',
+  FirmwareUpdating = 'FirmwareUpdating',
+  FirmwareUpdateCompleted = 'FirmwareUpdateCompleted',
+}
+
+export type IFirmwareUpdateTipMessage = `${FirmwareUpdateTipMessage}`;
 
 export type UiEventMessage = UiEvent & { event: typeof UI_EVENT };
 

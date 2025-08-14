@@ -12,7 +12,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -51,7 +51,7 @@ export default class BenfenGetPublicKey extends BaseMethod<any> {
   async run() {
     const res = await batchGetPublickeys(this.device, this.params, 'ed25519', 728);
 
-    const responses: BenfenPublicKey[] = res.message.public_keys.map(
+    const responses: BenfenPublicKey[] = res.public_keys.map(
       (publicKey: string, index: number) => ({
         path: serializedPath((this.params as any[])[index].address_n),
         pub: publicKey,

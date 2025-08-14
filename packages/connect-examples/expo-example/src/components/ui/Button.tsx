@@ -64,8 +64,9 @@ const BUTTON_VARIANTS: Record<
 };
 
 export const getSharedButtonStyles = ({ variant, disabled, loading }: Partial<IButtonProps>) => {
-  const { iconColor, color, bg, hoverBg, activeBg, focusRingColor } =
-    BUTTON_VARIANTS[variant || 'secondary'];
+  const selectedVariant = variant || 'secondary';
+  const variantConfig = BUTTON_VARIANTS[selectedVariant] || BUTTON_VARIANTS.secondary;
+  const { iconColor, color, bg, hoverBg, activeBg, focusRingColor } = variantConfig;
 
   const sharedFrameStyles = {
     bg,
@@ -116,7 +117,8 @@ const getSizeStyles = (size: IButtonProps['size']) => {
     },
   };
 
-  return sizes[size || 'medium'];
+  const selectedSize = size || 'medium';
+  return sizes[selectedSize] || sizes.medium;
 };
 
 export const ButtonFrame = styled(ThemeableStack, {
@@ -158,13 +160,12 @@ const ButtonComponent = ButtonFrame.styleable<IButtonProps>((props, ref) => {
 
   const { py, px, borderRadius, textVariant } = getSizeStyles(size);
 
-  const { sharedFrameStyles, iconColor, color } = getSharedButtonStyles({
+  const { sharedFrameStyles, color } = getSharedButtonStyles({
     variant,
     disabled,
     loading,
   }) as {
     sharedFrameStyles: ISharedFrameStylesProps;
-    iconColor: ColorTokens;
     color: ColorTokens;
   };
 

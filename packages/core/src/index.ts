@@ -1,4 +1,4 @@
-import { inject, InjectApi } from './inject';
+import { inject, InjectApi, executeCallback, cleanupCallback } from './inject';
 import { lowLevelInject, LowLevelInjectApi, LowLevelCoreApi } from './lowLevelInject';
 import { topLevelInject } from './topLevelInject';
 import { CoreApi } from './types/api';
@@ -14,6 +14,7 @@ export * from './data-manager';
 export * from './events';
 export * from './types';
 export { whitelist, whitelistExtension } from './data/config';
+export { executeCallback, cleanupCallback };
 
 const HardwareSdk = ({
   init,

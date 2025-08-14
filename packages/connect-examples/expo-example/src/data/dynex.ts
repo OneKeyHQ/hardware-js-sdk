@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'dnxGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -52,7 +52,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'dnxSignTransaction',
-    description: 'Sign Transaction',
+
     presupposes: [
       {
         title: 'Normal Transaction',

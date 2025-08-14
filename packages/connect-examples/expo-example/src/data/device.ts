@@ -235,6 +235,11 @@ const api: PlaygroundProps[] = [
     },
   },
   {
+    method: 'deviceUnlock',
+    description: 'unlock device',
+    noDeviceIdReq: true,
+  },
+  {
     method: 'deviceSupportFeatures',
     description: 'Check if a device supports a feature',
     noDeviceIdReq: true,
@@ -280,8 +285,8 @@ const api: PlaygroundProps[] = [
     },
   },
   {
-    method: 'checkTransportRelease',
-    description: 'Check transport release of a device',
+    method: 'checkBridgeRelease',
+    description: 'Check bridge release of a device',
     noDeviceIdReq: true,
     expect: {
       common: {
@@ -571,7 +576,7 @@ const api: PlaygroundProps[] = [
       {
         title: 'checkAllFirmwareRelease',
         value: {
-          platform: 'web',
+          checkBridgeRelease: true,
         },
       },
     ],

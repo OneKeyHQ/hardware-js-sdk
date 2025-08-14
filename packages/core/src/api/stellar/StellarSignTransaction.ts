@@ -149,7 +149,7 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     // check payload
     validateParams(this.payload, [
@@ -194,9 +194,6 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
         this.operations.push(transformed);
       }
     });
-
-    console.log('StellarSignTransactionParams', this.params);
-    console.log('StellarSignTransactionOperations', this.operations);
   }
 
   processTxRequest = async (operations: any, index: number): Promise<StellarSignedTx> => {

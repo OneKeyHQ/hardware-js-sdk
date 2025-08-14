@@ -8,7 +8,7 @@ import { stripHexPrefix } from '../helpers/hexUtils';
 export default class BenfenSignMessage extends BaseMethod<HardwareBenfenSignMessage> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'path', required: true },

@@ -5,9 +5,9 @@ import { getBleFirmwareReleaseInfo } from './firmware/releaseHelper';
 
 export default class CheckBLEFirmwareRelease extends BaseMethod {
   init() {
-    this.notAllowDeviceMode = [
-      ...this.notAllowDeviceMode,
-      UI_REQUEST.INITIALIZE,
+    this.allowDeviceMode = [
+      ...this.allowDeviceMode,
+      UI_REQUEST.NOT_INITIALIZE,
       UI_REQUEST.BOOTLOADER,
     ];
     this.useDevicePassphraseState = false;

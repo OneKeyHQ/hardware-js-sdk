@@ -1,10 +1,12 @@
 import { TronSignTx } from '@onekeyfe/hd-transport';
+import { isEmpty } from 'lodash';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { TronTransaction } from '../../types/api/tronSignTransaction';
 import { formatAnyHex } from '../helpers/hexUtils';
+import { DeviceFirmwareRange } from '../../types';
 
 export default class TronSignTransaction extends BaseMethod<TronSignTx> {
   parseTx(tx: TronTransaction, address_n: number[]): TronSignTx {
@@ -65,6 +67,7 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
             balance: tx.contract.delegateResourceContract.balance,
             receiver_address: tx.contract.delegateResourceContract.receiverAddress,
             lock: tx.contract.delegateResourceContract.lock,
+            lock_period: tx.contract.delegateResourceContract.lockPeriod,
           },
         };
       }
@@ -92,6 +95,24 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
           },
         };
       }
+
+      if (tx.contract.voteWitnessContract) {
+        unSignTx.contract = {
+          vote_witness_contract: {
+            votes: tx.contract.voteWitnessContract.votes?.map(vote => ({
+              vote_address: vote.voteAddress,
+              vote_count: vote.voteCount,
+            })),
+            support: tx.contract.voteWitnessContract.support,
+          },
+        };
+      }
+
+      if (tx.contract.cancelAllUnfreezeV2Contract) {
+        unSignTx.contract = {
+          cancel_all_unfreeze_v2_contract: {},
+        };
+      }
     }
 
     return unSignTx;
@@ -99,7 +120,7 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     // check payload
     validateParams(this.payload, [
@@ -130,7 +151,49 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
     };
   }
 
+  getFixDataTypeVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.13.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
+      },
+    };
+  }
+
+  checkFixDataTypeSupportVoteWitnessError() {
+    const { data } = this.payload;
+    const { cancel_all_unfreeze_v2_contract, vote_witness_contract } = this.params.contract;
+    this.checkFeatureVersionLimit(
+      () => !isEmpty(data) || !!cancel_all_unfreeze_v2_contract || !!vote_witness_contract,
+      () => this.getFixDataTypeVersionRange()
+    );
+  }
+
+  supportDelegateResourceLockPeriodVersionRange(): DeviceFirmwareRange {
+    return {
+      pro: {
+        min: '4.15.0',
+      },
+    };
+  }
+
+  checkSupportDelegateContractLockPeriod() {
+    const { delegate_resource_contract } = this.params.contract;
+    this.checkFeatureVersionLimit(
+      () =>
+        !!delegate_resource_contract &&
+        delegate_resource_contract.lock_period !== undefined &&
+        delegate_resource_contract.lock_period !== null,
+      () => this.supportDelegateResourceLockPeriodVersionRange()
+    );
+  }
+
   async run() {
+    this.checkFixDataTypeSupportVoteWitnessError();
+    this.checkSupportDelegateContractLockPeriod();
+
     const response = await this.device.commands.typedCall('TronSignTx', 'TronSignedTx', {
       ...this.params,
     });

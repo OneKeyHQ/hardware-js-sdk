@@ -101,10 +101,16 @@ export type AptosAddress = {
   address?: string;
 };
 
+export enum AptosTransactionType {
+  STANDARD = 0,
+  WITH_DATA = 1,
+}
+
 // AptosSignTx
 export type AptosSignTx = {
   address_n: number[];
   raw_tx: string;
+  tx_type?: AptosTransactionType;
 };
 
 // AptosSignedTx
@@ -1188,6 +1194,7 @@ export enum Enum_ButtonRequestType {
   ButtonRequest_Warning = 18,
   ButtonRequest_PassphraseEntry = 19,
   ButtonRequest_PinEntry = 20,
+  ButtonRequest_AttachPin = 8000,
 }
 export type ButtonRequestType = keyof typeof Enum_ButtonRequestType;
 
@@ -1225,6 +1232,7 @@ export type PinMatrixAck = {
 // PassphraseRequest
 export type PassphraseRequest = {
   _on_device?: boolean;
+  exists_attach_pin_user?: boolean;
 };
 
 // PassphraseAck
@@ -1232,6 +1240,7 @@ export type PassphraseAck = {
   passphrase?: string;
   _state?: string;
   on_device?: boolean;
+  on_device_attach_pin?: boolean;
 };
 
 // Deprecated_PassphraseStateRequest
@@ -1414,11 +1423,14 @@ export type Path = {
 export type BatchGetPublickeys = {
   ecdsa_curve_name?: string;
   paths: Path[];
+  include_node?: boolean;
 };
 
 // EcdsaPublicKeys
 export type EcdsaPublicKeys = {
   public_keys: string[];
+  hd_nodes: HDNodeType[];
+  root_fingerprint?: number;
 };
 
 // DnxGetAddress
@@ -2245,6 +2257,7 @@ export type KaspaGetAddress = {
   show_display?: boolean;
   prefix?: string;
   scheme?: string;
+  use_tweak?: boolean;
 };
 
 // KaspaAddress
@@ -2259,6 +2272,7 @@ export type KaspaSignTx = {
   scheme?: string;
   prefix?: string;
   input_count?: number;
+  use_tweak?: boolean;
 };
 
 // KaspaTxInputRequest
@@ -2310,6 +2324,8 @@ export type Initialize = {
   session_id?: string;
   _skip_passphrase?: boolean;
   derive_cardano?: boolean;
+  passphrase_state?: string;
+  is_contains_attach?: boolean;
 };
 
 // GetFeatures
@@ -2444,6 +2460,8 @@ export type Features = {
   onekey_se02_state?: string | null;
   onekey_se03_state?: string | null;
   onekey_se04_state?: string | null;
+  attach_to_pin_user?: boolean;
+  unlocked_attach_pin?: boolean;
 };
 
 // OnekeyFeatures
@@ -2932,6 +2950,28 @@ export type FileInfoList = {
 // DeviceEraseSector
 export type DeviceEraseSector = {
   sector: number;
+};
+
+// UnLockDevice
+export type UnLockDevice = {};
+
+// UnLockDeviceResponse
+export type UnLockDeviceResponse = {
+  unlocked?: boolean;
+  unlocked_attach_pin?: boolean;
+  passphrase_protection?: boolean;
+};
+
+// GetPassphraseState
+export type GetPassphraseState = {
+  passphrase_state?: string;
+};
+
+// PassphraseState
+export type PassphraseState = {
+  passphrase_state?: string;
+  session_id?: string;
+  unlocked_attach_pin?: boolean;
 };
 
 // UnlockPath
@@ -4292,6 +4332,7 @@ export type TronTriggerSmartContract = {
 export enum TronResourceCode {
   BANDWIDTH = 0,
   ENERGY = 1,
+  TRON_POWER = 2,
 }
 
 export type TronFreezeBalanceContract = {
@@ -4327,6 +4368,7 @@ export type TronDelegateResourceContract = {
   balance?: number;
   receiver_address?: string;
   lock?: boolean;
+  lock_period?: number;
 };
 
 export type TronUnDelegateResourceContract = {
@@ -4335,8 +4377,24 @@ export type TronUnDelegateResourceContract = {
   receiver_address?: string;
 };
 
+export type Vote = {
+  vote_address: string;
+  vote_count: number;
+};
+
+export type TronVoteWitnessContract = {
+  votes: Vote[];
+  support?: boolean;
+};
+
+export type TronCancelAllUnfreezeV2Contract = {};
+
 export type TronContract = {
   transfer_contract?: TronTransferContract;
+  provider?: string;
+  vote_witness_contract?: TronVoteWitnessContract;
+  contract_name?: string;
+  permission_id?: number;
   freeze_balance_contract?: TronFreezeBalanceContract;
   unfreeze_balance_contract?: TronUnfreezeBalanceContract;
   withdraw_balance_contract?: TronWithdrawBalanceContract;
@@ -4346,6 +4404,7 @@ export type TronContract = {
   withdraw_expire_unfreeze_contract?: TronWithdrawExpireUnfreezeContract;
   delegate_resource_contract?: TronDelegateResourceContract;
   undelegate_resource_contract?: TronUnDelegateResourceContract;
+  cancel_all_unfreeze_v2_contract?: TronCancelAllUnfreezeV2Contract;
 };
 
 // TronSignTx
@@ -4785,6 +4844,10 @@ export type MessageType = {
   FileInfo: FileInfo;
   FileInfoList: FileInfoList;
   DeviceEraseSector: DeviceEraseSector;
+  UnLockDevice: UnLockDevice;
+  UnLockDeviceResponse: UnLockDeviceResponse;
+  GetPassphraseState: GetPassphraseState;
+  PassphraseState: PassphraseState;
   UnlockPath: UnlockPath;
   UnlockedPathRequest: UnlockedPathRequest;
   MoneroRctKeyPublic: MoneroRctKeyPublic;
@@ -4976,6 +5039,9 @@ export type MessageType = {
   TronWithdrawExpireUnfreezeContract: TronWithdrawExpireUnfreezeContract;
   TronDelegateResourceContract: TronDelegateResourceContract;
   TronUnDelegateResourceContract: TronUnDelegateResourceContract;
+  Vote: Vote;
+  TronVoteWitnessContract: TronVoteWitnessContract;
+  TronCancelAllUnfreezeV2Contract: TronCancelAllUnfreezeV2Contract;
   TronContract: TronContract;
   TronSignTx: TronSignTx;
   TronSignedTx: TronSignedTx;

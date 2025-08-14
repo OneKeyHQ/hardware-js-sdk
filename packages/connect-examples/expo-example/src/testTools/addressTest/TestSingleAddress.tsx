@@ -110,7 +110,7 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
 
   const currentPassphrase = useRef<string | undefined>('');
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initTestCase: () => {
       const testCase = currentTestCase;
       const currentTestCases = testCase?.data?.map((item, index) => {
@@ -229,7 +229,11 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
             vertical
           />
 
-          <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+          <TestRunnerOptionButtons
+            onStop={stopTest}
+            onStart={beginTest}
+            onRetryFailed={retryFailedTasks}
+          />
           <ExportReportView />
         </Stack>
       </>
@@ -240,6 +244,7 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
       findTestCase,
       intl,
       passphrase,
+      retryFailedTasks,
       showOnOneKey,
       stopTest,
       testCaseList,

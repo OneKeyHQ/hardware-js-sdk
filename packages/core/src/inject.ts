@@ -1,6 +1,31 @@
 import { EventEmitter } from 'events';
 import { CallMethod } from './events';
 import { CoreApi } from './types/api';
+import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
+
+type CallbackFunction = (data?: any, error?: { message: string; code?: number }) => void;
+
+const callbackManager = new Map<string, CallbackFunction>();
+
+const generateCallbackId = () =>
+  `callback_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+const registerCallback = (id: string, callback: CallbackFunction) => {
+  callbackManager.set(id, callback);
+};
+
+const executeCallback = (id: string, ...args: any[]) => {
+  const callback = callbackManager.get(id);
+  if (callback) {
+    callback(...args);
+  }
+};
+
+const cleanupCallback = (id: string) => {
+  callbackManager.delete(id);
+};
+
+export { executeCallback, cleanupCallback };
 
 export interface InjectApi {
   call: CallMethod;
@@ -97,11 +122,6 @@ export const createCoreApi = (
   checkBLEFirmwareRelease: connectId => call({ connectId, method: 'checkBLEFirmwareRelease' }),
 
   /**
-   * 检查 bridge 版本
-   */
-  checkTransportRelease: () => call({ method: 'checkTransportRelease' }),
-
-  /**
    * 检查 Bridge 是否安装
    */
   checkBridgeStatus: () => call({ method: 'checkBridgeStatus' }),
@@ -143,6 +163,8 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'getPassphraseState' }),
   deviceCancel: (connectId, params) => call({ ...params, connectId, method: 'deviceCancel' }),
   deviceLock: (connectId, params) => call({ ...params, connectId, method: 'deviceLock' }),
+  deviceUnlock: (connectId, params) =>
+    call({ ...params, useEmptyPassphrase: true, connectId, method: 'deviceUnlock' }),
 
   getNextU2FCounter: (connectId, params) =>
     call({ ...params, connectId, method: 'getNextU2FCounter' }),
@@ -150,6 +172,28 @@ export const createCoreApi = (
 
   allNetworkGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'allNetworkGetAddress' }),
+  allNetworkGetAddressByLoop: (connectId, deviceId, params) => {
+    const { onLoopItemResponse, onAllItemsResponse, ...restParams } = params;
+
+    const callbackId = generateCallbackId();
+    registerCallback(callbackId, onLoopItemResponse);
+
+    const callbackIdFinish = generateCallbackId();
+    registerCallback(callbackIdFinish, (data?: AllNetworkAddress[]) => {
+      onAllItemsResponse?.(data);
+      cleanupCallback(callbackIdFinish);
+      cleanupCallback(callbackId);
+    });
+
+    return call({
+      ...restParams,
+      connectId,
+      deviceId,
+      method: 'allNetworkGetAddressByLoop',
+      callbackId,
+      callbackIdFinish,
+    });
+  },
 
   evmGetAddress: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'evmGetAddress' }),
@@ -246,6 +290,8 @@ export const createCoreApi = (
   firmwareUpdate: (connectId, params) => call({ ...params, connectId, method: 'firmwareUpdate' }),
   firmwareUpdateV2: (connectId, params) =>
     call({ ...params, connectId, method: 'firmwareUpdateV2' }),
+  firmwareUpdateV3: (connectId, params) =>
+    call({ ...params, connectId, method: 'firmwareUpdateV3' }),
   promptWebDeviceAccess: params => call({ ...params, method: 'promptWebDeviceAccess' }),
 
   tronGetAddress: (connectId, deviceId, params) =>

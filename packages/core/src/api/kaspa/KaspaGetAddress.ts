@@ -10,7 +10,7 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     this.hasBundle = !!this.payload?.bundle;
     const payload = this.hasBundle ? this.payload : { bundle: [this.payload] };
@@ -28,6 +28,7 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
         { name: 'showOnOneKey', type: 'boolean' },
         { name: 'prefix', type: 'string' },
         { name: 'scheme', type: 'string' },
+        { name: 'useTweak', type: 'boolean' },
       ]);
 
       const showOnOneKey = batch.showOnOneKey ?? true;
@@ -37,6 +38,7 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
         show_display: showOnOneKey,
         prefix: batch.prefix,
         scheme: batch.scheme,
+        use_tweak: batch.useTweak,
       });
     });
   }
@@ -52,12 +54,31 @@ export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[
     };
   }
 
+  getUseTweakVersionRange() {
+    return {
+      pro: {
+        min: '4.14.0',
+      },
+      model_classic1s: {
+        min: '3.12.0',
+      },
+    };
+  }
+
   async run() {
+    this.checkFeatureVersionLimit(
+      // exists use_tweak is false check firmware version
+      () => this.params.some(param => param.use_tweak === false),
+      () => this.getUseTweakVersionRange(),
+      {
+        strictCheckDeviceSupport: true,
+      }
+    );
+
     const responses: KaspaAddress[] = [];
 
     for (let i = 0; i < this.params.length; i++) {
       const param = this.params[i];
-
       const res = await this.device.commands.typedCall('KaspaGetAddress', 'KaspaAddress', {
         ...param,
       });

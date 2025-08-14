@@ -251,7 +251,7 @@ function ExecuteView() {
   const currentPassphrase = useRef<string | undefined>('');
   const currentPassphraseState = useRef<string | undefined>('');
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
       if (hardwareUiEventListener) {
         sdk.off(UI_EVENT, hardwareUiEventListener);
@@ -327,7 +327,6 @@ function ExecuteView() {
             break;
           }
 
-          console.log('======>>>>> passphraseStateList', params);
           try {
             // @ts-expect-error
             const mockRes = await mockDevice?.[method]?.('', '', {
@@ -356,7 +355,7 @@ function ExecuteView() {
               })} ${address}`
             );
           } catch (e) {
-            console.log('=====>>>>> error', e, params);
+            // ignore error
           }
         }
 
@@ -388,16 +387,41 @@ function ExecuteView() {
         params: requestParams,
       });
     },
-    processResponse: (res, item, itemIndex) => {
-      const response = res as {
-        path: string;
-        address: string;
-      };
+    preCheckResponse: (method, requestParams, item, itemIndex, res) => {
+      console.log('preCheckResponse', method, requestParams, item, itemIndex, res);
+
+      if (
+        method === 'alephiumGetAddress' &&
+        !res.success &&
+        (res.payload?.code === 416 ||
+          res.payload?.error?.toLowerCase()?.includes('forbidden key path'))
+      ) {
+        return Promise.resolve({
+          verifyState: 'skip',
+          error: undefined,
+        });
+      }
+
+      if (!res.success) {
+        if (res.payload?.code === 802 || res.payload?.code === 803) {
+          return Promise.resolve({
+            verifyState: 'skip',
+            error: undefined,
+          });
+        }
+        return Promise.resolve({
+          verifyState: 'fail',
+          error: res.payload?.error,
+        });
+      }
 
       const error = '';
+      const response = res.payload as {
+        address: string;
+        trackingKey?: string;
+      };
 
       const responseAddress =
-        // @ts-expect-error
         response.address?.toLowerCase() || response.trackingKey?.toLowerCase();
       if (item.address?.toLowerCase() !== responseAddress) {
         return Promise.resolve({
@@ -409,6 +433,10 @@ function ExecuteView() {
         error,
       });
     },
+    processResponse: () =>
+      Promise.resolve({
+        error: undefined,
+      }),
     removeHardwareListener: sdk => {
       if (hardwareUiEventListener) {
         sdk.off(UI_EVENT, hardwareUiEventListener);
@@ -459,11 +487,15 @@ function ExecuteView() {
           value={showOnOneKey}
           onToggle={setShowOnOneKey}
         />
-        <TestRunnerOptionButtons onStop={stopTest} onStart={beginTest} />
+        <TestRunnerOptionButtons
+          onStop={stopTest}
+          onStart={beginTest}
+          onRetryFailed={retryFailedTasks}
+        />
         <ExportReportView />
       </Stack>
     ),
-    [beginTest, intl, mnemonic, passphraseInputMemo, showOnOneKey, stopTest]
+    [beginTest, intl, mnemonic, passphraseInputMemo, retryFailedTasks, showOnOneKey, stopTest]
   );
 
   return contentMemo;

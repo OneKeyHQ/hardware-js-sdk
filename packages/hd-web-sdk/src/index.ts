@@ -21,6 +21,7 @@ import HardwareSdk, {
   DEVICE,
   UI_REQUEST,
   whitelist,
+  executeCallback,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
@@ -71,6 +72,12 @@ const handleMessage = async (message: CoreMessage) => {
         eventEmitter.emit(message.type, message.payload);
       }
       break;
+
+    case IFRAME.CALLBACK: {
+      const { callbackId, data, error } = message.payload;
+      executeCallback(callbackId, data, error);
+      break;
+    }
 
     default:
       Log.warn('No need to be captured message', message.event);
@@ -126,7 +133,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         const message = parseMessage(messageEvent);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
-            Log.debug('Host Bridge Receive message: ', message);
+            // Log.debug('Host Bridge Receive message: ', message);
           } else {
             Log.debug('Host Bridge Receive message: ', message);
           }
@@ -134,7 +141,7 @@ const createJSBridge = (messageEvent: PostMessageEvent) => {
         const response = await handleMessage(message);
         if (message.event !== 'LOG_EVENT') {
           if (['DEVICE_EVENT', 'FIRMWARE_EVENT'].includes(message.event)) {
-            Log.debug('Host Bridge response: ', message);
+            // Log.debug('Host Bridge response: ', message);
           } else {
             Log.debug('Host Bridge response: ', message);
           }

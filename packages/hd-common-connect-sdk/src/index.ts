@@ -19,15 +19,27 @@ import HardwareSdk, {
   DEVICE_EVENT,
   DEVICE,
   LowLevelCoreApi,
+  createUiMessage,
+  UI_REQUEST,
+  executeCallback,
 } from '@onekeyfe/hd-core';
 import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import WebusbTransport from '@onekeyfe/hd-transport-webusb';
+import { WebUsbTransport, ElectronBleTransport } from '@onekeyfe/hd-transport-web-device';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
+import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
+
+const getTransport = (env: ConnectSettings['env']) => {
+  if (env === 'desktop-web-ble') return ElectronBleTransport;
+  if (env === 'webusb') return WebUsbTransport;
+  if (env === 'lowlevel') return LowlevelTransport;
+  if (env === 'emulator') return EmulatorTransport;
+  return HttpTransport;
+};
 
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
@@ -81,6 +93,11 @@ function handleMessage(message: CoreMessage) {
         eventEmitter.emit(message.type, message.payload);
       }
       break;
+    case IFRAME.CALLBACK: {
+      const { callbackId, data, error } = message.payload;
+      executeCallback(callbackId, data, error);
+      break;
+    }
     default:
       Log.log('No need to be captured message', message.event);
   }
@@ -115,19 +132,7 @@ const init = async (
   Log.debug('init');
 
   try {
-    console.log(_settings.env);
-    // const Transport = _settings.env === 'webusb' ? WebusbTransport : HttpTransport;
-    let Transport: any;
-    switch (_settings.env) {
-      case 'webusb':
-        Transport = WebusbTransport;
-        break;
-      case 'lowlevel':
-        Transport = LowlevelTransport;
-        break;
-      default:
-        Transport = HttpTransport;
-    }
+    const Transport = getTransport(_settings.env);
     _core = await initCore(_settings, Transport, plugin);
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);
@@ -147,6 +152,19 @@ const call = async (params: any) => {
     const response = await postMessage({ event: IFRAME.CALL, type: IFRAME.CALL, payload: params });
     if (response) {
       Log.debug('response: ', response);
+
+      if (!response.success) {
+        console.log('response.payload?.code: ', response.payload?.code);
+        if (response.payload?.code === HardwareErrorCode.BleUnsupported) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED), false);
+        }
+        if (response.payload?.code === HardwareErrorCode.BlePoweredOff) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_POWERED_OFF), false);
+        }
+        if (response.payload?.code === HardwareErrorCode.BlePermissionError) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_PERMISSION), false);
+        }
+      }
 
       return response;
     }

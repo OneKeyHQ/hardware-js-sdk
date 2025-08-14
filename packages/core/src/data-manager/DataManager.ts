@@ -25,7 +25,7 @@ import type {
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-export type FirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v5';
+export type IFirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v6';
 
 export type MessageVersion = 'latest' | 'v1';
 
@@ -100,7 +100,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const currentVersion = deviceFirmwareVersion.join('.');
     const targetDeviceConfig = targetDeviceConfigList.filter(item =>
@@ -125,7 +125,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.fullResource);
 
@@ -134,14 +134,19 @@ export default class DataManager {
 
   static getBootloaderResource = (features: Features) => {
     const deviceType = getDeviceType(features);
-    if (deviceType === EDeviceType.Unknown) return undefined;
+    if (deviceType === EDeviceType.Unknown) throw new Error('Device type is unknown');
 
     if (deviceType !== EDeviceType.Pro && deviceType !== EDeviceType.Touch) return undefined;
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
+    if (targetDeviceConfigList.length === 0) {
+      throw new Error(
+        `Could not found bootloader resource with deviceType:${deviceType} firmwareUpdateField:${firmwareUpdateField}`
+      );
+    }
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
     return findLatestRelease(targetDeviceConfig)?.bootloaderResource;
@@ -154,7 +159,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(item => !!item.bootloaderResource);
 
@@ -169,7 +174,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
     const targetDeviceConfig = targetDeviceConfigList.filter(
       item => !!item.bootloaderRelatedFirmwareVersion
@@ -187,7 +192,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     if (
@@ -209,7 +214,7 @@ export default class DataManager {
     const firmwareUpdateField = getFirmwareUpdateField({
       features,
       updateType: 'firmware',
-    }) as FirmwareField;
+    }) as IFirmwareField;
     const targetDeviceConfigList = this.deviceMap[deviceType]?.[firmwareUpdateField] ?? [];
 
     const target = findLatestRelease(targetDeviceConfigList);
@@ -344,7 +349,7 @@ export default class DataManager {
   }
 
   static isBleConnect = (env: ConnectSettings['env']) =>
-    env === 'react-native' || env === 'lowlevel';
+    env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
 
   static isWebUsbConnect = (env: ConnectSettings['env']) => env === 'webusb';
 }

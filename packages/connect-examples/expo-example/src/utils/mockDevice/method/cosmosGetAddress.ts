@@ -55,34 +55,16 @@ export function pubkeyToAddressDetail({
   };
 }
 
-export default function cosmosGetAddress(
-  connectId: string,
-  deviceId: string,
-  params: CosmosGetAddressParams & {
-    mnemonic: string;
-    passphrase?: string;
-  }
-):
-  | Unsuccessful
-  | Success<{
-      address: string;
-      path: string;
-    }> {
-  const { path, mnemonic, passphrase, hrp } = params;
-
-  const seed = mnemonicToSeed(mnemonic, passphrase);
-  // @ts-expect-error
+/**
+ * 抽离的核心逻辑：从 seed 生成 Cosmos 地址
+ * 可以被 SLIP39 直接调用，避免助记词转换
+ */
+export function generateCosmosAddressFromSeed(seed: Buffer, path: string, hrp = 'cosmos'): string {
   const keyPair = deriveKeyPairWithPath(seed, path, 'secp256k1');
-
   const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
 
   if (!privateKeyArray || !publicKeyArray) {
-    return {
-      success: false,
-      payload: {
-        error: 'privateKey or publicKey is undefined',
-      },
-    };
+    throw new Error('privateKey or publicKey is undefined');
   }
 
   const { address } = pubkeyToAddressDetail({
@@ -91,12 +73,38 @@ export default function cosmosGetAddress(
     addressPrefix: hrp,
   });
 
-  return {
-    success: true,
-    payload: {
-      address,
-      // @ts-expect-error
-      path,
-    },
-  };
+  return address;
+}
+
+export default function cosmosGetAddress(
+  connectId: string,
+  deviceId: string,
+  params: CosmosGetAddressParams & {
+    mnemonic: string;
+    passphrase?: string;
+    path: string;
+  }
+):
+  | Unsuccessful
+  | Success<{
+      address: string;
+      path: string;
+    }> {
+  const { path, mnemonic, passphrase, hrp } = params;
+  const seed = mnemonicToSeed(mnemonic, passphrase);
+
+  try {
+    const address = generateCosmosAddressFromSeed(seed, path, hrp);
+    return {
+      success: true,
+      payload: { address, path },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      payload: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    };
+  }
 }

@@ -1,7 +1,8 @@
 import React, { lazy, useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { LinkingOptions, NavigationContainer, ParamListBase } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { TamaguiProvider, PortalProvider, Text, Stack, Card } from 'tamagui';
+import { TamaguiProvider, PortalProvider, Text, Stack, Card, YStack } from 'tamagui';
+import { Toast, ToastProvider, ToastViewport, useToastState } from '@tamagui/toast';
 import * as ExpoLinking from 'expo-linking';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Watermark from '@uiw/react-watermark';
@@ -21,19 +22,46 @@ const FirmwareScreen = lazy(() => import('./src/views/FirmwareScreen'));
 const AddressTestScreen = lazy(() => import('./src/views/AddressTestScreen'));
 const SecurityCheckScreen = lazy(() => import('./src/views/SecurityCheckScreen'));
 const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTestingScreen'));
+const AttachToPinTestingScreen = lazy(() => import('./src/views/AttachToPinTestingScreen'));
+const SLIP39TestScreen = lazy(() => import('./src/views/SLIP39TestScreen'));
+const ChainMethodTestScreen = lazy(() => import('./src/views/ChainMethodTestScreen'));
 
-const prefix = ExpoLinking.createURL('/');
-
-const routeConfig = {};
-
-const linking = {
-  prefixes: [prefix],
-  routeConfig,
+// React Navigation v6 linking 配置
+const linking: LinkingOptions<ParamListBase> = {
+  prefixes: [
+    // 为不同的部署环境设置 URL 前缀
+    'https://example.onekeytest.com/',
+    'http://localhost:19006/',
+    ExpoLinking.createURL('/'),
+  ],
+  config: {
+    initialRouteName: Routes.Payload,
+    screens: {
+      [Routes.Payload]: 'expo-example/api-payload',
+      [Routes.FirmwareUpdateTest]: 'expo-example/firmware-update-test',
+      [Routes.PassphraseTest]: 'expo-example/passphrase-test',
+      [Routes.AddressTest]: 'expo-example/address-test',
+      [Routes.SecurityCheck]: 'expo-example/security-check',
+      [Routes.FunctionalTesting]: 'expo-example/functional-testing',
+      [Routes.SLIP39Test]: 'expo-example/slip39-test',
+      [Routes.ChainMethodTest]: 'expo-example/chain-method-test',
+    },
+  },
 };
 
 // Create a native stack navigator
 const StackNavigator = createNativeStackNavigator();
 function NavigationContent() {
+  // 处理从 404 页面重定向过来的路径
+  useEffect(() => {
+    const redirectPath = sessionStorage?.getItem('redirectPath');
+    if (redirectPath) {
+      sessionStorage?.removeItem('redirectPath');
+      // 使用 window.history.replaceState 替换当前历史记录
+      window.history.replaceState(null, '', redirectPath);
+    }
+  }, []);
+
   return (
     <NavigationContainer linking={linking} fallback={<Text>Loading...</Text>}>
       <StackNavigator.Navigator
@@ -51,6 +79,12 @@ function NavigationContent() {
           name={Routes.FunctionalTesting}
           component={FunctionalTestingScreen}
         />
+        <StackNavigator.Screen
+          name={Routes.AttachToPinTestingScreen}
+          component={AttachToPinTestingScreen}
+        />
+        <StackNavigator.Screen name={Routes.SLIP39Test} component={SLIP39TestScreen} />
+        <StackNavigator.Screen name={Routes.ChainMethodTest} component={ChainMethodTestScreen} />
       </StackNavigator.Navigator>
     </NavigationContainer>
   );
@@ -125,21 +159,61 @@ function AppSafeAreaContent({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ToastView() {
+  const currentToast = useToastState();
+
+  if (!currentToast || currentToast.isHandledNatively) return null;
+
+  return (
+    <Toast
+      animation="quick"
+      key={currentToast.id}
+      duration={currentToast.duration}
+      enterStyle={{ opacity: 0, transform: [{ translateY: 100 }] }}
+      exitStyle={{ opacity: 0, transform: [{ translateY: 100 }] }}
+      transform={[{ translateY: 0 }]}
+      opacity={1}
+      scale={1}
+      viewportName={currentToast.viewportName}
+      backgroundColor="$bgApp"
+      borderWidth={1}
+      borderColor="$borderColor"
+    >
+      <YStack>
+        <Toast.Title>{currentToast.title}</Toast.Title>
+        {!!currentToast.message && <Toast.Description>{currentToast.message}</Toast.Description>}
+      </YStack>
+    </Toast>
+  );
+}
+
+// 声明全局变量类型
+declare global {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const __COMMIT_SHA__: string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const __BUILD_TIME__: string;
+}
+
 // Main App
 export default function App() {
   return (
     <TamaguiProviderWrapperMemo>
       <SafeAreaProvider>
-        <AppSafeAreaContent>
-          <SDKProvider>
-            <AppIntlProvider>
+        {/* <AppSafeAreaContent> */}
+        <SDKProvider>
+          <AppIntlProvider>
+            <ToastProvider burntOptions={{ from: 'bottom' }}>
               <UpdateTip />
               <MediaProvider>
                 <NavigationContentMemo />
               </MediaProvider>
-            </AppIntlProvider>
-          </SDKProvider>
-        </AppSafeAreaContent>
+              <ToastView />
+              <ToastViewport bottom={20} right={20} />
+            </ToastProvider>
+          </AppIntlProvider>
+        </SDKProvider>
+        {/* </AppSafeAreaContent> */}
       </SafeAreaProvider>
     </TamaguiProviderWrapperMemo>
   );

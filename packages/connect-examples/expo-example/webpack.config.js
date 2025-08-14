@@ -1,9 +1,46 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const webpack = require('webpack');
 
 // Expo CLI will await this method so you can optionally return a promise.
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
+
+  // 设置 publicPath 为 GitHub Pages 的路径
+  if (process.env.NODE_ENV === 'production') {
+    config.output.publicPath = '/expo-example/';
+  } else {
+    // 开发环境使用根路径
+    config.output.publicPath = '/';
+  }
+
+  // 配置 SPA 路由支持
+  if (config.devServer) {
+    // 开发环境配置
+    config.devServer.historyApiFallback = {
+      index: '/',
+      rewrites: [
+        {
+          from: /^\/expo-example\/.*$/,
+          to: '/',
+        },
+      ],
+    };
+  }
+
+  // 在生产环境中，确保使用我们的自定义 HTML 模板
+  if (process.env.NODE_ENV === 'production') {
+    const htmlPluginIndex = config.plugins.findIndex(plugin => plugin instanceof HtmlWebpackPlugin);
+    if (htmlPluginIndex !== -1) {
+      const originalPlugin = config.plugins[htmlPluginIndex];
+      // 创建新的 HtmlWebpackPlugin 实例，使用我们的模板
+      config.plugins[htmlPluginIndex] = new HtmlWebpackPlugin({
+        ...originalPlugin.options,
+        template: './public/index.html',
+      });
+    }
+  }
 
   // 只为我们自己的代码启用 source map
   config.module.rules = config.module.rules.filter(rule => {
@@ -38,14 +75,40 @@ module.exports = async function (env, argv) {
     config.devtool = false;
   }
 
-  const definePlugin = config.plugins.find(plugin => plugin.constructor.name === 'DefinePlugin');
-  if (definePlugin) {
-    const processEnv = {};
-    Object.keys(process.env).forEach(key => {
-      processEnv[key] = JSON.stringify(process.env[key]);
-    });
+  // 添加或修改 DefinePlugin 来注入 commit SHA 和 CONNECT_SRC
+  const commitSha = process.env.EXPO_PUBLIC_COMMIT_SHA || process.env.COMMIT_SHA || 'dev';
+  const buildTime = new Date().toISOString();
+  const connectSrc = process.env.CONNECT_SRC;
 
-    definePlugin.definitions['process.env'] = processEnv;
+  // 查找现有的 DefinePlugin
+  const definePluginIndex = config.plugins.findIndex(
+    plugin => plugin.constructor.name === 'DefinePlugin'
+  );
+
+  if (definePluginIndex !== -1) {
+    // 追加新的 DefinePlugin，避免依赖内部字段
+    const defs = {
+      __COMMIT_SHA__: JSON.stringify(commitSha),
+      __BUILD_TIME__: JSON.stringify(buildTime),
+      'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
+    };
+    if (connectSrc !== undefined) {
+      defs['process.env.CONNECT_SRC'] = JSON.stringify(connectSrc);
+    }
+    config.plugins.push(new webpack.DefinePlugin(defs));
+  } else {
+    // 添加新的 DefinePlugin
+    config.plugins.push(
+      new webpack.DefinePlugin({
+        __COMMIT_SHA__: JSON.stringify(commitSha),
+        __BUILD_TIME__: JSON.stringify(buildTime),
+        'process.env.EXPO_PUBLIC_COMMIT_SHA': JSON.stringify(commitSha),
+        ...(connectSrc !== undefined
+          ? { 'process.env.CONNECT_SRC': JSON.stringify(connectSrc) }
+          : {}),
+      })
+    );
   }
+
   return config;
 };

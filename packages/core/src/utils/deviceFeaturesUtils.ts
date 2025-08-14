@@ -5,7 +5,7 @@ import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
 import type { Features, SupportFeatureType } from '../types';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
-import DataManager, { FirmwareField, MessageVersion } from '../data-manager/DataManager';
+import DataManager, { IFirmwareField, MessageVersion } from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
@@ -73,11 +73,24 @@ export const supportNewPassphrase = (features?: Features): SupportFeatureType =>
   return { support: semver.gte(currentVersion, '2.4.0'), require: '2.4.0' };
 };
 
-export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) => {
+export const getPassphraseStateWithRefreshDeviceInfo = async (
+  device: Device,
+  options?: {
+    expectPassphraseState?: string;
+    onlyMainPin?: boolean;
+  }
+) => {
   const { features, commands } = device;
   const locked = features?.unlocked === false;
 
-  const passphraseState = await getPassphraseState(features, commands);
+  const { passphraseState, newSession, unlockedAttachPin } = await getPassphraseState(
+    features,
+    commands,
+    {
+      ...options,
+    }
+  );
+
   const isModeT =
     getDeviceType(features) === EDeviceType.Touch || getDeviceType(features) === EDeviceType.Pro;
 
@@ -93,14 +106,55 @@ export const getPassphraseStateWithRefreshDeviceInfo = async (device: Device) =>
     await device.getFeatures();
   }
 
-  return passphraseState;
+  // Attach to pin try to fix internal state
+  if (features?.device_id) {
+    device.updateInternalState(
+      device.features?.passphrase_protection ?? false,
+      passphraseState,
+      device.features?.device_id ?? '',
+      newSession,
+      device.features?.session_id
+    );
+  }
+
+  return { passphraseState, newSession, unlockedAttachPin };
 };
 
 export const getPassphraseState = async (
   features: Features | undefined,
-  commands: DeviceCommands
-) => {
-  if (!features) return false;
+  commands: DeviceCommands,
+  options?: {
+    expectPassphraseState?: string;
+    onlyMainPin?: boolean;
+  }
+): Promise<{
+  passphraseState: string | undefined;
+  newSession: string | undefined;
+  unlockedAttachPin: boolean | undefined;
+}> => {
+  if (!features)
+    return { passphraseState: undefined, newSession: undefined, unlockedAttachPin: undefined };
+
+  const firmwareVersion = getDeviceFirmwareVersion(features);
+  const deviceType = getDeviceType(features);
+
+  if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.15.0')) {
+    const { message, type } = await commands.typedCall('GetPassphraseState', 'PassphraseState', {
+      passphrase_state: options?.onlyMainPin ? undefined : options?.expectPassphraseState,
+    });
+
+    // @ts-expect-error
+    if (type === 'CallMethodError') {
+      throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Get the passphrase state error');
+    }
+
+    return {
+      passphraseState: message.passphrase_state,
+      newSession: message.session_id,
+      unlockedAttachPin: message.unlocked_attach_pin,
+    };
+  }
+
   const { message, type } = await commands.typedCall('GetAddress', 'Address', {
     address_n: [toHardened(44), toHardened(1), toHardened(0), 0, 0],
     coin_name: 'Testnet',
@@ -113,14 +167,41 @@ export const getPassphraseState = async (
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Get the passphrase state error');
   }
 
-  return message.address;
+  return {
+    passphraseState: message.address,
+    newSession: undefined,
+    unlockedAttachPin: undefined,
+  };
 };
 
-export const supportBatchPublicKey = (features?: Features): boolean => {
+export const supportBatchPublicKey = (
+  features?: Features,
+  options?: {
+    includeNode?: boolean;
+  }
+): boolean => {
   if (!features) return false;
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
 
   const deviceType = getDeviceType(features);
+  // btc batch get public key
+  if (!!options?.includeNode && deviceType === EDeviceType.Pro) {
+    return semver.gte(currentVersion, '4.14.0');
+  }
+  if (!!options?.includeNode && deviceType === EDeviceType.Touch) {
+    return semver.gte(currentVersion, '4.11.0');
+  }
+  if (!!options?.includeNode && DeviceModelToTypes.model_classic1s.includes(deviceType)) {
+    return semver.gte(currentVersion, '3.12.0');
+  }
+  if (!!options?.includeNode && DeviceModelToTypes.model_mini.includes(deviceType)) {
+    return semver.gte(currentVersion, '3.10.0');
+  }
+  if (options?.includeNode) {
+    return false;
+  }
+
+  // support batch get public key
   if (deviceType === EDeviceType.Touch || deviceType === EDeviceType.Pro) {
     return semver.gte(currentVersion, '3.1.0');
   }
@@ -151,7 +232,7 @@ export const getFirmwareUpdateField = ({
   features: Features;
   updateType: 'firmware' | 'ble';
   targetVersion?: string;
-}): 'ble' | FirmwareField => {
+}): 'ble' | IFirmwareField => {
   const deviceType = getDeviceType(features);
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
   if (updateType === 'ble') {
@@ -159,23 +240,66 @@ export const getFirmwareUpdateField = ({
   }
 
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-    return 'firmware-v5';
+    return 'firmware-v6';
   }
 
   if (deviceType === EDeviceType.Touch) {
     if (targetVersion) {
       if (semver.eq(targetVersion, '4.0.0')) return 'firmware-v2';
-      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v5';
+      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v6';
     }
 
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
 
-    return 'firmware-v5';
+    return 'firmware-v6';
   }
   if (deviceType === EDeviceType.Pro) {
-    return 'firmware-v5';
+    return 'firmware-v6';
   }
   return 'firmware';
+};
+/**
+ * Returns the optional firmware version
+ * Used in firmware web update
+ * https://firmware.onekey.so/
+ */
+export const getFirmwareUpdateFieldArray = (
+  features: Features,
+  updateType: 'firmware' | 'ble' | 'bootloader'
+): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v6')[] => {
+  const deviceType = getDeviceType(features);
+  if (updateType === 'ble') {
+    return ['ble'];
+  }
+
+  if (
+    deviceType === 'classic' ||
+    deviceType === 'classic1s' ||
+    deviceType === 'mini' ||
+    deviceType === 'classicpure'
+  ) {
+    return ['firmware-v6'];
+  }
+
+  if (deviceType === 'touch') {
+    const currentVersion = getDeviceFirmwareVersion(features).join('.');
+    if (semver.gt(currentVersion, '4.0.0')) {
+      return ['firmware-v6', 'firmware'];
+    }
+    if (semver.gte(currentVersion, '4.0.0')) {
+      return ['firmware-v2', 'firmware'];
+    }
+    if (!currentVersion || semver.lt(currentVersion, '3.0.0')) {
+      return ['firmware-v6', 'firmware-v2', 'firmware'];
+    }
+    return ['firmware'];
+  }
+
+  if (deviceType === 'pro') {
+    return ['firmware-v6'];
+  }
+
+  return ['firmware'];
 };
 
 export function fixVersion(version: string) {

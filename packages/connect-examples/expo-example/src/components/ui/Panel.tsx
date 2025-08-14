@@ -8,8 +8,6 @@ export interface PanelViewProps {
 
 const PanelView = ({ title, children, renderRight }: PanelViewProps) => (
   <Card
-    flex={1}
-    elevate
     size="$4"
     bordered
     padding="$2"

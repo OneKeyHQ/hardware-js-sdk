@@ -14,7 +14,16 @@ export type ConnectSettings = {
   priority: number;
   trustedHost: boolean;
   supportedBrowser?: boolean;
-  env: 'node' | 'web' | 'webextension' | 'electron' | 'react-native' | 'webusb' | 'lowlevel';
+  env:
+    | 'node'
+    | 'web'
+    | 'webextension'
+    | 'electron'
+    | 'react-native'
+    | 'webusb'
+    | 'emulator'
+    | 'desktop-web-ble'
+    | 'lowlevel';
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;
@@ -69,7 +78,7 @@ export type DeviceTypeMap = {
   [k in IKnownDevice]: {
     firmware: IFirmwareReleaseInfo[];
     'firmware-v2'?: IFirmwareReleaseInfo[];
-    'firmware-v5'?: IFirmwareReleaseInfo[];
+    'firmware-v6'?: IFirmwareReleaseInfo[];
     ble: IBLEFirmwareReleaseInfo[];
   };
 };

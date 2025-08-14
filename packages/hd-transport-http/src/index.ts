@@ -15,6 +15,8 @@ type IncompleteRequestOptions = {
 export default class HttpTransport {
   _messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
+  name = 'HttpTransport';
+
   configured = false;
 
   stopped = false;
@@ -79,9 +81,11 @@ export default class HttpTransport {
   }
 
   _acquireMixed(input: AcquireInput) {
-    const previousStr = input.previous == null ? 'null' : input.previous;
+    const previousStr = input.previous == null ? 'null' : encodeURIComponent(input.previous);
+    // @ts-expect-error
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    const url = `/acquire/${input.path}/${previousStr}`;
+    const path = encodeURIComponent(input.path);
+    const url = `/acquire/${path}/${previousStr}`;
     return this._post({ url });
   }
 

@@ -13,6 +13,7 @@ import {
 import {
   batchTestCases as batchPubkeyTestCases,
   testCases as pubkeyTestCases,
+  batchSoftTestCases as batchSoftPubkeyTestCases,
 } from '../testTools/pubkeyTest/data';
 import {
   batchTestCases as batchVariantAddressTestCases,
@@ -55,6 +56,12 @@ export default function AddressTestScreen() {
               <TestBatchPubkey
                 title={intl.formatMessage({ id: 'title__publickey_test_batch' })}
                 testCases={batchPubkeyTestCases}
+              />
+            </PanelView>
+            <PanelView>
+              <TestBatchPubkey
+                title={intl.formatMessage({ id: 'title__publickey_test_batch_soft' })}
+                testCases={batchSoftPubkeyTestCases}
               />
             </PanelView>
 

@@ -20,7 +20,7 @@ export default class ConfluxSignTransaction extends BaseMethod {
   formattedTx: ConfluxTransaction | undefined;
 
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     validateParams(this.payload, [
       { name: 'path', required: true },

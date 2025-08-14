@@ -42,7 +42,7 @@ const animations = createAnimations({
     type: 'spring',
     damping: 20,
     mass: 1.2,
-    stiffness: 250,
+    stiffness: 150,
   },
 });
 
@@ -363,6 +363,22 @@ const config = createTamagui({
     hoverNone: { hover: 'none' },
     pointerCoarse: { pointer: 'coarse' },
   }),
+
+  defaultProps: {
+    Stack: {
+      // 禁用阴影效果
+      elevation: 0,
+    },
+    Text: {
+      // 禁用文本阴影
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 0,
+    },
+    // 禁用默认动画
+    withStaticProperties: {
+      disableAnimations: true,
+    },
+  },
 });
 
 export type AppConfig = typeof config;

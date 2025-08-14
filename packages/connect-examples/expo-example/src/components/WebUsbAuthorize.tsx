@@ -24,13 +24,13 @@ export function WebUsbAuthorize({
 
   const handleRequestDevice = async () => {
     try {
-      // Request user permission to access the USB device
       const device = await navigator.usb.requestDevice({ filters });
       onSuccess(device);
       onOpenChange(false);
     } catch (error) {
       // User cancelled the device selection or an error occurred
       console.error('WebUSB request device error:', error);
+      onCancel();
     }
   };
 

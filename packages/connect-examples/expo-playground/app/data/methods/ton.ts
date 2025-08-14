@@ -1,0 +1,580 @@
+import type { UnifiedMethodConfig, ChainCategory } from '../types';
+
+const api: UnifiedMethodConfig[] = [
+  {
+    method: 'tonGetAddress',
+
+    presets: [
+      {
+        title: 'Get address',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+
+            value: false,
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            label: 'Wallet Version',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            label: 'Is Bounceable',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            label: 'Is Testnet Only',
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'Get multiaddress',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+
+            value: "m/44'/607'/1'",
+          },
+          {
+            name: 'showOnOneKey',
+            type: 'boolean',
+
+            value: false,
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            label: 'Wallet Version',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            label: 'Is Bounceable',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            label: 'Is Testnet Only',
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'Batch Get Address',
+        parameters: [
+          {
+            name: 'bundle',
+            type: 'textarea',
+            required: true,
+
+            value: [
+              {
+                path: "m/44'/607'/0'",
+                showOnOneKey: false,
+                walletVersion: 3,
+                isBounceable: false,
+                isTestnetOnly: false,
+              },
+              {
+                path: "m/44'/607'/1'",
+                showOnOneKey: false,
+                walletVersion: 3,
+                isBounceable: false,
+                isTestnetOnly: false,
+              },
+              {
+                path: "m/44'/607'/2'",
+                showOnOneKey: false,
+                walletVersion: 3,
+                isBounceable: false,
+                isTestnetOnly: false,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'tonSignMessage',
+
+    presets: [
+      {
+        title: 'Native',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'destination',
+            type: 'string',
+            required: true,
+            label: 'Destination',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'tonAmount',
+            type: 'number',
+            required: true,
+            label: 'Ton Amount',
+            value: 100,
+          },
+          {
+            name: 'seqno',
+            type: 'number',
+            required: true,
+            label: 'Seqno',
+            value: 0,
+          },
+          {
+            name: 'expireAt',
+            type: 'number',
+            label: 'Expire At',
+            value: Date.now() + 1000 * 60 * 60 * 24,
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            label: 'Wallet Version',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            label: 'Is Bounceable',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            label: 'Is Testnet Only',
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'Multiple Native',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'destination',
+            type: 'string',
+            required: true,
+            label: 'Destination',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'tonAmount',
+            type: 'number',
+            required: true,
+            label: 'Ton Amount',
+            value: 100,
+          },
+          {
+            name: 'seqno',
+            type: 'number',
+            required: true,
+            label: 'Seqno',
+            value: 0,
+          },
+          {
+            name: 'expireAt',
+            type: 'number',
+            label: 'Expire At',
+            value: Date.now() + 1000 * 60 * 60 * 24,
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            label: 'Wallet Version',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            label: 'Is Bounceable',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            label: 'Is Testnet Only',
+            value: false,
+          },
+          {
+            name: 'extDestination',
+            type: 'textarea',
+            label: 'Ext Destination',
+            value: ['UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_'],
+          },
+          {
+            name: 'extTonAmount',
+            type: 'textarea',
+            label: 'Ext Ton Amount',
+            value: [100],
+          },
+          {
+            name: 'extPayload',
+            type: 'textarea',
+            label: 'Ext Payload',
+            value: ['48656c6c6f204f6e654b6579'],
+          },
+        ],
+      },
+      {
+        title: 'Token',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'destination',
+            type: 'string',
+            required: true,
+            label: 'Destination',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'tonAmount',
+            type: 'number',
+            required: true,
+            label: 'Ton Amount',
+            value: 100,
+          },
+          {
+            name: 'seqno',
+            type: 'number',
+            required: true,
+            label: 'Seqno',
+            value: 0,
+          },
+          {
+            name: 'expireAt',
+            type: 'number',
+            label: 'Expire At',
+            value: Date.now() + 1000 * 60 * 60 * 24,
+          },
+          {
+            name: 'jettonMasterAddress',
+            type: 'string',
+            required: true,
+            label: 'Jetton Master Address',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'jettonAmount',
+            type: 'number',
+            required: true,
+            label: 'Jetton Amount',
+            value: 101,
+          },
+          {
+            name: 'fwdFee',
+            type: 'number',
+            label: 'Fwd Fee',
+            value: 100,
+          },
+          {
+            name: 'comment',
+            type: 'string',
+            label: 'Comment',
+            value: '48656c6c6f204f6e654b6579',
+          },
+          {
+            name: 'mode',
+            type: 'number',
+            label: 'Mode',
+            value: 1,
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            label: 'Wallet Version',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            label: 'Is Bounceable',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            label: 'Is Testnet Only',
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'Token (Big Number)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'destination',
+            type: 'string',
+            required: true,
+            label: 'Destination',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'tonAmount',
+            type: 'number',
+            required: true,
+            label: 'Ton Amount',
+            value: 100,
+          },
+          {
+            name: 'seqno',
+            type: 'number',
+            required: true,
+            label: 'Seqno',
+            value: 0,
+          },
+          {
+            name: 'expireAt',
+            type: 'number',
+            label: 'Expire At',
+            value: Date.now() + 1000 * 60 * 60 * 24,
+          },
+          {
+            name: 'jettonMasterAddress',
+            type: 'string',
+            required: true,
+            label: 'Jetton Master Address',
+            value: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+          },
+          {
+            name: 'jettonAmount',
+            type: 'string',
+            required: true,
+            label: 'Jetton Amount',
+            value: '500000000000000000',
+          },
+          {
+            name: 'fwdFee',
+            type: 'number',
+            label: 'Fwd Fee',
+            value: 100,
+          },
+          {
+            name: 'comment',
+            type: 'string',
+            label: 'Comment',
+            value: '48656c6c6f204f6e654b6579',
+          },
+          {
+            name: 'mode',
+            type: 'number',
+            label: 'Mode',
+            value: 1,
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            label: 'Wallet Version',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            label: 'Is Bounceable',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            label: 'Is Testnet Only',
+            value: false,
+          },
+        ],
+      },
+      {
+        title: 'Token (Big Data) - SIMPLIFIED',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'useEmptyPassphrase',
+            type: 'boolean',
+            label: 'Use Empty Passphrase',
+            value: true,
+          },
+          {
+            name: 'destination',
+            type: 'string',
+            required: true,
+            label: 'Destination',
+            value: 'EQA7JG8bpYAUrfcWybTE4krvsbE8m9G3cIGfzYfvezANBoP6',
+          },
+          {
+            name: 'tonAmount',
+            type: 'string',
+            required: true,
+            label: 'Ton Amount',
+            value: '60000000',
+          },
+          {
+            name: 'seqno',
+            type: 'number',
+            required: true,
+            label: 'Seqno',
+            value: 232,
+          },
+          {
+            name: 'expireAt',
+            type: 'number',
+            label: 'Expire At',
+            value: Date.now() + 1000 * 60 * 60 * 24,
+          },
+          {
+            name: 'comment',
+            type: 'string',
+            label: 'Comment',
+            value:
+              'b5ee9c7241010201008f000163000000150000000000000000800bf1271477abdae81fc28f536bfba2ebb01b608995cc4d9518bd7cc5a962e4d04805f5e1010100af178d451900000000000000007038d7ea4c680008007648de374b00295bee2d936989c495df63627937a36ee1033f9b0fdef6601a0d0017e24e28ef57b5d03f851ea6d7f745d76036c1132b989b2a317af98b52c5c9a08405d3eadf61',
+          },
+          {
+            name: 'isRawData',
+            type: 'boolean',
+            label: 'Is Raw Data',
+            value: true,
+          },
+          {
+            name: 'mode',
+            type: 'number',
+            label: 'Mode',
+            value: 3,
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            label: 'Wallet Version',
+            value: 3,
+          },
+          {
+            name: 'initState',
+            type: 'string',
+            label: 'Init State',
+            value:
+              'b5ee9c72410264010010ed00020134010f0114ff00f4a413f4bcf2c80b02020162030c0202cc040b01f5d906380492f81f000e8698180b8d8492f81f07d207d2018fd0018b8eb90fd0018fd001839d4da0001698fe99ff6a2687d007d206a6a18400aa9385d47199a9a9b1b289a6382f97024817d207d006a18106840306b90fd001812881a282178048a502819e428027d012c678b666664f6aa7041083deecbef29385d40504f48ee036373701fa00fa40f82854120670542013541403c85004fa0258cf1601cf16ccc922c8cb0112f400f400cb00c9f9007074c8cb02ca07cbffc9d05006c705f2e04aa1034545c85004fa0258cf16ccccc9ed5401fa403020d70b01c300915be30de082102c76b9735270bae30235373723c003e3023502c0040607090a003e8210d53276db708010c8cb055003cf1622fa0212cb6acb1fcb3fc98042fb0001fe365f03820898968015a015bcf2e04b02fa40d3003095c821cf16c9916de28210d1735400708018c8cb055005cf1624fa0214cb6a13cb1f14cb3f23fa443070ba8e33f828440370542013541403c85004fa0258cf1601cf16ccc922c8cb0112f400f400cb00c9f9007074c8cb02ca07cbffc9d0cf16966c227001cb01e2f40008000ac98040fb000034335035c705f2e04903fa403059c85004fa0258cf16ccccc9ed5400428e185124c705f2e049d4304300c85004fa0258cf16ccccc9ed54e05f05840ff2f00093b3f0508806e0a84026a8280790a009f404b19e2c039e2d99924591960225e801e80196019241f200e0e9919605940f97ff93a0ef003191960ab19e2ca009f4042796d625999992e3f60102037a600d0e007dadbcf6a2687d007d206a6a183618fc1400b82a1009aa0a01e428027d012c678b00e78b666491646580897a007a00658064fc80383a6465816503e5ffe4e840001faf16f6a2687d007d206a6a183faa904002430800bf1271477abdae81fc28f536bfba2ebb01b608995cc4d9518bd7cc5a962e4d051052010300c011020158121702012013150141bf4546a6ffe1b79cfdd86bad3db874313dcde2fb05e6a74aa7f3552d9617c79d13140042004a6f696e742050686f746f6772617068696320457870657274732047726f75700141bf6ed4f942a7848ce2cb066b77a1128c6a1ff8c43f438a2dce24612ba9ffab8b0316000a004a5045470201201850020120191c0141bf2411bde8deb43a9f3b9ccd56613e950a260be2cdf23def3b247deb1c69f344121a01fe004a504547206973206120636f6d6d6f6e6c792075736564206d6574686f64206f66206c6f73737920636f6d7072657373696f6e20666f72206469676974616c20696d616765732c20706172746963756c61726c7920666f722074686f736520696d616765732070726f6475636564206279206469676974616c2070686f741b00f46f6772617068792e2054686520646567726565206f6620636f6d7072657373696f6e2063616e2062652061646a75737465642c20616c6c6f77696e6720612073656c65637461626c652074726164656f6666206265747765656e2073746f726167652073697a6520616e6420696d616765207175616c6974792e0141bf26a2333b1e7bbd67212d9c44da883b39334032aab56f11f8b08220a4553ba7921d010301c01e0203cdc01f4e0201202037020120212c020120222702012023250101202400fe646174613a696d6167652f706e673b6261736536342c6956424f5277304b47676f414141414e5355684555674141414f45414141446843414d414141414a62534a49414141416456424d5645582f2f2f38724b797453556c4954457850543039506d3575596348427a4b797371586c35635a47526d6e7036636e4a796449530101202600fe456a72362b744f546b354c533073774d444168495348613274713374376667344f42726132734b436772773850423364336443516b4a65586c343950543239766232676f4b4376723638414141444f7a73356a59324f4467344f4e6a593177634841324e6a61536b704a3079525A5541414146586b6c45515652346e4f3364020120282a0101202900fe653365614d42674763434549786b67564369694956473374392f2b4953384c46532b314552793636352f6c6a5A7757336b39397965563978357a676149516943494169434941694349416943494168694c4746515466383569576e4637776b4b5175692f5a3259743854754c6e4345796e31744b6e4753442b427a6e7a62560101202b00fe7a46754f506759426336466f3569312f444c4e46612b505A6d495A454d425252433135324e54594d754d783559614E3965394959577572597456415643793436623459573237555556517276326f684b68565556446964437168617049614e464356535730703446544a72536d6143675457724d5846516f743259737168580201202d320201202e300101202f00fe5930634771464E75784670554972467170696f5156465137585166414f6e576d692b614b67586d74364C476f53473936494F6f646d696f554e6f64692f71455A7263693571454268733462554a6a7336684c6147366836684f614b686f61685959614f4931435130564471394449587451724e46453064417631487a6561680101203100fe5162326f6e61683972326f58366937614f675838675a4f36304931494e53385549304974545A775a6f51363936495a6f6336695955716f62793861453270723441774b4e5230334177726e39776c314c64514268624e3768587149417772586477753146493042685975376856714b786f444342795a527830496455736a7902012033350101203400fe42346a4B5439516868592f4e6f7571394f4B7a5163513735374E34637771635333682b57425338756441694545454a6f47676768684242434343474545454949495951515167676868424243434347454545494949595151516767686842424343434745454549494959510101203600fe515167676868424243434347454545494949595157434a6d4d336349467a2f463334676443614d524f62352f6c6c45656a664f36363839776866622b557a3443516c4845637a79516f6944325a494b6a3265664e53576a55586d385154762f4f525972704e787374776e48685679766f5a5451693334546963533245636a750201203843020120393e0201203a3c0101203b00fe754559546975367256483374754c7a61314e4B79524645486233777442625A58305771776c6877416659434774634B416365786d765743734e6a6c6f325130633279767450384d6c34476878375461463634583631576d796f5234393632637868576b324e532b564c6d6c4A4957544e4B695350656c2f414f786535746f580101203d00fe706a3755655354773763593861666643486645373149765253716e4E696949487a4557525751394654386e68796351316d634f49784d2b347267567070647a5138587463454f37362f7a55346450593432744f62524536624346325673367543396c6141732b2b6564656665345876334977315169667a75434839525367760201203f410101204000fe42765343336176773279614d7267705a4c696134654f6962642b30524d6f475958352f446143576d384c454f30426f682b6551374c61487453554f6a4c6b357a62644a6a30316b707a4958434a36753266616b31717937697543526250722b374f397074713453724e453333453038573841503730644d7359334741696a300101204200fe363634522b31755832796a5576504f6e615A75324b5047314c76597a58696b524d646976304e38737533733354783779776137334c745279744642376658735438674c6b55546f372f42734754434a4f343342544e4f3854367048484f3378366572644a3244734d6e455971424d2b625464767a58716f553461593758324b020120444902012045470101204600fe7951535A506e455A37647669495562546476537473663677635A30667146684b4C696a3763586678664C58306a4931714c682b64484B765a445149525766524d3835652b6c7243646c427441487639505331374A58324961385138686c4175546a32706b7732656b387233475730533432696c657a7256686e76795a6c6f5A0101204800fe4e667977724d4b782b573036724B7072306676645773333361667531326f6a48797947322f786d4f323670384f5270597569314e795a312b3871373862423570766a653431322b5953456636465868576576643371464675547835497277732b7a796d4d537773677943345847662b5a6875633562323778576978385a71330201204a4C0101204b00fe49734733533239506f426c68744f33574A7548354d5579666e4f66302b524f6a326472647055587545372f6e473249546e7a33784e77724A375250697434694f314f3550312b527a733368785a5378716f6c6b592b5837327965746471652b7a59623343614c2f35724d524275482f6f30656354434f6c304b51755a3938740101204d00fe6f586b50494B316e395165464C43746d75436f4C794d394949314833534d4d6f4C6e4C34396145426f494242432b4e384c457775456e6c4C684b4c7339424d584a6c6d71464f37326c3457665954433177745030774c50776f4651744865374d376b6161716761505256362f2f5836636d6a4f7a554130656a3670425233300101d24f008c526f74706a7141504A3430346d4a544C654b6a314545515241455152414551524145515241455166365350346a5076375748476f47754141414141456c46546b5375516d43430141bf5d01fa5e3c06901c45046c6b2ddcea5af764fea0eed72a10d404f2312ceb247d51000400390114ff00f4a413f4bcf2c80b5302016254630202cc55580201d4565700c30831c02497c138007434c0c05c6c2544d7c0fc02f83e903e900c7e800c5c75c87e800c7e800c1cea6d0000b4c7e08403e29fa954882ea54c4d167c0238208405e3514654882ea58c511100fc02780d60841657c1ef2ea4d67c02b817c12103fcbc2000113e910c1c2ebcb8536002014859600201205a5c01f100f4cffe803e90087c007b51343e803e903e90350c144da8548ab1c17cb8b04a30bffcb8b0950d109c150804d50500f214013e809633c58073c5b33248b232c044bd003d0032c032483e401c1d3232c0b281f2fff274013e903d010c7e800835d270803cb8b11de0063232c1540233c59c3e80b2dab33260103ec01004f214013e809633c58073c5b3327b55200083200835c87b51343e803e903e90350c0134c7e08405e3514654882ea0841ef765f784ee84ac7cb8b174cfcc7e800c04e81408f214013e809633c58073c5b3327b5520001ba0f605da89a1f401f481f481a8610e57ba0a',
+          },
+          {
+            name: 'signingMessageRepr',
+            type: 'string',
+            label: 'Signing Message Repr',
+            value:
+              '011c29a9a31767dbe630000000e80003000fb9247822504822a7621b17bff37ce74701ba2b2bd6553cd74682b83d8f53512c',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    method: 'tonSignProof',
+    description: 'methodDescriptions.tonSignProof',
+    presets: [
+      {
+        title: 'Sign Proof',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+
+            value: "m/44'/607'/0'",
+          },
+          {
+            name: 'appdomain',
+            type: 'string',
+            required: true,
+            label: 'Appdomain',
+            value: 'onekey.so',
+          },
+          {
+            name: 'comment',
+            type: 'string',
+            label: 'Comment',
+            value: '48656c6c6f204f6e654b6579',
+          },
+          {
+            name: 'expireAt',
+            type: 'number',
+            label: 'Expire At',
+            value: Date.now() + 1000 * 60 * 60 * 24,
+          },
+          {
+            name: 'walletVersion',
+            type: 'number',
+            label: 'Wallet Version',
+            value: 3,
+          },
+          {
+            name: 'isBounceable',
+            type: 'boolean',
+            label: 'Is Bounceable',
+            value: false,
+          },
+          {
+            name: 'isTestnetOnly',
+            type: 'boolean',
+            label: 'Is Testnet Only',
+            value: false,
+          },
+        ],
+      },
+    ],
+  },
+];
+
+// 导出链配置对象
+export const ton: {
+  api: UnifiedMethodConfig[];
+  id: ChainCategory;
+} = {
+  id: 'ton',
+  api,
+};

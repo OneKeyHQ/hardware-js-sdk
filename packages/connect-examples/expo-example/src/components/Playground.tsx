@@ -36,7 +36,7 @@ export interface PresupposeProps {
 }
 
 export type PlaygroundProps = {
-  description: string;
+  description?: string;
   presupposes?: PresupposeProps[];
   deprecated?: boolean;
 
@@ -106,7 +106,7 @@ const Playground = ({
           </Text>
           <Group orientation="horizontal" paddingHorizontal="$2" flexWrap="wrap">
             {presupposes.map((presuppose, index) => (
-              <Group.Item key={presuppose.title}>
+              <Group.Item key={`presuppose-${presuppose.title}-${index}`}>
                 <Button onPress={fillParameterCallback(index)}>{presuppose.title}</Button>
               </Group.Item>
             ))}

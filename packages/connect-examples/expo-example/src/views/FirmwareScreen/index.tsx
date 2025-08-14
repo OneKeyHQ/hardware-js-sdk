@@ -3,11 +3,12 @@ import { Checkbox, type CheckedState, H5, Label, Stack, Text, XStack } from 'tam
 import { Check as CheckIcon } from '@tamagui/lucide-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import type { Features, OnekeyFeatures } from '@onekeyfe/hd-core';
+import { getFirmwareType, type Features, type OnekeyFeatures } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
-import { EDeviceType } from '@onekeyfe/hd-shared';
-import type { Device, IDeviceListInstance } from '../../components/DeviceList';
+import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
+import { useAtomValue, useSetAtom } from 'jotai';
+import type { IDeviceListInstance } from '../../components/DeviceList';
 import PageView from '../../components/ui/Page';
 import PanelView from '../../components/ui/Panel';
 import { Button } from '../../components/ui/Button';
@@ -18,10 +19,11 @@ import { MessageBox } from './MessageBox';
 import { FirmwareUpdateEvent } from './FirmwareUpdateEvent';
 import { DeviceFieldContext } from './DeviceFieldContext';
 import { DeviceInfoFieldGroup, DeviceSeFieldGroup } from './DeviceFieldGroup';
-import { ExportDeviceInfo, formatCurrentTime } from './ExportDeviceInfo';
+import { ExportDeviceInfo, formatCurrentTime, getDeviceMode } from './ExportDeviceInfo';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
+import { selectDeviceAtom } from '../../atoms/deviceAtoms';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
 type UpdateState = {
@@ -180,18 +182,214 @@ function FirmwareLocalFile({ title, type, onUpdate, deviceType }: FirmwareLocalF
   );
 }
 
+interface FirmwareMultipleFilesProps {
+  title: string;
+  deviceType: string;
+  onUpdate: (options: {
+    firmwareBinary?: ArrayBuffer;
+    bleBinary?: ArrayBuffer;
+    bootloaderBinary?: ArrayBuffer;
+    resourceBinary?: ArrayBuffer;
+  }) => Promise<UpdateState | undefined>;
+}
+
+function FirmwareMultipleFiles({ title, onUpdate, deviceType }: FirmwareMultipleFilesProps) {
+  const intl = useIntl();
+  const [updateState, setUpdateState] = useState<UpdateState | undefined>();
+  const [loading, setLoading] = useState<boolean>(false);
+  const media = useMedia();
+
+  const [firmwareFile, setFirmwareFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [bleFile, setBleFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [bootloaderFile, setBootloaderFile] = useState<DocumentPicker.DocumentPickerAsset | null>(
+    null
+  );
+  const [resourceFile, setResourceFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+
+  // eslint-disable-next-line no-nested-ternary
+  const width = media.gtLg ? '48%' : media.gtSm ? '100%' : '100%';
+
+  const selectFile = (type: string) => {
+    // source -> .zip
+    // ble & firmware & bootloader -> .bin
+    const fileType = type === 'resource' ? 'application/zip' : 'application/octet-stream';
+    DocumentPicker.getDocumentAsync({
+      type: fileType,
+    }).then(res => {
+      if (res.canceled) return;
+      if (res.assets.length === 0) {
+        alert(intl.formatMessage({ id: 'tip__no_select_file_tip' }));
+        return;
+      }
+
+      if (type === 'firmware') {
+        setFirmwareFile(res.assets[0]);
+      } else if (type === 'ble') {
+        setBleFile(res.assets[0]);
+      } else if (type === 'bootloader') {
+        setBootloaderFile(res.assets[0]);
+      } else if (type === 'resource') {
+        setResourceFile(res.assets[0]);
+      }
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!firmwareFile && !bleFile && !bootloaderFile && !resourceFile) {
+      alert(intl.formatMessage({ id: 'tip__need_select_at_least_one_file' }));
+      return;
+    }
+
+    setUpdateState(undefined);
+    setLoading(true);
+
+    try {
+      const firmwareBinary = firmwareFile ? await firmwareFile.file?.arrayBuffer() : undefined;
+      const bleBinary = bleFile ? await bleFile.file?.arrayBuffer() : undefined;
+      const bootloaderBinary = bootloaderFile
+        ? await bootloaderFile.file?.arrayBuffer()
+        : undefined;
+      const resourceBinary = resourceFile ? await resourceFile.file?.arrayBuffer() : undefined;
+
+      const res = await onUpdate({
+        firmwareBinary,
+        bleBinary,
+        bootloaderBinary,
+        resourceBinary,
+      });
+
+      setUpdateState(res);
+    } catch (error: any) {
+      setUpdateState({
+        success: false,
+        payload: error.message || 'Unknown error occurred',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Stack
+      padding="$2"
+      gap="$2"
+      borderColor="$border"
+      borderWidth="$px"
+      borderRadius="$3"
+      width={width}
+    >
+      <H5>{title}</H5>
+
+      <Stack gap="$3">
+        <Stack
+          padding="$2"
+          backgroundColor="$bgHover"
+          gap="$2"
+          borderRadius="$2"
+          flexDirection="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Text>
+            {firmwareFile?.name
+              ? firmwareFile.name
+              : intl.formatMessage({ id: 'tip__no_select_firmware_file' })}
+          </Text>
+          <Button onPress={() => selectFile('firmware')}>
+            {intl.formatMessage({ id: 'label__device_select_firmware' })}
+          </Button>
+        </Stack>
+
+        {deviceType !== EDeviceType.Mini && (
+          <Stack
+            padding="$2"
+            backgroundColor="$bgHover"
+            gap="$2"
+            borderRadius="$2"
+            flexDirection="row"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Text>
+              {bleFile?.name ? bleFile.name : intl.formatMessage({ id: 'tip__no_select_ble_file' })}
+            </Text>
+            <Button onPress={() => selectFile('ble')}>
+              {intl.formatMessage({ id: 'label__device_select_ble_firmware' })}
+            </Button>
+          </Stack>
+        )}
+
+        <Stack
+          padding="$2"
+          backgroundColor="$bgHover"
+          gap="$2"
+          borderRadius="$2"
+          flexDirection="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Text>
+            {bootloaderFile?.name
+              ? bootloaderFile.name
+              : intl.formatMessage({ id: 'tip__no_select_bootloader_file' })}
+          </Text>
+          <Button onPress={() => selectFile('bootloader')}>
+            {intl.formatMessage({ id: 'label__device_select_bootloader' })}
+          </Button>
+        </Stack>
+
+        {(deviceType === EDeviceType.Pro || deviceType === EDeviceType.Touch) && (
+          <Stack
+            padding="$2"
+            backgroundColor="$bgHover"
+            gap="$2"
+            borderRadius="$2"
+            flexDirection="row"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Text>
+              {resourceFile?.name
+                ? resourceFile.name
+                : intl.formatMessage({ id: 'tip__no_select_resource_file' })}
+            </Text>
+            <Button onPress={() => selectFile('resource')}>
+              {intl.formatMessage({ id: 'label__device_select_sys_resource' })}
+            </Button>
+          </Stack>
+        )}
+      </Stack>
+
+      <Button
+        variant="primary"
+        size="large"
+        disabled={loading || (!firmwareFile && !bleFile && !bootloaderFile && !resourceFile)}
+        onPress={handleUpdate}
+      >
+        {intl.formatMessage({ id: 'action__update' })}
+      </Button>
+
+      {loading && <Text>{intl.formatMessage({ id: 'tip__updating' })}...</Text>}
+
+      {updateState && (
+        <Text color={updateState?.success ? '$text' : '$textCritical'}>
+          {updateState?.success
+            ? intl.formatMessage({ id: 'tip__update_success' })
+            : updateState?.payload}
+        </Text>
+      )}
+    </Stack>
+  );
+}
+
 interface FirmwareUpdateProps {
-  selectDevice: Device | undefined;
   onReconnectDevice: () => void;
   onDisconnectDevice: () => void;
 }
-function FirmwareUpdate({
-  selectDevice,
-  onDisconnectDevice,
-  onReconnectDevice,
-}: FirmwareUpdateProps) {
+function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdateProps) {
   const intl = useIntl();
   const { sdk } = useContext(HardwareSDKContext);
+  const selectDevice = useAtomValue(selectDeviceAtom);
   const [features, setFeatures] = useState<Features | undefined>(undefined);
   const [onekeyFeatures, setOnekeyFeatures] = useState<OnekeyFeatures | undefined>(undefined);
   const [connecting, setConnecting] = useState<boolean>(false);
@@ -253,6 +451,44 @@ function FirmwareUpdate({
     onDisconnectDevice?.();
   }, [onDisconnectDevice]);
 
+  const firmwareUpdateV3 = useCallback(
+    async ({
+      firmwareBinary,
+      bleBinary,
+      bootloaderBinary,
+      resourceBinary,
+    }: {
+      firmwareBinary?: ArrayBuffer;
+      bleBinary?: ArrayBuffer;
+      bootloaderBinary?: ArrayBuffer;
+      resourceBinary?: ArrayBuffer;
+    }) => {
+      if (!sdk)
+        return { payload: intl.formatMessage({ id: 'tip__sdk_not_ready' }), success: false };
+      if (!features) return { payload: 'features is not ready', success: false };
+      if (!selectDevice) return { payload: 'need connect device', success: false };
+      setShowUpdateDialog(true);
+      try {
+        const res = await sdk.firmwareUpdateV3(selectDevice.connectId, {
+          firmwareBinary,
+          bleBinary,
+          bootloaderBinary,
+          resourceBinary,
+          platform: 'web',
+        });
+        setShowUpdateDialog(false);
+        return {
+          success: res.success,
+          payload: res.success ? undefined : res.payload?.error,
+        };
+      } catch (error: any) {
+        setShowUpdateDialog(false);
+        return { payload: error.message || 'Unknown error occurred', success: false };
+      }
+    },
+    [features, intl, sdk, selectDevice, setShowUpdateDialog]
+  );
+
   const updateFirmware = useCallback(
     async ({
       type,
@@ -306,17 +542,16 @@ function FirmwareUpdate({
         };
       }
 
-      if (type === 'ble' || type === 'firmware' || type === 'bootloader') {
+      if (type === 'ble' || type === 'firmware') {
         setShowUpdateDialog(true);
-        const res = await sdk.firmwareUpdate(
+        const res = await sdk.firmwareUpdateV2(
           Platform.OS === 'web' ? undefined : selectDevice.connectId,
           {
-            updateType: type === 'bootloader' ? 'firmware' : type,
             binary: fileData,
-            rebootOnSuccess: reboot,
+            updateType: type,
+            platform: 'web',
           }
         );
-
         setShowUpdateDialog(false);
         if (!res.success) {
           return {
@@ -329,6 +564,22 @@ function FirmwareUpdate({
         };
       }
 
+      if (type === 'bootloader') {
+        setShowUpdateDialog(true);
+        const res = await sdk.deviceUpdateBootloader(selectDevice.connectId, {
+          binary: fileData,
+        });
+        setShowUpdateDialog(false);
+        if (!res.success) {
+          return {
+            success: false,
+            payload: res.payload.error,
+          };
+        }
+        return {
+          success: true,
+        };
+      }
       if (type === 'source') {
         setShowUpdateDialog(true);
         const res = await sdk.deviceFullyUploadResource(selectDevice.connectId, {
@@ -434,10 +685,16 @@ function FirmwareUpdate({
                 <DeviceField
                   field={intl.formatMessage({ id: 'label__device_device_statue' })}
                   value={intl.formatMessage({
+                    id: getDeviceMode(features),
+                  })}
+                />
+                <DeviceField
+                  field={intl.formatMessage({ id: 'label__device_firmware_type' })}
+                  value={intl.formatMessage({
                     id:
-                      features.bootloader_mode === true
-                        ? 'label__device_bootloader_statue'
-                        : 'label__device_firmware_status',
+                      getFirmwareType(features) === EFirmwareType.BitcoinOnly
+                        ? 'label__device_firmware_type_bitcoin_only'
+                        : 'label__device_firmware_type_universal',
                   })}
                 />
               </Stack>
@@ -467,17 +724,24 @@ function FirmwareUpdate({
 
             <PanelView title={intl.formatMessage({ id: 'title__device_firmware_update' })}>
               <XStack flexWrap="wrap" gap="$2">
+                {deviceTypeLowerCase === EDeviceType.Pro && (
+                  <FirmwareMultipleFiles
+                    deviceType={deviceTypeLowerCase}
+                    title={intl.formatMessage({ id: 'label__device_update_firmware_v3' })}
+                    onUpdate={firmwareUpdateV3}
+                  />
+                )}
                 <FirmwareLocalFile
                   deviceType={deviceTypeLowerCase}
                   title={intl.formatMessage({ id: 'label__device_update_firmware' })}
                   type="firmware"
                   onUpdate={updateFirmware}
                 />
-                {deviceTypeLowerCase !== 'mini' && (
+                {deviceTypeLowerCase !== EDeviceType.Mini && (
                   <FirmwareLocalFile
                     deviceType={deviceTypeLowerCase}
                     title={intl.formatMessage({ id: 'label__device_update_ble_firmware' })}
-                    type="firmware"
+                    type="ble"
                     onUpdate={updateFirmware}
                   />
                 )}
@@ -514,15 +778,14 @@ function FirmwareUpdate({
 }
 
 export default function FirmwareScreen() {
-  const [selectedDevice, setSelectedDevice] = useState<Device | undefined>(undefined);
+  const setSelectedDevice = useSetAtom(selectDeviceAtom);
   const deviceListInstanceRef = useRef<IDeviceListInstance>(null);
 
   return (
     <PageView>
       <Stack padding="$2">
-        <DeviceList ref={deviceListInstanceRef} onSelected={setSelectedDevice} disableSaveDevice />
+        <DeviceList ref={deviceListInstanceRef} disableSaveDevice />
         <FirmwareUpdate
-          selectDevice={selectedDevice}
           onDisconnectDevice={() => setSelectedDevice(undefined)}
           onReconnectDevice={() => {
             deviceListInstanceRef.current?.searchDevices();

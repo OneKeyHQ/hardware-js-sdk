@@ -14,6 +14,7 @@ export type EVMGetPublicKeyParams = {
   path: string | number[];
   showOnOneKey?: boolean;
   chainId?: number;
+  useBatch?: boolean;
 };
 
 export declare function evmGetPublicKey(
@@ -31,5 +32,5 @@ export declare function evmGetPublicKey(
 export declare function evmGetPublicKey(
   connectId: string,
   deviceId: string,
-  params: CommonParams & { bundle?: EVMGetPublicKeyParams[]; useBatch?: boolean }
+  params: CommonParams & { bundle?: EVMGetPublicKeyParams[] }
 ): Response<Omit<EVMPublicKey, 'node' | 'xpub'>>;

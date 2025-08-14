@@ -3,7 +3,7 @@ import { type PlaygroundProps } from '../components/Playground';
 const api: PlaygroundProps[] = [
   {
     method: 'tonGetAddress',
-    description: 'Get address',
+
     presupposes: [
       {
         title: 'Get address',
@@ -57,7 +57,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'tonSignMessage',
-    description: 'Sign Message',
+
     presupposes: [
       {
         title: 'Native',

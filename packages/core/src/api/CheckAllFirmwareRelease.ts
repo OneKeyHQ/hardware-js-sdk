@@ -11,29 +11,39 @@ import {
   AllFirmwareRelease,
   CheckAllFirmwareReleaseParams,
 } from '../types/api/checkAllFirmwareRelease';
+import { getDeviceFirmwareVersion, getDeviceType } from '../utils';
 
 export default class CheckAllFirmwareRelease extends BaseMethod {
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
   }
 
   async run() {
     const { features } = this.device;
-    const { platform } = this.payload as CheckAllFirmwareReleaseParams;
+    const { checkBridgeRelease } = this.payload as CheckAllFirmwareReleaseParams;
 
     if (!features) {
       return Promise.resolve(null);
     }
 
     const firmwareRelease = getFirmwareReleaseInfo(features);
+
+    const currentFirmwareVersion = getDeviceFirmwareVersion(features).join('.');
     const willUpdateFirmwareVersion = firmwareRelease.release?.version?.join('.');
+    const deviceType = getDeviceType(features);
+
     let bridgeReleaseInfo = null;
-    if (firmwareRelease.status === 'required' || firmwareRelease.status === 'outdated') {
-      if ((platform === 'web' || platform === 'ext') && willUpdateFirmwareVersion) {
-        bridgeReleaseInfo = await getBridgeReleaseInfo(features, willUpdateFirmwareVersion);
-      }
+    if (
+      checkBridgeRelease &&
+      (firmwareRelease.status === 'required' || firmwareRelease.status === 'outdated')
+    ) {
+      bridgeReleaseInfo = await getBridgeReleaseInfo({
+        deviceType,
+        currentFirmwareVersion,
+        willUpdateFirmwareVersion,
+      });
     }
     const bootloaderRelease = getBootloaderReleaseInfo(features, willUpdateFirmwareVersion);
     const bleFirmwareReleaseInfo = getBleFirmwareReleaseInfo(features);
@@ -44,6 +54,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
       ble: bleFirmwareReleaseInfo,
       bridge: bridgeReleaseInfo
         ? {
+            shouldUpdate: bridgeReleaseInfo.shouldUpdate,
             status: bridgeReleaseInfo.shouldUpdate ? 'outdated' : 'valid',
             changelog: bridgeReleaseInfo.changelog,
             release: bridgeReleaseInfo.releaseVersion,

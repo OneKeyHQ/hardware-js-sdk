@@ -3,17 +3,19 @@ import EventEmitter from 'events';
 import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
-  createDeprecatedHardwareError,
-  createNeedUpgradeFirmwareHardwareError,
-  createNewFirmwareForceUpdateHardwareError,
-  createNewFirmwareUnReleaseHardwareError,
   Deferred,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
+  createDeprecatedHardwareError,
+  createNeedUpgradeFirmwareHardwareError,
+  createNewFirmwareForceUpdateHardwareError,
+  createNewFirmwareUnReleaseHardwareError,
+  createDefectiveFirmwareError,
 } from '@onekeyfe/hd-shared';
 import {
   getDeviceFirmwareVersion,
+  getDeviceBLEFirmwareVersion,
   enableLog,
   getLogger,
   LoggerNames,
@@ -21,6 +23,10 @@ import {
   wait,
   getMethodVersionRange,
 } from '../utils';
+import {
+  findDefectiveBatchDevice,
+  getDefectiveDeviceInfo,
+} from '../utils/findDefectiveBatchDevice';
 import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
@@ -47,8 +53,12 @@ import type { BaseMethod } from '../api/BaseMethod';
 import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
+import RequestQueue from './RequestQueue';
+import { getSynchronize } from '../utils/getSynchronize';
 
 const Log = getLogger(LoggerNames.Core);
+
+export type CoreContext = ReturnType<Core['getCoreContext']>;
 
 function hasDeriveCardano(method: BaseMethod): boolean {
   if (
@@ -75,8 +85,6 @@ let _core: Core;
 let _deviceList: DeviceList | undefined;
 let _connector: DeviceConnector | undefined;
 let _uiPromises: UiPromise<UiPromiseResponse['type']>[] = []; // Waiting for ui response
-let _callPromise: Deferred<any> | undefined;
-const callApiQueue: BaseMethod[] = [];
 
 const deviceCacheMap = new Map<string, Device>();
 let pollingId = 1;
@@ -88,14 +96,13 @@ let preConnectCache: {
   passphraseState: undefined,
 };
 
-export const callAPI = async (message: CoreMessage) => {
+export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(ERRORS.TypedError('on call: message.id or message.payload is missing'));
   }
 
   // find api method
   let method: BaseMethod;
-  let messageResponse: any;
   try {
     method = findMethod(message as IFrameCallMessage);
     method.connector = _connector;
@@ -115,16 +122,73 @@ export const callAPI = async (message: CoreMessage) => {
       return createResponseMessage(method.responseID, false, { error });
     }
   }
-
   // push method to queue
-  callApiQueue.push(method);
+  // callApiQueue.push(method);
 
-  if (callApiQueue.length > 1) {
-    Log.debug(
-      'should cancel the previous method execution: ',
-      callApiQueue.map(m => m.name)
-    );
+  // if (callApiQueue.length > 1) {
+  //   Log.debug(
+  //     'should cancel the previous method execution: ',
+  //     callApiQueue.map(m => m.name)
+  //   );
+  // }
+
+  const { requestQueue, methodSynchronize } = context;
+  const error = await methodSynchronize(() => {
+    for (const requestId of requestQueue.getRequestTasksId()) {
+      const task = requestQueue.getTask(requestId);
+      Log.debug(
+        'pre request task: ',
+        `task?.id: ${task?.id},
+      task?.method.connectId: ${task?.method.connectId},
+      task?.method.deviceId: ${task?.method.deviceId},
+      task?.method.name: ${task?.method.name}`
+      );
+      // if (task) {
+      //   return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceBusy));
+      // }
+    }
+    return null;
+  });
+
+  if (error) {
+    return createResponseMessage(method.responseID, false, { error });
   }
+
+  return onCallDevice(context, message, method);
+};
+
+const waitWithTimeout = async (promise: Promise<any>, timeout: number) => {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Request timeout')), timeout);
+  });
+  return Promise.race([promise, timeoutPromise]);
+};
+
+const waitForPendingPromise = async (
+  getPrePendingCallPromise: () => Promise<void> | undefined,
+  removePrePendingCallPromise?: (promise: Promise<void> | undefined) => void
+) => {
+  const pendingPromise = getPrePendingCallPromise();
+  if (pendingPromise) {
+    Log.debug('pre pending call promise before call method, wait for it');
+    try {
+      await waitWithTimeout(pendingPromise, 5 * 1000);
+    } catch (error) {
+      // ignore timeout error
+    }
+    removePrePendingCallPromise?.(pendingPromise);
+    Log.debug('pre pending call promise before call method done');
+  }
+};
+
+const onCallDevice = async (
+  context: CoreContext,
+  message: CoreMessage,
+  method: BaseMethod
+): Promise<any> => {
+  let messageResponse: any;
+
+  const { requestQueue, getPrePendingCallPromise, setPrePendingCallPromise } = context;
 
   const connectStateChange = preConnectCache.passphraseState !== method.payload.passphraseState;
 
@@ -137,22 +201,42 @@ export const callAPI = async (message: CoreMessage) => {
     DevicePool.clearDeviceCache(method.payload.connectId);
   }
 
-  /**
-   * Polling to ensure successful connection
-   */
-  if (pollingState[pollingId]) {
-    pollingState[pollingId] = false;
+  // wait for previous callback tasks to complete (ensure device does not call concurrently)
+  if (method.connectId) {
+    await context.waitForCallbackTasks(method.connectId);
   }
-  pollingId += 1;
+
+  await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
+
+  const task = requestQueue.createTask(method);
+
   let device: Device;
   try {
-    device = await ensureConnected(method, pollingId);
+    /**
+     * Polling to ensure successful connection
+     */
+    if (pollingState[pollingId]) {
+      pollingState[pollingId] = false;
+    }
+    pollingId += 1;
+
+    device = await ensureConnected(context, method, pollingId, task.abortController?.signal);
   } catch (e) {
+    console.log('ensureConnected error: ', e);
+
+    if (e.name === 'AbortError' || e.message === 'Request aborted') {
+      requestQueue.releaseTask(method.responseID);
+      return createResponseMessage(method.responseID, false, {
+        error: ERRORS.TypedError(HardwareErrorCode.ActionCancelled, 'Request cancelled by user'),
+      });
+    }
+    requestQueue.releaseTask(method.responseID);
     return createResponseMessage(method.responseID, false, { error: e });
   }
 
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
+  method.context = context;
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
@@ -168,6 +252,12 @@ export const callAPI = async (message: CoreMessage) => {
   );
 
   try {
+    if (method.connectId) {
+      await context.waitForCallbackTasks(method.connectId);
+    }
+
+    await waitForPendingPromise(getPrePendingCallPromise, setPrePendingCallPromise);
+
     const inner = async (): Promise<void> => {
       // check firmware version
       const versionRange = getMethodVersionRange(
@@ -177,42 +267,94 @@ export const callAPI = async (message: CoreMessage) => {
 
       if (device.features) {
         await DataManager.checkAndReloadData();
+
+        // 检测故障固件设备
+        if (findDefectiveBatchDevice(device.features)) {
+          const defectiveInfo = getDefectiveDeviceInfo(device.features);
+          if (defectiveInfo) {
+            throw createDefectiveFirmwareError(
+              defectiveInfo.serialNo,
+              defectiveInfo.seVersion || 'Unknown',
+              defectiveInfo.deviceType,
+              method.connectId,
+              method.deviceId
+            );
+          }
+        }
+
         const newVersionStatus = DataManager.getFirmwareStatus(device.features);
         const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
+
+        const currentFirmwareVersion = getDeviceFirmwareVersion(device.features).join('.');
+        const currentBleVersion = getDeviceBLEFirmwareVersion(device.features).join('.');
         if (
           (newVersionStatus === 'required' || bleVersionStatus === 'required') &&
           method.skipForceUpdateCheck === false
         ) {
-          throw createNewFirmwareForceUpdateHardwareError(method.connectId, method.deviceId);
+          // Get current version information for error reporting
+          const currentVersions = {
+            firmware: currentFirmwareVersion,
+            ble: currentBleVersion,
+          };
+
+          // Provide more specific error message based on which version check failed
+          const requiredUpdates: ('firmware' | 'ble')[] = [];
+          if (newVersionStatus === 'required') {
+            requiredUpdates.push('firmware');
+          }
+          if (bleVersionStatus === 'required') {
+            requiredUpdates.push('ble');
+          }
+          throw createNewFirmwareForceUpdateHardwareError(
+            method.connectId,
+            method.deviceId,
+            requiredUpdates,
+            currentVersions
+          );
         }
 
         if (versionRange) {
-          const currentVersion = getDeviceFirmwareVersion(device.features).join('.');
-          if (semver.valid(versionRange.min) && semver.lt(currentVersion, versionRange.min)) {
+          if (
+            semver.valid(versionRange.min) &&
+            semver.lt(currentFirmwareVersion, versionRange.min)
+          ) {
             if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw createNewFirmwareUnReleaseHardwareError(currentVersion, versionRange.min);
+              throw createNewFirmwareUnReleaseHardwareError(
+                currentFirmwareVersion,
+                versionRange.min,
+                method.name
+              );
             }
 
             return Promise.reject(
-              createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min)
+              createNeedUpgradeFirmwareHardwareError(
+                currentFirmwareVersion,
+                versionRange.min,
+                method.name
+              )
             );
           }
           if (
             versionRange.max &&
             semver.valid(versionRange.max) &&
-            semver.gte(currentVersion, versionRange.max)
+            semver.gte(currentFirmwareVersion, versionRange.max)
           ) {
-            return Promise.reject(createDeprecatedHardwareError(currentVersion, versionRange.max));
+            return Promise.reject(
+              createDeprecatedHardwareError(currentFirmwareVersion, versionRange.max, method.name)
+            );
           }
         } else if (method.strictCheckDeviceSupport) {
-          throw ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod);
+          throw ERRORS.TypedError(
+            HardwareErrorCode.DeviceNotSupportMethod,
+            `Method '${method.name}' is not supported by this device`
+          );
         }
       }
 
       // Test/Api 模式下，不进行设备模式检查
       // check call method mode
       // const unexpectedMode = device.hasUnexpectedMode(
-      //   method.notAllowDeviceMode,
+      //   method.allowDeviceMode,
       //   method.requireDeviceMode
       // );
       // if (unexpectedMode) {
@@ -269,7 +411,9 @@ export const callAPI = async (message: CoreMessage) => {
 
         // Check Device passphrase State
         const passphraseStateSafety = await device.checkPassphraseStateSafety(
-          method.payload?.passphraseState
+          method.payload?.passphraseState,
+          method.payload?.useEmptyPassphrase,
+          method.payload?.skipPassphraseCheck
         );
 
         // Double check, handles the special case of Touch/Pro
@@ -281,6 +425,9 @@ export const callAPI = async (message: CoreMessage) => {
             ERRORS.TypedError(HardwareErrorCode.DeviceCheckPassphraseStateError)
           );
         }
+
+        // close pin popup window
+        postMessage(createUiMessage(UI_REQUEST.CLOSE_UI_PIN_WINDOW));
       }
 
       // Automatic check safety_check level for Kovan, Ropsten, Rinkeby, Goerli test networks.
@@ -291,20 +438,23 @@ export const callAPI = async (message: CoreMessage) => {
           e instanceof HardwareError
             ? e
             : ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'open safety check failed.');
-        messageResponse = createResponseMessage(method.responseID, false, { error });
-        _callPromise?.resolve(messageResponse);
-        return;
+        // messageResponse = createResponseMessage(method.responseID, false, { error });
+        // requestQueue.resolveRequest(method.responseID, messageResponse);
+        // return;
+        throw error;
       }
+
+      method.device?.commands?.checkDisposed();
 
       try {
         const response: object = await method.run();
         Log.debug('Call API - Inner Method Run: ');
         messageResponse = createResponseMessage(method.responseID, true, response);
-        _callPromise?.resolve(messageResponse);
+        requestQueue.resolveRequest(method.responseID, messageResponse);
       } catch (error) {
         Log.debug('Call API - Inner Method Run Error: ', error);
         messageResponse = createResponseMessage(method.responseID, false, { error });
-        _callPromise?.resolve(messageResponse);
+        requestQueue.resolveRequest(method.responseID, messageResponse);
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
@@ -314,17 +464,20 @@ export const callAPI = async (message: CoreMessage) => {
       ...parseInitOptions(method),
     };
     const deviceRun = () => device.run(inner, runOptions);
-    _callPromise = createDeferred(deviceRun);
+    task.callPromise = createDeferred<any>(deviceRun);
 
     try {
-      return await _callPromise.promise;
+      return await task.callPromise.promise;
     } catch (e) {
       Log.debug('Device Run Error: ', e);
       return createResponseMessage(method.responseID, false, { error: e });
     }
   } catch (error) {
     messageResponse = createResponseMessage(method.responseID, false, { error });
-    _callPromise?.reject(ERRORS.TypedError(HardwareErrorCode.CallMethodError, error.message));
+    requestQueue.rejectRequest(
+      method.responseID,
+      ERRORS.TypedError(HardwareErrorCode.CallMethodError, error.message)
+    );
     Log.debug('Call API - Run Error: ', error);
   } finally {
     const response = messageResponse;
@@ -336,16 +489,18 @@ export const callAPI = async (message: CoreMessage) => {
     }
 
     // remove method from queue
-    const index = method.responseID
-      ? callApiQueue.findIndex(m => m.responseID === method.responseID)
-      : -1;
-    if (index > -1) {
-      callApiQueue.splice(index, 1);
-      Log.debug(
-        'Remove the finished method from the queue： ',
-        callApiQueue.map(m => m.name)
-      );
-    }
+    // const index = method.responseID
+    //   ? callApiQueue.findIndex(m => m.responseID === method.responseID)
+    //   : -1;
+    // if (index > -1) {
+    //   callApiQueue.splice(index, 1);
+    //   Log.debug(
+    //     'Remove the finished method from the queue： ',
+    //     callApiQueue.map(m => m.name)
+    //   );
+    // }
+
+    requestQueue.releaseTask(method.responseID);
 
     closePopup();
 
@@ -390,6 +545,7 @@ function initDevice(method: BaseMethod) {
   } else if (allDevices.length > 1) {
     throw ERRORS.TypedError(
       [
+        'firmwareUpdateV3',
         'firmwareUpdateV2',
         'checkFirmwareRelease',
         'checkBootloaderRelease',
@@ -460,7 +616,12 @@ async function connectDeviceForBle(method: BaseMethod, device: Device) {
 
 type IPollFn<T> = (time?: number) => T;
 // eslint-disable-next-line @typescript-eslint/require-await
-const ensureConnected = async (method: BaseMethod, pollingId: number) => {
+const ensureConnected = async (
+  _context: CoreContext,
+  method: BaseMethod,
+  pollingId: number,
+  abortSignal?: AbortSignal
+) => {
   let tryCount = 0;
   const MAX_RETRY_COUNT =
     method.payload && typeof method.payload.retryCount === 'number' ? method.payload.retryCount : 5;
@@ -475,6 +636,21 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
   const poll: IPollFn<Promise<Device>> = async (time = POLL_INTERVAL_TIME) =>
     // eslint-disable-next-line no-async-promise-executor
     new Promise(async (resolve, reject) => {
+      const abort = () => {
+        if (abortSignal && abortSignal.aborted) {
+          if (timer) {
+            clearTimeout(timer);
+          }
+          reject(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+          return true;
+        }
+        return false;
+      };
+
+      if (abort()) {
+        return;
+      }
+
       if (!pollingState[pollingId]) {
         Log.debug('EnsureConnected function stop, polling id: ', pollingId);
         reject(ERRORS.TypedError(HardwareErrorCode.PollingStop));
@@ -509,6 +685,10 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         }
       }
 
+      if (abort()) {
+        return;
+      }
+
       const env = DataManager.getSettings('env');
       let device: Device;
       try {
@@ -528,6 +708,10 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
            */
           if (DataManager.isBleConnect(env)) {
             bleTimeoutRetry = 0;
+
+            if (abort()) {
+              return;
+            }
             await connectDeviceForBle(method, device);
           }
           resolve(device);
@@ -535,18 +719,25 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         }
       } catch (error) {
         Log.debug('device error: ', error);
+        if ([HardwareErrorCode.BleCharacteristicNotifyChangeFailure].includes(error.errorCode)) {
+          postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE));
+        }
         if (
           [
+            HardwareErrorCode.BlePoweredOff,
+            HardwareErrorCode.BleUnsupported,
             HardwareErrorCode.BlePermissionError,
             HardwareErrorCode.BleLocationError,
             HardwareErrorCode.BleLocationServicesDisabled,
             HardwareErrorCode.BleDeviceNotBonded,
             HardwareErrorCode.BleDeviceBondError,
+            HardwareErrorCode.BleDeviceBondedCanceled,
             HardwareErrorCode.BleCharacteristicNotifyError,
             HardwareErrorCode.BleTimeoutError,
             HardwareErrorCode.BleWriteCharacteristicError,
             HardwareErrorCode.BleAlreadyConnected,
             HardwareErrorCode.FirmwareUpdateLimitOneDevice,
+            HardwareErrorCode.SelectDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
@@ -565,6 +756,11 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
         reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
         return;
       }
+
+      if (abort()) {
+        return;
+      }
+
       // eslint-disable-next-line no-promise-executor-return
       return setTimeout(() => resolve(poll(time * 1.5)), time);
     });
@@ -572,22 +768,83 @@ const ensureConnected = async (method: BaseMethod, pollingId: number) => {
   return poll();
 };
 
-export const cancel = (connectId?: string) => {
-  const env = DataManager.getSettings('env');
-  try {
-    if (connectId) {
-      let device;
-      if (DataManager.isBleConnect(env)) {
-        device = initDeviceForBle({ connectId } as BaseMethod);
-      } else {
-        device = initDevice({ connectId } as BaseMethod);
+export const cancel = (context: CoreContext, connectId?: string) => {
+  const { requestQueue, setPrePendingCallPromise } = context;
+  if (connectId) {
+    try {
+      // let device;
+      // if (DataManager.isBleConnect(env)) {
+      //   device = initDeviceForBle({ connectId } as BaseMethod);
+      // } else {
+      //   device = initDevice({ connectId } as BaseMethod);
+      // }
+      // setPrePendingCallPromise(device?.interruptionFromUser());
+      // requestQueue.abortRequestsByConnectId(connectId);
+
+      // cancel callback tasks
+      requestQueue.cancelCallbackTasks(connectId);
+
+      const requestIds = requestQueue.getRequestTasksId();
+      Log.debug(
+        `Cancel Api connect requestQueues: length:${requestIds.length} requestIds:${requestIds.join(
+          ','
+        )}`
+      );
+      const canceledDevices: Device[] = [];
+      for (const requestId of requestIds) {
+        const task = requestQueue.getTask(requestId);
+        Log.debug('Cancel Api connect task: ', task);
+        if (task && task.method?.device) {
+          if (!canceledDevices.includes(task.method.device)) {
+            const { device } = task.method;
+            setPrePendingCallPromise(device?.interruptionFromUser());
+            canceledDevices.push(device);
+          }
+          requestQueue.rejectRequest(
+            requestId,
+            ERRORS.TypedError(HardwareErrorCode.ActionCancelled)
+          );
+        }
       }
-      device?.interruptionFromUser();
+      requestQueue.abortRequestsByConnectId(connectId);
+    } catch (e) {
+      Log.error('Cancel API Error: ', e);
     }
-  } catch (e) {
-    // Empty
-    Log.error('Cancel API Error: ', e);
+  } else {
+    const env = DataManager.getSettings('env');
+    if (DataManager.isBleConnect(env)) {
+      Log.debug('Cancel Api all _deviceList: ');
+      const canceledDevices: Device[] = [];
+      for (const requestId of requestQueue.getRequestTasksId()) {
+        const task = requestQueue.getTask(requestId);
+        Log.debug('Cancel Api connect task: ', task);
+        if (task && task.method?.device) {
+          if (!canceledDevices.includes(task.method.device)) {
+            const { device } = task.method;
+            device?.interruptionFromUser();
+            canceledDevices.push(device);
+          }
+
+          requestQueue.rejectRequest(
+            requestId,
+            ERRORS.TypedError(HardwareErrorCode.ActionCancelled)
+          );
+        }
+      }
+    } else {
+      _deviceList?.allDevices().forEach(device => {
+        Log.debug('device: ', device, ' device.hasDeviceAcquire: ', device.hasDeviceAcquire());
+        if (device.hasDeviceAcquire()) {
+          device?.interruptionFromUser();
+        }
+      });
+
+      requestQueue.getRequestTasksId().forEach(requestId => {
+        requestQueue.rejectRequest(requestId, ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+      });
+    }
   }
+
   cleanup();
   closePopup();
 };
@@ -595,13 +852,16 @@ export const cancel = (connectId?: string) => {
 const checkPassphraseEnableState = (method: BaseMethod, features?: Features) => {
   if (!method.useDevicePassphraseState) return;
 
-  if (
-    features?.passphrase_protection === true &&
-    (method.payload.passphraseState == null || method.payload.passphraseState === '') &&
-    !method.payload.useEmptyPassphrase
-  ) {
-    DevicePool.clearDeviceCache(method.payload.connectId);
-    throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
+  if (features?.passphrase_protection === true) {
+    const hasNoPassphraseState =
+      method.payload.passphraseState == null || method.payload.passphraseState === '';
+    const shouldRequirePassphrase =
+      !method.payload.useEmptyPassphrase && !method.payload.skipPassphraseCheck;
+
+    if (hasNoPassphraseState && shouldRequirePassphrase) {
+      DevicePool.clearDeviceCache(method.payload.connectId);
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceOpenedPassphrase);
+    }
   }
 
   if (features?.passphrase_protection === false && method.payload.passphraseState) {
@@ -657,15 +917,15 @@ const onDevicePinHandler = async (...[device, type, callback]: DeviceEvents['pin
   callback(null, uiResp.payload);
 };
 
-const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
+export const onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
   postMessage(createDeviceMessage(DEVICE.BUTTON, { ...request, device: device.toMessageObject() }));
 
-  if (request.code === 'ButtonRequest_PinEntry') {
-    Log.log('request Confirm Input PIN');
+  if (request.code === 'ButtonRequest_PinEntry' || request.code === 'ButtonRequest_AttachPin') {
+    Log.log('request Confirm Input PIN or Attach PIN');
     postMessage(
       createUiMessage(UI_REQUEST.REQUEST_PIN, {
         device: device.toMessageObject() as KnownDevice,
-        type: 'ButtonRequest_PinEntry',
+        type: request.code,
       })
     );
   } else {
@@ -678,27 +938,31 @@ const onDeviceFeaturesHandler = (...[_, features]: [...DeviceEvents['features']]
   postMessage(createDeviceMessage(DEVICE.FEATURES, { ...features }));
 };
 
-const onDevicePassphraseHandler = async (...[device, callback]: DeviceEvents['passphrase']) => {
+const onDevicePassphraseHandler = async (
+  ...[device, requestPayload, callback]: DeviceEvents['passphrase']
+) => {
   Log.debug('onDevicePassphraseHandler');
   const uiPromise = createUiPromise(UI_RESPONSE.RECEIVE_PASSPHRASE, device);
   postMessage(
     createUiMessage(UI_REQUEST.REQUEST_PASSPHRASE, {
       device: device.toMessageObject() as KnownDevice,
       passphraseState: device.passphraseState,
+      existsAttachPinUser: requestPayload.existsAttachPinUser,
     })
   );
   // wait for passphrase
   const uiResp = await uiPromise.promise;
-  const { value, passphraseOnDevice, save } = uiResp.payload;
+  const { value, passphraseOnDevice, save, attachPinOnDevice } = uiResp.payload;
   // send as PassphrasePromptResponse
   callback({
     passphrase: value.normalize('NFKD'),
     passphraseOnDevice,
+    attachPinOnDevice,
     cache: save,
   });
 };
 
-const onEmptyPassphraseHandler = (...[_, callback]: DeviceEvents['passphrase']) => {
+const onEmptyPassphraseHandler = (...[_, , callback]: DeviceEvents['passphrase']) => {
   Log.debug('onEmptyPassphraseHandler');
   // send as PassphrasePromptResponse
   callback({ passphrase: '' });
@@ -755,6 +1019,31 @@ const removeUiPromise = (promise: Deferred<any>) => {
 };
 
 export default class Core extends EventEmitter {
+  private requestQueue = new RequestQueue();
+
+  // background task
+  private prePendingCallPromise: Promise<void> | undefined;
+
+  private methodSynchronize = getSynchronize();
+
+  private getCoreContext() {
+    return {
+      requestQueue: this.requestQueue,
+      methodSynchronize: this.methodSynchronize,
+      getPrePendingCallPromise: () => this.prePendingCallPromise,
+      setPrePendingCallPromise: (promise: Promise<void> | undefined) => {
+        this.prePendingCallPromise = promise;
+      },
+      // callback 任务管理
+      registerCallbackTask: (connectId: string, callbackPromise: Deferred<any>) => {
+        this.requestQueue.registerPendingCallbackTask(connectId, callbackPromise);
+      },
+      waitForCallbackTasks: (connectId: string) =>
+        this.requestQueue.waitForPendingCallbackTasks(connectId),
+      cancelCallbackTasks: (connectId: string) => this.requestQueue.cancelCallbackTasks(connectId),
+    };
+  }
+
   async handleMessage(message: CoreMessage) {
     switch (message.type) {
       case UI_RESPONSE.RECEIVE_PIN:
@@ -769,6 +1058,8 @@ export default class Core extends EventEmitter {
         break;
       }
 
+      case UI_REQUEST.BLUETOOTH_UNSUPPORTED:
+      case UI_REQUEST.BLUETOOTH_POWERED_OFF:
       case UI_REQUEST.BLUETOOTH_PERMISSION:
       case UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE:
       case UI_REQUEST.LOCATION_PERMISSION:
@@ -779,7 +1070,7 @@ export default class Core extends EventEmitter {
 
       case IFRAME.CALL: {
         Log.log('call API: ', message);
-        const response = await callAPI(message);
+        const response = await callAPI(this.getCoreContext(), message);
         const { success, payload } = response;
         Log.log('call API Response: ', response);
         if (success) {
@@ -797,7 +1088,12 @@ export default class Core extends EventEmitter {
       }
       case IFRAME.CANCEL: {
         Log.log('cancel API: ', message);
-        cancel(message.payload.connectId);
+        cancel(this.getCoreContext(), message.payload.connectId);
+        break;
+      }
+      case IFRAME.CALLBACK: {
+        Log.log('callback message: ', message);
+        postMessage(message);
         break;
       }
       default:

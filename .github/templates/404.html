@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Hardware SDK Examples</title>
+  <script>
+    // 简化的路由分发器
+    (function () {
+      const path = window.location.pathname;
+      const search = window.location.search;
+      const hash = window.location.hash;
+      const fullUrl = search + hash;
+
+      console.log('Route dispatcher: handling path', path);
+
+      // 智能路由分发逻辑 - 保持原始URL不变，让SPA自己处理路由
+      if (path.startsWith('/expo-playground/')) {
+        // expo-playground 的子路由，保存原始路径信息
+        if (path !== '/expo-playground/' && path !== '/expo-playground') {
+          console.log('Handling expo-playground sub-route:', path);
+          // 保存完整的原始URL到sessionStorage供应用恢复路由
+          sessionStorage.setItem('spa_redirect_url', path + fullUrl);
+          // 重定向到应用首页，让React Router处理路由恢复
+          window.location.replace('/expo-playground/');
+          return;
+        }
+        return;
+      }
+
+      if (path.startsWith('/expo-example/')) {
+        // expo-example 的子路由，保存原始路径信息
+        if (path !== '/expo-example/' && path !== '/expo-example') {
+          console.log('Handling expo-example sub-route:', path);
+          // 保存完整的原始URL到sessionStorage供应用恢复路由
+          sessionStorage.setItem('spa_redirect_url', path + fullUrl);
+          // 重定向到应用首页，让React Navigation处理路由恢复
+          window.location.replace('/expo-example/');
+          return;
+        }
+        return;
+      }
+
+      // 所有其他路径都重定向到 expo-playground
+      console.log('Route dispatcher: redirecting', path, 'to expo-playground');
+      window.location.replace('/expo-playground' + fullUrl);
+    })();
+  </script>
+</head>
+
+<body>
+  <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 100px;">
+    <h2>OneKey Hardware SDK</h2>
+    <p>Redirecting to Developer Portal...</p>
+    <div style="margin: 30px 0;">
+      <a href="/expo-playground/"
+        style="color: #007bff; text-decoration: none; padding: 15px 30px; border: 2px solid #007bff; border-radius: 8px; display: inline-block; font-weight: bold;">
+        Go to Developer Portal
+      </a>
+    </div>
+    <p style="font-size: 14px; color: #666; margin-top: 20px;">
+      If you are not redirected automatically, click the button above.
+    </p>
+  </div>
+</body>
+
+</html>

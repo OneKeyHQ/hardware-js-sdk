@@ -34,7 +34,7 @@ const api: PlaygroundProps[] = [
   },
   {
     method: 'getOnekeyFeatures',
-    description: 'Get features of a device',
+    description: 'Get onekey features of a device(For Pro)',
     noDeviceIdReq: true,
     expect: {
       common: {

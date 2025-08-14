@@ -7,7 +7,6 @@ export { default as getPassphraseState } from './GetPassphraseState';
 export { default as getLogs } from './GetLogs';
 export { default as checkFirmwareRelease } from './CheckFirmwareRelease';
 export { default as checkBLEFirmwareRelease } from './CheckBLEFirmwareRelease';
-export { default as checkTransportRelease } from './CheckTransportRelease';
 export { default as checkBridgeStatus } from './CheckBridgeStatus';
 export { default as checkBridgeRelease } from './CheckBridgeRelease';
 export { default as checkBootloaderRelease } from './CheckBootloaderRelease';
@@ -28,6 +27,7 @@ export { default as deviceWipe } from './device/DeviceWipe';
 export { default as deviceFullyUploadResource } from './device/DeviceFullyUploadResource';
 export { default as deviceUpdateBootloader } from './device/DeviceUpdateBootloader';
 export { default as deviceLock } from './device/DeviceLock';
+export { default as deviceUnlock } from './device/DeviceUnlock';
 export { default as deviceCancel } from './device/DeviceCancel';
 
 export { default as setU2FCounter } from './u2f/SetU2FCounter';
@@ -35,11 +35,13 @@ export { default as getNextU2FCounter } from './u2f/GetNextU2FCounter';
 
 export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
+export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 
 export { default as allNetworkGetAddress } from './allnetwork/AllNetworkGetAddress';
+export { default as allNetworkGetAddressByLoop } from './allnetwork/AllNetworkGetAddressByLoop';
 
 export { default as btcGetAddress } from './btc/BTCGetAddress';
 export { default as btcGetPublicKey } from './btc/BTCGetPublicKey';

@@ -10,7 +10,7 @@ export default class FilecoinSignTransaction extends BaseMethod<HardwareFilecoin
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode];
+    this.allowDeviceMode = [...this.allowDeviceMode];
 
     // check payload
     validateParams(this.payload, [

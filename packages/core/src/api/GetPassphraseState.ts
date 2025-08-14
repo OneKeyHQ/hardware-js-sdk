@@ -5,7 +5,7 @@ import { BaseMethod } from './BaseMethod';
 
 export default class GetPassphraseState extends BaseMethod {
   init() {
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     this.useDevicePassphraseState = false;
   }
 
@@ -13,15 +13,15 @@ export default class GetPassphraseState extends BaseMethod {
     if (!this.device.features)
       return Promise.reject(ERRORS.TypedError(HardwareErrorCode.DeviceInitializeFailed));
 
-    const passphraseState = await getPassphraseStateWithRefreshDeviceInfo(this.device);
+    const { passphraseState } = await getPassphraseStateWithRefreshDeviceInfo(this.device);
+
     const { features } = this.device;
 
+    // refresh device info
     if (features && features.passphrase_protection === true) {
-      if (passphraseState && features.device_id) {
-        this.device.tryFixInternalState(passphraseState, features.device_id, features.session_id);
-      }
       return Promise.resolve(passphraseState);
     }
+
     return Promise.resolve(undefined);
   }
 }

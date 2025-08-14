@@ -5,7 +5,6 @@ import { init, updateSettings } from './init';
 import { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
 
 import { getLogs } from './getLogs';
-import { checkTransportRelease } from './checkTransportRelease';
 import { checkBridgeStatus } from './checkBridgeStatus';
 import { checkBridgeRelease } from './checkBridgeRelease';
 import { checkBootloaderRelease } from './checkBootloaderRelease';
@@ -17,7 +16,7 @@ import { getOnekeyFeatures } from './getOnekeyFeatures';
 import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
-import { firmwareUpdate, firmwareUpdateV2 } from './firmwareUpdate';
+import { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
 import { promptWebDeviceAccess } from './promptWebDeviceAccess';
 
 import { deviceReset } from './deviceReset';
@@ -36,6 +35,7 @@ import { deviceSupportFeatures } from './deviceSupportFeatures';
 import { deviceFullyUploadResource } from './deviceFullyUploadResource';
 import { deviceUpdateBootloader } from './deviceUpdateBootloader';
 import { deviceLock } from './deviceLock';
+import { deviceUnlock } from './deviceUnlock';
 import { deviceCancel } from './deviceCancel';
 
 import { getNextU2FCounter } from './getNextU2FCounter';
@@ -43,7 +43,7 @@ import { setU2FCounter } from './setU2FCounter';
 
 import { cipherKeyValue } from './cipherKeyValue';
 
-import { allNetworkGetAddress } from './allNetworkGetAddress';
+import { allNetworkGetAddress, allNetworkGetAddressByLoop } from './allNetworkGetAddress';
 
 import { evmGetAddress } from './evmGetAddress';
 import { evmGetPublicKey } from './evmGetPublicKey';
@@ -274,7 +274,6 @@ export type CoreApi = {
    * Core function
    */
   checkAllFirmwareRelease: typeof checkAllFirmwareRelease;
-  checkTransportRelease: typeof checkTransportRelease;
   checkBridgeStatus: typeof checkBridgeStatus;
   checkBridgeRelease: typeof checkBridgeRelease;
   checkBootloaderRelease: typeof checkBootloaderRelease;
@@ -303,6 +302,7 @@ export type CoreApi = {
   deviceFullyUploadResource: typeof deviceFullyUploadResource;
   deviceUpdateBootloader: typeof deviceUpdateBootloader;
   deviceLock: typeof deviceLock;
+  deviceUnlock: typeof deviceUnlock;
   deviceCancel: typeof deviceCancel;
   getNextU2FCounter: typeof getNextU2FCounter;
   setU2FCounter: typeof setU2FCounter;
@@ -310,13 +310,14 @@ export type CoreApi = {
   checkBLEFirmwareRelease: typeof checkBLEFirmwareRelease;
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdateV2;
-
+  firmwareUpdateV3: typeof firmwareUpdateV3;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**
    * All network function
    */
   allNetworkGetAddress: typeof allNetworkGetAddress;
+  allNetworkGetAddressByLoop: typeof allNetworkGetAddressByLoop;
 
   /**
    * EVM function

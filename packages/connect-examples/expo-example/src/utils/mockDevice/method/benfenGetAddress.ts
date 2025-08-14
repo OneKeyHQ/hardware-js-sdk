@@ -13,7 +13,7 @@ export const SIGNATURE_SCHEME_TO_FLAG = {
   Secp256k1: 0x01,
 };
 
-export function normalizeSuiAddress(value: string, forceAdd0x = false): string {
+export function normalizeBenfenAddress(value: string, forceAdd0x = false): string {
   let address = value.toLowerCase();
   if (!forceAdd0x && address.startsWith('0x')) {
     address = address.slice(2);
@@ -26,7 +26,7 @@ export function publicKeyToAddress(publicKey: string) {
   tmp.set([SIGNATURE_SCHEME_TO_FLAG.ED25519]);
   tmp.set(hexToBytes(publicKey), 1);
 
-  return normalizeSuiAddress(
+  return normalizeBenfenAddress(
     bytesToHex(blake2b(tmp, { dkLen: 32 })).slice(0, BENFEN_ADDRESS_LENGTH * 2)
   );
 }
@@ -48,6 +48,23 @@ export function hex2BfcAddress(hexAddress: string): string {
   return `BFC${hex}${checksumHex}`;
 }
 
+/**
+ * 抽离的核心逻辑：从 seed 生成 Benfen 地址
+ * 可以被 SLIP39 直接调用，避免助记词转换
+ */
+export function generateBenfenAddressFromSeed(seed: Buffer, path: string): string {
+  const keyPair = deriveKeyPairWithPath(seed, path, 'ed25519');
+  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
+
+  if (!privateKeyArray || !publicKeyArray) {
+    throw new Error('privateKey or publicKey is undefined');
+  }
+
+  const publicKey = Buffer.from(publicKeyArray.slice(1));
+  const rawAddress = addHexPrefix(publicKeyToAddress(publicKey.toString('hex'))) ?? '';
+  return hex2BfcAddress(rawAddress);
+}
+
 export default function benfenGetAddress(
   connectId: string,
   deviceId: string,
@@ -62,31 +79,20 @@ export default function benfenGetAddress(
       path: string;
     }> {
   const { path, mnemonic, passphrase } = params;
-
   const seed = mnemonicToSeed(mnemonic, passphrase);
-  const keyPair = deriveKeyPairWithPath(seed, path, 'ed25519');
 
-  const { privateKey: privateKeyArray, publicKey: publicKeyArray } = keyPair;
-
-  if (!privateKeyArray || !publicKeyArray) {
+  try {
+    const address = generateBenfenAddressFromSeed(seed, path);
+    return {
+      success: true,
+      payload: { address, path },
+    };
+  } catch (error) {
     return {
       success: false,
       payload: {
-        error: 'privateKey or publicKey is undefined',
+        error: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
-  const publicKey = Buffer.from(publicKeyArray.slice(1));
-
-  const rawAddress = addHexPrefix(publicKeyToAddress(publicKey.toString('hex'))) ?? '';
-
-  const address = hex2BfcAddress(rawAddress);
-
-  return {
-    success: true,
-    payload: {
-      address,
-      path,
-    },
-  };
 }

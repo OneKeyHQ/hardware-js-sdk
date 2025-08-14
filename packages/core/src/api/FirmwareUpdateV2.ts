@@ -21,7 +21,7 @@ import {
   LoggerNames,
   getDeviceFirmwareVersion,
 } from '../utils';
-import { createUiMessage } from '../events/ui-request';
+import { createUiMessage, FirmwareUpdateTipMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
 
@@ -43,7 +43,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
   init() {
-    this.notAllowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
@@ -141,16 +141,12 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           await wait(3000);
         }
 
-        console.log('checkCount: ', checkCount);
-        console.log(
-          'DataManager.isWebUsbConnect(DataManager.getSettings("env")): ',
-          DataManager.isWebUsbConnect(DataManager.getSettings('env'))
-        );
         if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
           clearInterval(intervalTimer);
           clearTimeout(timeoutTimer);
 
           try {
+            this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
             const confirmed = await this._promptDeviceInBootloaderForWebDevice({
               device: this.device,
             });
@@ -306,6 +302,9 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         }
       }
 
+      // check if the device commands has been disposed
+      this.device?.commands?.checkDisposed();
+
       // auto go to bootloader mode
       try {
         this.postTipMessage('AutoRebootToBootloader');
@@ -324,6 +323,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
         delete DevicePool.devicesCache[''];
         await this.checkPromise?.promise;
         this.checkPromise = null;
+
+        // check if the device commands has been disposed
+        this.device?.commands?.checkDisposed();
+
         /**
          * Touch 1 with bootloader v2.5.0 issue: BLE chip need more time for looking up name, here change the delay time to 3000ms after rebooting.
          */
@@ -365,6 +368,9 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
     }
+
+    // check if the device commands has been disposed
+    this.device?.commands?.checkDisposed();
 
     await this.device.acquire();
 

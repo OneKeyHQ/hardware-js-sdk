@@ -250,6 +250,21 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "tx_type": {
+          "type": "AptosTransactionType",
+          "id": 3,
+          "options": {
+            "default": "STANDARD"
+          }
+        }
+      },
+      "nested": {
+        "AptosTransactionType": {
+          "values": {
+            "STANDARD": 0,
+            "WITH_DATA": 1
+          }
         }
       }
     },
@@ -3189,7 +3204,8 @@
             "ButtonRequest_Success": 17,
             "ButtonRequest_Warning": 18,
             "ButtonRequest_PassphraseEntry": 19,
-            "ButtonRequest_PinEntry": 20
+            "ButtonRequest_PinEntry": 20,
+            "ButtonRequest_AttachPin": 8000
           }
         }
       }
@@ -3239,6 +3255,10 @@
           "options": {
             "deprecated": true
           }
+        },
+        "exists_attach_pin_user": {
+          "type": "bool",
+          "id": 8000
         }
       }
     },
@@ -3258,6 +3278,10 @@
         "on_device": {
           "type": "bool",
           "id": 3
+        },
+        "on_device_attach_pin": {
+          "type": "bool",
+          "id": 8000
         }
       }
     },
@@ -3779,6 +3803,13 @@
           "rule": "repeated",
           "type": "Path",
           "id": 2
+        },
+        "include_node": {
+          "type": "bool",
+          "id": 3,
+          "options": {
+            "default": false
+          }
         }
       },
       "nested": {
@@ -3802,6 +3833,15 @@
           "rule": "repeated",
           "type": "bytes",
           "id": 1
+        },
+        "hd_nodes": {
+          "rule": "repeated",
+          "type": "HDNodeType",
+          "id": 2
+        },
+        "root_fingerprint": {
+          "type": "uint32",
+          "id": 3
         }
       }
     },
@@ -6131,6 +6171,13 @@
           "options": {
             "default": "schnorr"
           }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 5,
+          "options": {
+            "default": true
+          }
         }
       }
     },
@@ -6177,6 +6224,13 @@
           "id": 5,
           "options": {
             "default": 1
+          }
+        },
+        "use_tweak": {
+          "type": "bool",
+          "id": 6,
+          "options": {
+            "default": true
           }
         }
       }
@@ -6286,6 +6340,14 @@
         "derive_cardano": {
           "type": "bool",
           "id": 3
+        },
+        "passphrase_state": {
+          "type": "string",
+          "id": 8000
+        },
+        "is_contains_attach": {
+          "type": "bool",
+          "id": 8001
         }
       }
     },
@@ -6684,6 +6746,14 @@
         "onekey_se04_state": {
           "type": "OneKeySEState",
           "id": 624
+        },
+        "attach_to_pin_user": {
+          "type": "bool",
+          "id": 625
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 626
         }
       },
       "nested": {
@@ -7637,6 +7707,49 @@
         "mac": {
           "type": "bytes",
           "id": 1
+        }
+      }
+    },
+    "UnLockDevice": {
+      "fields": {}
+    },
+    "UnLockDeviceResponse": {
+      "fields": {
+        "unlocked": {
+          "type": "bool",
+          "id": 1
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 2
+        },
+        "passphrase_protection": {
+          "type": "bool",
+          "id": 3
+        }
+      }
+    },
+    "GetPassphraseState": {
+      "fields": {
+        "passphrase_state": {
+          "type": "string",
+          "id": 1
+        }
+      }
+    },
+    "PassphraseState": {
+      "fields": {
+        "passphrase_state": {
+          "type": "string",
+          "id": 1
+        },
+        "session_id": {
+          "type": "bytes",
+          "id": 2
+        },
+        "unlocked_attach_pin": {
+          "type": "bool",
+          "id": 3
         }
       }
     },
@@ -11421,7 +11534,7 @@
           "id": 4
         },
         "data": {
-          "type": "string",
+          "type": "bytes",
           "id": 5
         },
         "contract": {
@@ -11445,6 +11558,22 @@
             "transfer_contract": {
               "type": "TronTransferContract",
               "id": 2
+            },
+            "provider": {
+              "type": "bytes",
+              "id": 3
+            },
+            "vote_witness_contract": {
+              "type": "TronVoteWitnessContract",
+              "id": 4
+            },
+            "contract_name": {
+              "type": "bytes",
+              "id": 5
+            },
+            "permission_id": {
+              "type": "uint32",
+              "id": 6
             },
             "freeze_balance_contract": {
               "type": "TronFreezeBalanceContract",
@@ -11481,6 +11610,10 @@
             "undelegate_resource_contract": {
               "type": "TronUnDelegateResourceContract",
               "id": 58
+            },
+            "cancel_all_unfreeze_v2_contract": {
+              "type": "TronCancelAllUnfreezeV2Contract",
+              "id": 59
             }
           },
           "nested": {
@@ -11523,7 +11656,8 @@
             "TronResourceCode": {
               "values": {
                 "BANDWIDTH": 0,
-                "ENERGY": 1
+                "ENERGY": 1,
+                "TRON_POWER": 2
               }
             },
             "TronFreezeBalanceContract": {
@@ -11610,6 +11744,10 @@
                 "lock": {
                   "type": "bool",
                   "id": 5
+                },
+                "lock_period": {
+                  "type": "uint64",
+                  "id": 6
                 }
               }
             },
@@ -11628,6 +11766,38 @@
                   "id": 4
                 }
               }
+            },
+            "TronVoteWitnessContract": {
+              "fields": {
+                "votes": {
+                  "rule": "repeated",
+                  "type": "Vote",
+                  "id": 2
+                },
+                "support": {
+                  "type": "bool",
+                  "id": 3
+                }
+              },
+              "nested": {
+                "Vote": {
+                  "fields": {
+                    "vote_address": {
+                      "rule": "required",
+                      "type": "string",
+                      "id": 1
+                    },
+                    "vote_count": {
+                      "rule": "required",
+                      "type": "uint32",
+                      "id": 2
+                    }
+                  }
+                }
+              }
+            },
+            "TronCancelAllUnfreezeV2Contract": {
+              "fields": {}
             }
           }
         }
@@ -12295,7 +12465,11 @@
         "MessageType_FileInfoList": 10024,
         "MessageType_OnekeyGetFeatures": 10025,
         "MessageType_OnekeyFeatures": 10026,
-        "MessageType_WriteSEPrivateKey": 10027
+        "MessageType_WriteSEPrivateKey": 10027,
+        "MessageType_GetPassphraseState": 10028,
+        "MessageType_PassphraseState": 10029,
+        "MessageType_UnLockDevice": 10030,
+        "MessageType_UnLockDeviceResponse": 10031
       }
     },
     "google": {

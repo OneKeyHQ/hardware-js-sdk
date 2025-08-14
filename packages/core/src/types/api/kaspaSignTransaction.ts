@@ -34,6 +34,7 @@ export type KaspaSignTransactionParams = {
   subNetworkID?: string;
   scheme?: string;
   prefix?: string;
+  useTweak?: boolean; // default is true
 };
 
 export declare function kaspaSignTransaction(
