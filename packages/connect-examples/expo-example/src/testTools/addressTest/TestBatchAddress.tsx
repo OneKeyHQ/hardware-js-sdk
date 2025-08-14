@@ -259,6 +259,21 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
     },
   });
 
+  // Additional effect to handle test case switching
+  // This ensures that when users switch test cases, any running tests are properly stopped
+  const prevTestCaseRef = useRef<AddressBatchTestCase | undefined>();
+  useEffect(() => {
+    if (
+      prevTestCaseRef.current &&
+      currentTestCase &&
+      prevTestCaseRef.current.name !== currentTestCase.name
+    ) {
+      // Test case changed - stop any running tests to ensure clean state
+      stopTest();
+    }
+    prevTestCaseRef.current = currentTestCase;
+  }, [currentTestCase, stopTest]);
+
   const contentMemo = useMemo(
     () => (
       <>

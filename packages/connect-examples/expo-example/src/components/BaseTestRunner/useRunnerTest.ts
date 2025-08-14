@@ -171,6 +171,10 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       SDK.cancel();
       removeHardwareListener?.(SDK);
     }
+
+    // Clear the test execution reference to allow new tests to start
+    // This is crucial for allowing test restart after manual stop
+    testExecutionRef.current = null;
   }, [stableContext, SDK, removeHardwareListener]);
 
   const endTestRunner = useCallback(() => {
@@ -198,8 +202,11 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       testExecutionRef.current = (async () => {
         try {
           if (!retryFailedOnly) {
+            // Clear all previous test state when starting a new test (not retrying)
             setFailedTasks?.([]);
             clearItemVerifyState?.();
+            // Also clear any previous test results to ensure fresh start
+            stableContext.setItemValues?.([]);
           }
           stableContext.setRunnerLogs?.([]);
           if (!SDK) return;
@@ -245,15 +252,20 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
 
           let initTestCaseRes = await initTestCase(context, SDK);
 
-          const failedTasks = store.get(
-            stateManager ? stateManager.getFailedTasksAtom : getFailedTasksAtom
-          );
-          if (retryFailedOnly && failedTasks && failedTasks.length > 0) {
-            initTestCaseRes = {
-              title: `${initTestCaseRes?.title || 'Test'} - 重试失败任务`,
-              data: failedTasks,
-            };
+          // Only use failed tasks if explicitly retrying failed tasks
+          if (retryFailedOnly) {
+            const failedTasks = store.get(
+              stateManager ? stateManager.getFailedTasksAtom : getFailedTasksAtom
+            );
+            if (failedTasks && failedTasks.length > 0) {
+              initTestCaseRes = {
+                title: `${initTestCaseRes?.title || 'Test'} - 重试失败任务`,
+                data: failedTasks,
+              };
+            }
           }
+          // When not retrying (normal start), always use the full test case data
+          // and ignore any existing failed tasks
 
           if (!initTestCaseRes) return;
 
