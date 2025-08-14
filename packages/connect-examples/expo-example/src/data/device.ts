@@ -474,28 +474,6 @@ const api: PlaygroundProps[] = [
     method: 'deviceRebootToBoardloader',
     description: 'DeviceRebootToBoardloader',
     noDeviceIdReq: true,
-    expect: {
-      common: {
-        normal: {
-          unknownMessage: true,
-        },
-      },
-      touch: {
-        normal: {
-          requestPin: true,
-        },
-      },
-      pro: {
-        normal: {
-          requestPin: true,
-        },
-      },
-    },
-  },
-  {
-    method: 'deviceRebootToBoardloader',
-    description: 'DeviceRebootToBoardloader',
-    noDeviceIdReq: true,
   },
   {
     method: 'deviceUpdateBootloader',
