@@ -8,7 +8,7 @@ export default class CryptoCosiCommit extends BaseMethod<CosiCommit> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     const addressN = validatePath(this.payload.path);
     // init params
     this.params = {

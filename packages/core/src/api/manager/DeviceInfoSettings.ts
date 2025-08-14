@@ -5,7 +5,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 export default class DeviceInfoSettings extends BaseMethod<HardwareDeviceInfoSettings> {
   init() {
     this.useDevicePassphraseState = false;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.params = {
       serial_no: this.payload.serial_no,
       cpu_info: this.payload.cpu_info,

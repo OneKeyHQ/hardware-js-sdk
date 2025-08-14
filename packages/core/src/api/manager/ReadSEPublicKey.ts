@@ -6,7 +6,7 @@ export default class ReadSEPublicKey extends BaseMethod<HardwareReadSEPublicKey>
   init() {
     this.useDevicePassphraseState = false;
     this.skipForceUpdateCheck = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
 
     this.params = {};
   }

@@ -58,7 +58,7 @@ export abstract class BaseMethod<Params = undefined> {
   useDevice: boolean;
 
   /**
-   * 不允许的设备模式。如果当前设备模式在该数组中，则抛出异常。
+   * 允许的设备模式。如果当前设备模式在该数组中， 则允许执行。
    * NOT_INITIALIZE, BOOTLOADER, SEEDLESS
    */
   allowDeviceMode: string[];

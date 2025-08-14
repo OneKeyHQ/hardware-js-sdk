@@ -8,7 +8,7 @@ export default class CryptoCipherKeyValue extends BaseMethod<CipherKeyValue> {
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
     const addressN = validatePath(this.payload.path);
     // init params
     this.params = {

@@ -8,7 +8,7 @@ export default class EosGetPublicKey extends BaseMethod<HardwareEosGetPublicKey>
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     // init params
     this.params = {

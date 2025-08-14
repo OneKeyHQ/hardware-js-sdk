@@ -8,7 +8,7 @@ export default class CryptoBatchGetPublickeys extends BaseMethod<BatchGetPublick
 
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     // init params
     this.params = {

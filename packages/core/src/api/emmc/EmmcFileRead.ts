@@ -5,7 +5,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 export default class EmmcFileRead extends BaseMethod<HardwareEmmcFileRead> {
   init() {
     this.useDevicePassphraseState = false;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.params = {
       file: this.payload.file,
       ui_percentage: this.payload.ui_percentage,

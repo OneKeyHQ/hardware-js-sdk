@@ -5,7 +5,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 export default class EmmcFileWrite extends BaseMethod<HardwareEmmcFileWrite> {
   init() {
     this.useDevicePassphraseState = false;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.params = {
       file: this.payload.file,
       overwrite: this.payload.overwrite,

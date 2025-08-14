@@ -7,7 +7,7 @@ import { getCoinAndScriptType } from './helpers/btcParamsUtils';
 export default class BTCAuthorizeCoinJoin extends BaseMethod<AuthorizeCoinJoin> {
   init() {
     this.checkDeviceId = true;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.INITIALIZE];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.NOT_INITIALIZE];
 
     const { path, coin } = this.payload;
 

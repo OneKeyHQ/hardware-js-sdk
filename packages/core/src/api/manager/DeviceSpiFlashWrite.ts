@@ -6,7 +6,7 @@ import { UI_REQUEST } from '../../constants/ui-request';
 export default class DeviceSpiFlashWrite extends BaseMethod<SpiFlashWrite> {
   init() {
     this.useDevicePassphraseState = false;
-    this.notAllowDeviceMode = [...this.notAllowDeviceMode, UI_REQUEST.BOOTLOADER];
+    this.allowDeviceMode = [...this.allowDeviceMode, UI_REQUEST.BOOTLOADER];
     this.params = {
       address: this.payload.address,
       data: formatAnyHex(this.payload.data),

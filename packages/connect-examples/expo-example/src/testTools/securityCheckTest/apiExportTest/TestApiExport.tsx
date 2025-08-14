@@ -577,9 +577,9 @@ function ExecuteView() {
       } else if (
         item.result.unknownMessage &&
         !res.success &&
-        (res.payload.error.includes('Failure_UnexpectedMessage') ||
-          res.payload.error.includes('unsupport') ||
-          res.payload.error.includes('no such type'))
+        (res?.payload?.error.includes('Failure_UnexpectedMessage') ||
+          res?.payload?.error.includes('unsupport') ||
+          res?.payload?.error.includes('no such type'))
       ) {
         verifyState = 'success';
       } else {
