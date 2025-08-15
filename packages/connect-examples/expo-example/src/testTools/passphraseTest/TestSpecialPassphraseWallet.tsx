@@ -258,12 +258,12 @@ function ExecuteView() {
 
       const currentTestCases: TestCaseDataWithKey<TestCaseDataType>[] = [];
       for (const item of passphraseStateList) {
-        ['btcGetAddress', 'evmGetAddress', 'dnxGetAddress'].forEach(method => {
+        for (const method of ['btcGetAddress', 'evmGetAddress', 'dnxGetAddress']) {
           const params = getRequestParams(method);
 
           try {
             // @ts-expect-error
-            const mockRes = mockDevice?.[method]?.('', '', {
+            const mockRes = await mockDevice?.[method]?.('', '', {
               ...params,
               mnemonic: mnemonic.trim(),
               passphrase: item.passphrase,
@@ -289,7 +289,7 @@ function ExecuteView() {
           } catch (e) {
             console.log('=====>>>>> error', e);
           }
-        });
+        }
       }
 
       console.log('currentTestCases', currentTestCases);
