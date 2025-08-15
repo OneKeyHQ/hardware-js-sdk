@@ -1018,7 +1018,7 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
 
   // If data is small enough, send directly
   if (buffer.length <= BLE_PACKET_SIZE) {
-    await wait(10);
+    await wait(5);
     return new Promise((resolve, reject) => {
       writeCharacteristic.write(buffer, true, (error: string) => {
         if (error) {
