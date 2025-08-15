@@ -21,12 +21,14 @@ function TestRunnerPrepareDataLogView() {
 }
 
 export type TestRunnerViewProps<T> = {
+  title?: string;
   renderExecuteView: () => React.ReactNode;
   isShowLogDetail?: boolean;
   stateManager?: CustomStateManager;
 } & TestRunnerResultViewProps;
 
 export function TestRunnerView<T>({
+  title,
   renderExecuteView,
   renderResultView,
   isShowLogDetail = true,
@@ -35,6 +37,11 @@ export function TestRunnerView<T>({
   return (
     <TestRunnerProvider>
       <YStack gap="$1">
+        {title && (
+          <Text fontSize={18} fontWeight="bold" paddingBottom="$3" color="$gray12">
+            {title}
+          </Text>
+        )}
         {renderExecuteView()}
         {isShowLogDetail && <TestRunnerPrepareDataLogView />}
         <TestRunnerResultView renderResultView={renderResultView} stateManager={stateManager} />
