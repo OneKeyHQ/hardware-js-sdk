@@ -18,7 +18,7 @@ import {
 } from '@onekeyfe/hd-shared';
 import { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
 import type { WebContents, IpcMainInvokeEvent } from 'electron';
-import type { Peripheral, Service, Characteristic } from '@abandonware/noble';
+import type { Peripheral, Service, Characteristic } from '@stoprocent/noble';
 import pRetry from 'p-retry';
 import type { NobleModule, Logger, DeviceInfo, CharacteristicPair } from './types/noble-extended';
 import { safeLog } from './types/noble-extended';
@@ -236,7 +236,7 @@ async function initializeNoble(): Promise<void> {
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
-    noble = require('@abandonware/noble') as NobleModule;
+    noble = require('@stoprocent/noble') as NobleModule;
     logger?.info('[NobleBLE] Noble library loaded');
 
     // Wait for Bluetooth to be ready
@@ -569,10 +569,10 @@ async function discoverServicesAndCharacteristics(
   peripheral: Peripheral
 ): Promise<CharacteristicPair> {
   return new Promise((resolve, reject) => {
-    peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error: string, services: Service[]) => {
+    peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error: Error | undefined, services: Service[]) => {
       if (error) {
         logger?.error('[NobleBLE] Service discovery failed:', error);
-        reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error));
+        reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
         return;
       }
 
@@ -587,10 +587,10 @@ async function discoverServicesAndCharacteristics(
       // Discover characteristics
       service.discoverCharacteristics(
         [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
-        (error: string, characteristics: Characteristic[]) => {
+        (error: Error | undefined, characteristics: Characteristic[]) => {
           if (error) {
             logger?.error('[NobleBLE] Characteristic discovery failed:', error);
-            reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error));
+            reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
             return;
           }
 
@@ -669,10 +669,10 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
 
   // Step 3: Re-establish connection
   await new Promise<void>((resolve, reject) => {
-    peripheral.connect((error: string) => {
+    peripheral.connect((error: Error | undefined) => {
       if (error) {
         logger?.error('[NobleBLE] Force reconnect failed:', error);
-        reject(new Error(`Force reconnect failed: ${error}`));
+        reject(new Error(`Force reconnect failed: ${error.message}`));
       } else {
         logger?.info('[NobleBLE] Force reconnect successful');
         connectedDevices.set(deviceId, peripheral);
@@ -719,9 +719,9 @@ async function connectAndDiscoverWithFreshScan(deviceId: string): Promise<Charac
 
     // Connect to fresh peripheral
     await new Promise<void>((resolve, reject) => {
-      freshPeripheral.connect((error: string) => {
+      freshPeripheral.connect((error: Error | undefined) => {
         if (error) {
-          reject(new Error(`Fresh peripheral connection failed: ${error}`));
+          reject(new Error(`Fresh peripheral connection failed: ${error.message}`));
         } else {
           connectedDevices.set(deviceId, freshPeripheral);
           resolve();
@@ -931,12 +931,12 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
     // TypeScript type assertion - peripheral is guaranteed to be defined at this point
     const connectedPeripheral = peripheral as Peripheral;
-    connectedPeripheral.connect((error: string) => {
+    connectedPeripheral.connect((error: Error | undefined) => {
       clearTimeout(timeout);
 
       if (error) {
         logger?.error('[NobleBLE] Connection failed:', error);
-        reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error));
+        reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.message));
         return;
       }
 
@@ -1020,10 +1020,10 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
   if (buffer.length <= BLE_PACKET_SIZE) {
     await wait(5);
     return new Promise((resolve, reject) => {
-      writeCharacteristic.write(buffer, true, (error: string) => {
+      writeCharacteristic.write(buffer, true, (error: Error | undefined) => {
         if (error) {
           logger?.error('[NobleBLE] Single packet write failed:', error);
-          reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error));
+          reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error.message));
           return;
         }
         // Record successful write time for pairing rejection detection
@@ -1049,10 +1049,10 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
   // Helper function to write a single chunk
   const writeChunk = (chunk: Buffer, chunkIndex: number): Promise<void> =>
     new Promise<void>((resolve, reject) => {
-      writeCharacteristic.write(chunk, false, (error: string) => {
+      writeCharacteristic.write(chunk, false, (error: Error | undefined) => {
         if (error) {
           logger?.error(`[NobleBLE] Chunk ${chunkIndex} write failed:`, error);
-          reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error));
+          reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error.message));
           return;
         }
         resolve();
@@ -1145,12 +1145,12 @@ async function subscribeNotifications(
     // Subscribe to notifications only if not already subscribed
     logger?.info('[NobleBLE] 🔄 Starting subscription process...', { deviceId });
 
-    notifyCharacteristic.subscribe((error: string) => {
+    notifyCharacteristic.subscribe((error: Error | undefined) => {
       if (error) {
         logger?.error('[NobleBLE] ❌ Notification subscription failed:', error);
         // 🔒 Clear operation state on error
         subscriptionOperations.set(deviceId, 'idle');
-        reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyError, error));
+        reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyError, error.message));
         return;
       }
 
@@ -1200,7 +1200,7 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
   subscriptionOperations.set(deviceId, 'unsubscribing');
 
   return new Promise<void>(resolve => {
-    notifyCharacteristic.unsubscribe((error: string) => {
+    notifyCharacteristic.unsubscribe((error: Error | undefined) => {
       if (error) {
         logger?.error('[NobleBLE] Notification unsubscription failed:', error);
       } else {

@@ -20,7 +20,7 @@
     "ts:check": "yarn tsc --noEmit"
   },
   "dependencies": {
-    "@abandonware/noble": "^1.9.2-26",
+    "@stoprocent/noble": "^2.3.4",
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",
     "electron-log": "^5.1.5",
