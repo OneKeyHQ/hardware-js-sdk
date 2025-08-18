@@ -50,7 +50,6 @@ module.exports = {
     {
       '@stoprocent/noble': 'commonjs @stoprocent/noble',
       '@stoprocent/bluetooth-hci-socket': 'commonjs @stoprocent/bluetooth-hci-socket',
-      '@abandonware/bluetooth-hci-socket': 'commonjs @abandonware/bluetooth-hci-socket',
       bufferutil: 'commonjs bufferutil',
       'utf-8-validate': 'commonjs utf-8-validate',
     },
