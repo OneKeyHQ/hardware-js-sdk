@@ -25,7 +25,7 @@ import type {
 import { DeviceModelToTypes } from '../types';
 import { findLatestRelease, getReleaseChangelog, getReleaseStatus } from '../utils/release';
 
-export type IFirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v6';
+export type IFirmwareField = 'firmware' | 'firmware-v2' | 'firmware-v7';
 
 export type MessageVersion = 'latest' | 'v1';
 

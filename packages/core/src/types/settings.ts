@@ -78,7 +78,7 @@ export type DeviceTypeMap = {
   [k in IKnownDevice]: {
     firmware: IFirmwareReleaseInfo[];
     'firmware-v2'?: IFirmwareReleaseInfo[];
-    'firmware-v6'?: IFirmwareReleaseInfo[];
+    'firmware-v7'?: IFirmwareReleaseInfo[];
     ble: IBLEFirmwareReleaseInfo[];
   };
 };
