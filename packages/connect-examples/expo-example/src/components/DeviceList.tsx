@@ -27,6 +27,8 @@ export type Device = {
   name: string;
   features?: Features;
   deviceType?: string;
+  id?: string;
+  state?: string;
 };
 
 const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
@@ -126,7 +128,13 @@ function DeviceListFC(
     const response = await sdk.searchDevices();
     const foundDevices = (response.payload as unknown as Device[]) ?? [];
     setDeviceActions({ type: 'setList', payload: foundDevices });
-    if (Platform.OS === 'web' && foundDevices?.length) {
+
+    // 🔧 DESKTOP BLE FIX: Don't auto-select devices, let user choose manually
+    // This prevents automatic connection which can cause issues with device switching
+    // Users should manually click the "Connect Device" button for their desired device
+
+    // Only auto-select for non-desktop-web-ble connections to maintain backward compatibility
+    if (Platform.OS === 'web' && foundDevices?.length && connectionType !== 'desktop-web-ble') {
       const device = foundDevices[0];
       selectDevice(device);
     }

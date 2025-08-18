@@ -49,6 +49,7 @@
     "dev:transport-lowlevel": "cd ./packages/hd-transport-lowlevel && yarn dev",
     "dev:transport-emulator": "cd ./packages/hd-transport-emulator && yarn dev",
     "dev:transport-web-device": "cd ./packages/hd-transport-web-device && yarn dev",
+    "dev:transport-electron": "cd ./packages/hd-transport-electron && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
     "debug:watcher": "node ./scripts/monitor.js"
   },
