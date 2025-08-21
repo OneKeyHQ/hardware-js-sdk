@@ -6290,7 +6290,7 @@
   optionalDependencies:
     usb "^2.14.0"
 
-"@stoprocent/noble@^2.3.4":
+"@stoprocent/noble@2.3.4":
   version "2.3.4"
   resolved "https://registry.yarnpkg.com/@stoprocent/noble/-/noble-2.3.4.tgz#6f6b7fc640e9ad697853846ab956ae47406f2ae6"
   integrity sha512-Tq0DSSvkd3hRWROS/JqrvhgI9GcFaQlxWgn2SaZuvLXHM7OEtQ0jrOPuWtxf/vNF5CaS6JJeo5DzEy5vmGrJFQ==

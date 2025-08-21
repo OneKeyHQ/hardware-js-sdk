@@ -1243,6 +1243,9 @@ async function subscribeNotifications(
       subscriptionOperations.set(deviceId, 'idle');
       resolve();
     } catch (e) {
+      logger?.error('[NobleBLE] Pairing probe failed, forcing disconnect to reset state', { deviceId, error: e });
+      // Force disconnect and cleanup on pairing failure to prevent zombie state
+      await disconnectDevice(deviceId);
       subscriptionOperations.set(deviceId, 'idle');
       reject(e);
     }
