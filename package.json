@@ -60,7 +60,10 @@
     "**/node-gyp": "10.0.1",
     "cross-spawn": "7.0.5",
     "brace-expansion": "^2.0.2",
-    "parse-url": "8.1.0"
+    "parse-url": "8.1.0",
+    "braces": "3.0.3",
+    "tmp": "0.2.4",
+    "micromatch": "4.0.8"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",
