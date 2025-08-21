@@ -565,7 +565,11 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
 
       if (type === 'ble' || type === 'firmware') {
         setShowUpdateDialog(true);
-        console.log('Starting firmware update:', { type, deviceId: selectDevice.connectId, platform: 'web' });
+        console.log('Starting firmware update:', {
+          type,
+          deviceId: selectDevice.connectId,
+          platform: 'web',
+        });
 
         // For desktop-web-ble mode, we need to pass the connectId
         const deviceId = selectDevice.connectId;
@@ -670,7 +674,9 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
             <MessageBox message="OneKey Features not available. Try clicking 'Refresh OneKey Features' button." />
           )}
           {selectDevice && selectDevice.state === 'disconnected' && (
-            <MessageBox message={`Device "${selectDevice.name}" shows as disconnected. In desktop-web-ble mode, this is normal - the device can still communicate via Bluetooth.`} />
+            <MessageBox
+              message={`Device "${selectDevice.name}" shows as disconnected. In desktop-web-ble mode, this is normal - the device can still communicate via Bluetooth.`}
+            />
           )}
         </Stack>
 

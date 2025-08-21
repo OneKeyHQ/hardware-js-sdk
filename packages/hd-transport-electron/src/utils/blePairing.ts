@@ -7,9 +7,9 @@ import type { Characteristic } from '@stoprocent/noble';
 import type { Logger } from '../types/noble-extended';
 
 export interface Step3Options {
-  intervalMs?: number;          // default 3000
-  maxCycles?: number;           // default 10
-  initDataHex?: string;         // hex string to write; default OneKey init
+  intervalMs?: number; // default 3000
+  maxCycles?: number; // default 10
+  initDataHex?: string; // hex string to write; default OneKey init
 }
 
 const DEFAULT_INIT_DATA =
@@ -44,7 +44,7 @@ export async function runPairingProbe(
       if (resolved || responseReceived) return;
       responseReceived = true;
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      logger?.info('[Pairing] response', { deviceId, cycles, elapsed: elapsed, len: data.length });
+      logger?.info('[Pairing] response', { deviceId, cycles, elapsed, len: data.length });
       cleanup();
       resolved = true;
       resolve();
@@ -58,18 +58,26 @@ export async function runPairingProbe(
       const t = ((Date.now() - startTime) / 1000).toFixed(1);
       logger?.info('[Pairing] cycle', { deviceId, cycle: cycles, t });
 
-      logger?.info(`[Pairing] Listeners before cycle: ${notifyCharacteristic.listenerCount('data')}`);
+      logger?.info(
+        `[Pairing] Listeners before cycle: ${notifyCharacteristic.listenerCount('data')}`
+      );
 
       // 清理旧监听，确保不会累积
       notifyCharacteristic.removeAllListeners('data');
 
-      logger?.info(`[Pairing] Listeners after cleanup: ${notifyCharacteristic.listenerCount('data')}`);
+      logger?.info(
+        `[Pairing] Listeners after cleanup: ${notifyCharacteristic.listenerCount('data')}`
+      );
 
       // 取消订阅 → 重新订阅 → 写入
       notifyCharacteristic.unsubscribe(() => {
         notifyCharacteristic.subscribe((subscribeError?: Error) => {
           if (subscribeError) {
-            logger?.error('[Pairing] subscribe failed', { deviceId, cycle: cycles, error: subscribeError.message });
+            logger?.error('[Pairing] subscribe failed', {
+              deviceId,
+              cycle: cycles,
+              error: subscribeError.message,
+            });
             return; // 等待下一轮
           }
 
@@ -77,14 +85,19 @@ export async function runPairingProbe(
           notifyCharacteristic.once('data', onData);
 
           writeCharacteristic.write(buffer, true, (writeError?: Error) => {
-          logger?.info(`[Pairing] Listeners after attach: ${notifyCharacteristic.listenerCount('data')}`);
+            logger?.info(
+              `[Pairing] Listeners after attach: ${notifyCharacteristic.listenerCount('data')}`
+            );
 
             if (writeError) {
-              logger?.error('[Pairing] write failed', { deviceId, cycle: cycles, error: writeError.message });
+              logger?.error('[Pairing] write failed', {
+                deviceId,
+                cycle: cycles,
+                error: writeError.message,
+              });
               return; // 等待下一轮
             }
             logger?.info('[Pairing] write', { deviceId, cycle: cycles });
-
           });
         });
       });
@@ -107,4 +120,3 @@ export async function runPairingProbe(
     intervalId = setInterval(doCycle, intervalMs);
   });
 }
-

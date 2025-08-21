@@ -64,11 +64,17 @@ const devicePacketStates = new Map<string, PacketAssemblyState>();
 // Track recent write operations to detect pairing rejection
 const recentWriteOperations = new Map<string, number>(); // deviceId -> timestamp
 
-
 // Enhanced pairing error detection (kept for potential future diagnostics)
 function isPairingError(error: Error): boolean {
   const keywords = [
-    'authentication', 'pairing', 'bonding', 'insufficient', 'security', 'authorization', 'permission', 'access denied'
+    'authentication',
+    'pairing',
+    'bonding',
+    'insufficient',
+    'security',
+    'authorization',
+    'permission',
+    'access denied',
   ];
   const errorMessage = error.message.toLowerCase();
   return keywords.some(k => errorMessage.includes(k));
@@ -595,77 +601,82 @@ async function discoverServicesAndCharacteristics(
   peripheral: Peripheral
 ): Promise<CharacteristicPair> {
   return new Promise((resolve, reject) => {
-    peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error: Error | undefined, services: Service[]) => {
-      if (error) {
-        logger?.error('[NobleBLE] Service discovery failed:', error);
-        reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
-        return;
-      }
-
-      if (!services || services.length === 0) {
-        reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found'));
-        return;
-      }
-
-      const service = services[0]; // Use first found service
-      logger?.info('[NobleBLE] Found service:', service.uuid);
-
-      // Discover characteristics
-      service.discoverCharacteristics(
-        [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
-        (error: Error | undefined, characteristics: Characteristic[]) => {
-          if (error) {
-            logger?.error('[NobleBLE] Characteristic discovery failed:', error);
-            reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
-            return;
-          }
-
-          // Log discovered characteristics summary
-          logger?.info('[NobleBLE] Discovered characteristics:', {
-            count: characteristics?.length || 0,
-            uuids: characteristics?.map(c => c.uuid) || [],
-          });
-
-          let writeCharacteristic: Characteristic | null = null;
-          let notifyCharacteristic: Characteristic | null = null;
-
-          // Find characteristics by extracting the distinguishing part of UUID
-          for (const characteristic of characteristics) {
-            const uuid = characteristic.uuid.replace(/-/g, '').toLowerCase();
-            const uuidKey = uuid.length >= 8 ? uuid.substring(4, 8) : uuid;
-
-            if (uuidKey === NORMALIZED_WRITE_UUID) {
-              writeCharacteristic = characteristic;
-            } else if (uuidKey === NORMALIZED_NOTIFY_UUID) {
-              notifyCharacteristic = characteristic;
-            }
-          }
-
-          logger?.info('[NobleBLE] Characteristic discovery result:', {
-            writeFound: !!writeCharacteristic,
-            notifyFound: !!notifyCharacteristic,
-          });
-
-          if (!writeCharacteristic || !notifyCharacteristic) {
-            logger?.error(
-              '[NobleBLE] Missing characteristics - write:',
-              !!writeCharacteristic,
-              'notify:',
-              !!notifyCharacteristic
-            );
-            reject(
-              ERRORS.TypedError(
-                HardwareErrorCode.BleCharacteristicNotFound,
-                'Required characteristics not found'
-              )
-            );
-            return;
-          }
-
-          resolve({ write: writeCharacteristic, notify: notifyCharacteristic });
+    peripheral.discoverServices(
+      ONEKEY_SERVICE_UUIDS,
+      (error: Error | undefined, services: Service[]) => {
+        if (error) {
+          logger?.error('[NobleBLE] Service discovery failed:', error);
+          reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
+          return;
         }
-      );
-    });
+
+        if (!services || services.length === 0) {
+          reject(
+            ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found')
+          );
+          return;
+        }
+
+        const service = services[0]; // Use first found service
+        logger?.info('[NobleBLE] Found service:', service.uuid);
+
+        // Discover characteristics
+        service.discoverCharacteristics(
+          [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
+          (error: Error | undefined, characteristics: Characteristic[]) => {
+            if (error) {
+              logger?.error('[NobleBLE] Characteristic discovery failed:', error);
+              reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
+              return;
+            }
+
+            // Log discovered characteristics summary
+            logger?.info('[NobleBLE] Discovered characteristics:', {
+              count: characteristics?.length || 0,
+              uuids: characteristics?.map(c => c.uuid) || [],
+            });
+
+            let writeCharacteristic: Characteristic | null = null;
+            let notifyCharacteristic: Characteristic | null = null;
+
+            // Find characteristics by extracting the distinguishing part of UUID
+            for (const characteristic of characteristics) {
+              const uuid = characteristic.uuid.replace(/-/g, '').toLowerCase();
+              const uuidKey = uuid.length >= 8 ? uuid.substring(4, 8) : uuid;
+
+              if (uuidKey === NORMALIZED_WRITE_UUID) {
+                writeCharacteristic = characteristic;
+              } else if (uuidKey === NORMALIZED_NOTIFY_UUID) {
+                notifyCharacteristic = characteristic;
+              }
+            }
+
+            logger?.info('[NobleBLE] Characteristic discovery result:', {
+              writeFound: !!writeCharacteristic,
+              notifyFound: !!notifyCharacteristic,
+            });
+
+            if (!writeCharacteristic || !notifyCharacteristic) {
+              logger?.error(
+                '[NobleBLE] Missing characteristics - write:',
+                !!writeCharacteristic,
+                'notify:',
+                !!notifyCharacteristic
+              );
+              reject(
+                ERRORS.TypedError(
+                  HardwareErrorCode.BleCharacteristicNotFound,
+                  'Required characteristics not found'
+                )
+              );
+              return;
+            }
+
+            resolve({ write: writeCharacteristic, notify: notifyCharacteristic });
+          }
+        );
+      }
+    );
   });
 }
 
@@ -1051,10 +1062,12 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
         if (error) {
           logger?.error('[NobleBLE] Write single failed:', error);
           if (isPairingError(error)) {
-            reject(ERRORS.TypedError(
-              HardwareErrorCode.BleWriteCharacteristicError,
-              `Pairing required for write operation: ${error.message}`
-            ));
+            reject(
+              ERRORS.TypedError(
+                HardwareErrorCode.BleWriteCharacteristicError,
+                `Pairing required for write operation: ${error.message}`
+              )
+            );
           } else {
             reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error.message));
           }
@@ -1199,12 +1212,22 @@ async function subscribeNotifications(
   });
 
   // Helper: rebuild a clean application-layer subscription
-  async function rebuildAppSubscription(deviceId: string, notifyCharacteristic: Characteristic): Promise<void> {
+  async function rebuildAppSubscription(
+    deviceId: string,
+    notifyCharacteristic: Characteristic
+  ): Promise<void> {
     notifyCharacteristic.removeAllListeners('data');
-    await new Promise<void>(resolve => notifyCharacteristic.unsubscribe(() => resolve()));
+    await new Promise<void>(resolve => {
+      notifyCharacteristic.unsubscribe(() => {
+        resolve();
+      });
+    });
     await new Promise<void>((resolve, reject) => {
       notifyCharacteristic.subscribe((error?: Error) => {
-        if (error) return reject(error);
+        if (error) {
+          reject(error);
+          return;
+        }
         resolve();
       });
     });
@@ -1237,19 +1260,19 @@ async function subscribeNotifications(
     subscribedDevices.set(deviceId, true);
   }
 
-  return new Promise(async (resolve, reject) => {
-    try {
-      await pairingProbeAndRebuild(deviceId);
-      subscriptionOperations.set(deviceId, 'idle');
-      resolve();
-    } catch (e) {
-      logger?.error('[NobleBLE] Pairing probe failed, forcing disconnect to reset state', { deviceId, error: e });
-      // Force disconnect and cleanup on pairing failure to prevent zombie state
-      await disconnectDevice(deviceId);
-      subscriptionOperations.set(deviceId, 'idle');
-      reject(e);
-    }
-  });
+  try {
+    await pairingProbeAndRebuild(deviceId);
+    subscriptionOperations.set(deviceId, 'idle');
+  } catch (e) {
+    logger?.error('[NobleBLE] Pairing probe failed, forcing disconnect to reset state', {
+      deviceId,
+      error: e,
+    });
+    // Force disconnect and cleanup on pairing failure to prevent zombie state
+    await disconnectDevice(deviceId);
+    subscriptionOperations.set(deviceId, 'idle');
+    throw e;
+  }
 }
 
 // Unsubscribe from notifications
