@@ -22,6 +22,7 @@ import type { Peripheral, Service, Characteristic } from '@stoprocent/noble';
 import pRetry from 'p-retry';
 import type { NobleModule, Logger, DeviceInfo, CharacteristicPair } from './types/noble-extended';
 import { safeLog } from './types/noble-extended';
+import { runPairingProbe } from './utils/blePairing';
 
 // Noble will be dynamically imported to avoid bundlinpissues
 let noble: NobleModule | null = null;
@@ -62,6 +63,17 @@ const devicePacketStates = new Map<string, PacketAssemblyState>();
 
 // Track recent write operations to detect pairing rejection
 const recentWriteOperations = new Map<string, number>(); // deviceId -> timestamp
+
+
+// Enhanced pairing error detection (kept for potential future diagnostics)
+function isPairingError(error: Error): boolean {
+  const keywords = [
+    'authentication', 'pairing', 'bonding', 'insufficient', 'security', 'authorization', 'permission', 'access denied'
+  ];
+  const errorMessage = error.message.toLowerCase();
+  return keywords.some(k => errorMessage.includes(k));
+}
+
 const WRITE_DISCONNECT_THRESHOLD = 1000; // 1 second
 
 // Service UUIDs to scan for - using constants from hd-shared
@@ -76,7 +88,7 @@ const BLUETOOTH_INIT_TIMEOUT = 10000; // 10 seconds for Bluetooth initialization
 const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for fast targeted scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
-const CONNECTION_TIMEOUT = 3000; // 15 seconds for device connection
+const CONNECTION_TIMEOUT = 15000; // 15 seconds for device connection
 const CHUNK_WRITE_DELAY = 10; // 10ms delay between chunk writes
 
 // BLE packet size constants
@@ -94,11 +106,18 @@ interface PacketProcessResult {
 
 // Process incoming BLE notification data with proper packet reassembly
 function processNotificationData(deviceId: string, data: Buffer): PacketProcessResult {
+  //  notification telemetry
+  logger?.info('[NobleBLE] Notification', {
+    deviceId,
+    dataLength: data.length,
+  });
+
   // Get or initialize packet state for this device
   let packetState = devicePacketStates.get(deviceId);
   if (!packetState) {
     packetState = { bufferLength: 0, buffer: [], packetCount: 0 };
     devicePacketStates.set(deviceId, packetState);
+    logger?.info('[NobleBLE] Initialized new packet state for device:', deviceId);
   }
 
   try {
@@ -109,7 +128,7 @@ function processNotificationData(deviceId: string, data: Buffer): PacketProcessR
       }
 
       // Generate message ID for this packet sequence
-      const messageId = `${deviceId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const messageId = `${deviceId}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
       // Reset packet state for new message
       packetState.bufferLength = data.readInt32BE(5);
@@ -143,6 +162,13 @@ function processNotificationData(deviceId: string, data: Buffer): PacketProcessR
     if (packetState.buffer.length - COMMON_HEADER_SIZE >= packetState.bufferLength) {
       const completeBuffer = Buffer.from(packetState.buffer);
       const hexString = completeBuffer.toString('hex');
+
+      logger?.info('[NobleBLE] Packet assembled', {
+        deviceId,
+        totalPackets: packetState.packetCount,
+        expectedLength: packetState.bufferLength,
+        actualLength: packetState.buffer.length - COMMON_HEADER_SIZE,
+      });
 
       // Reset packet state for next message
       resetPacketState(packetState);
@@ -385,7 +411,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
   }
 
-  // First check if we have a recent cached peripheral\n  const cachedDevice = deviceCache.get(targetDeviceId);\n  if (cachedDevice && (Date.now() - cachedDevice.lastSeen) < 30000) { // 30 seconds cache\n    logger?.info('[NobleBLE] Using cached device for fast connection:', targetDeviceId);\n    \n    // Use cached device if it was successful before\n    if (cachedDevice.connectionSuccess) {\n      discoveredDevices.set(targetDeviceId, cachedDevice.peripheral);\n      return cachedDevice.peripheral;\n    }\n  }\n\n  logger?.info('[NobleBLE] Starting targeted scan for device:', targetDeviceId);
+  logger?.info('[NobleBLE] Starting targeted scan for device:', targetDeviceId);
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -1018,14 +1044,25 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
 
   // If data is small enough, send directly
   if (buffer.length <= BLE_PACKET_SIZE) {
+    logger?.info('[NobleBLE] Write single', { deviceId, size: buffer.length });
     await wait(5);
     return new Promise((resolve, reject) => {
       writeCharacteristic.write(buffer, true, (error: Error | undefined) => {
         if (error) {
-          logger?.error('[NobleBLE] Single packet write failed:', error);
-          reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error.message));
+          logger?.error('[NobleBLE] Write single failed:', error);
+          if (isPairingError(error)) {
+            reject(ERRORS.TypedError(
+              HardwareErrorCode.BleWriteCharacteristicError,
+              `Pairing required for write operation: ${error.message}`
+            ));
+          } else {
+            reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error.message));
+          }
           return;
         }
+
+        logger?.info('[NobleBLE] Write single ok', { deviceId });
+
         // Record successful write time for pairing rejection detection
         recentWriteOperations.set(deviceId, Date.now());
         resolve();
@@ -1044,12 +1081,25 @@ async function writeData(deviceId: string, hexData: string): Promise<void> {
     offset += chunkSize;
   }
 
-  logger?.info('[NobleBLE] Splitting into chunks:', chunks.length);
+  logger?.info('[NobleBLE] Splitting into chunks:', {
+    deviceId,
+    totalChunks: chunks.length,
+    chunkSize: BLE_PACKET_SIZE,
+    totalDataLength: buffer.length,
+  });
 
   // Helper function to write a single chunk
   const writeChunk = (chunk: Buffer, chunkIndex: number): Promise<void> =>
     new Promise<void>((resolve, reject) => {
-      writeCharacteristic.write(chunk, false, (error: Error | undefined) => {
+      logger?.info(`[NobleBLE] Writing chunk ${chunkIndex}:`, {
+        deviceId,
+        chunkIndex,
+        chunkSize: chunk.length,
+        chunkData: chunk.toString('hex'),
+        withResponse: false,
+      });
+
+      writeCharacteristic.write(chunk, true, (error: Error | undefined) => {
         if (error) {
           logger?.error(`[NobleBLE] Chunk ${chunkIndex} write failed:`, error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError, error.message));
@@ -1100,6 +1150,13 @@ async function subscribeNotifications(
   const { notify: notifyCharacteristic } = characteristics;
 
   logger?.info('[NobleBLE] Subscribing to notifications for device:', deviceId);
+  // If a subscription is already in progress, dedupe
+  const opState = subscriptionOperations.get(deviceId);
+  if (opState === 'subscribing') {
+    // Subscription in progress; update callback and return
+    notificationCallbacks.set(deviceId, callback);
+    return Promise.resolve();
+  }
 
   // 🔒 Set operation state to prevent race conditions
   subscriptionOperations.set(deviceId, 'subscribing');
@@ -1141,45 +1198,54 @@ async function subscribeNotifications(
     messageId: undefined,
   });
 
-  return new Promise((resolve, reject) => {
-    // Subscribe to notifications only if not already subscribed
-    logger?.info('[NobleBLE] 🔄 Starting subscription process...', { deviceId });
+  // Helper: rebuild a clean application-layer subscription
+  async function rebuildAppSubscription(deviceId: string, notifyCharacteristic: Characteristic): Promise<void> {
+    notifyCharacteristic.removeAllListeners('data');
+    await new Promise<void>(resolve => notifyCharacteristic.unsubscribe(() => resolve()));
+    await new Promise<void>((resolve, reject) => {
+      notifyCharacteristic.subscribe((error?: Error) => {
+        if (error) return reject(error);
+        resolve();
+      });
+    });
 
-    notifyCharacteristic.subscribe((error: Error | undefined) => {
-      if (error) {
-        logger?.error('[NobleBLE] ❌ Notification subscription failed:', error);
-        // 🔒 Clear operation state on error
-        subscriptionOperations.set(deviceId, 'idle');
-        reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotifyError, error.message));
+    notifyCharacteristic.on('data', (data: Buffer) => {
+      const result = processNotificationData(deviceId, data);
+      if (result.error) {
+        logger?.error('[NobleBLE] Packet processing error:', result.error);
         return;
       }
-
-      logger?.info('[NobleBLE] ✅ Notification subscription successful');
-      subscribedDevices.set(deviceId, true);
-
-      // 🔒 Clear operation state on success
-      subscriptionOperations.set(deviceId, 'idle');
-
-      // Set up data handler with robust packet reassembly
-      notifyCharacteristic.on('data', (data: Buffer) => {
-        const result = processNotificationData(deviceId, data);
-
-        if (result.error) {
-          logger?.error('[NobleBLE] Packet processing error:', result.error);
-          return;
-        }
-
-        if (result.isComplete && result.completePacket) {
-          logger?.info('[NobleBLE] Packet complete:', {
-            deviceId,
-            length: result.completePacket.length / 2,
-          });
-          callback(result.completePacket);
-        }
-      });
-
-      resolve();
+      if (result.isComplete && result.completePacket) {
+        const appCb = notificationCallbacks.get(deviceId);
+        if (appCb) appCb(result.completePacket);
+      }
     });
+  }
+
+  // Helper: run pairing probe then rebuild subscription
+  async function pairingProbeAndRebuild(deviceId: string): Promise<void> {
+    const characteristics = deviceCharacteristics.get(deviceId);
+    if (!characteristics || !characteristics.write) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleCharacteristicNotFound,
+        'Required characteristics not found for pairing'
+      );
+    }
+    const { notify, write } = characteristics;
+    await runPairingProbe(logger, deviceId, notify, write, { intervalMs: 3000, maxCycles: 10 });
+    await rebuildAppSubscription(deviceId, notify);
+    subscribedDevices.set(deviceId, true);
+  }
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      await pairingProbeAndRebuild(deviceId);
+      subscriptionOperations.set(deviceId, 'idle');
+      resolve();
+    } catch (e) {
+      subscriptionOperations.set(deviceId, 'idle');
+      reject(e);
+    }
   });
 }
 
@@ -1282,6 +1348,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     ipcMain.handle(
       EOneKeyBleMessageKeys.NOBLE_BLE_WRITE,
       async (_event: IpcMainInvokeEvent, deviceId: string, hexData: string) => {
+        logger?.info('[NobleBLE] IPC WRITE', { deviceId, len: hexData.length });
         await writeData(deviceId, hexData);
       }
     );
