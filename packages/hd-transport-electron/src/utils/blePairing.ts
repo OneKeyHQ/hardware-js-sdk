@@ -58,8 +58,12 @@ export async function runPairingProbe(
       const t = ((Date.now() - startTime) / 1000).toFixed(1);
       logger?.info('[Pairing] cycle', { deviceId, cycle: cycles, t });
 
+      logger?.info(`[Pairing] Listeners before cycle: ${notifyCharacteristic.listenerCount('data')}`);
+
       // 清理旧监听，确保不会累积
       notifyCharacteristic.removeAllListeners('data');
+
+      logger?.info(`[Pairing] Listeners after cleanup: ${notifyCharacteristic.listenerCount('data')}`);
 
       // 取消订阅 → 重新订阅 → 写入
       notifyCharacteristic.unsubscribe(() => {
@@ -73,6 +77,8 @@ export async function runPairingProbe(
           notifyCharacteristic.once('data', onData);
 
           writeCharacteristic.write(buffer, true, (writeError?: Error) => {
+          logger?.info(`[Pairing] Listeners after attach: ${notifyCharacteristic.listenerCount('data')}`);
+
             if (writeError) {
               logger?.error('[Pairing] write failed', { deviceId, cycle: cycles, error: writeError.message });
               return; // 等待下一轮

@@ -408,23 +408,20 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
   const deviceTypeLowerCase = deviceType.toLowerCase();
 
   const loadOnekeyFeatures = useCallback(async () => {
-    if (!sdk) return;
-    if (!selectDevice?.connectId) return;
+    if (!sdk || !selectDevice?.connectId) return undefined;
 
     try {
       console.log('loadOnekeyFeatures: Starting to load OneKey features...');
-      // await wait(1000);
       const res = await sdk.getOnekeyFeatures(selectDevice.connectId);
       console.log('loadOnekeyFeatures: Result:', res);
 
       if (res.success) {
-        setOnekeyFeatures(res.payload);
-      } else {
-        setOnekeyFeatures(undefined);
+        return res.payload;
       }
+      return undefined;
     } catch (error) {
       console.error('loadOnekeyFeatures: Error:', error);
-      setOnekeyFeatures(undefined);
+      return undefined;
     }
   }, [sdk, selectDevice?.connectId]);
 
@@ -439,21 +436,22 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
     const loadDeviceFeatures = async () => {
       setConnecting(true);
       setFeatures(undefined);
+      setOnekeyFeatures(undefined);
       setError(undefined);
 
       try {
         console.log('Loading device features for:', selectDevice.connectId);
 
-        // First, get basic device features
         const featuresRes = await sdk.getFeatures(selectDevice.connectId);
         console.log('getFeatures result:', featuresRes);
 
         if (featuresRes.success) {
-          setFeatures(featuresRes.payload);
+          const fetchedFeatures = featuresRes.payload;
           console.log('Features loaded successfully, now loading OneKey features...');
+          const fetchedOnekeyFeatures = await loadOnekeyFeatures();
 
-          // Then, load OneKey specific features
-          await loadOnekeyFeatures();
+          setFeatures(fetchedFeatures);
+          setOnekeyFeatures(fetchedOnekeyFeatures);
         } else {
           console.error('Failed to get features:', featuresRes.payload.error);
           setError(featuresRes.payload.error);
