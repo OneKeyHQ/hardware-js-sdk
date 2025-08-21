@@ -240,21 +240,21 @@ export const getFirmwareUpdateField = ({
   }
 
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-    return 'firmware-v6';
+    return 'firmware-v7';
   }
 
   if (deviceType === EDeviceType.Touch) {
     if (targetVersion) {
       if (semver.eq(targetVersion, '4.0.0')) return 'firmware-v2';
-      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v6';
+      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v7';
     }
 
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
 
-    return 'firmware-v6';
+    return 'firmware-v7';
   }
   if (deviceType === EDeviceType.Pro) {
-    return 'firmware-v6';
+    return 'firmware-v7';
   }
   return 'firmware';
 };
@@ -266,7 +266,7 @@ export const getFirmwareUpdateField = ({
 export const getFirmwareUpdateFieldArray = (
   features: Features,
   updateType: 'firmware' | 'ble' | 'bootloader'
-): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v6')[] => {
+): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v7')[] => {
   const deviceType = getDeviceType(features);
   if (updateType === 'ble') {
     return ['ble'];
@@ -278,25 +278,25 @@ export const getFirmwareUpdateFieldArray = (
     deviceType === 'mini' ||
     deviceType === 'classicpure'
   ) {
-    return ['firmware-v6'];
+    return ['firmware-v7'];
   }
 
   if (deviceType === 'touch') {
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
     if (semver.gt(currentVersion, '4.0.0')) {
-      return ['firmware-v6', 'firmware'];
+      return ['firmware-v7', 'firmware'];
     }
     if (semver.gte(currentVersion, '4.0.0')) {
       return ['firmware-v2', 'firmware'];
     }
     if (!currentVersion || semver.lt(currentVersion, '3.0.0')) {
-      return ['firmware-v6', 'firmware-v2', 'firmware'];
+      return ['firmware-v7', 'firmware-v2', 'firmware'];
     }
     return ['firmware'];
   }
 
   if (deviceType === 'pro') {
-    return ['firmware-v6'];
+    return ['firmware-v7'];
   }
 
   return ['firmware'];
