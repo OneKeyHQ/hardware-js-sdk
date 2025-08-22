@@ -341,6 +341,23 @@
         }
       }
     },
+    "AptosSignSIWAMessage": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "siwa_payload": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        }
+      }
+    },
     "BenfenGetAddress": {
       "fields": {
         "address_n": {
@@ -5241,6 +5258,20 @@
         }
       }
     },
+    "EthereumAccessListOneKey": {
+      "fields": {
+        "address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "storage_keys": {
+          "rule": "repeated",
+          "type": "bytes",
+          "id": 2
+        }
+      }
+    },
     "EthereumSignTxEIP1559OneKey": {
       "fields": {
         "address_n": {
@@ -5305,19 +5336,124 @@
           "type": "EthereumAccessListOneKey",
           "id": 11
         }
+      }
+    },
+    "EthereumAuthorizationSignature": {
+      "fields": {
+        "y_parity": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 1
+        },
+        "r": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "s": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        }
+      }
+    },
+    "EthereumSignTxEIP7702OneKey": {
+      "fields": {
+        "address_n": {
+          "rule": "repeated",
+          "type": "uint32",
+          "id": 1,
+          "options": {
+            "packed": false
+          }
+        },
+        "nonce": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 2
+        },
+        "max_gas_fee": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 3
+        },
+        "max_priority_fee": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 4
+        },
+        "gas_limit": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "to": {
+          "rule": "required",
+          "type": "string",
+          "id": 6
+        },
+        "value": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        },
+        "data_initial_chunk": {
+          "type": "bytes",
+          "id": 8,
+          "options": {
+            "default": ""
+          }
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 9
+        },
+        "chain_id": {
+          "rule": "required",
+          "type": "uint64",
+          "id": 10
+        },
+        "access_list": {
+          "rule": "repeated",
+          "type": "EthereumAccessListOneKey",
+          "id": 11
+        },
+        "authorization_list": {
+          "rule": "repeated",
+          "type": "EthereumAuthorizationOneKey",
+          "id": 12
+        }
       },
       "nested": {
-        "EthereumAccessListOneKey": {
+        "EthereumAuthorizationOneKey": {
           "fields": {
+            "address_n": {
+              "rule": "repeated",
+              "type": "uint32",
+              "id": 1,
+              "options": {
+                "packed": false
+              }
+            },
+            "chain_id": {
+              "rule": "required",
+              "type": "uint64",
+              "id": 2
+            },
             "address": {
               "rule": "required",
               "type": "string",
-              "id": 1
+              "id": 3
             },
-            "storage_keys": {
-              "rule": "repeated",
+            "nonce": {
+              "rule": "required",
               "type": "bytes",
-              "id": 2
+              "id": 4
+            },
+            "signature": {
+              "type": "EthereumAuthorizationSignature",
+              "id": 5
             }
           }
         }
@@ -5340,6 +5476,11 @@
         "signature_s": {
           "type": "bytes",
           "id": 4
+        },
+        "authorization_signatures": {
+          "rule": "repeated",
+          "type": "EthereumAuthorizationSignature",
+          "id": 10
         }
       }
     },
@@ -11581,6 +11722,12 @@
         }
       }
     },
+    "TronMessageType": {
+      "values": {
+        "V1": 1,
+        "V2": 2
+      }
+    },
     "TronSignMessage": {
       "fields": {
         "address_n": {
@@ -11595,6 +11742,13 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "message_type": {
+          "type": "TronMessageType",
+          "id": 3,
+          "options": {
+            "default": "V1"
+          }
         }
       }
     },
@@ -11914,6 +12068,7 @@
         "MessageType_EthereumSignTypedHashOneKey": 20117,
         "MessageType_EthereumGnosisSafeTxAck": 20118,
         "MessageType_EthereumGnosisSafeTxRequest": 20119,
+        "MessageType_EthereumSignTxEIP7702OneKey": 20120,
         "MessageType_NEMGetAddress": 67,
         "MessageType_NEMAddress": 68,
         "MessageType_NEMSignTx": 69,
@@ -12055,6 +12210,7 @@
         "MessageType_AptosSignedTx": 10603,
         "MessageType_AptosSignMessage": 10604,
         "MessageType_AptosMessageSignature": 10605,
+        "MessageType_AptosSignSIWAMessage": 10606,
         "MessageType_WebAuthnListResidentCredentials": 800,
         "MessageType_WebAuthnCredentials": 801,
         "MessageType_WebAuthnAddResidentCredential": 802,

@@ -139,6 +139,12 @@ export type AptosMessageSignature = {
   address: string;
 };
 
+// AptosSignSIWAMessage
+export type AptosSignSIWAMessage = {
+  address_n: number[];
+  siwa_payload: string;
+};
+
 // BenfenGetAddress
 export type BenfenGetAddress = {
   address_n: number[];
@@ -1919,6 +1925,7 @@ export type EthereumSignTxOneKey = {
   tx_type?: number;
 };
 
+// EthereumAccessListOneKey
 export type EthereumAccessListOneKey = {
   address: string;
   storage_keys: string[];
@@ -1939,12 +1946,44 @@ export type EthereumSignTxEIP1559OneKey = {
   access_list: EthereumAccessListOneKey[];
 };
 
+// EthereumAuthorizationSignature
+export type EthereumAuthorizationSignature = {
+  y_parity: number;
+  r: string;
+  s: string;
+};
+
+export type EthereumAuthorizationOneKey = {
+  address_n: number[];
+  chain_id: number;
+  address: string;
+  nonce: string;
+  signature?: EthereumAuthorizationSignature;
+};
+
+// EthereumSignTxEIP7702OneKey
+export type EthereumSignTxEIP7702OneKey = {
+  address_n: number[];
+  nonce: string;
+  max_gas_fee: string;
+  max_priority_fee: string;
+  gas_limit: string;
+  to: string;
+  value: string;
+  data_initial_chunk?: string;
+  data_length: number;
+  chain_id: number;
+  access_list: EthereumAccessListOneKey[];
+  authorization_list: EthereumAuthorizationOneKey[];
+};
+
 // EthereumTxRequestOneKey
 export type EthereumTxRequestOneKey = {
   data_length?: number;
   signature_v?: number;
   signature_r?: string;
   signature_s?: string;
+  authorization_signatures: EthereumAuthorizationSignature[];
 };
 
 // EthereumTxAckOneKey
@@ -4233,10 +4272,16 @@ export type TronSignedTx = {
   serialized_tx?: string;
 };
 
+export enum TronMessageType {
+  V1 = 1,
+  V2 = 2,
+}
+
 // TronSignMessage
 export type TronSignMessage = {
   address_n: number[];
   message: string;
+  message_type?: TronMessageType;
 };
 
 // TronMessageSignature
@@ -4276,6 +4321,7 @@ export type MessageType = {
   AptosMessagePayload: AptosMessagePayload;
   AptosSignMessage: AptosSignMessage;
   AptosMessageSignature: AptosMessageSignature;
+  AptosSignSIWAMessage: AptosSignSIWAMessage;
   BenfenGetAddress: BenfenGetAddress;
   BenfenAddress: BenfenAddress;
   BenfenSignTx: BenfenSignTx;
@@ -4491,6 +4537,9 @@ export type MessageType = {
   EthereumSignTxOneKey: EthereumSignTxOneKey;
   EthereumAccessListOneKey: EthereumAccessListOneKey;
   EthereumSignTxEIP1559OneKey: EthereumSignTxEIP1559OneKey;
+  EthereumAuthorizationSignature: EthereumAuthorizationSignature;
+  EthereumAuthorizationOneKey: EthereumAuthorizationOneKey;
+  EthereumSignTxEIP7702OneKey: EthereumSignTxEIP7702OneKey;
   EthereumTxRequestOneKey: EthereumTxRequestOneKey;
   EthereumTxAckOneKey: EthereumTxAckOneKey;
   EthereumSignMessageOneKey: EthereumSignMessageOneKey;
