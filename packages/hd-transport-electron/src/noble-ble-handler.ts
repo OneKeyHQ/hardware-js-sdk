@@ -434,27 +434,24 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
         clearTimeout(timeout);
         if (noble) {
           noble.stopScanning();
+          noble.removeListener('discover', onDiscover);
         }
 
         // Cache the found device
         discoveredDevices.set(peripheral.id, peripheral);
 
-        logger?.info('[NobleBLE] Target device found:', {
+        logger?.info('[NobleBLE] OneKey device found during targeted scan:', {
           id: peripheral.id,
           name: peripheral.advertisement?.localName || 'Unknown',
         });
-
-        // Clean up listener
-        if (noble) {
-          noble.removeListener('discover', onDiscover);
-        }
 
         resolve(peripheral);
       }
     };
 
-    // Add discovery listener
+    // Remove any existing discover listeners to prevent memory leaks
     if (noble) {
+      noble.removeListener('discover', onDiscover);
       noble.on('discover', onDiscover);
     }
 
@@ -684,39 +681,38 @@ async function discoverServicesAndCharacteristics(
 async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string): Promise<void> {
   logger?.info('[NobleBLE] Forcing connection reset for device:', deviceId);
 
-  // Step 1: Force disconnect if connected
-  if (peripheral.state === 'connected') {
-    await new Promise<void>(resolve => {
-      peripheral.disconnect(() => {
-        logger?.info('[NobleBLE] Force disconnect completed');
-        resolve();
+    // Step 1: Clean up all device state first
+    cleanupDeviceState(deviceId);
+
+    // Step 2: Force disconnect if connected
+    if (peripheral.state === 'connected') {
+      await new Promise<void>(resolve => {
+        peripheral.disconnect(() => {
+          logger?.info('[NobleBLE] Force disconnect completed');
+          resolve();
+        });
       });
-    });
 
     // Wait for complete disconnection
     await wait(1000);
-  }
+    }
 
-  // Step 2: Clear device state
-  connectedDevices.delete(deviceId);
-  deviceCharacteristics.delete(deviceId);
-  devicePacketStates.delete(deviceId);
-  subscribedDevices.delete(deviceId);
-  subscriptionOperations.delete(deviceId);
+    // Step 3: Clear any remaining listeners on the peripheral
+    peripheral.removeAllListeners();
 
-  // Step 3: Re-establish connection
-  await new Promise<void>((resolve, reject) => {
-    peripheral.connect((error: Error | undefined) => {
-      if (error) {
-        logger?.error('[NobleBLE] Force reconnect failed:', error);
-        reject(new Error(`Force reconnect failed: ${error.message}`));
-      } else {
-        logger?.info('[NobleBLE] Force reconnect successful');
-        connectedDevices.set(deviceId, peripheral);
-        resolve();
-      }
+    // Step 4: Re-establish connection with longer timeout
+    await new Promise<void>((resolve, reject) => {
+      peripheral.connect((error: Error | undefined) => {
+        if (error) {
+          logger?.error('[NobleBLE] Force reconnect failed:', error);
+          reject(new Error(`Force reconnect failed: ${error.message}`));
+        } else {
+          logger?.info('[NobleBLE] Force reconnect successful');
+          connectedDevices.set(deviceId, peripheral);
+          resolve();
+        }
+      });
     });
-  });
 
   // Wait for connection to stabilize
   await wait(500);
@@ -946,6 +942,9 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       // Continue to re-setup the connection properly
     }
 
+    // Wait for the device to stabilize before proceeding
+    await wait(300);
+
     // Discover services and characteristics with enhanced retry including fresh scan
     try {
       const characteristics = await connectAndDiscoverWithFreshScan(deviceId);
@@ -968,7 +967,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
     // TypeScript type assertion - peripheral is guaranteed to be defined at this point
     const connectedPeripheral = peripheral as Peripheral;
-    connectedPeripheral.connect((error: Error | undefined) => {
+    connectedPeripheral.connect(async (error: Error | undefined) => {
       clearTimeout(timeout);
 
       if (error) {
@@ -983,22 +982,20 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       // Set up unified disconnect listener
       setupDisconnectListener(connectedPeripheral, deviceId, webContents);
 
-      // Discover services and characteristics with enhanced retry including fresh scan
-      connectAndDiscoverWithFreshScan(deviceId)
-        .then(characteristics => {
-          deviceCharacteristics.set(deviceId, characteristics);
-          logger?.info('[NobleBLE] Device ready for communication:', deviceId);
-          resolve();
-        })
-        .catch(error => {
-          logger?.error(
-            '[NobleBLE] Service/characteristic discovery failed after all attempts:',
-            error
-          );
-          // Disconnect on failure
-          connectedPeripheral.disconnect();
-          reject(error);
-        });
+      try {
+        const characteristics = await connectAndDiscoverWithFreshScan(deviceId);
+        deviceCharacteristics.set(deviceId, characteristics);
+        logger?.info('[NobleBLE] Device ready for communication:', deviceId);
+        resolve();
+      } catch (discoveryError) {
+        logger?.error(
+          '[NobleBLE] Service/characteristic discovery failed after all attempts:',
+          discoveryError
+        );
+        // Disconnect on failure
+        connectedPeripheral.disconnect();
+        reject(discoveryError);
+      }
     });
   });
 }
