@@ -37,6 +37,7 @@ export async function runPairingProbe(
     const cleanup = () => {
       if (intervalId) clearInterval(intervalId);
       // pairing阶段结束前，先移除一次性侦听器，避免泄露
+      logger?.info(`[Pairing] Cleaning up ${notifyCharacteristic.listenerCount('data')} listeners before cycle`);
       notifyCharacteristic.removeAllListeners('data');
     };
 
