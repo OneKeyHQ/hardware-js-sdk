@@ -1258,14 +1258,45 @@ async function subscribeNotifications(
   }
 
   try {
-    await pairingProbeAndRebuild(deviceId);
+    // The pairing probe is a workaround primarily for Windows BLE instability.
+    if (process.platform === 'win32') {
+      logger?.info('[NobleBLE] Windows platform detected, running pairing probe.');
+      await pairingProbeAndRebuild(deviceId);
+    } else {
+      logger?.info(`[NobleBLE] Non-Windows platform (${process.platform}) detected, skipping pairing probe.`);
+      const characteristics = deviceCharacteristics.get(deviceId);
+      if (!characteristics) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.BleCharacteristicNotFound,
+          'Characteristics not found for subscription'
+        );
+      }
+
+      // On non-Windows platforms, a probe write is needed to trigger the pairing dialog.
+      // This is a dummy write operation that doesn't expect a response.
+      logger?.info(`[NobleBLE] Performing probe write to trigger pairing on ${process.platform}`);
+      const probeData = Buffer.from('01', 'hex'); // A single byte is sufficient
+      await new Promise<void>((resolve, reject) => {
+        characteristics.write.write(probeData, false, (error) => {
+          if (error) {
+            // We can often ignore errors here, as the goal is just to trigger the dialog.
+            // However, log it for debugging purposes.
+            logger?.warn('[NobleBLE] Probe write failed (this may be expected):', error.message);
+          }
+          resolve(); // Resolve regardless of error
+        });
+      });
+
+      await rebuildAppSubscription(deviceId, characteristics.notify);
+      subscribedDevices.set(deviceId, true);
+    }
     subscriptionOperations.set(deviceId, 'idle');
   } catch (e) {
-    logger?.error('[NobleBLE] Pairing probe failed, forcing disconnect to reset state', {
+    logger?.error('[NobleBLE] Subscription setup failed, forcing disconnect to reset state', {
       deviceId,
       error: e,
     });
-    // Force disconnect and cleanup on pairing failure to prevent zombie state
+    // Force disconnect and cleanup on failure to prevent zombie state
     await disconnectDevice(deviceId);
     subscriptionOperations.set(deviceId, 'idle');
     throw e;
