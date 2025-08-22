@@ -4272,10 +4272,16 @@ export type TronSignedTx = {
   serialized_tx?: string;
 };
 
+export enum TronMessageType {
+  V1 = 1,
+  V2 = 2,
+}
+
 // TronSignMessage
 export type TronSignMessage = {
   address_n: number[];
   message: string;
+  message_type?: TronMessageType;
 };
 
 // TronMessageSignature

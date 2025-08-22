@@ -11722,6 +11722,12 @@
         }
       }
     },
+    "TronMessageType": {
+      "values": {
+        "V1": 1,
+        "V2": 2
+      }
+    },
     "TronSignMessage": {
       "fields": {
         "address_n": {
@@ -11736,6 +11742,13 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "message_type": {
+          "type": "TronMessageType",
+          "id": 3,
+          "options": {
+            "default": "V1"
+          }
         }
       }
     },
