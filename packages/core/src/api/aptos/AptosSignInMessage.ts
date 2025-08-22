@@ -29,7 +29,7 @@ export default class AptosSignInMessage extends BaseMethod<AptosSignSIWAMessage>
   getVersionRange() {
     return {
       pro: {
-        min: '4.15.0',
+        min: '4.16.0',
       },
     };
   }
