@@ -36,6 +36,9 @@ export type { EVMSignMessageEIP712Params } from './evmSignMessageEIP712';
 export type {
   EVMTransaction,
   EVMTransactionEIP1559,
+  EVMTransactionEIP7702,
+  EVMAuthorization,
+  EVMAuthorizationSignature,
   EVMSignedTx,
   EVMSignTransactionParams,
   EVMAccessList,
