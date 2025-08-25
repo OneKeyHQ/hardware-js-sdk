@@ -91,6 +91,7 @@ export { default as aptosGetAddress } from './aptos/AptosGetAddress';
 export { default as aptosGetPublicKey } from './aptos/AptosGetPublicKey';
 export { default as aptosSignTransaction } from './aptos/AptosSignTransaction';
 export { default as aptosSignMessage } from './aptos/AptosSignMessage';
+export { default as aptosSignInMessage } from './aptos/AptosSignInMessage';
 
 export { default as algoGetAddress } from './algo/AlgoGetAddress';
 export { default as algoSignTransaction } from './algo/AlgoSignTransaction';

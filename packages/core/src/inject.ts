@@ -288,6 +288,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'aptosGetPublicKey' }),
   aptosSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'aptosSignMessage' }),
+  aptosSignInMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'aptosSignInMessage' }),
   aptosSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'aptosSignTransaction' }),
 
