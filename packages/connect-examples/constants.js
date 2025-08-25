@@ -9,4 +9,5 @@
  * - "dev": "CONNECT_SRC=https://localhost:8087 webpack serve --mode=development"
  * - "start": "webpack serve --mode=development" (uses CDN)
  */
-export const getConnectSrc = () => process.env.CONNECT_SRC || `https://jssdk.onekey.so/1.1.3/`;
+export const getConnectSrc = () =>
+  process.env.CONNECT_SRC || `https://jssdk.onekey.so/1.1.10-alpha.1/`;

@@ -3,7 +3,12 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { SchemaParam, validateParams } from '../helpers/paramsValidator';
-import { EVMSignTransactionParams, EVMTransaction, EVMTransactionEIP1559 } from '../../types';
+import {
+  EVMSignTransactionParams,
+  EVMTransaction,
+  EVMTransactionEIP1559,
+  EVMTransactionEIP7702,
+} from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
 import TransportManager from '../../data-manager/TransportManager';
 import { signTransaction } from './latest/signTransaction';
@@ -14,7 +19,26 @@ export default class EVMSignTransaction extends BaseMethod {
 
   isEIP1559 = false;
 
-  formattedTx: EVMTransaction | EVMTransactionEIP1559 | undefined;
+  isEIP7702 = false;
+
+  formattedTx: EVMTransaction | EVMTransactionEIP1559 | EVMTransactionEIP7702 | undefined;
+
+  /**
+   * Check if transaction has EIP7702 authorization list
+   * Following ethereumjs pattern for type detection
+   */
+  private hasEIP7702Features(tx: EVMSignTransactionParams['transaction']): boolean {
+    const authList = (tx as EVMTransactionEIP7702).authorizationList;
+    return !!(authList && Array.isArray(authList) && authList.length > 0);
+  }
+
+  /**
+   * Check if transaction has EIP1559 fee market features
+   * Both maxFeePerGas and maxPriorityFeePerGas must be present
+   */
+  private hasEIP1559Features(tx: EVMSignTransactionParams['transaction']): boolean {
+    return !!(tx.maxFeePerGas && tx.maxPriorityFeePerGas);
+  }
 
   init() {
     this.checkDeviceId = true;
@@ -29,7 +53,14 @@ export default class EVMSignTransaction extends BaseMethod {
 
     const tx: EVMSignTransactionParams['transaction'] = transaction;
 
-    this.isEIP1559 = !!tx.maxFeePerGas && !!tx.maxPriorityFeePerGas;
+    // Transaction type detection based on distinctive features
+    // Following ethereumjs pattern: check most specific features first
+
+    // EIP7702: Has authorizationList (extends EIP1559)
+    this.isEIP7702 = this.hasEIP7702Features(tx);
+
+    // EIP1559: Has EIP1559 fee fields but no authorizationList (extends EIP2930)
+    this.isEIP1559 = this.hasEIP1559Features(tx) && !this.isEIP7702;
 
     // check if transaction is valid
     const schema: SchemaParam[] = [
@@ -40,7 +71,11 @@ export default class EVMSignTransaction extends BaseMethod {
       { name: 'chainId', type: 'number', required: true },
       { name: 'data', type: 'hexString' },
     ];
-    if (this.isEIP1559) {
+    if (this.isEIP7702) {
+      schema.push({ name: 'maxFeePerGas', type: 'hexString', required: true });
+      schema.push({ name: 'maxPriorityFeePerGas', type: 'hexString', required: true });
+      schema.push({ name: 'authorizationList', type: 'array', required: true });
+    } else if (this.isEIP1559) {
       schema.push({ name: 'maxFeePerGas', type: 'hexString', required: true });
       schema.push({ name: 'maxPriorityFeePerGas', type: 'hexString', required: true });
     } else {
@@ -53,6 +88,16 @@ export default class EVMSignTransaction extends BaseMethod {
   }
 
   getVersionRange() {
+    if (this.isEIP7702) {
+      return {
+        model_classic1s: {
+          min: '3.13.0',
+        },
+        model_touch: {
+          min: '4.16.0',
+        },
+      };
+    }
     if (this.isEIP1559) {
       return {
         model_mini: {
@@ -68,7 +113,7 @@ export default class EVMSignTransaction extends BaseMethod {
   }
 
   async run() {
-    const { addressN, isEIP1559, formattedTx } = this;
+    const { addressN, isEIP1559, isEIP7702, formattedTx } = this;
 
     if (formattedTx == null) throw ERRORS.TypedError('Runtime', 'formattedTx is not set');
 
@@ -78,6 +123,7 @@ export default class EVMSignTransaction extends BaseMethod {
         addressN,
         tx: formattedTx,
         isEIP1559,
+        isEIP7702,
       });
     }
 
@@ -86,6 +132,7 @@ export default class EVMSignTransaction extends BaseMethod {
       addressN,
       tx: formattedTx,
       isEIP1559,
+      isEIP7702,
     });
   }
 }

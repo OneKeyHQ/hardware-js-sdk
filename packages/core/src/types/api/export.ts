@@ -36,6 +36,9 @@ export type { EVMSignMessageEIP712Params } from './evmSignMessageEIP712';
 export type {
   EVMTransaction,
   EVMTransactionEIP1559,
+  EVMTransactionEIP7702,
+  EVMAuthorization,
+  EVMAuthorizationSignature,
   EVMSignedTx,
   EVMSignTransactionParams,
   EVMAccessList,
@@ -115,6 +118,7 @@ export type { NearSignTransactionParams } from './nearSignTransaction';
 export type { AptosAddress, AptosGetAddressParams } from './aptosGetAddress';
 export type { AptosPublicKey, AptosGetPublicKeyParams } from './aptosGetPublicKey';
 export type { AptosMessageSignature, AptosSignMessageParams } from './aptosSignMessage';
+export type { AptosSignInMessageSignature, AptosSignInMessageParams } from './aptosSignInMessage';
 export type { AptosSignedTx, AptosSignTransactionParams } from './aptosSignTransaction';
 
 export type { AlgoAddress, AlgoGetAddressParams } from './algoGetAddress';
@@ -134,6 +138,10 @@ export type {
   CardanoAddress,
   CardanoGetAddressParams,
 } from './cardanoGetAddress';
+export type {
+  CardanoSignMessageMethodParams,
+  CardanoSignMessageParams,
+} from './cardanoSignMessage';
 export type { CardanoSignTransaction, CardanoSignedTxData } from './cardano';
 
 export type { FilecoinAddress, FilecoinGetAddressParams } from './filecoinGetAddress';

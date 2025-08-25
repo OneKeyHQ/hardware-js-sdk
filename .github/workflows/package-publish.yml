@@ -7,8 +7,38 @@ permissions:
   id-token: write
 
 jobs:
-  publish-and-release:
+  get-version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version-info.outputs.version }}
+      is_prerelease: ${{ steps.version-info.outputs.is_prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version information
+        id: version-info
+        run: |
+          # Get version from core package (assuming independent versioning)
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "📦 Package version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this is a prerelease version (contains -)
+          if [[ "$VERSION" =~ - ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "📦 Detected prerelease version: $VERSION"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "📦 Detected stable version: $VERSION"
+          fi
+
+  publish-and-release:
+    needs: get-version
+    runs-on: ubuntu-latest
+    name: "Publish v${{ needs.get-version.outputs.version }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,38 +62,23 @@ jobs:
           echo "🔨 Building packages..."
           yarn build
 
-      - name: Get version information
-        id: version-info
-        run: |
-          # Get version from core package (assuming independent versioning)
-          VERSION=$(node -p "require('./packages/core/package.json').version")
-          echo "📦 Package version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          # Check if this is a prerelease version (contains -)
-          if [[ "$VERSION" =~ - ]]; then
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
-            echo "📦 Detected prerelease version: $VERSION"
-          else
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-            echo "📦 Detected stable version: $VERSION"
-          fi
 
       - name: Publish to NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          echo "📦 Publishing packages to NPM..."
+          echo "📦 Publishing packages to NPM (v${{ needs.get-version.outputs.version }})..."
           yarn publish-packages -y --no-verify-access
           echo "✅ Packages published successfully"
 
       - name: Publication Summary
         run: |
-          VERSION=${{ steps.version-info.outputs.version }}
-          IS_PRERELEASE=${{ steps.version-info.outputs.is_prerelease }}
+          VERSION=${{ needs.get-version.outputs.version }}
+          IS_PRERELEASE=${{ needs.get-version.outputs.is_prerelease }}
 
           echo "✅ NPM publication completed successfully"
-          echo "� Published version: $VERSION"
+          echo "📦 Published version: $VERSION"
 
           if [ "$IS_PRERELEASE" = "true" ]; then
             echo "📦 Prerelease version published to NPM"
@@ -74,8 +89,8 @@ jobs:
           fi
 
     outputs:
-      version: ${{ steps.version-info.outputs.version }}
-      is_prerelease: ${{ steps.version-info.outputs.is_prerelease }}
+      version: ${{ needs.get-version.outputs.version }}
+      is_prerelease: ${{ needs.get-version.outputs.is_prerelease }}
 
   create-github-release:
     needs: publish-and-release
