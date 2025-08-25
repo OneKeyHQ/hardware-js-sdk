@@ -683,6 +683,108 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
+    method: 'evmSignTransaction',
+    description: 'Sign an EIP-7702 transaction with your EVM account.',
+    presupposes: [
+      {
+        title: 'EIP-7702 Simple7702Account',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+            value: '0x0',
+            data: '0x', // empty data for code authorization only
+            chainId: 1,
+            nonce: '0x0',
+            gasLimit: '0x5208',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0x9502f900',
+            accessList: [],
+            authorizationList: [
+              {
+                chainId: 1,
+                address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+                nonce: '0x1',
+              },
+            ],
+          },
+        },
+      },
+      {
+        title: 'EIP-7702 MetaMask Account',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            value: '0x0',
+            data: '0x', // empty data for code authorization only
+            chainId: 1,
+            nonce: '0x1',
+            gasLimit: '0x5208',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0x9502f900',
+            accessList: [],
+            authorizationList: [
+              {
+                chainId: 1,
+                address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+                nonce: '0x2',
+              },
+            ],
+          },
+        },
+      },
+      {
+        title: 'EIP-7702 OKX WalletCore',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb',
+            value: '0x0',
+            data: '0x8129fc1c', // initialize() function selector
+            chainId: 1,
+            nonce: '0x2',
+            gasLimit: '0x5208',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0x9502f900',
+            accessList: [],
+            authorizationList: [
+              {
+                chainId: 1,
+                address: '0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb',
+                nonce: '0x3',
+              },
+            ],
+          },
+        },
+      },
+      {
+        title: 'EIP-7702 Revoke Authorization',
+        value: {
+          path: "m/44'/60'/0'/0/0",
+          transaction: {
+            to: '0x0000000000000000000000000000000000000000',
+            value: '0x0',
+            data: '0x', // empty data for revoke
+            chainId: 1,
+            nonce: '0x3',
+            gasLimit: '0x5208',
+            maxFeePerGas: '0xbebc200',
+            maxPriorityFeePerGas: '0x9502f900',
+            accessList: [],
+            authorizationList: [
+              {
+                chainId: 1,
+                address: '0x0000000000000000000000000000000000000000',
+                nonce: '0x4',
+              },
+            ],
+          },
+        },
+      },
+    ],
+  },
+  {
     method: 'evmVerifyMessage',
     description: 'Verify a message with your EVM account.',
     presupposes: [
