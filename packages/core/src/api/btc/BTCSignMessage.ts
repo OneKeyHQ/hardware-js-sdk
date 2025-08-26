@@ -38,7 +38,7 @@ export default class BTCSignMessage extends BaseMethod<SignMessage> {
         noScriptType = false;
       }
     } else {
-      finalScriptType = noScriptType ? undefined : scriptType;
+      finalScriptType = scriptType;
     }
 
     this.params = {
