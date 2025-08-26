@@ -10,6 +10,7 @@
   "workspaces": {
     "packages": [
       "packages/*",
+      "packages/connect-examples/shared-constants",
       "packages/connect-examples/expo-example",
       "packages/connect-examples/electron-example",
       "packages/connect-examples/expo-playground"
