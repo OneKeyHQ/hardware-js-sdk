@@ -377,8 +377,6 @@ describe('EVMSignTransaction EIP-7702', () => {
       });
     });
 
-
-
     it('should throw error for non-self-sponsoring transactions', async () => {
       const transaction: EVMTransactionEIP7702 = {
         to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
@@ -411,7 +409,9 @@ describe('EVMSignTransaction EIP-7702', () => {
 
       await expect(method.run()).rejects.toMatchObject({
         errorCode: 400,
-        message: expect.stringContaining('Hardware currently only supports self-sponsoring EIP-7702 transactions')
+        message: expect.stringContaining(
+          'Hardware currently only supports self-sponsoring EIP-7702 transactions'
+        ),
       });
     });
   });

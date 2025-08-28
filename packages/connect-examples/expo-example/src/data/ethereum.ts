@@ -418,8 +418,6 @@ const api: PlaygroundProps[] = [
           },
         },
       },
-
-
     ],
   },
   {

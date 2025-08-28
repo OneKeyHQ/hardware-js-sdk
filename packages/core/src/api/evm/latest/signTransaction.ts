@@ -35,7 +35,8 @@ export const processTxRequest = async ({
     let v = request.signature_v;
     const r = request.signature_r;
     const s = request.signature_s;
-    const authorizationSignatures = 'authorization_signatures' in request ? request.authorization_signatures : undefined;
+    const authorizationSignatures =
+      'authorization_signatures' in request ? request.authorization_signatures : undefined;
 
     if (v == null || r == null || s == null) {
       throw ERRORS.TypedError(
@@ -57,11 +58,13 @@ export const processTxRequest = async ({
 
     // Add authorization signatures for EIP7702 transactions with flattened yParity,r,s structure
     if (authorizationSignatures && authorizationSignatures.length > 0) {
-      result.authorizationSignatures = authorizationSignatures.map((sig: EthereumAuthorizationSignature) => ({
-        yParity: sig.y_parity,
-        r: sig.r,
-        s: sig.s,
-      }));
+      result.authorizationSignatures = authorizationSignatures.map(
+        (sig: EthereumAuthorizationSignature) => ({
+          yParity: sig.y_parity,
+          r: sig.r,
+          s: sig.s,
+        })
+      );
     }
 
     return Promise.resolve(result);
@@ -227,13 +230,17 @@ export const evmSignTxEip7702 = async ({
 
   // Hardware currently only supports self-sponsoring transactions
   // Check if all authorization entries are for self-sponsoring
-  const hasNonSelfSponsoring = authorizationList.some(auth => {
-    // If addressN is provided for this authorization, it should match the transaction signer
-    return auth.addressN && auth.addressN.join('/') !== addressN.join('/');
-  });
+  const hasNonSelfSponsoring = authorizationList.some(
+    auth =>
+      // If addressN is provided for this authorization, it should match the transaction signer
+      auth.addressN && auth.addressN.join('/') !== addressN.join('/')
+  );
 
   if (hasNonSelfSponsoring) {
-    throw ERRORS.TypedError(HardwareErrorCode.CallMethodError, 'Hardware currently only supports self-sponsoring EIP-7702 transactions. All authorization entries must be signed by the same account as the transaction.');
+    throw ERRORS.TypedError(
+      HardwareErrorCode.CallMethodError,
+      'Hardware currently only supports self-sponsoring EIP-7702 transactions. All authorization entries must be signed by the same account as the transaction.'
+    );
   }
 
   const length = data == null ? 0 : data.length / 2;
@@ -260,13 +267,14 @@ export const evmSignTxEip7702 = async ({
       chain_id: auth.chainId,
       address: addHexPrefix(auth.address),
       nonce: stripHexStartZeroes(auth.nonce),
-      signature: (auth.yParity !== undefined && auth.r && auth.s)
-        ? {
-            y_parity: auth.yParity,
-            r: auth.r,
-            s: auth.s,
-          }
-        : undefined,
+      signature:
+        auth.yParity !== undefined && auth.r && auth.s
+          ? {
+              y_parity: auth.yParity,
+              r: auth.r,
+              s: auth.s,
+            }
+          : undefined,
     })),
   };
 
@@ -282,7 +290,7 @@ export const evmSignTxEip7702 = async ({
     typedCall,
     request: response.message,
     data: rest,
-    supportTrezor
+    supportTrezor,
   });
 };
 
