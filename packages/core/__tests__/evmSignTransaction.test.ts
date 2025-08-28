@@ -370,7 +370,7 @@ describe('EVMSignTransaction EIP-7702', () => {
       const result = await method.run();
 
       expect(result.authorizationSignatures).toHaveLength(1);
-      expect(result.authorizationSignatures![0]).toEqual({
+      expect(result.authorizationSignatures?.[0]).toEqual({
         yParity: 1,
         r: 'abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd',
         s: 'efab5678901234567890abcdef1234567890abcdef1234567890abcdef123456',
