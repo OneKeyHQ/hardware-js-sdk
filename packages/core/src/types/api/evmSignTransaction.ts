@@ -45,11 +45,13 @@ export type EVMAuthorizationSignature = {
 };
 
 export type EVMAuthorization = {
-  addressN?: number[];
   chainId: number;
   address: string;
   nonce: string;
-  signature?: EVMAuthorizationSignature;
+  addressN?: number[];
+  yParity?: number;
+  r?: string;
+  s?: string;
 };
 
 export type EVMTransactionEIP7702 = {
