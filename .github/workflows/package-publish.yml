@@ -35,6 +35,34 @@ jobs:
             echo "📦 Detected stable version: $VERSION"
           fi
 
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version-info.outputs.version }}
+      is_prerelease: ${{ steps.version-info.outputs.is_prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version information
+        id: version-info
+        run: |
+          # Get version from core package (assuming independent versioning)
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "📦 Package version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this is a prerelease version (contains -)
+          if [[ "$VERSION" =~ - ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "📦 Detected prerelease version: $VERSION"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "📦 Detected stable version: $VERSION"
+          fi
+
   publish-and-release:
     needs: get-version
     runs-on: ubuntu-latest
