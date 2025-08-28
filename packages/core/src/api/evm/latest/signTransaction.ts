@@ -1,7 +1,9 @@
 import {
+  EthereumAuthorizationSignature,
   EthereumSignTx,
   EthereumSignTxEIP1559,
   EthereumSignTxEIP7702OneKey,
+  EthereumTxRequest,
   EthereumTxRequestOneKey,
   MessageResponse,
   TypedCall,
@@ -24,7 +26,7 @@ export const processTxRequest = async ({
   supportTrezor,
 }: {
   typedCall: TypedCall;
-  request: EthereumTxRequestOneKey;
+  request: EthereumTxRequestOneKey | EthereumTxRequest;
   data: string;
   chainId?: number | undefined;
   supportTrezor?: boolean;
@@ -33,7 +35,7 @@ export const processTxRequest = async ({
     let v = request.signature_v;
     const r = request.signature_r;
     const s = request.signature_s;
-    const authorizationSignatures = request.authorization_signatures;
+    const authorizationSignatures = 'authorization_signatures' in request ? request.authorization_signatures : undefined;
 
     if (v == null || r == null || s == null) {
       throw ERRORS.TypedError(
@@ -53,9 +55,9 @@ export const processTxRequest = async ({
       s: `0x${s}`,
     };
 
-    // Add authorization signatures for EIP7702 transactions
+    // Add authorization signatures for EIP7702 transactions with flattened yParity,r,s structure
     if (authorizationSignatures && authorizationSignatures.length > 0) {
-      result.authorizationSignatures = authorizationSignatures.map(sig => ({
+      result.authorizationSignatures = authorizationSignatures.map((sig: EthereumAuthorizationSignature) => ({
         yParity: sig.y_parity,
         r: sig.r,
         s: sig.s,
@@ -223,6 +225,17 @@ export const evmSignTxEip7702 = async ({
     authorizationList,
   } = tx;
 
+  // Hardware currently only supports self-sponsoring transactions
+  // Check if all authorization entries are for self-sponsoring
+  const hasNonSelfSponsoring = authorizationList.some(auth => {
+    // If addressN is provided for this authorization, it should match the transaction signer
+    return auth.addressN && auth.addressN.join('/') !== addressN.join('/');
+  });
+
+  if (hasNonSelfSponsoring) {
+    throw ERRORS.TypedError(HardwareErrorCode.CallMethodError, 'Hardware currently only supports self-sponsoring EIP-7702 transactions. All authorization entries must be signed by the same account as the transaction.');
+  }
+
   const length = data == null ? 0 : data.length / 2;
 
   const [first, rest] = cutString(data, 1024 * 2);
@@ -247,11 +260,11 @@ export const evmSignTxEip7702 = async ({
       chain_id: auth.chainId,
       address: addHexPrefix(auth.address),
       nonce: stripHexStartZeroes(auth.nonce),
-      signature: auth.signature
+      signature: (auth.yParity !== undefined && auth.r && auth.s)
         ? {
-            y_parity: auth.signature.yParity,
-            r: auth.signature.r,
-            s: auth.signature.s,
+            y_parity: auth.yParity,
+            r: auth.r,
+            s: auth.s,
           }
         : undefined,
     })),
@@ -265,7 +278,12 @@ export const evmSignTxEip7702 = async ({
     response = await typedCall('EthereumSignTxEIP7702OneKey', 'EthereumTxRequestOneKey', message);
   }
 
-  return processTxRequest({ typedCall, request: response.message, data: rest, supportTrezor });
+  return processTxRequest({
+    typedCall,
+    request: response.message,
+    data: rest,
+    supportTrezor
+  });
 };
 
 export const signTransaction = async ({
