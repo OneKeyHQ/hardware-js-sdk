@@ -48,8 +48,9 @@ module.exports = {
       }),
     }),
     {
-      '@abandonware/noble': 'commonjs @abandonware/noble',
-      '@abandonware/bluetooth-hci-socket': 'commonjs @abandonware/bluetooth-hci-socket',
+      '@onekeyfe/hd-transport-electron': 'commonjs @onekeyfe/hd-transport-electron',
+      '@stoprocent/noble': 'commonjs @stoprocent/noble',
+      '@stoprocent/bluetooth-hci-socket': 'commonjs @stoprocent/bluetooth-hci-socket',
       bufferutil: 'commonjs bufferutil',
       'utf-8-validate': 'commonjs utf-8-validate',
     },

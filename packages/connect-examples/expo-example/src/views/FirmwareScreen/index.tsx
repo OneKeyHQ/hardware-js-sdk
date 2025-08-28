@@ -407,44 +407,65 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
   } = getDeviceBasicInfo(features, onekeyFeatures);
   const deviceTypeLowerCase = deviceType.toLowerCase();
 
-  const loadOnekeyFeatures = useCallback(() => {
-    if (!sdk) return;
-    sdk.getOnekeyFeatures(selectDevice?.connectId).then(res => {
+  const loadOnekeyFeatures = useCallback(async () => {
+    if (!sdk || !selectDevice?.connectId) return undefined;
+
+    try {
+      console.log('loadOnekeyFeatures: Starting to load OneKey features...');
+      const res = await sdk.getOnekeyFeatures(selectDevice.connectId);
+      console.log('loadOnekeyFeatures: Result:', res);
+
       if (res.success) {
-        setOnekeyFeatures(res.payload);
-      } else {
-        setOnekeyFeatures(undefined);
+        return res.payload;
       }
-    });
+      return undefined;
+    } catch (error) {
+      console.error('loadOnekeyFeatures: Error:', error);
+      return undefined;
+    }
   }, [sdk, selectDevice?.connectId]);
 
   useEffect(() => {
     if (!sdk) return;
-    if (selectDevice?.connectId == null || selectDevice?.features == null) {
+    if (selectDevice?.connectId == null) {
       setFeatures(undefined);
       setOnekeyFeatures(undefined);
       return;
     }
 
-    setConnecting(true);
-    setFeatures(undefined);
-    sdk
-      .getFeatures(selectDevice?.connectId)
-      .then(res => {
-        if (res.success) {
-          setFeatures(res.payload);
-          loadOnekeyFeatures();
+    const loadDeviceFeatures = async () => {
+      setConnecting(true);
+      setFeatures(undefined);
+      setOnekeyFeatures(undefined);
+      setError(undefined);
+
+      try {
+        console.log('Loading device features for:', selectDevice.connectId);
+
+        const featuresRes = await sdk.getFeatures(selectDevice.connectId);
+        console.log('getFeatures result:', featuresRes);
+
+        if (featuresRes.success) {
+          const fetchedFeatures = featuresRes.payload;
+          console.log('Features loaded successfully, now loading OneKey features...');
+          const fetchedOnekeyFeatures = await loadOnekeyFeatures();
+
+          setFeatures(fetchedFeatures);
+          setOnekeyFeatures(fetchedOnekeyFeatures);
         } else {
-          setError(res.payload.error);
+          console.error('Failed to get features:', featuresRes.payload.error);
+          setError(featuresRes.payload.error);
         }
-      })
-      .catch(e => {
-        setError(e.message);
-      })
-      .finally(() => {
+      } catch (error) {
+        console.error('Exception in loadDeviceFeatures:', error);
+        setError(error instanceof Error ? error.message : String(error));
+      } finally {
         setConnecting(false);
-      });
-  }, [loadOnekeyFeatures, sdk, selectDevice?.connectId, selectDevice?.features]);
+      }
+    };
+
+    loadDeviceFeatures();
+  }, [sdk, selectDevice?.connectId, loadOnekeyFeatures]);
 
   const disconnectDevice = useCallback(() => {
     setFeatures(undefined);
@@ -544,14 +565,21 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
 
       if (type === 'ble' || type === 'firmware') {
         setShowUpdateDialog(true);
-        const res = await sdk.firmwareUpdateV2(
-          Platform.OS === 'web' ? undefined : selectDevice.connectId,
-          {
-            binary: fileData,
-            updateType: type,
-            platform: 'web',
-          }
-        );
+        console.log('Starting firmware update:', {
+          type,
+          deviceId: selectDevice.connectId,
+          platform: 'web',
+        });
+
+        // For desktop-web-ble mode, we need to pass the connectId
+        const deviceId = selectDevice.connectId;
+        console.log('Using device ID for firmware update:', deviceId);
+
+        const res = await sdk.firmwareUpdateV2(deviceId, {
+          binary: fileData,
+          updateType: type,
+          platform: 'web',
+        });
         setShowUpdateDialog(false);
         if (!res.success) {
           return {
@@ -635,12 +663,21 @@ function FirmwareUpdate({ onDisconnectDevice, onReconnectDevice }: FirmwareUpdat
           {connecting && (
             <MessageBox message={intl.formatMessage({ id: 'tip__connecting_device' })} />
           )}
+
           {!selectDevice && (
             <MessageBox
               message={intl.formatMessage({ id: 'tip__need_connect_and_search_device_first' })}
             />
           )}
           {!!error && <MessageBox message={error} />}
+          {features && !onekeyFeatures && (
+            <MessageBox message="OneKey Features not available. Try clicking 'Refresh OneKey Features' button." />
+          )}
+          {selectDevice && selectDevice.state === 'disconnected' && (
+            <MessageBox
+              message={`Device "${selectDevice.name}" shows as disconnected. In desktop-web-ble mode, this is normal - the device can still communicate via Bluetooth.`}
+            />
+          )}
         </Stack>
 
         {features && (

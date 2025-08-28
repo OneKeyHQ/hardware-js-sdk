@@ -2,8 +2,9 @@ import { EventEmitter } from 'events';
 import { CallMethod } from './events';
 import { CoreApi } from './types/api';
 import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
+import { Unsuccessful } from './types';
 
-type CallbackFunction = (data?: any, error?: { message: string; code?: number }) => void;
+type CallbackFunction = (data?: any, error?: Unsuccessful) => void;
 
 const callbackManager = new Map<string, CallbackFunction>();
 
@@ -179,8 +180,8 @@ export const createCoreApi = (
     registerCallback(callbackId, onLoopItemResponse);
 
     const callbackIdFinish = generateCallbackId();
-    registerCallback(callbackIdFinish, (data?: AllNetworkAddress[]) => {
-      onAllItemsResponse?.(data);
+    registerCallback(callbackIdFinish, (data?: AllNetworkAddress[], error?: Unsuccessful) => {
+      onAllItemsResponse?.(data, error);
       cleanupCallback(callbackIdFinish);
       cleanupCallback(callbackId);
     });
@@ -287,6 +288,8 @@ export const createCoreApi = (
     call({ ...params, connectId, deviceId, method: 'aptosGetPublicKey' }),
   aptosSignMessage: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'aptosSignMessage' }),
+  aptosSignInMessage: (connectId, deviceId, params) =>
+    call({ ...params, connectId, deviceId, method: 'aptosSignInMessage' }),
   aptosSignTransaction: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'aptosSignTransaction' }),
 

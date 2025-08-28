@@ -1,14 +1,20 @@
 import {
   EthereumSignTx,
   EthereumSignTxEIP1559,
+  EthereumSignTxEIP7702OneKey,
   EthereumTxRequestOneKey,
   MessageResponse,
   TypedCall,
 } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { EVMSignedTx, EVMTransaction, EVMTransactionEIP1559 } from '../../../types';
+import {
+  EVMSignedTx,
+  EVMTransaction,
+  EVMTransactionEIP1559,
+  EVMTransactionEIP7702,
+} from '../../../types';
 import { cutString } from '../../helpers/stringUtils';
-import { stripHexStartZeroes } from '../../helpers/hexUtils';
+import { stripHexStartZeroes, addHexPrefix } from '../../helpers/hexUtils';
 
 export const processTxRequest = async ({
   typedCall,
@@ -27,6 +33,7 @@ export const processTxRequest = async ({
     let v = request.signature_v;
     const r = request.signature_r;
     const s = request.signature_s;
+    const authorizationSignatures = request.authorization_signatures;
 
     if (v == null || r == null || s == null) {
       throw ERRORS.TypedError(
@@ -40,11 +47,22 @@ export const processTxRequest = async ({
       v += 2 * chainId + 35;
     }
 
-    return Promise.resolve({
+    const result: any = {
       v: `0x${v.toString(16)}`,
       r: `0x${r}`,
       s: `0x${s}`,
-    });
+    };
+
+    // Add authorization signatures for EIP7702 transactions
+    if (authorizationSignatures && authorizationSignatures.length > 0) {
+      result.authorizationSignatures = authorizationSignatures.map(sig => ({
+        yParity: sig.y_parity,
+        r: sig.r,
+        s: sig.s,
+      }));
+    }
+
+    return Promise.resolve(result);
   }
 
   const [first, rest] = cutString(data, request.data_length * 2);
@@ -180,17 +198,93 @@ export const evmSignTxEip1559 = async ({
 
   return processTxRequest({ typedCall, request: response.message, data: rest, supportTrezor });
 };
+
+export const evmSignTxEip7702 = async ({
+  typedCall,
+  addressN,
+  tx,
+  supportTrezor,
+}: {
+  typedCall: TypedCall;
+  addressN: number[];
+  tx: EVMTransactionEIP7702;
+  supportTrezor?: boolean;
+}) => {
+  const {
+    to,
+    value,
+    gasLimit,
+    nonce,
+    data,
+    chainId,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    accessList,
+    authorizationList,
+  } = tx;
+
+  const length = data == null ? 0 : data.length / 2;
+
+  const [first, rest] = cutString(data, 1024 * 2);
+
+  const message: EthereumSignTxEIP7702OneKey = {
+    address_n: addressN,
+    nonce: stripHexStartZeroes(nonce),
+    max_gas_fee: stripHexStartZeroes(maxFeePerGas),
+    max_priority_fee: stripHexStartZeroes(maxPriorityFeePerGas),
+    gas_limit: stripHexStartZeroes(gasLimit),
+    to,
+    value: stripHexStartZeroes(value),
+    data_length: length,
+    data_initial_chunk: first,
+    chain_id: chainId,
+    access_list: (accessList || []).map(a => ({
+      address: a.address,
+      storage_keys: a.storageKeys,
+    })),
+    authorization_list: authorizationList.map(auth => ({
+      address_n: auth.addressN || [],
+      chain_id: auth.chainId,
+      address: addHexPrefix(auth.address),
+      nonce: stripHexStartZeroes(auth.nonce),
+      signature: auth.signature
+        ? {
+            y_parity: auth.signature.yParity,
+            r: auth.signature.r,
+            s: auth.signature.s,
+          }
+        : undefined,
+    })),
+  };
+
+  let response;
+  if (supportTrezor) {
+    // Note: Trezor doesn't support EIP7702 yet, this is for future compatibility
+    throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'EIP7702 not supported by Trezor');
+  } else {
+    response = await typedCall('EthereumSignTxEIP7702OneKey', 'EthereumTxRequestOneKey', message);
+  }
+
+  return processTxRequest({ typedCall, request: response.message, data: rest, supportTrezor });
+};
+
 export const signTransaction = async ({
   typedCall,
   isEIP1559,
+  isEIP7702,
   addressN,
   tx,
 }: {
   addressN: number[];
-  tx: EVMTransaction | EVMTransactionEIP1559;
+  tx: EVMTransaction | EVMTransactionEIP1559 | EVMTransactionEIP7702;
   isEIP1559: boolean;
+  isEIP7702?: boolean;
   typedCall: TypedCall;
-}) =>
-  isEIP1559
+}) => {
+  if (isEIP7702) {
+    return evmSignTxEip7702({ typedCall, addressN, tx: tx as EVMTransactionEIP7702 });
+  }
+  return isEIP1559
     ? evmSignTxEip1559({ typedCall, addressN, tx: tx as EVMTransactionEIP1559 })
     : evmSignTx({ typedCall, addressN, tx: tx as EVMTransaction });
+};
