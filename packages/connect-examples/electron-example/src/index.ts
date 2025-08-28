@@ -257,8 +257,6 @@ function createMainWindow() {
     }
   });
 
-  initNobleBleSupport(browserWindow.webContents);
-
   ipcMain.on(ipcMessageKeys.APP_RESTART, () => {
     browserWindow?.reload();
   });
@@ -283,6 +281,15 @@ if (!singleInstance && !process.mas) {
     if (!mainWindow) {
       mainWindow = createMainWindow();
     }
+
+    try {
+      log.info('Initializing Noble BLE support...');
+      initNobleBleSupport(mainWindow.webContents);
+      log.info('Noble BLE support initialized successfully.');
+    } catch (e) {
+      log.error('Failed to initialize Noble BLE support:', e);
+    }
+
     initChildProcess();
     showMainWindow();
     console.log('日志文件位置:', log.transports.file.getFile().path);

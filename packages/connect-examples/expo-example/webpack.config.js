@@ -7,9 +7,12 @@ const webpack = require('webpack');
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
 
-  // 设置 publicPath 为 GitHub Pages 的路径
+  // 设置 publicPath：
+  // - Electron 打包（EXPO_ELECTRON_MODE=true）使用根路径，避免 file:// 协议下以 /expo-example/ 为前缀导致 404
+  // - 普通生产环境（例如 GitHub Pages）使用 /expo-example/
+  const isElectronMode = process.env.EXPO_ELECTRON_MODE === 'true';
   if (process.env.NODE_ENV === 'production') {
-    config.output.publicPath = '/expo-example/';
+    config.output.publicPath = isElectronMode ? '/' : '/expo-example/';
   } else {
     // 开发环境使用根路径
     config.output.publicPath = '/';
