@@ -182,7 +182,6 @@ testCaseMap.set('ethereumTrezor', ethereumTrezorApi);
 testCaseMap.set('filecoin', filecoinApi);
 testCaseMap.set('kaspa', kaspaApi);
 testCaseMap.set('lightning', lightningApi);
-testCaseMap.set('manager', managerApi);
 testCaseMap.set('near', nearApi);
 testCaseMap.set('nem', nemApi);
 testCaseMap.set('nexa', nexaApi);
@@ -195,6 +194,7 @@ testCaseMap.set('starcoin', starcoinApi);
 testCaseMap.set('stellar', stellarApi);
 testCaseMap.set('sui', suiApi);
 testCaseMap.set('tron', tronApi);
+testCaseMap.set('manager', managerApi);
 
 function getExpectResult(
   deviceType: TestDeviceType,

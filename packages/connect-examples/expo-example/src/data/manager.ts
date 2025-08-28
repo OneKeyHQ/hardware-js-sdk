@@ -443,30 +443,6 @@ const api: PlaygroundProps[] = [
     },
   },
   {
-    method: 'firmwareUpdateEmmcTest',
-    description: 'firmwareUpdateEmmcTest',
-    noDeviceIdReq: true,
-    presupposes: [
-      {
-        title: 'firmwareUpdateEmmcTest',
-        value: {
-          path: '0:firmware.bin',
-          reboot_on_success: false,
-        },
-        expect: {
-          common: {
-            normal: {
-              unknownMessage: true,
-            },
-            bootloader: {
-              error: true,
-            },
-          },
-        },
-      },
-    ],
-  },
-  {
     method: 'firmwareUploadTest',
     description: 'firmwareUploadTest',
     noDeviceIdReq: true,
@@ -545,6 +521,30 @@ const api: PlaygroundProps[] = [
         title: 'firmwareUpdateEmmcTest',
         value: {
           payload: '0x12346',
+        },
+        expect: {
+          common: {
+            normal: {
+              unknownMessage: true,
+            },
+            bootloader: {
+              error: true,
+            },
+          },
+        },
+      },
+    ],
+  },
+  {
+    method: 'firmwareUpdateEmmcTest',
+    description: 'firmwareUpdateEmmcTest',
+    noDeviceIdReq: true,
+    presupposes: [
+      {
+        title: 'firmwareUpdateEmmcTest',
+        value: {
+          path: '0:firmware.bin',
+          reboot_on_success: false,
         },
         expect: {
           common: {
