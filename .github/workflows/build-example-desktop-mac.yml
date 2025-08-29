@@ -1,0 +1,41 @@
+name: Build Example Desktop (macOS)
+
+on:
+  workflow_call:
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: |
+          echo "📦 Installing dependencies..."
+          yarn
+          yarn bootstrap
+
+      - name: Build macOS App
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd packages/connect-examples/electron-example
+          yarn make:mac
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-example-desktop
+          path: packages/connect-examples/electron-example/out/*.dmg
+
