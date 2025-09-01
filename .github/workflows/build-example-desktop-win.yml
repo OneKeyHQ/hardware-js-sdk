@@ -1,0 +1,44 @@
+name: Build Example Desktop (Windows)
+
+on:
+  workflow_call:
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Enable long paths on Windows
+        run: git config --system core.longpaths true
+
+      - name: Install dependencies
+        run: |
+          echo "📦 Installing dependencies..."
+          yarn
+          yarn bootstrap
+
+      - name: Build Windows App
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd packages/connect-examples/electron-example
+          yarn make:win
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-example-desktop
+          path: packages/connect-examples/electron-example/out/*.exe

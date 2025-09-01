@@ -93,7 +93,7 @@ export default class EVMSignTransaction extends BaseMethod {
         model_classic1s: {
           min: '3.13.0',
         },
-        model_touch: {
+        pro: {
           min: '4.16.0',
         },
       };

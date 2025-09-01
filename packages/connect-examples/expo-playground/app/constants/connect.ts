@@ -1,4 +1,4 @@
-import { getConnectSrc } from '../../../constants';
+import { getConnectSrc } from '@onekey-internal/shared-constants';
 
 /**
  * OneKey Hardware SDK Connect Source Configuration

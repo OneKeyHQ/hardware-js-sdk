@@ -705,6 +705,47 @@ const api: UnifiedMethodConfig[] = [
           },
         ],
       },
+      {
+        title: 'EIP-7702 With Pre-signed Authorization (Flattened)',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path',
+            value: "m/44'/60'/0'/0/0",
+          },
+          {
+            name: 'transaction',
+            type: 'textarea',
+            required: true,
+            label: 'Transaction',
+            description: 'EIP7702 transaction with pre-signed authorization using flattened yParity,r,s structure',
+            value: {
+              to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+              value: '0x0',
+              data: '0x', // empty data for authorization only
+              chainId: 1,
+              nonce: '0x5',
+              gasLimit: '0x7530',
+              maxFeePerGas: '0xbebc200',
+              maxPriorityFeePerGas: '0x9502f900',
+              accessList: [],
+              authorizationList: [
+                {
+                  chainId: 1,
+                  address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+                  nonce: '0x5',
+                  yParity: 0,
+                  r: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+                  s: '0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321',
+                },
+              ],
+            },
+          },
+        ],
+      },
     ],
   },
   {

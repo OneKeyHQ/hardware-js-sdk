@@ -3,7 +3,7 @@
  * Supplements @types/noble with additional interfaces
  */
 
-import type { Peripheral, Characteristic } from '@abandonware/noble';
+import type { Peripheral, Characteristic } from '@stoprocent/noble';
 
 // Device info interface for our API
 export interface DeviceInfo {

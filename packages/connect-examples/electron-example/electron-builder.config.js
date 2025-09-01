@@ -11,6 +11,11 @@ module.exports = {
   productName: 'HardwareExample',
   copyright: 'Copyright © OeKey 2024',
   asar: true,
+  // Unpack native modules so they can be loaded at runtime
+  asarUnpack: [
+    'node_modules/@stoprocent/noble/**',
+    'node_modules/@stoprocent/bluetooth-hci-socket/**',
+  ],
   buildVersion: version,
   directories: {
     output: 'out',

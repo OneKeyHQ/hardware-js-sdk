@@ -69,7 +69,15 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           echo "📦 Publishing packages to NPM (v${{ needs.get-version.outputs.version }})..."
-          yarn publish-packages -y --no-verify-access
+          IS_PRERELEASE=${{ needs.get-version.outputs.is_prerelease }}
+
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "📦 Publishing with --dist-tag next for prerelease"
+            yarn publish-packages -y --no-verify-access --dist-tag next
+          else
+            echo "📦 Publishing with --dist-tag latest for stable release"
+            yarn publish-packages -y --no-verify-access --dist-tag latest
+          fi
           echo "✅ Packages published successfully"
 
       - name: Publication Summary
