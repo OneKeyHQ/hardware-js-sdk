@@ -424,6 +424,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
       initTestCase,
       store,
       stateManager,
+      preCheckResponse,
       clearItemVerifyState,
       endTestRunner,
       setFailedTasks,

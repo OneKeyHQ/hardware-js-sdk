@@ -326,6 +326,7 @@ export const baseParams = {
   tronSignMessage: {
     path: `m/44'/${COINTYPE_MARK}'/0'/0/0`,
     messageHex: '0x6578616d706c65206d657373616765',
+    messageType: 'V2',
   },
   tonSignProof: {
     path: `m/44'/${COINTYPE_MARK}'/0'`,
