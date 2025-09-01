@@ -1,10 +1,112 @@
-import { Image } from 'react-native';
+import { Image as ImageView } from 'react-native';
 import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { DeviceUploadResourceParams } from '@onekeyfe/hd-core';
 import { bytesToHex } from '@noble/hashes/utils';
 import { ResourceType } from '@onekeyfe/hd-transport';
+import { canvasRGBA as blurCanvasRGBA } from 'stackblur-canvas';
 
 import axios from 'axios';
+
+function buildHtmlImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    // @ts-ignore
+    image.onerror = e => reject(e);
+    image.src = dataUrl;
+  });
+}
+
+function htmlImageToCanvas({
+  image,
+  width,
+  height,
+}: {
+  image: HTMLImageElement;
+  width: number;
+  height: number;
+}) {
+  const canvas = document.createElement('canvas');
+  canvas.height = height;
+  canvas.width = width;
+
+  const ctx = canvas.getContext('2d');
+  if (ctx == null) {
+    throw new Error('2D context is null');
+  }
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(image, 0, 0);
+
+  return { canvas, ctx };
+}
+
+function stripBase64UriPrefix(base64Uri: string): string {
+  return base64Uri.replace(/^data:image\/\w+;base64,/, '');
+}
+
+export async function processImageBlur({
+  base64Data,
+  blurRadius = 100,
+  overlayOpacity = 0.2,
+}: {
+  base64Data: string;
+  blurRadius?: number;
+  overlayOpacity?: number;
+}): Promise<{
+  hex: string;
+  width: number;
+  height: number;
+}> {
+  if (!base64Data || typeof base64Data !== 'string') {
+    throw new Error('Invalid base64 data');
+  }
+
+  if (!base64Data.startsWith('data:image/')) {
+    // eslint-disable-next-line no-param-reassign
+    base64Data = `data:image/jpeg;base64,${base64Data}`;
+  }
+
+  const img = await buildHtmlImage(base64Data);
+
+  try {
+    // 1. create canvas
+    const { canvas, ctx } = htmlImageToCanvas({
+      image: img,
+      width: img.width,
+      height: img.height,
+    });
+
+    // 2. add black semi-transparent mask
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = `rgba(0, 0, 0, ${overlayOpacity})`;
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalCompositeOperation = 'source-over';
+
+    // 3. apply blur effect
+    if (blurRadius > 0) {
+      try {
+        blurCanvasRGBA(canvas, 0, 0, canvas.width, canvas.height, Math.min(blurRadius, 300));
+      } catch (blurError) {
+        console.warn('blur processing failed, skip blur effect:', blurError);
+      }
+    }
+
+    const base64Uri = canvas.toDataURL('image/jpeg');
+
+    const base64 = stripBase64UriPrefix(base64Uri);
+    const buffer = Buffer.from(base64, 'base64');
+    const hex = buffer.toString('hex');
+
+    return {
+      hex: hex || '',
+      width: canvas.width,
+      height: canvas.height,
+    };
+  } catch (error) {
+    throw new Error(`Canvas processing failed: ${(error as Error).message}`);
+  }
+}
 
 export function formatBytes(bytes: number, decimals = 2) {
   if (!+bytes) return '0 Bytes';
@@ -22,7 +124,7 @@ export const getImageSize: (
   imageUrl: string
 ) => Promise<{ width: number; height: number }> = imageUrl =>
   new Promise((resolve, reject) => {
-    Image.getSize(
+    ImageView.getSize(
       imageUrl,
       (width: number, height: number) => {
         resolve({ width, height });
@@ -148,6 +250,8 @@ export const generateUploadNFTParams = async ({
   height,
   homeScreenSize,
   homeScreenThumbnailSize,
+  blurRadius,
+  blurOverlayOpacity,
   cb,
 }: {
   uri: string;
@@ -161,6 +265,8 @@ export const generateUploadNFTParams = async ({
     width: number;
     height: number;
   };
+  blurRadius?: number;
+  blurOverlayOpacity?: number;
   cb?: (data: { base64?: string }) => void;
 }) => {
   const data = await compressNFT(
@@ -179,6 +285,12 @@ export const generateUploadNFTParams = async ({
     height,
     true
   );
+
+  const blurData = await processImageBlur({
+    base64Data: data?.base64 ?? '',
+    blurRadius: blurRadius ?? 100,
+    overlayOpacity: blurOverlayOpacity ?? 0.2,
+  });
 
   cb?.(zoomData as any);
 
@@ -208,6 +320,7 @@ export const generateUploadNFTParams = async ({
     suffix: 'jpg',
     dataHex: bytesToHex(data?.arrayBuffer as Uint8Array),
     thumbnailDataHex: bytesToHex(zoomData?.arrayBuffer as Uint8Array),
+    blurDataHex: blurData.hex,
     nftMetaData,
   };
 
