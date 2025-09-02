@@ -2,7 +2,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } fro
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { Alert, AlertDescription } from '../ui/Alert';
-import { Edit, Save, X } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 import { Textarea } from '../ui/Textarea';
 
 interface JsonEditorProps {

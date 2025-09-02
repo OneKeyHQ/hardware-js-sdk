@@ -4,7 +4,7 @@ import { logHardware, logError } from '../utils/logger';
 // 预览并记录即将传给硬件的关键参数（不改变原始 params）
 export function previewHardwareParams(method: string, params: Record<string, unknown>) {
   try {
-    const p = params as any;
+    const p = params as Record<string, unknown>;
 
     // 通用提取：address_n（接受 path 字符串/数组 或 address_n 数组）
     const preview: Record<string, unknown> = {};
@@ -30,7 +30,9 @@ export function previewHardwareParams(method: string, params: Record<string, unk
     } else if (Array.isArray(preview.address_n)) {
       try {
         preview.script_type = getScriptType(preview.address_n as number[]);
-      } catch {}
+      } catch {
+        // Ignore script type extraction errors
+      }
     }
     if (p.noScriptType !== undefined) preview.no_script_type = p.noScriptType;
     if (p.no_script_type !== undefined) preview.no_script_type = p.no_script_type;
