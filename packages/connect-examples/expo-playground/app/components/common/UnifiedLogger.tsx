@@ -267,9 +267,9 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
   return (
     <Card className={`${className} bg-card border border-border/50 shadow-sm flex flex-col h-full`}>
       {showHeader && (
-        <CardHeader className="pb-3 flex-shrink-0">
+        <CardHeader className="py-2 px-2 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <FileText className="h-4 w-4" />
               {title}
             </CardTitle>
@@ -278,7 +278,7 @@ const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
                 {filteredLogs.length} {t('components.unifiedLogger.records')}
               </Badge>
               <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
                 onClick={onClearLogs}
                 disabled={logs.length === 0}

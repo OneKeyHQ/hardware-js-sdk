@@ -149,7 +149,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
     resetParameters();
     // 重置执行开始时间，清空执行日志显示
     setExecutionStartTime(null);
-    
+
     // 如果是固件更新，重置固件进度状态
     if (type === 'firmware') {
       resetFirmwareProgress();
@@ -170,7 +170,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       // 直接从 store 获取 setCommonParameter 和 setMethodParameter
       const { setCommonParameter, setMethodParameter } = useHardwareStore.getState();
 
-      const commonParamNames = ['useEmptyPassphrase', 'passphraseState']; // 定义通用参数名
+      const commonParamNames = ['useEmptyPassphrase', 'passphraseState', 'deriveCardano']; // 定义通用参数名
 
       if (commonParamNames.includes(paramName)) {
         setCommonParameter(paramName as keyof CommonParametersState, value); // 更新通用参数
@@ -223,7 +223,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
       <div className="w-full min-h-[380px] h-full">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 h-full">
           {/* 左侧：设备交互动效 */}
-          <div className="lg:col-span-2 flex flex-col h-full max-h-[520px]">
+          <div className="lg:col-span-2 flex flex-col h-full min-h-0">
             <DeviceInteractionArea
               status={status}
               deviceAction={deviceAction}
@@ -238,7 +238,7 @@ const MethodExecutor: React.FC<MethodExecutorProps> = ({
           </div>
 
           {/* 右侧：执行面板 */}
-          <div className="lg:col-span-3 flex flex-col h-full max-h-[520px]">
+          <div className="lg:col-span-3 flex flex-col h-full min-h-0">
             <ExecutionPanel
               requestData={storeExecutionParameters}
               onSaveRequest={handleRequestParamsEdit}

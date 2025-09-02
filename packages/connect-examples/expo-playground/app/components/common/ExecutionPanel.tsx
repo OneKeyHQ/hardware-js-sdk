@@ -57,11 +57,11 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
 
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
-      {/* 上部：请求参数编辑区域 - 极致紧凑设计 */}
-      <Card className="bg-card border border-border/50 shadow-sm flex-shrink-0">
-        <CardHeader className="pb-1 pt-2 px-2">
+      {/* 上部：请求参数编辑区域 - 内联编辑 */}
+      <Card className="bg-card border border-border/50 shadow-sm">
+        <CardHeader className="py-2 px-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xs font-medium text-foreground flex items-center gap-1">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-1">
               <Edit className="h-3 w-3" />
               {t('components.executionPanel.requestParameters')}
             </CardTitle>
@@ -70,7 +70,7 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsParamsCollapsed(!isParamsCollapsed)}
-                className="h-5 px-1 text-xs"
+                className="h-7 px-1 text-xs"
               >
                 {isParamsCollapsed ? (
                   <ChevronDown className="h-2.5 w-2.5" />
@@ -79,11 +79,11 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
                 )}
               </Button>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={handleCopyParams}
                 disabled={disabled}
-                className="h-5 px-1.5 text-xs"
+                className="h-7 px-2 text-xs bg-green-50 text-green-700 hover:bg-green-100 border-green-100"
               >
                 <Copy className="h-2.5 w-2.5 mr-0.5" />
                 {copied ? t('common.copied') : t('common.copy')}
@@ -91,13 +91,24 @@ const ExecutionPanel: React.FC<ExecutionPanelProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setIsEditing(true)}
+                onClick={() => setIsEditing(prev => !prev)}
                 disabled={disabled}
-                className="h-5 px-1.5 text-xs"
+                className="h-7 px-2 text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 border-sky-100"
               >
                 <Edit className="h-2.5 w-2.5 mr-0.5" />
-                {t('common.edit')}
+                {isEditing ? t('common.cancel') : t('common.edit')}
               </Button>
+              {!isEditing ? null : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => jsonEditorRef.current?.copyContent()}
+                  disabled={disabled}
+                  className="h-5 px-1.5 text-xs"
+                >
+                  {t('common.copy')}
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>

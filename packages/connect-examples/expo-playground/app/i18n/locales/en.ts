@@ -868,6 +868,8 @@ export const en = {
         },
         passphraseState: 'PassphraseState',
         passphraseStateDesc: 'Use passphraseState for hidden wallet',
+        deriveCardano: 'deriveCardano',
+        deriveCardanoDesc: 'Enable Cardano address derivation',
       },
       unifiedLogger: {
         executionLogs: 'Execution Logs',
