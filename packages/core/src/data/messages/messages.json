@@ -7531,6 +7531,10 @@
         "file_name_no_ext": {
           "type": "string",
           "id": 6
+        },
+        "blur_data_length": {
+          "type": "uint32",
+          "id": 7
         }
       },
       "nested": {
@@ -7543,6 +7547,19 @@
       }
     },
     "ZoomRequest": {
+      "fields": {
+        "offset": {
+          "type": "uint32",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      }
+    },
+    "BlurRequest": {
       "fields": {
         "offset": {
           "type": "uint32",
@@ -12366,6 +12383,7 @@
         "MessageType_NFTWriteData": 10015,
         "MessageType_ResourceUpload": 10018,
         "MessageType_ZoomRequest": 10019,
+        "MessageType_BlurRequest": 10032,
         "MessageType_ResourceRequest": 10020,
         "MessageType_ResourceAck": 10021,
         "MessageType_ResourceUpdate": 10022,
