@@ -86,7 +86,7 @@ export async function processImageBlur({
     // 3. apply blur effect
     if (blurRadius > 0) {
       try {
-        blurCanvasRGBA(canvas, 0, 0, canvas.width, canvas.height, Math.min(blurRadius, 300));
+        blurCanvasRGBA(canvas, 0, 0, canvas.width, canvas.height, Math.min(blurRadius, 400));
       } catch (blurError) {
         console.warn('blur processing failed, skip blur effect:', blurError);
       }

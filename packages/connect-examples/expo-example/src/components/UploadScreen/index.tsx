@@ -30,7 +30,7 @@ interface UploadResourceParams {
   nftMetaData?: string;
   fileNameNoExt?: string;
   blurRadius?: number;
-  blurOverlayOpacity?: number;
+  blurOverlayOpacity?: string;
 }
 
 function getUrlExtension(url: string) {
@@ -233,7 +233,7 @@ function UploadScreenComponent() {
           homeScreenSize: HomeScreenSize,
           homeScreenThumbnailSize: HomeScreenThumbnailSize,
           blurRadius: uploadScreenParams?.blurRadius ?? 100,
-          blurOverlayOpacity: uploadScreenParams?.blurOverlayOpacity ?? 0.2,
+          blurOverlayOpacity: parseFloat(uploadScreenParams?.blurOverlayOpacity ?? '0.2'),
           cb: data => {
             setImage({ uri: base64 } as any);
             setPreviewData(data?.base64 ? `data:image/png;base64,${data.base64}` : null);
@@ -296,7 +296,7 @@ function UploadScreenComponent() {
             homeScreenSize: HomeScreenSize,
             homeScreenThumbnailSize: HomeScreenThumbnailSize,
             blurRadius: uploadScreenParams?.blurRadius ?? 100,
-            blurOverlayOpacity: uploadScreenParams?.blurOverlayOpacity ?? 0.2,
+            blurOverlayOpacity: parseFloat(uploadScreenParams?.blurOverlayOpacity ?? '0.2'),
             cb: data => {
               setPreviewData(data?.base64 ? `data:image/png;base64,${data.base64}` : null);
             },
@@ -426,19 +426,13 @@ function UploadScreenComponent() {
           }}
         />
         <CommonInput
-          type="number"
+          type="text"
           label="Blur Overlay Opacity"
-          value={uploadScreenParams?.blurOverlayOpacity?.toString() ?? '0.2'}
-          placeholder="100"
+          value={uploadScreenParams?.blurOverlayOpacity ?? '0.2'}
+          placeholder="0.2"
           onChange={v => {
             if (!isInputDisabled) {
-              try {
-                parseInt(v);
-              } catch (e) {
-                alert('Blur Overlay Opacity must be a number');
-                return;
-              }
-              setUploadScreenParams({ ...uploadScreenParams, blurOverlayOpacity: parseInt(v) });
+              setUploadScreenParams({ ...uploadScreenParams, blurOverlayOpacity: v });
             }
           }}
         />
@@ -495,19 +489,13 @@ function UploadScreenComponent() {
           }}
         />
         <CommonInput
-          type="number"
+          type="text"
           label="Blur Overlay Opacity"
-          value={uploadScreenParams?.blurOverlayOpacity?.toString() ?? '0.2'}
-          placeholder="100"
+          value={uploadScreenParams?.blurOverlayOpacity ?? '0.2'}
+          placeholder="0.2"
           onChange={v => {
             if (!isInputDisabled) {
-              try {
-                parseInt(v);
-              } catch (e) {
-                alert('Blur Overlay Opacity must be a number');
-                return;
-              }
-              setUploadScreenParams({ ...uploadScreenParams, blurOverlayOpacity: parseInt(v) });
+              setUploadScreenParams({ ...uploadScreenParams, blurOverlayOpacity: v });
             }
           }}
         />
