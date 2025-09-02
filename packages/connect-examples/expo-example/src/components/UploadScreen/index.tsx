@@ -10,7 +10,13 @@ import { ResourceType } from '@onekeyfe/hd-transport';
 import { Image as ImageView, Label, Stack, View, XStack } from 'tamagui';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
-import { getImageSize, imageToBase64, formatBytes, generateUploadNFTParams, processImageBlur } from './nftUtils';
+import {
+  getImageSize,
+  imageToBase64,
+  formatBytes,
+  generateUploadNFTParams,
+  processImageBlur,
+} from './nftUtils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useCommonParams } from '../../provider/CommonParamsProvider';
 import { useDevice } from '../../provider/DeviceProvider';
@@ -75,7 +81,7 @@ export const generateUploadResParams = async ({
   );
 
   const blurData = await processImageBlur({
-    base64Data: data?.base64??'',
+    base64Data: data?.base64 ?? '',
     blurRadius: blurRadius ?? 100,
     overlayOpacity: blurOverlayOpacity ?? 0.2,
   });
@@ -157,7 +163,6 @@ export const compressHomescreen = async (
     arrayBuffer,
   };
 };
-
 
 function UploadScreenComponent() {
   const intl = useIntl();
