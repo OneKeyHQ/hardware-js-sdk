@@ -10,6 +10,7 @@ import {
 } from '../utils/hardwareInstance';
 import { useHardwareStore } from '../store/hardwareStore';
 import { METHODS_REQUIRING_PASSPHRASE_CHECK } from '../utils/constants';
+import { previewHardwareParams } from './previewHardwareParams';
 // 使用 hd-core 的标准类型
 export type ApiResponse<T = any> = Success<T> | Unsuccessful;
 export type HardwareApiMethod = keyof CoreApi;
@@ -217,6 +218,15 @@ export async function callHardwareAPI(
       } else {
         logInfo(`Using existing passphrase state from params: ${params.passphraseState}`);
       }
+    }
+
+    // 打印最终传入硬件的关键参数（尽量不变形，保持与 hd-core 接口一致）
+    try {
+      // 使用通用预览函数
+      previewHardwareParams(method as string, params as Record<string, unknown>);
+    } catch (e) {
+      // 仅日志失败时忽略
+      logError('Failed to preview hardware params', { error: e });
     }
 
     logInfo(`Executing method ${method}`, {

@@ -22,7 +22,7 @@ interface ParameterInputProps {
 
 // 需要passphrase检查的方法列表
 
-// 通用配置函数 - 只在需要时显示passphrase参数
+// 通用配置函数 - 只在需要时显示passphrase相关参数
 const getCommonParameters = (t: (key: string) => string, methodName: string): ParameterField[] => {
   const needsPassphrase = METHODS_REQUIRING_PASSPHRASE_CHECK.includes(methodName);
 
@@ -46,6 +46,15 @@ const getCommonParameters = (t: (key: string) => string, methodName: string): Pa
       label: t('components.parameterInput.passphraseState'),
       description: '', // 移除描述以节省空间
       value: '',
+      visible: true,
+      editable: true,
+    },
+    {
+      name: 'deriveCardano',
+      type: 'boolean',
+      label: t('components.parameterInput.deriveCardano'),
+      description: '', // 移除描述以节省空间
+      value: false,
       visible: true,
       editable: true,
     },
@@ -75,7 +84,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 获取参数值的统一函数
   const getParameterValue = (field: ParameterField): unknown => {
-    if (['useEmptyPassphrase', 'passphraseState'].includes(field.name)) {
+    if (['useEmptyPassphrase', 'passphraseState', 'deriveCardano'].includes(field.name)) {
       return commonParameters[field.name as keyof typeof commonParameters];
     }
     // 优先使用当前输入的值，如果没有则使用预设值
@@ -101,7 +110,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
       })),
     });
 
-    const commonParamNames = ['useEmptyPassphrase'];
+    const commonParamNames = ['useEmptyPassphrase', 'passphraseState', 'deriveCardano'];
 
     // 使用统一的预设方式获取参数
     if (selectedPreset && presets) {
@@ -163,7 +172,7 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
 
   // 参数变化处理
   const handleParamChange = (paramName: string, value: unknown) => {
-    if (paramName === 'useEmptyPassphrase' || paramName === 'passphraseState') {
+    if (paramName === 'useEmptyPassphrase' || paramName === 'passphraseState' || paramName === 'deriveCardano') {
       setCommonParameter(paramName as keyof typeof commonParameters, value);
       return;
     }
@@ -190,6 +199,8 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
             newCommonParams.useEmptyPassphrase = Boolean(param.value);
           } else if (param.name === 'passphraseState') {
             newCommonParams.passphraseState = String(param.value);
+          } else if (param.name === 'deriveCardano') {
+            newCommonParams.deriveCardano = Boolean(param.value);
           } else {
             // 普通方法参数
             newMethodParams[param.name] = parseParameterValue(param.name, param.value);

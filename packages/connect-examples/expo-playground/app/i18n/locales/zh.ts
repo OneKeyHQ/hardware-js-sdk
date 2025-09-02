@@ -24,7 +24,7 @@ export const zh = {
       signMessage: '签名消息',
       signTransaction: '签名交易',
       noResponse: '没有可用的响应数据',
-      copy: '复制到剪贴板',
+      copy: '复制',
       networks: '网络',
       home: '首页',
       emulator: '模拟器',
@@ -234,7 +234,7 @@ export const zh = {
       },
     },
     chains: {
-      title: '区块链方法',
+      title: 'Chains',
       subtitle: '通过您的 OneKey 设备与不同的区块链网络进行交互',
       searchPlaceholder: '搜索区块链...',
       availableChains: '{{count}} 个可用区块链',
@@ -846,6 +846,8 @@ export const zh = {
         },
         passphraseState: 'PassphraseState',
         passphraseStateDesc: '使用passphraseState隐藏钱包',
+        deriveCardano: 'deriveCardano',
+        deriveCardanoDesc: '启用Cardano地址派生',
       },
       unifiedLogger: {
         executionLogs: '执行日志',

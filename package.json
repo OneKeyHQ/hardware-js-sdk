@@ -40,7 +40,7 @@
     "example:desktop": "cd ./packages/connect-examples/electron-example && yarn dev",
     "build:example:desktop:mac": "cd ./packages/connect-examples/electron-example && yarn make:mac",
     "build:example:desktop:win": "cd ./packages/connect-examples/electron-example && yarn make:win",
-    "example:v2": "cd ./packages/connect-examples/expo-playground && yarn start",
+    "example:playground": "cd ./packages/connect-examples/expo-playground && yarn start",
     "dev:all": "lerna run dev --parallel --ignore expo-example --ignore hardware-example --ignore onekey-hardware-playground",
     "dev:web": "cd ./packages/hd-web-sdk && yarn dev",
     "dev:ble": "cd ./packages/hd-ble-sdk && yarn dev",

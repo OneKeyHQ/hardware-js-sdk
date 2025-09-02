@@ -64,3 +64,14 @@ export function logResponse(message: string, data?: logData) {
     console.error('Failed to add log to store:', e);
   }
 }
+
+// Log hardware-level details (e.g., final params to device)
+export function logHardware(message: string, data?: logData) {
+  console.info(`[HARDWARE] ${message}`, data || '');
+  try {
+    const store = useDeviceStore.getState();
+    store.addLog(createUnifiedLogEntry('hardware', message, data));
+  } catch (e) {
+    console.error('Failed to add log to store:', e);
+  }
+}
