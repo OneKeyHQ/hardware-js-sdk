@@ -69,18 +69,18 @@ const ChainsIndexPage: React.FC = () => {
 
           {/* 链列表 - 填充剩余空间 */}
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-4">
+            <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 pb-4">
               {filteredChains.map(chain => (
                 <div
                   key={chain.id}
-                  className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all duration-200"
+                  className="flex items-center gap-3 p-4 bg-card border border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 hover:shadow-sm"
                   onClick={() => handleChainSelect(chain)}
                   onKeyDown={e => handleKeyDown(e, () => handleChainSelect(chain))}
                   tabIndex={0}
                   role="button"
                   aria-label={t('chains.exploreChain', { chainId: chain.id })}
                 >
-                  <ChainIcon chainId={chain.id} size={24} />
+                  <ChainIcon chainId={chain.id} size={28} />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-foreground text-sm truncate">{chain.id}</h3>
                     <p className="text-xs text-muted-foreground">
