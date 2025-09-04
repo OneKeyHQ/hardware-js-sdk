@@ -38,14 +38,29 @@ const basename = process.env.NODE_ENV === 'production' ? '/expo-playground' : ''
 // 处理从404页面重定向过来的路径恢复
 function handleSpaRedirect() {
   const redirectUrl = sessionStorage.getItem('spa_redirect_url');
-  if (
-    redirectUrl &&
-    redirectUrl !== window.location.pathname + window.location.search + window.location.hash
-  ) {
-    console.log('Restoring SPA route from redirect:', redirectUrl);
-    sessionStorage.removeItem('spa_redirect_url');
-    // 使用 window.history.replaceState 替换当前历史记录
-    window.history.replaceState(null, '', redirectUrl);
+  if (redirectUrl) {
+    const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+    console.log('SPA redirect check:', { redirectUrl, currentUrl });
+
+    if (redirectUrl !== currentUrl) {
+      console.log('Restoring SPA route from redirect:', redirectUrl);
+      sessionStorage.removeItem('spa_redirect_url');
+
+      // 移除 basename 前缀来获取相对路径
+      const basename = '/expo-playground';
+      let targetPath = redirectUrl;
+      if (targetPath.startsWith(basename)) {
+        targetPath = targetPath.substring(basename.length) || '/';
+      }
+
+      console.log('Target path for router:', targetPath);
+
+      // 使用 window.history.replaceState 替换当前历史记录
+      window.history.replaceState(null, '', redirectUrl);
+    } else {
+      // 如果路径已经匹配，清除重定向标记
+      sessionStorage.removeItem('spa_redirect_url');
+    }
   }
 }
 

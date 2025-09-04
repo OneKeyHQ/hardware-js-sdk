@@ -228,20 +228,6 @@ export const evmSignTxEip7702 = async ({
     authorizationList,
   } = tx;
 
-  // Hardware currently only supports self-sponsoring transactions
-  // Check if all authorization entries are for self-sponsoring
-  const hasNonSelfSponsoring = authorizationList.some(
-    auth =>
-      // If addressN is provided for this authorization, it should match the transaction signer
-      auth.addressN && auth.addressN.join('/') !== addressN.join('/')
-  );
-
-  if (hasNonSelfSponsoring) {
-    throw ERRORS.TypedError(
-      HardwareErrorCode.CallMethodError,
-      'Hardware currently only supports self-sponsoring EIP-7702 transactions. All authorization entries must be signed by the same account as the transaction.'
-    );
-  }
 
   const length = data == null ? 0 : data.length / 2;
 
