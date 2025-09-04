@@ -476,6 +476,11 @@ const api: PlaygroundProps[] = [
           requestPin: true,
         },
       },
+      classic1s: {
+        normal: {
+          requestPin: true,
+        },
+      },
     },
   },
   {
@@ -499,6 +504,11 @@ const api: PlaygroundProps[] = [
             },
           },
           pro: {
+            normal: {
+              requestPin: true,
+            },
+          },
+          classic1s: {
             normal: {
               requestPin: true,
             },
@@ -532,6 +542,11 @@ const api: PlaygroundProps[] = [
               requestPin: true,
             },
           },
+          classic1s: {
+            normal: {
+              requestPin: true,
+            },
+          },
         },
       },
     ],
@@ -552,7 +567,7 @@ const api: PlaygroundProps[] = [
         expect: {
           classic1s: {
             normal: {
-              unknownMessage: true,
+              requestPin: true,
             },
           },
           touch: {

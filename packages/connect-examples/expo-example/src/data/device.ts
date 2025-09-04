@@ -474,6 +474,13 @@ const api: PlaygroundProps[] = [
     method: 'deviceRebootToBoardloader',
     description: 'DeviceRebootToBoardloader',
     noDeviceIdReq: true,
+    expect: {
+      classic1s: {
+        normal: {
+          unknownMessage: true,
+        },
+      },
+    },
   },
   {
     method: 'deviceUpdateBootloader',
