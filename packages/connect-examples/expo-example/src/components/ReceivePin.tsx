@@ -8,7 +8,7 @@ import { Button } from './ui/Button';
 import { useMedia } from '../provider/MediaProvider';
 
 // Pin value atom
-export const pinValueAtom = atom<string>('123456');
+export const pinValueAtom = atom<string>('');
 
 // Pin mask atom (derived atom)
 export const pinMaskAtom = atom(get => {
@@ -105,14 +105,14 @@ const KeyboardButton = memo<{
   }, [setPinAction, num]);
 
   const isRightEdge = index === 2 || index === 5 || index === 8;
-  const isBottomEdge = index === 6 || index === 7 || index === 8;
+  const isBottomEdge = index === 9;
 
   const borderRightStyle = isRightEdge ? { borderRightWidth: 0 } : {};
   const borderBottomStyle = isBottomEdge ? { borderBottomWidth: 0 } : {};
 
   return (
     <Stack
-      flexBasis="33.3333%"
+      flexBasis={index === 9 ? '100%' : '33.3333%'}
       height="$14"
       borderRightWidth={StyleSheet.hairlineWidth}
       borderBottomWidth={StyleSheet.hairlineWidth}
@@ -136,7 +136,7 @@ KeyboardButton.displayName = 'KeyboardButton';
 
 // PIN 键盘组件
 const PinKeyboard = memo(() => {
-  const keyboardMap = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+  const keyboardMap = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0'];
 
   return (
     <XStack flexWrap="wrap">
@@ -181,13 +181,14 @@ const PinActions = memo<{
     const setPinAction = useSetAtom(pinActionsAtom);
 
     const handleConfirmPress = useCallback(() => {
-      onConfirm(getDefaultStore().get(pinValueAtom));
+      const pin = getDefaultStore().get(pinValueAtom);
       setPinAction({ type: 'clear' });
+      onConfirm(pin);
     }, [onConfirm, setPinAction]);
 
     const handleSwitchDevicePress = useCallback(() => {
-      onSwitchDevice();
       setPinAction({ type: 'clear' });
+      onSwitchDevice();
     }, [onSwitchDevice, setPinAction]);
 
     const confirmText = useMemo(() => intl.formatMessage({ id: 'action__confirm' }), [intl]);
@@ -261,9 +262,15 @@ export const ReceivePin = memo<IReceivePinProps>(
   ({ open, payload, onOpenChange, onConfirm, onSwitchDevice, onCancel }: IReceivePinProps) => {
     const intl = useIntl();
     const media = useMedia();
+    const setPinAction = useSetAtom(pinActionsAtom);
 
     const minWidth = useMemo(() => (media.gtXs ? 480 : '100%'), [media.gtXs]);
     const titleText = useMemo(() => intl.formatMessage({ id: 'title__input_pin' }), [intl]);
+
+    const handleCancel = useCallback(() => {
+      setPinAction({ type: 'clear' });
+      onCancel();
+    }, [onCancel, setPinAction]);
 
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -307,7 +314,7 @@ export const ReceivePin = memo<IReceivePinProps>(
               <PinActions onConfirm={onConfirm} onSwitchDevice={onSwitchDevice} />
             </YStack>
 
-            <CloseButton onCancel={onCancel} />
+            <CloseButton onCancel={handleCancel} />
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog>
