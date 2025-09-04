@@ -454,6 +454,8 @@ const api: PlaygroundProps[] = [
         title: 'Sign Gnosis Safe Tx',
         value: {
           path: "m/44'/60'/0'/0/0",
+          domainHash: '8d3fd2ba3e47fb69ebeb3f94a96b03f99f43c2aa8e3e969bb8eec2a5e53f96b4',
+          messageHash: '5af73f1c5230924b60ba2c00e31ad5a5a5e6b7a45c9b93b5e2fa5c90e616e2f3',
           data: {
             types: {
               SafeTx: [
@@ -533,6 +535,8 @@ const api: PlaygroundProps[] = [
         title: 'Sign Gnosis Safe Tx(ChainId: 10 进制)',
         value: {
           path: "m/44'/60'/0'/0/0",
+          domainHash: '9e4b8f7c6d5e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b',
+          messageHash: '5af73f1c5230924b60ba2c00e31ad5a5a5e6b7a45c9b93b5e2fa5c90e616e2f3',
           data: {
             types: {
               SafeTx: [
@@ -612,6 +616,8 @@ const api: PlaygroundProps[] = [
         title: 'Sign Gnosis Safe Tx(Danger)',
         value: {
           path: "m/44'/60'/0'/0/0",
+          domainHash: '9e4b8f7c6d5e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b',
+          messageHash: '8f7c5e4d3b2a1c9e8d7f6b5a4e3c2d1b9a8f7e6d5c4b3a2e1d9c8b7f6a5e4d',
           data: {
             types: {
               SafeTx: [
