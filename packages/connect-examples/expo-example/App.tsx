@@ -70,7 +70,6 @@ function NavigationContent() {
     if (redirectPath) {
       sessionStorage?.removeItem('redirectPath');
       window.history.replaceState(null, '', redirectPath);
-      return;
     }
   }, []);
 

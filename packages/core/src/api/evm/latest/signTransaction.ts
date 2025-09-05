@@ -228,7 +228,6 @@ export const evmSignTxEip7702 = async ({
     authorizationList,
   } = tx;
 
-
   const length = data == null ? 0 : data.length / 2;
 
   const [first, rest] = cutString(data, 1024 * 2);
