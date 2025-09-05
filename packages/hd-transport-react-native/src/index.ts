@@ -19,7 +19,12 @@ import {
   isOnekeyDevice,
 } from '@onekeyfe/hd-shared';
 import type EventEmitter from 'events';
-import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
+import {
+  getConnectedDeviceIds,
+  onDeviceBondState,
+  pairDevice,
+  getBondedDevices,
+} from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
   getBluetoothServiceUuids,
@@ -260,9 +265,16 @@ export default class ReactNativeBleTransport {
 
     // check device is bonded
     if (Platform.OS === 'android') {
-      const bondState = await pairDevice(uuid);
-      if (bondState.bonding) {
-        await onDeviceBondState(uuid);
+      const bondedDevices = await getBondedDevices();
+      const existsBondedList = bondedDevices.find(
+        device => device.id.toLowerCase() === uuid.toLowerCase()
+      );
+
+      if (!existsBondedList) {
+        const bondState = await pairDevice(uuid);
+        if (bondState.bonding) {
+          await onDeviceBondState(uuid);
+        }
       }
     }
 

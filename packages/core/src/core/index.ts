@@ -602,7 +602,7 @@ async function connectDeviceForBle(method: BaseMethod, device: Device) {
     await device.acquire();
     await device.initialize(parseInitOptions(method));
   } catch (err) {
-    if (err.errorCode === HardwareErrorCode.BleTimeoutError && bleTimeoutRetry <= 5) {
+    if (err.errorCode === HardwareErrorCode.BleTimeoutError && bleTimeoutRetry <= 1) {
       bleTimeoutRetry += 1;
       Log.debug(`Bletooth connect timeout and will retry, retry count: ${bleTimeoutRetry}`);
       await wait(3000);
