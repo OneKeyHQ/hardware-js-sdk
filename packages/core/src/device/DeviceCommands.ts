@@ -393,6 +393,16 @@ export class DeviceCommands {
         }
       }
 
+      if (code === 'Failure_ProcessError') {
+        // Handle firmware verification failures
+        if (
+          message?.includes('Bootloader file verify failed') ||
+          message?.includes('verify failed')
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.FirmwareVerificationFailed, message);
+        }
+      }
+
       if (code === 'Failure_UnexpectedMessage') {
         if (callType === 'PassphraseAck') {
           error = ERRORS.TypedError(HardwareErrorCode.UnexpectPassphrase);

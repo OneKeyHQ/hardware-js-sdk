@@ -443,6 +443,11 @@ export const HardwareErrorCode = {
   EmmcFileWriteFirmwareError: 819,
 
   /**
+   * Firmware verification failed (e.g., bootloader file verify failed)
+   */
+  FirmwareVerificationFailed: 820,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -583,6 +588,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DataOverload]: 'Params data overload',
   [HardwareErrorCode.BTCPsbtTooManyUtxos]: 'PSBT too many utxos',
   [HardwareErrorCode.EmmcFileWriteFirmwareError]: 'EMMC file write firmware error',
+  [HardwareErrorCode.FirmwareVerificationFailed]: 'Firmware verification failed',
 
   /**
    * Lowlevel transport

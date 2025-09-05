@@ -283,10 +283,13 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         path: '0:updates',
       });
     } catch (error) {
-      console.error('triggerFirmwareUpdateEmmc error: ', error);
-      if (error.errorCode) {
+      Log.error('triggerFirmwareUpdateEmmc error: ', error);
+      // Re-throw errors with specific error codes that should not be ignored
+      if (error?.errorCode) {
         const unexpectedError = [
           HardwareErrorCode.ActionCancelled,
+          HardwareErrorCode.FirmwareVerificationFailed,
+          // BLE connection errors
           HardwareErrorCode.BleDeviceNotBonded,
           HardwareErrorCode.BleServiceNotFound,
           HardwareErrorCode.BlePoweredOff,
@@ -297,13 +300,20 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           HardwareErrorCode.BleCharacteristicNotifyError,
           HardwareErrorCode.BleTimeoutError,
           HardwareErrorCode.BleWriteCharacteristicError,
+          // Web device errors
           HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
         ];
+
         if (unexpectedError.includes(error.errorCode)) {
           throw error;
         }
       }
-      Log.error('triggerFirmwareUpdateEmmc error: ', error);
+
+      // Wrap and re-throw all other errors
+      throw ERRORS.TypedError(
+        HardwareErrorCode.FirmwareError,
+        error?.message || 'Firmware update failed'
+      );
     }
 
     // wait for 1.5s to ensure the device is in update mode
