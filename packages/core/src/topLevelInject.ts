@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { CoreApi } from './types/api';
-import { createCoreApi } from './inject';
+import { createCoreApi, executeCallback } from './inject';
 import type { LowLevelCoreApi } from './lowLevelInject';
 import { ConnectSettings } from './types/settings';
 
@@ -54,6 +54,8 @@ export const topLevelInject = () => {
 
     switchTransport: (env: ConnectSettings['env']) =>
       lowLevelApi?.switchTransport(env) ?? Promise.resolve({ success: false }),
+
+    executeCallback: (id, ...args) => executeCallback(id, ...args),
   };
 
   return api;

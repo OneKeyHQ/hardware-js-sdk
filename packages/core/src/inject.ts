@@ -15,18 +15,20 @@ const registerCallback = (id: string, callback: CallbackFunction) => {
   callbackManager.set(id, callback);
 };
 
-const executeCallback = (id: string, ...args: any[]) => {
+const executeCallbackApi = (id: string, ...args: any[]) => {
   const callback = callbackManager.get(id);
   if (callback) {
     callback(...args);
+    return true;
   }
+  return false;
 };
 
 const cleanupCallback = (id: string) => {
   callbackManager.delete(id);
 };
 
-export { executeCallback, cleanupCallback };
+export { executeCallbackApi as executeCallback, cleanupCallback };
 
 export interface InjectApi {
   call: CallMethod;
@@ -37,6 +39,7 @@ export interface InjectApi {
   uiResponse: CoreApi['uiResponse'];
   cancel: CoreApi['cancel'];
   switchTransport: CoreApi['switchTransport'];
+  executeCallback: typeof executeCallbackApi;
 }
 
 export const inject = ({
@@ -63,6 +66,8 @@ export const inject = ({
     removeAllListeners: type => {
       eventEmitter.removeAllListeners(type);
     },
+
+    executeCallback: (id, ...args) => executeCallbackApi(id, ...args),
 
     init,
 
@@ -98,6 +103,7 @@ export const createCoreApi = (
   | 'cancel'
   | 'updateSettings'
   | 'switchTransport'
+  | 'executeCallback'
 > => ({
   getLogs: () => call({ method: 'getLogs' }),
   /**

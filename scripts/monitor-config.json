@@ -1,7 +1,7 @@
 {
     "basePath": "./packages",
     "targetEnvVar": "APP_MONOREPO_LOCAL_PATH",
-    "defaultWatchDir": "dist",
+    "defaultWatchDir": ["src", "dist"],
     "projects": [
       "hd-ble-sdk",
       "hd-transport",
@@ -17,7 +17,7 @@
       "hd-transport-electron"
     ],
     "specialProjects": {
-      "hd-web-sdk": ["dist", "build"]
+      "hd-web-sdk": ["src", "dist", "build"]
     },
     "ignoredPaths": [
       "node_modules",

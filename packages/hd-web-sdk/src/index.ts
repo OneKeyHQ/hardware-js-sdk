@@ -22,6 +22,7 @@ import HardwareSdk, {
   UI_REQUEST,
   whitelist,
   executeCallback,
+  IFrameCallbackMessage,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import * as iframe from './iframe/builder';
@@ -75,7 +76,10 @@ const handleMessage = async (message: CoreMessage) => {
 
     case IFRAME.CALLBACK: {
       const { callbackId, data, error } = message.payload;
-      executeCallback(callbackId, data, error);
+      const result = executeCallback(callbackId, data, error);
+      if (!result) {
+        eventEmitter.emit(message.type, message);
+      }
       break;
     }
 
@@ -274,6 +278,22 @@ const addHardwareGlobalEventListener = (listener: (message: CoreMessage) => void
   });
 };
 
+const addHardwareCallbackEventListener = (listener: (message: IFrameCallbackMessage) => void) => {
+  [IFRAME.CALLBACK].forEach(eventName => {
+    eventEmitter.on(eventName, (message: IFrameCallbackMessage) => {
+      let emitMessage = message;
+      if (!message.event && !message.type) {
+        emitMessage = {
+          ...message,
+          event: eventName,
+          type: eventName,
+        };
+      }
+      listener?.(emitMessage);
+    });
+  });
+};
+
 const HardwareSDKLowLevel = HardwareLowLevelSdk({
   eventEmitter,
   init,
@@ -281,6 +301,7 @@ const HardwareSDKLowLevel = HardwareLowLevelSdk({
   cancel,
   dispose,
   addHardwareGlobalEventListener,
+  addHardwareCallbackEventListener,
   uiResponse,
   updateSettings,
   switchTransport,
@@ -297,6 +318,7 @@ const HardwareWebSdk = HardwareSdk({
   uiResponse,
   updateSettings,
   switchTransport,
+  executeCallback,
 });
 
 export default { HardwareSDKLowLevel, HardwareSDKTopLevel, HardwareWebSdk };
