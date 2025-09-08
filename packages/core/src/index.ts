@@ -35,7 +35,6 @@ const HardwareSdk = ({
     cancel,
     updateSettings,
     switchTransport,
-    executeCallback,
   });
 
 const HardwareSDKLowLevel = ({
@@ -44,7 +43,6 @@ const HardwareSDKLowLevel = ({
   dispose,
   eventEmitter,
   addHardwareGlobalEventListener,
-  addHardwareCallbackEventListener,
   uiResponse,
   cancel,
   updateSettings,
@@ -56,7 +54,6 @@ const HardwareSDKLowLevel = ({
     dispose,
     eventEmitter,
     addHardwareGlobalEventListener,
-    addHardwareCallbackEventListener,
     uiResponse,
     cancel,
     updateSettings,

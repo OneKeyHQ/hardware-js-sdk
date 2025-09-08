@@ -1,10 +1,9 @@
 import { EventEmitter } from 'events';
-import { CallMethod, CoreMessage, IFrameCallbackMessage } from './events';
+import { CallMethod, CoreMessage } from './events';
 import { CoreApi } from './types/api';
-import { createCoreApi, executeCallback } from './inject';
+import { createCoreApi } from './inject';
 
 type IAddHardwareGlobalEventListener = (coreMessage: CoreMessage) => void;
-type IAddHardwareCallbackEventListener = (coreMessage: IFrameCallbackMessage) => void;
 
 export interface LowLevelInjectApi {
   call: CallMethod;
@@ -16,12 +15,10 @@ export interface LowLevelInjectApi {
   updateSettings: CoreApi['updateSettings'];
   switchTransport: CoreApi['switchTransport'];
   addHardwareGlobalEventListener: (listener: IAddHardwareGlobalEventListener) => void;
-  addHardwareCallbackEventListener: (listener: IAddHardwareCallbackEventListener) => void;
 }
 
 export type LowLevelCoreApi = Omit<CoreApi, 'on' | 'off'> & {
   addHardwareGlobalEventListener: (listener: IAddHardwareGlobalEventListener) => void;
-  addHardwareCallbackEventListener: (listener: IAddHardwareCallbackEventListener) => void;
 };
 
 export const lowLevelInject = ({
@@ -34,11 +31,9 @@ export const lowLevelInject = ({
   updateSettings,
   switchTransport,
   addHardwareGlobalEventListener,
-  addHardwareCallbackEventListener,
 }: LowLevelInjectApi): LowLevelCoreApi => {
   const api: LowLevelCoreApi = {
     addHardwareGlobalEventListener,
-    addHardwareCallbackEventListener,
     removeAllListeners: type => {
       eventEmitter.removeAllListeners(type);
     },
@@ -56,8 +51,6 @@ export const lowLevelInject = ({
     updateSettings,
 
     switchTransport,
-
-    executeCallback: (id, ...args) => executeCallback(id, ...args),
 
     emit: () => {},
 
