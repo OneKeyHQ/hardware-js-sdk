@@ -188,6 +188,7 @@ const HardwareCommonConnectSdk = HardwareSdk({
   uiResponse,
   updateSettings,
   switchTransport,
+  executeCallback,
 });
 
 export default HardwareCommonConnectSdk;
