@@ -1221,6 +1221,7 @@ export enum Enum_PinMatrixRequestType {
   PinMatrixRequestType_WipeCodeSecond = 5,
   PinMatrixRequestType_BackupFirst = 6,
   PinMatrixRequestType_BackupSecond = 7,
+  PinMatrixRequestType_AttachToPin = 8000,
 }
 export type PinMatrixRequestType = keyof typeof Enum_PinMatrixRequestType;
 
