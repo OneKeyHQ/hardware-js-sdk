@@ -30,8 +30,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd packages/connect-examples/electron-example
-          yarn make:mac
+          yarn build:example:desktop:mac
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
