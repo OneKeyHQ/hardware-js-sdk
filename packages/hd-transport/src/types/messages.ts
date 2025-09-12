@@ -1221,6 +1221,7 @@ export enum Enum_PinMatrixRequestType {
   PinMatrixRequestType_WipeCodeSecond = 5,
   PinMatrixRequestType_BackupFirst = 6,
   PinMatrixRequestType_BackupSecond = 7,
+  PinMatrixRequestType_AttachToPin = 8000,
 }
 export type PinMatrixRequestType = keyof typeof Enum_PinMatrixRequestType;
 
@@ -2285,6 +2286,7 @@ export enum Enum_Capability {
   Capability_Shamir = 15,
   Capability_ShamirGroups = 16,
   Capability_PassphraseEntry = 17,
+  Capability_AttachToPin = 8000,
 }
 export type Capability = keyof typeof Enum_Capability;
 

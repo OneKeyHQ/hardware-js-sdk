@@ -1,6 +1,7 @@
 import semver from 'semver';
 import { isNaN } from 'lodash';
 import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { Enum_Capability } from '@onekeyfe/hd-transport';
 import { toHardened } from '../api/helpers/pathUtils';
 import { DeviceCommands } from '../device/DeviceCommands';
 import type { Features, SupportFeatureType } from '../types';
@@ -10,6 +11,7 @@ import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
 import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
+import { existCapability } from './capabilitieUtils';
 
 export const getSupportMessageVersion = (
   features: Features | undefined
@@ -138,7 +140,15 @@ export const getPassphraseState = async (
   const firmwareVersion = getDeviceFirmwareVersion(features);
   const deviceType = getDeviceType(features);
 
-  if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.15.0')) {
+  const supportAttachPinCapability = existCapability(
+    features,
+    Enum_Capability.Capability_AttachToPin
+  );
+  const supportGetPassphraseState =
+    supportAttachPinCapability ||
+    (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion.join('.'), '4.15.0'));
+
+  if (supportGetPassphraseState) {
     const { message, type } = await commands.typedCall('GetPassphraseState', 'PassphraseState', {
       passphrase_state: options?.onlyMainPin ? undefined : options?.expectPassphraseState,
     });

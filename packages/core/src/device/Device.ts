@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import semver from 'semver';
-import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import { OneKeyDeviceInfo as DeviceDescriptor, Enum_Capability } from '@onekeyfe/hd-transport';
 import {
   createDeferred,
   Deferred,
@@ -47,6 +47,7 @@ import { PROTO } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
+import { existCapability } from '../utils/capabilitieUtils';
 
 export type InitOptions = {
   initSession?: boolean;
@@ -765,7 +766,15 @@ export class Device extends EventEmitter {
       type => this.supportUnlockVersionRange()[type]
     );
 
-    if (versionRange && semver.gte(firmwareVersion, versionRange.min)) {
+    const supportAttachPinCapability = existCapability(
+      this.features,
+      Enum_Capability.Capability_AttachToPin
+    );
+
+    const supportUnlock =
+      supportAttachPinCapability || (versionRange && semver.gte(firmwareVersion, versionRange.min));
+
+    if (supportUnlock) {
       const res = await this.commands.typedCall('UnLockDevice', 'UnLockDeviceResponse');
       if (this.features) {
         this.features.unlocked = res.message.unlocked == null ? null : res.message.unlocked;
