@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useContext } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
@@ -16,6 +16,7 @@ import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
 
 type TestCaseDataType = AddressBatchTestCase['data'][0];
 type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
@@ -64,9 +65,11 @@ function ExportReportView() {
   });
 
   if (showExportReport) {
-    <Button variant="primary" onPress={exportReport}>
-      {intl.formatMessage({ id: 'action__export_report' })}
-    </Button>;
+    return (
+      <Button variant="primary" onPress={exportReport}>
+        {intl.formatMessage({ id: 'action__export_report' })}
+      </Button>
+    );
   }
 
   return null;
@@ -76,6 +79,7 @@ let hardwareUiEventListener: any | undefined;
 function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[] }) {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
+  const { setItemValues } = useContext(TestRunnerContext);
 
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressBatchTestCase>();
@@ -112,155 +116,157 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
   const fullOriginDataRef = useRef(passphraseTestCase);
   const originDataRef = useRef(passphraseTestCase);
 
-  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
-    initTestCase: () => {
-      const testCase = currentTestCase;
-      const currentTestCases = testCase?.data?.map((item, index) => {
-        const key = `${item.method}-${index}`;
+  const { stopTest, beginTest, retryFailedTasks, clearTestResults } =
+    useRunnerTest<TestCaseDataType>({
+      initTestCase: () => {
+        const testCase = currentTestCase;
+        const currentTestCases = testCase?.data?.map((item, index) => {
+          const key = `${item.method}-${index}`;
 
-        return {
-          ...item,
-          $key: key,
-        } as unknown as TestCaseDataWithKey<TestCaseDataType>;
-      });
-      if (testCase && currentTestCases) {
-        return Promise.resolve({
-          title: testCase.name,
-          data: currentTestCases,
+          return {
+            ...item,
+            $key: key,
+          } as unknown as TestCaseDataWithKey<TestCaseDataType>;
         });
-      }
-      return Promise.resolve(undefined);
-    },
-    initHardwareListener: sdk => {
-      if (hardwareUiEventListener) {
-        sdk.off(UI_EVENT, hardwareUiEventListener);
-      }
-
-      hardwareUiEventListener = (message: CoreMessage) => {
-        console.log('TopLEVEL EVENT ===>>>>: ', message);
-        if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+        if (testCase && currentTestCases) {
+          return Promise.resolve({
+            title: testCase.name,
+            data: currentTestCases,
+          });
         }
-        if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
-          setTimeout(() => {
-            sdk.uiResponse({
-              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-              payload: {
-                value: currentPassphrase.current ?? '',
-              },
-            });
-          }, 200);
+        return Promise.resolve(undefined);
+      },
+      initHardwareListener: sdk => {
+        if (hardwareUiEventListener) {
+          sdk.off(UI_EVENT, hardwareUiEventListener);
         }
-      };
-      sdk.on(UI_EVENT, hardwareUiEventListener);
-      return Promise.resolve();
-    },
-    prepareRunner: async (connectId, deviceId, features, sdk) => {
-      const testCase = currentTestCase;
 
-      if (features?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
-        await sdk.deviceSettings(connectId, {
-          usePassphrase: false,
-        });
-      }
-      if (!features?.passphrase_protection && testCase?.extra?.passphrase != null) {
-        await sdk.deviceSettings(connectId, {
-          usePassphrase: true,
-        });
-      }
-
-      currentPassphrase.current = testCase?.extra?.passphrase;
-
-      fullOriginDataRef.current = fullPath(passphraseTestCase);
-      originDataRef.current = passphraseTestCase;
-    },
-    generateRequestParams: item => {
-      const { params } = item;
-      const requestParams = {
-        ...params,
-        passphraseState: currentTestCase?.extra?.passphraseState,
-        useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
-      };
-      return Promise.resolve({
-        method: item.method,
-        params: requestParams,
-      });
-    },
-    processResponse: (res, item, itemIndex) => {
-      const response = res as {
-        path: string;
-        address: string;
-        // ada
-        serializedPath: string;
-      }[];
-
-      let error = '';
-
-      for (const key of Object.keys(item.result)) {
-        const address = response?.find(
-          account => account.path === key || account.serializedPath === key
-        );
-
-        // 测试数据
-        originDataRef.current = {
-          ...originDataRef.current,
-          data: [
-            ...originDataRef.current.data.map((item, index) => {
-              if (index === itemIndex) {
-                const originParams = fullOriginDataRef.current.data[index].params;
-                const template = originParams?.addressParameters?.path || originParams?.path;
-
-                const originKey = Object.keys(item.expectedAddress).find(key => {
-                  const path = replaceTemplate(key, template);
-                  const resultPath = address?.serializedPath || address?.path;
-                  if (path === resultPath) {
-                    return key;
-                  }
-                  return false;
-                });
-
-                const indexKey = originKey || key;
-                return {
-                  ...item,
-                  expectedAddress: {
-                    ...item.expectedAddress,
-                    [indexKey]: address?.address,
-                  },
-                };
-              }
-              return item;
-            }),
-          ],
+        hardwareUiEventListener = (message: CoreMessage) => {
+          console.log('TopLEVEL EVENT ===>>>>: ', message);
+          if (message.type === UI_REQUEST.REQUEST_PIN) {
+            openDialog(sdk, message.payload.device.features);
+          }
+          if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+            setTimeout(() => {
+              sdk.uiResponse({
+                type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+                payload: {
+                  value: currentPassphrase.current ?? '',
+                },
+              });
+            }, 200);
+          }
         };
+        sdk.on(UI_EVENT, hardwareUiEventListener);
+        return Promise.resolve();
+      },
+      prepareRunner: async (connectId, deviceId, features, sdk) => {
+        const testCase = currentTestCase;
 
-        for (const verifyField of Object.keys(item.result[key])) {
-          if (
-            // @ts-expect-error
-            address[verifyField] !== item.result[key][verifyField]
-          ) {
-            // @ts-expect-error
-            error += `(${key}) actual: ${address[verifyField]}, expected: ${item.result[key][verifyField]}\n`;
+        if (features?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
+          await sdk.deviceSettings(connectId, {
+            usePassphrase: false,
+          });
+        }
+        if (!features?.passphrase_protection && testCase?.extra?.passphrase != null) {
+          await sdk.deviceSettings(connectId, {
+            usePassphrase: true,
+          });
+        }
+
+        currentPassphrase.current = testCase?.extra?.passphrase;
+
+        fullOriginDataRef.current = fullPath(passphraseTestCase);
+        originDataRef.current = passphraseTestCase;
+      },
+      generateRequestParams: item => {
+        const { params } = item;
+        const requestParams = {
+          ...params,
+          passphraseState: currentTestCase?.extra?.passphraseState,
+          useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
+        };
+        return Promise.resolve({
+          method: item.method,
+          params: requestParams,
+        });
+      },
+      processResponse: (res, item, itemIndex) => {
+        const response = res as {
+          path: string;
+          address: string;
+          // ada
+          serializedPath: string;
+        }[];
+
+        let error = '';
+
+        for (const key of Object.keys(item.result)) {
+          const address = response?.find(
+            account => account.path === key || account.serializedPath === key
+          );
+
+          // 测试数据
+          originDataRef.current = {
+            ...originDataRef.current,
+            data: [
+              ...originDataRef.current.data.map((item, index) => {
+                if (index === itemIndex) {
+                  const originParams = fullOriginDataRef.current.data[index].params;
+                  const template = originParams?.addressParameters?.path || originParams?.path;
+
+                  const originKey = Object.keys(item.expectedAddress).find(key => {
+                    const path = replaceTemplate(key, template);
+                    const resultPath = address?.serializedPath || address?.path;
+                    if (path === resultPath) {
+                      return key;
+                    }
+                    return false;
+                  });
+
+                  const indexKey = originKey || key;
+                  return {
+                    ...item,
+                    expectedAddress: {
+                      ...item.expectedAddress,
+                      [indexKey]: address?.address,
+                    },
+                  };
+                }
+                return item;
+              }),
+            ],
+          };
+
+          for (const verifyField of Object.keys(item.result[key])) {
+            if (
+              // @ts-expect-error
+              address[verifyField] !== item.result[key][verifyField]
+            ) {
+              // @ts-expect-error
+              error += `(${key}) actual: ${address[verifyField]}, expected: ${item.result[key][verifyField]}\n`;
+            }
           }
         }
-      }
 
-      return Promise.resolve({
-        error,
-      });
-    },
-    removeHardwareListener: sdk => {
-      if (hardwareUiEventListener) {
-        sdk.off(UI_EVENT, hardwareUiEventListener);
-      }
-      return Promise.resolve();
-    },
-    processRunnerDone: () => {
-      console.log('=====>>> Success Data:\n', JSON.stringify(originDataRef.current, null, 2));
-    },
-  });
+        return Promise.resolve({
+          error,
+        });
+      },
+      removeHardwareListener: sdk => {
+        if (hardwareUiEventListener) {
+          sdk.off(UI_EVENT, hardwareUiEventListener);
+        }
+        return Promise.resolve();
+      },
+      processRunnerDone: () => {
+        console.log('=====>>> Success Data:\n', JSON.stringify(originDataRef.current, null, 2));
+      },
+    });
 
   // Additional effect to handle test case switching
   // This ensures that when users switch test cases, any running tests are properly stopped
+  // and all previous test results are cleared for a clean state
   const prevTestCaseRef = useRef<AddressBatchTestCase | undefined>();
   useEffect(() => {
     if (
@@ -268,11 +274,12 @@ function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[
       currentTestCase &&
       prevTestCaseRef.current.name !== currentTestCase.name
     ) {
-      // Test case changed - stop any running tests to ensure clean state
+      // Test case changed - stop any running tests and clear all results
       stopTest();
+      clearTestResults();
     }
     prevTestCaseRef.current = currentTestCase;
-  }, [currentTestCase, stopTest]);
+  }, [currentTestCase, stopTest, clearTestResults]);
 
   const contentMemo = useMemo(
     () => (
