@@ -442,10 +442,19 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
     beginTest(true);
   }, [beginTest]);
 
+  const clearTestResults = useCallback(() => {
+    // Clear all test results and state
+    clearItemVerifyState?.();
+    stableContext.setItemValues?.([]);
+    setFailedTasks?.([]);
+    stableContext.setRunnerLogs?.([]);
+  }, [clearItemVerifyState, stableContext, setFailedTasks]);
+
   return {
     beginTest,
     stopTest,
     retryFailedTasks,
+    clearTestResults,
   };
 }
 
