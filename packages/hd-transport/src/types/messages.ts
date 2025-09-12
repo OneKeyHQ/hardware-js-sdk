@@ -2762,17 +2762,10 @@ export type ResourceUpload = {
   nft_meta_data?: string;
   zoom_data_length: number;
   file_name_no_ext?: string;
-  blur_data_length?: number;
 };
 
 // ZoomRequest
 export type ZoomRequest = {
-  offset?: number;
-  data_length: number;
-};
-
-// BlurRequest
-export type BlurRequest = {
   offset?: number;
   data_length: number;
 };
@@ -4643,7 +4636,6 @@ export type MessageType = {
   SEMessageSignature: SEMessageSignature;
   ResourceUpload: ResourceUpload;
   ZoomRequest: ZoomRequest;
-  BlurRequest: BlurRequest;
   ResourceRequest: ResourceRequest;
   ResourceAck: ResourceAck;
   ResourceUpdate: ResourceUpdate;

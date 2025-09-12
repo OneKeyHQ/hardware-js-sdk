@@ -5,7 +5,6 @@ export type DeviceUploadResourceParams = {
   suffix: string;
   dataHex: string;
   thumbnailDataHex: string;
-  blurDataHex: string;
   resType: ResourceType;
   nftMetaData: string;
   fileNameNoExt?: string;
