@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios';
+import axios, { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import secureJSON from 'secure-json-parse';
 
@@ -66,19 +66,16 @@ export async function request(options: HttpRequestOptions) {
   }
 }
 
-axios.interceptors.request.use(config => {
+axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     return config;
   }
   // node environment
   if (config.url?.startsWith('http://localhost:21320')) {
-    if (!config?.headers?.Origin) {
+    if (!config.headers.get('Origin')) {
       console.log('set node request origin');
       // add Origin field for request headers
-      config.headers = {
-        ...config.headers,
-        Origin: 'https://jssdk.onekey.so',
-      };
+      config.headers.set('Origin', 'https://jssdk.onekey.so');
     }
   }
   return config;
