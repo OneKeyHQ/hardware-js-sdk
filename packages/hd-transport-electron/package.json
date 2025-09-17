@@ -1,6 +1,6 @@
 {
   "name": "@onekeyfe/hd-transport-electron",
-  "version": "1.1.12",
+  "version": "1.1.13",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "MIT",
@@ -25,9 +25,9 @@
     "electron-log": ">=4.0.0"
   },
   "dependencies": {
-    "@onekeyfe/hd-core": "1.1.12",
-    "@onekeyfe/hd-shared": "1.1.12",
-    "@onekeyfe/hd-transport": "1.1.12",
+    "@onekeyfe/hd-core": "1.1.13",
+    "@onekeyfe/hd-shared": "1.1.13",
+    "@onekeyfe/hd-transport": "1.1.13",
     "@stoprocent/noble": "2.3.4",
     "p-retry": "^4.6.2"
   },

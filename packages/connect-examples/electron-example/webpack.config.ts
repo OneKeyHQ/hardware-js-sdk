@@ -42,13 +42,15 @@ module.exports = {
   },
   externals: [
     nodeExternals({
-      allowlist: Object.keys({
-        ...pkg.dependencies,
-        ...pkg.devDependencies,
-      }),
+      allowlist: [
+        '@onekeyfe/hd-transport-electron',
+        ...Object.keys({
+          ...pkg.dependencies,
+          ...pkg.devDependencies,
+        }),
+      ],
     }),
     {
-      '@onekeyfe/hd-transport-electron': 'commonjs @onekeyfe/hd-transport-electron',
       '@stoprocent/noble': 'commonjs @stoprocent/noble',
       '@stoprocent/bluetooth-hci-socket': 'commonjs @stoprocent/bluetooth-hci-socket',
       bufferutil: 'commonjs bufferutil',
