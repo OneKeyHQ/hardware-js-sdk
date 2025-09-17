@@ -73,7 +73,7 @@ axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // node environment
   if (config.url?.startsWith('http://localhost:21320')) {
     if (!config.headers.get('Origin')) {
-      console.log('set node request origin');
+      // 移除可能导致 EPIPE 错误的 console.log
       // add Origin field for request headers
       config.headers.set('Origin', 'https://jssdk.onekey.so');
     }
