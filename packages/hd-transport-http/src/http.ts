@@ -1,5 +1,9 @@
-import axios, { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import {
+  HardwareError,
+  HardwareErrorCode,
+  CreateHardwareErrorByBridgeError,
+} from '@onekeyfe/hd-shared';
 import secureJSON from 'secure-json-parse';
 
 export type HttpRequestOptions = {
@@ -50,19 +54,37 @@ export async function request(options: HttpRequestOptions) {
     transformResponse: data => data,
   };
 
-  const res = await axios.request(fetchOptions);
+  try {
+    const res = await axios.request(fetchOptions);
 
-  if (+res.status === 200) {
-    return parseResult(res.data);
-  }
-  const resJson = parseResult(res.data);
-  if (typeof resJson === 'object' && resJson != null && resJson.error != null) {
+    if (+res.status === 200) {
+      return parseResult(res.data);
+    }
+    const resJson = parseResult(res.data);
+    if (typeof resJson === 'object' && resJson != null && resJson.error != null) {
+      throw new HardwareError({
+        errorCode: HardwareErrorCode.NetworkError,
+        message: resJson.error,
+      });
+    } else {
+      throw new HardwareError({ errorCode: HardwareErrorCode.NetworkError, message: res.data });
+    }
+  } catch (err) {
+    const axiosErr = err as AxiosError<string>;
+    const respData = axiosErr?.response?.data;
+
+    if (typeof respData === 'string') {
+      const parsed = parseResult(respData);
+      if (typeof parsed === 'object' && parsed !== null && parsed.error) {
+        throw CreateHardwareErrorByBridgeError(String(parsed.error));
+      }
+      throw CreateHardwareErrorByBridgeError(respData);
+    }
+
     throw new HardwareError({
-      errorCode: HardwareErrorCode.NetworkError,
-      message: resJson.error,
+      errorCode: HardwareErrorCode.BridgeNetworkError,
+      message: axiosErr?.message || 'Bridge network error',
     });
-  } else {
-    throw new HardwareError({ errorCode: HardwareErrorCode.NetworkError, message: res.data });
   }
 }
 

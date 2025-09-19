@@ -205,13 +205,13 @@ export class Device extends EventEmitter {
   connect() {
     const env = DataManager.getSettings('env');
     // eslint-disable-next-line no-async-promise-executor
-    return new Promise<boolean>(async resolve => {
+    return new Promise<boolean>(async (resolve, reject) => {
       if (DataManager.isBleConnect(env)) {
         try {
           await this.acquire();
           resolve(true);
         } catch (error) {
-          resolve(error);
+          reject(error);
         }
         return;
       }
@@ -221,7 +221,7 @@ export class Device extends EventEmitter {
           await this.acquire();
           resolve(true);
         } catch (error) {
-          resolve(error);
+          reject(error);
         }
         return;
       }
