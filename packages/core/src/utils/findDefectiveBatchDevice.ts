@@ -1,4 +1,3 @@
-import { EDeviceType } from '@onekeyfe/hd-shared';
 import type { Features } from '../types';
 import { getDeviceUUID, getDeviceType } from './deviceInfoUtils';
 
