@@ -92,23 +92,22 @@ OneKey SDK 支持多种 EVM 交易类型，能够自动检测并处理，确保�
 - **优点:** 比 `eth_sign` 更安全，因为前缀可以防止签名恶意交易。
 - **缺点:** 用户在设备上只能看到消息哈希，无法直观理解签名内容。
 
-### 3.3 结构化数据签名 (`EVMSignMessageEIP712`)
+### 3.3 结构化数据签名（EIP-712）
 
-**EIP-712** 是一种结构化数据签名标准，允许 DApp 在硬件钱包上以清晰、可读的方式展示待签名数据。
+EIP-712 结构化数据签名在 SDK 中通过两条路径实现：
 
-- **过程:** DApp 端需自行计算 `domainHash` 和 `messageHash`，然后传入 SDK。设备会安全地展示结构化内容并对哈希进行签名。
-- **优点:**
-  - **高安全性:** 用户明确知道自己正在签署什么内容，有效防止钓鱼攻击。
-  - **优良的用户体验:** 数据结构清晰，而非一串无法理解的哈希值。
-- **应用场景:** NFT 市场授权、去中心化身份验证、链下投票等。
+- 解析签名（TypedData）：`EVMSignTypedData` 内部调用 `EthereumSignTypedData(OneKey)` 与交互请求，实现设备端结构化展示与签名。
+- 哈希盲签（TypedHash）：`EVMSignTypedData` 内部在指定场景降级为 `EthereumSignTypedHash(OneKey)`，调用方需提供 `domainHash` 与 `messageHash`。
+
+两条路径由 SDK 自动选择，调用方统一使用 `evmSignTypedData`。
 
 ### 签名方法对比
 
-| 方法 | `EVMSignMessage` (`personal_sign`) | `EVMSignMessageEIP712` |
+| 方法 | `EVMSignMessage` (`personal_sign`) | `EVMSignTypedData` |
 | :--- | :--- | :--- |
-| **显示内容** | 消息哈希 (不直观) | 结构化数据 (清晰可读) |
-| **安全性** | 中等 | **高 (推荐)** |
-| **用户体验** | 差 | **优** |
+| **显示内容** | 消息哈希（不直观） | 结构化数据（清晰可读）或哈希盲签 |
+| **安全性** | 中等 | 高（解析）/ 中（盲签） |
+| **用户体验** | 一般 | 优（解析）/ 一般（盲签） |
 | **应用场景** | 简单身份验证 | 复杂 DApp 授权、链下操作 |
 
 ## 5. 核心 API 实现分析
@@ -147,14 +146,27 @@ OneKey SDK 支持多种 EVM 交易类型，能够自动检测并处理，确保�
   - **协议切换:** 同样使用 `TransportManager.getMessageVersion()` 来选择 `legacyV1` 或 `latest` 实现。注意：EIP-7702 在 `legacyV1` 模式下不被支持。
   - **设备交互:** 根据交易类型，调用 `latest` 模块中对应的 `evmSignTx`, `evmSignTxEip1559`, 或 `evmSignTxEip7702` 函数，将交易数据分块发送给设备进行签名。
 
-### 5.4 `EVMSignMessageEIP712`
+### 5.4 `EVMSignTypedData`
 
-对 EIP-712 规范的结构化数据进行签名。
+EIP-712 结构化数据签名的统一入口。SDK 内部根据设备能力与数据复杂度，在“解析签名”与“哈希盲签”之间自动选择：
 
-- **关键逻辑:**
-  - **预计算哈希:** SDK 要求调用者预先计算好 EIP-712 数据的 `domainHash` 和 `messageHash` 并作为参数传入。这简化了硬件钱包端的处理逻辑，使其无需解析复杂的 JSON 结构。
-  - **参数验证:** 验证 `path`、`domainHash` 和 `messageHash` 的有效性。
-  - **设备交互:** 将地址路径、`domainHash` 和 `messageHash` 发送到设备。设备会展示结构化数据的意图并对最终的哈希进行签名。
+- 解析签名（推荐）：设备端结构化展示与签名。
+- 哈希盲签：调用方需提供 `domainHash` 与 `messageHash`，设备仅对哈希进行签名。
+
+选择规则（摘要）：
+
+- Classic1s / ClassicPure：
+  - 固件 ≥ 3.14.0 或设备具备 `Capability_EthereumTypedData` → 解析签名
+  - 否则 → 哈希盲签（`EthereumSignTypedHash(OneKey)`）
+- Classic / Mini：
+  - 固件 ≥ 2.2.0 → 哈希盲签（需要 `domainHash` 和 `messageHash`）
+  - 固件 < 2.2.0 → SDK 内部兼容性降级
+- Touch / Pro：
+  - 默认解析签名
+  - 若数据包含嵌套数组或数据量过大 → 哈希盲签
+  - 固件要求：嵌套数组签名能力需固件 ≥ 4.2.0；更大数据阈值在固件 ≥ 4.4.0 生效（从 1KB 提升到 1.5KB）
+
+注意：`EVMSignMessageEIP712` 已废弃，不再对外提供方法。请统一使用 `evmSignTypedData`。
 ## 6. 最佳实践与安全
 
 1.  **优先使用现代标准:**
