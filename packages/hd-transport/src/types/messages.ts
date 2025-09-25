@@ -2286,6 +2286,7 @@ export enum Enum_Capability {
   Capability_Shamir = 15,
   Capability_ShamirGroups = 16,
   Capability_PassphraseEntry = 17,
+  Capability_EthereumTypedData = 1000,
   Capability_AttachToPin = 8000,
 }
 export type Capability = keyof typeof Enum_Capability;

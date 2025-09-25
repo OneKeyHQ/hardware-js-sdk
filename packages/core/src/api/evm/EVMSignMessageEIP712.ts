@@ -5,6 +5,9 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
+/**
+ * @deprecated
+ */
 export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessageEIP712> {
   init() {
     this.checkDeviceId = true;

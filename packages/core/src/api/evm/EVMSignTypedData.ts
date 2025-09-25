@@ -1,20 +1,22 @@
 import semver from 'semver';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { get } from 'lodash';
+import BigNumber from 'bignumber.js';
+import { ERRORS, HardwareErrorCode, EDeviceType } from '@onekeyfe/hd-shared';
 import {
   EthereumTypedDataSignature,
   EthereumTypedDataStructAck,
   MessageKey,
   MessageResponse,
   TypedCall,
+  Enum_Capability,
 } from '@onekeyfe/hd-transport';
-import { get } from 'lodash';
-import BigNumber from 'bignumber.js';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex, parseChainId, stripHexStartZeroes } from '../helpers/hexUtils';
 import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
+import { existCapability } from '../../utils/capabilitieUtils';
 import {
   DeviceModelToTypes,
   type EthereumSignTypedDataMessage,
@@ -402,6 +404,17 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     // For Classic、Mini device we use EthereumSignTypedData
     const deviceType = getDeviceType(this.device.features);
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {
+      // Classic1s / ClassicPure 3.14.0+, supported EthereumSignTypedDataOneKey
+      const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+      const isClassic1sOrPure =
+        deviceType === EDeviceType.Classic1s || deviceType === EDeviceType.ClassicPure;
+      if (
+        (isClassic1sOrPure && semver.gte(currentVersion, '3.14.0')) ||
+        existCapability(this.device.features, Enum_Capability.Capability_EthereumTypedData)
+      ) {
+        return this.signTypedData();
+      }
+
       validateParams(this.params, [
         { name: 'domainHash', type: 'hexString', required: true },
         { name: 'messageHash', type: 'hexString', required: true },
