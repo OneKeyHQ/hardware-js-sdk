@@ -59,6 +59,7 @@ export { default as confluxSignTransaction } from './conflux/ConfluxSignTransact
 export { default as evmGetAddress } from './evm/EVMGetAddress';
 export { default as evmGetPublicKey } from './evm/EVMGetPublicKey';
 export { default as evmSignMessage } from './evm/EVMSignMessage';
+export { default as evmSignMessageEIP712 } from './evm/EVMSignMessageEIP712';
 export { default as evmSignTransaction } from './evm/EVMSignTransaction';
 export { default as evmSignTypedData } from './evm/EVMSignTypedData';
 export { default as evmVerifyMessage } from './evm/EVMVerifyMessage';
