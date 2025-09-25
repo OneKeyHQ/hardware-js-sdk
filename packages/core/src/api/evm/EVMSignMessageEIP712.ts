@@ -6,7 +6,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 
 /**
- * @deprecated
+ * @deprecated Use EVMSignTypedData instead.
  */
 export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessageEIP712> {
   init() {
@@ -34,6 +34,9 @@ export default class EVMSignMessageEIP712 extends BaseMethod<EthereumSignMessage
     return {
       model_mini: {
         min: '2.1.9',
+      },
+      model_classic1s: {
+        min: '3.14.0',
       },
     };
   }
