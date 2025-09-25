@@ -6,6 +6,7 @@ import {
   HardwareError,
   HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
+import { RebootType } from '@onekeyfe/hd-transport';
 import type { KnownDevice } from '../../types';
 
 import {
@@ -400,5 +401,17 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         await wait(2000);
       }
     }
+  }
+
+  /**
+   * @description 设备重启（Bootloader 侧可用）
+   * @param rebootType 重启类型，参考 RebootType 枚举
+   */
+  async reboot(rebootType: RebootType) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    const res = await typedCall('Reboot', 'Success', {
+      reboot_type: rebootType,
+    });
+    return res.message;
   }
 }

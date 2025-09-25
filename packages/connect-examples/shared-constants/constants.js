@@ -10,4 +10,4 @@
  * - "start": "webpack serve --mode=development" (uses CDN)
  */
 export const getConnectSrc = () =>
-  process.env.CONNECT_SRC || `https://jssdk.onekey.so/1.1.14-alpha.0/`;
+  process.env.CONNECT_SRC || `https://jssdk.onekey.so/1.1.14-alpha.1/`;
