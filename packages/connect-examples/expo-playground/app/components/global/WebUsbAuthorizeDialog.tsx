@@ -39,11 +39,11 @@ const WebUsbAuthorizeDialog: React.FC<WebUsbAuthorizeDialogProps> = ({
           </div>
           <div className="flex-1">
             <DialogTitle className="text-lg font-semibold mb-1">
-              {t('webusb.authorize.title', 'Authorize WebUSB')}
+              {t('firmware.webusb.authorize.title', 'Authorize WebUSB')}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
               {t(
-                'webusb.authorize.description',
+                'firmware.webusb.authorize.description',
                 'Your device switched to bootloader mode to apply the update. Chrome treats this as a new USB device. Please authorize it to continue the firmware update.'
               )}
             </DialogDescription>
@@ -56,8 +56,8 @@ const WebUsbAuthorizeDialog: React.FC<WebUsbAuthorizeDialogProps> = ({
             <ShieldCheck className="h-4 w-4 mt-0.5 text-foreground/60" />
             <span>
               {t(
-                'webusb.authorize.tip',
-                'Ensure your device is connected. If the chooser doesn’t appear, try a different USB port or reconnect the cable.'
+                'firmware.webusb.authorize.tip',
+                'Ensure your device is connected. If the chooser does not appear, try a different USB port or reconnect the cable.'
               )}
             </span>
           </AlertDescription>
@@ -88,10 +88,10 @@ const WebUsbAuthorizeDialog: React.FC<WebUsbAuthorizeDialogProps> = ({
             {loading ? (
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {t('webusb.authorize.selecting', 'Selecting...')}
+                {t('firmware.webusb.authorize.selecting', 'Selecting...')}
               </span>
             ) : (
-              t('webusb.authorize.selectButton', 'Select Device')
+              t('firmware.webusb.authorize.selectButton', 'Select Device')
             )}
           </Button>
         </DialogFooter>
@@ -101,7 +101,7 @@ const WebUsbAuthorizeDialog: React.FC<WebUsbAuthorizeDialogProps> = ({
           <AlertCircle className="h-3.5 w-3.5 mt-0.5" />
           <p>
             {t(
-              'webusb.authorize.troubleshooting',
+              'firmware.webusb.authorize.troubleshooting',
               'If you close this dialog or dismiss the chooser, the update will pause. Reopen this dialog to continue when ready.'
             )}
           </p>

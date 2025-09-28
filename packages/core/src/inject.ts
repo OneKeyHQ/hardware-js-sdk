@@ -259,7 +259,6 @@ export const createCoreApi = (
     call({ ...params, connectId, method: 'firmwareUpdateV2' }),
   firmwareUpdateV3: (connectId, params) =>
     call({ ...params, connectId, method: 'firmwareUpdateV3' }),
-  emmcFileWrite: (connectId, params) => call({ ...params, connectId, method: 'emmcFileWrite' }),
   promptWebDeviceAccess: params => call({ ...params, method: 'promptWebDeviceAccess' }),
 
   tronGetAddress: (connectId, deviceId, params) =>

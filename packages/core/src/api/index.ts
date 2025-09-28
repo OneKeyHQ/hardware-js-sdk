@@ -37,7 +37,6 @@ export { default as firmwareUpdate } from './FirmwareUpdate';
 export { default as firmwareUpdateV2 } from './FirmwareUpdateV2';
 export { default as firmwareUpdateV3 } from './FirmwareUpdateV3';
 export { default as promptWebDeviceAccess } from './PromptWebDeviceAccess';
-export { default as emmcFileWrite } from './EmmcFileWrite';
 
 export { default as cipherKeyValue } from './CipherKeyValue';
 

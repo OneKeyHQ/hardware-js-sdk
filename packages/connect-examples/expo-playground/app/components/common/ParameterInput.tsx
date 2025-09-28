@@ -278,30 +278,37 @@ const ParameterInput: React.FC<ParameterInputProps> = ({
     const acceptTypes = field.accept || config.accept;
 
     return (
-      <div key={field.name} className="flex items-center gap-2">
-        <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
-        <div className="flex-1 min-w-0">
-          <div className="relative">
-            <input
-              type="file"
-              accept={acceptTypes}
-              onChange={e => {
-                const file = e.target.files?.[0] || null;
-                handleParamChange(field.name, file);
-              }}
-              className="absolute inset-0 w-full h-full opacity-0 z-10"
-            />
-            <div className="bg-background border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/50 hover:border-primary cursor-pointer transition-colors select-none">
-              {currentValue ? (
-                <span className="text-foreground cursor-pointer">{currentValue.name}</span>
-              ) : (
-                <span className="text-muted-foreground cursor-pointer">
-                  {t('components.parameterInput.selectFirmwareFile', { title: config.title })}
-                </span>
-              )}
+      <div key={field.name} className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-shrink-0 w-32">{renderFieldLabel(field)}</div>
+          <div className="flex-1 min-w-0">
+            <div className="relative">
+              <input
+                type="file"
+                accept={acceptTypes}
+                onChange={e => {
+                  const file = e.target.files?.[0] || null;
+                  handleParamChange(field.name, file);
+                }}
+                className="absolute inset-0 w-full h-full opacity-0 z-10"
+              />
+              <div className="bg-background border border-border rounded-md px-3 py-1.5 text-xs hover:bg-muted/50 hover:border-primary cursor-pointer transition-colors select-none">
+                {currentValue ? (
+                  <span className="text-foreground cursor-pointer">{currentValue.name}</span>
+                ) : (
+                  <span className="text-muted-foreground cursor-pointer">
+                    {t('components.parameterInput.selectFirmwareFile', { title: config.title })}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
+        {(field.description || config.description) && (
+          <div className="text-xs text-muted-foreground ml-34">
+            {field.description || config.description}
+          </div>
+        )}
       </div>
     );
   };

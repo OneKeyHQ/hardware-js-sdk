@@ -409,9 +409,24 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    */
   async reboot(rebootType: RebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const res = await typedCall('Reboot', 'Success', {
-      reboot_type: rebootType,
-    });
-    return res.message;
+    try {
+      const res = await typedCall('Reboot', 'Success', {
+        reboot_type: rebootType,
+      });
+      return res.message;
+    } catch (error) {
+      // Device disconnection during reboot is expected behavior
+      if (
+        error instanceof Error &&
+        (error.message.includes('device was disconnected') ||
+          error.message.includes('transferIn') ||
+          error.message.includes('USBDevice'))
+      ) {
+        // This is expected - device successfully rebooted and disconnected
+        return { message: 'Device rebooted successfully' };
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 }
