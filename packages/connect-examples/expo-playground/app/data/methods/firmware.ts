@@ -105,36 +105,6 @@ const api: UnifiedMethodConfig[] = [
     ],
   },
   {
-    method: 'emmcFileWrite',
-    description: 'methodDescriptions.emmcFileWrite',
-    noDeviceIdReq: true,
-    presets: [
-      {
-        title: 'EMMC write file',
-        parameters: [
-          {
-            name: 'filePath',
-            type: 'string',
-            required: true,
-            label: 'EMMC Path',
-            placeholder: '0:boot/bootloader.bin',
-            value: '0:boot/bootloader.bin',
-          },
-          {
-            name: 'payload',
-            type: 'file',
-            required: true,
-            label: 'Binary',
-            description: 'Upload binary file (.bin) to write into EMMC',
-            accept: '.bin',
-            visible: true,
-            editable: true,
-          },
-        ],
-      },
-    ],
-  },
-  {
     method: 'firmwareUpdateV3',
     description: 'methodDescriptions.firmwareUpdateV3',
     noDeviceIdReq: true,
@@ -263,7 +233,23 @@ const api: UnifiedMethodConfig[] = [
     method: 'deviceUpdateBootloader',
     description: 'methodDescriptions.deviceUpdateBootloader',
     noDeviceIdReq: true,
-    presets: [],
+    presets: [
+      {
+        title: 'Update bootloader',
+        parameters: [
+          {
+            name: 'binary',
+            type: 'file',
+            required: false,
+            label: 'Bootloader Binary',
+            description: 'Upload bootloader binary file (.bin). If not provided, latest will be downloaded automatically.',
+            accept: '.bin',
+            visible: true,
+            editable: true,
+          },
+        ],
+      },
+    ],
   },
   {
     method: 'deviceRebootToBootloader',

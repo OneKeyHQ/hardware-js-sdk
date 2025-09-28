@@ -26,7 +26,6 @@ export type {
   FirmwareUpdateBinaryParams,
   FirmwareUpdateV3Params,
 } from './firmwareUpdate';
-export type { EmmcFileWriteParams } from './emmcFileWrite';
 
 export type { AllNetworkAddressParams, AllNetworkGetAddressParams } from './allNetworkGetAddress';
 

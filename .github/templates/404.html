@@ -21,8 +21,8 @@
           console.log('Handling expo-playground sub-route:', path);
           // 保存完整的原始URL到sessionStorage供应用恢复路由
           sessionStorage.setItem('spa_redirect_url', path + fullUrl);
-          // 重定向到应用首页，让React Router处理路由恢复
-          window.location.replace('/expo-playground/');
+          // 直接重定向到 index.html，保持 URL 不变
+          window.location.replace('/expo-playground/index.html');
           return;
         }
         return;

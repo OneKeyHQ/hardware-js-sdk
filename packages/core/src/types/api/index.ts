@@ -17,7 +17,6 @@ import { getPassphraseState } from './getPassphraseState';
 import { checkFirmwareRelease } from './checkFirmwareRelease';
 import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
 import { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
-import { emmcFileWrite } from './emmcFileWrite';
 import { promptWebDeviceAccess } from './promptWebDeviceAccess';
 
 import { deviceReset } from './deviceReset';
@@ -226,7 +225,6 @@ export type CoreApi = {
   firmwareUpdate: typeof firmwareUpdate;
   firmwareUpdateV2: typeof firmwareUpdateV2;
   firmwareUpdateV3: typeof firmwareUpdateV3;
-  emmcFileWrite: typeof emmcFileWrite;
   cipherKeyValue: typeof cipherKeyValue;
 
   /**
