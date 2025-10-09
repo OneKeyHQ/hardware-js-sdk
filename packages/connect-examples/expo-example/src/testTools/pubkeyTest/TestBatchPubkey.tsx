@@ -16,9 +16,19 @@ import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { stripHexPrefix } from '../../utils/hexstring';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import {
+  checkBatchCompatibility,
+  handleSkipInRequest,
+  handleSkipInResponse,
+} from '../deviceCompatibility';
+import { useDevice } from '../../provider/DeviceProvider';
+import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
 
 type TestCaseDataType = PubkeyBatchTestCase['data'][0];
-type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
+type ResultViewProps = {
+  item: TestCaseDataWithKey<TestCaseDataType>;
+  itemVerifyState: { verify: string; error?: string };
+};
 
 function ExportReportView() {
   const intl = useIntl();
@@ -75,8 +85,13 @@ const RenderNestedObject = ({ obj, parentKey = '' }: { obj: any; parentKey?: str
   </>
 );
 
-function ResultView({ item }: ResultViewProps) {
+function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const title = item?.title || item?.method;
+
+  // 🎯 检查测试状态 - 如果是 skip 状态，显示跳过信息
+  if (itemVerifyState?.verify === 'skip') {
+    return <SkippedTestItem title={title} reason={itemVerifyState?.error} />;
+  }
 
   return (
     <>
@@ -171,6 +186,7 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
 let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
   const { openDialog } = useHardwareInputPinDialog();
+  const { selectedDevice } = useDevice();
 
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PubkeyBatchTestCase>();
@@ -267,19 +283,23 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
       fullOriginDataRef.current = fullPath(passphraseTestCase);
       originDataRef.current = passphraseTestCase;
     },
-    generateRequestParams: item => {
-      const { params } = item;
-      const requestParams = {
-        ...params,
-        passphraseState: currentTestCase?.extra?.passphraseState,
-        useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
-      };
-      return Promise.resolve({
-        method: item.method,
-        params: requestParams,
-      });
-    },
+    generateRequestParams: item =>
+      // 🎯 使用批量兼容性检查 helper
+      Promise.resolve(
+        checkBatchCompatibility(selectedDevice?.features || {}, item, {
+          passphraseState: currentTestCase?.extra?.passphraseState,
+          useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
+        })
+      ),
+    processRequest: async (SDK, method, connectId, deviceId, requestParams) =>
+      // 🎯 使用 helper 处理跳过逻辑
+      handleSkipInRequest(SDK, method, connectId, deviceId, requestParams),
     processResponse: (res, item, itemIndex) => {
+      // 🎯 使用 helper 检查跳过状态
+      const skipCheck = handleSkipInResponse(res, item);
+      if (skipCheck.shouldReturn && skipCheck.result) {
+        return Promise.resolve(skipCheck.result);
+      }
       const response = res as {
         path: string;
         address: string;
@@ -294,17 +314,24 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
           account => account.path === key || account.serializedPath === key
         );
 
-        // 测试数据
-        originDataRef.current = setTestData(
-          originDataRef.current,
-          fullOriginDataRef.current,
-          itemIndex,
-          address,
-          item.result[key],
-          key
-        );
+        // 🎯 检查预期结果是否为空对象
+        const expectedFields = Object.keys(item.result[key] || {});
+        if (expectedFields.length === 0) {
+          console.warn(`⚠️ 路径 ${key} 的预期结果为空，跳过验证`);
+          error += `(${key}) 预期结果为空，无法验证\n`;
+        } else {
+          // 测试数据
+          originDataRef.current = setTestData(
+            originDataRef.current,
+            fullOriginDataRef.current,
+            itemIndex,
+            address,
+            item.result[key],
+            key
+          );
 
-        error += validateFields(key, address, item.result[key]);
+          error += validateFields(key, address, item.result[key]);
+        }
       }
 
       return Promise.resolve({
@@ -370,11 +397,18 @@ export function TestBatchPubkey({
   title: string;
   testCases: PubkeyBatchTestCase[];
 }) {
+  // 🎯 使用 testCases 数组的第一个元素的 name 作为 key
+  // 当 testCases 改变时，强制 TestRunnerView 完全重新挂载，清除所有状态
+  const testKey = testCases[0]?.name || title;
+
   return (
     <TestRunnerView<PubkeyBatchTestCase['data']>
+      key={testKey}
       title={title}
       renderExecuteView={() => <ExecuteView testCases={testCases} />}
-      renderResultView={item => <ResultView item={item} />}
+      renderResultView={(item, itemVerifyState) => (
+        <ResultView item={item} itemVerifyState={itemVerifyState} />
+      )}
     />
   );
 }

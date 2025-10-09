@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
@@ -14,14 +14,28 @@ import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
-import { TestRunnerContext } from '../../components/BaseTestRunner/Context/TestRunnerProvider';
+import {
+  checkCompatibilityInParams,
+  handleSkipInRequest,
+  handleSkipInResponse,
+} from '../deviceCompatibility';
+import { useDevice } from '../../provider/DeviceProvider';
+import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
 
 type TestCaseDataType = AddressTestCase['data'][0];
-type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
+type ResultViewProps = {
+  item: TestCaseDataWithKey<TestCaseDataType>;
+  itemVerifyState: { verify: string; error?: string };
+};
 
-function ResultView({ item }: ResultViewProps) {
+function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const intl = useIntl();
   const title = item?.title || item?.method;
+
+  // 🎯 检查测试状态 - 如果是 skip 状态，显示跳过信息
+  if (itemVerifyState?.verify === 'skip') {
+    return <SkippedTestItem title={title} reason={itemVerifyState?.error} />;
+  }
 
   return (
     <>
@@ -77,7 +91,7 @@ let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
-  const { setItemValues } = useContext(TestRunnerContext);
+  const { selectedDevice } = useDevice();
 
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
@@ -155,7 +169,7 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
         sdk.on(UI_EVENT, hardwareUiEventListener);
         return Promise.resolve();
       },
-      prepareRunner: async (connectId, deviceId, features, sdk) => {
+      prepareRunner: async (connectId, _deviceId, features, sdk) => {
         const testCase = currentTestCase;
 
         if (features?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
@@ -179,12 +193,23 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
           passphraseState: currentTestCase?.extra?.passphraseState,
           useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
         };
-        return Promise.resolve({
-          method: item.method,
-          params: requestParams,
-        });
+
+        // 🎯 使用 helper 检查兼容性
+        return Promise.resolve(
+          checkCompatibilityInParams(selectedDevice?.features || {}, item.method, requestParams)
+        );
       },
-      processResponse: (res, item, itemIndex) => {
+      processRequest: async (SDK, method, connectId, deviceId, requestParams) =>
+        // 🎯 使用 helper 处理跳过逻辑
+        handleSkipInRequest(SDK, method, connectId, deviceId, requestParams),
+      processResponse: (res, item, _itemIndex) => {
+        // 🎯 使用 helper 检查跳过状态
+        const skipCheck = handleSkipInResponse(res, item);
+        if (skipCheck.shouldReturn && skipCheck.result) {
+          return Promise.resolve(skipCheck.result);
+        }
+
+        // 正常验证逻辑
         const response = res as {
           path: string;
           address: string;
@@ -282,11 +307,18 @@ export function TestSingleAddress({
   title: string;
   testCases: AddressTestCase[];
 }) {
+  // 🎯 使用 testCases 数组的第一个元素的 name 作为 key
+  // 当 testCases 改变时，强制 TestRunnerView 完全重新挂载，清除所有状态
+  const testKey = testCases[0]?.name || title;
+
   return (
     <TestRunnerView<AddressTestCase['data']>
+      key={testKey}
       title={title}
       renderExecuteView={() => <ExecuteView testCases={testCases} />}
-      renderResultView={item => <ResultView item={item} />}
+      renderResultView={(item, itemVerifyState) => (
+        <ResultView item={item} itemVerifyState={itemVerifyState} />
+      )}
     />
   );
 }

@@ -38,13 +38,14 @@ const TestItemView = ({ item, renderResultView, stateManager }: TestItemViewProp
   const errorState = useMemo(() => itemVerifyState?.error ?? '', [itemVerifyState]);
 
   const errorStateViewMemo = useMemo(() => {
-    if (!errorState) return null;
+    // 🎯 如果是跳过状态，不显示错误信息
+    if (!errorState || verifyState === 'skip') return null;
     return (
       <Text fontSize={14} color="red">
         error: {errorState}
       </Text>
     );
-  }, [errorState]);
+  }, [errorState, verifyState]);
 
   const verifyStateViewMemo = useMemo(() => {
     let color = 'gray';
