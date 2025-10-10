@@ -82,7 +82,7 @@ export type DeviceMethodCategory = 'device' | 'firmware';
 // 联合类型，用于统一处理
 export type AllMethodCategory = ChainCategory | DeviceMethodCategory;
 
-// **统一的方法配置类型** - 极简设计
+// **统一的方法配置类型**
 export interface UnifiedMethodConfig {
   method: HardwareApiMethod;
   description?: string;
