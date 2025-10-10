@@ -401,20 +401,15 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
 
     const { addressN, chainId } = this.params;
 
+    // Classic1s / ClassicPure 3.14.0+, supported EthereumSignTypedDataOneKey
+    const supportEip712OnClassic = existCapability(
+      this.device.features,
+      Enum_Capability.Capability_EthereumTypedData
+    );
+
     // For Classic、Mini device we use EthereumSignTypedData
     const deviceType = getDeviceType(this.device.features);
-    if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-      // Classic1s / ClassicPure 3.14.0+, supported EthereumSignTypedDataOneKey
-      const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
-      const isClassic1sOrPure =
-        deviceType === EDeviceType.Classic1s || deviceType === EDeviceType.ClassicPure;
-      if (
-        (isClassic1sOrPure && semver.gte(currentVersion, '3.14.0')) ||
-        existCapability(this.device.features, Enum_Capability.Capability_EthereumTypedData)
-      ) {
-        return this.signTypedData();
-      }
-
+    if (DeviceModelToTypes.model_mini.includes(deviceType) && !supportEip712OnClassic) {
       validateParams(this.params, [
         { name: 'domainHash', type: 'hexString', required: true },
         { name: 'messageHash', type: 'hexString', required: true },
