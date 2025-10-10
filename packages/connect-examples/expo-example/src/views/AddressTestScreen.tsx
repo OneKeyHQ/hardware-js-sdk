@@ -1,5 +1,5 @@
 import React from 'react';
-import { Separator, Stack } from 'tamagui';
+import { Separator, Stack, Text, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { TestSingleAddress } from '../testTools/addressTest/TestSingleAddress';
@@ -34,6 +34,28 @@ export default function AddressTestScreen() {
             <PanelView>
               <MnemonicAddressValidation />
             </PanelView>
+
+            {/* 🔔 重要提示：安全检查设置 */}
+            <YStack
+              padding="$4"
+              marginVertical="$3"
+              backgroundColor="$yellow2"
+              borderRadius="$4"
+              borderWidth={2}
+              borderColor="$yellow8"
+            >
+              <Text fontSize={16} fontWeight="bold" color="$yellow11" marginBottom="$2">
+                ⚠️ 提示
+              </Text>
+              <Text fontSize={14} color="$yellow11" lineHeight={20}>
+                对于 【Classic/Classic1s/ClassicPure】
+                设备进行地址测试时，需要在设备上关闭安全检查功能：
+              </Text>
+              <Text fontSize={14} color="$yellow11" marginTop="$2" lineHeight={20}>
+                设备操作：关于设备 → 「安全检查」
+              </Text>
+            </YStack>
+
             <PanelView>
               <TestSingleAddress
                 title={intl.formatMessage({ id: 'title__address_test_single' })}

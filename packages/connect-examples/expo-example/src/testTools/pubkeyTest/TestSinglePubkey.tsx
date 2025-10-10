@@ -15,9 +15,19 @@ import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { stripHexPrefix } from '../../utils/hexstring';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import {
+  checkCompatibilityInParams,
+  handleSkipInRequest,
+  handleSkipInResponse,
+} from '../deviceCompatibility';
+import { useDevice } from '../../provider/DeviceProvider';
+import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
 
 type TestCaseDataType = PubkeyTestCase['data'][0];
-type ResultViewProps = { item: TestCaseDataWithKey<PubkeyTestCase['data'][0]> };
+type ResultViewProps = {
+  item: TestCaseDataWithKey<PubkeyTestCase['data'][0]>;
+  itemVerifyState: { verify: string; error?: string };
+};
 
 function ExportReportView() {
   const intl = useIntl();
@@ -76,8 +86,13 @@ const RenderNestedObject = ({ obj, parentKey = '' }: { obj: any; parentKey?: str
   </>
 );
 
-function ResultView({ item }: ResultViewProps) {
+function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const title = item?.title || item?.method;
+
+  // 🎯 检查测试状态 - 如果是 skip 状态，显示跳过信息
+  if (itemVerifyState?.verify === 'skip') {
+    return <SkippedTestItem title={title} reason={itemVerifyState?.error} />;
+  }
 
   return (
     <>
@@ -112,6 +127,7 @@ let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
+  const { selectedDevice } = useDevice();
 
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
@@ -134,6 +150,9 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
     });
     setTestCaseList(testCaseList);
     setCurrentTestCase(findTestCase(testCaseList[0]));
+
+    // 🎯 当 testCases 改变时，清除所有测试结果
+    // Note: clearTestResults 不在 useRunnerTest 的返回值中，所以这里不调用
   }, [findTestCase, testCases]);
 
   useEffect(() => {
@@ -213,12 +232,22 @@ function ExecuteView({ testCases }: { testCases: PubkeyTestCase[] }) {
         passphraseState: currentTestCase?.extra?.passphraseState,
         useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
       };
-      return Promise.resolve({
-        method: item.method,
-        params: requestParams,
-      });
+
+      // 🎯 使用 helper 检查兼容性
+      return Promise.resolve(
+        checkCompatibilityInParams(selectedDevice?.features || {}, item.method, requestParams)
+      );
     },
+    processRequest: async (SDK, method, connectId, deviceId, requestParams) =>
+      // 🎯 使用 helper 处理跳过逻辑
+      handleSkipInRequest(SDK, method, connectId, deviceId, requestParams),
     processResponse: (res, item, itemIndex) => {
+      // 🎯 使用 helper 检查跳过状态
+      const skipCheck = handleSkipInResponse(res, item);
+      if (skipCheck.shouldReturn && skipCheck.result) {
+        return Promise.resolve(skipCheck.result);
+      }
+
       const error = validateFields(res, item.result);
 
       return Promise.resolve({
@@ -285,11 +314,18 @@ export function TestSinglePubkey({
   title: string;
   testCases: PubkeyTestCase[];
 }) {
+  // 🎯 使用 testCases 数组的第一个元素的 name 作为 key
+  // 当 testCases 改变时，强制 TestRunnerView 完全重新挂载，清除所有状态
+  const testKey = testCases[0]?.name || title;
+
   return (
     <TestRunnerView<PubkeyTestCase['data']>
+      key={testKey}
       title={title}
       renderExecuteView={() => <ExecuteView testCases={testCases} />}
-      renderResultView={item => <ResultView item={item} />}
+      renderResultView={(item, itemVerifyState) => (
+        <ResultView item={item} itemVerifyState={itemVerifyState} />
+      )}
     />
   );
 }
