@@ -617,7 +617,7 @@ const api: PlaygroundProps[] = [
         value: {
           path: "m/44'/60'/0'/0/0",
           domainHash: '9e4b8f7c6d5e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b',
-          messageHash: '8f7c5e4d3b2a1c9e8d7f6b5a4e3c2d1b9a8f7e6d5c4b3a2e1d9c8b7f6a5e4d',
+          messageHash: '8f7c5e4d3b2a1c9e8d7f6b5a4e3c2d1b9a8f7e6d5c4b3a2e1d9c8b7f6a5e4d4d',
           data: {
             types: {
               SafeTx: [
