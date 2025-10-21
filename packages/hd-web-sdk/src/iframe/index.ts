@@ -97,7 +97,8 @@ export async function init(payload: IFrameInit['payload']) {
       }
 
       if (message.event === IFRAME.SWITCH_TRANSPORT) {
-        switchCoreTransport(message.payload.env);
+        Log.debug('switchCoreTransport', message.payload.env);
+        await switchCoreTransport(message.payload.env);
         return { success: true, payload: {} };
       }
 
@@ -114,7 +115,7 @@ export async function init(payload: IFrameInit['payload']) {
   await sendMessage(createIFrameMessage(IFRAME.INIT_BRIDGE, {}), false);
 }
 
-export const switchCoreTransport = (env: ConnectSettings['env']) => {
+export const switchCoreTransport = async (env: ConnectSettings['env']) => {
   if (_core) {
     const Transport = getTransport(env);
     switchTransport({

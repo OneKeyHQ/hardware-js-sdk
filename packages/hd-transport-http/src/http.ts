@@ -88,7 +88,7 @@ export async function request(options: HttpRequestOptions) {
   }
 }
 
-axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+axios?.interceptors?.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     return config;
   }

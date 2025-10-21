@@ -30,6 +30,11 @@ jobs:
           yarn
           yarn bootstrap
 
+      - name: Build all packages
+        run: |
+          echo "🔨 Building all packages..."
+          yarn build
+
       - name: Build Windows App
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

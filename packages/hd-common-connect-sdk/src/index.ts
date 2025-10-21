@@ -5,6 +5,7 @@ import HardwareSdk, {
   parseConnectSettings,
   initCore,
   Core,
+  switchTransport as coreSwitchTransport,
   createErrorMessage,
   CORE_EVENT,
   CoreMessage,
@@ -35,7 +36,7 @@ const Log = getLogger(LoggerNames.HdCommonConnectSdk);
 
 const getTransport = (env: ConnectSettings['env']) => {
   if (env === 'desktop-web-ble') return ElectronBleTransport;
-  if (env === 'webusb') return WebUsbTransport;
+  if (env === 'webusb' || env === 'desktop-web-usb') return WebUsbTransport;
   if (env === 'lowlevel') return LowlevelTransport;
   if (env === 'emulator') return EmulatorTransport;
   return HttpTransport;
@@ -48,7 +49,15 @@ let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
 
 const dispose = () => {
-  eventEmitter.removeAllListeners();
+  try {
+    eventEmitter.removeAllListeners();
+    _core?.removeAllListeners?.();
+    _core?.dispose?.();
+    setLoggerPostMessage(() => {});
+    _core = undefined;
+  } catch (e) {
+    // ignore
+  }
   _settings = parseConnectSettings();
 };
 
@@ -177,7 +186,27 @@ const call = async (params: any) => {
 };
 
 const updateSettings = () => Promise.resolve(true);
-const switchTransport = () => Promise.resolve({ success: true });
+
+const switchTransport = (env: ConnectSettings['env']) => {
+  if (!_core) {
+    throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
+  }
+
+  try {
+    Log.debug('switchTransport: switching transport to', env);
+
+    _settings.env = env;
+
+    const Transport = getTransport(env);
+    coreSwitchTransport({ env, Transport, plugin: undefined });
+
+    Log.debug('switchTransport: success');
+    return { success: true };
+  } catch (error) {
+    Log.error('switchTransport: error', error);
+    return { success: false, error: error?.message ?? String(error) } as any;
+  }
+};
 
 const HardwareCommonConnectSdk = HardwareSdk({
   eventEmitter,
