@@ -20,7 +20,10 @@ export type { DeviceResetParams } from './deviceReset';
 export type { DeviceSettingsParams } from './deviceSettings';
 export type { DeviceVerifyParams, DeviceVerifySignature } from './deviceVerify';
 export type { DeviceSupportFeatures } from './deviceSupportFeatures';
-export type { DeviceUploadResourceParams } from './deviceUploadResource';
+export type {
+  DeviceUploadResourceParams,
+  DeviceUploadResourceResponse,
+} from './deviceUploadResource';
 export type {
   FirmwareUpdateParams,
   FirmwareUpdateBinaryParams,
