@@ -1162,7 +1162,7 @@ export const init = async (
   }
 };
 
-export const switchTransport = async ({
+export const switchTransport = ({
   env,
   Transport,
   plugin,

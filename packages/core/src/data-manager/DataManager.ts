@@ -353,5 +353,5 @@ export default class DataManager {
 
   static isWebUsbConnect = (env: ConnectSettings['env']) => env === 'webusb';
 
-  static isDesktopUsbConnect = (env: ConnectSettings['env']) => env === 'desktop-web-usb';
+  static isDesktopWebUsbConnect = (env: ConnectSettings['env']) => env === 'desktop-web-usb';
 }

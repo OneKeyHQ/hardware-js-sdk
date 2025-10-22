@@ -1,6 +1,5 @@
 import { atom } from 'jotai';
 
-// Connection type atom: 'bridge' | 'webusb' | 'emulator' | 'desktop-web-ble'
 export type ConnectionType =
   | 'bridge'
   | 'webusb'
