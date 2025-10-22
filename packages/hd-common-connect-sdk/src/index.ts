@@ -49,15 +49,8 @@ let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
 
 const dispose = () => {
-  try {
-    eventEmitter.removeAllListeners();
-    _core?.removeAllListeners?.();
-    _core?.dispose?.();
-    setLoggerPostMessage(() => {});
-    _core = undefined;
-  } catch (e) {
-    // ignore
-  }
+  _core?.removeAllListeners?.();
+  _core?.dispose?.();
   _settings = parseConnectSettings();
 };
 
@@ -186,27 +179,7 @@ const call = async (params: any) => {
 };
 
 const updateSettings = () => Promise.resolve(true);
-
-const switchTransport = (env: ConnectSettings['env']) => {
-  if (!_core) {
-    throw ERRORS.TypedError(HardwareErrorCode.NotInitialized);
-  }
-
-  try {
-    Log.debug('switchTransport: switching transport to', env);
-
-    _settings.env = env;
-
-    const Transport = getTransport(env);
-    coreSwitchTransport({ env, Transport, plugin: undefined });
-
-    Log.debug('switchTransport: success');
-    return { success: true };
-  } catch (error) {
-    Log.error('switchTransport: error', error);
-    return { success: false, error: error?.message ?? String(error) } as any;
-  }
-};
+const switchTransport = () => Promise.resolve({ success: true });
 
 const HardwareCommonConnectSdk = HardwareSdk({
   eventEmitter,

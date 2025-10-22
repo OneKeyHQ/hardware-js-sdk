@@ -1105,20 +1105,7 @@ export default class Core extends EventEmitter {
   }
 
   dispose() {
-    try {
-      cancel(this.getCoreContext());
-
-      this.removeAllListeners();
-      DevicePool.emitter.removeAllListeners(DEVICE.CONNECT);
-      DevicePool.emitter.removeAllListeners(DEVICE.DISCONNECT);
-
-      _deviceList = undefined;
-      _connector?.stop?.();
-      _connector = undefined;
-      DevicePool.resetState();
-    } catch (e) {
-      // ignore
-    }
+    _deviceList = undefined;
   }
 }
 
