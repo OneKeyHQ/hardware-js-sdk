@@ -60,7 +60,7 @@ export default class TransportManager {
         await this.transport.init(LowLevelLogger, DevicePool.emitter, this.plugin);
       } else if (env === 'desktop-web-ble') {
         await this.transport.init(WebBleLogger, DevicePool.emitter);
-      } else if (env === 'webusb' || env === 'desktop-web-usb') {
+      } else if (env === 'webusb') {
         await this.transport.init(WebUsbLogger);
       } else {
         await this.transport.init(HttpLogger);

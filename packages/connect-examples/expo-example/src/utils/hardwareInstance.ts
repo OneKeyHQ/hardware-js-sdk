@@ -17,21 +17,17 @@ const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
  * Determine if the connection type should use hd-common-connect-sdk
  */
 const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
-  connectionType === 'desktop-web-ble' ||
-  connectionType === 'webusb' ||
-  connectionType === 'desktop-web-usb';
+  connectionType === 'desktop-web-ble' || connectionType === 'webusb';
 
 /**
  * Map connection type to SDK env parameter
  */
 const getSDKEnv = (
   connectionType: ConnectionType | null
-): 'webusb' | 'emulator' | 'desktop-web-ble' | 'web' | 'desktop-web-usb' => {
+): 'webusb' | 'emulator' | 'desktop-web-ble' | 'web' => {
   switch (connectionType) {
     case 'desktop-web-ble':
       return 'desktop-web-ble';
-    case 'desktop-web-usb':
-      return 'desktop-web-usb';
     case 'webusb':
       return 'webusb';
     case 'emulator':

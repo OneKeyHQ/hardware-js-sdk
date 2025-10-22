@@ -37,9 +37,7 @@ const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
  * Determine if the connection type should use hd-common-connect-sdk
  */
 const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
-  connectionType === 'desktop-web-ble' ||
-  connectionType === 'webusb' ||
-  connectionType === 'desktop-web-usb';
+  connectionType === 'desktop-web-ble' || connectionType === 'webusb';
 
 /**
  * Check if switching between connection types requires app restart

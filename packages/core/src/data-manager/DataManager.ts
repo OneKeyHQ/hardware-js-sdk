@@ -352,6 +352,4 @@ export default class DataManager {
     env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
 
   static isWebUsbConnect = (env: ConnectSettings['env']) => env === 'webusb';
-
-  static isDesktopWebUsbConnect = (env: ConnectSettings['env']) => env === 'desktop-web-usb';
 }
