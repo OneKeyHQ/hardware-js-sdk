@@ -11,7 +11,11 @@ export type DeviceUploadResourceParams = {
   fileNameNoExt?: string;
 };
 
+export type DeviceUploadResourceResponse = Success & {
+  applyScreen?: boolean;
+};
+
 export declare function deviceUploadResource(
   connectId: string,
   params: CommonParams & DeviceUploadResourceParams
-): Response<Success>;
+): Response<DeviceUploadResourceResponse>;
