@@ -24,10 +24,12 @@ const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
  */
 const getSDKEnv = (
   connectionType: ConnectionType | null
-): 'webusb' | 'emulator' | 'desktop-web-ble' | 'web' => {
+): 'webusb' | 'emulator' | 'desktop-web-ble' | 'web' | 'desktop-web-usb' => {
   switch (connectionType) {
     case 'desktop-web-ble':
       return 'desktop-web-ble';
+    case 'desktop-web-usb':
+      return 'desktop-web-usb';
     case 'webusb':
       return 'webusb';
     case 'emulator':

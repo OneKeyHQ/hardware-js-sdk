@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TamaguiProvider, PortalProvider, Text, Stack, Card, YStack } from 'tamagui';
 import { Toast, ToastProvider, ToastViewport, useToastState } from '@tamagui/toast';
 import * as ExpoLinking from 'expo-linking';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIntl } from 'react-intl';
 import SDKProvider from './src/provider/SDKProvider';
@@ -46,7 +46,6 @@ const linking: LinkingOptions<ParamListBase> = {
       [Routes.FunctionalTesting]: 'expo-example/functional-testing',
       [Routes.SLIP39Test]: 'expo-example/slip39-test',
       [Routes.ChainMethodTest]: 'expo-example/chain-method-test',
-      [Routes.WebUsbTest]: 'expo-example/webusb-test',
     },
   },
 };
@@ -152,6 +151,22 @@ function UpdateTip() {
         {intl.formatMessage({ id: 'action__update_restart' })}
       </Button>
     </Card>
+  );
+}
+
+function AppSafeAreaContent({ children }: { children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Stack
+      paddingTop={insets.top}
+      paddingBottom={insets.bottom}
+      paddingLeft={insets.left}
+      paddingRight={insets.right}
+      flex={1}
+    >
+      {children}
+    </Stack>
   );
 }
 
