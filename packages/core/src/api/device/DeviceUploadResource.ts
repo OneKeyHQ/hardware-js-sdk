@@ -1,11 +1,15 @@
 import semver from 'semver';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { bytesToHex } from '@noble/hashes/utils';
-import { ResourceUpload, Success } from '@onekeyfe/hd-transport';
+import { ResourceUpload } from '@onekeyfe/hd-transport';
 import { blake2s } from '@noble/hashes/blake2s';
 import { isEmpty } from 'lodash';
 import { TypedResponseMessage } from '../../device/DeviceCommands';
-import { DeviceModelToTypes, DeviceUploadResourceParams } from '../../types';
+import {
+  DeviceModelToTypes,
+  DeviceUploadResourceParams,
+  DeviceUploadResourceResponse,
+} from '../../types';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { hexToBytes } from '../helpers/hexUtils';
@@ -128,9 +132,20 @@ export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
       | TypedResponseMessage<'ZoomRequest'>
       | TypedResponseMessage<'BlurRequest'>
       | TypedResponseMessage<'Success'>
-  ): Promise<Success> => {
+  ): Promise<DeviceUploadResourceResponse> => {
     if (res.type === 'Success') {
-      return res.message;
+      const response: DeviceUploadResourceResponse = {
+        message: res.message.message,
+      };
+      response.applyScreen = true;
+
+      const firmwareVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+      const deviceType = getDeviceType(this.device.features);
+      if (deviceType === EDeviceType.Pro && semver.gte(firmwareVersion, '4.17.0')) {
+        response.applyScreen = false;
+      }
+
+      return response;
     }
 
     const { offset, data_length } = res.message;
