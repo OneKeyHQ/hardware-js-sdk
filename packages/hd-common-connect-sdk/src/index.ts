@@ -5,7 +5,6 @@ import HardwareSdk, {
   parseConnectSettings,
   initCore,
   Core,
-  switchTransport as coreSwitchTransport,
   createErrorMessage,
   CORE_EVENT,
   CoreMessage,
