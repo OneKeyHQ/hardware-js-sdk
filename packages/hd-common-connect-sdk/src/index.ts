@@ -48,7 +48,7 @@ let _messageID = 0;
 export const messagePromises: { [key: number]: Deferred<any> } = {};
 
 const dispose = () => {
-  _core?.removeAllListeners?.();
+  eventEmitter.removeAllListeners();
   _core?.dispose?.();
   _settings = parseConnectSettings();
 };
