@@ -195,7 +195,8 @@ function createMainWindow() {
     log.debug('WebUSB: select-usb-device 事件触发');
     log.debug('WebUSB: 可用设备列表:', JSON.stringify(details.deviceList, null, 2));
 
-    // 阻止默认行为，以便我们可以自定义设备选择
+    // 阻止默认行为，以便我们可以自动选择设备
+    // 这是 Electron 的优势：不像浏览器必须显示弹窗，桌面应用可以自动化处理
     event.preventDefault();
 
     // 直接选择第一个设备

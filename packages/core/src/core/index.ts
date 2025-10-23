@@ -1105,7 +1105,8 @@ export default class Core extends EventEmitter {
   }
 
   dispose() {
-    // empty
+    _deviceList = undefined;
+    _connector = undefined;
   }
 }
 

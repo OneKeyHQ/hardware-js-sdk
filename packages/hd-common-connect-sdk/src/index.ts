@@ -49,6 +49,7 @@ export const messagePromises: { [key: number]: Deferred<any> } = {};
 
 const dispose = () => {
   eventEmitter.removeAllListeners();
+  _core?.dispose?.();
   _settings = parseConnectSettings();
 };
 

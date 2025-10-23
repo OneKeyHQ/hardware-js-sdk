@@ -141,7 +141,11 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           await wait(3000);
         }
 
-        if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
+        if (
+          checkCount > 4 &&
+          DataManager.isWebUsbConnect(DataManager.getSettings('env')) &&
+          !this.payload.skipWebDevicePrompt
+        ) {
           clearInterval(intervalTimer);
           clearTimeout(timeoutTimer);
 

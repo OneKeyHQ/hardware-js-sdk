@@ -13,6 +13,31 @@ let initialized = false;
 
 const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
 
+/**
+ * Determine if the connection type should use hd-common-connect-sdk
+ */
+const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
+  connectionType === 'desktop-web-ble' || connectionType === 'webusb';
+
+/**
+ * Map connection type to SDK env parameter
+ */
+const getSDKEnv = (
+  connectionType: ConnectionType | null
+): 'webusb' | 'emulator' | 'desktop-web-ble' | 'web' => {
+  switch (connectionType) {
+    case 'desktop-web-ble':
+      return 'desktop-web-ble';
+    case 'webusb':
+      return 'webusb';
+    case 'emulator':
+      return 'emulator';
+    case 'bridge':
+    default:
+      return 'web';
+  }
+};
+
 const getStoredConnectionType = async (): Promise<ConnectionType | null> => {
   try {
     const value = await getItem(CONNECTION_TYPE_STORE_KEY);
@@ -44,19 +69,24 @@ export const getHardwareSDKInstance = memoizee(
           fetchConfig: true,
         };
 
-        // Get stored connection type to determine useCommonSdk
+        // Get stored connection type to determine SDK type and transport
         const storedConnectionType = await getStoredConnectionType();
-        const isDesktopWebBleEnv = storedConnectionType === 'desktop-web-ble';
+        const useCommonSdk = shouldUseCommonSdk(storedConnectionType);
 
-        console.log('isDesktopWebBleEnv: =====> ', isDesktopWebBleEnv, storedConnectionType);
+        console.log('SDK Configuration: =====> ', {
+          connectionType: storedConnectionType,
+          useCommonSdk,
+          sdkEnv: getSDKEnv(storedConnectionType),
+        });
+
         HardwareSDK = await importSdk({
-          useCommonSdk: isDesktopWebBleEnv,
+          useCommonSdk,
         });
         console.log(HardwareSDK);
 
         if (Platform.OS === 'web') {
           settings.connectSrc = CONNECT_SRC;
-          settings.env = isDesktopWebBleEnv ? 'desktop-web-ble' : 'web';
+          settings.env = getSDKEnv(storedConnectionType);
           settings.preRelease = true;
           HardwareLowLevelSDK = await importLowLevelSDK();
 

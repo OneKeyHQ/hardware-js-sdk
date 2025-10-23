@@ -1,5 +1,15 @@
 import type { IDeviceType } from './device';
 
+export type transportEnv =
+  | 'node'
+  | 'web'
+  | 'webextension'
+  | 'electron'
+  | 'react-native'
+  | 'webusb'
+  | 'desktop-web-ble'
+  | 'emulator'
+  | 'lowlevel';
 export type ConnectSettings = {
   connectSrc?: string;
   debug?: boolean;
@@ -14,16 +24,7 @@ export type ConnectSettings = {
   priority: number;
   trustedHost: boolean;
   supportedBrowser?: boolean;
-  env:
-    | 'node'
-    | 'web'
-    | 'webextension'
-    | 'electron'
-    | 'react-native'
-    | 'webusb'
-    | 'emulator'
-    | 'desktop-web-ble'
-    | 'lowlevel';
+  env: transportEnv;
   timestamp: number;
   isFrame?: boolean;
   preRelease?: boolean;

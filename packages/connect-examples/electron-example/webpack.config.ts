@@ -43,7 +43,8 @@ module.exports = {
   externals: [
     nodeExternals({
       allowlist: [
-        '@onekeyfe/hd-transport-electron',
+        // Include all @onekeyfe packages to handle transitive dependencies
+        /^@onekeyfe\//,
         ...Object.keys({
           ...pkg.dependencies,
           ...pkg.devDependencies,

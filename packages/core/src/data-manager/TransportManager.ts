@@ -12,6 +12,7 @@ const BleLogger = getLogger(LoggerNames.HdBleTransport);
 const HttpLogger = getLogger(LoggerNames.HdTransportHttp);
 const LowLevelLogger = getLogger(LoggerNames.HdTransportLowLevel);
 const WebBleLogger = getLogger(LoggerNames.HdWebBleTransport);
+const WebUsbLogger = getLogger(LoggerNames.HdTransportWebUsb);
 
 /**
  * transport 在同一个环境中只会存在一个
@@ -41,7 +42,7 @@ export default class TransportManager {
   static async configure() {
     try {
       const env = DataManager.getSettings('env');
-      Log.debug('Initializing transports');
+      Log.debug('Initializing transports', env);
       if (env === 'react-native') {
         if (!this.reactNativeInit) {
           await this.transport.init(BleLogger, DevicePool.emitter);
@@ -58,7 +59,9 @@ export default class TransportManager {
         }
         await this.transport.init(LowLevelLogger, DevicePool.emitter, this.plugin);
       } else if (env === 'desktop-web-ble') {
-        await this.transport.init(WebBleLogger);
+        await this.transport.init(WebBleLogger, DevicePool.emitter);
+      } else if (env === 'webusb') {
+        await this.transport.init(WebUsbLogger);
       } else {
         await this.transport.init(HttpLogger);
       }
