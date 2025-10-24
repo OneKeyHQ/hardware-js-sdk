@@ -1,6 +1,6 @@
 //
 //  ViewController.swift
-//  native-iOS-example
+//  native-ios-example
 //
 
 import CoreBluetooth

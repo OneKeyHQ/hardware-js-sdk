@@ -13,6 +13,8 @@ import android.util.Log
 import android.view.View
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
@@ -140,9 +142,18 @@ class MainActivity : AppCompatActivity() {
         
         // Do not restore previously selected device; show only real-time scan results
         
+        // 启用 WebView 调试，便于在 Android Studio/Chrome DevTools 中查看 Web 日志
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
+
+        // 预先触发一次权限检查，避免后续扫描/连接静默失败
+        checkBluetoothPermissions()
+
         configureWebView()
-        loadHtmlFile()
+        // 先注册 Native 侧 handler，避免页面加载早期 JS 调用找不到 Native handler
         registerHandlers()
+        loadHtmlFile()
 
         // Rely on system pairing dialog when bonding is required
     }
@@ -175,7 +186,11 @@ class MainActivity : AppCompatActivity() {
                     Log.w("enumerate", "parse params failed, fallback to BLE", e)
                 }
 
-                // Default BLE search: run a fresh, local scan session and return results
+                // Default BLE search: 先做权限与蓝牙开关检查，防止静默失败
+                if (!checkBluetoothPermissions() || !checkBluetoothEnabled()) {
+                    function?.onCallBack("[]")
+                    return
+                }
                 lifecycleScope.launch(Dispatchers.Main) {
                     val devices = scanOneKeyDevices(assignToScanJob = false, timeoutMs = 5000, minSeen = 2)
                     val deviceList = devices.map {
@@ -400,6 +415,10 @@ class MainActivity : AppCompatActivity() {
 
         webview.addHandlerLocal("connect", object : BridgeHandler() {
             override fun handler(context: Context?, data: String?, function: CallBackFunction?) {
+                if (!checkBluetoothPermissions() || !checkBluetoothEnabled()) {
+                    function?.onCallBack("")
+                    return
+                }
                 lifecycleScope.launch(Dispatchers.Main) {
                     val macAddress = JsonParser.parseString(data).asJsonObject.get("uuid").asString
                     Log.d("connect", "macAddress: $macAddress")
@@ -515,10 +534,21 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun configureWebView() {
-        webview.settings.javaScriptEnabled = true  // Enable JavaScript
+        // 启用 JS 与 DOM 存储
+        webview.settings.javaScriptEnabled = true
+        webview.settings.domStorageEnabled = true
+        // 允许混合内容（部分场景需要从 http/file 加载资源）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            webview.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        }
+        // 将 WebView 的 console 输出映射到 Logcat，包含级别、来源与行号
         webview.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                Log.d("WebView", consoleMessage?.message() ?: "null")
+                val lvl = consoleMessage?.messageLevel()?.name ?: "LOG"
+                val src = consoleMessage?.sourceId() ?: "unknown"
+                val ln = consoleMessage?.lineNumber() ?: -1
+                val msg = consoleMessage?.message() ?: ""
+                Log.d("WebView", "[$lvl] $msg (source: $src line: $ln)")
                 return true
             }
         }

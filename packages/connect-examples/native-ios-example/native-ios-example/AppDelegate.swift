@@ -1,6 +1,6 @@
 //
 //  AppDelegate.swift
-//  native-iOS-example
+//  native-ios-example
 //
 //  Created by Leon on 2023/8/11.
 //
