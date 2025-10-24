@@ -10,7 +10,8 @@ android {
     defaultConfig {
         applicationId = "com.onekey.hardware.hardwareexample"
         minSdk = 28
-        targetSdk = 33
+        // 升级 targetSdk 到 34 以匹配 compileSdk，满足新版系统兼容性要求
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -51,7 +52,7 @@ dependencies {
     implementation("com.smallbuer:jsbridge:1.0.7")
     implementation("com.google.code.gson:gson:2.10.1")
 
-    implementation("no.nordicsemi.android.kotlin.ble:scanner:1.0.8")
-    implementation("no.nordicsemi.android.kotlin.ble:client:1.0.8")
+    implementation("no.nordicsemi.android.kotlin.ble:scanner:1.0.9")
+    implementation("no.nordicsemi.android.kotlin.ble:client:1.0.9")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 }
