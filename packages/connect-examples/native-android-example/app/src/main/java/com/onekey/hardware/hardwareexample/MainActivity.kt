@@ -864,7 +864,11 @@ class MainActivity : AppCompatActivity() {
                     serviceUuid = FilteredServiceUuid(ParcelUuid.fromString(ONEKEY_SERVICE_UUID_STR))
                 )
             ),
-            settings = BleScannerSettings(scanMode = BleScanMode.SCAN_MODE_LOW_LATENCY)
+            // 排除系统缓存的已绑定设备，避免未广播时仍被返回，确保“再次搜索”只显示实时结果
+            settings = BleScannerSettings(
+                scanMode = BleScanMode.SCAN_MODE_LOW_LATENCY,
+                includeStoredBondedDevices = false
+            )
         ).onEach { data ->
             val results = sessionAggregator.aggregateDevices(data)
             results.forEach { dev ->
