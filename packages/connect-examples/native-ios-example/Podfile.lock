@@ -1,0 +1,16 @@
+PODS:
+  - WKWebViewJavascriptBridge (1.2.2)
+
+DEPENDENCIES:
+  - WKWebViewJavascriptBridge (~> 1.2.0)
+
+SPEC REPOS:
+  trunk:
+    - WKWebViewJavascriptBridge
+
+SPEC CHECKSUMS:
+  WKWebViewJavascriptBridge: d7324badf8996486c71648f448617b09bf927b4b
+
+PODFILE CHECKSUM: d7fe70a855b88049ff6074561984a5d727cb0150
+
+COCOAPODS: 1.16.2
