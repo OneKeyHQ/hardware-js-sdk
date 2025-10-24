@@ -32,8 +32,16 @@ import DeviceMethodExecutePage from './routes/device-methods.$methodName';
 // Import styles
 import './tailwind.css';
 
-// 根据环境确定 basename
-const basename = process.env.NODE_ENV === 'production' ? '/expo-playground' : '';
+// 运行时自动检测 basename：
+// - 若路径以 /expo-playground 开头，则使用 '/expo-playground'（GitHub Pages 子路径）
+// - 否则使用 ''（CDN 根路径或其他根部署）
+const basename = (() => {
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  if (segments.length > 0) {
+    return `/${segments[0]}`;
+  }
+  return '';
+})();
 
 // 处理从404页面重定向过来的路径恢复
 function handleSpaRedirect() {
@@ -55,6 +63,8 @@ function handleSpaRedirect() {
       window.history.replaceState(null, '', redirectUrl);
     }
   }
+
+  // 保持 404 重定向的 sessionStorage 路由恢复（用于 GH Pages 子路径）
 }
 
 // Layout wrapper component

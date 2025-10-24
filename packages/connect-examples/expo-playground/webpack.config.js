@@ -18,7 +18,8 @@ module.exports = async (env, argv) => {
       path: path.resolve(__dirname, 'dist'),
       filename: isProduction ? '[name].[contenthash].js' : '[name].js',
       clean: true,
-      publicPath: isProduction ? '/expo-playground/' : '/',
+      // 使用 webpack5 的 auto，让资源在 GH Pages 子路径与 CDN 根路径都能正确加载
+      publicPath: 'auto',
     },
 
     resolve: {
