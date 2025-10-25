@@ -9,7 +9,7 @@ import './utils/shim.js';
 
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import { createHashRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { SDKProvider } from './components/providers/SDKProvider';
 import { I18nProvider } from './i18n/i18n-provider';
 import { CommandPalette } from './components/common/CommandPalette';
@@ -32,39 +32,39 @@ import DeviceMethodExecutePage from './routes/device-methods.$methodName';
 // Import styles
 import './tailwind.css';
 
-// 运行时自动检测 basename：
-// - 若路径以 /expo-playground 开头，则使用 '/expo-playground'（GitHub Pages 子路径）
-// - 否则使用 ''（CDN 根路径或其他根部署）
-const basename = (() => {
-  const segments = window.location.pathname.split('/').filter(Boolean);
-  if (segments.length > 0) {
-    return `/${segments[0]}`;
-  }
-  return '';
-})();
-
-// 处理从404页面重定向过来的路径恢复
+// 处理旧版 404 回退留下的 sessionStorage 路径，转化为 Hash 路由格式
 function handleSpaRedirect() {
   const redirectUrl = sessionStorage.getItem('spa_redirect_url');
 
-  if (redirectUrl) {
-    console.log('Found SPA redirect URL in sessionStorage:', redirectUrl);
-
-    // 清除 sessionStorage 中的重定向 URL
-    sessionStorage.removeItem('spa_redirect_url');
-
-    // 检查当前 URL 是否已经是目标 URL
-    const currentUrl = window.location.pathname + window.location.search + window.location.hash;
-
-    if (redirectUrl !== currentUrl) {
-      console.log('Restoring SPA route from redirect:', redirectUrl);
-
-      // 使用 window.history.replaceState 恢复原始 URL
-      window.history.replaceState(null, '', redirectUrl);
-    }
+  if (!redirectUrl) {
+    return;
   }
 
-  // 保持 404 重定向的 sessionStorage 路由恢复（用于 GH Pages 子路径）
+  console.log('Found legacy SPA redirect URL in sessionStorage:', redirectUrl);
+  sessionStorage.removeItem('spa_redirect_url');
+
+  try {
+    const parsed = new URL(redirectUrl, window.location.origin);
+    const hostingBase = window.location.pathname
+      .replace(/\/index\.html?$/, '')
+      .replace(/\/$/, '');
+    const base = hostingBase || '';
+
+    const originalPath = parsed.pathname;
+    const subPath = originalPath.slice(base.length) || '/';
+    const normalizedPath = subPath.startsWith('/') ? subPath : `/${subPath}`;
+    const hashPayload = `${normalizedPath}${parsed.search}${parsed.hash}`;
+    const hashPath = hashPayload.startsWith('/') ? `#${hashPayload}` : `#/${hashPayload}`;
+    const needsSlash = base ? !base.endsWith('/') : true;
+    const target = `${base}${needsSlash ? '/' : ''}${hashPath}`.replace('//#', '/#');
+
+    if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== target) {
+      window.location.replace(target);
+      return;
+    }
+  } catch (error) {
+    console.error('Failed to convert legacy SPA redirect URL:', error);
+  }
 }
 
 // Layout wrapper component
@@ -91,8 +91,8 @@ function RootLayout() {
   );
 }
 
-// 创建路由配置
-const router = createBrowserRouter(
+// 创建路由配置（哈希路由，兼容任意静态托管环境）
+const router = createHashRouter(
   [
     {
       path: '/',
@@ -138,10 +138,7 @@ const router = createBrowserRouter(
         },
       ],
     },
-  ],
-  {
-    basename,
-  }
+  ]
 );
 
 // 启动应用
