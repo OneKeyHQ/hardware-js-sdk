@@ -8,6 +8,8 @@ module.exports = async (env, argv) => {
   // Dynamically import ESM-only rehype-highlight
   const rehypeHighlight = (await import('rehype-highlight')).default;
   const isProduction = argv.mode === 'production';
+  const commitIdentifier = isProduction ? process.env.COMMIT_SHA || '' : '';
+  const assetPublicPath = commitIdentifier ? './' : 'auto';
 
   return {
     entry: './app/entry.client.tsx',
@@ -19,7 +21,7 @@ module.exports = async (env, argv) => {
       filename: isProduction ? '[name].[contenthash].js' : '[name].js',
       clean: true,
       // 使用 webpack5 的 auto，让资源在 GH Pages 子路径与 CDN 根路径都能正确加载
-      publicPath: 'auto',
+      publicPath: assetPublicPath,
     },
 
     resolve: {
@@ -127,11 +129,8 @@ module.exports = async (env, argv) => {
       }),
       new webpack.DefinePlugin({
         'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
-        'process.env.COMMIT_SHA': JSON.stringify(process.env.COMMIT_SHA || 'dev'),
+        'process.env.COMMIT_SHA': JSON.stringify(commitIdentifier || 'dev'),
         'process.env.BUILD_TIME': JSON.stringify(new Date().toISOString()),
-        'process.env.PLAYGROUND_BUILD_ENV': JSON.stringify(
-          process.env.PLAYGROUND_BUILD_ENV || (isProduction ? 'production' : 'development')
-        ),
         ...(process.env.CONNECT_SRC !== undefined
           ? { 'process.env.CONNECT_SRC': JSON.stringify(process.env.CONNECT_SRC) }
           : {}),

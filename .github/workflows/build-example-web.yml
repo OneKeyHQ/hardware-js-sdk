@@ -6,7 +6,7 @@ env:
   COMMIT_FULL_SHA: ${{ github.sha }}
 
 jobs:
-  build_expo:
+  deploy_preview:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
         run: EXPO_PUBLIC_COMMIT_SHA=${{ env.COMMIT_SHORT_SHA }} yarn expo export:web
         working-directory: packages/connect-examples/expo-example
 
-      - name: Add commit info to build output
+      - name: Add commit info to Expo Example
         run: |
           mkdir -p temp-build
           cp -r web-build/* temp-build/ 2>/dev/null || true
@@ -43,49 +43,59 @@ jobs:
           rm -rf temp-build
         working-directory: packages/connect-examples/expo-example
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: expo-build
-          path: packages/connect-examples/expo-example/web-build
-
-  build_playground_preview:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get short commit SHA
-        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install Dependencies
-        run: |
-          yarn
-          yarn bootstrap
-
-      - name: Build All Packages
-        run: yarn build
-
       - name: Build Expo Playground (testing preview)
         working-directory: packages/connect-examples/expo-playground
         env:
           COMMIT_SHA: ${{ env.COMMIT_SHORT_SHA }}
-          PLAYGROUND_BUILD_ENV: testing
         run: yarn build
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - name: Add SPA fallback pages
+        run: |
+          cp packages/connect-examples/expo-playground/dist/index.html packages/connect-examples/expo-playground/dist/404.html
+          cp packages/connect-examples/expo-example/web-build/index.html packages/connect-examples/expo-example/web-build/404.html
+
+      - name: Prepare root static assets
+        run: |
+          rm -rf gh-pages-root
+          mkdir -p gh-pages-root
+          cp .github/templates/404.html gh-pages-root/404.html
+          cp .github/templates/404.html gh-pages-root/index.html
+          if [ -f "packages/connect-examples/expo-example/web-build/manifest.json" ]; then
+            cp packages/connect-examples/expo-example/web-build/manifest.json gh-pages-root/manifest.json
+            echo "✅ Copied manifest.json from expo-example"
+          else
+            cp .github/templates/manifest.json gh-pages-root/manifest.json
+            echo "⚠️ expo-example manifest not found, using template"
+          fi
+          find packages/connect-examples/expo-example/web-build -maxdepth 1 -type f -name "favicon*" -exec cp {} gh-pages-root/ \;
+
+      - name: Deploy root assets
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          name: expo-playground-build
-          path: packages/connect-examples/expo-playground/dist
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages-root
+          cname: hardware-example.onekeytest.com
+          force_orphan: true
+
+      - name: Deploy Expo Example (GitHub Pages)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/connect-examples/expo-example/web-build
+          destination_dir: expo-example
+          keep_files: true
+
+      - name: Deploy Expo Playground (GitHub Pages)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/connect-examples/expo-playground/dist
+          destination_dir: expo-playground
+          keep_files: true
 
   build_playground_production:
     runs-on: ubuntu-latest
+    needs: deploy_preview
     steps:
       - uses: actions/checkout@v4
 
@@ -109,109 +119,29 @@ jobs:
       - name: Build Expo Playground (production)
         working-directory: packages/connect-examples/expo-playground
         env:
-          COMMIT_SHA: ${{ env.COMMIT_SHORT_SHA }}
-          PLAYGROUND_BUILD_ENV: production
+          COMMIT_SHA: ${{ env.COMMIT_FULL_SHA }}
         run: yarn build
 
       - name: Package production bundle with commit id
         working-directory: packages/connect-examples/expo-playground
-        env:
-          PLAYGROUND_BUILD_ENV: production
-          COMMIT_SHORT_SHA: ${{ env.COMMIT_SHORT_SHA }}
         run: |
-          TARGET_NAME="expo-playground-${COMMIT_FULL_SHA}"
           RELEASE_ROOT="release"
-          rm -rf "${RELEASE_ROOT}"
-          mkdir -p "${RELEASE_ROOT}"
-          mv dist "${RELEASE_ROOT}/${TARGET_NAME}"
-          cat <<EOF > "${RELEASE_ROOT}/${TARGET_NAME}/build-info.json"
+          TARGET_DIR="${RELEASE_ROOT}/${COMMIT_FULL_SHA}"
+          rm -rf "${TARGET_DIR}"
+          mkdir -p "${TARGET_DIR}"
+          cp dist/index.html dist/404.html
+          cp -R dist/. "${TARGET_DIR}/"
+          cat <<EOF > "${TARGET_DIR}/build-info.json"
           {
             "commit": "${COMMIT_FULL_SHA}",
             "shortCommit": "${COMMIT_SHORT_SHA}",
-            "buildEnv": "${PLAYGROUND_BUILD_ENV}",
+            "buildEnv": "production",
             "buildTime": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
-          tar -czf "${RELEASE_ROOT}/${TARGET_NAME}.tar.gz" -C "${RELEASE_ROOT}" "${TARGET_NAME}"
 
       - name: Upload Production Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: expo-playground-${{ env.COMMIT_FULL_SHA }}
-          path: |
-            packages/connect-examples/expo-playground/release/expo-playground-${{ env.COMMIT_FULL_SHA }}
-            packages/connect-examples/expo-playground/release/expo-playground-${{ env.COMMIT_FULL_SHA }}.tar.gz
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: [build_expo, build_playground_preview]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Get short commit SHA
-        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
-
-      - name: Setup Deploy Directory
-        run: mkdir -p deploy
-
-      - name: Download Expo Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: expo-build
-          path: deploy/temp-expo
-
-      - name: Download Playground Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: expo-playground-build
-          path: deploy/expo-playground
-
-      - name: Setup Expo as Root and create routing
-        run: |
-          mkdir -p deploy/expo-example
-          cp -r deploy/temp-expo/* deploy/expo-example/
-
-          echo "=== Files in deploy/expo-example ==="
-          find deploy/expo-example -type f -name "*.json" -o -name "favicon*" -o -name "*.ico" | head -10
-
-          favicon_count=0
-          find deploy/expo-example -name "favicon*" -type f | while read file; do
-            filename=$(basename "$file")
-            cp "$file" "deploy/$filename"
-            echo "✅ Copied favicon: $filename"
-            favicon_count=$((favicon_count + 1))
-          done
-
-          if [ $favicon_count -eq 0 ]; then
-            echo "⚠️  No favicon files found in build output"
-          fi
-
-          if [ -f "deploy/expo-example/manifest.json" ]; then
-            cp deploy/expo-example/manifest.json deploy/manifest.json
-            echo "✅ Copied manifest.json to root"
-            echo "=== Generated manifest.json content ==="
-            cat deploy/manifest.json | head -10
-          else
-            cp .github/templates/manifest.json deploy/manifest.json
-            echo "⚠️  Used fallback manifest.json (Expo didn't generate one)"
-          fi
-
-          rm -rf deploy/temp-expo
-
-      - name: Add SPA fallback for client-side routing
-        run: |
-          cp deploy/expo-playground/index.html deploy/expo-playground/404.html
-          cp deploy/expo-example/index.html deploy/expo-example/404.html
-          cp .github/templates/404.html deploy/404.html
-
-          echo "=== Deployment Structure ==="
-          find deploy -name "*.html" -o -name "manifest.json" -o -name "favicon*" | sort
-
-      - name: Deploy to Github Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./deploy
-          cname: hardware-example.onekeytest.com
-          force_orphan: true
+          name: ${{ env.COMMIT_FULL_SHA }}
+          path: packages/connect-examples/expo-playground/release/${{ env.COMMIT_FULL_SHA }}
