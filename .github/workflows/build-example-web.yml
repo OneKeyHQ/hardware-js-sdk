@@ -45,8 +45,6 @@ jobs:
 
       - name: Build Expo Playground (testing preview)
         working-directory: packages/connect-examples/expo-playground
-        env:
-          COMMIT_SHA: ${{ env.COMMIT_SHORT_SHA }}
         run: yarn build
 
       - name: Add SPA fallback pages
@@ -124,14 +122,18 @@ jobs:
 
       - name: Package production bundle with commit id
         working-directory: packages/connect-examples/expo-playground
+        env:
+          COMMIT_FULL_SHA: ${{ env.COMMIT_FULL_SHA }}
+          COMMIT_SHORT_SHA: ${{ env.COMMIT_SHORT_SHA }}
         run: |
           RELEASE_ROOT="release"
-          TARGET_DIR="${RELEASE_ROOT}/${COMMIT_FULL_SHA}"
-          rm -rf "${TARGET_DIR}"
-          mkdir -p "${TARGET_DIR}"
-          cp dist/index.html dist/404.html
-          cp -R dist/. "${TARGET_DIR}/"
-          cat <<EOF > "${TARGET_DIR}/build-info.json"
+          rm -rf "${RELEASE_ROOT}"
+          mkdir -p "${RELEASE_ROOT}"
+          cp dist/index.html "${RELEASE_ROOT}/index.html"
+          cp dist/404.html "${RELEASE_ROOT}/404.html"
+          mkdir -p "${RELEASE_ROOT}/${COMMIT_FULL_SHA}"
+          cp -R dist/${COMMIT_FULL_SHA}/. "${RELEASE_ROOT}/${COMMIT_FULL_SHA}/"
+          cat <<EOF > "${RELEASE_ROOT}/${COMMIT_FULL_SHA}/build-info.json"
           {
             "commit": "${COMMIT_FULL_SHA}",
             "shortCommit": "${COMMIT_SHORT_SHA}",
@@ -144,4 +146,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.COMMIT_FULL_SHA }}
-          path: packages/connect-examples/expo-playground/release/${{ env.COMMIT_FULL_SHA }}
+          path: packages/connect-examples/expo-playground/release
