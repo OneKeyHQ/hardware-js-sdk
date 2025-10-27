@@ -83,16 +83,24 @@ export const validateParams = (values: any, fields: Array<SchemaParam>): void =>
           }
           break;
 
-        case 'buffer':
-          if (
-            typeof value === 'undefined' ||
-            (typeof value.constructor.isBuffer === 'function' && value.constructor.isBuffer(value))
-          ) {
+        case 'buffer': {
+          const isNodeBuffer =
+            typeof Buffer !== 'undefined' &&
+            typeof Buffer.isBuffer === 'function' &&
+            Buffer.isBuffer(value);
+          const isCustomBuffer =
+            value &&
+            value.constructor &&
+            typeof value.constructor.isBuffer === 'function' &&
+            value.constructor.isBuffer(value);
+
+          if (!isNodeBuffer && !isCustomBuffer) {
             throw invalidParameter(
               `Parameter [${field.name}] is of type invalid and should be [buffer].`
             );
           }
           break;
+        }
 
         case 'hexString':
           if (typeof value !== 'string' || !isHexString(addHexPrefix(value))) {
