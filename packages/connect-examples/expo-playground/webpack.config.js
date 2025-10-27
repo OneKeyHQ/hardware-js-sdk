@@ -129,6 +129,9 @@ module.exports = async (env, argv) => {
         'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
         'process.env.COMMIT_SHA': JSON.stringify(process.env.COMMIT_SHA || 'dev'),
         'process.env.BUILD_TIME': JSON.stringify(new Date().toISOString()),
+        'process.env.PLAYGROUND_BUILD_ENV': JSON.stringify(
+          process.env.PLAYGROUND_BUILD_ENV || (isProduction ? 'production' : 'development')
+        ),
         ...(process.env.CONNECT_SRC !== undefined
           ? { 'process.env.CONNECT_SRC': JSON.stringify(process.env.CONNECT_SRC) }
           : {}),

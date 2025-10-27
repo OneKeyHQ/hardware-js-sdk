@@ -2,21 +2,29 @@ import { deviceMethodsRegistry, signerMethodsRegistry } from '../hooks/useMethod
 import { usePersistenceStore } from '../store/persistenceStore';
 import type { Action } from 'kbar';
 
-// 获取基础路径 - 与项目配置保持一致
-const getBasename = () => {
-  if (typeof window === 'undefined') return '';
-  // 统一使用环境变量，与 entry.client.tsx 和 webpack.config.js 保持一致
-  return process.env.NODE_ENV === 'production' ? '/expo-playground' : '';
+// 规范化路径并生成 Hash 路由路径
+const buildHashPath = (path: string) => {
+  if (!path) {
+    return '#/';
+  }
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return normalized === '/' ? '#/' : `#${normalized}`;
 };
 
-// 导航函数 - 使用 React Router 的编程式导航
+// 导航函数 - 切换 Hash 路由以适配 createHashRouter
 const navigateTo = (path: string) => {
-  // 添加 basename 前缀
-  const fullPath = getBasename() + path;
-  // 使用 window.history.pushState 进行 SPA 导航
-  window.history.pushState(null, '', fullPath);
-  // 触发 popstate 事件让 React Router 响应
-  window.dispatchEvent(new PopStateEvent('popstate'));
+  if (typeof window === 'undefined') return;
+  const targetHash = buildHashPath(path);
+  if (window.location.hash === targetHash) {
+    // 如果已在目标哈希，则手动触发事件以确保路由响应
+    const hashEvent =
+      typeof HashChangeEvent === 'function'
+        ? new HashChangeEvent('hashchange')
+        : new Event('hashchange');
+    window.dispatchEvent(hashEvent);
+    return;
+  }
+  window.location.hash = targetHash;
 };
 
 // 主题切换函数
