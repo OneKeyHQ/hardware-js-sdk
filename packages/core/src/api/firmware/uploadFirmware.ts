@@ -31,6 +31,15 @@ const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
 
 const Log = getLogger(LoggerNames.Method);
 
+const isDeviceDisconnectedError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    message.includes('device was disconnected') ||
+    message.includes('transferIn') ||
+    message.includes('USBDevice')
+  );
+};
+
 const postConfirmationMessage = (device: Device) => {
   // only if firmware is already installed. fresh device does not require button confirmation
   if (device.features?.firmware_present) {
@@ -220,10 +229,23 @@ const newTouchUpdateProcess = async (
   postProgressTip(device, 'InstallingFirmware', postMessage);
   typedCall = device.getCommands().typedCall.bind(device.getCommands());
   // Firmware Update
-  const response = await typedCall('FirmwareUpdateEmmc', 'Success', {
-    path: filePath,
-    reboot_on_success: rebootOnSuccess,
-  });
+  let response: TypedResponseMessage<'Success'>;
+  try {
+    response = await typedCall('FirmwareUpdateEmmc', 'Success', {
+      path: filePath,
+      reboot_on_success: rebootOnSuccess,
+    });
+  } catch (error) {
+    if (isDeviceDisconnectedError(error)) {
+      Log.log('Rebooting device');
+      response = {
+        type: 'Success',
+        message: { message: FIRMWARE_UPDATE_CONFIRM },
+      } as TypedResponseMessage<'Success'>;
+    } else {
+      throw error;
+    }
+  }
 
   if (
     response.type === 'Success' &&

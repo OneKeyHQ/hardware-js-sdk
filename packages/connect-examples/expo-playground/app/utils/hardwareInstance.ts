@@ -1,10 +1,7 @@
 import memoizee from 'memoizee';
 import { ConnectSettings, CoreApi } from '@onekeyfe/hd-core';
-import SDK from '@onekeyfe/hd-web-sdk';
-import { CONNECT_SRC } from '../constants/connect';
+import HardwareCommonConnectSdk from '@onekeyfe/hd-common-connect-sdk';
 import { logInfo, logError } from './logger';
-
-const { HardwareWebSdk } = SDK;
 
 let initialized = false;
 
@@ -24,8 +21,8 @@ function getSDKEnv(transport: TransportType): ConnectSettings['env'] {
       return 'emulator';
     case 'webusb':
     default:
-      // 对于WebUSB，使用 'web' 环境配置，这与expo-example保持一致
-      return 'web';
+      // WebUSB 场景直接使用 common-connect-sdk 的 WebUSB 传输
+      return 'webusb';
   }
 }
 
@@ -36,7 +33,7 @@ export const getHardwareSDKInstance = memoizee(
       // 如果已经初始化且transport相同，直接返回
       if (initialized) {
         logInfo('SDK already initialized, returning cached instance');
-        return { HardwareSDK: HardwareWebSdk, initialized: true };
+        return { HardwareSDK: HardwareCommonConnectSdk, initialized: true };
       }
 
       logInfo(`Initializing SDK with transport: ${transport}`);
@@ -45,12 +42,11 @@ export const getHardwareSDKInstance = memoizee(
         debug: true,
         fetchConfig: true,
         env: getSDKEnv(transport),
-        connectSrc: CONNECT_SRC,
       };
 
       logInfo('SDK initialization settings:', settings as Record<string, unknown>);
 
-      const result = await HardwareWebSdk.init(settings);
+      const result = await HardwareCommonConnectSdk.init(settings);
 
       if (result === false) {
         throw new Error('SDK initialization returned false');
@@ -59,21 +55,8 @@ export const getHardwareSDKInstance = memoizee(
       initialized = true;
       logInfo('SDK initialized successfully');
 
-      return { HardwareSDK: HardwareWebSdk, initialized: true };
+      return { HardwareSDK: HardwareCommonConnectSdk, initialized: true };
     } catch (error) {
-      // 处理iframe已存在的情况
-      if (error && typeof error === 'object' && 'message' in error) {
-        const errorMessage = (error as Error).message || '';
-        if (
-          errorMessage.includes('IFrame alerady initialized') ||
-          errorMessage.includes('IFrame already initialized')
-        ) {
-          logInfo('SDK iframe already exists, using existing instance');
-          initialized = true;
-          return { HardwareSDK: HardwareWebSdk, initialized: true };
-        }
-      }
-
       logError('SDK initialization failed:', { error });
       throw error;
     }
