@@ -9,5 +9,6 @@ submodules/
 packages/**/coverage/
 packages/hd-transport/scripts/protobuf-patches/
 packages/connect-examples/electron-example/public/
+packages/connect-examples/react-native-demo/
 packages/connect-examples/native-android-example/
 packages/connect-examples/native-ios-example/
