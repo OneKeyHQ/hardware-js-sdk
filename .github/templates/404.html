@@ -16,13 +16,14 @@
 
       // 智能路由分发逻辑 - 保持原始URL不变，让SPA自己处理路由
       if (path.startsWith('/expo-playground/')) {
-        // expo-playground 的子路由，保存原始路径信息
-        if (path !== '/expo-playground/' && path !== '/expo-playground') {
+        const base = '/expo-playground';
+        const relativePath = path.slice(base.length);
+
+        if (relativePath && relativePath !== '/') {
           console.log('Handling expo-playground sub-route:', path);
-          // 保存完整的原始URL到sessionStorage供应用恢复路由
-          sessionStorage.setItem('spa_redirect_url', path + fullUrl);
-          // 直接重定向到 index.html，保持 URL 不变
-          window.location.replace('/expo-playground/index.html');
+          const normalized = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+          const hashPath = normalized.startsWith('/') ? `#${normalized}` : `#/${normalized}`;
+          window.location.replace(`${base}/${hashPath}${search}${hash}`);
           return;
         }
         return;
