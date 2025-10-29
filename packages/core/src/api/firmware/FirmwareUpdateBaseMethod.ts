@@ -24,9 +24,20 @@ import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 import { PROTO } from '../../constants';
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
+const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
+
+const isDeviceDisconnectedError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    message.includes('device was disconnected') ||
+    message.includes('transferIn') ||
+    message.includes('USBDevice')
+  );
+};
 
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
@@ -255,10 +266,23 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    */
   async startEmmcFirmwareUpdate({ path }: { path: string }) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const updaeteResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
-      path,
-      reboot_on_success: true,
-    });
+    let updaeteResponse: TypedResponseMessage<'Success'>;
+    try {
+      updaeteResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
+        path,
+        reboot_on_success: true,
+      });
+    } catch (error) {
+      if (isDeviceDisconnectedError(error)) {
+        Log.log('Rebooting device');
+        updaeteResponse = {
+          type: 'Success',
+          message: { message: FIRMWARE_UPDATE_CONFIRM },
+        };
+      } else {
+        throw error;
+      }
+    }
     if (updaeteResponse.type !== 'Success') {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, 'firmware update error');
     }

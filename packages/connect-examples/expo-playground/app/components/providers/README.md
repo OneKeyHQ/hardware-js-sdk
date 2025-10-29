@@ -51,18 +51,17 @@ const initConfig: Partial<ConnectSettings> = {
   debug: true,
   fetchConfig: true,
   env: sdkEnv,
-  connectSrc: CONNECT_SRC,
 };
 ```
 
 ### 4. 初始化SDK
 ```typescript
 // 执行SDK初始化
-const res = await HardwareWebSdk.init(initConfig);
+const res = await HardwareCommonConnectSdk.init(initConfig);
 if (res === false) {
   throw new Error(t('sdk.initError'));
 }
-sdkInstance = HardwareWebSdk;
+sdkInstance = HardwareCommonConnectSdk;
 
 // 设置事件监听器
 setupSDKEventListeners(sdkInstance);
