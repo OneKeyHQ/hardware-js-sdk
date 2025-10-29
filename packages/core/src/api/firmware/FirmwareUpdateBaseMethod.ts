@@ -278,7 +278,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         updaeteResponse = {
           type: 'Success',
           message: { message: FIRMWARE_UPDATE_CONFIRM },
-        }
+        };
       } else {
         throw error;
       }
