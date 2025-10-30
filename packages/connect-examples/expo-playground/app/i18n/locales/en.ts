@@ -281,7 +281,6 @@ export const en = {
       checkBLEFirmwareRelease: 'Check BLE firmware release information',
       checkBootloaderRelease: 'Check bootloader release information',
       checkBridgeRelease: 'Check bridge release information',
-      checkBridgeStatus: 'Check bridge connection status',
       checkFirmwareRelease: 'Check firmware release information',
       confluxGetAddress: 'Get address for your account.',
       confluxSignMessage: 'Sign a message with your private key.',

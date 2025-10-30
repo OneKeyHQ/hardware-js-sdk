@@ -45,6 +45,8 @@ jobs:
 
       - name: Build Expo Playground (testing preview)
         working-directory: packages/connect-examples/expo-playground
+        env:
+          COMMIT_SHA: ${{ env.COMMIT_SHORT_SHA }}
         run: yarn build
 
       - name: Add SPA fallback pages

@@ -17,6 +17,11 @@ import MainLayout from './components/layout/MainLayout';
 import { Toaster } from './components/ui/Toaster';
 import { useTheme } from './hooks/use-theme';
 
+// 注入构建时的提交信息，便于页面展示版本
+const commitSha =
+  (typeof process !== 'undefined' && process.env && process.env.COMMIT_SHA) || 'dev';
+(globalThis as typeof globalThis & { __COMMIT_SHA__?: string }).__COMMIT_SHA__ = commitSha;
+
 // Import existing route components
 import IndexPage from './routes/_index';
 import LogsPage from './routes/logs';

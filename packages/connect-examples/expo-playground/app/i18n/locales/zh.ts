@@ -272,7 +272,6 @@ export const zh = {
       checkBLEFirmwareRelease: '检查蓝牙固件版本信息',
       checkBootloaderRelease: '检查引导程序版本信息',
       checkBridgeRelease: '检查桥接程序版本信息',
-      checkBridgeStatus: '检查桥接连接状态',
       checkFirmwareRelease: '检查固件版本信息',
       confluxGetAddress: '获取 Conflux 地址',
       confluxSignMessage: '使用 Conflux 私钥签名消息',
