@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDeviceStore } from '../../store/deviceStore';
@@ -30,31 +30,6 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
   const { preferredType: transportType, setTransportPreference } = useTransportPersistence();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [bridgeUnavailable, setBridgeUnavailable] = useState(false);
-
-  // 检测bridge状态 - 等待SDK初始化完成后再检查
-  useEffect(() => {
-    const checkBridge = async () => {
-      // 只有在SDK初始化完成后才检查bridge状态
-      if (!sdkInitState.isInitialized) {
-        return;
-      }
-
-      try {
-        const sdkInstance = await SDKUtils.getInstance();
-        const result = await sdkInstance.checkBridgeStatus();
-
-        // 只有在bridge不可用时才设置状态
-        setBridgeUnavailable(!result.success);
-      } catch (error) {
-        // 检查失败时认为bridge不可用
-        setBridgeUnavailable(true);
-      }
-    };
-
-    // 当SDK初始化状态改变时检查bridge
-    void checkBridge();
-  }, [sdkInitState.isInitialized]);
 
   const transportOptions: Array<{
     type: TransportType | 'webble';
@@ -376,23 +351,6 @@ const TransportSwitcher: React.FC<TransportSwitcherProps> = ({ className = '' })
                 </span>
               )}
             </Button>
-
-            {/* JSBridge 下载提示 - 只有在bridge不可用时才显示 */}
-            {option.type === 'jsbridge' && option.needsBridge && bridgeUnavailable && (
-              <div className="ml-8 flex items-center space-x-1.5 text-xs text-gray-500">
-                <Info className="h-3 w-3" />
-                <span>{t('transport.needsBridge')}</span>
-                <a
-                  href="https://help.onekey.so/hc/zh-cn/articles/9740566472335-%E4%B8%8B%E8%BD%BD%E5%B9%B6%E6%9B%B4%E6%96%B0-OneKey-Bridge"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-700 underline decoration-1 underline-offset-2 inline-flex items-center space-x-1 transition-colors"
-                >
-                  <span>{t('transport.downloadBridge')}</span>
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
-            )}
 
             {/* 模拟器教程提示 */}
             {option.type === 'emulator' && option.isEmulator && (

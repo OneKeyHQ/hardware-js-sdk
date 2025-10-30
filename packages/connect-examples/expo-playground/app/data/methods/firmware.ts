@@ -220,12 +220,6 @@ const api: UnifiedMethodConfig[] = [
     noDeviceIdReq: true,
     presets: [],
   },
-  {
-    method: 'checkBridgeStatus',
-    description: 'methodDescriptions.checkBridgeStatus',
-    noDeviceIdReq: true,
-    presets: [],
-  },
 
   // === 固件更新 ===
 
