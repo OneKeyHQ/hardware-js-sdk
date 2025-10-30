@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
@@ -14,13 +14,28 @@ import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+import {
+  checkCompatibilityInParams,
+  handleSkipInRequest,
+  handleSkipInResponse,
+} from '../deviceCompatibility';
+import { useDevice } from '../../provider/DeviceProvider';
+import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
 
 type TestCaseDataType = AddressTestCase['data'][0];
-type ResultViewProps = { item: TestCaseDataWithKey<TestCaseDataType> };
+type ResultViewProps = {
+  item: TestCaseDataWithKey<TestCaseDataType>;
+  itemVerifyState: { verify: string; error?: string };
+};
 
-function ResultView({ item }: ResultViewProps) {
+function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const intl = useIntl();
   const title = item?.title || item?.method;
+
+  // 🎯 检查测试状态 - 如果是 skip 状态，显示跳过信息
+  if (itemVerifyState?.verify === 'skip') {
+    return <SkippedTestItem title={title} reason={itemVerifyState?.error} />;
+  }
 
   return (
     <>
@@ -76,6 +91,7 @@ let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
+  const { selectedDevice } = useDevice();
 
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
@@ -110,100 +126,129 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
 
   const currentPassphrase = useRef<string | undefined>('');
 
-  const { stopTest, beginTest, retryFailedTasks } = useRunnerTest<TestCaseDataType>({
-    initTestCase: () => {
-      const testCase = currentTestCase;
-      const currentTestCases = testCase?.data?.map((item, index) => {
-        const key = `${item.method}-${index}`;
+  const { stopTest, beginTest, retryFailedTasks, clearTestResults } =
+    useRunnerTest<TestCaseDataType>({
+      initTestCase: () => {
+        const testCase = currentTestCase;
+        const currentTestCases = testCase?.data?.map((item, index) => {
+          const key = `${item.method}-${index}`;
 
-        return {
-          ...item,
-          $key: key,
-        } as unknown as TestCaseDataWithKey<TestCaseDataType>;
-      });
-      if (testCase && currentTestCases) {
+          return {
+            ...item,
+            $key: key,
+          } as unknown as TestCaseDataWithKey<TestCaseDataType>;
+        });
+        if (testCase && currentTestCases) {
+          return Promise.resolve({
+            title: testCase.name,
+            data: currentTestCases,
+          });
+        }
+        return Promise.resolve(undefined);
+      },
+      initHardwareListener: sdk => {
+        if (hardwareUiEventListener) {
+          sdk.off(UI_EVENT, hardwareUiEventListener);
+        }
+        hardwareUiEventListener = (message: CoreMessage) => {
+          console.log('TopLEVEL EVENT ===>>>>: ', message);
+          if (message.type === UI_REQUEST.REQUEST_PIN) {
+            openDialog(sdk, message.payload.device.features);
+          }
+          if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
+            setTimeout(() => {
+              sdk.uiResponse({
+                type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+                payload: {
+                  value: currentPassphrase.current ?? '',
+                },
+              });
+            }, 200);
+          }
+        };
+        sdk.on(UI_EVENT, hardwareUiEventListener);
+        return Promise.resolve();
+      },
+      prepareRunner: async (connectId, _deviceId, features, sdk) => {
+        const testCase = currentTestCase;
+
+        if (features?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
+          await sdk.deviceSettings(connectId, {
+            usePassphrase: false,
+          });
+        }
+        if (!features?.passphrase_protection && testCase?.extra?.passphrase != null) {
+          await sdk.deviceSettings(connectId, {
+            usePassphrase: true,
+          });
+        }
+
+        currentPassphrase.current = testCase?.extra?.passphrase;
+      },
+      generateRequestParams: item => {
+        const { params } = item;
+        const requestParams = {
+          ...params,
+          showOnOneKey,
+          passphraseState: currentTestCase?.extra?.passphraseState,
+          useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
+        };
+
+        // 🎯 使用 helper 检查兼容性
+        return Promise.resolve(
+          checkCompatibilityInParams(selectedDevice?.features || {}, item.method, requestParams)
+        );
+      },
+      processRequest: async (SDK, method, connectId, deviceId, requestParams) =>
+        // 🎯 使用 helper 处理跳过逻辑
+        handleSkipInRequest(SDK, method, connectId, deviceId, requestParams),
+      processResponse: (res, item, _itemIndex) => {
+        // 🎯 使用 helper 检查跳过状态
+        const skipCheck = handleSkipInResponse(res, item);
+        if (skipCheck.shouldReturn && skipCheck.result) {
+          return Promise.resolve(skipCheck.result);
+        }
+
+        // 正常验证逻辑
+        const response = res as {
+          path: string;
+          address: string;
+        };
+
+        let error = '';
+
+        if (response.address !== item.result.address) {
+          error = `actual: ${response.address}, expected: ${item.result.address}`;
+        }
+
         return Promise.resolve({
-          title: testCase.name,
-          data: currentTestCases,
+          error,
         });
-      }
-      return Promise.resolve(undefined);
-    },
-    initHardwareListener: sdk => {
-      if (hardwareUiEventListener) {
-        sdk.off(UI_EVENT, hardwareUiEventListener);
-      }
-      hardwareUiEventListener = (message: CoreMessage) => {
-        console.log('TopLEVEL EVENT ===>>>>: ', message);
-        if (message.type === UI_REQUEST.REQUEST_PIN) {
-          openDialog(sdk, message.payload.device.features);
+      },
+      removeHardwareListener: sdk => {
+        if (hardwareUiEventListener) {
+          sdk.off(UI_EVENT, hardwareUiEventListener);
         }
-        if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
-          setTimeout(() => {
-            sdk.uiResponse({
-              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-              payload: {
-                value: currentPassphrase.current ?? '',
-              },
-            });
-          }, 200);
-        }
-      };
-      sdk.on(UI_EVENT, hardwareUiEventListener);
-      return Promise.resolve();
-    },
-    prepareRunner: async (connectId, deviceId, features, sdk) => {
-      const testCase = currentTestCase;
+        return Promise.resolve();
+      },
+    });
 
-      if (features?.passphrase_protection === true && testCase?.extra?.passphrase == null) {
-        await sdk.deviceSettings(connectId, {
-          usePassphrase: false,
-        });
-      }
-      if (!features?.passphrase_protection && testCase?.extra?.passphrase != null) {
-        await sdk.deviceSettings(connectId, {
-          usePassphrase: true,
-        });
-      }
-
-      currentPassphrase.current = testCase?.extra?.passphrase;
-    },
-    generateRequestParams: item => {
-      const { params } = item;
-      const requestParams = {
-        ...params,
-        showOnOneKey,
-        passphraseState: currentTestCase?.extra?.passphraseState,
-        useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
-      };
-      return Promise.resolve({
-        method: item.method,
-        params: requestParams,
-      });
-    },
-    processResponse: (res, item, itemIndex) => {
-      const response = res as {
-        path: string;
-        address: string;
-      };
-
-      let error = '';
-
-      if (response.address !== item.result.address) {
-        error = `actual: ${response.address}, expected: ${item.result.address}`;
-      }
-
-      return Promise.resolve({
-        error,
-      });
-    },
-    removeHardwareListener: sdk => {
-      if (hardwareUiEventListener) {
-        sdk.off(UI_EVENT, hardwareUiEventListener);
-      }
-      return Promise.resolve();
-    },
-  });
+  // Additional effect to handle test case switching
+  // This ensures that when users switch test cases, any running tests are properly stopped
+  // and all previous test results are cleared for a clean state
+  const prevTestCaseRef = useRef<AddressTestCase | undefined>();
+  useEffect(() => {
+    if (
+      prevTestCaseRef.current &&
+      currentTestCase &&
+      prevTestCaseRef.current.name !== currentTestCase.name
+    ) {
+      // Test case changed - stop any running tests and clear all results
+      stopTest();
+      clearTestResults();
+    }
+    prevTestCaseRef.current = currentTestCase;
+  }, [currentTestCase, stopTest, clearTestResults]);
 
   const contentMemo = useMemo(
     () => (
@@ -262,11 +307,18 @@ export function TestSingleAddress({
   title: string;
   testCases: AddressTestCase[];
 }) {
+  // 🎯 使用 testCases 数组的第一个元素的 name 作为 key
+  // 当 testCases 改变时，强制 TestRunnerView 完全重新挂载，清除所有状态
+  const testKey = testCases[0]?.name || title;
+
   return (
     <TestRunnerView<AddressTestCase['data']>
+      key={testKey}
       title={title}
       renderExecuteView={() => <ExecuteView testCases={testCases} />}
-      renderResultView={item => <ResultView item={item} />}
+      renderResultView={(item, itemVerifyState) => (
+        <ResultView item={item} itemVerifyState={itemVerifyState} />
+      )}
     />
   );
 }

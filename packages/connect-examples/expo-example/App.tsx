@@ -30,6 +30,7 @@ const ChainMethodTestScreen = lazy(() => import('./src/views/ChainMethodTestScre
 const linking: LinkingOptions<ParamListBase> = {
   prefixes: [
     // 为不同的部署环境设置 URL 前缀
+    'https://hardware-example.onekeytest.com/',
     'https://example.onekeytest.com/',
     'http://localhost:19006/',
     ExpoLinking.createURL('/'),
@@ -54,10 +55,20 @@ const StackNavigator = createNativeStackNavigator();
 function NavigationContent() {
   // 处理从 404 页面重定向过来的路径
   useEffect(() => {
+    // 处理从 404 页面保存的重定向 URL
+    const spaRedirectUrl = sessionStorage?.getItem('spa_redirect_url');
+    if (spaRedirectUrl) {
+      console.log('Restoring SPA route from redirect:', spaRedirectUrl);
+      sessionStorage?.removeItem('spa_redirect_url');
+      // 使用 window.history.replaceState 替换当前历史记录
+      window.history.replaceState(null, '', spaRedirectUrl);
+      return;
+    }
+
+    // 兼容旧的 redirectPath 处理
     const redirectPath = sessionStorage?.getItem('redirectPath');
     if (redirectPath) {
       sessionStorage?.removeItem('redirectPath');
-      // 使用 window.history.replaceState 替换当前历史记录
       window.history.replaceState(null, '', redirectPath);
     }
   }, []);

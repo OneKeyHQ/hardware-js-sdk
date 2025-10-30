@@ -249,16 +249,19 @@ const api: UnifiedMethodConfig[] = [
   },
   {
     method: 'tronSignMessage',
+    description: 'Sign a message using Tron message signing protocol V2',
 
     presets: [
       {
-        title: 'Sign message',
+        title: 'Sign Message V2',
+        description: 'Sign a message using Tron V2 message format (recommended)',
         parameters: [
           {
             name: 'path',
             type: 'string',
             required: true,
             label: 'Derivation Path',
+            description: 'BIP32 derivation path for Tron account',
             value: "m/44'/195'/0'/0/0",
           },
           {
@@ -266,7 +269,51 @@ const api: UnifiedMethodConfig[] = [
             type: 'string',
             required: true,
             label: 'Message (Hex)',
+            description: 'Message to sign in hexadecimal format',
             value: '48656c6c6f20576f726c64',
+          },
+          {
+            name: 'messageType',
+            type: 'select',
+            required: true,
+            label: 'Message Type',
+            description: 'Tron message signing version (V2 is required)',
+            value: 'V2',
+            options: ['V2'],
+            editable: false,
+          },
+        ],
+      },
+
+      {
+        title: 'Sign Message V1 (Not Supported)',
+        description: 'Demonstrates V1 message signing is not supported - will throw error',
+        parameters: [
+          {
+            name: 'path',
+            type: 'string',
+            required: true,
+            label: 'Derivation Path',
+            description: 'BIP32 derivation path for Tron account',
+            value: "m/44'/195'/0'/0/0",
+          },
+          {
+            name: 'messageHex',
+            type: 'string',
+            required: true,
+            label: 'Message (Hex)',
+            description: 'Message to sign in hexadecimal format (this will fail)',
+            value: '6578616d706c65206d657373616765',
+          },
+          {
+            name: 'messageType',
+            type: 'select',
+            required: true,
+            label: 'Message Type',
+            description: 'V1 is not supported and will cause an error',
+            value: 'V1',
+            options: ['V1', 'V2'],
+            editable: true,
           },
         ],
       },

@@ -285,6 +285,23 @@ export class DeviceCommands {
       );
     }
 
+    // Structured log of actual outgoing payloads (skip acks)
+    try {
+      const skipTypes: MessageKey[] = [
+        'ButtonAck',
+        'PinMatrixAck',
+        'PassphraseAck',
+        'Cancel',
+        'BixinPinInputOnDevice',
+      ] as any;
+      if (!skipTypes.includes(type) && msg) {
+        // Use debug channel to avoid noise escalation
+        Log.debug('[DeviceCommands] [typedCall] Sending payload', type, msg);
+      }
+    } catch (e) {
+      // ignore logging errors
+    }
+
     const response = await this._commonCall(type, msg);
     try {
       assertType(response, resType);
@@ -373,6 +390,16 @@ export class DeviceCommands {
         }
         if (message?.includes('bytes overflow')) {
           error = ERRORS.TypedError(HardwareErrorCode.DataOverload);
+        }
+      }
+
+      if (code === 'Failure_ProcessError') {
+        // Handle firmware verification failures
+        if (
+          message?.includes('Bootloader file verify failed') ||
+          message?.includes('verify failed')
+        ) {
+          error = ERRORS.TypedError(HardwareErrorCode.FirmwareVerificationFailed, message);
         }
       }
 

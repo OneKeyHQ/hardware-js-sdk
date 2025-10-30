@@ -38,7 +38,15 @@ const api: PlaygroundProps[] = [
 
     presupposes: [
       {
-        title: 'Sign Message',
+        title: 'Sign Message V2',
+        value: {
+          path: "m/44'/195'/0'/0/0",
+          messageHex: '0x6578616d706c65206d657373616765',
+          messageType: 'V2',
+        },
+      },
+      {
+        title: 'Sign Message V1 not support',
         value: {
           path: "m/44'/195'/0'/0/0",
           messageHex: '0x6578616d706c65206d657373616765',

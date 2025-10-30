@@ -22,25 +22,12 @@ export function SLIP39BatchTest() {
       <YStack gap="$4">
         {/* 批量地址测试 */}
         <View backgroundColor="$gray1" borderRadius="$3" padding="$3">
-          <Text fontSize={16} fontWeight="600" marginBottom="$3" color="$gray12">
-            📍 SLIP39 批量地址测试
-          </Text>
-          <Text fontSize={12} color="$gray10" marginBottom="$3">
-            使用Bundle模式一次性获取多个地址，提高测试效率
-          </Text>
-          <SLIP39BatchAddressTest title="" />
+          <SLIP39BatchAddressTest />
         </View>
 
         {/* 批量公钥测试 */}
         <View backgroundColor="$gray1" borderRadius="$3" padding="$3">
-          <Text fontSize={16} fontWeight="600" marginBottom="$3" color="$gray12">
-            🔑 SLIP39 批量公钥测试
-          </Text>
-          <Text fontSize={12} color="$gray10" marginBottom="$3">
-            使用Bundle模式一次性获取多个公钥，提高测试效率
-          </Text>
           <SLIP39BatchAddressTest
-            title=""
             testCases={convertedBundlePubkeyTests}
             stateManager={slip39StateInstances.batchPubkey}
           />

@@ -8,17 +8,27 @@ module.exports = async (env, argv) => {
   // Dynamically import ESM-only rehype-highlight
   const rehypeHighlight = (await import('rehype-highlight')).default;
   const isProduction = argv.mode === 'production';
-
+  const commitSha = isProduction ? (process.env.COMMIT_SHA || '').trim() : '';
+  const hasCommit = Boolean(commitSha);
+  const assetPublicPath = hasCommit ? `./${commitSha}/` : 'auto';
+  const htmlPublicPath = hasCommit ? assetPublicPath : undefined;
+  const outputPath = hasCommit
+    ? path.resolve(__dirname, 'dist', commitSha)
+    : path.resolve(__dirname, 'dist');
+  const indexHtmlFilename = hasCommit ? '../index.html' : 'index.html';
+  const fallbackHtmlFilename = hasCommit ? '../404.html' : '404.html';
+  const staticBasePath = hasCommit ? `./${commitSha}/` : './';
   return {
     entry: './app/entry.client.tsx',
     mode: isProduction ? 'production' : 'development',
     devtool: isProduction ? 'source-map' : 'eval-source-map',
 
     output: {
-      path: path.resolve(__dirname, 'dist'),
+      path: outputPath,
       filename: isProduction ? '[name].[contenthash].js' : '[name].js',
       clean: true,
-      publicPath: isProduction ? '/expo-playground/' : '/',
+      // 使用 webpack5 的 auto，让资源在 GH Pages 子路径与 CDN 根路径都能正确加载
+      publicPath: assetPublicPath,
     },
 
     resolve: {
@@ -107,7 +117,20 @@ module.exports = async (env, argv) => {
       new HtmlWebpackPlugin({
         template: 'public/index.html',
         inject: true,
-        filename: 'index.html',
+        filename: indexHtmlFilename,
+        ...(htmlPublicPath ? { publicPath: htmlPublicPath } : {}),
+        templateParameters: {
+          BASE_PATH: staticBasePath,
+        },
+      }),
+      new HtmlWebpackPlugin({
+        template: 'public/index.html',
+        inject: true,
+        filename: fallbackHtmlFilename,
+        ...(htmlPublicPath ? { publicPath: htmlPublicPath } : {}),
+        templateParameters: {
+          BASE_PATH: staticBasePath,
+        },
       }),
       new CopyWebpackPlugin({
         patterns: [
@@ -128,9 +151,6 @@ module.exports = async (env, argv) => {
         'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development'),
         'process.env.COMMIT_SHA': JSON.stringify(process.env.COMMIT_SHA || 'dev'),
         'process.env.BUILD_TIME': JSON.stringify(new Date().toISOString()),
-        ...(process.env.CONNECT_SRC !== undefined
-          ? { 'process.env.CONNECT_SRC': JSON.stringify(process.env.CONNECT_SRC) }
-          : {}),
       }),
     ],
 

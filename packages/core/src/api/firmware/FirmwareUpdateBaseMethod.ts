@@ -6,6 +6,7 @@ import {
   HardwareError,
   HardwareErrorCode,
 } from '@onekeyfe/hd-shared';
+import { RebootType } from '@onekeyfe/hd-transport';
 import type { KnownDevice } from '../../types';
 
 import {
@@ -23,9 +24,20 @@ import { DataManager } from '../../data-manager';
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
 import { PROTO } from '../../constants';
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 const Log = getLogger(LoggerNames.Method);
 const SESSION_ERROR = 'session not found';
+const FIRMWARE_UPDATE_CONFIRM = 'Firmware install confirmed';
+
+const isDeviceDisconnectedError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    message.includes('device was disconnected') ||
+    message.includes('transferIn') ||
+    message.includes('USBDevice')
+  );
+};
 
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
@@ -127,7 +139,11 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
           await wait(3000);
         }
 
-        if (checkCount > 4 && DataManager.isWebUsbConnect(DataManager.getSettings('env'))) {
+        if (
+          checkCount > 4 &&
+          DataManager.isWebUsbConnect(DataManager.getSettings('env')) &&
+          !this.payload.skipWebDevicePrompt
+        ) {
           clearInterval(intervalTimer);
           clearTimeout(timeoutTimer);
 
@@ -250,10 +266,23 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    */
   async startEmmcFirmwareUpdate({ path }: { path: string }) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    const updaeteResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
-      path,
-      reboot_on_success: true,
-    });
+    let updaeteResponse: TypedResponseMessage<'Success'>;
+    try {
+      updaeteResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
+        path,
+        reboot_on_success: true,
+      });
+    } catch (error) {
+      if (isDeviceDisconnectedError(error)) {
+        Log.log('Rebooting device');
+        updaeteResponse = {
+          type: 'Success',
+          message: { message: FIRMWARE_UPDATE_CONFIRM },
+        };
+      } else {
+        throw error;
+      }
+    }
     if (updaeteResponse.type !== 'Success') {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, 'firmware update error');
     }
@@ -399,6 +428,33 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         }
         await wait(2000);
       }
+    }
+  }
+
+  /**
+   * @description 设备重启（Bootloader 侧可用）
+   * @param rebootType 重启类型，参考 RebootType 枚举
+   */
+  async reboot(rebootType: RebootType) {
+    const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+    try {
+      const res = await typedCall('Reboot', 'Success', {
+        reboot_type: rebootType,
+      });
+      return res.message;
+    } catch (error) {
+      // Device disconnection during reboot is expected behavior
+      if (
+        error instanceof Error &&
+        (error.message.includes('device was disconnected') ||
+          error.message.includes('transferIn') ||
+          error.message.includes('USBDevice'))
+      ) {
+        // This is expected - device successfully rebooted and disconnected
+        return { message: 'Device rebooted successfully' };
+      }
+      // Re-throw other errors
+      throw error;
     }
   }
 }

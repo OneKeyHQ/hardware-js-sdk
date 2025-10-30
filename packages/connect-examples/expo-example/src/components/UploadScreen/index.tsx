@@ -2,16 +2,21 @@ import { Buffer } from 'buffer';
 import React, { useState, useEffect, useContext } from 'react';
 
 import { bytesToHex } from '@noble/hashes/utils';
-import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 import { DeviceUploadResourceParams, getHomeScreenSize, getDeviceType } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
-import { Image, Label, Stack, View, XStack } from 'tamagui';
+import { Image as ImageView, Label, Stack, View, XStack } from 'tamagui';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
-import { getImageSize, imageToBase64, formatBytes, generateUploadNFTParams } from './nftUtils';
+import {
+  getImageSize,
+  imageToBase64,
+  formatBytes,
+  generateUploadNFTParams,
+  processImageBlur,
+} from './nftUtils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useCommonParams } from '../../provider/CommonParamsProvider';
 import { useDevice } from '../../provider/DeviceProvider';
@@ -24,6 +29,8 @@ interface UploadResourceParams {
   resType?: number;
   nftMetaData?: string;
   fileNameNoExt?: string;
+  blurRadius?: number;
+  blurOverlayOpacity?: string;
 }
 
 function getUrlExtension(url: string) {
@@ -39,6 +46,8 @@ export const generateUploadResParams = async ({
   height,
   homeScreenSize,
   homeScreenThumbnailSize,
+  blurRadius,
+  blurOverlayOpacity,
   cb,
 }: {
   uri: string;
@@ -52,6 +61,8 @@ export const generateUploadResParams = async ({
     width: number;
     height: number;
   };
+  blurRadius?: number;
+  blurOverlayOpacity?: number;
   cb?: (data: { base64?: string }) => void;
 }) => {
   const data = await compressHomescreen(
@@ -69,6 +80,12 @@ export const generateUploadResParams = async ({
     height
   );
 
+  const blurData = await processImageBlur({
+    base64Data: data?.base64 ?? '',
+    blurRadius: blurRadius ?? 100,
+    overlayOpacity: blurOverlayOpacity ?? 0.2,
+  });
+
   cb?.(data as any);
 
   if (!data?.arrayBuffer && !zoomData?.arrayBuffer) return;
@@ -84,6 +101,7 @@ export const generateUploadResParams = async ({
     suffix: 'jpeg',
     dataHex: bytesToHex(data?.arrayBuffer as Uint8Array),
     thumbnailDataHex: bytesToHex(zoomData?.arrayBuffer as Uint8Array),
+    blurDataHex: blurData.hex,
     nftMetaData: '',
     fileNameNoExt: undefined,
   };
@@ -214,6 +232,8 @@ function UploadScreenComponent() {
           height,
           homeScreenSize: HomeScreenSize,
           homeScreenThumbnailSize: HomeScreenThumbnailSize,
+          blurRadius: uploadScreenParams?.blurRadius ?? 100,
+          blurOverlayOpacity: parseFloat(uploadScreenParams?.blurOverlayOpacity ?? '0.2'),
           cb: data => {
             setImage({ uri: base64 } as any);
             setPreviewData(data?.base64 ? `data:image/png;base64,${data.base64}` : null);
@@ -275,6 +295,8 @@ function UploadScreenComponent() {
             height: image.height ?? 0,
             homeScreenSize: HomeScreenSize,
             homeScreenThumbnailSize: HomeScreenThumbnailSize,
+            blurRadius: uploadScreenParams?.blurRadius ?? 100,
+            blurOverlayOpacity: parseFloat(uploadScreenParams?.blurOverlayOpacity ?? '0.2'),
             cb: data => {
               setPreviewData(data?.base64 ? `data:image/png;base64,${data.base64}` : null);
             },
@@ -386,6 +408,34 @@ function UploadScreenComponent() {
             }
           }}
         />
+        <CommonInput
+          type="number"
+          label="Blur Radius"
+          value={uploadScreenParams?.blurRadius?.toString() ?? '100'}
+          placeholder="100"
+          onChange={v => {
+            if (!isInputDisabled) {
+              try {
+                parseInt(v);
+              } catch (e) {
+                alert('Blur Radius must be a number');
+                return;
+              }
+              setUploadScreenParams({ ...uploadScreenParams, blurRadius: parseInt(v) });
+            }
+          }}
+        />
+        <CommonInput
+          type="text"
+          label="Blur Overlay Opacity"
+          value={uploadScreenParams?.blurOverlayOpacity ?? '0.2'}
+          placeholder="0.2"
+          onChange={v => {
+            if (!isInputDisabled) {
+              setUploadScreenParams({ ...uploadScreenParams, blurOverlayOpacity: v });
+            }
+          }}
+        />
         <Button onPress={() => handleScreenUpdate('WallPaper')} disabled={isLoading || !image}>
           {isLoading ? 'Uploading...' : intl.formatMessage({ id: 'action__upload' })}
         </Button>
@@ -421,6 +471,34 @@ function UploadScreenComponent() {
             }
           }}
         />
+        <CommonInput
+          type="number"
+          label="Blur Radius"
+          value={uploadScreenParams?.blurRadius?.toString() ?? '100'}
+          placeholder="100"
+          onChange={v => {
+            if (!isInputDisabled) {
+              try {
+                parseInt(v);
+              } catch (e) {
+                alert('Blur Radius must be a number');
+                return;
+              }
+              setUploadScreenParams({ ...uploadScreenParams, blurRadius: parseInt(v) });
+            }
+          }}
+        />
+        <CommonInput
+          type="text"
+          label="Blur Overlay Opacity"
+          value={uploadScreenParams?.blurOverlayOpacity ?? '0.2'}
+          placeholder="0.2"
+          onChange={v => {
+            if (!isInputDisabled) {
+              setUploadScreenParams({ ...uploadScreenParams, blurOverlayOpacity: v });
+            }
+          }}
+        />
         <Button onPress={loadNftData} disabled={isLoading || !nftUrl} marginRight="$2">
           {isLoading ? 'Loading...' : 'Load NFT Data'}
         </Button>
@@ -434,7 +512,7 @@ function UploadScreenComponent() {
             预览
           </Label>
           {image && (
-            <Image
+            <ImageView
               height={800}
               width={480}
               source={{ uri: image.uri }}
@@ -444,7 +522,7 @@ function UploadScreenComponent() {
           )}
           {previewData && (
             // NFT
-            <Image height={238} width={238} source={{ uri: previewData }} />
+            <ImageView height={238} width={238} source={{ uri: previewData }} />
             // HOME SCREEN
             // <Image style={{ height: 800, width: 480 }} source={{ uri: previewData }} />
           )}

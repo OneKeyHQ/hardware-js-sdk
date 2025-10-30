@@ -195,7 +195,8 @@ function createMainWindow() {
     log.debug('WebUSB: select-usb-device 事件触发');
     log.debug('WebUSB: 可用设备列表:', JSON.stringify(details.deviceList, null, 2));
 
-    // 阻止默认行为，以便我们可以自定义设备选择
+    // 阻止默认行为，以便我们可以自动选择设备
+    // 这是 Electron 的优势：不像浏览器必须显示弹窗，桌面应用可以自动化处理
     event.preventDefault();
 
     // 直接选择第一个设备
@@ -257,8 +258,6 @@ function createMainWindow() {
     }
   });
 
-  initNobleBleSupport(browserWindow.webContents);
-
   ipcMain.on(ipcMessageKeys.APP_RESTART, () => {
     browserWindow?.reload();
   });
@@ -283,6 +282,15 @@ if (!singleInstance && !process.mas) {
     if (!mainWindow) {
       mainWindow = createMainWindow();
     }
+
+    try {
+      log.info('Initializing Noble BLE support...');
+      initNobleBleSupport(mainWindow.webContents);
+      log.info('Noble BLE support initialized successfully.');
+    } catch (e) {
+      log.error('Failed to initialize Noble BLE support:', e);
+    }
+
     initChildProcess();
     showMainWindow();
     console.log('日志文件位置:', log.transports.file.getFile().path);

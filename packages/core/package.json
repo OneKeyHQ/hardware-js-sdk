@@ -1,7 +1,7 @@
 {
   "name": "@onekeyfe/hd-core",
-  "version": "1.1.7",
-  "description": "> TODO: description",
+  "version": "1.1.16",
+  "description": "Core processes and APIs for communicating with OneKey hardware devices.",
   "author": "OneKey",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
   "license": "ISC",
@@ -25,9 +25,9 @@
     "url": "https://github.com/OneKeyHQ/hardware-js-sdk/issues"
   },
   "dependencies": {
-    "@onekeyfe/hd-shared": "1.1.7",
-    "@onekeyfe/hd-transport": "1.1.7",
-    "axios": "^0.27.2",
+    "@onekeyfe/hd-shared": "1.1.16",
+    "@onekeyfe/hd-transport": "1.1.16",
+    "axios": "1.12.2",
     "bignumber.js": "^9.0.2",
     "bytebuffer": "^5.0.1",
     "jszip": "^3.10.1",

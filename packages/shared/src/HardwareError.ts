@@ -443,6 +443,16 @@ export const HardwareErrorCode = {
   EmmcFileWriteFirmwareError: 819,
 
   /**
+   * Firmware verification failed (e.g., bootloader file verify failed)
+   */
+  FirmwareVerificationFailed: 820,
+
+  /**
+   * Web bridge coonect needs permission
+   */
+  BridgeNeedsPermission: 821,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -583,6 +593,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.DataOverload]: 'Params data overload',
   [HardwareErrorCode.BTCPsbtTooManyUtxos]: 'PSBT too many utxos',
   [HardwareErrorCode.EmmcFileWriteFirmwareError]: 'EMMC file write firmware error',
+  [HardwareErrorCode.FirmwareVerificationFailed]: 'Firmware verification failed',
+  [HardwareErrorCode.BridgeNeedsPermission]: 'Bridge needs permission',
 
   /**
    * Lowlevel transport
@@ -629,6 +641,17 @@ export const CreateErrorByMessage = (message: string): HardwareError => {
     }
   }
   return new HardwareError(message);
+};
+
+// Map low-level bridge/libusb error strings to structured HardwareError
+export const CreateHardwareErrorByBridgeError = (raw: string): HardwareError => {
+  const msg = String(raw || '');
+  // Permission denied when accessing USB device via libusb (e.g., missing udev rules)
+  if (msg.includes('LIBUSB_ERROR_ACCESS')) {
+    return TypedError(HardwareErrorCode.BridgeNeedsPermission, 'LIBUSB_ERROR_ACCESS');
+  }
+  // Fallback: treat as bridge/network error with original message
+  return TypedError(HardwareErrorCode.BridgeNetworkError, msg);
 };
 
 const createNewFirmwareUnReleaseHardwareError = (

@@ -200,7 +200,7 @@ const DeviceInteractionArea: React.FC<DeviceInteractionAreaProps> = ({
                   )}
                 </div>
 
-                {/* 设备信息 - 极简文字 */}
+                {/* 设备信息 */}
                 <div className="text-center space-y-3">
                   <h3 className="text-base font-medium text-foreground">
                     {currentDevice ? `OneKey ${currentDevice.deviceType || 'Device'}` : ''}

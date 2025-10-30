@@ -94,6 +94,7 @@
   "label__upload_image_res_type": "Support PNG & MP4",
   "label__image_res_type": "Resource type",
   "label__res_file_suffix": "File Suffix",
+  "label__res_file_name": "File Name (wp|nft-{filename}-{random})",
   "label__res_type_wall_paper": "WallPaper",
   "label__res_type_nft": "NFT",
   "label__nft_data": "NFT Data",

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-import { useSetAtom } from 'jotai';
 
 import { Stack, Text, View, YStack, Separator } from 'tamagui';
 import { useIntl } from 'react-intl';
@@ -304,10 +303,6 @@ function ExecuteView({
 
   const [testDescription, setTestDescription] = useState<string>();
 
-  // State management atoms for clearing test states (使用传入的状态管理器)
-  const clearItemVerifyState = useSetAtom(stateManager.clearItemVerifyStateAtom);
-  const setFailedTasks = useSetAtom(stateManager.setFailedTasksAtom);
-
   const findTestCase = useCallback(
     (name: string) => {
       const testCase = batchTestCases.find(testCase => testCase.name === name);
@@ -330,11 +325,7 @@ function ExecuteView({
     if (!testCase) return;
 
     setTestDescription(testCase.description);
-
-    // 清理状态：助记词组切换时重置所有测试状态
-    clearItemVerifyState();
-    setFailedTasks([]);
-  }, [currentTestCase, clearItemVerifyState, setFailedTasks]);
+  }, [currentTestCase]);
 
   const currentPassphrase = useRef<string | undefined>('');
   const currentPassphraseState = useRef<string | undefined>('');
@@ -532,6 +523,21 @@ function ExecuteView({
       return Promise.resolve();
     },
   });
+
+  // Additional effect to handle test case switching
+  // This ensures that when users switch test cases, any running tests are properly stopped
+  const prevTestCaseRef = useRef<SLIP39BatchTestCase | undefined>();
+  useEffect(() => {
+    if (
+      prevTestCaseRef.current &&
+      currentTestCase &&
+      prevTestCaseRef.current.name !== currentTestCase.name
+    ) {
+      // Test case changed - stop any running tests to ensure clean state
+      stopTest();
+    }
+    prevTestCaseRef.current = currentTestCase;
+  }, [currentTestCase, stopTest]);
 
   const contentMemo = useMemo(
     () => (

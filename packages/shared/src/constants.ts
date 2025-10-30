@@ -39,6 +39,7 @@ export enum EOneKeyBleMessageKeys {
   NOBLE_BLE_SUBSCRIBE = '$onekey-noble-ble-subscribe',
   NOBLE_BLE_UNSUBSCRIBE = '$onekey-noble-ble-unsubscribe',
   NOBLE_BLE_NOTIFICATION = '$onekey-noble-ble-notification',
+  NOBLE_BLE_CANCEL_PAIRING = '$onekey-noble-ble-cancel-pairing',
 }
 
 export const ONEKEY_SERVICE_UUID = '00000001-0000-1000-8000-00805f9b34fb';

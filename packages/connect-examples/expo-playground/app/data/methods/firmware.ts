@@ -233,7 +233,23 @@ const api: UnifiedMethodConfig[] = [
     method: 'deviceUpdateBootloader',
     description: 'methodDescriptions.deviceUpdateBootloader',
     noDeviceIdReq: true,
-    presets: [],
+    presets: [
+      {
+        title: 'Update bootloader',
+        parameters: [
+          {
+            name: 'binary',
+            type: 'file',
+            required: false,
+            label: 'Bootloader Binary',
+            description: 'Upload bootloader binary file (.bin). If not provided, latest will be downloaded automatically.',
+            accept: '.bin',
+            visible: true,
+            editable: true,
+          },
+        ],
+      },
+    ],
   },
   {
     method: 'deviceRebootToBootloader',

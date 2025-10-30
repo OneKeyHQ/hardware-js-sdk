@@ -97,6 +97,7 @@ export async function init(payload: IFrameInit['payload']) {
       }
 
       if (message.event === IFRAME.SWITCH_TRANSPORT) {
+        Log.debug('switchCoreTransport', message.payload.env);
         switchCoreTransport(message.payload.env);
         return { success: true, payload: {} };
       }

@@ -66,6 +66,7 @@ export const en = {
       edit: 'Edit',
       save: 'Save',
       clear: 'Clear',
+      select: 'Select',
       seInfo: 'Device SE Information',
     },
     deviceInfo: {
@@ -595,6 +596,20 @@ export const en = {
       initError: 'SDK initialization failed',
       initFailed: 'Initialization failed: {{error}}',
     },
+    firmware: {
+      webusb: {
+        authorize: {
+          title: 'Authorize WebUSB',
+          description:
+            'Your device switched to bootloader mode to apply the update. Chrome treats this as a new USB device. Please authorize it to continue the firmware update.',
+          tip: 'Ensure your device is connected. If the chooser doesn\'t appear, try a different USB port or reconnect the cable.',
+          selectButton: 'Select Device',
+          selecting: 'Selecting...',
+          troubleshooting:
+            'If you close this dialog or dismiss the chooser, the update will pause. Reopen this dialog to continue when ready.',
+        },
+      },
+    },
     search: {
       sections: {
         interface: 'Interface Control',
@@ -868,6 +883,8 @@ export const en = {
         },
         passphraseState: 'PassphraseState',
         passphraseStateDesc: 'Use passphraseState for hidden wallet',
+        deriveCardano: 'deriveCardano',
+        deriveCardanoDesc: 'Enable Cardano address derivation',
       },
       unifiedLogger: {
         executionLogs: 'Execution Logs',

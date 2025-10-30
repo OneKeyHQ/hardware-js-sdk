@@ -672,9 +672,11 @@ const ensureConnected = async (
       } catch (error) {
         Log.debug('device list error: ', error);
         if (
-          [HardwareErrorCode.BridgeNotInstalled, HardwareErrorCode.BridgeTimeoutError].includes(
-            error.errorCode
-          )
+          [
+            HardwareErrorCode.BridgeNotInstalled,
+            HardwareErrorCode.BridgeTimeoutError,
+            HardwareErrorCode.BridgeNeedsPermission,
+          ].includes(error.errorCode)
         ) {
           _deviceList = undefined;
           reject(error);
@@ -741,6 +743,7 @@ const ensureConnected = async (
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
             HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
+            HardwareErrorCode.BridgeNeedsPermission,
           ].includes(error.errorCode)
         ) {
           reject(error);
@@ -1103,7 +1106,8 @@ export default class Core extends EventEmitter {
   }
 
   dispose() {
-    // empty
+    _deviceList = undefined;
+    _connector = undefined;
   }
 }
 

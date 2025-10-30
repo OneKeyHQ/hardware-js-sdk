@@ -5,6 +5,7 @@ import { devtools } from 'zustand/middleware';
 export interface CommonParametersState {
   useEmptyPassphrase: boolean;
   passphraseState: string;
+  deriveCardano: boolean;
   // passphraseState 只做会话缓存，页面刷新即丢失
 }
 
@@ -33,6 +34,7 @@ export interface HardwareState {
 const initialCommonParameters: CommonParametersState = {
   useEmptyPassphrase: false,
   passphraseState: '',
+  deriveCardano: false,
 };
 
 export const useHardwareStore = create<HardwareState>()(

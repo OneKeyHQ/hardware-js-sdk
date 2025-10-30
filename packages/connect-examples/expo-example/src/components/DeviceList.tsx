@@ -27,9 +27,26 @@ export type Device = {
   name: string;
   features?: Features;
   deviceType?: string;
+  id?: string;
+  state?: string;
 };
 
 const CONNECTION_TYPE_STORE_KEY = '@onekey/connectionType';
+
+/**
+ * Determine if the connection type should use hd-common-connect-sdk
+ */
+const shouldUseCommonSdk = (connectionType: ConnectionType | null): boolean =>
+  connectionType === 'desktop-web-ble' || connectionType === 'webusb';
+
+/**
+ * Check if switching between connection types requires app restart
+ */
+const needsRestartForSwitch = (from: ConnectionType | null, to: ConnectionType | null): boolean => {
+  const fromUsesCommonSdk = shouldUseCommonSdk(from);
+  const toUsesCommonSdk = shouldUseCommonSdk(to);
+  return fromUsesCommonSdk !== toUsesCommonSdk;
+};
 
 const storeConnectionType = async (value: ConnectionType) => {
   try {
@@ -126,7 +143,13 @@ function DeviceListFC(
     const response = await sdk.searchDevices();
     const foundDevices = (response.payload as unknown as Device[]) ?? [];
     setDeviceActions({ type: 'setList', payload: foundDevices });
-    if (Platform.OS === 'web' && foundDevices?.length) {
+
+    // 🔧 DESKTOP BLE FIX: Don't auto-select devices, let user choose manually
+    // This prevents automatic connection which can cause issues with device switching
+    // Users should manually click the "Connect Device" button for their desired device
+
+    // Only auto-select for non-desktop-web-ble connections to maintain backward compatibility
+    if (Platform.OS === 'web' && foundDevices?.length && connectionType !== 'desktop-web-ble') {
       const device = foundDevices[0];
       selectDevice(device);
     }
@@ -153,14 +176,17 @@ function DeviceListFC(
         setConnectionType(value);
         await storeConnectionType(value);
 
-        // Restart desktop client when switching between desktop-web-ble and other modes
-        const needsRestart =
-          Platform.OS === 'web' &&
-          (previousConnectionType === 'desktop-web-ble' || value === 'desktop-web-ble') &&
-          previousConnectionType !== value;
+        // Restart desktop client when switching between different SDK types
+        // (e.g., bridge <-> webusb, bridge <-> desktop-web-ble, webusb <-> desktop-web-ble)
+        const shouldRestart =
+          Platform.OS === 'web' && needsRestartForSwitch(previousConnectionType, value);
 
         // @ts-expect-error
-        if (needsRestart && window.desktopApi?.restart) {
+        if (shouldRestart && window.desktopApi?.restart) {
+          console.log('Restarting app due to SDK type change:', {
+            from: previousConnectionType,
+            to: value,
+          });
           // @ts-expect-error
           window.desktopApi.restart();
           return; // Exit early as the app will restart

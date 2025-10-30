@@ -294,6 +294,58 @@ const api: PlaygroundProps[] = [
         },
       },
       {
+        title: 'Sign Transaction(500 Ref Txs 泄漏助记词)',
+        value: {
+          coin: 'btc',
+          inputs: [
+            {
+              prev_index: 480,
+              prev_hash: '5471c493730cf41e48a46af6c5684fa4c3dede54ccba0ff7d1d3803d9e3ba63a',
+              amount: '10000',
+              address_n: [2147483692, 2147483648, 2147483648, 0, 0],
+              script_type: 'PAYTOADDRESS',
+            },
+          ],
+          outputs: [
+            {
+              script_type: 'PAYTOADDRESS',
+              address: '3F6g14r5Z37at7HTvMN5Mmf8QJxLJp2p3U',
+              amount: '1000',
+            },
+            {
+              script_type: 'PAYTOP2SHWITNESS',
+              address_n: [2147483697, 2147483648, 2147483648, 0, 0],
+              amount: '8000',
+            },
+          ],
+          refTxs: [
+            {
+              hash: '5471c493730cf41e48a46af6c5684fa4c3dede54ccba0ff7d1d3803d9e3ba63a',
+              version: 2,
+              inputs: [
+                {
+                  prev_hash: 'b9d4894235c32f122a7c47dff4bf751bbbaede425b88f010bb9758508621026d',
+                  prev_index: 400,
+                  script_sig: '',
+                  sequence: 4294967295,
+                },
+              ],
+              bin_outputs: [
+                ...Array.from({ length: 500 }, () => ({
+                  amount: 10000,
+                  script_pubkey: `76a9144e20ec718604a211629e42fbe37dda3576bfcd8b88ac`,
+                })),
+                {
+                  amount: 49000,
+                  script_pubkey: '76a914cbe71ea01cd0909ac0585098689c045303e6327788ac',
+                },
+              ],
+              lock_time: 0,
+            },
+          ],
+        },
+      },
+      {
         title: 'Sign Transaction(Big Ref Txs)',
         value: {
           coin: 'btc',
