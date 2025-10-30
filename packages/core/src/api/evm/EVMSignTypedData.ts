@@ -1,7 +1,7 @@
 import semver from 'semver';
 import { get } from 'lodash';
 import BigNumber from 'bignumber.js';
-import { ERRORS, HardwareErrorCode, EDeviceType } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import {
   EthereumTypedDataSignature,
   EthereumTypedDataStructAck,
@@ -337,9 +337,15 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     let biggerLimit = 1024; // 1k
 
     const currentVersion = getDeviceFirmwareVersion(this.device.features).join('.');
+    const currentDeviceType = getDeviceType(this.device.features);
     const supportBiggerDataVersion = '4.4.0';
 
-    if (semver.gte(currentVersion, supportBiggerDataVersion)) {
+    const supportBiggerData =
+      DeviceModelToTypes.model_classic1s.includes(currentDeviceType) ||
+      (DeviceModelToTypes.model_touch.includes(currentDeviceType) &&
+        semver.gte(currentVersion, supportBiggerDataVersion));
+
+    if (supportBiggerData) {
       biggerLimit = 1536; // 1.5k
     }
 
