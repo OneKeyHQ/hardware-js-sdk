@@ -6,7 +6,105 @@ env:
   COMMIT_FULL_SHA: ${{ github.sha }}
 
 jobs:
+  build_api_payload:
+    if: github.ref == 'refs/heads/test/api'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get short commit SHA
+        run: echo "COMMIT_SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Dependencies
+        run: |
+          yarn
+          yarn bootstrap
+
+      - name: Build All Packages
+        run: yarn build
+
+      - name: Build Expo Example with local iframe
+        env:
+          CONNECT_SRC: ./js-sdk/
+          EXPO_PUBLIC_COMMIT_SHA: ${{ env.COMMIT_SHORT_SHA }}
+        run: yarn expo export:web
+        working-directory: packages/connect-examples/expo-example
+
+      - name: Copy local iframe bundle into Expo Example
+        run: |
+          rm -rf packages/connect-examples/expo-example/web-build/js-sdk
+          mkdir -p packages/connect-examples/expo-example/web-build/js-sdk
+          cp -r packages/hd-web-sdk/build/* packages/connect-examples/expo-example/web-build/js-sdk/
+
+      - name: Force Expo bundle to use local iframe source
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          const targetRoot = path.resolve('packages/connect-examples/expo-example/web-build');
+          const sdkVersion = require(path.resolve('packages/hd-web-sdk/package.json')).version;
+          const replacements = [
+            { search: `https://jssdk.onekey.so/${sdkVersion}/`, replace: './js-sdk/' },
+            { search: 'https://jssdk.onekey.so/', replace: './js-sdk/' },
+            { search: 'https://jssdk.onekey.so', replace: './js-sdk' },
+          ];
+
+          const exts = new Set(['.js', '.html', '.json']);
+          const touched = [];
+
+          function walk(dir) {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              const abs = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                walk(abs);
+                continue;
+              }
+              const ext = path.extname(entry.name);
+              if (!exts.has(ext)) continue;
+              let content = fs.readFileSync(abs, 'utf8');
+              let modified = false;
+              for (const { search, replace } of replacements) {
+                if (content.includes(search)) {
+                  content = content.split(search).join(replace);
+                  modified = true;
+                }
+              }
+              if (!modified) continue;
+              fs.writeFileSync(abs, content);
+              touched.push(path.relative(targetRoot, abs));
+            }
+          }
+
+          walk(targetRoot);
+
+          if (touched.length === 0) {
+            console.warn(`⚠️ 未找到需要替换的 iframe 连接，检查是否已经使用本地资源。`);
+          } else {
+            console.log(`✅ 已替换 ${touched.length} 个文件中的 iframe 域名:`);
+            touched.forEach(file => console.log(`  • ${file}`));
+          }
+          EOF
+
+      - name: Add SPA fallback page
+        run: |
+          cp packages/connect-examples/expo-example/web-build/index.html packages/connect-examples/expo-example/web-build/404.html
+
+      - name: Upload Expo Example artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-example-web-build-${{ env.COMMIT_SHORT_SHA }}
+          path: packages/connect-examples/expo-example/web-build
+
   deploy_preview:
+    if: github.ref != 'refs/heads/test/api'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,6 +190,7 @@ jobs:
           keep_files: true
 
   build_playground_production:
+    if: github.ref != 'refs/heads/test/api'
     runs-on: ubuntu-latest
     needs: deploy_preview
     steps:

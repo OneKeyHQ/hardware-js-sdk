@@ -31,6 +31,7 @@ const linking: LinkingOptions<ParamListBase> = {
   prefixes: [
     // 为不同的部署环境设置 URL 前缀
     'https://hardware-example.onekeytest.com/',
+    'https://hd-example.onekeytest.com/',
     'https://example.onekeytest.com/',
     'http://localhost:19006/',
     ExpoLinking.createURL('/'),
