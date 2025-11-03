@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-export type FeatureId = 'Air-Gap' | 'Deep-Link';
+export type FeatureId = 'Air-Gap' | 'Deep-Link' | 'BLE';
 
 export interface FeatureDescriptor {
   id: FeatureId;

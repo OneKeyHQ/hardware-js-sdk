@@ -38,6 +38,7 @@ build
 # iOS
 Pods
 .expo
+**/.expo
 
 # Xcode user data
 *.xcodeproj/xcuserdata/
@@ -61,3 +62,17 @@ Pods
 .cxx
 local.properties
 .idea
+
+# Expo / RN example prebuild outputs (ignore generated native folders under examples)
+packages/connect-examples/react-native-demo/android
+packages/connect-examples/react-native-demo/ios
+packages/connect-examples/expo-example/android
+packages/connect-examples/expo-example/ios
+packages/connect-examples/expo-example/web-build
+
+# Metro cache
+.metro-cache
+**/.metro-cache
+
+# Expo web export
+**/web-build
