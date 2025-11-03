@@ -7,6 +7,7 @@ const config = getDefaultConfig(projectRoot);
 
 config.resolver.extraNodeModules = {
   ...config.resolver.extraNodeModules,
+  buffer: require.resolve('buffer/'),
   crypto: require.resolve('crypto-browserify'),
   stream: require.resolve('stream-browserify'),
   process: require.resolve('process/browser'),
@@ -19,6 +20,7 @@ config.resolver.extraNodeModules = {
   path: require.resolve('path-browserify'),
 };
 
-config.resolver.unstable_enablePackageExports = false;
+// Enable package exports to allow resolving subpath imports like '@noble/hashes/blake2b'
+config.resolver.unstable_enablePackageExports = true;
 
 module.exports = config;

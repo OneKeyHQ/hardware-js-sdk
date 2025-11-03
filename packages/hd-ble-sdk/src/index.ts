@@ -26,7 +26,11 @@ import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/h
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
 
 const eventEmitter = new EventEmitter();
-const Log = getLogger(LoggerNames.HdBleSdk);
+const Log = (getLogger(LoggerNames.HdBleSdk) as any) || {
+  debug: (..._args: any[]) => {},
+  log: (..._args: any[]) => {},
+  error: (..._args: any[]) => {},
+};
 
 let _core: Core | undefined;
 let _settings = parseConnectSettings();
