@@ -22,6 +22,7 @@ import {
   setLoggerPostMessage,
   wait,
   getMethodVersionRange,
+  getFirmwareType,
 } from '../utils';
 import {
   findDefectiveBatchDevice,
@@ -282,7 +283,8 @@ const onCallDevice = async (
           }
         }
 
-        const newVersionStatus = DataManager.getFirmwareStatus(device.features);
+        const deviceFirmwareType = getFirmwareType(device.features);
+        const newVersionStatus = DataManager.getFirmwareStatus(device.features, deviceFirmwareType);
         const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
 
         const currentFirmwareVersion = getDeviceFirmwareVersion(device.features).join('.');

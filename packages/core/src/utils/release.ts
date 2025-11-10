@@ -1,5 +1,6 @@
 import semver from 'semver';
-import {
+
+import type {
   IBLEFirmwareReleaseInfo,
   IDeviceFirmwareStatus,
   IFirmwareReleaseInfo,

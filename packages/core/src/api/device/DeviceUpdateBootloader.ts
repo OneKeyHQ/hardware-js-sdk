@@ -1,4 +1,4 @@
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { RebootType } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { FirmwareUpdateTipMessage } from '../../events/ui-request';
@@ -8,10 +8,11 @@ import { updateBootloader } from '../firmware/uploadFirmware';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
 import { checkBootloaderLength } from '../firmware/updateBootloader';
-import { getDeviceType } from '../../utils';
+import { getDeviceType, getFirmwareType } from '../../utils';
 
 import type { Device } from '../../device/Device';
 import type { Features } from '../../types';
+import { DeviceUpdateBootloaderParams } from '../../types/api/deviceUpdateBootloader';
 
 export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any> {
   init() {
@@ -41,11 +42,21 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     return true;
   }
 
-  async updateTouchBootloader(device: Device, features?: Features) {
+  async updateTouchBootloader({
+    device,
+    features,
+    firmwareType,
+  }: {
+    device: Device;
+    features?: Features;
+    firmwareType: EFirmwareType;
+  }) {
     let { binary } = this.payload;
     if (!binary) {
       this.postTipMessage(FirmwareUpdateTipMessage.CheckLatestUiResource);
-      const resourceUrl = features ? DataManager.getBootloaderResource(features) : null;
+      const resourceUrl = features
+        ? DataManager.getBootloaderResource(features, firmwareType)
+        : null;
       if (resourceUrl) {
         this.postTipMessage(FirmwareUpdateTipMessage.DownloadLatestBootloaderResource);
         const resource = await getSysResourceBinary(resourceUrl);
@@ -83,9 +94,14 @@ export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any
     const { device } = this;
     const { features } = device;
 
+    const payload = this.payload as DeviceUpdateBootloaderParams;
+
     const deviceType = getDeviceType(features);
+    const deviceFirmwareType = getFirmwareType(features);
+    const firmwareType = payload.firmwareType ?? deviceFirmwareType;
+
     if (DeviceModelToTypes.model_touch.includes(deviceType)) {
-      return this.updateTouchBootloader(device, features);
+      return this.updateTouchBootloader({ device, features, firmwareType });
     }
 
     return Promise.resolve(true);

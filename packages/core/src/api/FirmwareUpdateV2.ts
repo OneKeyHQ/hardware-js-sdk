@@ -1,12 +1,14 @@
 import {
-  createDeferred,
-  Deferred,
+  type Deferred,
   EDeviceType,
+  type EFirmwareType,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
+  createDeferred,
 } from '@onekeyfe/hd-shared';
 import semver from 'semver';
+
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
@@ -14,20 +16,21 @@ import { DevicePool } from '../device/DevicePool';
 import { getBinary, getInfo, getSysResourceBinary } from './firmware/getBinary';
 import { updateResources, uploadFirmware } from './firmware/uploadFirmware';
 import {
-  getDeviceType,
-  getDeviceUUID,
-  wait,
-  getLogger,
   LoggerNames,
   getDeviceFirmwareVersion,
+  getDeviceType,
+  getDeviceUUID,
+  getFirmwareType,
+  getLogger,
+  wait,
 } from '../utils';
-import { createUiMessage, FirmwareUpdateTipMessage } from '../events/ui-request';
+import { FirmwareUpdateTipMessage, createUiMessage } from '../events/ui-request';
 import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
-
-import type { KnownDevice, Features } from '../types';
-import type { Device } from '../device/Device';
 import { DEVICE } from '../events';
+
+import type { Features, KnownDevice } from '../types';
+import type { Device } from '../device/Device';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -35,6 +38,7 @@ type Params = {
   updateType: 'firmware' | 'ble';
   forcedUpdateRes?: boolean;
   isUpdateBootloader?: boolean;
+  firmwareType?: EFirmwareType;
 };
 
 const Log = getLogger(LoggerNames.Method);
@@ -55,6 +59,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       { name: 'binary', type: 'buffer' },
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'platform', type: 'string', required: true },
+      { name: 'firmwareType', type: 'string' },
     ]);
 
     if (!payload.updateType) {
@@ -74,6 +79,7 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       this.params = {
         ...this.params,
         version: payload.version,
+        firmwareType: payload.firmwareType,
       };
     }
 
@@ -246,14 +252,14 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
    * Check the version number of Touch to determine if it
    * needs to be upgraded via the desktop
    */
-  checkVersionForCopyTouchResource(features?: Features) {
+  checkVersionForCopyTouchResource(features: Features | undefined, firmwareType: EFirmwareType) {
     if (!features) return;
     const deviceType = getDeviceType(features);
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
     const targetVersion = this.params.version?.join('.');
     const { updateType } = this.params;
 
-    const releaseInfo = getInfo({ features, updateType });
+    const releaseInfo = getInfo({ features, updateType, firmwareType });
     if (!releaseInfo) return;
     const { fullResourceRange } = releaseInfo;
     if (!fullResourceRange) return;
@@ -275,7 +281,10 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
     const { features, commands } = device;
     const deviceType = getDeviceType(features);
 
-    this.checkVersionForCopyTouchResource(features);
+    const deviceFirmwareType = getFirmwareType(device.features);
+    const firmwareType = params.firmwareType ?? deviceFirmwareType;
+
+    this.checkVersionForCopyTouchResource(features, firmwareType);
 
     if (!features?.bootloader_mode && features) {
       const uuid = getDeviceUUID(features);
@@ -287,10 +296,11 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
       // check & upgrade firmware resource
       if (features && this.isSupportResourceUpdate(features, params.updateType)) {
         this.postTipMessage('CheckLatestUiResource');
-        const resourceUrl = DataManager.getSysResourcesLatestRelease(
+        const resourceUrl = DataManager.getSysResourcesLatestRelease({
           features,
-          params.forcedUpdateRes
-        );
+          forcedUpdateRes: params.forcedUpdateRes,
+          firmwareType,
+        });
         if (resourceUrl) {
           this.postTipMessage('DownloadLatestUiResource');
           const resource = await getSysResourceBinary(resourceUrl);
@@ -360,11 +370,13 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           );
         }
         this.postTipMessage('DownloadFirmware');
+
         const firmware = await getBinary({
           features: device.features,
           version: params.version,
           updateType: params.updateType,
           isUpdateBootloader: params.isUpdateBootloader,
+          firmwareType,
         });
         binary = firmware.binary;
         this.postTipMessage('DownloadFirmwareSuccess');

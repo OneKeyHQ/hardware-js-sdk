@@ -165,6 +165,13 @@ const api: PlaygroundProps[] = [
           checkBridgeRelease: true,
         },
       },
+      {
+        title: 'checkAllFirmwareRelease Bitcoin Only',
+        value: {
+          checkBridgeRelease: true,
+          firmwareType: 'bitcoinonly',
+        },
+      },
     ],
   },
   {

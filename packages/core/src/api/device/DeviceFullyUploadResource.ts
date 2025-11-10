@@ -4,10 +4,11 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
 import { updateResources } from '../firmware/uploadFirmware';
-import { getDeviceType, getDeviceFirmwareVersion } from '../../utils';
+import { getDeviceType, getDeviceFirmwareVersion, getFirmwareType } from '../../utils';
 import { createUiMessage } from '../../events/ui-request';
 import type { KnownDevice, Features } from '../../types';
 import { DataManager } from '../../data-manager';
+import type { DeviceFullyUploadResourceParams } from '../../types/api/deviceFullyUploadResource';
 
 export default class DeviceFullyUploadResource extends BaseMethod {
   checkPromise: Deferred<any> | null = null;
@@ -43,13 +44,18 @@ export default class DeviceFullyUploadResource extends BaseMethod {
     const { device } = this;
     const { features } = device;
 
+    const payload = this.payload as DeviceFullyUploadResourceParams;
+
+    const deviceFirmwareType = getFirmwareType(features);
+    const firmwareType = payload.firmwareType ?? deviceFirmwareType;
+
     if (!features?.bootloader_mode && features) {
       // check & upgrade firmware resource
       if (features) {
         let { binary } = this.payload;
         if (!binary) {
           this.postTipMessage('CheckLatestUiResource');
-          const resourceUrl = DataManager.getSysFullResource(features);
+          const resourceUrl = DataManager.getSysFullResource(features, firmwareType);
           if (resourceUrl) {
             this.postTipMessage('DownloadLatestUiResource');
             const resource = await getSysResourceBinary(resourceUrl);

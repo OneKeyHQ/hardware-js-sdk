@@ -1,18 +1,27 @@
 import semver from 'semver';
 import {
-  createNeedUpgradeFirmwareHardwareError,
   ERRORS,
   HardwareErrorCode,
+  createNeedUpgradeFirmwareHardwareError,
 } from '@onekeyfe/hd-shared';
+
 import { supportInputPinOnSoftware, supportModifyHomescreen } from '../utils/deviceFeaturesUtils';
 import { createDeviceMessage } from '../events/device';
 import { UI_REQUEST } from '../constants/ui-request';
-import { Device } from '../device/Device';
-import DeviceConnector from '../device/DeviceConnector';
-import { DeviceFirmwareRange, KnownDevice } from '../types';
-import { CoreMessage, createFirmwareMessage, createUiMessage, DEVICE, FIRMWARE } from '../events';
+import { DEVICE, FIRMWARE, createFirmwareMessage, createUiMessage } from '../events';
 import { getBleFirmwareReleaseInfo, getFirmwareReleaseInfo } from './firmware/releaseHelper';
-import { getDeviceFirmwareVersion, getLogger, getMethodVersionRange, LoggerNames } from '../utils';
+import {
+  LoggerNames,
+  getDeviceFirmwareVersion,
+  getFirmwareType,
+  getLogger,
+  getMethodVersionRange,
+} from '../utils';
+
+import type { Device } from '../device/Device';
+import type DeviceConnector from '../device/DeviceConnector';
+import type { DeviceFirmwareRange, KnownDevice } from '../types';
+import type { CoreMessage } from '../events';
 import type { CoreContext } from '../core';
 
 const Log = getLogger(LoggerNames.Method);
@@ -128,7 +137,8 @@ export abstract class BaseMethod<Params = undefined> {
 
   checkFirmwareRelease() {
     if (!this.device || !this.device.features) return;
-    const releaseInfo = getFirmwareReleaseInfo(this.device.features);
+    const firmwareType = getFirmwareType(this.device.features);
+    const releaseInfo = getFirmwareReleaseInfo(this.device.features, firmwareType);
     this.postMessage(
       createFirmwareMessage(FIRMWARE.RELEASE_INFO, {
         ...releaseInfo,

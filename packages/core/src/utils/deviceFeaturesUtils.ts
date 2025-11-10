@@ -1,17 +1,19 @@
 import semver from 'semver';
 import { isNaN } from 'lodash';
-import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { EDeviceType, type EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { Enum_Capability } from '@onekeyfe/hd-transport';
+
 import { toHardened } from '../api/helpers/pathUtils';
-import { DeviceCommands } from '../device/DeviceCommands';
-import type { Features, SupportFeatureType } from '../types';
 import { DeviceModelToTypes, DeviceTypeToModels } from '../types';
-import DataManager, { IFirmwareField, MessageVersion } from '../data-manager/DataManager';
+import DataManager, { type IFirmwareField, type MessageVersion } from '../data-manager/DataManager';
 import { PROTOBUF_MESSAGE_CONFIG } from '../data-manager/MessagesConfig';
-import { Device } from '../device/Device';
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
 import { existCapability } from './capabilitieUtils';
+
+import type { Device } from '../device/Device';
+import type { DeviceCommands } from '../device/DeviceCommands';
+import type { Features, SupportFeatureType } from '../types';
 
 export const getSupportMessageVersion = (
   features: Features | undefined
@@ -231,6 +233,13 @@ export const supportModifyHomescreen = (features?: Features): SupportFeatureType
   return { support: semver.gte(currentVersion, '3.4.0') };
 };
 
+const getLatestFirmwareField = (firmwareType?: EFirmwareType): IFirmwareField => {
+  if (firmwareType === 'bitcoinonly') {
+    return `firmware-btc-v7`;
+  }
+  return `firmware-v7`;
+};
+
 /**
  *  Since 3.5.0, Touch uses the firmware-v3 field to get firmware release info
  */
@@ -238,33 +247,36 @@ export const getFirmwareUpdateField = ({
   features,
   updateType,
   targetVersion,
+  firmwareType,
 }: {
   features: Features;
   updateType: 'firmware' | 'ble';
   targetVersion?: string;
+  firmwareType: EFirmwareType;
 }): 'ble' | IFirmwareField => {
   const deviceType = getDeviceType(features);
   const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
   if (updateType === 'ble') {
     return 'ble';
   }
+  const latestFirmwareField = getLatestFirmwareField(firmwareType);
 
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
-    return 'firmware-v7';
+    return latestFirmwareField;
   }
 
   if (deviceType === EDeviceType.Touch) {
     if (targetVersion) {
       if (semver.eq(targetVersion, '4.0.0')) return 'firmware-v2';
-      if (semver.gt(targetVersion, '4.0.0')) return 'firmware-v7';
+      if (semver.gt(targetVersion, '4.0.0')) return latestFirmwareField;
     }
 
     if (semver.lt(deviceFirmwareVersion.join('.'), '3.4.0')) return 'firmware';
 
-    return 'firmware-v7';
+    return latestFirmwareField;
   }
   if (deviceType === EDeviceType.Pro) {
-    return 'firmware-v7';
+    return latestFirmwareField;
   }
   return 'firmware';
 };
@@ -276,7 +288,7 @@ export const getFirmwareUpdateField = ({
 export const getFirmwareUpdateFieldArray = (
   features: Features,
   updateType: 'firmware' | 'ble' | 'bootloader'
-): ('firmware' | 'ble' | 'firmware-v2' | 'firmware-v7')[] => {
+): ('ble' | IFirmwareField)[] => {
   const deviceType = getDeviceType(features);
   if (updateType === 'ble') {
     return ['ble'];

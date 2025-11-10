@@ -1,16 +1,17 @@
 import ByteBuffer from 'bytebuffer';
 import semver from 'semver';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import { DeviceModelToTypes, Features } from '../../types';
 import { getDeviceType, getDeviceBootloaderVersion, getDeviceFirmwareVersion } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { shouldUpdateBootloaderForClassicAndMini } from './bootloaderHelper';
 
-export function checkNeedUpdateBootForTouch(features: Features) {
+export function checkNeedUpdateBootForTouch(features: Features, firmwareType: EFirmwareType) {
   const deviceType = getDeviceType(features);
   if (!DeviceModelToTypes.model_touch.includes(deviceType)) return false;
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
-  const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features);
+  const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features, firmwareType);
   if (!targetBootloaderVersion) return false;
 
   return (
@@ -23,22 +24,29 @@ export function checkNeedUpdateBootForTouch(features: Features) {
   );
 }
 
-export function checkNeedUpdateBootForClassicAndMini(
-  features: Features,
-  willUpdateFirmware?: string
-) {
+export function checkNeedUpdateBootForClassicAndMini({
+  features,
+  willUpdateFirmware,
+  firmwareType,
+}: {
+  features: Features;
+  willUpdateFirmware?: string;
+  firmwareType: EFirmwareType;
+}) {
   const deviceType = getDeviceType(features);
   if (!DeviceModelToTypes.model_mini.includes(deviceType)) return false;
   if (!willUpdateFirmware) return false;
   const currentVersion = getDeviceFirmwareVersion(features).join('.');
   const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
-  const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features);
+  const targetBootloaderVersion = DataManager.getBootloaderTargetVersion(features, firmwareType);
   if (targetBootloaderVersion && semver.gte(bootloaderVersion, targetBootloaderVersion.join('.'))) {
     return false;
   }
 
-  const bootloaderRelatedFirmwareVersion =
-    DataManager.getBootloaderRelatedFirmwareVersion(features);
+  const bootloaderRelatedFirmwareVersion = DataManager.getBootloaderRelatedFirmwareVersion(
+    features,
+    firmwareType
+  );
   if (!bootloaderRelatedFirmwareVersion) return false;
 
   return shouldUpdateBootloaderForClassicAndMini({

@@ -9,22 +9,21 @@ import {
 import { serializedPath, toHardened } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { CoreApi } from '../../types';
-import type {
-  AllNetworkAddressParams,
-  INetwork,
-  AllNetworkAddress,
-  CommonResponseParams,
-} from '../../types/api/allNetworkGetAddress';
 import { PROTO } from '../../constants';
-
 import { findMethod } from '../utils';
-import { createUiMessage, DEVICE, IFRAME } from '../../events';
+import { DEVICE, IFRAME, createUiMessage } from '../../events';
 import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
-import { Device, DeviceEvents } from '../../device/Device';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
-import { DevicePool } from '../../device/DevicePool';
+
+import type { Device, DeviceEvents } from '../../device/Device';
+import type { CoreApi } from '../../types';
+import type {
+  AllNetworkAddress,
+  AllNetworkAddressParams,
+  CommonResponseParams,
+  INetwork,
+} from '../../types/api/allNetworkGetAddress';
 
 const Mainnet = 'mainnet';
 
