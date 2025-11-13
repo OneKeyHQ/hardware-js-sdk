@@ -50,7 +50,7 @@ const deviceCharacteristics = new Map<string, CharacteristicPair>();
 const notificationCallbacks = new Map<string, (data: string) => void>();
 const subscribedDevices = new Map<string, boolean>(); // Track subscription status
 
-// 🔒 Add subscription operation state tracking to prevent race conditions
+// 🔒 Subscription operation state tracking to prevent race conditions
 const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' | 'idle'>();
 
 // Packet reassembly state for each device
@@ -1367,25 +1367,28 @@ async function unsubscribeNotifications(deviceId: string): Promise<void> {
   // 🔒 Set operation state to prevent race conditions
   subscriptionOperations.set(deviceId, 'unsubscribing');
 
-  return new Promise<void>(resolve => {
-    notifyCharacteristic.unsubscribe((error: Error | undefined) => {
-      if (error) {
-        logger?.error('[NobleBLE] Notification unsubscription failed:', error);
-      } else {
-        logger?.info('[NobleBLE] Notification unsubscription successful');
-      }
-
-      // Remove all listeners and clear subscription status
-      notifyCharacteristic.removeAllListeners('data');
-      notificationCallbacks.delete(deviceId);
-      devicePacketStates.delete(deviceId);
-      subscribedDevices.delete(deviceId);
-
-      // 🔒 Clear operation state
-      subscriptionOperations.set(deviceId, 'idle');
-      resolve();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      notifyCharacteristic.unsubscribe((error: Error | undefined) => {
+        if (error) {
+          logger?.error('[NobleBLE] Notification unsubscription failed:', error);
+          reject(error);
+        } else {
+          logger?.info('[NobleBLE] Notification unsubscription successful');
+          resolve();
+        }
+      });
     });
-  });
+
+    // Remove all listeners and clear subscription status
+    notifyCharacteristic.removeAllListeners('data');
+    notificationCallbacks.delete(deviceId);
+    devicePacketStates.delete(deviceId);
+    subscribedDevices.delete(deviceId);
+  } finally {
+    // 🔒 CRITICAL: Always clear operation state (even on error)
+    subscriptionOperations.set(deviceId, 'idle');
+  }
 }
 
 // Subscribe to notifications
@@ -1406,18 +1409,35 @@ async function subscribeNotifications(
   const { notify: notifyCharacteristic } = characteristics;
 
   logger?.info('[NobleBLE] Subscribing to notifications for device:', deviceId);
+
+  // 🔒 CRITICAL: Check operation state FIRST to prevent race conditions
+  const opState = subscriptionOperations.get(deviceId);
+
   logger?.info('[NobleBLE] Subscribe context', {
     deviceId,
-    opStateBefore: subscriptionOperations.get(deviceId) || 'idle',
+    opStateBefore: opState || 'idle',
     paired: false,
     hasController: false,
   });
+
   // If a subscription is already in progress, dedupe
-  const opState = subscriptionOperations.get(deviceId);
   if (opState === 'subscribing') {
-    // Subscription in progress; update callback and return
+    logger?.info('[NobleBLE] Subscription already in progress, updating callback only');
     notificationCallbacks.set(deviceId, callback);
     return Promise.resolve();
+  }
+
+  // 🚨 CRITICAL: Reject subscribe if unsubscribe is in progress
+  // Let upper layer handle retry after device reconnection
+  if (opState === 'unsubscribing') {
+    logger?.error('[NobleBLE] Cannot subscribe while unsubscribe is in progress', {
+      deviceId,
+      opState,
+    });
+    throw ERRORS.TypedError(
+      HardwareErrorCode.DeviceBusy,
+      `Device ${deviceId} is currently unsubscribing, please retry after reconnection`
+    );
   }
 
   // 🔒 Set operation state to prevent race conditions
