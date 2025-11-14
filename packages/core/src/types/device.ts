@@ -1,6 +1,7 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
+
+import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
-import { IVersionArray } from './settings';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 

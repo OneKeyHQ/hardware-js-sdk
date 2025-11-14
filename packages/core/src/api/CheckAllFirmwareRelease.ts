@@ -67,6 +67,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
             release: bridgeReleaseInfo.releaseVersion,
           }
         : undefined,
+      features,
     } as AllFirmwareRelease;
   }
 }
