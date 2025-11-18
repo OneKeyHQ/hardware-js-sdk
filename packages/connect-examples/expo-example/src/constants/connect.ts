@@ -1,4 +1,3 @@
 // eslint-disable-next-line import/no-relative-packages
-import { getConnectSrc } from '@onekey-internal/shared-constants';
 
-export const CONNECT_SRC = getConnectSrc();
+export const CONNECT_SRC = process.env.CONNECT_SRC || `https://jssdk.onekey.so/1.1.17/`;

@@ -55,6 +55,13 @@ module.exports = async function (env, argv) {
     });
   });
 
+  // Force axios to use our wrapper which ensures .default exists
+  config.resolve.alias = {
+    ...config.resolve.alias,
+    // Force all axios imports to use our wrapper (no $ to match all imports including from node_modules)
+    axios: require.resolve('./shim/axios.js'),
+  };
+
   // 保持其他配置不变
   config.resolve.fallback = {
     crypto: require.resolve('./shim/crypto'),
