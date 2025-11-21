@@ -299,6 +299,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       if (error?.errorCode) {
         const unexpectedError = [
           HardwareErrorCode.ActionCancelled,
+          HardwareErrorCode.CallQueueActionCancelled,
           HardwareErrorCode.FirmwareVerificationFailed,
           // BLE connection errors
           HardwareErrorCode.BleDeviceNotBonded,
@@ -365,6 +366,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           firmwareVersion,
         };
       } catch (error) {
+        // Hardware install firmware progress message
         if (error.message && error.message.includes('Update mode')) {
           const updateParts = error.message.split('Update mode ');
           const progressValue = updateParts[1] ?? '0';

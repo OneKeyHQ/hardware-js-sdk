@@ -22,6 +22,7 @@ import type { Device } from '../device/Device';
 import type DeviceConnector from '../device/DeviceConnector';
 import type { DeviceFirmwareRange, KnownDevice } from '../types';
 import type { CoreMessage } from '../events';
+import { generateInstanceId, RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
 
 const Log = getLogger(LoggerNames.Method);
@@ -53,6 +54,12 @@ export abstract class BaseMethod<Params = undefined> {
    * method name
    */
   name: string;
+
+  instanceId!: string;
+
+  sdkInstanceId?: string;
+
+  requestContext?: RequestContext;
 
   /**
    * 请求携带参数
@@ -130,9 +137,39 @@ export abstract class BaseMethod<Params = undefined> {
     return {};
   }
 
+  setContext(context: CoreContext) {
+    this.sdkInstanceId = context.sdkInstanceId;
+    this.instanceId = generateInstanceId('Method', this.sdkInstanceId);
+    Log.debug(
+      `[BaseMethod] Created: ${this.instanceId}, method: ${this.name}, SDK: ${this.sdkInstanceId}`
+    );
+  }
+
   setDevice(device: Device) {
     this.device = device;
-    // this.connectId = device.originalDescriptor.path;
+
+    if (!device.sdkInstanceId && this.sdkInstanceId) {
+      device.sdkInstanceId = this.sdkInstanceId;
+      device.instanceId = generateInstanceId('Device', this.sdkInstanceId);
+    }
+
+    if (this.requestContext) {
+      this.requestContext.deviceInstanceId = device.instanceId;
+      this.requestContext.commandsInstanceId = device.commands?.instanceId;
+      this.requestContext.sdkInstanceId = this.sdkInstanceId;
+    }
+
+    if (device.commands && this.sdkInstanceId) {
+      device.commands.instanceId = generateInstanceId('DeviceCommands', this.sdkInstanceId);
+    }
+
+    if (device.commands) {
+      device.commands.currentResponseID = this.responseID;
+    }
+
+    Log.debug(
+      `[${this.instanceId}] setDevice: ${device.instanceId}, commands: ${device.commands?.instanceId}`
+    );
   }
 
   checkFirmwareRelease() {

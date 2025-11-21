@@ -35,6 +35,11 @@ export type KnownDevice = {
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
   firmwareVersion: IVersionArray | null;
+
+  // debug sdk
+  instanceId?: string;
+  sdkInstanceId?: string;
+  createdAt?: number;
 };
 
 export type SearchDevice = {

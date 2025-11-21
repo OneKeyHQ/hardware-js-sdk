@@ -6,6 +6,11 @@ import { patchFeatures, getLogger, LoggerNames, getDeviceType } from '../utils';
 import type { Device } from './Device';
 import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
+import {
+  formatRequestContext,
+  generateInstanceId,
+  getActiveRequestsByDeviceInstance,
+} from '../utils/tracing';
 
 export type PassphrasePromptResponse = {
   passphrase?: string;
@@ -114,12 +119,17 @@ export const cancelDeviceWithInitialize = (device: Device) => {
 };
 
 const Log = getLogger(LoggerNames.DeviceCommands);
+const LogCore = getLogger(LoggerNames.Core);
 
 /**
  * The life cycle begins with the acquisition of the device and ends with the disposal device commands
  * acquire device -> create DeviceCommands -> release device -> dispose DeviceCommands
  */
 export class DeviceCommands {
+  instanceId: string;
+
+  currentResponseID?: number;
+
   device: Device;
 
   transport: Transport;
@@ -135,6 +145,9 @@ export class DeviceCommands {
     this.mainId = mainId;
     this.transport = TransportManager.getTransport();
     this.disposed = false;
+    this.instanceId = generateInstanceId('DeviceCommands', device.sdkInstanceId);
+
+    Log.debug(`[DeviceCommands] Created: ${this.instanceId}, device: ${this.device.instanceId}`);
   }
 
   async dispose(_cancelRequest: boolean) {
@@ -217,10 +230,10 @@ export class DeviceCommands {
       const promise = this.transport.call(this.mainId, type, msg) as any;
       this.callPromise = promise;
       const res = await promise;
-      Log.debug('[DeviceCommands] [call] Received', res.type);
+      LogCore.debug('[DeviceCommands] [call] Received', res.type);
       return res;
     } catch (error) {
-      Log.debug('[DeviceCommands] [call] Received error', error);
+      LogCore.debug('[DeviceCommands] [call] Received error', error);
       if (error.errorCode === HardwareErrorCode.BleDeviceBondError) {
         return {
           type: 'BleDeviceBondError',
@@ -500,7 +513,7 @@ export class DeviceCommands {
         cancelDeviceInPrompt(this.device, false)
           .then(onCancel => {
             const error = ERRORS.TypedError(
-              HardwareErrorCode.ActionCancelled,
+              HardwareErrorCode.CallQueueActionCancelled,
               `${DEVICE.PIN} canceled`
             );
             // onCancel not void
@@ -515,7 +528,15 @@ export class DeviceCommands {
             reject(error);
           });
 
-      if (this.device.listenerCount(DEVICE.PIN) > 0) {
+      const listenerCount = this.device.listenerCount(DEVICE.PIN);
+
+      Log.debug(`[${this.instanceId}] _promptPin called`, {
+        responseID: this.currentResponseID,
+        deviceInstanceId: this.device.instanceId,
+        listenerCount,
+      });
+
+      if (listenerCount > 0) {
         this.device.setCancelableAction(cancelAndReject);
         this.device.emit(DEVICE.PIN, this.device, type, (err, pin) => {
           this.device.clearCancelableAction();
@@ -526,11 +547,22 @@ export class DeviceCommands {
           }
         });
       } else {
-        console.warn('[DeviceCommands] [call] PIN callback not configured, cancelling request');
+        const activeRequests = getActiveRequestsByDeviceInstance(this.device.instanceId);
+        const errorInfo = {
+          commandsInstanceId: this.instanceId,
+          deviceInstanceId: this.device.instanceId,
+          currentResponseID: this.currentResponseID,
+          listenerCount,
+          activeRequests: activeRequests.map(formatRequestContext),
+        };
+
+        LogCore.error('[DeviceCommands] [call] PIN callback not configured, cancelling request', {
+          ...errorInfo,
+        });
         reject(
           ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
-            '_promptPin: PIN callback not configured'
+            `_promptPin: PIN callback not configured: ${JSON.stringify(errorInfo)}`
           )
         );
       }
@@ -543,7 +575,7 @@ export class DeviceCommands {
         cancelDeviceInPrompt(this.device, false)
           .then(onCancel => {
             const error = ERRORS.TypedError(
-              HardwareErrorCode.ActionCancelled,
+              HardwareErrorCode.CallQueueActionCancelled,
               `${DEVICE.PASSPHRASE} canceled`
             );
             // onCancel not void
@@ -574,7 +606,9 @@ export class DeviceCommands {
           }
         );
       } else {
-        Log.error('[DeviceCommands] [call] Passphrase callback not configured, cancelling request');
+        LogCore.error(
+          '[DeviceCommands] [call] Passphrase callback not configured, cancelling request'
+        );
         reject(
           ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,

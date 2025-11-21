@@ -248,10 +248,7 @@ export default class WebUsbTransport {
 
     const firstPacket = await device.transferIn(this.endpointId, PACKET_SIZE);
     const firstData = firstPacket.data?.buffer.slice(1);
-    console.log('receive first packet: ', firstPacket);
     const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData as ArrayBuffer);
-
-    console.log('chunk length: ', length);
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const lengthWithHeader = Number(length + HEADER_LENGTH);
@@ -261,7 +258,6 @@ export default class WebUsbTransport {
     if (length) {
       decoded.append(restBuffer);
     }
-    console.log('first decoded: ', decoded);
 
     while (decoded.offset < lengthWithHeader) {
       const res = await device.transferIn(this.endpointId, PACKET_SIZE);

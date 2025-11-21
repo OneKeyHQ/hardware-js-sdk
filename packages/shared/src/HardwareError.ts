@@ -452,6 +452,8 @@ export const HardwareErrorCode = {
    */
   BridgeNeedsPermission: 821,
 
+  CallQueueActionCancelled: 822,
+
   /**
    * Lowlevel transport connect error
    */
@@ -577,6 +579,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.PinInvalid]: 'Pin invalid',
   [HardwareErrorCode.PinCancelled]: 'Pin cancelled',
   [HardwareErrorCode.ActionCancelled]: 'Action cancelled by user',
+  [HardwareErrorCode.CallQueueActionCancelled]: 'Action cancelled by user on call queue',
   [HardwareErrorCode.FirmwareError]: 'Firmware installation failed',
   [HardwareErrorCode.ResponseUnexpectTypeError]: 'Response type is not expected',
   [HardwareErrorCode.BridgeNetworkError]: 'Bridge network error',

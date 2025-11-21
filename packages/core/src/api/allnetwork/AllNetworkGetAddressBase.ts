@@ -15,6 +15,11 @@ import { DEVICE, IFRAME, createUiMessage } from '../../events';
 import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
+import {
+  completeRequestContext,
+  createRequestContext,
+  updateRequestContext,
+} from '../../utils/tracing';
 
 import type { Device, DeviceEvents } from '../../device/Device';
 import type { CoreApi } from '../../types';
@@ -321,6 +326,27 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
 
     method.connector = this.connector;
     method.postMessage = this.postMessage;
+    if (this.context) {
+      method.setContext?.(this.context);
+    }
+
+    method.requestContext = createRequestContext(method.responseID, methodName, {
+      sdkInstanceId: this.sdkInstanceId,
+      connectId: this.payload.connectId,
+      parentResponseID: this.responseID,
+    });
+
+    const onSignalAbort = () => {
+      this.abortController?.abort(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
+    };
+
+    const buttonListener = (...[device, request]: [...DeviceEvents['button']]) => {
+      if (request.code === 'ButtonRequest_PinEntry' || request.code === 'ButtonRequest_AttachPin') {
+        onSignalAbort();
+      } else {
+        onDeviceButtonHandler(device, request);
+      }
+    };
 
     let result: AllNetworkAddress[];
     try {
@@ -328,23 +354,15 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       method.setDevice?.(this.device);
       method.context = this.context;
 
-      const onSignalAbort = () => {
-        this.abortController?.abort(HardwareErrorCodeMessage[HardwareErrorCode.RepeatUnlocking]);
-      };
-
-      const _onDeviceButtonHandler = (...[device, request]: [...DeviceEvents['button']]) => {
-        if (
-          request.code === 'ButtonRequest_PinEntry' ||
-          request.code === 'ButtonRequest_AttachPin'
-        ) {
-          onSignalAbort();
-        } else {
-          onDeviceButtonHandler(device, request);
-        }
-      };
+      if (method.requestContext && this.device) {
+        updateRequestContext(method.requestContext.responseID, {
+          deviceInstanceId: this.device.instanceId,
+          commandsInstanceId: this.device.commands?.instanceId,
+        });
+      }
 
       // pro pin event
-      this.device.on(DEVICE.BUTTON, _onDeviceButtonHandler);
+      this.device.on(DEVICE.BUTTON, buttonListener);
       // classic pin event
       this.device.on(DEVICE.PIN, onSignalAbort);
       this.device.on(DEVICE.PASSPHRASE, onSignalAbort);
@@ -365,6 +383,9 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
           rootFingerprint,
         },
       }));
+      if (method.requestContext) {
+        completeRequestContext(method.requestContext.responseID);
+      }
     } catch (e: any) {
       const error = handleSkippableHardwareError(e, this.device, method);
 
@@ -383,6 +404,16 @@ export default abstract class AllNetworkGetAddressBase extends BaseMethod<
       } else {
         throw e;
       }
+      if (method.requestContext) {
+        completeRequestContext(
+          method.requestContext.responseID,
+          e instanceof Error ? e : new Error(String(e))
+        );
+      }
+    } finally {
+      this.device.off(DEVICE.BUTTON, buttonListener);
+      this.device.off(DEVICE.PIN, onSignalAbort);
+      this.device.off(DEVICE.PASSPHRASE, onSignalAbort);
     }
 
     return result;
