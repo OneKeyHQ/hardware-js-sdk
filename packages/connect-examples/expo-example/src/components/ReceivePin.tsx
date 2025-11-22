@@ -1,9 +1,10 @@
-import React, { useMemo, useCallback, memo } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import { Dialog, Stack, Text, Unspaced, XStack, YStack } from 'tamagui';
 import { Delete, X } from '@tamagui/lucide-icons';
 import { StyleSheet } from 'react-native';
 import { atom, getDefaultStore, useAtomValue, useSetAtom } from 'jotai';
+
 import { Button } from './ui/Button';
 import { useMedia } from '../provider/MediaProvider';
 
@@ -256,10 +257,19 @@ type IReceivePinProps = {
   onConfirm: (value: string) => void;
   onSwitchDevice: () => void;
   onCancel: () => void;
+  onTestUnexpectedMessage: () => void;
 };
 
 export const ReceivePin = memo<IReceivePinProps>(
-  ({ open, payload, onOpenChange, onConfirm, onSwitchDevice, onCancel }: IReceivePinProps) => {
+  ({
+    open,
+    payload,
+    onOpenChange,
+    onConfirm,
+    onSwitchDevice,
+    onCancel,
+    onTestUnexpectedMessage,
+  }: IReceivePinProps) => {
     const intl = useIntl();
     const media = useMedia();
     const setPinAction = useSetAtom(pinActionsAtom);
@@ -312,6 +322,7 @@ export const ReceivePin = memo<IReceivePinProps>(
               {payload && <Text>payload: {JSON.stringify(payload)}</Text>}
               <PinInputArea />
               <PinActions onConfirm={onConfirm} onSwitchDevice={onSwitchDevice} />
+              <Button onPress={onTestUnexpectedMessage}>Test UnexpectedMessage</Button>
             </YStack>
 
             <CloseButton onCancel={handleCancel} />

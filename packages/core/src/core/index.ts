@@ -1,28 +1,27 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
-  createDeferred,
-  Deferred,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
+  createDefectiveFirmwareError,
+  createDeferred,
   createDeprecatedHardwareError,
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
-  createDefectiveFirmwareError,
 } from '@onekeyfe/hd-shared';
+
 import {
-  getDeviceFirmwareVersion,
-  getDeviceBLEFirmwareVersion,
-  enableLog,
-  getLogger,
   LoggerNames,
+  enableLog,
+  getDeviceBLEFirmwareVersion,
+  getDeviceFirmwareVersion,
+  getFirmwareType,
+  getLogger,
+  getMethodVersionRange,
   setLoggerPostMessage,
   wait,
-  getMethodVersionRange,
-  getFirmwareType,
 } from '../utils';
 import {
   findDefectiveBatchDevice,
@@ -30,42 +29,46 @@ import {
 } from '../utils/findDefectiveBatchDevice';
 import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
 import {
+  cleanupSdkInstance,
   completeRequestContext,
   createRequestContext,
   createSdkTracingContext,
   formatRequestContext,
   getActiveRequestsByDeviceInstance,
-  SdkTracingContext,
   updateRequestContext,
-  cleanupSdkInstance,
 } from '../utils/tracing';
-import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
+import { Device } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-
 import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
 import {
   CORE_EVENT,
-  CoreMessage,
+  DEVICE,
+  IFRAME,
+  UI_REQUEST,
+  UI_RESPONSE,
   createDeviceMessage,
   createResponseMessage,
   createUiMessage,
-  DEVICE,
-  IFRAME,
-  IFrameCallMessage,
-  UI_REQUEST,
-  UI_RESPONSE,
-  UiPromise,
-  UiPromiseResponse,
 } from '../events';
-import type { BaseMethod } from '../api/BaseMethod';
-import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
 import { getSynchronize } from '../utils/getSynchronize';
+
+import type { ConnectSettings, KnownDevice } from '../types';
+import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
+import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
+import type { SdkTracingContext } from '../utils/tracing';
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type {
+  Features,
+  LowlevelTransportSharedPlugin,
+  OneKeyDeviceInfo,
+} from '@onekeyfe/hd-transport';
+import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
 
@@ -585,8 +588,9 @@ const onCallDevice = async (
             pinListeners: device.listenerCount(DEVICE.PIN),
           }
         );
+      } else {
+        removeDeviceListener(device);
       }
-      removeDeviceListener(device);
     }
   }
 };
@@ -1091,6 +1095,9 @@ const onSelectDeviceInBootloaderForWebDeviceHandler = async (
  * @memberof Core
  */
 const postMessage = (message: CoreMessage) => {
+  if (!_core) {
+    return;
+  }
   _core.emit(CORE_EVENT, message);
 };
 

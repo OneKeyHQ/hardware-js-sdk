@@ -1,10 +1,13 @@
 import ByteBuffer from 'bytebuffer';
 import semver from 'semver';
-import type { EFirmwareType } from '@onekeyfe/hd-shared';
-import { DeviceModelToTypes, Features } from '../../types';
-import { getDeviceType, getDeviceBootloaderVersion, getDeviceFirmwareVersion } from '../../utils';
+
+import { DeviceModelToTypes } from '../../types';
+import { getDeviceBootloaderVersion, getDeviceFirmwareVersion, getDeviceType } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { shouldUpdateBootloaderForClassicAndMini } from './bootloaderHelper';
+
+import type { Features } from '../../types';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 
 export function checkNeedUpdateBootForTouch(features: Features, firmwareType: EFirmwareType) {
   const deviceType = getDeviceType(features);

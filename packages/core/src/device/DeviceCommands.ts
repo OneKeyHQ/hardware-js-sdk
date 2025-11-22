@@ -1,9 +1,8 @@
-import type { Transport, Messages, FailureType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
-import { patchFeatures, getLogger, LoggerNames, getDeviceType } from '../utils';
-import type { Device } from './Device';
+import { LoggerNames, getDeviceType, getLogger, patchFeatures } from '../utils';
 import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
 import {
@@ -11,6 +10,9 @@ import {
   generateInstanceId,
   getActiveRequestsByDeviceInstance,
 } from '../utils/tracing';
+
+import type { Device } from './Device';
+import type { FailureType, Messages, Transport } from '@onekeyfe/hd-transport';
 
 export type PassphrasePromptResponse = {
   passphrase?: string;
@@ -230,7 +232,11 @@ export class DeviceCommands {
       const promise = this.transport.call(this.mainId, type, msg) as any;
       this.callPromise = promise;
       const res = await promise;
-      LogCore.debug('[DeviceCommands] [call] Received', res.type);
+      if (res.type === 'Failure') {
+        LogCore.debug('[DeviceCommands] [call] Received', res.type, res.message);
+      } else {
+        LogCore.debug('[DeviceCommands] [call] Received', res.type);
+      }
       return res;
     } catch (error) {
       LogCore.debug('[DeviceCommands] [call] Received error', error);
@@ -413,14 +419,16 @@ export class DeviceCommands {
           message?.includes('verify failed')
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.FirmwareVerificationFailed, message);
+        } else if (message?.includes('Firmware downgrade not allowed')) {
+          // Check firmware check failed
+          error = ERRORS.TypedError(HardwareErrorCode.FirmwareDowngradeNotAllowed, message);
         }
       }
 
       if (code === 'Failure_UnexpectedMessage') {
         if (callType === 'PassphraseAck') {
           error = ERRORS.TypedError(HardwareErrorCode.UnexpectPassphrase);
-        }
-        if (message === 'Not in Signing mode') {
+        } else if (message === 'Not in Signing mode') {
           error = ERRORS.TypedError(HardwareErrorCode.NotInSigningMode);
         }
       }

@@ -455,6 +455,11 @@ export const HardwareErrorCode = {
   CallQueueActionCancelled: 822,
 
   /**
+   * Firmware downgrade not allowed
+   */
+  FirmwareDowngradeNotAllowed: 823,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -598,6 +603,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.EmmcFileWriteFirmwareError]: 'EMMC file write firmware error',
   [HardwareErrorCode.FirmwareVerificationFailed]: 'Firmware verification failed',
   [HardwareErrorCode.BridgeNeedsPermission]: 'Bridge needs permission',
+  [HardwareErrorCode.FirmwareDowngradeNotAllowed]: 'Firmware downgrade not allowed',
 
   /**
    * Lowlevel transport

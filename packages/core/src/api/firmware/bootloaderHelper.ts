@@ -1,7 +1,9 @@
 import semver from 'semver';
 import { EDeviceType } from '@onekeyfe/hd-shared';
-import { Features, IVersionArray } from '../../types';
+
 import { getDeviceType } from '../../utils';
+
+import type { Features, IVersionArray } from '../../types';
 
 export function shouldUpdateBootloaderForClassicAndMini({
   currentVersion,

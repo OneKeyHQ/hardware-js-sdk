@@ -206,7 +206,8 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       this.device.getCommands().typedCall.bind(this.device.getCommands()),
       this.postMessage,
       device,
-      { payload: binary, rebootOnSuccess: this.payload.rebootOnSuccess }
+      { payload: binary, rebootOnSuccess: this.payload.rebootOnSuccess },
+      false
     );
 
     if (this.connectId) {
