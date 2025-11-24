@@ -139,9 +139,9 @@ export const uploadFirmware = async (
         const header = new Uint8Array(payload.slice(0, HEADER_SIZE));
 
         try {
-          const headerRes = (await typedCall('UpgradeFileHeader', 'Success', {
+          const headerRes = await typedCall('UpgradeFileHeader', 'Success', {
             data: bytesToHex(header),
-          })) as TypedResponseMessage<'Success'>;
+          });
 
           const isUnknownMessage = headerRes.message?.message?.includes('Failure_UnknownMessage');
 
