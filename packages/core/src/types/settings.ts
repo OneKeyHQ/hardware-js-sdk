@@ -1,3 +1,4 @@
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { IDeviceType } from './device';
 
 export type transportEnv =
@@ -40,6 +41,11 @@ export type ILocale = 'zh-CN' | 'en-US';
 export type IFirmwareReleaseInfo = {
   required: boolean;
   url: string;
+  /**
+   * Firmware type (bitcoinonly or universal)
+   * This field is not present in the remote config, but will be inferred from the firmware field name
+   */
+  firmwareType?: EFirmwareType;
   /** Firmware UI resource */
   resource?: string;
   /** Firmware full UI resource */
@@ -75,11 +81,42 @@ export type IBLEFirmwareReleaseInfo = {
 };
 
 type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
+
+/**
+ * Device firmware configuration map
+ *
+ * IMPORTANT: This type is used for firmware update logic.
+ * - DO NOT remove existing firmware fields
+ * - Only ADD new optional firmware fields for new versions
+ * - 'firmware' field is required for backward compatibility
+ * - 'ble' field is required for BLE firmware updates
+ *
+ * @example
+ * // When adding firmware-v8:
+ * // {
+ * //   firmware: IFirmwareReleaseInfo[];
+ * //   'firmware-v2'?: IFirmwareReleaseInfo[];
+ * //   'firmware-v7'?: IFirmwareReleaseInfo[];
+ * //   'firmware-v8'?: IFirmwareReleaseInfo[];      // New
+ * //   'firmware-btc-v7'?: IFirmwareReleaseInfo[];
+ * //   'firmware-btc-v8'?: IFirmwareReleaseInfo[];  // New
+ * //   ble: IBLEFirmwareReleaseInfo[];
+ * // }
+ */
 export type DeviceTypeMap = {
   [k in IKnownDevice]: {
+    /** Base firmware field (required for backward compatibility) */
     firmware: IFirmwareReleaseInfo[];
+    /** Firmware v2 (Touch/Pro specific) */
     'firmware-v2'?: IFirmwareReleaseInfo[];
+    /** Universal firmware v7 */
     'firmware-v7'?: IFirmwareReleaseInfo[];
+    /** Bitcoin-only firmware v7 */
+    'firmware-btc-v7'?: IFirmwareReleaseInfo[];
+    // Future firmware versions should be added here as optional fields:
+    // 'firmware-v8'?: IFirmwareReleaseInfo[];
+    // 'firmware-btc-v8'?: IFirmwareReleaseInfo[];
+    /** BLE firmware (required) */
     ble: IBLEFirmwareReleaseInfo[];
   };
 };

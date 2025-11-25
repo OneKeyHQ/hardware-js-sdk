@@ -1,29 +1,27 @@
 import {
-  createDeferred,
-  Deferred,
   EDeviceType,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
+  createDeferred,
 } from '@onekeyfe/hd-shared';
-import { RebootType } from '@onekeyfe/hd-transport';
-import type { KnownDevice } from '../../types';
 
-import {
-  UI_REQUEST,
-  createUiMessage,
-  FirmwareUpdateTipMessage,
-  IFirmwareUpdateTipMessage,
-  IFirmwareUpdateProgressType,
-} from '../../events/ui-request';
+import { FirmwareUpdateTipMessage, UI_REQUEST, createUiMessage } from '../../events/ui-request';
 import { DevicePool } from '../../device/DevicePool';
-import { getDeviceType, wait, getLogger, LoggerNames, getDeviceUUID } from '../../utils';
+import { LoggerNames, getDeviceType, getDeviceUUID, getLogger, wait } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
 import { DataManager } from '../../data-manager';
-
 import { BaseMethod } from '../BaseMethod';
 import { DEVICE } from '../../events';
-import { PROTO } from '../../constants';
+
+import type {
+  IFirmwareUpdateProgressType,
+  IFirmwareUpdateTipMessage,
+} from '../../events/ui-request';
+import type { PROTO } from '../../constants';
+import type { RebootType } from '@onekeyfe/hd-transport';
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type { KnownDevice } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 const Log = getLogger(LoggerNames.Method);
@@ -266,16 +264,16 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
    */
   async startEmmcFirmwareUpdate({ path }: { path: string }) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
-    let updaeteResponse: TypedResponseMessage<'Success'>;
+    let updateResponse: TypedResponseMessage<'Success'>;
     try {
-      updaeteResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
+      updateResponse = await typedCall('FirmwareUpdateEmmc', 'Success', {
         path,
         reboot_on_success: true,
       });
     } catch (error) {
       if (isDeviceDisconnectedError(error)) {
         Log.log('Rebooting device');
-        updaeteResponse = {
+        updateResponse = {
           type: 'Success',
           message: { message: FIRMWARE_UPDATE_CONFIRM },
         };
@@ -283,7 +281,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         throw error;
       }
     }
-    if (updaeteResponse.type !== 'Success') {
+    if (updateResponse.type !== 'Success') {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareError, 'firmware update error');
     }
     this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdating);

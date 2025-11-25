@@ -1,3 +1,4 @@
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { PROTO } from '../../constants';
 import type { Params, Response } from '../params';
 
@@ -10,10 +11,10 @@ export interface FirmwareUpdateBinaryParams {
 
 export interface FirmwareUpdateParams {
   version?: number[];
-  btcOnly?: boolean;
   updateType: IUpdateType;
   forcedUpdateRes?: boolean;
   isUpdateBootloader?: boolean;
+  firmwareType?: EFirmwareType;
 }
 
 export declare function firmwareUpdate(
@@ -49,6 +50,8 @@ export interface FirmwareUpdateV3Params {
 
   resourceBinary?: ArrayBuffer;
   forcedUpdateRes?: boolean;
+
+  firmwareType?: EFirmwareType;
 
   platform: IPlatform;
 }

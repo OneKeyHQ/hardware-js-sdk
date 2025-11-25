@@ -1,5 +1,6 @@
-import { CoreMessage } from '../events';
-import { createLogMessage, LOG } from '../events/log';
+import { LOG, createLogMessage } from '../events/log';
+
+import type { CoreMessage } from '../events';
 
 type LogMessage = {
   level: string;

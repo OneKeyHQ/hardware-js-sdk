@@ -2,28 +2,27 @@ import semver from 'semver';
 import { blake2s } from '@noble/hashes/blake2s';
 import JSZip from 'jszip';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Success } from '@onekeyfe/hd-transport';
+
+import { getDeviceFirmwareVersion } from '../../utils/deviceVersionUtils';
 import {
-  wait,
+  LoggerNames,
   getDeviceBootloaderVersion,
   getDeviceType,
-  LoggerNames,
   getLogger,
+  wait,
 } from '../../utils';
-import {
-  DEVICE,
-  CoreMessage,
-  createUiMessage,
-  UI_REQUEST,
-  IFirmwareUpdateProgressType,
-} from '../../events';
-import { PROTO } from '../../constants';
-import type { Device } from '../../device/Device';
-import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
-import { DeviceModelToTypes, KnownDevice } from '../../types';
+import { DEVICE, UI_REQUEST, createUiMessage } from '../../events';
+import { DeviceModelToTypes } from '../../types';
 import { bytesToHex } from '../helpers/hexUtils';
 import { DataManager } from '../../data-manager';
 import { DevicePool } from '../../device/DevicePool';
+
+import type { KnownDevice } from '../../types';
+import type { TypedCall, TypedResponseMessage } from '../../device/DeviceCommands';
+import type { PROTO } from '../../constants';
+import type { CoreMessage, IFirmwareUpdateProgressType } from '../../events';
+import type { Success } from '@onekeyfe/hd-transport';
+import type { Device } from '../../device/Device';
 
 const NEW_BOOT_UPRATE_FIRMWARE_VERSION = '2.4.5';
 const SESSION_ERROR = 'session not found';
@@ -105,29 +104,96 @@ export const uploadFirmware = async (
     rebootOnSuccess,
   }: PROTO.FirmwareUpload & {
     rebootOnSuccess?: boolean;
-  }
+  },
+  isUpdateBootloader?: boolean
 ) => {
   const deviceType = getDeviceType(device.features);
   if (DeviceModelToTypes.model_mini.includes(deviceType)) {
     postConfirmationMessage(device);
     postProgressTip(device, 'ConfirmOnDevice', postMessage);
-    const eraseCommand = updateType === 'firmware' ? 'FirmwareErase' : 'FirmwareErase_ex';
+
+    const isFirmware = updateType === 'firmware';
+
+    if (isFirmware && !isUpdateBootloader) {
+      const newFeatures = await typedCall('GetFeatures', 'Features', {});
+      const deviceBootloaderVersion = getDeviceBootloaderVersion(newFeatures.message).join('.');
+      const supportUpgradeFileHeader = semver.gte(deviceBootloaderVersion, '2.1.0');
+      Log.debug('supportUpgradeFileHeader:', supportUpgradeFileHeader);
+
+      if (supportUpgradeFileHeader) {
+        // Extract and validate firmware header (first 1KB)
+        const HEADER_SIZE = 1024;
+        if (payload.byteLength < HEADER_SIZE) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.RuntimeError,
+            `firmware payload too small: ${payload.byteLength} bytes, expected at least ${HEADER_SIZE} bytes`
+          );
+        }
+
+        Log.debug('Uploading firmware header:', {
+          size: HEADER_SIZE,
+          totalSize: payload.byteLength,
+        });
+        postProgressTip(device, 'UploadingFirmwareHeader', postMessage);
+
+        const header = new Uint8Array(payload.slice(0, HEADER_SIZE));
+
+        try {
+          const headerRes = await typedCall('UpgradeFileHeader', 'Success', {
+            data: bytesToHex(header),
+          });
+
+          const isUnknownMessage = headerRes.message?.message?.includes('Failure_UnknownMessage');
+
+          if (headerRes.type !== 'Success' && !isUnknownMessage) {
+            Log.error('Firmware header upload failed:', headerRes);
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              'failed to upload firmware header'
+            );
+          }
+        } catch (error) {
+          Log.error('Firmware header upload failed:', error);
+          const message = error instanceof Error ? error.message : String(error ?? '');
+          if (!message.includes('Failure_UnknownMessage')) {
+            throw error;
+          }
+        }
+        Log.debug('Firmware header uploaded successfully');
+      }
+    }
+
+    const eraseCommand = isFirmware ? 'FirmwareErase' : 'FirmwareErase_ex';
     const eraseRes = await typedCall(eraseCommand as unknown as any, 'Success', {});
     if (eraseRes.type !== 'Success') {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'erase firmware error');
     }
     postProgressTip(device, 'FirmwareEraseSuccess', postMessage);
+
     postProgressMessage(device, 0, 'installingFirmware', postMessage);
-    const { message, type } = await typedCall('FirmwareUpload', 'Success', {
-      payload,
-    });
+    let updateResponse: TypedResponseMessage<'Success'>;
+    try {
+      updateResponse = await typedCall('FirmwareUpload', 'Success', {
+        payload,
+      });
+    } catch (error) {
+      if (isDeviceDisconnectedError(error)) {
+        Log.log('Rebooting device');
+        updateResponse = {
+          type: 'Success',
+          message: { message: FIRMWARE_UPDATE_CONFIRM },
+        };
+      } else {
+        throw error;
+      }
+    }
     postProgressMessage(device, 100, 'installingFirmware', postMessage);
 
     await waitBleInstall(updateType);
-    if (type !== 'Success') {
+    if (updateResponse.type !== 'Success') {
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'install firmware error');
     }
-    return message;
+    return updateResponse.message;
   }
 
   if (DeviceModelToTypes.model_touch.includes(deviceType)) {

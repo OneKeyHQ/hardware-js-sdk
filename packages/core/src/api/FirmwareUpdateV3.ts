@@ -1,23 +1,26 @@
-import { Deferred, ERRORS, HardwareErrorCode, EDeviceType, wait } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import JSZip from 'jszip';
-import { UI_REQUEST, FirmwareUpdateTipMessage } from '../events/ui-request';
-import { validateParams } from './helpers/paramsValidator';
 
+import { FirmwareUpdateTipMessage, UI_REQUEST } from '../events/ui-request';
+import { validateParams } from './helpers/paramsValidator';
 import {
-  getDeviceType,
-  getDeviceBootloaderVersion,
-  getDeviceBLEFirmwareVersion,
-  getDeviceFirmwareVersion,
   LoggerNames,
+  getDeviceBLEFirmwareVersion,
+  getDeviceBootloaderVersion,
+  getDeviceFirmwareVersion,
+  getDeviceType,
+  getFirmwareType,
   getLogger,
 } from '../utils';
 import { getBinary, getSysResourceBinary } from './firmware/getBinary';
 import { DataManager } from '../data-manager';
-import { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
-import { TypedResponseMessage } from '../device/DeviceCommands';
+
+import type { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
+import type { Deferred, EFirmwareType } from '@onekeyfe/hd-shared';
+import type { TypedResponseMessage } from '../device/DeviceCommands';
 
 const Log = getLogger(LoggerNames.Method);
 
@@ -54,6 +57,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       { name: 'forcedUpdateRes', type: 'boolean' },
       { name: 'bootloaderVersion', type: 'array' },
       { name: 'bootloaderBinary', type: 'buffer' },
+      { name: 'firmwareType', type: 'string' },
       { name: 'platform', type: 'string' },
     ]);
 
@@ -66,6 +70,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       bootloaderBinary: payload.bootloaderBinary,
       firmwareVersion: payload.firmwareVersion,
       resourceBinary: payload.resourceBinary,
+      firmwareType: payload.firmwareType,
       platform: payload.platform,
     };
   }
@@ -83,14 +88,17 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Device features not available');
     }
 
+    const deviceFirmwareType = getFirmwareType(features);
+    const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
+
     let resourceBinary: ArrayBuffer | null = null;
     let fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
     let bootloaderBinary: ArrayBuffer | null = null;
     try {
       this.postTipMessage(FirmwareUpdateTipMessage.StartDownloadFirmware);
-      resourceBinary = await this.prepareResourceBinary();
-      fwBinaryMap = await this.prepareFirmwareAndBleBinary();
-      bootloaderBinary = await this.prepareBootloaderBinary();
+      resourceBinary = await this.prepareResourceBinary(firmwareType);
+      fwBinaryMap = await this.prepareFirmwareAndBleBinary(firmwareType);
+      bootloaderBinary = await this.prepareBootloaderBinary(firmwareType);
       this.postTipMessage(FirmwareUpdateTipMessage.FinishDownloadFirmware);
     } catch (err) {
       throw ERRORS.TypedError(HardwareErrorCode.FirmwareUpdateDownloadFailed, err.message ?? err);
@@ -130,16 +138,17 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
   }
 
-  private async prepareResourceBinary() {
+  private async prepareResourceBinary(firmwareType: EFirmwareType) {
     if (this.params.resourceBinary) {
       return this.params.resourceBinary;
     }
     const { features } = this.device;
     if (!features) return null;
-    const resourceUrl = DataManager.getSysResourcesLatestRelease(
+    const resourceUrl = DataManager.getSysResourcesLatestRelease({
       features,
-      this.params.forcedUpdateRes
-    );
+      forcedUpdateRes: this.params.forcedUpdateRes,
+      firmwareType,
+    });
 
     if (resourceUrl) {
       const resource = (await getSysResourceBinary(resourceUrl)).binary;
@@ -149,7 +158,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     return null;
   }
 
-  private async prepareBootloaderBinary(): Promise<ArrayBuffer | null> {
+  private async prepareBootloaderBinary(firmwareType: EFirmwareType): Promise<ArrayBuffer | null> {
     if (this.params.bootloaderBinary) {
       return this.params.bootloaderBinary;
     }
@@ -157,7 +166,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     if (!features) return null;
 
     if (this.params.bootloaderVersion) {
-      const bootResourceUrl = DataManager.getBootloaderResource(features);
+      const bootResourceUrl = DataManager.getBootloaderResource(features, firmwareType);
       if (bootResourceUrl) {
         const bootBinary = (await getSysResourceBinary(bootResourceUrl)).binary;
         return bootBinary;
@@ -166,7 +175,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     return null;
   }
 
-  private async prepareFirmwareAndBleBinary() {
+  private async prepareFirmwareAndBleBinary(firmwareType: EFirmwareType) {
     const fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
     if (this.params.firmwareBinary) {
       fwBinaryMap.push({
@@ -182,6 +191,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
             version: this.params.firmwareVersion,
             updateType: 'firmware',
             isUpdateBootloader: false,
+            firmwareType,
           })
         ).binary;
         fwBinaryMap.push({
@@ -203,6 +213,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           features,
           version: this.params.bleVersion,
           updateType: 'ble',
+          firmwareType,
         });
         fwBinaryMap.push({
           fileName: 'ble-firmware.bin',
@@ -288,6 +299,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
       if (error?.errorCode) {
         const unexpectedError = [
           HardwareErrorCode.ActionCancelled,
+          HardwareErrorCode.CallQueueActionCancelled,
           HardwareErrorCode.FirmwareVerificationFailed,
           // BLE connection errors
           HardwareErrorCode.BleDeviceNotBonded,
@@ -354,6 +366,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           firmwareVersion,
         };
       } catch (error) {
+        // Hardware install firmware progress message
         if (error.message && error.message.includes('Update mode')) {
           const updateParts = error.message.split('Update mode ');
           const progressValue = updateParts[1] ?? '0';

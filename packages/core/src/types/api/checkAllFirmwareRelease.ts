@@ -1,6 +1,8 @@
+import type { IBLEFirmwareReleaseInfo } from '../settings';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
+import type { Features } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 import type { IDeviceBLEFirmwareStatus, IDeviceFirmwareStatus } from '../device';
-import { IBLEFirmwareReleaseInfo } from '../settings';
 
 export type FirmwareRelease = {
   shouldUpdate?: boolean;
@@ -18,10 +20,12 @@ export type AllFirmwareRelease = {
   ble: FirmwareRelease;
   bootloader?: FirmwareRelease;
   bridge?: FirmwareRelease;
+  features?: Features;
 };
 
 export type CheckAllFirmwareReleaseParams = {
   checkBridgeRelease?: boolean;
+  firmwareType?: EFirmwareType;
 };
 
 export declare function checkAllFirmwareRelease(

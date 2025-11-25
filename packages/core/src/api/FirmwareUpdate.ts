@@ -1,23 +1,24 @@
 import {
+  EFirmwareType,
   ERRORS,
-  HardwareErrorCode,
   HardwareError,
+  HardwareErrorCode,
   createDeferred,
-  Deferred,
 } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../constants/ui-request';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
 import { getBinary } from './firmware/getBinary';
 import { uploadFirmware } from './firmware/uploadFirmware';
 import { createUiMessage } from '../events';
-import { type KnownDevice, DeviceModelToTypes } from '../types';
-
+import { DeviceModelToTypes, type KnownDevice } from '../types';
 import { isEnteredManuallyBoot } from './firmware/bootloaderHelper';
-
 import { LoggerNames, getDeviceType, getDeviceUUID, getLogger, wait } from '../utils';
 import { DataManager } from '../data-manager';
 import { DevicePool } from '../device/DevicePool';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
 
 type Params = {
   binary?: ArrayBuffer;
@@ -189,6 +190,7 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
           features: device.features,
           version: params.version,
           updateType: params.updateType,
+          firmwareType: EFirmwareType.Universal,
         });
         binary = firmware.binary;
         this.postTipMessage('DownloadFirmwareSuccess');
@@ -204,7 +206,8 @@ export default class FirmwareUpdate extends BaseMethod<Params> {
       this.device.getCommands().typedCall.bind(this.device.getCommands()),
       this.postMessage,
       device,
-      { payload: binary, rebootOnSuccess: this.payload.rebootOnSuccess }
+      { payload: binary, rebootOnSuccess: this.payload.rebootOnSuccess },
+      false
     );
 
     if (this.connectId) {

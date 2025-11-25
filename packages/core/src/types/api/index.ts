@@ -1,164 +1,131 @@
-import { off, on, removeAllListeners } from './event';
-import { uiResponse } from './uiResponse';
-import { init, updateSettings } from './init';
-
-import { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
-
-import { getLogs } from './getLogs';
-import { checkBridgeStatus } from './checkBridgeStatus';
-import { checkBridgeRelease } from './checkBridgeRelease';
-import { checkBootloaderRelease } from './checkBootloaderRelease';
-import { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
-
-import { searchDevices } from './searchDevices';
-import { getFeatures } from './getFeatures';
-import { getOnekeyFeatures } from './getOnekeyFeatures';
-import { getPassphraseState } from './getPassphraseState';
-import { checkFirmwareRelease } from './checkFirmwareRelease';
-import { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
-import { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
-import { promptWebDeviceAccess } from './promptWebDeviceAccess';
-
-import { deviceReset } from './deviceReset';
-import { deviceRecovery } from './deviceRecovery';
-import { deviceVerify } from './deviceVerify';
-import { deviceWipe } from './deviceWipe';
-import { deviceRebootToBootloader } from './deviceRebootToBootloader';
-import { deviceRebootToBoardloader } from './deviceRebootToBoardloader';
-import { deviceBackup } from './deviceBackup';
-import { deviceChangePin } from './deviceChangePin';
-import { deviceSettings } from './deviceSettings';
-import { deviceFlags } from './deviceFlags';
-import { deviceUpdateReboot } from './deviceUpdateReboot';
-import { deviceUploadResource } from './deviceUploadResource';
-import { deviceSupportFeatures } from './deviceSupportFeatures';
-import { deviceFullyUploadResource } from './deviceFullyUploadResource';
-import { deviceUpdateBootloader } from './deviceUpdateBootloader';
-import { deviceLock } from './deviceLock';
-import { deviceUnlock } from './deviceUnlock';
-import { deviceCancel } from './deviceCancel';
-
-import { getNextU2FCounter } from './getNextU2FCounter';
-import { setU2FCounter } from './setU2FCounter';
-
-import { cipherKeyValue } from './cipherKeyValue';
-
-import { allNetworkGetAddress, allNetworkGetAddressByLoop } from './allNetworkGetAddress';
-
-import { evmGetAddress } from './evmGetAddress';
-import { evmGetPublicKey } from './evmGetPublicKey';
-import { evmSignMessage } from './evmSignMessage';
-import { evmSignMessageEIP712 } from './evmSignMessageEIP712';
-import { evmSignTransaction } from './evmSignTransaction';
-import { evmSignTypedData } from './evmSignTypedData';
-import { evmVerifyMessage } from './evmVerifyMessage';
-
-import { btcGetAddress } from './btcGetAddress';
-import { btcGetPublicKey } from './btcGetPublicKey';
-import { btcSignMessage } from './btcSignMessage';
-import { btcSignPsbt } from './btcSignPsbt';
-import { btcSignTransaction } from './btcSignTransaction';
-import { btcVerifyMessage } from './btcVerifyMessage';
-
-import { starcoinGetAddress } from './starcoinGetAddress';
-import { starcoinGetPublicKey } from './starcoinGetPublicKey';
-import { starcoinSignMessage } from './starcoinSignMessage';
-import { starcoinSignTransaction } from './starcoinSignTransaction';
-import { starcoinVerifyMessage } from './starcoinVerifyMessage';
-
-import { nemGetAddress } from './nemGetAddress';
-import { nemSignTransaction } from './nemSignTransaction';
-
-import { solGetAddress } from './solGetAddress';
-import { solSignTransaction } from './solSignTransaction';
-import { solSignOffchainMessage } from './solSignOffchainMessage';
-import { solSignMessage } from './solSignMessage';
-
-import { stellarGetAddress } from './stellarGetAddress';
-import { stellarSignTransaction } from './stellarSignTransaction';
-
-import { tronGetAddress } from './tronGetAddress';
-import { tronSignTransaction } from './tronSignTransaction';
-import { tronSignMessage } from './tronSignMessage';
-
-import { confluxGetAddress } from './confluxGetAddress';
-import { confluxSignMessage } from './confluxSignMessage';
-import { confluxSignMessageCIP23 } from './confluxSignMessageCIP23';
-import { confluxSignTransaction } from './confluxSignTransaction';
-
-import { nearGetAddress } from './nearGetAddress';
-import { nearSignTransaction } from './nearSignTransaction';
-
-import { aptosGetAddress } from './aptosGetAddress';
-import { aptosGetPublicKey } from './aptosGetPublicKey';
-import { aptosSignMessage } from './aptosSignMessage';
-import { aptosSignInMessage } from './aptosSignInMessage';
-import { aptosSignTransaction } from './aptosSignTransaction';
-
-import { algoGetAddress } from './algoGetAddress';
-import { algoSignTransaction } from './algoSignTransaction';
-
-import { cosmosGetAddress } from './cosmosGetAddress';
-import { cosmosGetPublicKey } from './cosmosGetPublicKey';
-import { cosmosSignTransaction } from './cosmosSignTransaction';
-
-import { xrpGetAddress } from './xrpGetAddress';
-import { xrpSignTransaction } from './xrpSignTransaction';
-
-import { suiGetAddress } from './suiGetAddress';
-import { suiGetPublicKey } from './suiGetPublicKey';
-import { suiSignMessage } from './suiSignMessage';
-import { suiSignTransaction } from './suiSignTransaction';
-
-import { cardanoGetAddress } from './cardanoGetAddress';
-import { cardanoGetPublicKey } from './cardanoGetPublicKey';
-import { cardanoSignTransaction } from './cardanoSignTransaction';
-import { cardanoSignMessage } from './cardanoSignMessage';
-
-import { filecoinGetAddress } from './filecoinGetAddress';
-import { filecoinSignTransaction } from './filecoinSignTransaction';
-
-import { polkadotGetAddress } from './polkadotGetAddress';
-import { polkadotSignTransaction } from './polkadotSignTransaction';
-
-import { kaspaGetAddress } from './kaspaGetAddress';
-import { kaspaSignTransaction } from './kaspaSignTransaction';
-
-import { nexaGetAddress } from './nexaGetAddress';
-import { nexaSignTransaction } from './nexaSignTransaction';
-
-import { nostrGetPublicKey } from './nostrGetPublicKey';
-import { nostrSignEvent } from './nostrSignEvent';
-import { nostrEncryptMessage } from './nostrEncryptMessage';
-import { nostrDecryptMessage } from './nostrDecryptMessage';
-import { nostrSignSchnorr } from './nostrSignSchnorr';
-
-import { lnurlAuth } from './lnurlAuth';
-import { nervosGetAddress } from './nervosGetAddress';
-import { nervosSignTransaction } from './nervosSignTransaction';
-
-import { dnxGetAddress } from './dnxGetAddress';
-import { dnxSignTransaction } from './dnxSignTransaction';
-
-import { tonGetAddress } from './tonGetAddress';
-import { tonSignMessage } from './tonSignMessage';
-import { tonSignProof } from './tonSignProof';
-
-import { scdoGetAddress } from './scdoGetAddress';
-import { scdoSignMessage } from './scdoSignMessage';
-import { scdoSignTransaction } from './scdoSignTransaction';
-import { alephiumGetAddress } from './alephiumGetAddress';
-import { alephiumSignMessage } from './alephiumSignMessage';
-import { alephiumSignTransaction } from './alephiumSignTransaction';
-
-import { benfenGetAddress } from './benfenGetAddress';
-import { benfenGetPublicKey } from './benfenGetPublicKey';
-import { benfenSignTransaction } from './benfenSignTransaction';
-import { benfenSignMessage } from './benfenSignMessage';
-
-import { neoGetAddress } from './neoGetAddress';
-import { neoSignTransaction } from './neoSignTransaction';
-import { ConnectSettings } from '../settings';
+import type { off, on, removeAllListeners } from './event';
+import type { uiResponse } from './uiResponse';
+import type { init, updateSettings } from './init';
+import type { testInitializeDeviceDuration } from './testInitializeDeviceDuration';
+import type { getLogs } from './getLogs';
+import type { checkBridgeStatus } from './checkBridgeStatus';
+import type { checkBridgeRelease } from './checkBridgeRelease';
+import type { checkBootloaderRelease } from './checkBootloaderRelease';
+import type { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
+import type { searchDevices } from './searchDevices';
+import type { getFeatures } from './getFeatures';
+import type { getOnekeyFeatures } from './getOnekeyFeatures';
+import type { getPassphraseState } from './getPassphraseState';
+import type { checkFirmwareRelease } from './checkFirmwareRelease';
+import type { checkBLEFirmwareRelease } from './checkBLEFirmwareRelease';
+import type { firmwareUpdate, firmwareUpdateV2, firmwareUpdateV3 } from './firmwareUpdate';
+import type { promptWebDeviceAccess } from './promptWebDeviceAccess';
+import type { deviceReset } from './deviceReset';
+import type { deviceRecovery } from './deviceRecovery';
+import type { deviceVerify } from './deviceVerify';
+import type { deviceWipe } from './deviceWipe';
+import type { deviceRebootToBootloader } from './deviceRebootToBootloader';
+import type { deviceRebootToBoardloader } from './deviceRebootToBoardloader';
+import type { deviceBackup } from './deviceBackup';
+import type { deviceChangePin } from './deviceChangePin';
+import type { deviceSettings } from './deviceSettings';
+import type { deviceFlags } from './deviceFlags';
+import type { deviceUpdateReboot } from './deviceUpdateReboot';
+import type { deviceUploadResource } from './deviceUploadResource';
+import type { deviceSupportFeatures } from './deviceSupportFeatures';
+import type { deviceFullyUploadResource } from './deviceFullyUploadResource';
+import type { deviceUpdateBootloader } from './deviceUpdateBootloader';
+import type { deviceLock } from './deviceLock';
+import type { deviceUnlock } from './deviceUnlock';
+import type { deviceCancel } from './deviceCancel';
+import type { getNextU2FCounter } from './getNextU2FCounter';
+import type { setU2FCounter } from './setU2FCounter';
+import type { cipherKeyValue } from './cipherKeyValue';
+import type { allNetworkGetAddress, allNetworkGetAddressByLoop } from './allNetworkGetAddress';
+import type { evmGetAddress } from './evmGetAddress';
+import type { evmGetPublicKey } from './evmGetPublicKey';
+import type { evmSignMessage } from './evmSignMessage';
+import type { evmSignMessageEIP712 } from './evmSignMessageEIP712';
+import type { evmSignTransaction } from './evmSignTransaction';
+import type { evmSignTypedData } from './evmSignTypedData';
+import type { evmVerifyMessage } from './evmVerifyMessage';
+import type { btcGetAddress } from './btcGetAddress';
+import type { btcGetPublicKey } from './btcGetPublicKey';
+import type { btcSignMessage } from './btcSignMessage';
+import type { btcSignPsbt } from './btcSignPsbt';
+import type { btcSignTransaction } from './btcSignTransaction';
+import type { btcVerifyMessage } from './btcVerifyMessage';
+import type { starcoinGetAddress } from './starcoinGetAddress';
+import type { starcoinGetPublicKey } from './starcoinGetPublicKey';
+import type { starcoinSignMessage } from './starcoinSignMessage';
+import type { starcoinSignTransaction } from './starcoinSignTransaction';
+import type { starcoinVerifyMessage } from './starcoinVerifyMessage';
+import type { nemGetAddress } from './nemGetAddress';
+import type { nemSignTransaction } from './nemSignTransaction';
+import type { solGetAddress } from './solGetAddress';
+import type { solSignTransaction } from './solSignTransaction';
+import type { solSignOffchainMessage } from './solSignOffchainMessage';
+import type { solSignMessage } from './solSignMessage';
+import type { stellarGetAddress } from './stellarGetAddress';
+import type { stellarSignTransaction } from './stellarSignTransaction';
+import type { tronGetAddress } from './tronGetAddress';
+import type { tronSignTransaction } from './tronSignTransaction';
+import type { tronSignMessage } from './tronSignMessage';
+import type { confluxGetAddress } from './confluxGetAddress';
+import type { confluxSignMessage } from './confluxSignMessage';
+import type { confluxSignMessageCIP23 } from './confluxSignMessageCIP23';
+import type { confluxSignTransaction } from './confluxSignTransaction';
+import type { nearGetAddress } from './nearGetAddress';
+import type { nearSignTransaction } from './nearSignTransaction';
+import type { aptosGetAddress } from './aptosGetAddress';
+import type { aptosGetPublicKey } from './aptosGetPublicKey';
+import type { aptosSignMessage } from './aptosSignMessage';
+import type { aptosSignInMessage } from './aptosSignInMessage';
+import type { aptosSignTransaction } from './aptosSignTransaction';
+import type { algoGetAddress } from './algoGetAddress';
+import type { algoSignTransaction } from './algoSignTransaction';
+import type { cosmosGetAddress } from './cosmosGetAddress';
+import type { cosmosGetPublicKey } from './cosmosGetPublicKey';
+import type { cosmosSignTransaction } from './cosmosSignTransaction';
+import type { xrpGetAddress } from './xrpGetAddress';
+import type { xrpSignTransaction } from './xrpSignTransaction';
+import type { suiGetAddress } from './suiGetAddress';
+import type { suiGetPublicKey } from './suiGetPublicKey';
+import type { suiSignMessage } from './suiSignMessage';
+import type { suiSignTransaction } from './suiSignTransaction';
+import type { cardanoGetAddress } from './cardanoGetAddress';
+import type { cardanoGetPublicKey } from './cardanoGetPublicKey';
+import type { cardanoSignTransaction } from './cardanoSignTransaction';
+import type { cardanoSignMessage } from './cardanoSignMessage';
+import type { filecoinGetAddress } from './filecoinGetAddress';
+import type { filecoinSignTransaction } from './filecoinSignTransaction';
+import type { polkadotGetAddress } from './polkadotGetAddress';
+import type { polkadotSignTransaction } from './polkadotSignTransaction';
+import type { kaspaGetAddress } from './kaspaGetAddress';
+import type { kaspaSignTransaction } from './kaspaSignTransaction';
+import type { nexaGetAddress } from './nexaGetAddress';
+import type { nexaSignTransaction } from './nexaSignTransaction';
+import type { nostrGetPublicKey } from './nostrGetPublicKey';
+import type { nostrSignEvent } from './nostrSignEvent';
+import type { nostrEncryptMessage } from './nostrEncryptMessage';
+import type { nostrDecryptMessage } from './nostrDecryptMessage';
+import type { nostrSignSchnorr } from './nostrSignSchnorr';
+import type { lnurlAuth } from './lnurlAuth';
+import type { nervosGetAddress } from './nervosGetAddress';
+import type { nervosSignTransaction } from './nervosSignTransaction';
+import type { dnxGetAddress } from './dnxGetAddress';
+import type { dnxSignTransaction } from './dnxSignTransaction';
+import type { tonGetAddress } from './tonGetAddress';
+import type { tonSignMessage } from './tonSignMessage';
+import type { tonSignProof } from './tonSignProof';
+import type { scdoGetAddress } from './scdoGetAddress';
+import type { scdoSignMessage } from './scdoSignMessage';
+import type { scdoSignTransaction } from './scdoSignTransaction';
+import type { alephiumGetAddress } from './alephiumGetAddress';
+import type { alephiumSignMessage } from './alephiumSignMessage';
+import type { alephiumSignTransaction } from './alephiumSignTransaction';
+import type { benfenGetAddress } from './benfenGetAddress';
+import type { benfenGetPublicKey } from './benfenGetPublicKey';
+import type { benfenSignTransaction } from './benfenSignTransaction';
+import type { benfenSignMessage } from './benfenSignMessage';
+import type { neoGetAddress } from './neoGetAddress';
+import type { neoSignTransaction } from './neoSignTransaction';
+import type { ConnectSettings } from '../settings';
 
 export * from './export';
 

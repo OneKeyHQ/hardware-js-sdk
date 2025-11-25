@@ -1,60 +1,74 @@
 import semver from 'semver';
 import EventEmitter from 'events';
-import { Features, LowlevelTransportSharedPlugin, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 import {
-  createDeferred,
-  Deferred,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
+  createDefectiveFirmwareError,
+  createDeferred,
   createDeprecatedHardwareError,
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
-  createDefectiveFirmwareError,
 } from '@onekeyfe/hd-shared';
+
 import {
-  getDeviceFirmwareVersion,
-  getDeviceBLEFirmwareVersion,
-  enableLog,
-  getLogger,
   LoggerNames,
+  enableLog,
+  getDeviceBLEFirmwareVersion,
+  getDeviceFirmwareVersion,
+  getFirmwareType,
+  getLogger,
+  getMethodVersionRange,
   setLoggerPostMessage,
   wait,
-  getMethodVersionRange,
 } from '../utils';
 import {
   findDefectiveBatchDevice,
   getDefectiveDeviceInfo,
 } from '../utils/findDefectiveBatchDevice';
 import { supportNewPassphrase } from '../utils/deviceFeaturesUtils';
-import { Device, DeviceEvents, InitOptions, RunOptions } from '../device/Device';
+import {
+  cleanupSdkInstance,
+  completeRequestContext,
+  createRequestContext,
+  createSdkTracingContext,
+  formatRequestContext,
+  getActiveRequestsByDeviceInstance,
+  updateRequestContext,
+} from '../utils/tracing';
+import { Device } from '../device/Device';
 import { DeviceList } from '../device/DeviceList';
 import { DevicePool } from '../device/DevicePool';
 import { findMethod } from '../api/utils';
 import { DataManager } from '../data-manager';
-
 import { UI_REQUEST as UI_REQUEST_CONST } from '../constants/ui-request';
 import {
   CORE_EVENT,
-  CoreMessage,
+  DEVICE,
+  IFRAME,
+  UI_REQUEST,
+  UI_RESPONSE,
   createDeviceMessage,
   createResponseMessage,
   createUiMessage,
-  DEVICE,
-  IFRAME,
-  IFrameCallMessage,
-  UI_REQUEST,
-  UI_RESPONSE,
-  UiPromise,
-  UiPromiseResponse,
 } from '../events';
-import type { BaseMethod } from '../api/BaseMethod';
-import type { ConnectSettings, KnownDevice } from '../types';
 import TransportManager from '../data-manager/TransportManager';
 import DeviceConnector from '../device/DeviceConnector';
 import RequestQueue from './RequestQueue';
 import { getSynchronize } from '../utils/getSynchronize';
+
+import type { ConnectSettings, KnownDevice } from '../types';
+import type { CoreMessage, IFrameCallMessage, UiPromise, UiPromiseResponse } from '../events';
+import type { DeviceEvents, InitOptions, RunOptions } from '../device/Device';
+import type { SdkTracingContext } from '../utils/tracing';
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type {
+  Features,
+  LowlevelTransportSharedPlugin,
+  OneKeyDeviceInfo,
+} from '@onekeyfe/hd-transport';
+import type { BaseMethod } from '../api/BaseMethod';
 
 const Log = getLogger(LoggerNames.Core);
 
@@ -96,6 +110,30 @@ let preConnectCache: {
   passphraseState: undefined,
 };
 
+const toError = (error: unknown): Error | undefined => {
+  if (error instanceof Error) return error;
+  if (error == null) return undefined;
+  if (typeof error === 'string') return new Error(error);
+  try {
+    return new Error(JSON.stringify(error));
+  } catch {
+    return new Error(String(error));
+  }
+};
+
+const updateMethodRequestContext = (method: BaseMethod, updates: any) => {
+  if (method.requestContext) {
+    updateRequestContext(method.requestContext.responseID, updates);
+  }
+};
+
+const completeMethodRequestContext = (method: BaseMethod, error?: unknown) => {
+  if (!method.requestContext) {
+    return;
+  }
+  completeRequestContext(method.requestContext.responseID, toError(error));
+};
+
 export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   if (!message.id || !message.payload || message.type !== IFRAME.CALL) {
     return Promise.reject(ERRORS.TypedError('on call: message.id or message.payload is missing'));
@@ -107,6 +145,15 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
     method = findMethod(message as IFrameCallMessage);
     method.connector = _connector;
     method.postMessage = postMessage;
+    method.setContext?.(context);
+
+    method.requestContext = createRequestContext(method.responseID, method.name, {
+      sdkInstanceId: context.sdkInstanceId,
+      connectId: method.connectId,
+    });
+
+    Log.debug(`[${context.sdkInstanceId}] callAPI: ${formatRequestContext(method.requestContext)}`);
+
     method.init();
   } catch (error) {
     return Promise.reject(error);
@@ -115,10 +162,13 @@ export const callAPI = async (context: CoreContext, message: CoreMessage) => {
   DevicePool.emitter.on(DEVICE.CONNECT, onDeviceConnectHandler);
 
   if (!method.useDevice) {
+    updateMethodRequestContext(method, { status: 'running' });
     try {
       const response = await method.run();
+      completeMethodRequestContext(method);
       return createResponseMessage(method.responseID, true, response);
     } catch (error) {
+      completeMethodRequestContext(method, error);
       return createResponseMessage(method.responseID, false, { error });
     }
   }
@@ -190,6 +240,8 @@ const onCallDevice = async (
 
   const { requestQueue, getPrePendingCallPromise, setPrePendingCallPromise } = context;
 
+  updateMethodRequestContext(method, { status: 'running' });
+
   const connectStateChange = preConnectCache.passphraseState !== method.payload.passphraseState;
 
   preConnectCache = {
@@ -224,6 +276,8 @@ const onCallDevice = async (
   } catch (e) {
     console.log('ensureConnected error: ', e);
 
+    completeMethodRequestContext(method, e);
+
     if (e.name === 'AbortError' || e.message === 'Request aborted') {
       requestQueue.releaseTask(method.responseID);
       return createResponseMessage(method.responseID, false, {
@@ -237,6 +291,19 @@ const onCallDevice = async (
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
   method.context = context;
+
+  updateMethodRequestContext(method, {
+    deviceInstanceId: device.instanceId,
+    commandsInstanceId: device.commands?.instanceId,
+  });
+
+  const activeRequests = getActiveRequestsByDeviceInstance(device.instanceId);
+  if (activeRequests.length > 0) {
+    Log.warn(
+      `[${method.instanceId}] Device ${device.instanceId} has ${activeRequests.length} active requests:`,
+      activeRequests.map(formatRequestContext)
+    );
+  }
 
   device.on(DEVICE.PIN, onDevicePinHandler);
   device.on(DEVICE.BUTTON, onDeviceButtonHandler);
@@ -282,7 +349,8 @@ const onCallDevice = async (
           }
         }
 
-        const newVersionStatus = DataManager.getFirmwareStatus(device.features);
+        const deviceFirmwareType = getFirmwareType(device.features);
+        const newVersionStatus = DataManager.getFirmwareStatus(device.features, deviceFirmwareType);
         const bleVersionStatus = DataManager.getBLEFirmwareStatus(device.features);
 
         const currentFirmwareVersion = getDeviceFirmwareVersion(device.features).join('.');
@@ -450,10 +518,12 @@ const onCallDevice = async (
         Log.debug('Call API - Inner Method Run: ');
         messageResponse = createResponseMessage(method.responseID, true, response);
         requestQueue.resolveRequest(method.responseID, messageResponse);
+        completeMethodRequestContext(method);
       } catch (error) {
-        Log.debug('Call API - Inner Method Run Error: ', error);
+        Log.debug(`Call API - Inner Method Run Error`, error);
         messageResponse = createResponseMessage(method.responseID, false, { error });
         requestQueue.resolveRequest(method.responseID, messageResponse);
+        completeMethodRequestContext(method, error);
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);
@@ -469,6 +539,7 @@ const onCallDevice = async (
       return await task.callPromise.promise;
     } catch (e) {
       Log.debug('Device Run Error: ', e);
+      completeMethodRequestContext(method, e);
       return createResponseMessage(method.responseID, false, { error: e });
     }
   } catch (error) {
@@ -478,6 +549,7 @@ const onCallDevice = async (
       ERRORS.TypedError(HardwareErrorCode.CallMethodError, error.message)
     );
     Log.debug('Call API - Run Error: ', error);
+    completeMethodRequestContext(method, error);
   } finally {
     const response = messageResponse;
 
@@ -505,7 +577,21 @@ const onCallDevice = async (
 
     cleanup();
 
-    removeDeviceListener(device);
+    if (device) {
+      const stillActive = getActiveRequestsByDeviceInstance(device.instanceId);
+      if (stillActive.length > 1) {
+        Log.warn(
+          `[${method.instanceId}] Removing listeners while ${stillActive.length} requests are active!`,
+          {
+            deviceInstanceId: device.instanceId,
+            activeRequests: stillActive.map(formatRequestContext),
+            pinListeners: device.listenerCount(DEVICE.PIN),
+          }
+        );
+      } else {
+        removeDeviceListener(device);
+      }
+    }
   }
 };
 
@@ -585,7 +671,10 @@ function initDeviceForBle(method: BaseMethod) {
   if (deviceCacheMap.has(method.connectId)) {
     device = deviceCacheMap.get(method.connectId) as Device;
   } else {
-    device = Device.fromDescriptor({ id: method.connectId } as OneKeyDeviceInfo);
+    device = Device.fromDescriptor(
+      { id: method.connectId } as OneKeyDeviceInfo,
+      method.sdkInstanceId
+    );
     deviceCacheMap.set(method.connectId, device);
   }
   device.deviceConnector = _connector;
@@ -640,7 +729,7 @@ const ensureConnected = async (
           if (timer) {
             clearTimeout(timer);
           }
-          reject(ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+          reject(ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled));
           return true;
         }
         return false;
@@ -804,7 +893,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
           }
           requestQueue.rejectRequest(
             requestId,
-            ERRORS.TypedError(HardwareErrorCode.ActionCancelled)
+            ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
           );
         }
       }
@@ -829,7 +918,7 @@ export const cancel = (context: CoreContext, connectId?: string) => {
 
           requestQueue.rejectRequest(
             requestId,
-            ERRORS.TypedError(HardwareErrorCode.ActionCancelled)
+            ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
           );
         }
       }
@@ -842,7 +931,10 @@ export const cancel = (context: CoreContext, connectId?: string) => {
       });
 
       requestQueue.getRequestTasksId().forEach(requestId => {
-        requestQueue.rejectRequest(requestId, ERRORS.TypedError(HardwareErrorCode.ActionCancelled));
+        requestQueue.rejectRequest(
+          requestId,
+          ERRORS.TypedError(HardwareErrorCode.CallQueueActionCancelled)
+        );
       });
     }
   }
@@ -1003,6 +1095,9 @@ const onSelectDeviceInBootloaderForWebDeviceHandler = async (
  * @memberof Core
  */
 const postMessage = (message: CoreMessage) => {
+  if (!_core) {
+    return;
+  }
   _core.emit(CORE_EVENT, message);
 };
 
@@ -1021,6 +1116,10 @@ const removeUiPromise = (promise: Deferred<any>) => {
 };
 
 export default class Core extends EventEmitter {
+  private tracingContext: SdkTracingContext;
+
+  public readonly sdkInstanceId: string;
+
   private requestQueue = new RequestQueue();
 
   // background task
@@ -1028,8 +1127,17 @@ export default class Core extends EventEmitter {
 
   private methodSynchronize = getSynchronize();
 
+  constructor() {
+    super();
+    this.tracingContext = createSdkTracingContext();
+    this.sdkInstanceId = this.tracingContext.sdkInstanceId;
+    Log.debug(`[Core] Created SDK instance: ${this.sdkInstanceId}`);
+  }
+
   private getCoreContext() {
     return {
+      sdkInstanceId: this.sdkInstanceId,
+      tracingContext: this.tracingContext,
       requestQueue: this.requestQueue,
       methodSynchronize: this.methodSynchronize,
       getPrePendingCallPromise: () => this.prePendingCallPromise,
@@ -1107,6 +1215,8 @@ export default class Core extends EventEmitter {
   dispose() {
     _deviceList = undefined;
     _connector = undefined;
+    Log.debug(`[Core] Disposing SDK instance: ${this.sdkInstanceId}`);
+    cleanupSdkInstance(this.sdkInstanceId);
   }
 }
 

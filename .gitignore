@@ -6,6 +6,7 @@ node_modules
 *.sublime-project
 *.sublime-workspace
 .vscode/**/*
+.vscode
 !.vscode/launch.json
 !.vscode/tasks.json
 !.vscode/settings.json
