@@ -1,15 +1,11 @@
 /**
  * SDK Tracing Utilities
- * 用于追踪对象实例和请求调用链路
- *
- * 支持多个 SDK 实例，每个实例有独立的追踪上下文
+ * Tracks object instances and request call chains across multiple SDK instances
  */
 
 import { getLogger, LoggerNames } from './logger';
 
-// ============================================================
-// 全局计数器（跨 SDK 实例）
-// ============================================================
+// Global counters (cross-SDK instances)
 
 const Log = getLogger(LoggerNames.Core);
 
@@ -17,8 +13,8 @@ let globalInstanceCounter = 0;
 let sdkInstanceCounter = 0;
 
 /**
- * 生成 SDK 实例 ID
- * @returns 格式: "SDK-<序号>-<时间戳>"
+ * Generate SDK instance ID
+ * @returns Format: "SDK-<number>-<timestamp>"
  * @example "SDK-1-123456"
  */
 export function generateSdkInstanceId(): string {
@@ -28,11 +24,11 @@ export function generateSdkInstanceId(): string {
 }
 
 /**
- * 生成全局唯一的实例 ID
- * @param type 实例类型 (Device, DeviceCommands, BaseMethod, etc.)
- * @param sdkInstanceId SDK 实例 ID（可选，用于前缀）
- * @returns 格式: <SDK实例>.<类型>-<序号>-<时间戳>
- * @example "SDK-1.Device-1-123456" 或 "Device-1-123456"（无 SDK 实例）
+ * Generate globally unique instance ID
+ * @param type Instance type (Device, DeviceCommands, BaseMethod, etc.)
+ * @param sdkInstanceId SDK instance ID (optional)
+ * @returns Format: <SDK>.<type>-<number>-<timestamp>
+ * @example "SDK-1.Device-1-123456" or "Device-1-123456"
  */
 export function generateInstanceId(type: string, sdkInstanceId?: string): string {
   globalInstanceCounter++;
@@ -41,58 +37,56 @@ export function generateInstanceId(type: string, sdkInstanceId?: string): string
   return sdkInstanceId ? `${sdkInstanceId}.${baseId}` : baseId;
 }
 
-// ============================================================
-// 请求上下文管理
-// ============================================================
+// Request context management
 
 /**
- * 请求上下文信息
+ * Request context information
  */
 export interface RequestContext {
-  /** 请求唯一 ID (复用 BaseMethod.responseID) */
+  /** Request unique ID (reuses BaseMethod.responseID) */
   responseID: number;
-  /** SDK 实例 ID */
+  /** SDK instance ID */
   sdkInstanceId?: string;
-  /** API 方法名 */
+  /** API method name */
   methodName: string;
-  /** 设备连接 ID */
+  /** Device connection ID */
   connectId?: string;
-  /** Device 实例 ID */
+  /** Device instance ID */
   deviceInstanceId?: string;
-  /** DeviceCommands 实例 ID */
+  /** DeviceCommands instance ID */
   commandsInstanceId?: string;
-  /** 父请求 ID (用于嵌套调用如 allNetworkGetAddress) */
+  /** Parent request ID (for nested calls like allNetworkGetAddress) */
   parentResponseID?: number;
-  /** 请求开始时间 */
+  /** Request start time */
   startTime: number;
-  /** 请求结束时间 */
+  /** Request end time */
   endTime?: number;
-  /** 请求状态 */
+  /** Request status */
   status?: 'pending' | 'running' | 'success' | 'error' | 'cancelled';
-  /** 错误信息 */
+  /** Error message */
   error?: string;
 }
 
 /**
- * SDK 实例追踪上下文
+ * SDK instance tracing context
  */
 export interface SdkTracingContext {
-  /** SDK 实例 ID */
+  /** SDK instance ID */
   sdkInstanceId: string;
-  /** 创建时间 */
+  /** Creation timestamp */
   createdAt: number;
-  /** 活跃请求 */
+  /** Active requests */
   activeRequests: Map<number, RequestContext>;
 }
 
-// 全局 SDK 实例追踪 Map
+// Global SDK instance tracking map
 const sdkInstances = new Map<string, SdkTracingContext>();
 
-// 全局请求 Map（跨 SDK 实例，用于快速查找）
+// Global request map (cross-SDK instances for quick lookup)
 const globalActiveRequests = new Map<number, RequestContext>();
 
 /**
- * 创建 SDK 实例追踪上下文
+ * Create SDK instance tracing context
  */
 export function createSdkTracingContext(): SdkTracingContext {
   const sdkInstanceId = generateSdkInstanceId();
@@ -108,10 +102,10 @@ export function createSdkTracingContext(): SdkTracingContext {
 }
 
 /**
- * 创建并注册请求上下文
- * @param responseID 请求 ID (复用 BaseMethod.responseID)
- * @param methodName API 方法名
- * @param options 额外选项
+ * Create and register request context
+ * @param responseID Request ID (reuses BaseMethod.responseID)
+ * @param methodName API method name
+ * @param options Additional options
  */
 export function createRequestContext(
   responseID: number,
@@ -136,10 +130,10 @@ export function createRequestContext(
     status: 'pending',
   };
 
-  // 注册到全局 Map
+  // Register to global map
   globalActiveRequests.set(context.responseID, context);
 
-  // 注册到 SDK 实例 Map
+  // Register to SDK instance map
   if (options?.sdkInstanceId) {
     const sdkContext = sdkInstances.get(options.sdkInstanceId);
     if (sdkContext) {
@@ -151,7 +145,7 @@ export function createRequestContext(
 }
 
 /**
- * 更新请求状态
+ * Update request context
  */
 export function updateRequestContext(responseID: number, updates: Partial<RequestContext>): void {
   const context = globalActiveRequests.get(responseID);
@@ -161,7 +155,7 @@ export function updateRequestContext(responseID: number, updates: Partial<Reques
 }
 
 /**
- * 完成请求
+ * Complete request context
  */
 export function completeRequestContext(responseID: number, error?: Error): void {
   const context = globalActiveRequests.get(responseID);
@@ -170,16 +164,15 @@ export function completeRequestContext(responseID: number, error?: Error): void 
     context.status = error ? 'error' : 'success';
     if (error) {
       context.error = error.message;
-      // print core log
       Log.error(
         `[RequestContext] [completeRequestContext] Error: ${formatRequestContext(context)}`
       );
     }
 
-    // 从活跃列表移除
+    // Remove from active list
     globalActiveRequests.delete(responseID);
 
-    // 从 SDK 实例移除
+    // Remove from SDK instance
     if (context.sdkInstanceId) {
       const sdkContext = sdkInstances.get(context.sdkInstanceId);
       if (sdkContext) {
@@ -189,12 +182,10 @@ export function completeRequestContext(responseID: number, error?: Error): void 
   }
 }
 
-// ============================================================
-// 查询 API
-// ============================================================
+// Query API
 
 /**
- * 获取特定 Device 实例的活跃请求
+ * Get active requests for specific Device instance
  */
 export function getActiveRequestsByDeviceInstance(deviceInstanceId: string): RequestContext[] {
   return Array.from(globalActiveRequests.values()).filter(
@@ -202,12 +193,10 @@ export function getActiveRequestsByDeviceInstance(deviceInstanceId: string): Req
   );
 }
 
-// ============================================================
-// 格式化输出
-// ============================================================
+// Format output
 
 /**
- * 格式化请求上下文用于日志输出
+ * Format request context for logging
  */
 export function formatRequestContext(context: RequestContext): string {
   const duration = context.endTime
@@ -230,22 +219,20 @@ export function formatRequestContext(context: RequestContext): string {
   return parts.join(' ');
 }
 
-// ============================================================
-// 清理和重置
-// ============================================================
+// Cleanup and reset
 
 /**
- * 清理特定 SDK 实例
+ * Cleanup specific SDK instance
  */
 export function cleanupSdkInstance(sdkInstanceId: string): void {
   const sdkContext = sdkInstances.get(sdkInstanceId);
   if (sdkContext) {
-    // 从全局活跃请求中移除该 SDK 的请求
+    // Remove SDK requests from global active requests
     for (const responseID of sdkContext.activeRequests.keys()) {
       globalActiveRequests.delete(responseID);
     }
 
-    // 移除 SDK 实例
+    // Remove SDK instance
     sdkInstances.delete(sdkInstanceId);
   }
 }
