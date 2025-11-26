@@ -808,10 +808,7 @@ const ensureConnected = async (
         if ([HardwareErrorCode.BleCharacteristicNotifyChangeFailure].includes(error.errorCode)) {
           postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_CHARACTERISTIC_NOTIFY_CHANGE_FAILURE));
         }
-        if (error.errorCode === HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission) {
-          // WebUSB device not found or needs permission, mark and continue retrying (consistent with Bridge behavior)
-          isWebUsbRetrying = true;
-        } else if (
+        if (
           [
             HardwareErrorCode.BlePoweredOff,
             HardwareErrorCode.BleUnsupported,
