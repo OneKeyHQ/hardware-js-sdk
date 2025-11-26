@@ -1,13 +1,13 @@
-import {
-  TronSignMessage as HardwareTronSignMessage,
-  TronMessageType,
-} from '@onekeyfe/hd-transport';
+import { TronMessageType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
+
+import type { TronSignMessage as HardwareTronSignMessage } from '@onekeyfe/hd-transport';
 
 export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage> {
   init() {
@@ -53,6 +53,9 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
     return {
       pro: {
         min: '4.16.0',
+      },
+      touch: {
+        min: '4.12.0',
       },
       classic1s: {
         min: '3.13.0',

@@ -1,10 +1,10 @@
-import { PolkadotGetAddress as HardwarePolkadotGetAddress } from '@onekeyfe/hd-transport';
-
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
 import { getPolkadotVersionRangeWithBundle } from './networks';
+
+import type { PolkadotGetAddress as HardwarePolkadotGetAddress } from '@onekeyfe/hd-transport';
+import type { PolkadotAddress, PolkadotGetAddressParams } from '../../types';
 
 export default class PolkadotGetAddress extends BaseMethod<HardwarePolkadotGetAddress[]> {
   hasBundle = false;

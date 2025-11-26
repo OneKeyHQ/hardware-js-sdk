@@ -1,10 +1,11 @@
-import { PolkadotSignTx as HardwarePolkadotSignTx } from '@onekeyfe/hd-transport';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { PolkadotSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { getPolkadotVersionRange } from './networks';
+
+import type { PolkadotSignTransactionParams } from '../../types';
+import type { PolkadotSignTx as HardwarePolkadotSignTx } from '@onekeyfe/hd-transport';
 
 export default class PolkadotSignTransaction extends BaseMethod<HardwarePolkadotSignTx> {
   hasBundle = false;
