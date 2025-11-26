@@ -713,9 +713,6 @@ const ensureConnected = async (
   const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
   const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  // Track WebUSB scenario: to return the correct error type after retries
-  let isWebUsbRetrying = false;
-
   Log.debug(
     `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
   );
