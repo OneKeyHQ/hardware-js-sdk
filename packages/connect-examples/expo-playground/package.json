@@ -60,7 +60,6 @@
     "react-router-dom": "^7.6.2",
     "reactflow": "^11.11.4",
     "rehype-highlight": "^7.0.2",
-    "ripple-keypairs": "^2.0.0",
     "stream-browserify": "^3.0.0",
     "stream-http": "^3.2.0",
     "string_decoder": "^1.3.0",
