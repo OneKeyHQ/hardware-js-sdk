@@ -846,7 +846,7 @@ const ensureConnected = async (
         }
         Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
         // WebUSB scenario: after all retries failed, send permission prompt and return error
-        if (isWebUsbRetrying) {
+        if (DataManager.isWebUsbConnect(env)) {
           if (!method.payload?.skipWebDevicePrompt) {
             postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
           }
