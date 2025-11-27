@@ -8,6 +8,7 @@ export type transportEnv =
   | 'electron'
   | 'react-native'
   | 'webusb'
+  | 'desktop-webusb'
   | 'desktop-web-ble'
   | 'emulator'
   | 'lowlevel';
