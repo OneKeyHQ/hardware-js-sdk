@@ -39,6 +39,7 @@
     "@tamagui/toast": "1.90.2",
     "@ton/core": "^0.57.0",
     "asyncstorage-down": "^4.2.0",
+    "axios": "1.12.2",
     "bchaddrjs": "^0.5.2",
     "bitcoinjs-lib": "^6.1.5",
     "bn.js": "^5.2.1",
@@ -75,7 +76,6 @@
     "react-native-screens": "~3.29.0",
     "react-native-svg": "^14.1.0",
     "react-native-web": "~0.19.10",
-    "ripple-keypairs": "^1.1.4",
     "rlp": "^3.0.0",
     "stackblur-canvas": "^2.7.0",
     "stream-browserify": "^3.0.0",
@@ -83,7 +83,7 @@
     "text-encoding": "^0.7.0",
     "tonweb": "^0.0.66",
     "varint": "^6.0.0",
-    "xrpl": "^4.0.0"
+    "ripple-address-codec": "^5.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
