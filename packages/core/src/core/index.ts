@@ -841,7 +841,8 @@ const ensureConnected = async (
         }
         Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
         // Browser WebUSB needs permission prompt, desktop WebUSB doesn't
-        if (DataManager.isBrowserWebUsb(env)) {
+        // skipWebDevicePrompt can override this behavior for special cases
+        if (DataManager.isBrowserWebUsb(env) && !method.payload?.skipWebDevicePrompt) {
           postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
           reject(ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission));
         } else {
