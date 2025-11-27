@@ -8,6 +8,11 @@ enum Networks {
   Astar = 'astar',
   JoyStream = 'joystream',
   Manta = 'manta',
+  Hydration = 'hydration',
+  Bifrost = 'bifrost',
+  BifrostKusama = 'bifrost-ksm',
+  PolkadotAssetHub = 'polkadot-assethub',
+  KusamaAssetHub = 'kusama-assethub',
 }
 
 // All polkadot networks are included in no special case
@@ -53,4 +58,15 @@ export function getPolkadotVersionRangeWithBundle(networks: string[]) {
     return specialVersionRange[Networks.Manta];
   }
   return baseVersionRange;
+}
+
+export function parseNetwork(network: string) {
+  switch (network) {
+    case Networks.PolkadotAssetHub:
+      return Networks.Polkadot;
+    case Networks.KusamaAssetHub:
+      return Networks.Kusama;
+    default:
+      return network;
+  }
 }

@@ -3533,6 +3533,7 @@ export type PolkadotSignTx = {
   address_n: number[];
   raw_tx: string;
   network: string;
+  prefix?: number;
 };
 
 // PolkadotSignedTx
