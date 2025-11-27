@@ -1,9 +1,10 @@
-import { TronGetAddress as HardwareTronGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { TronGetAddressParams, TronAddress } from '../../types';
+
+import type { TronGetAddress as HardwareTronGetAddress } from '@onekeyfe/hd-transport';
+import type { TronGetAddressParams, TronAddress } from '../../types';
 
 export default class TronGetAddress extends BaseMethod<HardwareTronGetAddress[]> {
   hasBundle = false;

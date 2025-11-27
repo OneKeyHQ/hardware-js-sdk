@@ -9603,6 +9603,10 @@
           "rule": "required",
           "type": "string",
           "id": 3
+        },
+        "prefix": {
+          "type": "uint32",
+          "id": 4
         }
       }
     },

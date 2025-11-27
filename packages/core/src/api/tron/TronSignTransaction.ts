@@ -1,12 +1,14 @@
-import { TronSignTx } from '@onekeyfe/hd-transport';
 import { isEmpty } from 'lodash';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { TronTransaction } from '../../types/api/tronSignTransaction';
 import { formatAnyHex } from '../helpers/hexUtils';
-import { DeviceFirmwareRange } from '../../types';
+
+import type { TronTransaction } from '../../types/api/tronSignTransaction';
+import type { TronSignTx } from '@onekeyfe/hd-transport';
+import type { DeviceFirmwareRange } from '../../types';
 
 export default class TronSignTransaction extends BaseMethod<TronSignTx> {
   parseTx(tx: TronTransaction, address_n: number[]): TronSignTx {
@@ -156,6 +158,9 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
       pro: {
         min: '4.13.0',
       },
+      touch: {
+        min: '4.12.0',
+      },
       model_classic1s: {
         min: '3.12.0',
       },
@@ -175,6 +180,12 @@ export default class TronSignTransaction extends BaseMethod<TronSignTx> {
     return {
       pro: {
         min: '4.15.0',
+      },
+      touch: {
+        min: '4.12.0',
+      },
+      model_classic1s: {
+        min: '3.13.0',
       },
     };
   }
