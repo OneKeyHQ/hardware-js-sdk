@@ -1,6 +1,5 @@
 import { useCallback, useContext, useState } from 'react';
 import {
-  CoreMessage,
   DEVICE,
   FIRMWARE_EVENT,
   LOG_EVENT,
@@ -9,13 +8,16 @@ import {
   UI_RESPONSE,
   supportInputPinOnSoftware,
 } from '@onekeyfe/hd-core';
-
 import { useFocusEffect } from '@react-navigation/native';
 import { View } from 'tamagui';
+
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { ReceivePin } from './ReceivePin';
 import { WebUsbAuthorize } from './WebUsbAuthorize';
-import { BluetoothPermission, BluetoothErrorType } from './BluetoothPermission';
+import { BluetoothPermission } from './BluetoothPermission';
+
+import type { BluetoothErrorType } from './BluetoothPermission';
+import type { CoreMessage } from '@onekeyfe/hd-core';
 
 // Type declaration for desktopApi matches the one in BluetoothPermission
 declare global {
@@ -207,6 +209,15 @@ export default function HandleSDKEvents() {
     }, [HardwareLowLevelSDK, SDK, onInputPinOnDeviceCallback])
   );
 
+  const onTestUnexpectedMessage = useCallback(() => {
+    SDK?.btcGetAddress('', '', {
+      path: "m/44'/0'/0'/0/0",
+      showOnOneKey: false,
+      useEmptyPassphrase: true,
+      passphraseState: undefined,
+    });
+  }, [SDK]);
+
   return (
     <View>
       <ReceivePin
@@ -215,6 +226,7 @@ export default function HandleSDKEvents() {
         onConfirm={val => onConfirmPin(val)}
         onSwitchDevice={onInputPinOnDeviceCallback}
         onCancel={onPinCancelCallback}
+        onTestUnexpectedMessage={onTestUnexpectedMessage}
       />
       <WebUsbAuthorize
         open={showWebUsbAuthorize}

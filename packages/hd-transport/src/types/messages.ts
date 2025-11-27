@@ -770,6 +770,11 @@ export type FirmwareUpdateEmmc = {
   reboot_on_success?: boolean;
 };
 
+// UpgradeFileHeader
+export type UpgradeFileHeader = {
+  data: string;
+};
+
 export enum CardanoDerivationType {
   LEDGER = 0,
   ICARUS = 1,
@@ -4401,6 +4406,7 @@ export type MessageType = {
   FirmwareErase_ex: FirmwareErase_ex;
   Reboot: Reboot;
   FirmwareUpdateEmmc: FirmwareUpdateEmmc;
+  UpgradeFileHeader: UpgradeFileHeader;
   CardanoBlockchainPointerType: CardanoBlockchainPointerType;
   CardanoNativeScript: CardanoNativeScript;
   CardanoGetNativeScriptHash: CardanoGetNativeScriptHash;

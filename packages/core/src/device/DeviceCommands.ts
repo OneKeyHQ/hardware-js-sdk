@@ -1,11 +1,18 @@
-import type { Transport, Messages, FailureType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import TransportManager from '../data-manager/TransportManager';
 import DataManager from '../data-manager/DataManager';
-import { patchFeatures, getLogger, LoggerNames, getDeviceType } from '../utils';
-import type { Device } from './Device';
+import { LoggerNames, getDeviceType, getLogger, patchFeatures } from '../utils';
 import { DEVICE, type PassphraseRequestPayload } from '../events';
 import { DeviceModelToTypes } from '../types';
+import {
+  formatRequestContext,
+  generateInstanceId,
+  getActiveRequestsByDeviceInstance,
+} from '../utils/tracing';
+
+import type { Device } from './Device';
+import type { FailureType, Messages, Transport } from '@onekeyfe/hd-transport';
 
 export type PassphrasePromptResponse = {
   passphrase?: string;
@@ -114,12 +121,17 @@ export const cancelDeviceWithInitialize = (device: Device) => {
 };
 
 const Log = getLogger(LoggerNames.DeviceCommands);
+const LogCore = getLogger(LoggerNames.Core);
 
 /**
  * The life cycle begins with the acquisition of the device and ends with the disposal device commands
  * acquire device -> create DeviceCommands -> release device -> dispose DeviceCommands
  */
 export class DeviceCommands {
+  instanceId: string;
+
+  currentResponseID?: number;
+
   device: Device;
 
   transport: Transport;
@@ -135,6 +147,9 @@ export class DeviceCommands {
     this.mainId = mainId;
     this.transport = TransportManager.getTransport();
     this.disposed = false;
+    this.instanceId = generateInstanceId('DeviceCommands', device.sdkInstanceId);
+
+    Log.debug(`[DeviceCommands] Created: ${this.instanceId}, device: ${this.device.instanceId}`);
   }
 
   async dispose(_cancelRequest: boolean) {
@@ -217,10 +232,14 @@ export class DeviceCommands {
       const promise = this.transport.call(this.mainId, type, msg) as any;
       this.callPromise = promise;
       const res = await promise;
-      Log.debug('[DeviceCommands] [call] Received', res.type);
+      if (res.type === 'Failure') {
+        LogCore.debug('[DeviceCommands] [call] Received', res.type, res.message);
+      } else {
+        LogCore.debug('[DeviceCommands] [call] Received', res.type);
+      }
       return res;
     } catch (error) {
-      Log.debug('[DeviceCommands] [call] Received error', error);
+      LogCore.debug('[DeviceCommands] [call] Received error', error);
       if (error.errorCode === HardwareErrorCode.BleDeviceBondError) {
         return {
           type: 'BleDeviceBondError',
@@ -400,14 +419,16 @@ export class DeviceCommands {
           message?.includes('verify failed')
         ) {
           error = ERRORS.TypedError(HardwareErrorCode.FirmwareVerificationFailed, message);
+        } else if (message?.includes('Firmware downgrade not allowed')) {
+          // Check firmware check failed
+          error = ERRORS.TypedError(HardwareErrorCode.FirmwareDowngradeNotAllowed, message);
         }
       }
 
       if (code === 'Failure_UnexpectedMessage') {
         if (callType === 'PassphraseAck') {
           error = ERRORS.TypedError(HardwareErrorCode.UnexpectPassphrase);
-        }
-        if (message === 'Not in Signing mode') {
+        } else if (message === 'Not in Signing mode') {
           error = ERRORS.TypedError(HardwareErrorCode.NotInSigningMode);
         }
       }
@@ -500,7 +521,7 @@ export class DeviceCommands {
         cancelDeviceInPrompt(this.device, false)
           .then(onCancel => {
             const error = ERRORS.TypedError(
-              HardwareErrorCode.ActionCancelled,
+              HardwareErrorCode.CallQueueActionCancelled,
               `${DEVICE.PIN} canceled`
             );
             // onCancel not void
@@ -515,7 +536,15 @@ export class DeviceCommands {
             reject(error);
           });
 
-      if (this.device.listenerCount(DEVICE.PIN) > 0) {
+      const listenerCount = this.device.listenerCount(DEVICE.PIN);
+
+      Log.debug(`[${this.instanceId}] _promptPin called`, {
+        responseID: this.currentResponseID,
+        deviceInstanceId: this.device.instanceId,
+        listenerCount,
+      });
+
+      if (listenerCount > 0) {
         this.device.setCancelableAction(cancelAndReject);
         this.device.emit(DEVICE.PIN, this.device, type, (err, pin) => {
           this.device.clearCancelableAction();
@@ -526,11 +555,22 @@ export class DeviceCommands {
           }
         });
       } else {
-        console.warn('[DeviceCommands] [call] PIN callback not configured, cancelling request');
+        const activeRequests = getActiveRequestsByDeviceInstance(this.device.instanceId);
+        const errorInfo = {
+          commandsInstanceId: this.instanceId,
+          deviceInstanceId: this.device.instanceId,
+          currentResponseID: this.currentResponseID,
+          listenerCount,
+          activeRequests: activeRequests.map(formatRequestContext),
+        };
+
+        LogCore.error('[DeviceCommands] [call] PIN callback not configured, cancelling request', {
+          ...errorInfo,
+        });
         reject(
           ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,
-            '_promptPin: PIN callback not configured'
+            `_promptPin: PIN callback not configured: ${JSON.stringify(errorInfo)}`
           )
         );
       }
@@ -543,7 +583,7 @@ export class DeviceCommands {
         cancelDeviceInPrompt(this.device, false)
           .then(onCancel => {
             const error = ERRORS.TypedError(
-              HardwareErrorCode.ActionCancelled,
+              HardwareErrorCode.CallQueueActionCancelled,
               `${DEVICE.PASSPHRASE} canceled`
             );
             // onCancel not void
@@ -574,7 +614,9 @@ export class DeviceCommands {
           }
         );
       } else {
-        Log.error('[DeviceCommands] [call] Passphrase callback not configured, cancelling request');
+        LogCore.error(
+          '[DeviceCommands] [call] Passphrase callback not configured, cancelling request'
+        );
         reject(
           ERRORS.TypedError(
             HardwareErrorCode.RuntimeError,

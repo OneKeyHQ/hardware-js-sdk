@@ -24,6 +24,7 @@ import {
   fixFeaturesFirmwareVersion,
   getPassphraseStateWithRefreshDeviceInfo,
 } from '../utils/deviceFeaturesUtils';
+import { generateInstanceId } from '../utils/tracing';
 
 import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
@@ -99,6 +100,15 @@ export class Device extends EventEmitter {
    */
   originalDescriptor: DeviceDescriptor;
 
+  sdkInstanceId?: string;
+
+  /**
+   * 设备实例唯一标识
+   */
+  instanceId: string;
+
+  createdAt: number;
+
   /**
    * 设备主 ID
    * 蓝牙连接时是设备的 UUID
@@ -158,14 +168,22 @@ export class Device extends EventEmitter {
 
   pendingCallbackPromise?: Deferred<void>;
 
-  constructor(descriptor: DeviceDescriptor) {
+  constructor(descriptor: DeviceDescriptor, sdkInstanceId?: string) {
     super();
     this.originalDescriptor = descriptor;
+    this.sdkInstanceId = sdkInstanceId;
+    this.instanceId = generateInstanceId('Device', this.sdkInstanceId);
+    this.createdAt = Date.now();
+    Log.debug(
+      `[Device] Created: ${this.instanceId}${
+        this.sdkInstanceId ? ` for SDK: ${this.sdkInstanceId}` : ''
+      }`
+    );
   }
 
-  static fromDescriptor(originalDescriptor: DeviceDescriptor) {
+  static fromDescriptor(originalDescriptor: DeviceDescriptor, sdkInstanceId?: string) {
     const descriptor = { ...originalDescriptor };
-    return new Device(descriptor);
+    return new Device(descriptor, sdkInstanceId);
   }
 
   // simplified object to pass via postMessage
@@ -183,6 +201,9 @@ export class Device extends EventEmitter {
       connectId: DataManager.isBleConnect(env) ? this.mainId || null : getDeviceUUID(this.features),
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
+      sdkInstanceId: this.sdkInstanceId,
+      instanceId: this.instanceId,
+      createdAt: this.createdAt,
       deviceType,
       /** ID for current seeds, will clear after replace a new seed at device */
       deviceId: this.features.device_id || null,

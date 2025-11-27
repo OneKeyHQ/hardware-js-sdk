@@ -1,17 +1,21 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Features } from '../../types';
+
 import { getDeviceType, httpRequest } from '../../utils';
 import { DataManager } from '../../data-manager';
 import { findLatestRelease } from '../../utils/release';
 import { getFirmwareUpdateField } from '../../utils/deviceFeaturesUtils';
-import { IFirmwareField } from '../../data-manager/DataManager';
+
+import type { Features } from '../../types';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
+import type { IFirmwareField } from '../../data-manager/DataManager';
 
 export interface GetInfoProps {
   features: Features;
   updateType: 'firmware' | 'ble';
   isUpdateBootloader?: boolean;
   targetVersion?: string;
+  firmwareType: EFirmwareType;
 }
 
 interface GetBinaryProps extends GetInfoProps {
@@ -23,8 +27,14 @@ export const getBinary = async ({
   updateType,
   version,
   isUpdateBootloader,
+  firmwareType,
 }: GetBinaryProps) => {
-  const releaseInfo = getInfo({ features, updateType, targetVersion: version?.join('.') });
+  const releaseInfo = getInfo({
+    features,
+    updateType,
+    targetVersion: version?.join('.'),
+    firmwareType,
+  });
 
   if (!releaseInfo) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'no firmware found for this device');
@@ -71,7 +81,7 @@ export const getSysResourceBinary = async (url: string) => {
   };
 };
 
-export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) => {
+export const getInfo = ({ features, updateType, targetVersion, firmwareType }: GetInfoProps) => {
   const deviceType = getDeviceType(features);
   if (deviceType === 'unknown') {
     return null;
@@ -82,6 +92,7 @@ export const getInfo = ({ features, updateType, targetVersion }: GetInfoProps) =
     features,
     updateType,
     targetVersion,
+    firmwareType,
   });
   const releaseInfo = deviceMap?.[deviceType]?.[firmwareUpdateField] ?? [];
   return findLatestRelease(releaseInfo);

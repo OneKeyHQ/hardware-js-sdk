@@ -1,6 +1,7 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
+
+import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
-import { IVersionArray } from './settings';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -34,6 +35,11 @@ export type KnownDevice = {
   unavailableCapabilities: UnavailableCapabilities;
   bleFirmwareVersion: IVersionArray | null;
   firmwareVersion: IVersionArray | null;
+
+  // debug sdk
+  instanceId?: string;
+  sdkInstanceId?: string;
+  createdAt?: number;
 };
 
 export type SearchDevice = {

@@ -2,6 +2,7 @@ export { getLogger, enableLog, LoggerNames, getLog, setLoggerPostMessage } from 
 export * from './assets';
 export * from './versionUtils';
 export * from './patch';
+export * from './tracing';
 // Device utils
 export {
   getDeviceTypeByBleName,

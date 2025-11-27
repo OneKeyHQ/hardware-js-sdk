@@ -1997,6 +1997,15 @@
         }
       }
     },
+    "UpgradeFileHeader": {
+      "fields": {
+        "data": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
+        }
+      }
+    },
     "CardanoDerivationType": {
       "values": {
         "LEDGER": 0,
@@ -12397,7 +12406,8 @@
         "MessageType_GetPassphraseState": 10028,
         "MessageType_PassphraseState": 10029,
         "MessageType_UnLockDevice": 10030,
-        "MessageType_UnLockDeviceResponse": 10031
+        "MessageType_UnLockDeviceResponse": 10031,
+        "MessageType_UpgradeFileHeader": 10050
       }
     },
     "google": {

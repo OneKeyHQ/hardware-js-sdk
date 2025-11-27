@@ -1,6 +1,6 @@
+import type { MessageFactoryFn } from './utils';
 import type { PROTO } from '../constants';
-import type { Features, KnownDevice as Device, SupportFeatures } from '../types/device';
-import { MessageFactoryFn } from './utils';
+import type { KnownDevice as Device, Features, SupportFeatures } from '../types/device';
 
 export const DEVICE_EVENT = 'DEVICE_EVENT';
 export const DEVICE = {

@@ -1,17 +1,17 @@
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
-
 import {
   getBleFirmwareReleaseInfo,
   getBootloaderReleaseInfo,
   getFirmwareReleaseInfo,
 } from './firmware/releaseHelper';
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
-import {
+import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../utils';
+
+import type {
   AllFirmwareRelease,
   CheckAllFirmwareReleaseParams,
 } from '../types/api/checkAllFirmwareRelease';
-import { getDeviceFirmwareVersion, getDeviceType } from '../utils';
 
 export default class CheckAllFirmwareRelease extends BaseMethod {
   init() {
@@ -22,13 +22,16 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
 
   async run() {
     const { features } = this.device;
-    const { checkBridgeRelease } = this.payload as CheckAllFirmwareReleaseParams;
+    const { checkBridgeRelease, firmwareType: firmwareTypeParams } = this
+      .payload as CheckAllFirmwareReleaseParams;
 
     if (!features) {
       return Promise.resolve(null);
     }
 
-    const firmwareRelease = getFirmwareReleaseInfo(features);
+    const deviceFirmwareType = getFirmwareType(features);
+    const firmwareType = firmwareTypeParams ?? deviceFirmwareType;
+    const firmwareRelease = getFirmwareReleaseInfo(features, firmwareType);
 
     const currentFirmwareVersion = getDeviceFirmwareVersion(features).join('.');
     const willUpdateFirmwareVersion = firmwareRelease.release?.version?.join('.');
@@ -45,7 +48,11 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
         willUpdateFirmwareVersion,
       });
     }
-    const bootloaderRelease = getBootloaderReleaseInfo(features, willUpdateFirmwareVersion);
+    const bootloaderRelease = getBootloaderReleaseInfo({
+      features,
+      willUpdateFirmwareVersion,
+      firmwareType,
+    });
     const bleFirmwareReleaseInfo = getBleFirmwareReleaseInfo(features);
 
     return {
@@ -60,6 +67,7 @@ export default class CheckAllFirmwareRelease extends BaseMethod {
             release: bridgeReleaseInfo.releaseVersion,
           }
         : undefined,
+      features,
     } as AllFirmwareRelease;
   }
 }
