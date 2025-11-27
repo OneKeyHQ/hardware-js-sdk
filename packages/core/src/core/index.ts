@@ -643,7 +643,8 @@ function initDevice(method: BaseMethod) {
 
   if (!device) {
     const env = DataManager.getSettings('env');
-    if (DataManager.isWebUsbConnect(env)) {
+    // Browser WebUSB needs permission prompt, desktop WebUSB doesn't
+    if (DataManager.isBrowserWebUsb(env)) {
       throw ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission);
     }
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
@@ -839,7 +840,8 @@ const ensureConnected = async (
           clearTimeout(timer);
         }
         Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
-        if (DataManager.isWebUsbConnect(env) && !method.payload?.skipWebDevicePrompt) {
+        // Browser WebUSB needs permission prompt, desktop WebUSB doesn't
+        if (DataManager.isBrowserWebUsb(env)) {
           postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
           reject(ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission));
         } else {

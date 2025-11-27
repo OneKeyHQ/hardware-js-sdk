@@ -147,11 +147,8 @@ export default class FirmwareUpdateV2 extends BaseMethod<Params> {
           await wait(3000);
         }
 
-        if (
-          checkCount > 4 &&
-          DataManager.isWebUsbConnect(DataManager.getSettings('env')) &&
-          !this.payload.skipWebDevicePrompt
-        ) {
+        // Browser WebUSB needs device selection prompt, desktop WebUSB doesn't
+        if (checkCount > 4 && DataManager.isBrowserWebUsb(DataManager.getSettings('env'))) {
           clearInterval(intervalTimer);
           clearTimeout(timeoutTimer);
 

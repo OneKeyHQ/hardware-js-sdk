@@ -455,5 +455,9 @@ export default class DataManager {
   static isBleConnect = (env: ConnectSettings['env']) =>
     env === 'react-native' || env === 'lowlevel' || env === 'desktop-web-ble';
 
-  static isWebUsbConnect = (env: ConnectSettings['env']) => env === 'webusb';
+  /** Desktop WebUSB doesn't need browser permission prompt */
+  static isDesktopWebUsb = (env: ConnectSettings['env']) => env === 'desktop-webusb';
+
+  /** Browser WebUSB needs permission prompt */
+  static isBrowserWebUsb = (env: ConnectSettings['env']) => env === 'webusb';
 }
