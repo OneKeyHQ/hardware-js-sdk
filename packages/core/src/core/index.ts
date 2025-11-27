@@ -644,9 +644,6 @@ function initDevice(method: BaseMethod) {
   if (!device) {
     const env = DataManager.getSettings('env');
     if (DataManager.isWebUsbConnect(env)) {
-      if (!method.payload.skipWebDevicePrompt) {
-        postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
-      }
       throw ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission);
     }
     throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound);
@@ -716,7 +713,6 @@ const ensureConnected = async (
   const POLL_INTERVAL_TIME = (method.payload && method.payload.pollIntervalTime) || 1000;
   const TIME_OUT = (method.payload && method.payload.timeout) || 10000;
   let timer: ReturnType<typeof setTimeout> | null = null;
-
   Log.debug(
     `EnsureConnected function start, MAX_RETRY_COUNT=${MAX_RETRY_COUNT}, POLL_INTERVAL_TIME=${POLL_INTERVAL_TIME}  `
   );
@@ -830,7 +826,6 @@ const ensureConnected = async (
             HardwareErrorCode.SelectDevice,
             HardwareErrorCode.DeviceDetectInBootloaderMode,
             HardwareErrorCode.BleCharacteristicNotifyChangeFailure,
-            HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission,
             HardwareErrorCode.BridgeNeedsPermission,
           ].includes(error.errorCode)
         ) {
@@ -844,7 +839,15 @@ const ensureConnected = async (
           clearTimeout(timer);
         }
         Log.debug('EnsureConnected get to max try count, will return: ', tryCount);
-        reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+        // WebUSB scenario: after all retries failed, send permission prompt and return error
+        if (DataManager.isWebUsbConnect(env)) {
+          if (!method.payload?.skipWebDevicePrompt) {
+            postMessage(createUiMessage(UI_REQUEST.WEB_DEVICE_PROMPT_ACCESS_PERMISSION));
+          }
+          reject(ERRORS.TypedError(HardwareErrorCode.WebDeviceNotFoundOrNeedsPermission));
+        } else {
+          reject(ERRORS.TypedError(HardwareErrorCode.DeviceNotFound));
+        }
         return;
       }
 
