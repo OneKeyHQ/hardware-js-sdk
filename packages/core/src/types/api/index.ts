@@ -7,6 +7,7 @@ import type { checkBridgeStatus } from './checkBridgeStatus';
 import type { checkBridgeRelease } from './checkBridgeRelease';
 import type { checkBootloaderRelease } from './checkBootloaderRelease';
 import type { checkAllFirmwareRelease } from './checkAllFirmwareRelease';
+import type { checkFirmwareTypeAvailable } from './checkFirmwareTypeAvailable';
 import type { searchDevices } from './searchDevices';
 import type { getFeatures } from './getFeatures';
 import type { getOnekeyFeatures } from './getOnekeyFeatures';
@@ -158,6 +159,7 @@ export type CoreApi = {
   checkBridgeStatus: typeof checkBridgeStatus;
   checkBridgeRelease: typeof checkBridgeRelease;
   checkBootloaderRelease: typeof checkBootloaderRelease;
+  checkFirmwareTypeAvailable: typeof checkFirmwareTypeAvailable;
 
   /**
    * Device function

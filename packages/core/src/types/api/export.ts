@@ -29,6 +29,7 @@ export type {
   FirmwareUpdateBinaryParams,
   FirmwareUpdateV3Params,
 } from './firmwareUpdate';
+export type { AllFirmwareRelease } from './checkAllFirmwareRelease';
 
 export type { AllNetworkAddressParams, AllNetworkGetAddressParams } from './allNetworkGetAddress';
 
