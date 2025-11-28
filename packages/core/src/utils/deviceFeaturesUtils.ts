@@ -233,7 +233,7 @@ export const supportModifyHomescreen = (features?: Features): SupportFeatureType
   return { support: semver.gte(currentVersion, '3.4.0') };
 };
 
-const getLatestFirmwareField = (firmwareType?: EFirmwareType): IFirmwareField => {
+export const getLatestFirmwareField = (firmwareType?: EFirmwareType): IFirmwareField => {
   if (firmwareType === 'bitcoinonly') {
     return `firmware-btc-v7`;
   }

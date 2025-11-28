@@ -135,6 +135,7 @@ export const createCoreApi = (
 
   checkAllFirmwareRelease: (connectId, params) =>
     call({ ...params, connectId, method: 'checkAllFirmwareRelease' }),
+  checkFirmwareTypeAvailable: params => call({ ...params, method: 'checkFirmwareTypeAvailable' }),
 
   cipherKeyValue: (connectId, deviceId, params) =>
     call({ ...params, connectId, deviceId, method: 'cipherKeyValue' }),
