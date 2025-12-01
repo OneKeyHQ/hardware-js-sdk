@@ -1,11 +1,12 @@
 import { TronMessageType } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { createDeviceNotSupportMethodError } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { stripHexPrefix } from '../helpers/hexUtils';
+import { getFirmwareType } from '../../utils';
 
 import type { TronSignMessage as HardwareTronSignMessage } from '@onekeyfe/hd-transport';
 
@@ -25,9 +26,9 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
     const addressN = validatePath(path, 3);
 
     if (this.payload.messageType === 'V1' || this.payload.messageType == null) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.DeviceNotSupportMethod,
-        'not support tron message v1'
+      throw createDeviceNotSupportMethodError(
+        'TronSignMessage',
+        getFirmwareType(this.device.features)
       );
     }
 

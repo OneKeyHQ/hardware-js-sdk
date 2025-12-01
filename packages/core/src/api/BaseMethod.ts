@@ -1,7 +1,6 @@
 import semver from 'semver';
 import {
-  ERRORS,
-  HardwareErrorCode,
+  createDeviceNotSupportMethodError,
   createNeedUpgradeFirmwareHardwareError,
 } from '@onekeyfe/hd-shared';
 
@@ -17,12 +16,13 @@ import {
   getLogger,
   getMethodVersionRange,
 } from '../utils';
+import { generateInstanceId } from '../utils/tracing';
 
 import type { Device } from '../device/Device';
 import type DeviceConnector from '../device/DeviceConnector';
 import type { DeviceFirmwareRange, KnownDevice } from '../types';
 import type { CoreMessage } from '../events';
-import { generateInstanceId, RequestContext } from '../utils/tracing';
+import type { RequestContext } from '../utils/tracing';
 import type { CoreContext } from '../core';
 
 const Log = getLogger(LoggerNames.Method);
@@ -224,17 +224,19 @@ export abstract class BaseMethod<Params = undefined> {
 
     if (!versionRange) {
       if (options?.strictCheckDeviceSupport) {
-        throw ERRORS.TypedError(
-          HardwareErrorCode.DeviceNotSupportMethod,
-          'Device does not support this method'
-        );
+        throw createDeviceNotSupportMethodError(this.name, getFirmwareType(this.device.features));
       }
       // Equipment that does not need to be repaired
       return;
     }
 
     if (semver.valid(firmwareVersion) && semver.lt(firmwareVersion, versionRange.min)) {
-      throw createNeedUpgradeFirmwareHardwareError(firmwareVersion, versionRange.min);
+      throw createNeedUpgradeFirmwareHardwareError({
+        currentVersion: firmwareVersion,
+        requireVersion: versionRange.min,
+        methodName: this.name,
+        firmwareType: getFirmwareType(this.device.features),
+      });
     }
   }
 

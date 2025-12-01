@@ -7,6 +7,7 @@ import {
   createDefectiveFirmwareError,
   createDeferred,
   createDeprecatedHardwareError,
+  createDeviceNotSupportMethodError,
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createNewFirmwareUnReleaseHardwareError,
@@ -387,19 +388,21 @@ const onCallDevice = async (
             semver.lt(currentFirmwareVersion, versionRange.min)
           ) {
             if (newVersionStatus === 'none' || newVersionStatus === 'valid') {
-              throw createNewFirmwareUnReleaseHardwareError(
-                currentFirmwareVersion,
-                versionRange.min,
-                method.name
-              );
+              throw createNewFirmwareUnReleaseHardwareError({
+                currentVersion: currentFirmwareVersion,
+                requireVersion: versionRange.min,
+                methodName: method.name,
+                firmwareType: getFirmwareType(device.features),
+              });
             }
 
             return Promise.reject(
-              createNeedUpgradeFirmwareHardwareError(
-                currentFirmwareVersion,
-                versionRange.min,
-                method.name
-              )
+              createNeedUpgradeFirmwareHardwareError({
+                currentVersion: currentFirmwareVersion,
+                requireVersion: versionRange.min,
+                methodName: method.name,
+                firmwareType: getFirmwareType(device.features),
+              })
             );
           }
           if (
@@ -412,10 +415,7 @@ const onCallDevice = async (
             );
           }
         } else if (method.strictCheckDeviceSupport) {
-          throw ERRORS.TypedError(
-            HardwareErrorCode.DeviceNotSupportMethod,
-            `Method '${method.name}' is not supported by this device`
-          );
+          throw createDeviceNotSupportMethodError(method.name, getFirmwareType(device.features));
         }
       }
 
