@@ -1,3 +1,5 @@
+import { EFirmwareType } from './firmwareType';
+
 export interface IHardwareError {
   errorCode: ValueOf<typeof HardwareErrorCode>;
   message?: string;
@@ -663,11 +665,21 @@ export const CreateHardwareErrorByBridgeError = (raw: string): HardwareError => 
   return TypedError(HardwareErrorCode.BridgeNetworkError, msg);
 };
 
-const createNewFirmwareUnReleaseHardwareError = (
-  currentVersion: string,
-  requireVersion: string,
-  methodName?: string
-) => {
+const createNewFirmwareUnReleaseHardwareError = ({
+  currentVersion,
+  requireVersion,
+  methodName,
+  firmwareType,
+}: {
+  currentVersion: string;
+  requireVersion: string;
+  methodName?: string;
+  firmwareType?: EFirmwareType;
+}) => {
+  if (methodName?.startsWith('btc') === false && firmwareType === EFirmwareType.BitcoinOnly) {
+    return createDeviceNotSupportMethodError(methodName ?? '', firmwareType);
+  }
+
   const methodInfo = methodName ? ` for method '${methodName}'` : '';
   return TypedError(
     HardwareErrorCode.NewFirmwareUnRelease,
@@ -676,11 +688,21 @@ const createNewFirmwareUnReleaseHardwareError = (
   );
 };
 
-const createNeedUpgradeFirmwareHardwareError = (
-  currentVersion: string,
-  requireVersion: string,
-  methodName?: string
-) => {
+const createNeedUpgradeFirmwareHardwareError = ({
+  currentVersion,
+  requireVersion,
+  methodName,
+  firmwareType,
+}: {
+  currentVersion: string;
+  requireVersion: string;
+  methodName?: string;
+  firmwareType?: EFirmwareType;
+}) => {
+  if (methodName?.startsWith('btc') === false && firmwareType === EFirmwareType.BitcoinOnly) {
+    return createDeviceNotSupportMethodError(methodName ?? '', firmwareType);
+  }
+
   const methodInfo = methodName ? ` for method '${methodName}'` : '';
   return TypedError(
     HardwareErrorCode.CallMethodNeedUpgradeFirmware,
@@ -751,10 +773,17 @@ const createDefectiveFirmwareError = (
   });
 };
 
+const createDeviceNotSupportMethodError = (methodName: string, firmwareType: EFirmwareType) =>
+  TypedError(HardwareErrorCode.DeviceNotSupportMethod, `Device not support this method`, {
+    firmwareType: firmwareType.toString(),
+    method: methodName,
+  });
+
 export {
   createNewFirmwareUnReleaseHardwareError,
   createNeedUpgradeFirmwareHardwareError,
   createNewFirmwareForceUpdateHardwareError,
   createDeprecatedHardwareError,
   createDefectiveFirmwareError,
+  createDeviceNotSupportMethodError,
 };

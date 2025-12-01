@@ -12,7 +12,7 @@ import { validateParams } from '../helpers/paramsValidator';
 import { PROTO } from '../../constants';
 import { findMethod } from '../utils';
 import { DEVICE, IFRAME, createUiMessage } from '../../events';
-import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
+import { getDeviceFirmwareVersion, getFirmwareType, getMethodVersionRange } from '../../utils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { onDeviceButtonHandler } from '../../core';
 import {
@@ -463,9 +463,14 @@ function preCheckDeviceSupport(device: Device, method: BaseMethod) {
     semver.valid(versionRange.min) &&
     semver.lt(currentVersion, versionRange.min)
   ) {
-    throw ERRORS.createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min);
+    throw ERRORS.createNeedUpgradeFirmwareHardwareError({
+      currentVersion,
+      requireVersion: versionRange.min,
+      methodName: method.name,
+      firmwareType: getFirmwareType(device.features),
+    });
   } else if (method.strictCheckDeviceSupport && !versionRange) {
-    throw ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod);
+    throw ERRORS.createDeviceNotSupportMethodError(method.name, getFirmwareType(device.features));
   }
 }
 
@@ -483,7 +488,10 @@ function handleSkippableHardwareError(
     } else if (errorCode === HardwareErrorCode.DeviceNotSupportMethod) {
       error = e;
     }
-  } else if (e.message?.includes('Failure_UnexpectedMessage')) {
+  } else if (
+    e.message?.includes('Failure_UnexpectedMessage') ||
+    e.message?.includes('Failure_UnknownMessage')
+  ) {
     const versionRange = getMethodVersionRange(
       device.features,
       type => method.getVersionRange()[type]
@@ -495,9 +503,17 @@ function handleSkippableHardwareError(
       semver.valid(versionRange.min) &&
       semver.lt(currentVersion, versionRange.min)
     ) {
-      error = ERRORS.createNeedUpgradeFirmwareHardwareError(currentVersion, versionRange.min);
+      error = ERRORS.createNeedUpgradeFirmwareHardwareError({
+        currentVersion,
+        requireVersion: versionRange.min,
+        methodName: method.name,
+        firmwareType: getFirmwareType(device.features),
+      });
     } else {
-      error = ERRORS.TypedError(HardwareErrorCode.DeviceNotSupportMethod, e.message);
+      error = ERRORS.createDeviceNotSupportMethodError(
+        method.name,
+        getFirmwareType(device.features)
+      );
     }
   } else if (
     e.message?.toLowerCase()?.includes('forbidden key path') ||

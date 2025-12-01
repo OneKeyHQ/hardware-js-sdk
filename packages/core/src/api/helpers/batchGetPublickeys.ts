@@ -1,12 +1,17 @@
-import { EcdsaPublicKeys, Path } from '@onekeyfe/hd-transport';
+import {
+  HardwareErrorCode,
+  TypedError,
+  createDeviceNotSupportMethodError,
+} from '@onekeyfe/hd-shared';
 
-import { TypedError, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { Device } from '../../device/Device';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { isEqualBip44CoinType } from './pathUtils';
 import { splitArray } from '../../utils/arrayUtils';
-import { getDeviceType } from '../../utils';
+import { getDeviceType, getFirmwareType } from '../../utils';
 import { DeviceModelToTypes } from '../../types';
+
+import type { EcdsaPublicKeys, Path } from '@onekeyfe/hd-transport';
+import type { Device } from '../../device/Device';
 
 export async function batchGetPublickeys(
   device: Device,
@@ -25,7 +30,7 @@ export async function batchGetPublickeys(
 
   const supportsBatchPublicKey = supportBatchPublicKey(device.features, options);
   if (!supportsBatchPublicKey) {
-    throw TypedError(HardwareErrorCode.DeviceNotSupportMethod);
+    throw createDeviceNotSupportMethodError('BatchGetPublickeys', getFirmwareType(device.features));
   }
 
   const existsPathNotEqualCoinType = paths.find(p => !isEqualBip44CoinType(p.address_n, coinType));
@@ -53,7 +58,10 @@ export async function batchGetPublickeys(
       include_node: options?.includeNode ?? false,
     });
     if (res.type !== 'EcdsaPublicKeys') {
-      throw TypedError(HardwareErrorCode.DeviceNotSupportMethod, 'BatchGetPublickeys failed');
+      throw createDeviceNotSupportMethodError(
+        'BatchGetPublickeys',
+        getFirmwareType(device.features)
+      );
     } else {
       result.root_fingerprint = res.message.root_fingerprint;
       result.public_keys.push(...res.message.public_keys);
