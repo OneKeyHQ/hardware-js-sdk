@@ -441,7 +441,7 @@ export class DeviceCommands {
         ERRORS.TypedError(
           HardwareErrorCode.RuntimeError,
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          `${(code as any) || 'Failure_UnknownCode'},${message || 'Failure_UnknownMessage'}`
+          `${(code as any) || 'Failure_UnknownCode'},${message || 'no error message'}`
         )
       );
     }
