@@ -35,7 +35,7 @@ const Log = getLogger(LoggerNames.HdCommonConnectSdk);
 
 const getTransport = (env: ConnectSettings['env']) => {
   if (env === 'desktop-web-ble') return ElectronBleTransport;
-  if (env === 'webusb') return WebUsbTransport;
+  if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
   if (env === 'lowlevel') return LowlevelTransport;
   if (env === 'emulator') return EmulatorTransport;
   return HttpTransport;

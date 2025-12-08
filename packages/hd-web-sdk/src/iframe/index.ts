@@ -30,7 +30,7 @@ let _core: Core | undefined;
 const Log = getLogger(LoggerNames.Iframe);
 
 const getTransport = (env: ConnectSettings['env']) => {
-  if (env === 'webusb') return WebUsbTransport;
+  if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
   if (env === 'emulator') return EmulatorTransport;
   return HttpTransport;
 };
