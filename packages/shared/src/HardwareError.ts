@@ -455,11 +455,14 @@ export const HardwareErrorCode = {
   BridgeNeedsPermission: 821,
 
   CallQueueActionCancelled: 822,
-
   /**
    * Firmware downgrade not allowed
    */
   FirmwareDowngradeNotAllowed: 823,
+  /**
+   * Cosmos invalid JSON message, Only support Amino msgs.
+   */
+  CosmosInvalidJsonMessage: 824,
 
   /**
    * Lowlevel transport connect error
@@ -606,6 +609,8 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FirmwareVerificationFailed]: 'Firmware verification failed',
   [HardwareErrorCode.BridgeNeedsPermission]: 'Bridge needs permission',
   [HardwareErrorCode.FirmwareDowngradeNotAllowed]: 'Firmware downgrade not allowed',
+  [HardwareErrorCode.CosmosInvalidJsonMessage]:
+    'Cosmos invalid JSON message, Only support Amino msgs.',
 
   /**
    * Lowlevel transport
