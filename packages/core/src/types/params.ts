@@ -42,6 +42,11 @@ export interface CommonParams {
    * Skip passphrase check
    */
   skipPassphraseCheck?: boolean;
+
+  /**
+   * Only connect device, not initialize device, only ble connect
+   */
+  onlyConnectBleDevice?: boolean;
 }
 
 export type Params<T> = CommonParams & T & { bundle?: undefined };

@@ -289,6 +289,11 @@ const onCallDevice = async (
     return createResponseMessage(method.responseID, false, { error: e });
   }
 
+  if (method.payload?.onlyConnectBleDevice) {
+    Log.debug('Call API - only connect ble device: ', device?.mainId);
+    return createResponseMessage(method.responseID, true, null);
+  }
+
   Log.debug('Call API - setDevice: ', device.mainId);
   method.setDevice?.(device);
   method.context = context;
@@ -687,6 +692,9 @@ let bleTimeoutRetry = 0;
 async function connectDeviceForBle(method: BaseMethod, device: Device) {
   try {
     await device.acquire();
+    if (method.payload?.onlyConnectBleDevice) {
+      return;
+    }
     await device.initialize(parseInitOptions(method));
   } catch (err) {
     if (err.errorCode === HardwareErrorCode.BleTimeoutError && bleTimeoutRetry <= 5) {
