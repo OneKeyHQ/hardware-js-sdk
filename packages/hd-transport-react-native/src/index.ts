@@ -215,7 +215,7 @@ export default class ReactNativeBleTransport {
 
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {
-          deviceList.push({ ...device, type: 'ble' } as IOneKeyDevice);
+          deviceList.push({ ...device, commType: 'ble' } as IOneKeyDevice);
         }
       };
 

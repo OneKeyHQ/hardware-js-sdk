@@ -2,7 +2,7 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import type { IVersionArray } from './settings';
 import type { PROTO } from '../constants';
-import type { OneKeyDeviceCommunicationType } from '@onekeyfe/hd-transport';
+import type { OneKeyDeviceCommType } from '@onekeyfe/hd-transport';
 
 export type DeviceStatus = 'available' | 'occupied' | 'used';
 
@@ -26,7 +26,7 @@ export type KnownDevice = {
   uuid: string;
   deviceId: string | null;
   deviceType: IDeviceType | null;
-  communicationType: OneKeyDeviceCommunicationType | null;
+  commType: OneKeyDeviceCommType | null;
   path: string;
   label: string;
   bleName: string | null;
@@ -50,6 +50,7 @@ export type SearchDevice = {
   deviceId: string | null;
   deviceType: IDeviceType;
   name: string;
+  commType: OneKeyDeviceCommType;
 };
 
 // export type UnknownDevice = {

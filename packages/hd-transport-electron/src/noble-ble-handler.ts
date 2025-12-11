@@ -824,7 +824,7 @@ async function enumerateDevices(): Promise<DeviceInfo[]> {
           if (!existingDevice) {
             const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
             devices.push({
-              type: 'electron-ble',
+              commType: 'electron-ble',
               id,
               name: deviceName,
               state: peripheral.state || 'disconnected',
@@ -883,7 +883,7 @@ function getDevice(deviceId: string): DeviceInfo | null {
   if (peripheral) {
     const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
     return {
-      type: 'electron-ble',
+      commType: 'electron-ble',
       id: peripheral.id,
       name: deviceName,
       state: peripheral.state || 'disconnected',
@@ -895,7 +895,7 @@ function getDevice(deviceId: string): DeviceInfo | null {
   if (connectedPeripheral) {
     const deviceName = connectedPeripheral.advertisement?.localName || 'Unknown Device';
     return {
-      type: 'electron-ble',
+      commType: 'electron-ble',
       id: connectedPeripheral.id,
       name: deviceName,
       state: connectedPeripheral.state || 'connected',
@@ -905,7 +905,7 @@ function getDevice(deviceId: string): DeviceInfo | null {
   // For direct connection mode, return a placeholder device info
   // This allows the connection process to proceed without prior discovery
   return {
-    type: 'electron-ble',
+    commType: 'electron-ble',
     id: deviceId,
     name: 'OneKey Device',
     state: 'disconnected',

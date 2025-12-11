@@ -201,7 +201,7 @@ export class Device extends EventEmitter {
       connectId: DataManager.isBleConnect(env) ? this.mainId || null : getDeviceUUID(this.features),
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
-      communicationType: this.originalDescriptor.type,
+      commType: this.originalDescriptor.commType,
       sdkInstanceId: this.sdkInstanceId,
       instanceId: this.instanceId,
       createdAt: this.createdAt,

@@ -115,7 +115,7 @@ export default class WebUsbTransport {
     this.deviceList = onekeyDevices.map(device => ({
       path: device.serialNumber as string,
       device,
-      type: 'webusb',
+      commType: 'webusb',
     }));
 
     return this.deviceList;

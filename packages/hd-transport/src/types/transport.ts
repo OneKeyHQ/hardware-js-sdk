@@ -1,6 +1,6 @@
 import type EventEmitter from 'events';
 
-export type OneKeyDeviceCommunicationType =
+export type OneKeyDeviceCommType =
   | 'usb'
   | 'webusb'
   | 'ble'
@@ -25,7 +25,7 @@ export type OneKeyMobileDeviceInfo = {
 };
 
 export type OneKeyDeviceInfoBase = {
-  type: OneKeyDeviceCommunicationType;
+  commType: OneKeyDeviceCommType;
 };
 
 // TODO: sorting type by communication type

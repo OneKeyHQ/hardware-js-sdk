@@ -23,7 +23,7 @@ export type {
   LowlevelTransportSharedPlugin,
   LowLevelDevice,
   OneKeyDeviceInfoBase,
-  OneKeyDeviceCommunicationType,
+  OneKeyDeviceCommType,
 } from './types';
 
 export { Messages } from './types';
