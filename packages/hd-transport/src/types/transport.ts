@@ -1,5 +1,14 @@
 import type EventEmitter from 'events';
 
+export type OneKeyDeviceCommunicationType =
+  | 'usb'
+  | 'webusb'
+  | 'ble'
+  | 'webble'
+  | 'electron-ble'
+  | 'bridge'
+  | 'emulator';
+
 export type OneKeyUsbDeviceInfo = {
   path: string;
 };
@@ -15,7 +24,14 @@ export type OneKeyMobileDeviceInfo = {
   name: string | null;
 };
 
-export type OneKeyDeviceInfo = OneKeyDeviceInfoWithSession & OneKeyMobileDeviceInfo;
+export type OneKeyDeviceInfoBase = {
+  type: OneKeyDeviceCommunicationType;
+};
+
+// TODO: sorting type by communication type
+export type OneKeyDeviceInfo = OneKeyDeviceInfoBase &
+  OneKeyDeviceInfoWithSession &
+  OneKeyMobileDeviceInfo;
 
 export type AcquireInput = {
   path?: string;
@@ -58,7 +74,7 @@ export type Transport = {
   isOutdated: boolean;
 };
 
-export type LowLevelDevice = { id: string; name: string };
+export type LowLevelDevice = OneKeyDeviceInfoBase & { id: string; name: string };
 export type LowlevelTransportSharedPlugin = {
   enumerate: () => Promise<LowLevelDevice[]>;
   send: (uuid: string, data: string) => Promise<void>;

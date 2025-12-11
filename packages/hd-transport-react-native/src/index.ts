@@ -1,35 +1,35 @@
-import { Platform, PermissionsAndroid } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 import { Buffer } from 'buffer';
 import {
-  BleManager as BlePlxManager,
-  Device,
-  BleErrorCode,
-  Characteristic,
-  ScanMode,
   BleATTErrorCode,
   BleError,
+  BleErrorCode,
+  BleManager as BlePlxManager,
+  ScanMode,
 } from 'react-native-ble-plx';
 import ByteBuffer from 'bytebuffer';
-import transport, { COMMON_HEADER_SIZE, LogBlockCommand } from '@onekeyfe/hd-transport';
-import {
-  createDeferred,
-  Deferred,
-  ERRORS,
-  HardwareErrorCode,
-  isOnekeyDevice,
-} from '@onekeyfe/hd-shared';
-import type EventEmitter from 'events';
+import transport, {
+  COMMON_HEADER_SIZE,
+  LogBlockCommand,
+  type OneKeyDeviceInfoBase,
+} from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode, createDeferred, isOnekeyDevice } from '@onekeyfe/hd-shared';
+
 import { getConnectedDeviceIds, onDeviceBondState, pairDevice } from './BleManager';
 import { subscribeBleOn } from './subscribeBleOn';
 import {
+  ANDROID_PACKET_LENGTH,
+  IOS_PACKET_LENGTH,
   getBluetoothServiceUuids,
   getInfosForServiceUuid,
-  IOS_PACKET_LENGTH,
-  ANDROID_PACKET_LENGTH,
 } from './constants';
 import { isHeaderChunk } from './utils/validateNotify';
 import BleTransport from './BleTransport';
 import timer from './utils/timer';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type { Characteristic, Device } from 'react-native-ble-plx';
+import type EventEmitter from 'events';
 import type { BleAcquireInput, TransportOptions } from './types';
 
 const { check, buildBuffers, receiveOne, parseConfigure } = transport;
@@ -41,6 +41,8 @@ let connectOptions: Record<string, unknown> = {
   timeout: 3000,
   refreshGatt: 'OnConnected',
 };
+
+export type IOneKeyDevice = OneKeyDeviceInfoBase & Device;
 
 const tryToGetConfiguration = (device: Device) => {
   if (!device || !device.serviceUUIDs) return null;
@@ -133,8 +135,8 @@ export default class ReactNativeBleTransport {
    */
   async enumerate() {
     // eslint-disable-next-line no-async-promise-executor
-    return new Promise<Device[]>(async (resolve, reject) => {
-      const deviceList: Device[] = [];
+    return new Promise<IOneKeyDevice[]>(async (resolve, reject) => {
+      const deviceList: IOneKeyDevice[] = [];
       const blePlxManager = await this.getPlxManager();
       try {
         await subscribeBleOn(blePlxManager);
@@ -213,7 +215,7 @@ export default class ReactNativeBleTransport {
 
       const addDevice = (device: Device) => {
         if (deviceList.every(d => d.id !== device.id)) {
-          deviceList.push(device);
+          deviceList.push({ ...device, type: 'ble' } as IOneKeyDevice);
         }
       };
 

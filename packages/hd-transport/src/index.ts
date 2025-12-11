@@ -22,6 +22,8 @@ export type {
   MessageFromOneKey,
   LowlevelTransportSharedPlugin,
   LowLevelDevice,
+  OneKeyDeviceInfoBase,
+  OneKeyDeviceCommunicationType,
 } from './types';
 
 export { Messages } from './types';
