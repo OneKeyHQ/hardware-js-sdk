@@ -81,7 +81,7 @@ export default class EmulatorTransport {
   async enumerate() {
     const devicesS = await this._post({ url: '/enumerate' });
     const devices = check.devices(devicesS);
-    return devices.map(device => ({ ...device, type: 'emulator' }));
+    return devices.map(device => ({ ...device, commType: 'emulator' }));
   }
 
   _acquireMixed(input: AcquireInput) {
