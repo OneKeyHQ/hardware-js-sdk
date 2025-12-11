@@ -4,9 +4,10 @@
  */
 
 import type { Peripheral, Characteristic } from '@stoprocent/noble';
+import type { OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
 
 // Device info interface for our API
-export interface DeviceInfo {
+export interface DeviceInfo extends OneKeyDeviceInfoBase {
   id: string;
   name: string;
   state: string;

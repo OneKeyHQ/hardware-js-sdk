@@ -1,7 +1,9 @@
 /* eslint-disable no-undef */
-import transport, { AcquireInput, LogBlockCommand } from '@onekeyfe/hd-transport';
+import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 import ByteBuffer from 'bytebuffer';
+
+import type { AcquireInput, OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
 
 const { parseConfigure, buildEncodeBuffers, decodeProtocol, receiveOne, check } = transport;
 
@@ -14,7 +16,7 @@ const HEADER_LENGTH = 6;
 /**
  * Device information with path and WebUSB device instance
  */
-interface DeviceInfo {
+export interface DeviceInfo extends OneKeyDeviceInfoBase {
   path: string;
   device: USBDevice;
 }
@@ -113,6 +115,7 @@ export default class WebUsbTransport {
     this.deviceList = onekeyDevices.map(device => ({
       path: device.serialNumber as string,
       device,
+      type: 'webusb',
     }));
 
     return this.deviceList;

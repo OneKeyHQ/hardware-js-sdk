@@ -201,13 +201,14 @@ export class Device extends EventEmitter {
       connectId: DataManager.isBleConnect(env) ? this.mainId || null : getDeviceUUID(this.features),
       /** Hardware ID, will not change at any time */
       uuid: getDeviceUUID(this.features),
+      communicationType: this.originalDescriptor.type,
       sdkInstanceId: this.sdkInstanceId,
       instanceId: this.instanceId,
       createdAt: this.createdAt,
       deviceType,
       /** ID for current seeds, will clear after replace a new seed at device */
       deviceId: this.features.device_id || null,
-      path: this.originalDescriptor.path,
+      path: this.originalDescriptor?.path,
       bleName,
       name: bleName || label || `OneKey ${deviceType?.toUpperCase()}`,
       label: label || 'OneKey',

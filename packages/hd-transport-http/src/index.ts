@@ -77,7 +77,7 @@ export default class HttpTransport {
   async enumerate() {
     const devicesS = await this._post({ url: '/enumerate' });
     const devices = check.devices(devicesS);
-    return devices;
+    return devices.map(device => ({ ...device, type: 'bridge' }));
   }
 
   _acquireMixed(input: AcquireInput) {
