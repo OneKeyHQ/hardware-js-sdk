@@ -142,6 +142,10 @@ const playgroundConfig = [
     title: 'TRON API',
     data: require('../data/tron').default,
   },
+  {
+    title: 'WipeDevice API',
+    data: require('../data/wipeDevice').default,
+  },
 ];
 
 interface ApiPayloadItem {
