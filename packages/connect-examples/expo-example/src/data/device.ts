@@ -119,11 +119,6 @@ const api: PlaygroundProps[] = [
     ],
   },
   {
-    method: 'deviceWipe',
-    description: 'Wipe a device',
-    noDeviceIdReq: true,
-  },
-  {
     method: 'deviceRebootToBoardloader',
     description: 'DeviceRebootToBoardloader',
     noDeviceIdReq: true,
