@@ -32,6 +32,7 @@ export type ConnectSettings = {
   preRelease?: boolean;
   fetchConfig?: boolean;
   extension?: string;
+  configFetcher?: (url: string) => Promise<RemoteConfigResponse | null>;
 };
 
 export type IVersionArray = [number, number, number];

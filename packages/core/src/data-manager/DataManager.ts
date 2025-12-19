@@ -5,11 +5,13 @@ import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 import MessagesJSON from '../data/messages/messages.json';
 import MessagesLegacyV1JSON from '../data/messages/messages_legacy_v1.json';
 import {
+  LoggerNames,
   getDeviceBLEFirmwareVersion,
   getDeviceFirmwareVersion,
   getDeviceType,
   getFirmwareType,
   getFirmwareUpdateField,
+  getLogger,
   getTimeStamp,
 } from '../utils';
 import { DeviceModelToTypes } from '../types';
@@ -26,6 +28,8 @@ import type {
   IVersionArray,
   RemoteConfigResponse,
 } from '../types';
+
+const Log = getLogger(LoggerNames.Core);
 
 export const FIRMWARE_FIELDS = [
   'firmware',
@@ -387,18 +391,50 @@ export default class DataManager {
     if (!settings.fetchConfig) {
       return;
     }
-    try {
-      const url = settings.preRelease
-        ? 'https://data.onekey.so/pre-config.json'
-        : 'https://data.onekey.so/config.json';
 
-      const { data } = await axios.get<RemoteConfigResponse>(
-        `${url}?noCache=${getTimeStamp()}`,
-        // because of iframe timeout is 10000
-        {
-          timeout: 7000,
+    const url = settings.preRelease
+      ? 'https://data.onekey.so/pre-config.json'
+      : 'https://data.onekey.so/config.json';
+
+    const urlWithCache = `${url}?noCache=${getTimeStamp()}`;
+    let data: RemoteConfigResponse | null = null;
+    let fetchMethod: 'configFetcher' | 'axios' | 'none' = 'none';
+
+    // 1. Try custom configFetcher first (client-side IP direct connection support)
+    if (settings.configFetcher) {
+      Log.debug('[DataConfig] Trying configFetcher (client-side fetcher)...');
+      try {
+        data = await settings.configFetcher(urlWithCache);
+        if (data) {
+          fetchMethod = 'configFetcher';
+          Log.log('[DataConfig] ConfigFetcher success');
+        } else {
+          Log.debug('[DataConfig] ConfigFetcher returned null, will fallback to axios');
         }
-      );
+      } catch (e) {
+        Log.warn('[DataConfig] ConfigFetcher error, will fallback to axios:', e);
+      }
+    }
+
+    // 2. Fallback to default axios request
+    if (!data) {
+      Log.debug('[DataConfig] Trying axios (SDK default fetcher)...');
+      try {
+        const response = await axios.get<RemoteConfigResponse>(urlWithCache, {
+          // because of iframe timeout is 10000
+          timeout: 7000,
+        });
+        data = response.data;
+        fetchMethod = 'axios';
+        Log.log('[DataConfig] Axios fetch success');
+      } catch (e) {
+        Log.warn('[DataConfig] Axios fetch error:', e);
+      }
+    }
+
+    // 3. Apply config if available
+    if (data) {
+      Log.log(`[DataConfig] Config loaded successfully via [${fetchMethod}]`);
       this.deviceMap = {
         [EDeviceType.Classic]: this.enrichFirmwareReleaseInfo(data.classic),
         [EDeviceType.Classic1s]: this.enrichFirmwareReleaseInfo(data.classic1s),
@@ -410,8 +446,8 @@ export default class DataManager {
       this.assets = {
         bridge: data.bridge,
       };
-    } catch (e) {
-      // ignore
+    } else {
+      Log.warn('[DataConfig] All fetch methods failed, using built-in default config');
     }
   }
 
