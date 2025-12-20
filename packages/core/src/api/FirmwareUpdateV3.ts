@@ -377,20 +377,18 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           await wait(1000);
         } else {
           await wait(1000);
-          if (!this.shouldSkipReconnect(error)) {
-            /**
-             * Needs second reconnect case:
-             * 1. While including 'Ble firmwware' in ble connect type
-             * 2. While including bootloader upgrade
-             */
-            const reconnectTimeout =
-              this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)
-                ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
-                : 60 * 1000; // 1 minute for normal reconnect
+          /**
+           * Needs second reconnect case:
+           * 1. While including 'Ble firmwware' in ble connect type
+           * 2. While including bootloader upgrade
+           */
+          const reconnectTimeout =
+            this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)
+              ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
+              : 60 * 1000; // 1 minute for normal reconnect
 
-            await this.ensureWebUsbBootloaderReauthPrompt();
-            await this.waitForDeviceReconnect(reconnectTimeout);
-          }
+          await this.ensureWebUsbBootloaderReauthPrompt();
+          await this.waitForDeviceReconnect(reconnectTimeout);
         }
       }
     }
@@ -410,26 +408,6 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     const progress = parseInt(match[1], 10);
     return Number.isNaN(progress) ? null : progress;
-  }
-
-  /**
-   * Check whether the error is a transient BLE reconnect/timeout hint (e.g., force clean/cancel).
-   */
-  private shouldSkipReconnect(error: unknown): boolean {
-    const errorCode = (error as { errorCode?: number })?.errorCode;
-    const transientCodes: number[] = [
-      HardwareErrorCode.BleForceCleanRunPromise,
-      HardwareErrorCode.BleTransportCallCanceled,
-      HardwareErrorCode.BleConnectedError,
-      HardwareErrorCode.ActionCancelled,
-      HardwareErrorCode.CallQueueActionCancelled,
-      HardwareErrorCode.BleTimeoutError,
-    ];
-    if (typeof errorCode === 'number' && transientCodes.includes(errorCode)) {
-      return true;
-    }
-
-    return false;
   }
 
   private normalizeErrorMessage(error: unknown): string {
