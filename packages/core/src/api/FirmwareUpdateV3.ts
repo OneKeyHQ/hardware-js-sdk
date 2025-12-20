@@ -358,37 +358,96 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
         const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
         const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
-        this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
-        DevicePool.resetState();
-        return {
-          bootloaderVersion,
-          bleVersion,
-          firmwareVersion,
-        };
+        // Treat update as complete once firmware version becomes non-zero
+        if (firmwareVersion !== '0.0.0') {
+          this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+          DevicePool.resetState();
+          return {
+            bootloaderVersion,
+            bleVersion,
+            firmwareVersion,
+          };
+        }
+        // Still in update mode; continue polling (e.g., iOS may return firmwareVersion 0.0.0 during switches)
+        await wait(1000);
       } catch (error) {
-        // Hardware install firmware progress message
-        if (error.message && error.message.includes('Update mode')) {
-          const updateParts = error.message.split('Update mode ');
-          const progressValue = updateParts[1] ?? '0';
-          const progress = parseInt(progressValue, 10) || 0;
+        const progress = this.extractUpdateModeProgress(error);
+        if (progress !== null) {
           this.postProgressMessage(progress, 'installingFirmware');
           await wait(1000);
         } else {
           await wait(1000);
-          /**
-           * Needs second reconnect case:
-           * 1. While including 'Ble firmwware' in ble connect type
-           * 2. While including bootloader upgrade
-           */
-          const reconnectTimeout =
-            this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)
-              ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
-              : 60 * 1000; // 1 minute for normal reconnect
+          if (!this.shouldSkipReconnect(error)) {
+            /**
+             * Needs second reconnect case:
+             * 1. While including 'Ble firmwware' in ble connect type
+             * 2. While including bootloader upgrade
+             */
+            const reconnectTimeout =
+              this.isBleReconnect() && (this.params.bleBinary || this.params.bleVersion)
+                ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
+                : 60 * 1000; // 1 minute for normal reconnect
 
-          await this.waitForDeviceReconnect(reconnectTimeout);
+            await this.ensureWebUsbBootloaderReauthPrompt();
+            await this.waitForDeviceReconnect(reconnectTimeout);
+          }
         }
       }
     }
+  }
+
+  /**
+   * 从设备返回的错误里解析出“Update mode XX”的进度数字，避免硬编码 message.includes。
+   */
+  private extractUpdateModeProgress(error: unknown): number | null {
+    const message = this.normalizeErrorMessage(error);
+    if (!message) {
+      return null;
+    }
+    const match = message.match(/Update mode\s*(\d+)/i);
+    if (!match) {
+      return null;
+    }
+    const progress = parseInt(match[1], 10);
+    return Number.isNaN(progress) ? null : progress;
+  }
+
+  /**
+   * 判断当前错误是否是短暂的蓝牙重连/超时提示，比如 Force clean 请求或操作被取消。
+   */
+  private shouldSkipReconnect(error: unknown): boolean {
+    const message = this.normalizeErrorMessage(error);
+    if (!message) {
+      return false;
+    }
+    const normalized = message.toLowerCase();
+    const transientKeywords = [
+      'operation was cancelled',
+      'force clean bluetooth run promise',
+      'getfeatures timeout',
+      'timeout after 3 seconds',
+      'transport cancel',
+    ];
+    return transientKeywords.some(keyword => normalized.includes(keyword));
+  }
+
+  private normalizeErrorMessage(error: unknown): string {
+    if (!error) {
+      return '';
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    if (typeof error === 'object') {
+      const { message } = error as { message?: unknown };
+      if (typeof message === 'string') {
+        return message;
+      }
+      if (message !== undefined && message !== null) {
+        return String(message);
+      }
+    }
+    return '';
   }
 
   /**

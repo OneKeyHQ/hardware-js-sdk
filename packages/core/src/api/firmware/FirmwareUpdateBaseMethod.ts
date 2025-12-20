@@ -40,6 +40,8 @@ const isDeviceDisconnectedError = (error: unknown) => {
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
+  protected hasPromptedWebUsbBootloaderReauth = false;
+
   init(): void {}
 
   run(): Promise<any> {
@@ -153,7 +155,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
             }
           } catch (e) {
             Log.log(
-              'FirmwareUpdateBaseMethod [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
+              'FirmwareUpdateBaseMethod [checkDeviceToBootloader] _promptDeviceInBootloaderForWebDevice failed: ',
               e
             );
             this.checkPromise?.reject(e);
@@ -191,6 +193,29 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         this.checkPromise.reject(new Error());
       }
     }, 30000);
+  }
+
+  /**
+   * 仅在 firmware 被抹掉、需要重新授权的 bootloader 场景下才提示 WebUSB
+   * （比如 BTC-only 与通用固件互转后算作新设备）。
+   */
+  protected async ensureWebUsbBootloaderReauthPrompt() {
+    if (
+      this.hasPromptedWebUsbBootloaderReauth ||
+      !DataManager.isBrowserWebUsb(DataManager.getSettings('env')) ||
+      this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) === 0
+    ) {
+      return;
+    }
+
+    this.hasPromptedWebUsbBootloaderReauth = true;
+    this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
+
+    try {
+      await this._promptDeviceInBootloaderForWebDevice();
+    } catch (error) {
+      Log.log('WebUSB 设备重新授权失败: ', error);
+    }
   }
 
   private async _checkDeviceInBootloaderMode(
