@@ -416,19 +416,20 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
    * Check whether the error is a transient BLE reconnect/timeout hint (e.g., force clean/cancel).
    */
   private shouldSkipReconnect(error: unknown): boolean {
-    const message = this.normalizeErrorMessage(error);
-    if (!message) {
-      return false;
-    }
-    const normalized = message.toLowerCase();
-    const transientKeywords = [
-      'operation was cancelled',
-      'force clean bluetooth run promise',
-      'getfeatures timeout',
-      'timeout after 3 seconds',
-      'transport cancel',
+    const errorCode = (error as { errorCode?: number })?.errorCode;
+    const transientCodes: number[] = [
+      HardwareErrorCode.BleForceCleanRunPromise,
+      HardwareErrorCode.BleTransportCallCanceled,
+      HardwareErrorCode.BleConnectedError,
+      HardwareErrorCode.ActionCancelled,
+      HardwareErrorCode.CallQueueActionCancelled,
+      HardwareErrorCode.BleTimeoutError,
     ];
-    return transientKeywords.some(keyword => normalized.includes(keyword));
+    if (typeof errorCode === 'number' && transientCodes.includes(errorCode)) {
+      return true;
+    }
+
+    return false;
   }
 
   private normalizeErrorMessage(error: unknown): string {
