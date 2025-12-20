@@ -247,7 +247,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
-    // 处理资源文件
+    // Process resource zip contents
     if (resourceBinary) {
       const file = await JSZip.loadAsync(resourceBinary);
       const files = Object.entries(file.files);
@@ -397,7 +397,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   /**
-   * 从设备返回的错误里解析出“Update mode XX”的进度数字，避免硬编码 message.includes。
+   * Parse “Update mode XX” progress value from device errors to avoid hardcoded message.includes.
    */
   private extractUpdateModeProgress(error: unknown): number | null {
     const message = this.normalizeErrorMessage(error);
@@ -413,7 +413,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   }
 
   /**
-   * 判断当前错误是否是短暂的蓝牙重连/超时提示，比如 Force clean 请求或操作被取消。
+   * Check whether the error is a transient BLE reconnect/timeout hint (e.g., force clean/cancel).
    */
   private shouldSkipReconnect(error: unknown): boolean {
     const message = this.normalizeErrorMessage(error);
