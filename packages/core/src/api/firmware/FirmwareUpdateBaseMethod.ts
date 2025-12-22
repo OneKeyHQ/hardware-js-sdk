@@ -40,6 +40,8 @@ const isDeviceDisconnectedError = (error: unknown) => {
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
+  protected hasPromptedWebUsbBootloaderReauth = false;
+
   init(): void {}
 
   run(): Promise<any> {
@@ -153,7 +155,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
             }
           } catch (e) {
             Log.log(
-              'FirmwareUpdateBaseMethod [checkDeviceToBootloader] promptDeviceInBootloaderForWebDevice failed: ',
+              'FirmwareUpdateBaseMethod [checkDeviceToBootloader] _promptDeviceInBootloaderForWebDevice failed: ',
               e
             );
             this.checkPromise?.reject(e);
@@ -191,6 +193,29 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         this.checkPromise.reject(new Error());
       }
     }, 30000);
+  }
+
+  /**
+   * Only prompt WebUSB in bootloader scenarios that require re-authorization
+   * (e.g., switching between BTC-only and general firmware is treated as a new device).
+   */
+  protected async ensureWebUsbBootloaderReauthPrompt() {
+    if (
+      this.hasPromptedWebUsbBootloaderReauth ||
+      !DataManager.isBrowserWebUsb(DataManager.getSettings('env')) ||
+      this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) === 0
+    ) {
+      return;
+    }
+
+    this.hasPromptedWebUsbBootloaderReauth = true;
+    this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
+
+    try {
+      await this._promptDeviceInBootloaderForWebDevice();
+    } catch (error) {
+      Log.log('WebUSB re-authorization failed: ', error);
+    }
   }
 
   private async _checkDeviceInBootloaderMode(
@@ -430,8 +455,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   }
 
   /**
-   * @description 设备重启（Bootloader 侧可用）
-   * @param rebootType 重启类型，参考 RebootType 枚举
+   * @description Device reboot (available in bootloader mode)
+   * @param rebootType Reboot type, see the RebootType enum
    */
   async reboot(rebootType: RebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());

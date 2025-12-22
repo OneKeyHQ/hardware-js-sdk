@@ -235,9 +235,9 @@ export const supportModifyHomescreen = (features?: Features): SupportFeatureType
 
 export const getLatestFirmwareField = (firmwareType?: EFirmwareType): IFirmwareField => {
   if (firmwareType === 'bitcoinonly') {
-    return `firmware-btc-v7`;
+    return `firmware-btc-v8`;
   }
-  return `firmware-v7`;
+  return `firmware-v8`;
 };
 
 /**
@@ -300,25 +300,25 @@ export const getFirmwareUpdateFieldArray = (
     deviceType === 'mini' ||
     deviceType === 'classicpure'
   ) {
-    return ['firmware-v7'];
+    return ['firmware-v8'];
   }
 
   if (deviceType === 'touch') {
     const currentVersion = getDeviceFirmwareVersion(features).join('.');
     if (semver.gt(currentVersion, '4.0.0')) {
-      return ['firmware-v7', 'firmware'];
+      return ['firmware-v8', 'firmware'];
     }
     if (semver.gte(currentVersion, '4.0.0')) {
       return ['firmware-v2', 'firmware'];
     }
     if (!currentVersion || semver.lt(currentVersion, '3.0.0')) {
-      return ['firmware-v7', 'firmware-v2', 'firmware'];
+      return ['firmware-v8', 'firmware-v2', 'firmware'];
     }
     return ['firmware'];
   }
 
   if (deviceType === 'pro') {
-    return ['firmware-v7'];
+    return ['firmware-v8'];
   }
 
   return ['firmware'];

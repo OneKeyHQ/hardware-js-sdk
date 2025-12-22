@@ -247,7 +247,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
 
     this.postTipMessage(FirmwareUpdateTipMessage.StartTransferData);
-    // 处理资源文件
+    // Process resource zip contents
     if (resourceBinary) {
       const file = await JSZip.loadAsync(resourceBinary);
       const files = Object.entries(file.files);
@@ -358,19 +358,21 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
         const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
         const firmwareVersion = getDeviceFirmwareVersion(features).join('.');
-        this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
-        DevicePool.resetState();
-        return {
-          bootloaderVersion,
-          bleVersion,
-          firmwareVersion,
-        };
+        // Treat update as complete once firmware version becomes non-zero
+        if (firmwareVersion !== '0.0.0') {
+          this.postTipMessage(FirmwareUpdateTipMessage.FirmwareUpdateCompleted);
+          DevicePool.resetState();
+          return {
+            bootloaderVersion,
+            bleVersion,
+            firmwareVersion,
+          };
+        }
+        // Still in update mode; continue polling (e.g., iOS may return firmwareVersion 0.0.0 during switches)
+        await wait(1000);
       } catch (error) {
-        // Hardware install firmware progress message
-        if (error.message && error.message.includes('Update mode')) {
-          const updateParts = error.message.split('Update mode ');
-          const progressValue = updateParts[1] ?? '0';
-          const progress = parseInt(progressValue, 10) || 0;
+        const progress = this.extractUpdateModeProgress(error);
+        if (progress !== null) {
           this.postProgressMessage(progress, 'installingFirmware');
           await wait(1000);
         } else {
@@ -385,10 +387,46 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
               ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
               : 60 * 1000; // 1 minute for normal reconnect
 
+          await this.ensureWebUsbBootloaderReauthPrompt();
           await this.waitForDeviceReconnect(reconnectTimeout);
         }
       }
     }
+  }
+
+  /**
+   * Parse “Update mode XX” progress value from device errors to avoid hardcoded message.includes.
+   */
+  private extractUpdateModeProgress(error: unknown): number | null {
+    const message = this.normalizeErrorMessage(error);
+    if (!message) {
+      return null;
+    }
+    const match = message.match(/Update mode\s*(\d+)/i);
+    if (!match) {
+      return null;
+    }
+    const progress = parseInt(match[1], 10);
+    return Number.isNaN(progress) ? null : progress;
+  }
+
+  private normalizeErrorMessage(error: unknown): string {
+    if (!error) {
+      return '';
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    if (typeof error === 'object') {
+      const { message } = error as { message?: unknown };
+      if (typeof message === 'string') {
+        return message;
+      }
+      if (message !== undefined && message !== null) {
+        return String(message);
+      }
+    }
+    return '';
   }
 
   /**

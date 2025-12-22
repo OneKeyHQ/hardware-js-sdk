@@ -34,8 +34,8 @@ const Log = getLogger(LoggerNames.Core);
 export const FIRMWARE_FIELDS = [
   'firmware',
   'firmware-v2',
-  'firmware-v7',
-  'firmware-btc-v7',
+  'firmware-v8',
+  'firmware-btc-v8',
 ] as const;
 
 export type IFirmwareField = (typeof FIRMWARE_FIELDS)[number];
@@ -45,8 +45,8 @@ export type MessageVersion = 'latest' | 'v1';
 const FIRMWARE_FIELD_TYPE_MAP: Readonly<Record<IFirmwareField, EFirmwareType>> = {
   firmware: EFirmwareType.Universal,
   'firmware-v2': EFirmwareType.Universal,
-  'firmware-v7': EFirmwareType.Universal,
-  'firmware-btc-v7': EFirmwareType.BitcoinOnly,
+  'firmware-v8': EFirmwareType.Universal,
+  'firmware-btc-v8': EFirmwareType.BitcoinOnly,
 } as const;
 
 function getFirmwareTypeFromField(firmwareField: IFirmwareField): EFirmwareType {

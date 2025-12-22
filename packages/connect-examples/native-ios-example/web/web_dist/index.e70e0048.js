@@ -2986,7 +2986,7 @@ function postMessage(message, usePromise) {
                 case 2:
                     _core.handleMessage(message);
                     return [
-                        2 /*return*/ 
+                        2 /*return*/
                     ];
             }
         });
@@ -3034,7 +3034,7 @@ var init = function(settings, _, plugin) {
                     ];
                 case 4:
                     return [
-                        2 /*return*/ 
+                        2 /*return*/
                     ];
             }
         });
@@ -3092,7 +3092,7 @@ var call = function(params) {
                     ];
                 case 4:
                     return [
-                        2 /*return*/ 
+                        2 /*return*/
                     ];
             }
         });
@@ -28629,16 +28629,16 @@ const getFirmwareUpdateField = ({ features, updateType, targetVersion })=>{
     const deviceType = getDeviceType(features);
     const deviceFirmwareVersion = getDeviceFirmwareVersion(features);
     if (updateType === "ble") return "ble";
-    if (DeviceModelToTypes.model_mini.includes(deviceType)) return "firmware-v7";
+    if (DeviceModelToTypes.model_mini.includes(deviceType)) return "firmware-v8";
     if (deviceType === hdShared.EDeviceType.Touch) {
         if (targetVersion) {
             if (semver__default["default"].eq(targetVersion, "4.0.0")) return "firmware-v2";
-            if (semver__default["default"].gt(targetVersion, "4.0.0")) return "firmware-v7";
+            if (semver__default["default"].gt(targetVersion, "4.0.0")) return "firmware-v8";
         }
         if (semver__default["default"].lt(deviceFirmwareVersion.join("."), "3.4.0")) return "firmware";
-        return "firmware-v7";
+        return "firmware-v8";
     }
-    if (deviceType === hdShared.EDeviceType.Pro) return "firmware-v7";
+    if (deviceType === hdShared.EDeviceType.Pro) return "firmware-v8";
     return "firmware";
 };
 const getFirmwareUpdateFieldArray = (features, updateType)=>{
@@ -28647,12 +28647,12 @@ const getFirmwareUpdateFieldArray = (features, updateType)=>{
         "ble"
     ];
     if (deviceType === "classic" || deviceType === "classic1s" || deviceType === "mini" || deviceType === "classicpure") return [
-        "firmware-v7"
+        "firmware-v8"
     ];
     if (deviceType === "touch") {
         const currentVersion = getDeviceFirmwareVersion(features).join(".");
         if (semver__default["default"].gt(currentVersion, "4.0.0")) return [
-            "firmware-v7",
+            "firmware-v8",
             "firmware"
         ];
         if (semver__default["default"].gte(currentVersion, "4.0.0")) return [
@@ -28660,7 +28660,7 @@ const getFirmwareUpdateFieldArray = (features, updateType)=>{
             "firmware"
         ];
         if (!currentVersion || semver__default["default"].lt(currentVersion, "3.0.0")) return [
-            "firmware-v7",
+            "firmware-v8",
             "firmware-v2",
             "firmware"
         ];
@@ -28669,7 +28669,7 @@ const getFirmwareUpdateFieldArray = (features, updateType)=>{
         ];
     }
     if (deviceType === "pro") return [
-        "firmware-v7"
+        "firmware-v8"
     ];
     return [
         "firmware"
@@ -67768,7 +67768,7 @@ module.exports = {}; /**
  *
  * // in any subsequent module:
  * var root = protobuf.roots["myroot"];
- */ 
+ */
 
 },{}],"14FRe":[function(require,module,exports) {
 "use strict";
@@ -70344,7 +70344,7 @@ var util = require("265369b258276eba");
  * @returns {Object.<string,*>} JSON object
  */ Message.prototype.toJSON = function toJSON() {
     return this.$type.toObject(this, util.toJSONOptions);
-}; /*eslint-enable valid-jsdoc*/ 
+}; /*eslint-enable valid-jsdoc*/
 
 },{"265369b258276eba":"k72f7"}],"5dWn6":[function(require,module,exports) {
 "use strict";
@@ -85059,7 +85059,7 @@ var $replace = bind.call(Function.call, String.prototype.replace);
 var $strSlice = bind.call(Function.call, String.prototype.slice);
 var $exec = bind.call(Function.call, RegExp.prototype.exec);
 /* adapted from https://github.com/lodash/lodash/blob/4.17.15/dist/lodash.js#L6735-L6744 */ var rePropName = /[^%.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|%$))/g;
-var reEscapeChar = /\\(\\)?/g; /** Used to match backslashes in property paths. */ 
+var reEscapeChar = /\\(\\)?/g; /** Used to match backslashes in property paths. */
 var stringToPath = function stringToPath(string) {
     var first = $strSlice(string, 0, 1);
     var last = $strSlice(string, -1);
@@ -85429,7 +85429,7 @@ var ddaClass2 = "[object HTML document.all class]";
 var ddaClass3 = "[object HTMLCollection]"; // IE 9-10
 var hasToStringTag = typeof Symbol === "function" && !!Symbol.toStringTag; // better: use `has-tostringtag`
 var isIE68 = !(0 in [
-    , 
+    ,
 ]); // eslint-disable-line no-sparse-arrays, comma-spacing
 var isDDA = function isDocumentDotAll() {
     return false;

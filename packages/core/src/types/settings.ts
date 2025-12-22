@@ -98,9 +98,9 @@ type IKnownDevice = Exclude<IDeviceType, 'unknown'>;
  * // {
  * //   firmware: IFirmwareReleaseInfo[];
  * //   'firmware-v2'?: IFirmwareReleaseInfo[];
- * //   'firmware-v7'?: IFirmwareReleaseInfo[];
+ * //   'firmware-v8'?: IFirmwareReleaseInfo[];
  * //   'firmware-v8'?: IFirmwareReleaseInfo[];      // New
- * //   'firmware-btc-v7'?: IFirmwareReleaseInfo[];
+ * //   'firmware-btc-v8'?: IFirmwareReleaseInfo[];
  * //   'firmware-btc-v8'?: IFirmwareReleaseInfo[];  // New
  * //   ble: IBLEFirmwareReleaseInfo[];
  * // }
@@ -112,9 +112,9 @@ export type DeviceTypeMap = {
     /** Firmware v2 (Touch/Pro specific) */
     'firmware-v2'?: IFirmwareReleaseInfo[];
     /** Universal firmware v7 */
-    'firmware-v7'?: IFirmwareReleaseInfo[];
+    'firmware-v8'?: IFirmwareReleaseInfo[];
     /** Bitcoin-only firmware v7 */
-    'firmware-btc-v7'?: IFirmwareReleaseInfo[];
+    'firmware-btc-v8'?: IFirmwareReleaseInfo[];
     // Future firmware versions should be added here as optional fields:
     // 'firmware-v8'?: IFirmwareReleaseInfo[];
     // 'firmware-btc-v8'?: IFirmwareReleaseInfo[];
