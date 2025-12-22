@@ -40,8 +40,6 @@ const isDeviceDisconnectedError = (error: unknown) => {
 export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   checkPromise: Deferred<any> | null = null;
 
-  protected hasPromptedWebUsbBootloaderReauth = false;
-
   init(): void {}
 
   run(): Promise<any> {
@@ -94,7 +92,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     );
   };
 
-  private async _promptDeviceInBootloaderForWebDevice() {
+  protected async _promptDeviceInBootloaderForWebDevice() {
     return new Promise((resolve, reject) => {
       if (this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0) {
         this.device.emit(
@@ -193,29 +191,6 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         this.checkPromise.reject(new Error());
       }
     }, 30000);
-  }
-
-  /**
-   * Only prompt WebUSB in bootloader scenarios that require re-authorization
-   * (e.g., switching between BTC-only and general firmware is treated as a new device).
-   */
-  protected async ensureWebUsbBootloaderReauthPrompt() {
-    if (
-      this.hasPromptedWebUsbBootloaderReauth ||
-      !DataManager.isBrowserWebUsb(DataManager.getSettings('env')) ||
-      this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) === 0
-    ) {
-      return;
-    }
-
-    this.hasPromptedWebUsbBootloaderReauth = true;
-    this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
-
-    try {
-      await this._promptDeviceInBootloaderForWebDevice();
-    } catch (error) {
-      Log.log('WebUSB re-authorization failed: ', error);
-    }
   }
 
   private async _checkDeviceInBootloaderMode(
