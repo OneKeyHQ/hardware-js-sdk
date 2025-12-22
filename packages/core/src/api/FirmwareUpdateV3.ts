@@ -1,4 +1,4 @@
-import { EDeviceType, ERRORS, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
+import { EDeviceType, ERRORS, HardwareError, HardwareErrorCode, wait } from '@onekeyfe/hd-shared';
 import semver from 'semver';
 import JSZip from 'jszip';
 
@@ -17,6 +17,7 @@ import { getBinary, getSysResourceBinary } from './firmware/getBinary';
 import { DataManager } from '../data-manager';
 import { FirmwareUpdateBaseMethod } from './firmware/FirmwareUpdateBaseMethod';
 import { DevicePool } from '../device/DevicePool';
+import { DEVICE } from '../events';
 
 import type { FirmwareUpdateV3Params } from '../types/api/firmwareUpdate';
 import type { Deferred, EFirmwareType } from '@onekeyfe/hd-shared';
@@ -25,6 +26,7 @@ import type { TypedResponseMessage } from '../device/DeviceCommands';
 const Log = getLogger(LoggerNames.Method);
 
 export const MIN_UPDATE_V3_BOOTLOADER_VERSION = '2.8.0';
+
 
 /**
  * FirmwareUpdateV3 flow
@@ -336,6 +338,9 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     const installStartTime = Date.now();
     const maxWaitTimeForInstallingFirmware = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+    let getFeaturesTimeoutCount = 0;
+    const maxGetFeaturesTimeoutBeforeReauth = 3;
+
     // eslint-disable-next-line no-constant-condition
     while (true) {
       // Check if timeout exceeded
@@ -348,12 +353,24 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
       try {
         const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+        const timeoutMs = 3000;
         const featuresRes = await Promise.race<TypedResponseMessage<'Features'>>([
           typedCall('GetFeatures', 'Features', {}),
           new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('GetFeatures timeout after 3 seconds')), 3000);
+            setTimeout(
+              () =>
+                reject(
+                  ERRORS.TypedError(
+                    HardwareErrorCode.CallMethodNotResponse,
+                    'GetFeatures timeout',
+                    { method: 'GetFeatures', timeoutMs }
+                  )
+                ),
+              timeoutMs
+            );
           }),
         ]);
+        getFeaturesTimeoutCount = 0;
         const features = featuresRes.message;
         const bootloaderVersion = getDeviceBootloaderVersion(features).join('.');
         const bleVersion = getDeviceBLEFirmwareVersion(features).join('.');
@@ -371,11 +388,26 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         // Still in update mode; continue polling (e.g., iOS may return firmwareVersion 0.0.0 during switches)
         await wait(1000);
       } catch (error) {
+        Log.log('getFeatures error', error);
+        let shouldReconnect = true;
         const progress = this.extractUpdateModeProgress(error);
         if (progress !== null) {
+          getFeaturesTimeoutCount = 0;
           this.postProgressMessage(progress, 'installingFirmware');
           await wait(1000);
+          shouldReconnect = false;
+        } else if (this.isGetFeaturesTimeoutError(error)) {
+          getFeaturesTimeoutCount += 1;
+          // Retry transient GetFeatures timeouts to avoid unnecessary WebUSB re-authorization prompts.
+          if (getFeaturesTimeoutCount <= maxGetFeaturesTimeoutBeforeReauth) {
+            await wait(1000);
+            shouldReconnect = false;
+          }
         } else {
+          getFeaturesTimeoutCount = 0;
+        }
+
+        if (shouldReconnect) {
           await wait(1000);
           /**
            * Needs second reconnect case:
@@ -387,7 +419,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
               ? 3 * 60 * 1000 // 3 minutes for BLE reconnect
               : 60 * 1000; // 1 minute for normal reconnect
 
-          await this.ensureWebUsbBootloaderReauthPrompt();
+          getFeaturesTimeoutCount = 0;
           await this.waitForDeviceReconnect(reconnectTimeout);
         }
       }
@@ -408,6 +440,14 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     }
     const progress = parseInt(match[1], 10);
     return Number.isNaN(progress) ? null : progress;
+  }
+
+  private isGetFeaturesTimeoutError(error: unknown): boolean {
+    return (
+      error instanceof HardwareError &&
+      error.errorCode === HardwareErrorCode.CallMethodNotResponse &&
+      error.params?.method === 'GetFeatures'
+    );
   }
 
   private normalizeErrorMessage(error: unknown): string {
@@ -436,6 +476,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
   async waitForDeviceReconnect(timeout: number) {
     const startTime = Date.now();
     const isBleReconnect = this.isBleReconnect();
+    let webUsbCheckCount = 0;
     while (Date.now() - startTime < timeout) {
       try {
         if (isBleReconnect) {
@@ -462,6 +503,27 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
         } else {
           const deviceDiff = await this.device.deviceConnector?.enumerate();
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
+
+          const canPromptWebUsbBootloader =
+            DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
+            !this.payload.skipWebDevicePrompt &&
+            this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0;
+
+          if (canPromptWebUsbBootloader) {
+            webUsbCheckCount += 1;
+            if (webUsbCheckCount > 4) {
+              this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
+              try {
+                await this._promptDeviceInBootloaderForWebDevice();
+              } catch (e) {
+                Log.log('WebUSB re-authorization failed: ', e);
+              }
+              webUsbCheckCount = 0;
+            }
+          } else {
+            webUsbCheckCount = 0;
+          }
+
           const { deviceList } = await DevicePool.getDevices(devicesDescriptor, this.connectId);
 
           if (deviceList.length === 1) {
