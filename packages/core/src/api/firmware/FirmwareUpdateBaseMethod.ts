@@ -196,8 +196,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   }
 
   /**
-   * 仅在 firmware 被抹掉、需要重新授权的 bootloader 场景下才提示 WebUSB
-   * （比如 BTC-only 与通用固件互转后算作新设备）。
+   * Only prompt WebUSB in bootloader scenarios that require re-authorization
+   * (e.g., switching between BTC-only and general firmware is treated as a new device).
    */
   protected async ensureWebUsbBootloaderReauthPrompt() {
     if (
@@ -214,7 +214,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     try {
       await this._promptDeviceInBootloaderForWebDevice();
     } catch (error) {
-      Log.log('WebUSB 设备重新授权失败: ', error);
+      Log.log('WebUSB re-authorization failed: ', error);
     }
   }
 
@@ -455,8 +455,8 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   }
 
   /**
-   * @description 设备重启（Bootloader 侧可用）
-   * @param rebootType 重启类型，参考 RebootType 枚举
+   * @description Device reboot (available in bootloader mode)
+   * @param rebootType Reboot type, see the RebootType enum
    */
   async reboot(rebootType: RebootType) {
     const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
