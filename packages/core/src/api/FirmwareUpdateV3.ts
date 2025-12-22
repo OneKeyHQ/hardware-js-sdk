@@ -27,7 +27,6 @@ const Log = getLogger(LoggerNames.Method);
 
 export const MIN_UPDATE_V3_BOOTLOADER_VERSION = '2.8.0';
 
-
 /**
  * FirmwareUpdateV3 flow
    1. StartDownloadFirmware
