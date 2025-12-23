@@ -59,6 +59,10 @@ export type Transport = {
   read(session: string): Promise<MessageFromOneKey>;
   cancel(): Promise<void>;
 
+  // reset the session of the transport
+  // used to reset the session of the transport when the session is not valid
+  disconnect?: (session: string) => Promise<void>;
+
   // web-usb, web-bluetooth request device
   promptDeviceAccess?: () => Promise<USBDevice | BluetoothDevice | null>;
 

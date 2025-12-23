@@ -1,3 +1,5 @@
+import { HardwareErrorCode } from './HardwareError';
+
 export const ONEKEY_WEBUSB_FILTER = [
   { vendorId: 0x1209, productId: 0x53c0 }, // Classic Boot、Classic1s Boot、Mini Boot
   { vendorId: 0x1209, productId: 0x53c1 }, // Classic Firmware、Classic1s Firmware、Mini Firmware、Pro Firmware、Touch Firmware
@@ -6,6 +8,30 @@ export const ONEKEY_WEBUSB_FILTER = [
   // { vendorId: 0x1209, productId: 0x4f4c }, // Pro Board
   // { vendorId: 0x1209, productId: 0x4f50 }, // Touch Board
 ];
+
+/**
+ * Error codes that require device release after occurrence
+ * These errors indicate the device is in an invalid state and needs to be released
+ */
+export const ERROR_CODES_REQUIRE_RELEASE = [
+  HardwareErrorCode.DeviceInitializeFailed,
+  HardwareErrorCode.DeviceInterruptedFromOutside,
+  HardwareErrorCode.DeviceInterruptedFromUser,
+  HardwareErrorCode.DeviceCheckPassphraseStateError,
+  HardwareErrorCode.ResponseUnexpectTypeError,
+  HardwareErrorCode.PinInvalid,
+  HardwareErrorCode.PinCancelled,
+  HardwareErrorCode.UnexpectPassphrase,
+] as const;
+
+/**
+ * Error codes that require device disconnect before release
+ * These errors indicate a communication failure that requires full reconnection
+ */
+export const ERROR_CODES_REQUIRE_DISCONNECT = [
+  HardwareErrorCode.DeviceInitializeFailed,
+  HardwareErrorCode.ResponseUnexpectTypeError,
+] as const;
 
 // BLE IPC communication message types
 export enum EOneKeyBleMessageKeys {

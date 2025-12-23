@@ -1,6 +1,7 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import {
+  ERROR_CODES_REQUIRE_RELEASE,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
@@ -529,6 +530,14 @@ const onCallDevice = async (
         messageResponse = createResponseMessage(method.responseID, false, { error });
         requestQueue.resolveRequest(method.responseID, messageResponse);
         completeMethodRequestContext(method, error);
+
+        // Re-throw errors that need to trigger device release/disconnect in Device._runInner
+        if (
+          error instanceof HardwareError &&
+          ERROR_CODES_REQUIRE_RELEASE.includes(error.errorCode as any)
+        ) {
+          throw error;
+        }
       }
     };
     Log.debug('Call API - Device Run: ', device.mainId);

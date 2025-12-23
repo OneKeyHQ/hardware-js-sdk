@@ -1,10 +1,12 @@
-import { Transport, OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import { safeThrowError } from '../constants';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
-import { DevicePool, DeviceDescriptorDiff } from './DevicePool';
+import { DevicePool } from './DevicePool';
 import { resolveAfter } from '../utils/promiseUtils';
-import { getLogger, LoggerNames } from '../utils';
+import { LoggerNames, getLogger } from '../utils';
+
+import type { DeviceDescriptorDiff } from './DevicePool';
+import type { OneKeyDeviceInfo as DeviceDescriptor, Transport } from '@onekeyfe/hd-transport';
 
 const Log = getLogger(LoggerNames.DeviceConnector);
 
@@ -94,6 +96,16 @@ export default class DeviceConnector {
     try {
       const res = await this.transport.release(session, onclose);
       return res;
+    } catch (error) {
+      safeThrowError(error);
+    }
+  }
+
+  async disconnect(session: string | undefined | null) {
+    try {
+      if (this.transport.disconnect && !!session) {
+        await this.transport.disconnect(session);
+      }
     } catch (error) {
       safeThrowError(error);
     }
