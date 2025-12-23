@@ -110,6 +110,24 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
     });
   }
 
+  protected async _promptDeviceForSwitchFirmwareWebDevice() {
+    return new Promise((resolve, reject) => {
+      if (this.device.listenerCount(DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE) > 0) {
+        this.device.emit(
+          DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
+          this.device,
+          (err, deviceId) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(deviceId);
+            }
+          }
+        );
+      }
+    });
+  }
+
   checkDeviceToBootloader(connectId: string | undefined) {
     this.checkPromise = createDeferred();
     const env = DataManager.getSettings('env');

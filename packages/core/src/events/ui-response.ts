@@ -6,6 +6,8 @@ export const UI_RESPONSE = {
   RECEIVE_PASSPHRASE: 'ui-receive_passphrase',
   SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
     'ui-receive_select-device-in-bootloader-for-web-device',
+  SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE:
+    'ui-receive_select-device-for-switch-firmware-web-device',
 } as const;
 
 export interface UiResponsePin {
@@ -30,10 +32,18 @@ export interface UiResponseSelectDeviceInBootloaderForWebDevice {
   };
 }
 
+export interface UiResponseSelectDeviceForSwitchFirmwareWebDevice {
+  type: typeof UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE;
+  payload: {
+    deviceId: string;
+  };
+}
+
 export type UiResponseEvent =
   | UiResponsePin
   | UiResponsePassphrase
-  | UiResponseSelectDeviceInBootloaderForWebDevice;
+  | UiResponseSelectDeviceInBootloaderForWebDevice
+  | UiResponseSelectDeviceForSwitchFirmwareWebDevice;
 
 export type UiResponseMessage = UiResponseEvent & { event: typeof UI_EVENT };
 

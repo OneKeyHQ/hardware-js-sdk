@@ -41,6 +41,8 @@ export const MIN_UPDATE_V3_BOOTLOADER_VERSION = '2.8.0';
 export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareUpdateV3Params> {
   checkPromise: Deferred<any> | null = null;
 
+  private isSwitchFirmware = false;
+
   init() {
     this.allowDeviceMode = [UI_REQUEST.BOOTLOADER, UI_REQUEST.NOT_INITIALIZE];
     this.requireDeviceMode = [];
@@ -91,6 +93,7 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
 
     const deviceFirmwareType = getFirmwareType(features);
     const firmwareType = this.params.firmwareType ?? deviceFirmwareType;
+    this.isSwitchFirmware = firmwareType !== deviceFirmwareType;
 
     let resourceBinary: ArrayBuffer | null = null;
     let fwBinaryMap: { fileName: string; binary: ArrayBuffer }[] = [];
@@ -468,6 +471,17 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
     return '';
   }
 
+  private canPromptWebUsbSwitchFirmwareReconnect(): boolean {
+    if (!this.isSwitchFirmware) {
+      return false;
+    }
+    return (
+      DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
+      !this.payload.skipWebDevicePrompt &&
+      this.device.listenerCount(DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE) > 0
+    );
+  }
+
   /**
    * @description Reconnect device - While update with bootloader, it will reconnect device
    * @param {number} timeout - The timeout for the reconnection
@@ -503,17 +517,14 @@ export default class FirmwareUpdateV3 extends FirmwareUpdateBaseMethod<FirmwareU
           const deviceDiff = await this.device.deviceConnector?.enumerate();
           const devicesDescriptor = deviceDiff?.descriptors ?? [];
 
-          const canPromptWebUsbBootloader =
-            DataManager.isBrowserWebUsb(DataManager.getSettings('env')) &&
-            !this.payload.skipWebDevicePrompt &&
-            this.device.listenerCount(DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) > 0;
+          const canPromptSwitchFirmwareReconnect = this.canPromptWebUsbSwitchFirmwareReconnect();
 
-          if (canPromptWebUsbBootloader) {
+          if (canPromptSwitchFirmwareReconnect) {
             webUsbCheckCount += 1;
             if (webUsbCheckCount > 4) {
-              this.postTipMessage(FirmwareUpdateTipMessage.SelectDeviceInBootloaderForWebDevice);
+              this.postTipMessage(FirmwareUpdateTipMessage.SwitchFirmwareReconnectDevice);
               try {
-                await this._promptDeviceInBootloaderForWebDevice();
+                await this._promptDeviceForSwitchFirmwareWebDevice();
               } catch (e) {
                 Log.log('WebUSB re-authorization failed: ', e);
               }

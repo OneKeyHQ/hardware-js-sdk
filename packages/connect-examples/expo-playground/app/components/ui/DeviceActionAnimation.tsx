@@ -86,6 +86,7 @@ const DeviceActionAnimation: React.FC<DeviceActionAnimationProps> = ({
 
       case UI_REQUEST.REQUEST_PIN:
       case UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
+      case UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE:
         switch (deviceModel) {
           case 'classic':
             return enterPinOnClassic;

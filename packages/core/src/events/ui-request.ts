@@ -13,6 +13,8 @@ export const UI_REQUEST = {
   REQUEST_PASSPHRASE_ON_DEVICE: 'ui-request_passphrase_on_device',
   REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
     'ui-request_select_device_in_bootloader_for_web_device',
+  REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE:
+    'ui-request_select_device_for_switch_firmware_web_device',
 
   CLOSE_UI_WINDOW: 'ui-close_window',
   CLOSE_UI_PIN_WINDOW: 'ui-close_pin_window',
@@ -106,6 +108,13 @@ export interface UiRequestSelectDeviceInBootloaderForWebDevice {
   };
 }
 
+export interface UiRequestSelectDeviceForSwitchFirmwareWebDevice {
+  type: typeof UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE;
+  payload: {
+    device: Device;
+  };
+}
+
 export interface FirmwareProcessing {
   type: typeof UI_REQUEST.FIRMWARE_PROCESSING;
   payload: {
@@ -156,6 +165,7 @@ export type UiEvent =
   | UiRequestPassphraseOnDevice
   | UiRequestPassphrase
   | UiRequestSelectDeviceInBootloaderForWebDevice
+  | UiRequestSelectDeviceForSwitchFirmwareWebDevice
   | FirmwareProcessing
   | UiRequestSelectDeviceInBootloaderForWebDevice
   | FirmwareProgress
@@ -181,6 +191,7 @@ export enum FirmwareUpdateTipMessage {
   AutoRebootToBootloader = 'AutoRebootToBootloader',
   GoToBootloaderSuccess = 'GoToBootloaderSuccess',
   SelectDeviceInBootloaderForWebDevice = 'SelectDeviceInBootloaderForWebDevice',
+  SwitchFirmwareReconnectDevice = 'SwitchFirmwareReconnectDevice',
   ConfirmOnDevice = 'ConfirmOnDevice',
   FirmwareEraseSuccess = 'FirmwareEraseSuccess',
   StartTransferData = 'StartTransferData',

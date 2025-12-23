@@ -82,6 +82,10 @@ export interface DeviceEvents {
     Device,
     (err: any, deviceId: string) => void
   ];
+  [DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE]: [
+    Device,
+    (err: any, deviceId: string) => void
+  ];
 }
 
 export interface Device {

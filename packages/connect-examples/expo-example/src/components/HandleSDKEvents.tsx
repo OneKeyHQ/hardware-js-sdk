@@ -44,6 +44,10 @@ export default function HandleSDKEvents() {
   const { sdk: SDK, lowLevelSDK: HardwareLowLevelSDK, type } = useContext(HardwareSDKContext);
   const [showPinInput, setShowPinInput] = useState(false);
   const [showWebUsbAuthorize, setShowWebUsbAuthorize] = useState(false);
+  const [webUsbResponseType, setWebUsbResponseType] = useState<
+    | typeof UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE
+    | typeof UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE
+  >(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
   const [showBluetoothPermission, setShowBluetoothPermission] = useState(false);
   const [bluetoothErrorType, setBluetoothErrorType] = useState<BluetoothErrorType>('permission');
 
@@ -73,13 +77,13 @@ export default function HandleSDKEvents() {
     (device: USBDevice) => {
       console.log('webUsbSuccess: ', device);
       SDK?.uiResponse({
-        type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+        type: webUsbResponseType,
         payload: {
           deviceId: device.serialNumber ?? '',
         },
       });
     },
-    [SDK]
+    [SDK, webUsbResponseType]
   );
 
   const onWebUsbCancel = useCallback(() => {
@@ -155,6 +159,11 @@ export default function HandleSDKEvents() {
           }, 2000);
         }
         if (message.type === UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE) {
+          setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
+          setShowWebUsbAuthorize(true);
+        }
+        if (message.type === UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE) {
+          setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE);
           setShowWebUsbAuthorize(true);
         }
         if (message.type === UI_REQUEST.BLUETOOTH_POWERED_OFF) {
