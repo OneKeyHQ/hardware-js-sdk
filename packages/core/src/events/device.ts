@@ -26,6 +26,7 @@ export const DEVICE = {
   WORD: 'word',
   SUPPORT_FEATURES: 'support_features',
   SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: 'select_device_in_bootloader_for_web_device',
+  SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: 'select_device_for_switch_firmware_web_device',
 
   FEATURES: 'features',
 } as const;

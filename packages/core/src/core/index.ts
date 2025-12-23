@@ -323,6 +323,10 @@ const onCallDevice = async (
     DEVICE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
     onSelectDeviceInBootloaderForWebDeviceHandler
   );
+  device.on(
+    DEVICE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
+    onSelectDeviceForSwitchFirmwareWebDeviceHandler
+  );
 
   try {
     if (method.connectId) {
@@ -1098,6 +1102,23 @@ const onSelectDeviceInBootloaderForWebDeviceHandler = async (
   callback(null, uiResp.payload.deviceId);
 };
 
+const onSelectDeviceForSwitchFirmwareWebDeviceHandler = async (
+  ...[device, callback]: [...DeviceEvents['select_device_for_switch_firmware_web_device']]
+) => {
+  Log.debug('onSelectDeviceForSwitchFirmwareWebDeviceHandler');
+  const uiPromise = createUiPromise(
+    UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE,
+    device
+  );
+  postMessage(
+    createUiMessage(UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE, {
+      device: device.toMessageObject() as KnownDevice,
+    })
+  );
+  const uiResp = await uiPromise.promise;
+  callback(null, uiResp.payload.deviceId);
+};
+
 /**
  * Emit message to listener (parent).
  * Clear method reference from _callMethods
@@ -1169,7 +1190,8 @@ export default class Core extends EventEmitter {
     switch (message.type) {
       case UI_RESPONSE.RECEIVE_PIN:
       case UI_RESPONSE.RECEIVE_PASSPHRASE:
-      case UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: {
+      case UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
+      case UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: {
         const uiPromise = findUiPromise(message.type);
         if (uiPromise) {
           Log.log('receive UI Response: ', message.type);

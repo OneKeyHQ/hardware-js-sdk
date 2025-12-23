@@ -53,6 +53,10 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
   const { setDeviceAction, clearDeviceAction, updateSdkInitState } = useDeviceStore();
   const initializationRef = useRef<boolean>(false);
   const [webUsbModalOpen, setWebUsbModalOpen] = React.useState(false);
+  const [webUsbResponseType, setWebUsbResponseType] = React.useState<
+    | typeof UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE
+    | typeof UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE
+  >(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
   const lastSdkRef = useRef<CoreApi | null>(null);
 
   const setupSDKEventListeners = useCallback(
@@ -108,6 +112,12 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
 
           case UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE: {
             // Open modal; actual requestDevice() will be called in button onClick handler to satisfy user gesture
+            setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE);
+            setWebUsbModalOpen(true);
+            break;
+          }
+          case UI_REQUEST.REQUEST_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE: {
+            setWebUsbResponseType(UI_RESPONSE.SELECT_DEVICE_FOR_SWITCH_FIRMWARE_WEB_DEVICE);
             setWebUsbModalOpen(true);
             break;
           }
@@ -214,13 +224,13 @@ export const SDKProvider: React.FC<SDKProviderProps> = ({ children }) => {
         open={webUsbModalOpen}
         onOpenChange={setWebUsbModalOpen}
         onSuccess={device => {
-          logInfo('WebUSB device selected for bootloader (modal)', {
+          logInfo('WebUSB device selected (modal)', {
             serialNumber: device?.serialNumber ?? '',
             vendorId: device?.vendorId,
             productId: device?.productId,
           });
           lastSdkRef.current?.uiResponse({
-            type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+            type: webUsbResponseType,
             payload: { deviceId: device?.serialNumber ?? '' },
           });
         }}
