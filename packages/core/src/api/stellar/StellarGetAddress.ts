@@ -1,9 +1,10 @@
-import { StellarGetAddress as HardwareStellarGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { StellarGetAddressParams, StellarAddress } from '../../types';
+
+import type { StellarGetAddress as HardwareStellarGetAddress } from '@onekeyfe/hd-transport';
+import type { StellarAddress, StellarGetAddressParams } from '../../types';
 
 export default class StellarGetAddress extends BaseMethod<HardwareStellarGetAddress[]> {
   hasBundle = false;

@@ -1,18 +1,19 @@
 import {
-  createDeferred,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
   HardwareErrorCodeMessage,
+  createDeferred,
 } from '@onekeyfe/hd-shared';
+
+import { IFRAME } from '../../events';
+import AllNetworkGetAddressBase from './AllNetworkGetAddressBase';
+
+import type { Unsuccessful } from '../../types';
 import type {
   AllNetworkAddress,
   AllNetworkGetAddressParamsByLoop,
 } from '../../types/api/allNetworkGetAddress';
-
-import { IFRAME } from '../../events';
-import AllNetworkGetAddressBase from './AllNetworkGetAddressBase';
-import { Unsuccessful } from '../../types';
 
 export default class AllNetworkGetAddressByLoop extends AllNetworkGetAddressBase {
   async getAllNetworkAddress(rootFingerprint: number) {
