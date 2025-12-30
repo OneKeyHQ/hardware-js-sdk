@@ -1,15 +1,18 @@
 import EventEmitter from 'events';
 import semver from 'semver';
-import { OneKeyDeviceInfo as DeviceDescriptor, Enum_Capability } from '@onekeyfe/hd-transport';
+import { Enum_Capability } from '@onekeyfe/hd-transport';
 import {
-  createDeferred,
-  Deferred,
   EDeviceType,
+  ERROR_CODES_REQUIRE_DISCONNECT,
+  ERROR_CODES_REQUIRE_RELEASE,
   ERRORS,
   HardwareError,
   HardwareErrorCode,
+  createDeferred,
 } from '@onekeyfe/hd-shared';
+
 import {
+  LoggerNames,
   getDeviceBLEFirmwareVersion,
   getDeviceBleName,
   getDeviceFirmwareVersion,
@@ -18,7 +21,6 @@ import {
   getDeviceUUID,
   getLogger,
   getMethodVersionRange,
-  LoggerNames,
 } from '../utils';
 import {
   fixFeaturesFirmwareVersion,
@@ -26,29 +28,31 @@ import {
 } from '../utils/deviceFeaturesUtils';
 import { generateInstanceId } from '../utils/tracing';
 
-import type DeviceConnector from './DeviceConnector';
 // eslint-disable-next-line import/no-cycle
-import { DeviceCommands, PassphrasePromptResponse } from './DeviceCommands';
-
+import { DeviceCommands } from './DeviceCommands';
 import {
   type DeviceFirmwareRange,
-  EOneKeyDeviceMode,
   type Device as DeviceTyped,
+  EOneKeyDeviceMode,
   type Features,
   type UnavailableCapabilities,
 } from '../types';
-import {
-  DEVICE,
-  DeviceButtonRequestPayload,
-  DeviceFeaturesPayload,
-  PassphraseRequestPayload,
-  UI_REQUEST,
-} from '../events';
-import { PROTO } from '../constants';
+import { DEVICE, UI_REQUEST } from '../events';
 import { DataManager } from '../data-manager';
 import TransportManager from '../data-manager/TransportManager';
 import { toHardened } from '../api/helpers/pathUtils';
 import { existCapability } from '../utils/capabilitieUtils';
+
+import type { PROTO } from '../constants';
+import type {
+  DeviceButtonRequestPayload,
+  DeviceFeaturesPayload,
+  PassphraseRequestPayload,
+} from '../events';
+import type { PassphrasePromptResponse } from './DeviceCommands';
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+import type DeviceConnector from './DeviceConnector';
 
 export type InitOptions = {
   initSession?: boolean;
@@ -595,15 +599,11 @@ export class Device extends EventEmitter {
 
         if (
           e instanceof HardwareError &&
-          (e.errorCode === HardwareErrorCode.DeviceInitializeFailed ||
-            e.errorCode === HardwareErrorCode.DeviceInterruptedFromOutside ||
-            e.errorCode === HardwareErrorCode.DeviceInterruptedFromUser ||
-            e.errorCode === HardwareErrorCode.DeviceCheckPassphraseStateError ||
-            e.errorCode === HardwareErrorCode.ResponseUnexpectTypeError ||
-            e.errorCode === HardwareErrorCode.PinInvalid ||
-            e.errorCode === HardwareErrorCode.PinCancelled ||
-            e.errorCode === HardwareErrorCode.UnexpectPassphrase)
+          ERROR_CODES_REQUIRE_RELEASE.includes(e.errorCode as any)
         ) {
+          if (ERROR_CODES_REQUIRE_DISCONNECT.includes(e.errorCode as any)) {
+            await this.deviceConnector?.disconnect(this.mainId);
+          }
           await this.release();
           Log.debug(`error code ${e.errorCode} release device, mainId: ${this.mainId}`);
         }

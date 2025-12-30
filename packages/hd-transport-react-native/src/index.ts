@@ -405,7 +405,10 @@ export default class ReactNativeBleTransport {
     await this.release(uuid);
 
     const transport = new BleTransport(device, writeCharacteristic, notifyCharacteristic);
-    transport.nofitySubscription = this._monitorCharacteristic(transport.notifyCharacteristic);
+    transport.nofitySubscription = this._monitorCharacteristic(
+      transport.notifyCharacteristic,
+      uuid
+    );
     transportCache[uuid] = transport;
 
     this.emitter?.emit('device-connect', {
@@ -436,7 +439,7 @@ export default class ReactNativeBleTransport {
     return { uuid };
   }
 
-  _monitorCharacteristic(characteristic: Characteristic) {
+  _monitorCharacteristic(characteristic: Characteristic, uuid: string) {
     let bufferLength = 0;
     let buffer: any[] = [];
     const subscription = characteristic.monitor((error, c) => {
@@ -510,7 +513,7 @@ export default class ReactNativeBleTransport {
         this.Log.debug('monitor data error: ', error);
         this.runPromise?.reject(ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError));
       }
-    });
+    }, uuid);
 
     return () => {
       this.Log.debug('remove characteristic monitor: ', characteristic.uuid);
@@ -662,6 +665,67 @@ export default class ReactNativeBleTransport {
 
   stop() {
     this.stopped = true;
+  }
+
+  async disconnect(session: string) {
+    this.Log.debug('transport-react-native transport resetSession: ', session);
+    const transport = transportCache[session] as BleTransport;
+
+    // cancel the notify subscription
+    if (transport?.nofitySubscription) {
+      try {
+        transport.nofitySubscription();
+        transport.nofitySubscription = undefined;
+      } catch (e) {
+        this.Log.error('resetSession: remove notify subscription error: ', e);
+      }
+    }
+
+    // cancel the ble transaction
+    if (session) {
+      try {
+        await this.blePlxManager?.cancelTransaction(session);
+      } catch (e) {
+        this.Log.debug('resetSession: cancel transaction error (ignored): ', e?.message || e);
+      }
+    }
+
+    // disconnect the device via the device object
+    if (transport?.device) {
+      try {
+        await transport.device.cancelConnection();
+      } catch (e) {
+        this.Log.debug('resetSession: device.cancelConnection error (ignored): ', e?.message || e);
+      }
+    }
+
+    // disconnect the device via the ble manager
+    try {
+      await this.blePlxManager?.cancelDeviceConnection(session);
+    } catch (e) {
+      this.Log.debug(
+        'resetSession: manager.cancelDeviceConnection error (ignored): ',
+        e?.message || e
+      );
+    }
+
+    // clear the transport cache
+    if (transportCache[session]) {
+      delete transportCache[session];
+    }
+
+    // emit the disconnect event
+    try {
+      this.emitter?.emit('device-disconnect', {
+        name: transport?.device?.name,
+        id: session,
+        connectId: session,
+      });
+    } catch (e) {
+      this.Log.error('resetSession: emit disconnect event error: ', e);
+    }
+    // eslint-disable-next-line no-promise-executor-return
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
   }
 
   cancel() {
