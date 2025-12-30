@@ -240,6 +240,9 @@ const networkConfigMap: NetworkConfigMap = {
   neo: {
     methodName: 'neoGetAddress',
   },
+  stellar: {
+    methodName: 'stellarGetAddress',
+  },
 };
 
 type MethodParams = {

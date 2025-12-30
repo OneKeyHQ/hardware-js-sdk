@@ -1,14 +1,15 @@
 import { HardwareErrorCode, HardwareErrorCodeMessage } from '@onekeyfe/hd-shared';
-import { CoreApi } from '../../types';
 
+import { createUiMessage } from '../../events';
+import { UI_REQUEST } from '../../constants/ui-request';
+import AllNetworkGetAddressBase from './AllNetworkGetAddressBase';
+
+import type { CoreApi } from '../../types';
 import type {
   AllNetworkAddress,
   AllNetworkAddressParams,
   AllNetworkGetAddressParams,
 } from '../../types/api/allNetworkGetAddress';
-import { createUiMessage } from '../../events';
-import { UI_REQUEST } from '../../constants/ui-request';
-import AllNetworkGetAddressBase from './AllNetworkGetAddressBase';
 
 type MethodParams = {
   methodName: keyof CoreApi;

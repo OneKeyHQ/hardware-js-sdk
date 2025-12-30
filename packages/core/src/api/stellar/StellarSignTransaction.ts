@@ -1,14 +1,16 @@
-import {
-  StellarMemoType,
-  StellarSignedTx,
-  StellarSignTx as HardwareStellarSignTx,
-} from '@onekeyfe/hd-transport';
+import { StellarMemoType } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { StellarOperation, StellarSignTransactionParams } from '../../types';
+
+import type {
+  StellarSignTx as HardwareStellarSignTx,
+  StellarSignedTx,
+} from '@onekeyfe/hd-transport';
+import type { StellarOperation, StellarSignTransactionParams } from '../../types';
 
 export default class StellarSignTransaction extends BaseMethod<HardwareStellarSignTx> {
   operations: any[] = [];

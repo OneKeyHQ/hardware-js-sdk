@@ -33,7 +33,8 @@ export type INetwork =
   | 'alph'
   | 'nostr'
   | 'benfen'
-  | 'neo';
+  | 'neo'
+  | 'stellar';
 
 export type CommonResponseParams = {
   path: string;
