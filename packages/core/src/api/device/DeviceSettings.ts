@@ -18,6 +18,9 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       { name: 'passphraseAlwaysOnDevice', type: 'boolean' },
       { name: 'safetyChecks', type: 'number' },
       { name: 'experimentalFeatures', type: 'boolean' },
+      { name: 'autoShutdownDelayMs', type: 'number' },
+      { name: 'changeBrightness', type: 'boolean' },
+      { name: 'hapticFeedback', type: 'boolean' },
     ]);
 
     // init params
@@ -32,6 +35,11 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       passphrase_always_on_device: this.payload.passphraseAlwaysOnDevice,
       safety_checks: this.payload.safetyChecks,
       experimental_features: this.payload.experimentalFeatures,
+      auto_shutdown_delay_ms: this.payload.autoShutdownDelayMs,
+      ...(this.payload.changeBrightness
+        ? { change_brightness: this.payload.changeBrightness }
+        : undefined),
+      haptic_feedback: this.payload.hapticFeedback,
     };
   }
 

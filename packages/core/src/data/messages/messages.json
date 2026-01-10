@@ -6498,6 +6498,18 @@
           "type": "uint32",
           "id": 520
         },
+        "brightness_prcent": {
+          "type": "uint32",
+          "id": 521
+        },
+        "haptic_feedback": {
+          "type": "bool",
+          "id": 522
+        },
+        "auto_shutdown_delay_ms": {
+          "type": "uint32",
+          "id": 523
+        },
         "onekey_device_type": {
           "type": "OneKeyDeviceType",
           "id": 600
@@ -6894,6 +6906,18 @@
         "fastpay_times": {
           "type": "uint32",
           "id": 106
+        },
+        "auto_shutdown_delay_ms": {
+          "type": "uint32",
+          "id": 500
+        },
+        "change_brightness": {
+          "type": "bool",
+          "id": 501
+        },
+        "haptic_feedback": {
+          "type": "bool",
+          "id": 502
         }
       },
       "nested": {
@@ -9869,6 +9893,39 @@
         }
       }
     },
+    "SolanaTxATADetails": {
+      "fields": {
+        "owner_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 1
+        },
+        "program_id": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "mint_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        },
+        "associated_token_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 4
+        }
+      }
+    },
+    "SolanaTxExtraInfo": {
+      "fields": {
+        "ata_details": {
+          "rule": "repeated",
+          "type": "SolanaTxATADetails",
+          "id": 1
+        }
+      }
+    },
     "SolanaSignTx": {
       "fields": {
         "address_n": {
@@ -9883,6 +9940,10 @@
           "rule": "required",
           "type": "bytes",
           "id": 2
+        },
+        "extra_info": {
+          "type": "SolanaTxExtraInfo",
+          "id": 3
         }
       }
     },

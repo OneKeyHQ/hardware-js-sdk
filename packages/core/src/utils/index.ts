@@ -28,6 +28,7 @@ export {
   checkNeedUpdateBootForTouch,
   checkNeedUpdateBootForClassicAndMini,
 } from '../api/firmware/updateBootloader';
+export { getLanguageConfig, getAutoLockOptions, getAutoShutDownOptions } from './deviceSettings';
 
 // Helpers utils
 

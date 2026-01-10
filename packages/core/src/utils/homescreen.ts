@@ -1,8 +1,10 @@
 import semver from 'semver';
 import { EDeviceType } from '@onekeyfe/hd-shared';
-import type { Features, IDeviceType } from '../types';
+
 import { getDeviceType } from './deviceInfoUtils';
 import { getDeviceFirmwareVersion } from './deviceVersionUtils';
+
+import type { Features, IDeviceType } from '../types';
 
 type IScreenData = { name: string; hex: string };
 

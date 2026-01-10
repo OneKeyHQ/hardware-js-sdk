@@ -12,6 +12,9 @@ export type DeviceSettingsParams = {
   passphraseAlwaysOnDevice?: boolean;
   safetyChecks?: SafetyCheckLevel;
   experimentalFeatures?: boolean;
+  autoShutdownDelayMs?: number;
+  changeBrightness?: boolean;
+  hapticFeedback?: boolean;
 };
 
 export declare function deviceSettings(
