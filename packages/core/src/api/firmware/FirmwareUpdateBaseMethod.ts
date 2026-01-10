@@ -383,6 +383,7 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
   ) {
     const writeFunc = async () => {
       const typedCall = this.device.getCommands().typedCall.bind(this.device.getCommands());
+      Log.log('emmcFileWriteWithRetry start');
       // @ts-expect-error
       const writeRes = await typedCall('EmmcFileWrite', 'EmmcFile', {
         file: {
@@ -395,13 +396,16 @@ export class FirmwareUpdateBaseMethod<Params> extends BaseMethod<Params> {
         append: offset !== 0,
         ui_percentage: progress,
       });
+      Log.log('emmcFileWriteWithRetry done');
       if (writeRes.type !== 'EmmcFile') {
-        // @ts-expect-error
-        if (writeRes.type === 'CallMethodError') {
-          if (((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1) {
-            throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
-          }
+        if (
+          // @ts-expect-error
+          writeRes.type === 'CallMethodError' &&
+          ((writeRes as any).message.error ?? '').indexOf(SESSION_ERROR) > -1
+        ) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, SESSION_ERROR);
         }
+
         throw ERRORS.TypedError(
           HardwareErrorCode.EmmcFileWriteFirmwareError,
           'transfer data error'

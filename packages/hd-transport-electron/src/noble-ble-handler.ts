@@ -89,6 +89,8 @@ const RETRY_CONFIG = { MAX_ATTEMPTS: 15, WRITE_TIMEOUT: 2000 } as const;
 const IS_WINDOWS = process.platform === 'win32';
 const ABORTABLE_WRITE_ERROR_PATTERNS = [
   /status:\s*3/i, // Windows pairing cancelled / GATT write failed
+  /getcharacteristic/i, // Windows pairing failed, characteristic access error
+  /getcharacteristicsforuuidasync/i,
 ];
 
 // Validation limits
@@ -533,6 +535,11 @@ async function attemptWindowsWriteUntilPaired(
       });
       // Abort immediately on known error patterns (e.g., status: 3)
       if (ABORTABLE_WRITE_ERROR_PATTERNS.some(p => p.test(errorMessage))) {
+        logger?.info('[NobleBLE] Windows pairing failure', {
+          deviceId,
+          reason: 'write-failed',
+          errorMessage,
+        });
         await unsubscribeNotifications(deviceId).catch(() => {});
         await disconnectDevice(deviceId).catch(() => {});
         discoveredDevices.delete(deviceId);
@@ -540,8 +547,8 @@ async function attemptWindowsWriteUntilPaired(
         logger?.info('[NobleBLE] Deep cleanup to reset device state to initial', { deviceId });
         // 置空/重置订阅操作状态，避免后续进入 subscribing 等中间态
         throw ERRORS.TypedError(
-          HardwareErrorCode.BleConnectedError,
-          `Write failed with abortable error for device ${deviceId}: ${errorMessage}`
+          HardwareErrorCode.BleDeviceBondedCanceled,
+          `Bluetooth pairing failed or timed out for device ${deviceId}: ${errorMessage}`
         );
       }
     }
@@ -589,8 +596,17 @@ async function attemptWindowsWriteUntilPaired(
     }
   }
 
+  logger?.info('[NobleBLE] Windows pairing failure', {
+    deviceId,
+    reason: 'write-retry-exhausted',
+    errorMessage: 'no-response',
+  });
+  await unsubscribeNotifications(deviceId).catch(() => {});
+  await disconnectDevice(deviceId).catch(() => {});
+  discoveredDevices.delete(deviceId);
+  subscriptionOperations.set(deviceId, 'idle');
   throw ERRORS.TypedError(
-    HardwareErrorCode.DeviceNotFound,
+    HardwareErrorCode.BleDeviceBondError,
     `No response observed after ${RETRY_CONFIG.MAX_ATTEMPTS} writes: ${deviceId}`
   );
 }

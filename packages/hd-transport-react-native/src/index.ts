@@ -36,6 +36,9 @@ const { check, buildBuffers, receiveOne, parseConfigure } = transport;
 
 const transportCache: Record<string, any> = {};
 
+const firstBytesHex = (buffer: Buffer, byteLength = 8) =>
+  buffer.subarray(0, byteLength).toString('hex');
+
 let connectOptions: Record<string, unknown> = {
   requestMTU: 256,
   timeout: 3000,
@@ -126,6 +129,41 @@ export default class ReactNativeBleTransport {
     if (this.blePlxManager) return Promise.resolve(this.blePlxManager);
     this.blePlxManager = new BlePlxManager();
     return Promise.resolve(this.blePlxManager);
+  }
+
+  private async writeChunkedData(
+    buffers: ByteBuffer[],
+    writeFunction: (data: string) => Promise<void>,
+    onError: (e: any) => void
+  ) {
+    const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
+    let index = 0;
+    let chunk = ByteBuffer.allocate(packetCapacity);
+
+    while (index < buffers.length) {
+      const buffer = buffers[index].toBuffer();
+      chunk.append(buffer);
+      index += 1;
+
+      if (chunk.offset === packetCapacity || index >= buffers.length) {
+        chunk.reset();
+        try {
+          const payloadBase64 = chunk.toString('base64');
+          if (index === 0) {
+            const payloadBuffer = Buffer.from(payloadBase64, 'base64');
+            this.Log?.debug(
+              'transport-react-native writeChunkedData head packet',
+              firstBytesHex(payloadBuffer)
+            );
+          }
+          await writeFunction(payloadBase64);
+          chunk = ByteBuffer.allocate(packetCapacity);
+        } catch (e) {
+          onError(e);
+          throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
+        }
+      }
+    }
   }
 
   /**
@@ -577,35 +615,8 @@ export default class ReactNativeBleTransport {
 
     const buffers = buildBuffers(messages, name, data);
 
-    async function writeChunkedData(
-      buffers: ByteBuffer[],
-      writeFunction: (data: string) => Promise<void>,
-      onError: (e: any) => void
-    ) {
-      const packetCapacity = Platform.OS === 'ios' ? IOS_PACKET_LENGTH : ANDROID_PACKET_LENGTH;
-      let index = 0;
-      let chunk = ByteBuffer.allocate(packetCapacity);
-
-      while (index < buffers.length) {
-        const buffer = buffers[index].toBuffer();
-        chunk.append(buffer);
-        index += 1;
-
-        if (chunk.offset === packetCapacity || index >= buffers.length) {
-          chunk.reset();
-          try {
-            await writeFunction(chunk.toString('base64'));
-            chunk = ByteBuffer.allocate(packetCapacity);
-          } catch (e) {
-            onError(e);
-            throw ERRORS.TypedError(HardwareErrorCode.BleWriteCharacteristicError);
-          }
-        }
-      }
-    }
-
     if (name === 'EmmcFileWrite') {
-      await writeChunkedData(
+      await this.writeChunkedData(
         buffers,
         data => transport.writeWithRetry(data),
         e => {
@@ -614,7 +625,7 @@ export default class ReactNativeBleTransport {
         }
       );
     } else if (name === 'FirmwareUpload') {
-      await writeChunkedData(
+      await this.writeChunkedData(
         buffers,
         async data => {
           await transport.writeCharacteristic.writeWithoutResponse(data);
