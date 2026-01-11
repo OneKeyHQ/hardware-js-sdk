@@ -1,6 +1,9 @@
-import { ApplySettings } from '@onekeyfe/hd-transport';
+import { HardwareErrorCode, TypedError } from '@onekeyfe/hd-shared';
+
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
+
+import type { ApplySettings } from '@onekeyfe/hd-transport';
 
 export default class DeviceSettings extends BaseMethod<ApplySettings> {
   init() {
@@ -55,10 +58,18 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('ApplySettings', 'Success', {
-      ...this.params,
-    });
-
-    return Promise.resolve(res.message);
+    try {
+      const res = await this.device.commands.typedCall('ApplySettings', 'Success', {
+        ...this.params,
+      });
+      return res.message;
+    } catch (error) {
+      if (error.message?.toLowerCase().includes('no setting provided')) {
+        return Promise.reject(
+          TypedError(HardwareErrorCode.DeviceSettingsNotProvided, error.message)
+        );
+      }
+      throw error;
+    }
   }
 }

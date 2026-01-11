@@ -463,6 +463,10 @@ export const HardwareErrorCode = {
    * Cosmos invalid JSON message, Only support Amino msgs.
    */
   CosmosInvalidJsonMessage: 824,
+  /**
+   * No setting provided
+   */
+  DeviceSettingsNotProvided: 825,
 
   /**
    * Lowlevel transport connect error
@@ -611,6 +615,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.FirmwareDowngradeNotAllowed]: 'Firmware downgrade not allowed',
   [HardwareErrorCode.CosmosInvalidJsonMessage]:
     'Cosmos invalid JSON message, Only support Amino msgs.',
+  [HardwareErrorCode.DeviceSettingsNotProvided]: 'No setting provided',
 
   /**
    * Lowlevel transport
