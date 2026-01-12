@@ -469,6 +469,11 @@ export const HardwareErrorCode = {
   DeviceSettingsNotProvided: 825,
 
   /**
+   * Language not supported
+   */
+  DeviceSettingsLanguageNotSupport: 826,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -616,6 +621,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
   [HardwareErrorCode.CosmosInvalidJsonMessage]:
     'Cosmos invalid JSON message, Only support Amino msgs.',
   [HardwareErrorCode.DeviceSettingsNotProvided]: 'No setting provided',
+  [HardwareErrorCode.DeviceSettingsLanguageNotSupport]: 'Language not supported',
 
   /**
    * Lowlevel transport
