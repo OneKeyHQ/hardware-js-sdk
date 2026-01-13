@@ -2357,6 +2357,7 @@ export type Features = {
   build_id?: string;
   boardloader_version?: string;
   battery_level?: number;
+  product?: string;
   brightness_prcent?: number;
   haptic_feedback?: boolean;
   auto_shutdown_delay_ms?: number;
