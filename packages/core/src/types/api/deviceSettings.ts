@@ -1,4 +1,4 @@
-import { SafetyCheckLevel, Success } from '@onekeyfe/hd-transport';
+import type { SafetyCheckLevel, Success } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type DeviceSettingsParams = {
@@ -12,6 +12,9 @@ export type DeviceSettingsParams = {
   passphraseAlwaysOnDevice?: boolean;
   safetyChecks?: SafetyCheckLevel;
   experimentalFeatures?: boolean;
+  autoShutdownDelayMs?: number;
+  changeBrightness?: boolean;
+  hapticFeedback?: boolean;
 };
 
 export declare function deviceSettings(

@@ -2357,6 +2357,9 @@ export type Features = {
   build_id?: string;
   boardloader_version?: string;
   battery_level?: number;
+  brightness_prcent?: number;
+  haptic_feedback?: boolean;
+  auto_shutdown_delay_ms?: number;
   onekey_device_type?: string | null;
   onekey_se_type?: string | null;
   onekey_board_version?: string;
@@ -2465,6 +2468,9 @@ export type ApplySettings = {
   fastpay_confirm?: boolean;
   fastpay_money_limit?: number;
   fastpay_times?: number;
+  auto_shutdown_delay_ms?: number;
+  change_brightness?: boolean;
+  haptic_feedback?: boolean;
 };
 
 // ApplyFlags
@@ -3633,10 +3639,24 @@ export type SolanaAddress = {
   address?: string;
 };
 
+// SolanaTxATADetails
+export type SolanaTxATADetails = {
+  owner_address: string;
+  program_id: string;
+  mint_address: string;
+  associated_token_address: string;
+};
+
+// SolanaTxExtraInfo
+export type SolanaTxExtraInfo = {
+  ata_details: SolanaTxATADetails[];
+};
+
 // SolanaSignTx
 export type SolanaSignTx = {
   address_n: number[];
   raw_tx: string;
+  extra_info?: SolanaTxExtraInfo;
 };
 
 // SolanaSignedTx
@@ -4779,6 +4799,8 @@ export type MessageType = {
   ScdoSignedMessage: ScdoSignedMessage;
   SolanaGetAddress: SolanaGetAddress;
   SolanaAddress: SolanaAddress;
+  SolanaTxATADetails: SolanaTxATADetails;
+  SolanaTxExtraInfo: SolanaTxExtraInfo;
   SolanaSignTx: SolanaSignTx;
   SolanaSignedTx: SolanaSignedTx;
   SolanaSignOffChainMessage: SolanaSignOffChainMessage;

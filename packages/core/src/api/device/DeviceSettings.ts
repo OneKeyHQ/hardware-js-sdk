@@ -1,6 +1,10 @@
-import { ApplySettings } from '@onekeyfe/hd-transport';
+import { HardwareErrorCode, TypedError } from '@onekeyfe/hd-shared';
+
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
+import { LANGUAGE_LABELS } from '../../utils/deviceSettings';
+
+import type { ApplySettings } from '@onekeyfe/hd-transport';
 
 export default class DeviceSettings extends BaseMethod<ApplySettings> {
   init() {
@@ -18,6 +22,9 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       { name: 'passphraseAlwaysOnDevice', type: 'boolean' },
       { name: 'safetyChecks', type: 'number' },
       { name: 'experimentalFeatures', type: 'boolean' },
+      { name: 'autoShutdownDelayMs', type: 'number' },
+      { name: 'changeBrightness', type: 'boolean' },
+      { name: 'hapticFeedback', type: 'boolean' },
     ]);
 
     // init params
@@ -32,6 +39,11 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
       passphrase_always_on_device: this.payload.passphraseAlwaysOnDevice,
       safety_checks: this.payload.safetyChecks,
       experimental_features: this.payload.experimentalFeatures,
+      auto_shutdown_delay_ms: this.payload.autoShutdownDelayMs,
+      ...(this.payload.changeBrightness
+        ? { change_brightness: this.payload.changeBrightness }
+        : undefined),
+      haptic_feedback: this.payload.hapticFeedback,
     };
   }
 
@@ -47,10 +59,38 @@ export default class DeviceSettings extends BaseMethod<ApplySettings> {
   }
 
   async run() {
-    const res = await this.device.commands.typedCall('ApplySettings', 'Success', {
-      ...this.params,
-    });
+    try {
+      const res = await this.device.commands.typedCall('ApplySettings', 'Success', {
+        ...this.params,
+      });
+      return res.message;
+    } catch (error) {
+      if (error.message?.toLowerCase().includes('no setting provided')) {
+        return Promise.reject(
+          TypedError(HardwareErrorCode.DeviceSettingsNotProvided, error.message)
+        );
+      }
+      if (error.message?.includes('all support ISO_639-1 language keys include')) {
+        const supportedLanguages: string[] = error.message
+          ?.replace('all support ISO_639-1 language keys include', '')
+          ?.trim()
+          ?.split(' ');
 
-    return Promise.resolve(res.message);
+        const errorMessage = supportedLanguages.reduce((acc, language) => {
+          const label = LANGUAGE_LABELS?.[language as keyof typeof LANGUAGE_LABELS];
+          if (label) {
+            acc.push(label);
+          }
+          return acc;
+        }, [] as string[]);
+
+        return Promise.reject(
+          TypedError(HardwareErrorCode.DeviceSettingsLanguageNotSupport, error.message, {
+            languages: errorMessage.join(', '),
+          })
+        );
+      }
+      throw error;
+    }
   }
 }

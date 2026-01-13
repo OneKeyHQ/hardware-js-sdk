@@ -1,10 +1,11 @@
-import { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { SolanaSignedTx, SolanaSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { SolanaSignTransactionParams, SolanaSignedTx } from '../../types';
+import type { SolanaSignTx as HardwareSolanaSignTx } from '@onekeyfe/hd-transport';
 
 export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[]> {
   hasBundle = false;
@@ -27,11 +28,13 @@ export default class SolSignTransaction extends BaseMethod<HardwareSolanaSignTx[
       validateParams(batch, [
         { name: 'path', required: true },
         { name: 'rawTx', type: 'hexString', required: true },
+        { name: 'extraInfo', type: 'object' },
       ]);
 
       this.params.push({
         address_n: addressN,
         raw_tx: formatAnyHex(batch.rawTx),
+        ...(batch.extraInfo ? { extra_info: batch.extraInfo } : undefined),
       });
     });
   }
