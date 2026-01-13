@@ -6498,17 +6498,21 @@
           "type": "uint32",
           "id": 520
         },
+        "product": {
+          "type": "string",
+          "id": 521
+        },
         "brightness_prcent": {
           "type": "uint32",
-          "id": 521
+          "id": 522
         },
         "haptic_feedback": {
           "type": "bool",
-          "id": 522
+          "id": 523
         },
         "auto_shutdown_delay_ms": {
           "type": "uint32",
-          "id": 523
+          "id": 524
         },
         "onekey_device_type": {
           "type": "OneKeyDeviceType",
