@@ -1,13 +1,13 @@
-import { SuiGetAddress as HardwareSuiGetAddress } from '@onekeyfe/hd-transport';
-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { SuiAddress, SuiGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { publicKeyToAddress } from './normalize';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { SuiAddress, SuiGetAddressParams } from '../../types';
+import type { SuiGetAddress as HardwareSuiGetAddress } from '@onekeyfe/hd-transport';
 
 export default class SuiGetAddress extends BaseMethod<HardwareSuiGetAddress[]> {
   hasBundle = false;

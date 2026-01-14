@@ -1,8 +1,8 @@
 export const PRO_SCREEN = {
   width: 480,
   height: 800,
-  statusBarHeight: 44
-}
+  statusBarHeight: 44,
+};
 
 export const PRO_DEVICE = {
   width: 544,
@@ -13,9 +13,9 @@ export const PRO_DEVICE = {
   framePadding: {
     x: 32,
     top: 44,
-    bottom: 76
-  }
-}
+    bottom: 76,
+  },
+};
 
 export const PRO_COLORS = {
   WHITE: '#FFFFFF',
@@ -38,8 +38,8 @@ export const PRO_COLORS = {
   ONEKEY_GRAY_1: '#696969',
   ONEKEY_GRAY_2: '#3C3C3C',
   ONEKEY_GRAY_3: '#2D2D2D',
-  ONEKEY_GRAY_4: '#B4B4B4'
-}
+  ONEKEY_GRAY_4: '#B4B4B4',
+};
 
 export const PRO_LAYOUT = {
   screenPaddingX: 12,
@@ -49,5 +49,5 @@ export const PRO_LAYOUT = {
   cardRadius: 40,
   buttonHeight: 98,
   buttonRadius: 98,
-  buttonHalfWidth: 224
-}
+  buttonHalfWidth: 224,
+};

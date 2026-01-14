@@ -1,9 +1,10 @@
-import { ScdoGetAddress as HardwareScdoGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { ScdoAddress, ScdoGetAddressParams } from '../../types';
+
+import type { ScdoGetAddress as HardwareScdoGetAddress } from '@onekeyfe/hd-transport';
+import type { ScdoAddress, ScdoGetAddressParams } from '../../types';
 
 export default class ScdoGetAddress extends BaseMethod<HardwareScdoGetAddress[]> {
   hasBundle = false;

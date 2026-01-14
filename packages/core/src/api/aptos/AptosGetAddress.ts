@@ -1,15 +1,16 @@
-import { AptosGetAddress as HardwareAptosGetAddress } from '@onekeyfe/hd-transport';
-
 import { sha3_256 as sha3Hash } from '@noble/hashes/sha3';
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { AptosAddress, AptosGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { hexToBytes } from '../helpers/hexUtils';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { AptosAddress, AptosGetAddressParams } from '../../types';
+import type { AptosGetAddress as HardwareAptosGetAddress } from '@onekeyfe/hd-transport';
 
 export default class AptosGetAddress extends BaseMethod<HardwareAptosGetAddress[]> {
   hasBundle = false;

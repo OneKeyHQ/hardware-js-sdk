@@ -1,8 +1,8 @@
-import { inject, executeCallback, cleanupCallback } from './inject';
+import { cleanupCallback, executeCallback, inject } from './inject';
 import { lowLevelInject } from './lowLevelInject';
 import { topLevelInject } from './topLevelInject';
 
-import type { LowLevelInjectApi, LowLevelCoreApi } from './lowLevelInject';
+import type { LowLevelCoreApi, LowLevelInjectApi } from './lowLevelInject';
 import type { InjectApi } from './inject';
 import type { CoreApi } from './types/api';
 

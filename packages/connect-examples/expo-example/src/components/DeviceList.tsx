@@ -1,26 +1,22 @@
-import {
-  ForwardedRef,
-  forwardRef,
-  useCallback,
-  useContext,
-  useEffect,
-  useImperativeHandle,
-} from 'react';
-
+import { forwardRef, useCallback, useContext, useEffect, useImperativeHandle } from 'react';
 import { ListItem, Stack, Text, View, XStack } from 'tamagui';
 import { FlatList, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { Check } from '@tamagui/lucide-icons';
 import { useIntl } from 'react-intl';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import type { Features } from '@onekeyfe/hd-transport';
 import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { Button } from './ui/Button';
 import PanelView from './ui/Panel';
 import { getItem, setItem } from '../utils/storeUtil';
-import { connectionTypeAtom, ConnectionType } from '../atoms/deviceConnectAtoms';
-import { selectDeviceAtom, deviceListAtom, deviceActionsAtom } from '../atoms/deviceAtoms';
+import { connectionTypeAtom } from '../atoms/deviceConnectAtoms';
+import { deviceActionsAtom, deviceListAtom, selectDeviceAtom } from '../atoms/deviceAtoms';
+
+import type { ConnectionType } from '../atoms/deviceConnectAtoms';
+import type { ForwardedRef } from 'react';
+import type { Features } from '@onekeyfe/hd-transport';
 
 export type Device = {
   connectId: string;

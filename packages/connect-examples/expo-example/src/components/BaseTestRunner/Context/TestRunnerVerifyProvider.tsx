@@ -1,6 +1,7 @@
 import { atom } from 'jotai';
 import { selectAtom } from 'jotai/utils';
-import { TestCaseDataWithKey, VerifyState } from '../types';
+
+import type { TestCaseDataWithKey, VerifyState } from '../types';
 
 export type ItemVerifyState = { verify: VerifyState; error?: string; ext?: any };
 

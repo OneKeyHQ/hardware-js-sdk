@@ -1,4 +1,4 @@
-import { SuiAddress as HardwareSuiAddress } from '@onekeyfe/hd-transport';
+import type { SuiAddress as HardwareSuiAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type SuiAddress = {

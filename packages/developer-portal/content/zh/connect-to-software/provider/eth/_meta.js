@@ -4,5 +4,5 @@ export default {
   'accessing-accounts': '账户访问',
   'sending-transactions': '发送交易',
   'signing-data': '签名数据',
-  reference: 'JSON-RPC 参考'
-}
+  reference: 'JSON-RPC 参考',
+};

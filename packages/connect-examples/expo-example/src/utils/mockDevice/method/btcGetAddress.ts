@@ -1,10 +1,11 @@
 import * as bitcoin from 'bitcoinjs-lib';
 import { initEccLib } from 'bitcoinjs-lib';
 import * as bchaddr from 'bchaddrjs';
-import { getPublicKey, Point, utils } from '@noble/secp256k1';
-import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
+import { Point, getPublicKey, utils } from '@noble/secp256k1';
 
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 // Minimal ECC wrapper for bitcoinjs-lib using @noble/secp256k1
 const ecc = {

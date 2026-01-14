@@ -1,9 +1,10 @@
-import { AlephiumGetAddress as HardwareAlephiumGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { AlephiumAddress, AlephiumGetAddressParams } from '../../types';
+
+import type { AlephiumGetAddress as HardwareAlephiumGetAddress } from '@onekeyfe/hd-transport';
+import type { AlephiumAddress, AlephiumGetAddressParams } from '../../types';
 
 export default class AlephiumGetAddress extends BaseMethod<HardwareAlephiumGetAddress[]> {
   hasBundle = false;

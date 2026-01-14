@@ -1,5 +1,7 @@
-import { Device, Characteristic, BleErrorCode } from 'react-native-ble-plx';
-import { getLogger, LoggerNames, wait } from '@onekeyfe/hd-core';
+import { BleErrorCode } from 'react-native-ble-plx';
+import { LoggerNames, getLogger, wait } from '@onekeyfe/hd-core';
+
+import type { Characteristic, Device } from 'react-native-ble-plx';
 // import { wait } from '@onekeyfe/hd-core/src/utils';
 
 const Log = getLogger(LoggerNames.HdBleTransport);

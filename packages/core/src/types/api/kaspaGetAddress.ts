@@ -1,4 +1,4 @@
-import { KaspaAddress as HardwareKaspaAddress } from '@onekeyfe/hd-transport';
+import type { KaspaAddress as HardwareKaspaAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type KaspaAddress = {

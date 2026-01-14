@@ -8,4 +8,4 @@ export default {
   android: 'Android (Native)',
   ios: 'iOS (Native)',
   flutter: 'Flutter (Native)',
-}
+};

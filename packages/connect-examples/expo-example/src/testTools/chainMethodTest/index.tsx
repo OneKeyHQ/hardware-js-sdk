@@ -1,7 +1,7 @@
-import React, { useCallback, useContext, useMemo, useRef, useState, useEffect } from 'react';
-import { Text, H3, ScrollView, View, Group, XStack, YStack } from 'tamagui';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Group, H3, ScrollView, Text, View, XStack, YStack } from 'tamagui';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
 import { useCommonParams } from '../../provider/CommonParamsProvider';
@@ -9,6 +9,8 @@ import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvid
 import { Button } from '../../components/ui/Button';
 import AutoWrapperTextArea from '../../components/ui/AutoWrapperTextArea';
 import { chainTestData } from './data';
+
+import type { CoreMessage } from '@onekeyfe/hd-core';
 
 interface TestCase {
   id: string;

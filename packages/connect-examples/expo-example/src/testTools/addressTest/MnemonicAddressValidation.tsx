@@ -1,23 +1,24 @@
 import { useMemo, useRef, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Input, Label, Stack, Text, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get, isEmpty } from 'lodash';
+
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
-import { ADDRESS_INDEX_MARK, baseParams, CHANGE_MARK, INDEX_MARK } from './baseParams';
+import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from './baseParams';
 import { replaceTemplate } from './data/utils';
-import { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import mockDevice from '../../utils/mockDevice';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { CommonInput } from '../../components/CommonInput';
+
+import type { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 
 type TestCaseDataType = {
   id: string;

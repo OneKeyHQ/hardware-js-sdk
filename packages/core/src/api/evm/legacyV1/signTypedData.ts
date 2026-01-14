@@ -1,5 +1,5 @@
-import { TypedCall } from '@onekeyfe/hd-transport';
-import { EthereumSignTypedDataMessage, EthereumSignTypedDataTypes } from '../../../types';
+import type { TypedCall } from '@onekeyfe/hd-transport';
+import type { EthereumSignTypedDataMessage, EthereumSignTypedDataTypes } from '../../../types';
 
 export const signTypedData = async ({
   typedCall,

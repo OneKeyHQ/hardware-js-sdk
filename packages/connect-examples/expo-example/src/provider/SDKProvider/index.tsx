@@ -1,10 +1,12 @@
-import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Usb } from '@tamagui/lucide-icons';
-import { LowLevelCoreApi } from '@onekeyfe/hd-core/dist/lowLevelInject';
 import { Stack, Text } from 'tamagui';
+
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
+
+import type { LowLevelCoreApi } from '@onekeyfe/hd-core/dist/lowLevelInject';
+import type { CoreApi } from '@onekeyfe/hd-core';
 
 let isSdkInit = false;
 export default function USB({ children }: { children: React.ReactNode }) {

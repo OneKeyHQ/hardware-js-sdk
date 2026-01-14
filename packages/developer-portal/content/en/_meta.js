@@ -10,31 +10,31 @@ export default {
       breadcrumb: false,
       timestamp: false,
       footer: false,
-      copyPage: false
-    }
+      copyPage: false,
+    },
   },
   'connect-to-hardware': {
     title: 'Connect to hardware',
     type: 'menu',
     items: {
       'hardware-sdk': { title: 'Hardware JS SDK', href: '/en/hardware-sdk' },
-      'air-gap': { title: 'Air-Gap', href: '/en/air-gap' }
-    }
+      'air-gap': { title: 'Air-Gap', href: '/en/air-gap' },
+    },
   },
   'hardware-sdk': {
     title: 'hardware-sdk',
-    type: 'page'
+    type: 'page',
   },
   'air-gap': {
     title: 'Air Gap',
-    type: 'page'
+    type: 'page',
   },
   'connect-to-software': {
     title: 'Connect to Software',
-    type: 'page'
+    type: 'page',
   },
   changelog: {
     title: 'Changelog',
-    display: 'hidden'
-  }
-}
+    display: 'hidden',
+  },
+};

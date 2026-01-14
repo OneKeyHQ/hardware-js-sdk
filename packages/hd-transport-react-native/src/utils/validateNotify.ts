@@ -1,4 +1,4 @@
-import { MESSAGE_TOP_CHAR, MESSAGE_HEADER_BYTE } from '@onekeyfe/hd-transport';
+import { MESSAGE_HEADER_BYTE, MESSAGE_TOP_CHAR } from '@onekeyfe/hd-transport';
 
 export const isHeaderChunk = (chunk: Buffer): boolean => {
   if (chunk.length < 9) return false;

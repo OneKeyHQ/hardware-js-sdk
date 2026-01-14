@@ -1,4 +1,4 @@
-import { UintType } from '@onekeyfe/hd-transport';
+import type { UintType } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type DnxTxKey = {

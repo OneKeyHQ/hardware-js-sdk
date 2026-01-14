@@ -17,7 +17,6 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const crypto = require('react-native-crypto');
-
 const { randomBytes } = require('@noble/hashes/utils');
 
 // re-assign randomBytes from global.crypto.getRandomValues

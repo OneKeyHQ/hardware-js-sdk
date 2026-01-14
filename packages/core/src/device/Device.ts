@@ -3,9 +3,9 @@ import semver from 'semver';
 import { Enum_Capability } from '@onekeyfe/hd-transport';
 import {
   EDeviceType,
+  ERRORS,
   ERROR_CODES_REQUIRE_DISCONNECT,
   ERROR_CODES_REQUIRE_RELEASE,
-  ERRORS,
   HardwareError,
   HardwareErrorCode,
   createDeferred,

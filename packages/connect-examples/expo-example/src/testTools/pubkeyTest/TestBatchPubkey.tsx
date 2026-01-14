@@ -1,13 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-
 import { Text, XStack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { PubkeyBatchTestCase } from './types';
-import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
@@ -23,6 +20,10 @@ import {
 } from '../deviceCompatibility';
 import { useDevice } from '../../provider/DeviceProvider';
 import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
+
+import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { PubkeyBatchTestCase } from './types';
 
 type TestCaseDataType = PubkeyBatchTestCase['data'][0];
 type ResultViewProps = {

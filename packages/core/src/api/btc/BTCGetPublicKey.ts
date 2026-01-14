@@ -1,15 +1,17 @@
-import type { GetPublicKey } from '@onekeyfe/hd-transport';
 import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getScriptType, isTaprootPath, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
-import { BTCPublicKey } from '../../types/api/btcGetPublicKey';
 import { getBitcoinForkVersionRange } from './helpers/versionLimit';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
 import { createExtendedPublicKey, getVersionBytes } from './helpers/xpubUtils';
+
+import type { BTCPublicKey } from '../../types/api/btcGetPublicKey';
+import type { BTCGetAddressParams } from '../../types/api/btcGetAddress';
+import type { GetPublicKey } from '@onekeyfe/hd-transport';
 
 export default class BTCGetPublicKey extends BaseMethod<GetPublicKey[]> {
   hasBundle = false;

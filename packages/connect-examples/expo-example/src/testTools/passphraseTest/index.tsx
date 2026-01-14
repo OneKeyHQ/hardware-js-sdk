@@ -1,6 +1,6 @@
 import { Stack } from 'tamagui';
-import { DeviceProvider } from '../../provider/DeviceProvider';
 
+import { DeviceProvider } from '../../provider/DeviceProvider';
 import TestSessionCountView from './TestSessionCountView';
 import { TestSwitchPassphraseWallet } from './TestSwitchPassphraseWallet';
 import { TestSpecialPassphraseWallet } from './TestSpecialPassphraseWallet';

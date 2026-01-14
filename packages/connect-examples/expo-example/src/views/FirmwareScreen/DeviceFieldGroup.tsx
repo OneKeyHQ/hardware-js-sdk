@@ -1,4 +1,5 @@
 import { XStack } from 'tamagui';
+
 import { DeviceField } from './DeviceField';
 import { deviceInfoKeys, deviceSEInfoKeys } from './ExportDeviceInfo';
 

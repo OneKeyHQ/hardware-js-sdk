@@ -1,13 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useContext } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-
 import { Stack, Text, XStack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { PubkeyTestCase } from './types';
-import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
@@ -22,6 +19,10 @@ import {
 } from '../deviceCompatibility';
 import { useDevice } from '../../provider/DeviceProvider';
 import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
+
+import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { PubkeyTestCase } from './types';
 
 type TestCaseDataType = PubkeyTestCase['data'][0];
 type ResultViewProps = {

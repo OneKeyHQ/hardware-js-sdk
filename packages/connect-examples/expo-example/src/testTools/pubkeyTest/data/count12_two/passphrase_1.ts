@@ -1,5 +1,6 @@
 import { INDEX_MARK } from '../../baseParams';
-import { PubkeyTestCaseData } from '../types';
+
+import type { PubkeyTestCaseData } from '../types';
 
 export default {
   name: 'two-passphrase12-密语1',

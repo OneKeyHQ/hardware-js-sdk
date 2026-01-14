@@ -1,11 +1,12 @@
-import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { base58xmr, utils } from '@scure/base';
 import { keccak_256 as keccak } from '@noble/hashes/sha3';
-import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
+import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 import { fastHash, generateKeys } from './menero/crypto-util.js';
 import { getConfig } from './menero/config.js';
 import { encodeVarint } from './menero/helpers';
+
+import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 function base58xmrCheck(checksumSize: number) {
   return utils.chain(

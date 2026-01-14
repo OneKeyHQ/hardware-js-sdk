@@ -1,20 +1,20 @@
 import { useMemo, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Stack, Text, XStack, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get } from 'lodash';
+
 import { TestRunnerView } from '../../../components/BaseTestRunner/TestRunnerView';
-import { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
 import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
-import type { InitDurationTestCase, ResultViewProps, TestCaseDataType } from './types';
-
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { CommonInput } from '../../../components/CommonInput';
+
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
+import type { InitDurationTestCase, ResultViewProps, TestCaseDataType } from './types';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
   let timeoutHandle: NodeJS.Timeout;

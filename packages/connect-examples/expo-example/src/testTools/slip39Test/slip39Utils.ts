@@ -6,7 +6,8 @@
 
 import { pbkdf2 } from '@noble/hashes/pbkdf2';
 import { sha256 } from '@noble/hashes/sha256';
-import { Slip39, WORD_LIST, validateMnemonic, combineMnemonics } from './core/index';
+
+import { Slip39, WORD_LIST, combineMnemonics, validateMnemonic } from './core/index';
 
 // Import address generators
 import { generateBtcAddressFromSeed } from '../../utils/mockDevice/method/btcGetAddress';
@@ -27,7 +28,6 @@ import { generateAptosPublicKeyFromSeed } from '../../utils/mockDevice/method/ap
 import { generateNostrPublicKeyFromSeed } from '../../utils/mockDevice/method/nostrGetPublicKey';
 import { generatePolkadotPublicKeyFromSeed } from '../../utils/mockDevice/method/polkadotGetPublicKey';
 import { generateSuiPublicKeyFromSeed } from '../../utils/mockDevice/method/suiGetPublicKey';
-
 import { deriveKeyPairWithPath } from '../../utils/mockDevice/helper';
 
 /**

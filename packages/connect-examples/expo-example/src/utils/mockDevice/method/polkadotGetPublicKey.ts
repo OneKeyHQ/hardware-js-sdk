@@ -1,5 +1,6 @@
-import { PolkadotGetPublicKeyParams } from '@onekeyfe/hd-core';
-import { mnemonicToSeed, deriveKeyPairWithPath } from '../helper';
+import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { PolkadotGetPublicKeyParams } from '@onekeyfe/hd-core';
 
 /**
  * 抽离的核心逻辑：从 seed 生成 Polkadot 公钥

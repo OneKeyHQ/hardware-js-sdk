@@ -1,11 +1,12 @@
-import { CoreApi } from '@onekeyfe/hd-core';
 import React, { useEffect } from 'react';
 import { PermissionsAndroid, Platform, Text } from 'react-native';
-
 import { Stack } from 'tamagui';
 import { BluetoothSearching } from '@tamagui/lucide-icons';
+
 import { getHardwareSDKInstance } from '../../utils/hardwareInstance';
 import HardwareSDKContext from '../HardwareSDKContext';
+
+import type { CoreApi } from '@onekeyfe/hd-core';
 
 let isSdkInit = false;
 

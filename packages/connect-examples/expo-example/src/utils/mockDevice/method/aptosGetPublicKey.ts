@@ -1,5 +1,6 @@
-import { AptosGetPublicKeyParams } from '@onekeyfe/hd-core';
-import { mnemonicToSeed, deriveKeyPairWithPath } from '../helper';
+import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { AptosGetPublicKeyParams } from '@onekeyfe/hd-core';
 
 /**
  * 抽离的核心逻辑：从 seed 生成 Aptos 公钥

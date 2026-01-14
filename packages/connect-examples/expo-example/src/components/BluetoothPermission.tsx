@@ -1,8 +1,9 @@
-import React, { useMemo, useCallback, memo } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { useIntl } from 'react-intl';
 import { Dialog, Text, Unspaced, YStack } from 'tamagui';
-import { X, Bluetooth, Settings } from '@tamagui/lucide-icons';
+import { Bluetooth, Settings, X } from '@tamagui/lucide-icons';
 import { Platform } from 'react-native';
+
 import { Button } from './ui/Button';
 import { useMedia } from '../provider/MediaProvider';
 

@@ -1,8 +1,11 @@
 import axios from 'axios';
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { DeviceModelToTypes, IDeviceType } from '../types';
+
+import { DeviceModelToTypes } from '../types';
 import { DataManager } from '../data-manager';
+
+import type { IDeviceType } from '../types';
 
 const REQUIRED_BRIDGE_VERSION = '2.2.0';
 const TOUCH_NEED_UPDATE_BRIDGE_VERSION = '4.3.0';

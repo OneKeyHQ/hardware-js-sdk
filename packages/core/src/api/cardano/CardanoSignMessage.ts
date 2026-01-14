@@ -3,7 +3,8 @@ import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validateParams } from '../helpers/paramsValidator';
 import { validatePath } from '../helpers/pathUtils';
-import { CardanoSignMessageParams } from '../../types/api/cardanoSignMessage';
+
+import type { CardanoSignMessageParams } from '../../types/api/cardanoSignMessage';
 
 export default class CardanoSignMessage extends BaseMethod<CardanoSignMessageParams> {
   hasBundle?: boolean;

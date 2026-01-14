@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, YStack } from 'tamagui';
+import { Text, View, YStack } from 'tamagui';
 
 import { SLIP39BatchAddressTest } from './SLIP39BatchAddressTest';
 import { convertToBundleFormat } from './utils';

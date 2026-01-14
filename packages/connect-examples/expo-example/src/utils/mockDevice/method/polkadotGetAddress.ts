@@ -1,7 +1,9 @@
 /* eslint-disable no-bitwise */
-import { PolkadotGetAddressParams } from '@onekeyfe/hd-core';
-import { hdLedger, encodeAddress } from '@polkadot/util-crypto';
+import { encodeAddress, hdLedger } from '@polkadot/util-crypto';
+
 import { deriveKeyPairWithPath } from '../helper';
+
+import type { PolkadotGetAddressParams } from '@onekeyfe/hd-core';
 
 /**
  * 抽离的核心逻辑：从 seed 生成 Polkadot 地址

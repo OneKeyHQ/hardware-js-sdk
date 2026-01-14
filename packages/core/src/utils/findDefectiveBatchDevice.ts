@@ -1,5 +1,6 @@
+import { getDeviceType, getDeviceUUID } from './deviceInfoUtils';
+
 import type { Features } from '../types';
-import { getDeviceUUID, getDeviceType } from './deviceInfoUtils';
 
 /**
  * 检测故障固件设备

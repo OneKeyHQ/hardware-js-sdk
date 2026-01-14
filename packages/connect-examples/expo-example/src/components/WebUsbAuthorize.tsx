@@ -2,6 +2,7 @@ import React from 'react';
 import { useIntl } from 'react-intl';
 import { Dialog, Text, Unspaced, YStack } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
+
 import { Button } from './ui/Button';
 
 type IWebUsbAuthorizeProps = {

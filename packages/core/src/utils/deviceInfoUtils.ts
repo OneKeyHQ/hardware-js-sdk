@@ -1,10 +1,11 @@
 import { isEmpty } from 'lodash';
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 import { Enum_Capability } from '@onekeyfe/hd-transport';
+
 import { DeviceModelToTypes } from '../types';
+import { existCapability } from './capabilitieUtils';
 
 import type { Features, IDeviceModel, IDeviceType, IVersionRange } from '../types';
-import { existCapability } from './capabilitieUtils';
 
 /**
  * get device type by features

@@ -1,6 +1,5 @@
 export default {
   index: 'Overview',
-  'ethsignrequest': 'EthSignRequest',
-  'ethsignature': 'EthSignature'
-}
-
+  ethsignrequest: 'EthSignRequest',
+  ethsignature: 'EthSignature',
+};

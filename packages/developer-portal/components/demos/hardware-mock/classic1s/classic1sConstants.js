@@ -6,11 +6,11 @@ export const CLASSIC1S_DEVICE = {
     x: 49,
     y: 28,
     width: 222,
-    height: 118
+    height: 118,
   },
   buttons: {
     y: 182,
     size: 38,
-    gap: 15
-  }
-}
+    gap: 15,
+  },
+};

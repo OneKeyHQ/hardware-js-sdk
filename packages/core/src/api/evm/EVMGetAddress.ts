@@ -1,12 +1,13 @@
-import { EthereumGetAddressOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { EVMAddress, EVMGetAddressParams } from '../../types';
 import TransportManager from '../../data-manager/TransportManager';
 import getAddressLegacyV1 from './legacyV1/getAddress';
 import getAddress from './latest/getAddress';
+
+import type { EVMAddress, EVMGetAddressParams } from '../../types';
+import type { EthereumGetAddressOneKey } from '@onekeyfe/hd-transport';
 
 export default class EvmGetAddress extends BaseMethod<EthereumGetAddressOneKey[]> {
   hasBundle = false;

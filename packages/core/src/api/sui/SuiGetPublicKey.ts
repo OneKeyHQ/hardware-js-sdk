@@ -2,8 +2,9 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { SuiGetAddressParams, SuiPublicKey } from '../../types';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { SuiGetAddressParams, SuiPublicKey } from '../../types';
 
 export default class SuiGetPublicKey extends BaseMethod<any> {
   hasBundle = false;

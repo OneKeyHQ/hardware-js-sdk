@@ -1,9 +1,10 @@
-import { AptosSignSIWAMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { AptosSignInMessageParams, AptosSignInMessageSignature } from '../../types';
+
+import type { AptosSignSIWAMessage } from '@onekeyfe/hd-transport';
+import type { AptosSignInMessageParams, AptosSignInMessageSignature } from '../../types';
 
 export default class AptosSignInMessage extends BaseMethod<AptosSignSIWAMessage> {
   init() {

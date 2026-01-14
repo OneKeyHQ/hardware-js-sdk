@@ -1,8 +1,8 @@
-import { EventEmitter } from 'events';
-import { CallMethod } from './events';
-import { CoreApi } from './types/api';
+import type { Unsuccessful } from './types';
+import type { EventEmitter } from 'events';
+import type { CallMethod } from './events';
+import type { CoreApi } from './types/api';
 import type { AllNetworkAddress } from './types/api/allNetworkGetAddress';
-import { Unsuccessful } from './types';
 
 type CallbackFunction = (data?: any, error?: Unsuccessful) => void;
 

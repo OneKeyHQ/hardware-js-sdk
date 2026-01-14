@@ -1,20 +1,17 @@
-import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { useSetAtom } from 'jotai';
-
-import { Stack, Text, YStack, XStack, TextArea, Separator } from 'tamagui';
+import { Separator, Stack, Text, TextArea, XStack, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { isEmpty } from 'lodash';
+
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
-import { ADDRESS_INDEX_MARK, baseParams, CHANGE_MARK, INDEX_MARK } from '../addressTest/baseParams';
+import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from '../addressTest/baseParams';
 import { replaceTemplate } from '../addressTest/data/utils';
-import { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
 import {
   addressValidationClearItemVerifyStateAtom,
   addressValidationSetFailedTasksAtom,
@@ -23,13 +20,17 @@ import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerO
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { CommonInput } from '../../components/CommonInput';
 import {
-  validateSLIP39Mnemonic,
   analyzeSLIP39Shares,
   generateBackupSLIP39Shares,
   generateMultiChainAddressFromSLIP39,
   recoverMasterSecret,
+  validateSLIP39Mnemonic,
 } from './slip39Utils';
 import { Slip39 } from './core/index';
+
+import type { ItemVerifyState } from '../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 
 type AddressTestCaseDataType = {
   id: string;

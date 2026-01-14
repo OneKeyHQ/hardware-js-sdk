@@ -8,15 +8,17 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+
 import {
+  analyzeSLIP39Shares,
   generateMultiChainAddressFromSLIP39,
   generateMultiChainPublicKeyFromSLIP39,
-  analyzeSLIP39Shares,
   getSupportedMethods,
 } from './slip39Utils';
-import { SLIP39TestConfig, SLIP39PassphraseConfig, SLIP39TestCaseData } from './types';
 import { batchAddressTests } from './addressData';
 import { allPubkeyTestCases } from './pubKeyData';
+
+import type { SLIP39PassphraseConfig, SLIP39TestCaseData, SLIP39TestConfig } from './types';
 
 // 统一的 SLIP39 配置数据
 const SLIP39_CONFIGS: SLIP39TestConfig[] = [

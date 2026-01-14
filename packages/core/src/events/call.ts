@@ -1,6 +1,7 @@
 import { serializeError } from '@onekeyfe/hd-shared';
-import { IFRAME } from './iframe';
-import { CommonParams, CoreApi, ConnectSettings } from '../types';
+
+import type { IFRAME } from './iframe';
+import type { CommonParams, ConnectSettings, CoreApi } from '../types';
 
 type UnwrappedResponse<T> = T extends Promise<infer R>
   ? R extends { success: true; payload: infer P }

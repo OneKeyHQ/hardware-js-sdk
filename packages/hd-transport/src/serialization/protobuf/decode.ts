@@ -1,6 +1,8 @@
-import { Type, Message, Field } from 'protobufjs/light';
 import ByteBuffer from 'bytebuffer';
+
 import { isPrimitiveField } from '../../utils/protobuf';
+
+import type { Field, Message, Type } from 'protobufjs/light';
 
 const transform = (field: Field, value: any) => {
   // [compatibility]: optional undefined keys should be null. Example: Features.fw_major.

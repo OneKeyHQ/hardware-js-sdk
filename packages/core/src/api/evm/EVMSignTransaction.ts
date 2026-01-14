@@ -1,18 +1,21 @@
 import { ERRORS } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { SchemaParam, validateParams } from '../helpers/paramsValidator';
-import {
+import { validateParams } from '../helpers/paramsValidator';
+import { formatAnyHex } from '../helpers/hexUtils';
+import TransportManager from '../../data-manager/TransportManager';
+import { signTransaction } from './latest/signTransaction';
+import { signTransaction as signTransactionLegacyV1 } from './legacyV1/signTransaction';
+
+import type {
   EVMSignTransactionParams,
   EVMTransaction,
   EVMTransactionEIP1559,
   EVMTransactionEIP7702,
 } from '../../types';
-import { formatAnyHex } from '../helpers/hexUtils';
-import TransportManager from '../../data-manager/TransportManager';
-import { signTransaction } from './latest/signTransaction';
-import { signTransaction as signTransactionLegacyV1 } from './legacyV1/signTransaction';
+import type { SchemaParam } from '../helpers/paramsValidator';
 
 export default class EVMSignTransaction extends BaseMethod {
   addressN: number[] = [];

@@ -1,11 +1,14 @@
-import { LowlevelTransportSharedPlugin, Transport } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import DataManager, { MessageVersion } from './DataManager';
-import { getLogger, LoggerNames } from '../utils';
+
+import DataManager from './DataManager';
+import { LoggerNames, getLogger } from '../utils';
 // eslint-disable-next-line import/no-cycle
 import { DevicePool } from '../device/DevicePool';
 import { getSupportMessageVersion } from '../utils/deviceFeaturesUtils';
-import { Features } from '../types';
+
+import type { MessageVersion } from './DataManager';
+import type { LowlevelTransportSharedPlugin, Transport } from '@onekeyfe/hd-transport';
+import type { Features } from '../types';
 
 const Log = getLogger(LoggerNames.Transport);
 const BleLogger = getLogger(LoggerNames.HdBleTransport);

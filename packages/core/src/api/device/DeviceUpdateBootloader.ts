@@ -1,5 +1,6 @@
-import { EFirmwareType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { RebootType } from '@onekeyfe/hd-transport';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { FirmwareUpdateTipMessage } from '../../events/ui-request';
 import { FirmwareUpdateBaseMethod } from '../firmware/FirmwareUpdateBaseMethod';
@@ -10,9 +11,10 @@ import { DataManager } from '../../data-manager';
 import { checkBootloaderLength } from '../firmware/updateBootloader';
 import { getDeviceType, getFirmwareType } from '../../utils';
 
+import type { DeviceUpdateBootloaderParams } from '../../types/api/deviceUpdateBootloader';
+import type { EFirmwareType } from '@onekeyfe/hd-shared';
 import type { Device } from '../../device/Device';
 import type { Features } from '../../types';
-import { DeviceUpdateBootloaderParams } from '../../types/api/deviceUpdateBootloader';
 
 export default class DeviceUpdateBootloader extends FirmwareUpdateBaseMethod<any> {
   init() {

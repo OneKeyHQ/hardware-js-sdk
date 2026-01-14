@@ -1,12 +1,18 @@
-import { ScdoSignTx as HardwareScdoSignTx, TypedCall, ScdoSignedTx } from '@onekeyfe/hd-transport';
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { ScdoSignTransactionParams } from '../../types';
-import type { TypedResponseMessage } from '../../device/DeviceCommands';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
+
+import type { ScdoSignTransactionParams } from '../../types';
+import type {
+  ScdoSignTx as HardwareScdoSignTx,
+  ScdoSignedTx,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 export default class ScdoSignTransaction extends BaseMethod<HardwareScdoSignTx> {
   init() {

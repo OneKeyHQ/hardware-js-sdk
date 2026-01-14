@@ -3,7 +3,7 @@
  * Tracks object instances and request call chains across multiple SDK instances
  */
 
-import { getLogger, LoggerNames } from './logger';
+import { LoggerNames, getLogger } from './logger';
 
 // Global counters (cross-SDK instances)
 

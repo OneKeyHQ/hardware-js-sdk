@@ -1,5 +1,6 @@
 import { Stack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { useCommonParams } from '../provider/CommonParamsProvider';
 import { CommonInput } from './CommonInput';
 import { SwitchInput } from './SwitchInput';

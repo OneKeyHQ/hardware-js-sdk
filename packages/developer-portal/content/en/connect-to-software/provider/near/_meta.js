@@ -3,6 +3,5 @@ export default {
   introduction: 'Introduction',
   integrating: 'Integrating',
   reference: 'Reference',
-  resources: 'Resources'
-}
-
+  resources: 'Resources',
+};

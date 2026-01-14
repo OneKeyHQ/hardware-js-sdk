@@ -1,33 +1,37 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
+  DEVICE,
+  DEVICE_EVENT,
+  FIRMWARE_EVENT,
   HardwareSDKLowLevel as HardwareLowLevelSdk,
   HardwareTopLevelSdk,
-  parseConnectSettings,
-  enableLog,
-  PostMessageEvent,
   IFRAME,
-  createErrorMessage,
-  parseMessage,
-  UI_EVENT,
-  CoreMessage,
-  ConnectSettings,
-  UiResponseEvent,
   LOG_EVENT,
-  setLoggerPostMessage,
-  getLogger,
   LoggerNames,
-  FIRMWARE_EVENT,
-  DEVICE_EVENT,
-  DEVICE,
+  UI_EVENT,
   UI_REQUEST,
-  whitelist,
+  createErrorMessage,
+  enableLog,
   executeCallback,
+  getLogger,
+  parseConnectSettings,
+  parseMessage,
+  setLoggerPostMessage,
+  whitelist,
 } from '@onekeyfe/hd-core';
 import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import * as iframe from './iframe/builder';
 import JSBridgeConfig from './iframe/bridge-config';
-import { sendMessage, createJsBridge, hostBridge, resetListenerFlag } from './utils/bridgeUtils';
+import { createJsBridge, hostBridge, resetListenerFlag, sendMessage } from './utils/bridgeUtils';
 import { getHost } from './utils/urlUtils';
+
+import type {
+  ConnectSettings,
+  CoreMessage,
+  PostMessageEvent,
+  UiResponseEvent,
+} from '@onekeyfe/hd-core';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.Connect);

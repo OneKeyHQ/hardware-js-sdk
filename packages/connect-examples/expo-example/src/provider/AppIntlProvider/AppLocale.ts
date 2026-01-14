@@ -1,5 +1,7 @@
-import { IntlShape, ResolvedIntlConfig, createIntl, createIntlCache } from 'react-intl';
-import { ILocaleSymbol } from '../../../locale';
+import { createIntl, createIntlCache } from 'react-intl';
+
+import type { IntlShape, ResolvedIntlConfig } from 'react-intl';
+import type { ILocaleSymbol } from '../../../locale';
 
 class AppLocale {
   constructor() {

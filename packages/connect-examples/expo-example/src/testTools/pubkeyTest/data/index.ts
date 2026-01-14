@@ -1,13 +1,14 @@
-import { singlePubkeyTestCount12One, batchPubkeyTestCount12One } from './count12_one/index';
-import { singlePubkeyTestCount18One, batchPubkeyTestCount18One } from './count18_one/index';
-import { singlePubkeyTestCount24One, batchPubkeyTestCount24One } from './count24_one/index';
-import { singlePubkeyTestCount12Two, batchPubkeyTestCount12Two } from './count12_two/index';
-import { singlePubkeyTestCount18Two, batchPubkeyTestCount18Two } from './count18_two/index';
-import { singlePubkeyTestCount24Two, batchPubkeyTestCount24Two } from './count24_two/index';
-import { singlePubkeyTestCount12Three, batchPubkeyTestCount12Three } from './count12_three/index';
-import { singlePubkeyTestCount18Three, batchPubkeyTestCount18Three } from './count18_three/index';
-import { singlePubkeyTestCount24Three, batchPubkeyTestCount24Three } from './count24_three/index';
-import { PubkeyBatchTestCase, PubkeyTestCase } from '../types';
+import { batchPubkeyTestCount12One, singlePubkeyTestCount12One } from './count12_one/index';
+import { batchPubkeyTestCount18One, singlePubkeyTestCount18One } from './count18_one/index';
+import { batchPubkeyTestCount24One, singlePubkeyTestCount24One } from './count24_one/index';
+import { batchPubkeyTestCount12Two, singlePubkeyTestCount12Two } from './count12_two/index';
+import { batchPubkeyTestCount18Two, singlePubkeyTestCount18Two } from './count18_two/index';
+import { batchPubkeyTestCount24Two, singlePubkeyTestCount24Two } from './count24_two/index';
+import { batchPubkeyTestCount12Three, singlePubkeyTestCount12Three } from './count12_three/index';
+import { batchPubkeyTestCount18Three, singlePubkeyTestCount18Three } from './count18_three/index';
+import { batchPubkeyTestCount24Three, singlePubkeyTestCount24Three } from './count24_three/index';
+
+import type { PubkeyBatchTestCase, PubkeyTestCase } from '../types';
 
 export const testCases: PubkeyTestCase[] = [
   ...singlePubkeyTestCount12One,

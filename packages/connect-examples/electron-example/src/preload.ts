@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unused-vars,@typescript-eslint/require-await */
-import { ipcRenderer, contextBridge } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 import { EOneKeyBleMessageKeys } from '@onekeyfe/hd-shared';
-import type { DesktopAPI as BaseDesktopAPI, NobleBleAPI } from '@onekeyfe/hd-transport-electron';
+
 import { ipcMessageKeys } from './config';
+
+import type { DesktopAPI as BaseDesktopAPI, NobleBleAPI } from '@onekeyfe/hd-transport-electron';
 
 // Simplified Bluetooth system API - only for opening settings
 export interface BluetoothSystemAPI {

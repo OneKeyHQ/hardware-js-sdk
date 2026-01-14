@@ -3,7 +3,8 @@ import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
-import { CardanoPublicKeyParams, CardanoPublicKey } from '../../types/api/cardanoGetPublicKey';
+
+import type { CardanoPublicKey, CardanoPublicKeyParams } from '../../types/api/cardanoGetPublicKey';
 
 export default class CardanoGetPublicKey extends BaseMethod<CardanoPublicKeyParams[]> {
   hasBundle?: boolean;

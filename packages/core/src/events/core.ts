@@ -1,17 +1,18 @@
 import { HardwareError } from '@onekeyfe/hd-shared';
-import { Unsuccessful } from '../types/params';
-import {
+
+import type { Unsuccessful } from '../types/params';
+import type {
   IFrameCallMessage,
+  IFrameCallbackMessage,
   IFrameCancelMessage,
   IFrameSwitchTransportMessage,
-  IFrameCallbackMessage,
 } from './call';
-import { DeviceEventMessage } from './device';
-import { IFrameEventMessage } from './iframe';
-import { UiEventMessage } from './ui-request';
-import { UiResponseMessage } from './ui-response';
-import { LogEventMessage } from './log';
-import { FirmwareMessage } from './firmware';
+import type { DeviceEventMessage } from './device';
+import type { IFrameEventMessage } from './iframe';
+import type { UiEventMessage } from './ui-request';
+import type { UiResponseMessage } from './ui-response';
+import type { LogEventMessage } from './log';
+import type { FirmwareMessage } from './firmware';
 
 export const CORE_EVENT = 'CORE_EVENT';
 

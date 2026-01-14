@@ -1,20 +1,19 @@
 import { Buffer } from 'buffer';
-import React, { useState, useEffect, useContext } from 'react';
-
+import React, { useContext, useEffect, useState } from 'react';
 import { bytesToHex } from '@noble/hashes/utils';
 import * as ImagePicker from 'expo-image-picker';
-import { Action, manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-
-import { DeviceUploadResourceParams, getHomeScreenSize, getDeviceType } from '@onekeyfe/hd-core';
+import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
+import { getDeviceType, getHomeScreenSize } from '@onekeyfe/hd-core';
 import { ResourceType } from '@onekeyfe/hd-transport';
 import { Image as ImageView, Label, Stack, View, XStack } from 'tamagui';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
+
 import {
-  getImageSize,
-  imageToBase64,
   formatBytes,
   generateUploadNFTParams,
+  getImageSize,
+  imageToBase64,
   processImageBlur,
 } from './nftUtils';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
@@ -23,6 +22,9 @@ import { useDevice } from '../../provider/DeviceProvider';
 import PanelView from '../ui/Panel';
 import { Button } from '../ui/Button';
 import { CommonInput } from '../CommonInput';
+
+import type { DeviceUploadResourceParams } from '@onekeyfe/hd-core';
+import type { Action } from 'expo-image-manipulator';
 
 interface UploadResourceParams {
   suffix?: string;

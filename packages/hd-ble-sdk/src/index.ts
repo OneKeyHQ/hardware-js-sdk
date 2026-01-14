@@ -1,29 +1,28 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
-  ConnectSettings,
-  enableLog,
-  parseConnectSettings,
-  initCore,
-  Core,
+  CORE_EVENT,
+  DEVICE,
+  DEVICE_EVENT,
+  FIRMWARE_EVENT,
+  IFRAME,
+  LOG_EVENT,
+  LoggerNames,
+  UI_EVENT,
+  UI_REQUEST,
   createErrorMessage,
   createUiMessage,
-  CORE_EVENT,
-  CoreMessage,
-  IFRAME,
-  UI_EVENT,
-  UiResponseEvent,
-  UI_REQUEST,
-  LOG_EVENT,
-  getLogger,
-  LoggerNames,
-  setLoggerPostMessage,
-  FIRMWARE_EVENT,
-  DEVICE_EVENT,
-  DEVICE,
+  enableLog,
   executeCallback,
+  getLogger,
+  initCore,
+  parseConnectSettings,
+  setLoggerPostMessage,
 } from '@onekeyfe/hd-core';
-import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import ReactNativeTransport from '@onekeyfe/hd-transport-react-native';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type { ConnectSettings, Core, CoreMessage, UiResponseEvent } from '@onekeyfe/hd-core';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdBleSdk);

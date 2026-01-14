@@ -1,6 +1,6 @@
 // input checks for high-level transports
 
-import type { OneKeyDeviceInfoWithSession, MessageFromOneKey } from '../types';
+import type { MessageFromOneKey, OneKeyDeviceInfoWithSession } from '../types';
 
 const ERROR = 'Wrong result type.';
 

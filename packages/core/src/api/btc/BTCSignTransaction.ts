@@ -1,20 +1,21 @@
-import { TxInputType, TxOutputType } from '@onekeyfe/hd-transport';
-
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getOutputScriptType, isSegwitPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import {
+import signtx from './helpers/signtx';
+import signtxLegacy from './helpers/signtxLegacy';
+import { getCoinInfo } from './helpers/btcParamsUtils';
+import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+
+import type {
   AccountAddresses,
   BTCSignTransactionParams,
   RefTransaction,
   TransactionOptions,
 } from '../../types/api/btcSignTransaction';
-import signtx from './helpers/signtx';
-import signtxLegacy from './helpers/signtxLegacy';
-import { getCoinInfo } from './helpers/btcParamsUtils';
-import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+import type { TxInputType, TxOutputType } from '@onekeyfe/hd-transport';
 
 type Params = {
   inputs: TxInputType[];

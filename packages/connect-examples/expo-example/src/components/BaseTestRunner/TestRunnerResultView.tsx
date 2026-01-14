@@ -1,16 +1,13 @@
-import { memo, useContext, useEffect, useMemo, useCallback } from 'react';
-
+import { memo, useCallback, useContext, useEffect, useMemo } from 'react';
 import { Stack, Text, XStack, YStack } from 'tamagui';
 import { useAtomValue } from 'jotai';
 import { FlatList } from 'react-native';
 
-import { TestCaseDataWithKey } from './types';
-import {
-  ItemVerifyState,
-  selectedItemVerifyStateAtom as createSelectedItemVerifyStateAtom,
-  createTestRunnerAtoms,
-} from './Context/TestRunnerVerifyProvider';
+import { selectedItemVerifyStateAtom as createSelectedItemVerifyStateAtom } from './Context/TestRunnerVerifyProvider';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
+
+import type { TestCaseDataWithKey } from './types';
+import type { ItemVerifyState, createTestRunnerAtoms } from './Context/TestRunnerVerifyProvider';
 
 // 自定义状态管理器类型
 type CustomStateManager = ReturnType<typeof createTestRunnerAtoms>;

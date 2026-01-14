@@ -2,7 +2,7 @@
  * SLIP39 测试系统统一类型定义
  */
 
-import { TestCase } from '../../components/BaseTestRunner/types';
+import type { TestCase } from '../../components/BaseTestRunner/types';
 
 /**
  * SLIP39 测试配置

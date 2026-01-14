@@ -1,13 +1,13 @@
-import { BenfenGetAddress as HardwareBenfenGetAddress } from '@onekeyfe/hd-transport';
-
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { hex2BfcAddress, publicKeyToAddress } from './normalize';
-import { BenfenAddress, BenfenGetAddressParams } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { BenfenAddress, BenfenGetAddressParams } from '../../types';
+import type { BenfenGetAddress as HardwareBenfenGetAddress } from '@onekeyfe/hd-transport';
 
 export default class BenfenGetAddress extends BaseMethod<HardwareBenfenGetAddress[]> {
   hasBundle = false;

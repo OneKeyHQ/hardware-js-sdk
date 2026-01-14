@@ -1,8 +1,9 @@
 import { UI_REQUEST } from '../../constants/ui-request';
-import { XrpAddress, XrpGetAddressParams } from '../../types/api/xrpGetAddress';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
+
+import type { XrpAddress, XrpGetAddressParams } from '../../types/api/xrpGetAddress';
 
 export default class XrpGetAddress extends BaseMethod<
   {

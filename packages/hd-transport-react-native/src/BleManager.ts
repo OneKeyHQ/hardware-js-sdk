@@ -1,6 +1,8 @@
-import BleUtils, { Peripheral } from '@onekeyfe/react-native-ble-utils';
+import BleUtils from '@onekeyfe/react-native-ble-utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { getLogger, LoggerNames } from '@onekeyfe/hd-core';
+import { LoggerNames, getLogger } from '@onekeyfe/hd-core';
+
+import type { Peripheral } from '@onekeyfe/react-native-ble-utils';
 
 const Logger = getLogger(LoggerNames.HdBleTransport);
 

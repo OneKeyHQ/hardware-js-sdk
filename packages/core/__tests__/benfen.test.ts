@@ -1,4 +1,4 @@
-import { publicKeyToAddress, hex2BfcAddress } from '../src/api/benfen/normalize';
+import { hex2BfcAddress, publicKeyToAddress } from '../src/api/benfen/normalize';
 
 export const TEST_FIXTURES = [
   // 12 位助记词

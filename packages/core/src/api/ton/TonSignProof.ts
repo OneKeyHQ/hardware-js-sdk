@@ -1,10 +1,10 @@
-import { TonSignProof as HardwareTonSignProof } from '@onekeyfe/hd-transport';
-
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { TonSignProofParams } from '../../types';
+
+import type { TonSignProof as HardwareTonSignProof } from '@onekeyfe/hd-transport';
+import type { TonSignProofParams } from '../../types';
 
 export default class TonSignProof extends BaseMethod<HardwareTonSignProof> {
   init() {

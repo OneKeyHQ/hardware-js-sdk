@@ -1,9 +1,10 @@
-import { NeoGetAddress as HardwareNeoGetAddress } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { NeoAddress, NeoGetAddressParams } from '../../types/api/neoGetAddress';
+
+import type { NeoGetAddress as HardwareNeoGetAddress } from '@onekeyfe/hd-transport';
+import type { NeoAddress, NeoGetAddressParams } from '../../types/api/neoGetAddress';
 
 export default class NeoGetAddress extends BaseMethod<HardwareNeoGetAddress[]> {
   hasBundle = false;

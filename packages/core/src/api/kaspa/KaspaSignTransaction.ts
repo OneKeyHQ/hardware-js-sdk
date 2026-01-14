@@ -1,18 +1,20 @@
 import { bytesToHex } from '@noble/hashes/utils';
-import { TypedCall } from '@onekeyfe/hd-transport';
-import { TypedResponseMessage } from '../../device/DeviceCommands';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import {
+import { serialize, zeroSubnetworkID } from './helpers/TransferSerialize';
+import { SignatureType } from './helpers/SignatureType';
+
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type {
   KaspaSignInputParams,
   KaspaSignOutputParams,
   KaspaSignTransactionParams,
   KaspaSignature,
 } from '../../types';
-import { zeroSubnetworkID, serialize } from './helpers/TransferSerialize';
-import { SignatureType } from './helpers/SignatureType';
+import type { TypedCall } from '@onekeyfe/hd-transport';
 
 export default class KaspaSignTransaction extends BaseMethod<KaspaSignTransactionParams> {
   hasBundle = false;

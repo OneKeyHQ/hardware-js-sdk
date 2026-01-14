@@ -1,7 +1,9 @@
 import EventEmitter from 'events';
-import DeviceConnector from './DeviceConnector';
-import { Device, InitOptions } from './Device';
+
 import { DevicePool } from './DevicePool';
+
+import type DeviceConnector from './DeviceConnector';
+import type { Device, InitOptions } from './Device';
 
 export class DeviceList extends EventEmitter {
   devices: Record<string, Device> = {};

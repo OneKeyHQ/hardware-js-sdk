@@ -1,10 +1,12 @@
-import { TypedCall } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { TypedResponseMessage } from '../../device/DeviceCommands';
+
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { NexaSignTransactionParams, NexaSignature } from '../../types';
+
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { TypedCall } from '@onekeyfe/hd-transport';
+import type { NexaSignTransactionParams, NexaSignature } from '../../types';
 
 export default class NexaSignTransaction extends BaseMethod<NexaSignTransactionParams> {
   hasBundle = false;

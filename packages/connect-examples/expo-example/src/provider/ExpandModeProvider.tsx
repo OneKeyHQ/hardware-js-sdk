@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { Stack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { Button } from '../components/ui/Button';
+
+import type { ReactNode } from 'react';
 
 const ExpandModeContext = createContext<boolean>(false);
 

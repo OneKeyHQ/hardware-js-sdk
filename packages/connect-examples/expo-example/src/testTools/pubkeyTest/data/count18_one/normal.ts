@@ -1,5 +1,6 @@
-import { PubkeyTestCaseData } from '../types';
 import passphrase12Empty from './passphrase_empty';
+
+import type { PubkeyTestCaseData } from '../types';
 
 export default {
   ...passphrase12Empty,

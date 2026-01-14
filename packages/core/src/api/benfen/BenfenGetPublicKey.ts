@@ -2,8 +2,9 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { BenfenPublicKey, BenfenGetPublicKeyParams } from '../../types';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { BenfenGetPublicKeyParams, BenfenPublicKey } from '../../types';
 
 export default class BenfenGetPublicKey extends BaseMethod<any> {
   hasBundle = false;

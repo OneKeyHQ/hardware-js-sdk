@@ -1,6 +1,7 @@
-import type { ConnectSettings } from '../types';
 import { UI_EVENT } from './ui-request';
-import { MessageFactoryFn } from './utils';
+
+import type { MessageFactoryFn } from './utils';
+import type { ConnectSettings } from '../types';
 
 export const IFRAME = {
   INIT: 'iframe-init',

@@ -1,11 +1,12 @@
-import { GetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { getScriptType, serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { BTCAddress, BTCGetAddressParams } from '../../types/api/btcGetAddress';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+
+import type { BTCAddress, BTCGetAddressParams } from '../../types/api/btcGetAddress';
+import type { GetAddress } from '@onekeyfe/hd-transport';
 
 export default class BTCGetAddress extends BaseMethod<GetAddress[]> {
   hasBundle = false;

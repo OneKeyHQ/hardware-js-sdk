@@ -1,35 +1,36 @@
 import semver from 'semver';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { BaseMethod } from '../BaseMethod';
 import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validateParams } from '../helpers/paramsValidator';
 import {
-  transformInput,
-  Path,
-  CollateralInputWithPath,
   transformCollateralInput,
+  transformInput,
   transformReferenceInput,
 } from './helper/cardanoInputs';
-import { transformOutput, sendOutput } from './helper/cardanoOutputs';
+import { sendOutput, transformOutput } from './helper/cardanoOutputs';
 import { transformCertificate } from './helper/certificate';
 import { tokenBundleToProto } from './helper/token';
 import {
-  transformAuxiliaryData,
   modifyAuxiliaryDataForBackwardsCompatibility,
+  transformAuxiliaryData,
 } from './helper/auxiliaryData';
 import { gatherWitnessPaths } from './helper/witnesses';
 import { validatePath } from '../helpers/pathUtils';
+import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
+
+import type { DeviceFirmwareRange } from '../../types';
+import type { CollateralInputWithPath, Path } from './helper/cardanoInputs';
 import type {
-  CertificateWithPoolOwnersAndRelays,
   AssetGroupWithTokens,
-  CardanoSignedTxData,
-  CardanoSignedTxWitness,
   CardanoAuxiliaryDataSupplement,
   CardanoSignTransaction as CardanoSignTransactionType,
+  CardanoSignedTxData,
+  CardanoSignedTxWitness,
+  CertificateWithPoolOwnersAndRelays,
 } from '../../types/api/cardano';
-import { DeviceFirmwareRange } from '../../types';
-import { getDeviceFirmwareVersion, getMethodVersionRange } from '../../utils';
 
 export default class CardanoSignTransaction extends BaseMethod<any> {
   hasBundle?: boolean;

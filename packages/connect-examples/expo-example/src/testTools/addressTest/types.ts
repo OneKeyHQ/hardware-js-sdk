@@ -1,4 +1,4 @@
-import { TestCase } from '../../components/BaseTestRunner/types';
+import type { TestCase } from '../../components/BaseTestRunner/types';
 
 export type AddressCaseData = {
   title: string;

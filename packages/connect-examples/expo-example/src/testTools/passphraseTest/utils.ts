@@ -1,5 +1,6 @@
-import { CoreApi } from '@onekeyfe/hd-core';
 import { StyleSheet } from 'react-native';
+
+import type { CoreApi } from '@onekeyfe/hd-core';
 
 export type TestChain = 'btc' | 'evm' | 'dot' | 'ada';
 

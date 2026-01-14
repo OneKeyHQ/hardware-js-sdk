@@ -1,5 +1,6 @@
-import { Cancel } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
+
+import type { Cancel } from '@onekeyfe/hd-transport';
 
 export default class DeviceCancel extends BaseMethod<Cancel> {
   init() {

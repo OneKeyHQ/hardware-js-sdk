@@ -1,10 +1,12 @@
-import type { NervosSignTx as HardwareNervosSignTx, TypedCall } from '@onekeyfe/hd-transport';
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import type { NervosSignTransactionParams, NervosSignedTx } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { NervosSignTransactionParams, NervosSignedTx } from '../../types';
+import type { NervosSignTx as HardwareNervosSignTx, TypedCall } from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 type NervosSignTx = Omit<HardwareNervosSignTx, 'data_initial_chunk' | 'data_length'> & {

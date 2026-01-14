@@ -1,8 +1,10 @@
 import EventEmitter from 'events';
-import { CoreApi } from './types/api';
+
 import { createCoreApi } from './inject';
+
+import type { ConnectSettings } from './types/settings';
+import type { CoreApi } from './types/api';
 import type { LowLevelCoreApi } from './lowLevelInject';
-import { ConnectSettings } from './types/settings';
 
 export interface TopLevelInjectApi {
   init: CoreApi['init'];

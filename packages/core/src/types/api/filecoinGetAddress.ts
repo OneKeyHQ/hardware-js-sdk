@@ -1,4 +1,4 @@
-import { FilecoinAddress as HardwareFilecoinAddress } from '@onekeyfe/hd-transport';
+import type { FilecoinAddress as HardwareFilecoinAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type FilecoinAddress = {

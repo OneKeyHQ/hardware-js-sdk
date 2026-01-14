@@ -1,9 +1,10 @@
-import { FilecoinSignTx as HardwareFilecoinSignTx } from '@onekeyfe/hd-transport';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { FilecoinSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { FilecoinSignTransactionParams } from '../../types';
+import type { FilecoinSignTx as HardwareFilecoinSignTx } from '@onekeyfe/hd-transport';
 
 export default class FilecoinSignTransaction extends BaseMethod<HardwareFilecoinSignTx> {
   hasBundle = false;

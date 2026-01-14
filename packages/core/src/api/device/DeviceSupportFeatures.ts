@@ -1,4 +1,5 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import {
   supportInputPinOnSoftware,
   supportModifyHomescreen,

@@ -1,7 +1,6 @@
 const { parseConfigure } = require('../src/serialization/protobuf/messages');
 const { buildOne } = require('../src/serialization/send');
 const { receiveOne } = require('../src/serialization/receive');
-
 const { buildEncodeBuffers } = require('../src/serialization/send');
 
 const messages = {

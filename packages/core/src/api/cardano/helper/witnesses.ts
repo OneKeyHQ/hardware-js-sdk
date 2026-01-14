@@ -1,6 +1,7 @@
-import type { CertificateWithPoolOwnersAndRelays } from '../../../types/api/cardano';
-import { CollateralInputWithPath, InputWithPath, Path } from './cardanoInputs';
 import { PROTO } from '../../../constants';
+
+import type { CollateralInputWithPath, InputWithPath, Path } from './cardanoInputs';
+import type { CertificateWithPoolOwnersAndRelays } from '../../../types/api/cardano';
 
 export const gatherWitnessPaths = (
   inputsWithPath: InputWithPath[],

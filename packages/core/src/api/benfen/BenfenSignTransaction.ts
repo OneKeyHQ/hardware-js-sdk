@@ -1,11 +1,12 @@
-import { BenfenSignTx, TypedCall, BenfenSignedTx, MessageType } from '@onekeyfe/hd-transport';
-
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { BenfenSignTx, BenfenSignedTx, MessageType, TypedCall } from '@onekeyfe/hd-transport';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 export default class BenfenSignTransaction extends BaseMethod<BenfenSignTx> {

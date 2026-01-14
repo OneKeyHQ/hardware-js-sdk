@@ -1,5 +1,6 @@
 import React from 'react';
 import { Stack } from 'tamagui';
+
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { HardwareInputPinDialogProvider } from '../provider/HardwareInputPinProvider';
 import PageView from '../components/ui/Page';

@@ -1,21 +1,21 @@
 import React, { lazy, useEffect, useState } from 'react';
-import { LinkingOptions, NavigationContainer, ParamListBase } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { TamaguiProvider, PortalProvider, Text, Stack, Card, YStack } from 'tamagui';
+import { Card, PortalProvider, Stack, TamaguiProvider, Text, YStack } from 'tamagui';
 import { Toast, ToastProvider, ToastViewport, useToastState } from '@tamagui/toast';
 import * as ExpoLinking from 'expo-linking';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { useIntl } from 'react-intl';
-import SDKProvider from './src/provider/SDKProvider';
 
+import SDKProvider from './src/provider/SDKProvider';
 import config from './tamagui.config';
 import { Routes } from './src/route';
 import AppIntlProvider from './src/provider/AppIntlProvider';
-
 import ApiPayloadScreen from './src/views/ApiPayloadScreen';
 import { Button } from './src/components/ui/Button';
 import { MediaProvider } from './src/provider/MediaProvider';
+
+import type { LinkingOptions, ParamListBase } from '@react-navigation/native';
 
 const PassphraseTestScreen = lazy(() => import('./src/views/PassphraseTestScreen'));
 const FirmwareScreen = lazy(() => import('./src/views/FirmwareScreen'));

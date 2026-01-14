@@ -3,32 +3,31 @@
 
 export const hardwareMockTourBus = (() => {
   /** @type {Map<string, Set<(payload: any) => void>>} */
-  const listeners = new Map()
+  const listeners = new Map();
 
   function on(type, handler) {
-    const set = listeners.get(type) ?? new Set()
-    set.add(handler)
-    listeners.set(type, set)
+    const set = listeners.get(type) ?? new Set();
+    set.add(handler);
+    listeners.set(type, set);
     return () => {
-      const current = listeners.get(type)
-      if (!current) return
-      current.delete(handler)
-      if (current.size === 0) listeners.delete(type)
-    }
+      const current = listeners.get(type);
+      if (!current) return;
+      current.delete(handler);
+      if (current.size === 0) listeners.delete(type);
+    };
   }
 
   function emit(type, payload) {
-    const set = listeners.get(type)
-    if (!set || set.size === 0) return
+    const set = listeners.get(type);
+    if (!set || set.size === 0) return;
     for (const handler of set) {
       try {
-        handler(payload)
+        handler(payload);
       } catch {
         // 忽略单个订阅者异常，避免影响主流程
       }
     }
   }
 
-  return { on, emit }
-})()
-
+  return { on, emit };
+})();

@@ -1,9 +1,11 @@
-import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { bytesToHex } from '@noble/hashes/utils';
 import { keccak_256 as keccak256 } from '@noble/hashes/sha3';
 import { encode as rlpEncode } from 'rlp';
 import { getPublicKey } from '@noble/secp256k1';
+
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 const SCDO_ADDRESS_LENGTH = 20;
 const SHARD_NUM = 4;

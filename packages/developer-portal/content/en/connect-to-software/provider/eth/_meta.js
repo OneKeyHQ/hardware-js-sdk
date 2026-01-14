@@ -4,5 +4,5 @@ export default {
   'accessing-accounts': 'Accessing Accounts',
   'sending-transactions': 'Sending Transactions',
   'signing-data': 'Signing Data',
-  reference: 'JSON-RPC Reference'
-}
+  reference: 'JSON-RPC Reference',
+};

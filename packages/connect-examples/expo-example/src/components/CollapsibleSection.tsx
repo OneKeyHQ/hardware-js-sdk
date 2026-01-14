@@ -1,7 +1,10 @@
-import React, { ReactNode, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { H4, Stack } from 'tamagui';
 import { ChevronDownCircle, ChevronUpCircle } from '@tamagui/lucide-icons';
+
 import { useExpandMode } from '../provider/ExpandModeProvider';
+
+import type { ReactNode } from 'react';
 
 interface CollapsibleSectionProps {
   title: string;

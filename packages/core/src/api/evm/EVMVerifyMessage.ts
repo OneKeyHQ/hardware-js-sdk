@@ -1,4 +1,3 @@
-import { EthereumVerifyMessageOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
@@ -6,6 +5,8 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import TransportManager from '../../data-manager/TransportManager';
 import verifyMessageLegacyV1 from './legacyV1/verifyMessage';
 import verifyMessage from './latest/verifyMessage';
+
+import type { EthereumVerifyMessageOneKey } from '@onekeyfe/hd-transport';
 
 export default class EVMSignMessage extends BaseMethod<EthereumVerifyMessageOneKey> {
   init() {

@@ -1,9 +1,10 @@
-import { StarcoinGetAddress as HardwareStarcoinGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { validatePath, serializedPath } from '../helpers/pathUtils';
+import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { StarcoinAddress, StarcoinGetAddressParams } from '../../types/api/starcoinGetAddress';
+
+import type { StarcoinGetAddress as HardwareStarcoinGetAddress } from '@onekeyfe/hd-transport';
+import type { StarcoinAddress, StarcoinGetAddressParams } from '../../types/api/starcoinGetAddress';
 
 export default class StarcoinGetAddress extends BaseMethod<HardwareStarcoinGetAddress[]> {
   hasBundle = false;

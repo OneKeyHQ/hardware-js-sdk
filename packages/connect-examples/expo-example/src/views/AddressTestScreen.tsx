@@ -1,23 +1,24 @@
 import React from 'react';
 import { Separator, Stack, Text, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { TestSingleAddress } from '../testTools/addressTest/TestSingleAddress';
 import { TestBatchAddress } from '../testTools/addressTest/TestBatchAddress';
 import { TestSinglePubkey } from '../testTools/pubkeyTest/TestSinglePubkey';
 import { TestBatchPubkey } from '../testTools/pubkeyTest/TestBatchPubkey';
 import {
-  batchTestCases as batchAddressTestCases,
   testCases as addressTestCases,
+  batchTestCases as batchAddressTestCases,
 } from '../testTools/addressTest/data';
 import {
   batchTestCases as batchPubkeyTestCases,
-  testCases as pubkeyTestCases,
   batchSoftTestCases as batchSoftPubkeyTestCases,
+  testCases as pubkeyTestCases,
 } from '../testTools/pubkeyTest/data';
 import {
-  batchTestCases as batchVariantAddressTestCases,
   testCases as addressVariantTestCases,
+  batchTestCases as batchVariantAddressTestCases,
 } from '../testTools/addressTest/dataVariant';
 import PageView from '../components/ui/Page';
 import PanelView from '../components/ui/Panel';

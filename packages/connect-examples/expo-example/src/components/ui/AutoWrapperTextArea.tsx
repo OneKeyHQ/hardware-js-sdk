@@ -1,5 +1,5 @@
 import { isNaN } from 'lodash';
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { TextArea } from 'tamagui';
 
 export type AutoExpandingTextAreaProps = React.ComponentProps<typeof TextArea>;

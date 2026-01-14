@@ -1,7 +1,9 @@
-import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { PrivateKeyWallet } from '@alephium/web3-wallet';
 import { NodeProvider, groupOfAddress } from '@alephium/web3';
+
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 const nodeProvider = new NodeProvider('https://api.mainnet.alephium.org');
 

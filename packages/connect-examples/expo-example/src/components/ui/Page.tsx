@@ -1,4 +1,5 @@
 import { ScrollView, View } from 'tamagui';
+
 import HeaderView from './Header';
 
 export interface PageViewProps {

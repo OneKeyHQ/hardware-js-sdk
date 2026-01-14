@@ -1,8 +1,9 @@
 import { UI_REQUEST } from '../../constants/ui-request';
-import { XrpSignTransactionParams } from '../../types/api/xrpSignTransaction';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { validatePath } from '../helpers/pathUtils';
+
+import type { XrpSignTransactionParams } from '../../types/api/xrpSignTransaction';
 
 export default class XrpGetAddress extends BaseMethod<XrpSignTransactionParams> {
   hasBundle = false;

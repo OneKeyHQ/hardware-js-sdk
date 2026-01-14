@@ -1,7 +1,9 @@
 import { blake2b } from '@noble/hashes/blake2b';
 import BigNumber from 'bignumber.js';
-import { Hash } from '@noble/hashes/utils';
+
 import BufferWriter from './BufferWriter';
+
+import type { Hash } from '@noble/hashes/utils';
 
 const TransactionSigningHashKey = Buffer.from('TransactionSigningHash');
 

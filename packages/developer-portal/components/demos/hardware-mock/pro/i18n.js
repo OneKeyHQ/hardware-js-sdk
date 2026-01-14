@@ -13,8 +13,8 @@ const PRO_I18N_ZH = {
   address: '地址',
 
   myAddress: '我的地址',
-  addressTitle: (network) => `${network} 地址`
-}
+  addressTitle: network => `${network} 地址`,
+};
 
 const PRO_I18N_EN = {
   homeSwipeUpToShowApps: 'Swipe up to show apps',
@@ -31,10 +31,10 @@ const PRO_I18N_EN = {
   address: 'Address',
 
   myAddress: 'My Address',
-  addressTitle: (network) => `${network} Address`
-}
+  addressTitle: network => `${network} Address`,
+};
 
 export function getProI18n(locale) {
-  if ((locale ?? 'zh') === 'en') return PRO_I18N_EN
-  return PRO_I18N_ZH
+  if ((locale ?? 'zh') === 'en') return PRO_I18N_EN;
+  return PRO_I18N_ZH;
 }

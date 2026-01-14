@@ -1,5 +1,5 @@
-import { ItemVerifyState } from '../../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
-import { TestCase, TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
+import type { ItemVerifyState } from '../../../components/BaseTestRunner/Context/TestRunnerVerifyProvider';
+import type { TestCase, TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
 
 export type TestCaseDataType = {
   id: string;

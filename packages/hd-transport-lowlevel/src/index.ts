@@ -1,5 +1,6 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
+
 import type EventEmitter from 'events';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 import type { LowLevelAcquireInput } from './types';

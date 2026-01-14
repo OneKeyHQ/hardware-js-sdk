@@ -3,10 +3,11 @@ import {
   ERRORS,
   HardwareErrorCode,
   HardwareErrorCodeMessage,
-  Deferred,
   createDeferred,
   isHeaderChunk,
 } from '@onekeyfe/hd-shared';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
 import type EventEmitter from 'events';
 // Import DesktopAPI type from hd-transport-electron
 import type { DesktopAPI } from '@onekeyfe/hd-transport-electron';

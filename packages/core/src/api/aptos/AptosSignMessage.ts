@@ -1,9 +1,10 @@
-import { AptosSignMessage as HardwareAptosSignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { AptosMessageSignature, AptosSignMessageParams } from '../../types';
+
+import type { AptosSignMessage as HardwareAptosSignMessage } from '@onekeyfe/hd-transport';
+import type { AptosMessageSignature, AptosSignMessageParams } from '../../types';
 
 export default class AptosSignMessage extends BaseMethod<HardwareAptosSignMessage> {
   init() {

@@ -1,9 +1,10 @@
-import { KaspaGetAddress as HardwareKaspaGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { KaspaGetAddressParams, KaspaAddress } from '../../types';
+
+import type { KaspaGetAddress as HardwareKaspaGetAddress } from '@onekeyfe/hd-transport';
+import type { KaspaAddress, KaspaGetAddressParams } from '../../types';
 
 export default class KaspaGetAddress extends BaseMethod<HardwareKaspaGetAddress[]> {
   hasBundle = false;
