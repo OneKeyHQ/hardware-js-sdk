@@ -1,0 +1,34 @@
+---
+title: nip04.encrypt
+---
+
+# nip04.encrypt
+
+### Method
+
+async function nip04.encrypt(pubkey, plaintext): string 
+
+```
+
+### Response
+
+returns ciphertext and iv as specified in nip-04
+
+### Params
+
+* `pubkey` — _required_ `string`  the publick key
+* `message` — _required_ `string` a string to sign
+
+### Example
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const encrypted = async provider.nip04.encrypt(pubkey, "Data to be encrypted")
+```
+
+### Demo
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/rNPZwaa" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

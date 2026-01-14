@@ -1,0 +1,109 @@
+---
+title: tonSignMessage
+---
+
+# tonSignMessage
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.10.0
+
+### TON：签名消息
+
+使用由给定 BIP32 路径派生的私钥对消息或交易进行签名。用户需要在 OneKey 设备上确认操作。
+
+```typescript
+const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    destination: "UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_",
+    tonAmount: 100,
+    seqno: 0,
+    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+```
+
+#### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+**必需参数**
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 3
+* `destination` - _必需_ `string` 目标地址
+* `tonAmount` - _必需_ `number` 要转账的 TON 数量
+* `seqno` - _必需_ `number` 序列号
+* `expireAt` - _必需_ `number` 消息过期时间戳
+
+**可选参数**
+
+* `walletVersion` - _可选_ `TonWalletVersion` TON 钱包版本（默认：3）
+* `isBounceable` - _可选_ `boolean` 消息是否可弹回（默认：false）
+* `isTestnetOnly` - _可选_ `boolean` 是否使用测试网（默认：false）
+* `jettonMasterAddress` - _可选_ `string` Jetton 主合约地址
+* `jettonAmount` - _可选_ `number` 要转账的 Jetton 数量
+* `fwdFee` - _可选_ `number` Jetton 转账的转发费用
+* `comment` - _可选_ `string` 消息备注
+* `mode` - _可选_ `number` 消息模式
+* `workchain` - _可选_ `TonWorkChain` TON 工作链
+* `walletId` - _可选_ `number` 钱包 ID
+
+#### 示例
+
+```typescript
+// 简单的 TON 转账
+const response = await HardwareSDK.tonSignMessage(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    destination: "UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_",
+    tonAmount: 100,
+    seqno: 0,
+    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false
+});
+
+// 多笔原生代币转账
+const jettonResponse = await HardwareSDK.tonSignMessage(connectId, deviceId, {
+    path: "m/44'/607'/0'",
+    destination: 'UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_',
+    tonAmount: 100,
+    seqno: 0,
+    expireAt: Date.now() + 1000 * 60 * 60 * 24,
+    walletVersion: 3,
+    isBounceable: false,
+    isTestnetOnly: false,
+    extDestination: ['UQBYkuShkZzRYAWX_HrK3kFpeAixiRKd-K7QBXYxl9OBXM0_'],
+    extTonAmount: [100],
+    extPayload: ['48656c6c6f204f6e654b6579'],
+});
+
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        skip_validate: boolean; // 用于在 Classic 1s 中跳过验证
+        signature: string;
+        signning_message: string;
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

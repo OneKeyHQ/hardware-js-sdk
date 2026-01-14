@@ -1,6 +1,6 @@
 import { BaseMethod } from './BaseMethod';
 import { UI_REQUEST } from '../constants/ui-request';
-import { getDeviceType, getDeviceFirmwareVersion } from '../utils';
+import { getDeviceFirmwareVersion, getDeviceType } from '../utils';
 import { getBridgeReleaseInfo } from '../utils/bridgeUpdate';
 
 export default class CheckBridgeRelease extends BaseMethod {

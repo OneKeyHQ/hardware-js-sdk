@@ -1,4 +1,4 @@
-import { UintType, TronSignedTx, TronResourceCode } from '@onekeyfe/hd-transport';
+import type { TronResourceCode, TronSignedTx, UintType } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type TronTransferContract = {

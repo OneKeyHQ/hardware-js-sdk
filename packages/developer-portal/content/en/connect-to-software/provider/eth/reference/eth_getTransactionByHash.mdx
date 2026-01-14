@@ -1,0 +1,107 @@
+---
+title: eth_getTransactionByHash
+description: Get transaction details by hash
+---
+
+# eth_getTransactionByHash
+
+Returns the information about a transaction by its hash.
+
+---
+
+## Parameters
+
+| Index | Type | Description |
+|-------|------|-------------|
+| 0 | `string` | Transaction hash (32 bytes) |
+
+---
+
+## Returns
+
+`object | null` - Transaction object or null if not found
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hash` | `string` | Transaction hash |
+| `nonce` | `string` | Sender's nonce (hex) |
+| `blockHash` | `string` | Block hash (null if pending) |
+| `blockNumber` | `string` | Block number (null if pending) |
+| `transactionIndex` | `string` | Index in block (null if pending) |
+| `from` | `string` | Sender address |
+| `to` | `string` | Recipient address (null for contract creation) |
+| `value` | `string` | Value transferred (hex wei) |
+| `gasPrice` | `string` | Gas price (hex) |
+| `gas` | `string` | Gas limit (hex) |
+| `input` | `string` | Transaction data |
+| `v` | `string` | ECDSA recovery id |
+| `r` | `string` | ECDSA signature r |
+| `s` | `string` | ECDSA signature s |
+
+---
+
+## Example
+
+```typescript
+const tx = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionByHash',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (tx) {
+  console.log('From:', tx.from)
+  console.log('To:', tx.to)
+  console.log('Value:', parseInt(tx.value, 16))
+  console.log('Status:', tx.blockHash ? 'Mined' : 'Pending')
+}
+```
+
+### Track Transaction After Sending
+
+```typescript
+async function sendAndTrack(txParams) {
+  // Send transaction
+  const txHash = await window.$onekey.ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [txParams]
+  })
+
+  console.log('Transaction sent:', txHash)
+
+  // Poll for transaction details
+  const checkTx = async () => {
+    const tx = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionByHash',
+      params: [txHash]
+    })
+
+    if (tx && tx.blockHash) {
+      console.log('Transaction mined in block:', parseInt(tx.blockNumber, 16))
+      return tx
+    }
+
+    // Still pending, check again
+    await new Promise(r => setTimeout(r, 2000))
+    return checkTx()
+  }
+
+  return checkTx()
+}
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32602 | Invalid params | Invalid transaction hash |
+
+---
+
+## Notes
+
+- Returns `null` if the transaction is not found
+- Pending transactions have null `blockHash` and `blockNumber`
+- For transaction status (success/failure), use [eth_getTransactionReceipt](./eth_getTransactionReceipt)
+- Transaction data persists even after the transaction is mined

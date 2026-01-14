@@ -1,4 +1,3 @@
-import { EthereumSignMessageOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -7,6 +6,8 @@ import { formatAnyHex } from '../helpers/hexUtils';
 import TransportManager from '../../data-manager/TransportManager';
 import signMessage from './latest/signMessage';
 import signMessageLegacyV1 from './legacyV1/signMessage';
+
+import type { EthereumSignMessageOneKey } from '@onekeyfe/hd-transport';
 
 export default class EVMSignMessage extends BaseMethod<EthereumSignMessageOneKey> {
   init() {

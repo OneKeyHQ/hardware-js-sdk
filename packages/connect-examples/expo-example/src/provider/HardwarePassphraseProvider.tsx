@@ -1,6 +1,9 @@
-import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { UI_RESPONSE } from '@onekeyfe/hd-core';
+
 import { EnterPhase } from '../components/EnterPhase';
+
+import type { ReactNode } from 'react';
 
 interface DialogState {
   isOpen: boolean;

@@ -1,9 +1,10 @@
 import { BaseMethod } from './BaseMethod';
-import DeviceConnector from '../device/DeviceConnector';
 import TransportManager from '../data-manager/TransportManager';
 import { DataManager } from '../data-manager';
 import { getDeviceTypeByBleName } from '../utils';
 import { DevicePool } from '../device/DevicePool';
+
+import type DeviceConnector from '../device/DeviceConnector';
 
 export default class SearchDevices extends BaseMethod {
   connector?: DeviceConnector;

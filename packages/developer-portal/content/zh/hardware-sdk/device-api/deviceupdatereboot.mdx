@@ -1,0 +1,44 @@
+---
+title: deviceUpdateReboot
+---
+
+# deviceUpdateReboot
+
+## 重启设备
+
+将设备启动到引导加载程序模式。
+
+```typescript
+const result = await HardwareSDK.deviceUpdateReboot(connectId);
+```
+
+## 参数
+
+* 空
+
+## 示例
+
+```typescript
+HardwareSDK.deviceUpdateReboot(connectId);
+```
+
+## 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {}
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

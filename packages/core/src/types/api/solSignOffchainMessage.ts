@@ -1,4 +1,7 @@
-import { SolanaOffChainMessageFormat, SolanaOffChainMessageVersion } from '@onekeyfe/hd-transport';
+import type {
+  SolanaOffChainMessageFormat,
+  SolanaOffChainMessageVersion,
+} from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type SolSignOffchainMessageResponse = {

@@ -1,10 +1,10 @@
-import type { NervosGetAddress as HardwareNervosGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
-import type { NervosGetAddressParams, NervosAddress } from '../../types';
+import type { NervosGetAddress as HardwareNervosGetAddress } from '@onekeyfe/hd-transport';
+import type { NervosAddress, NervosGetAddressParams } from '../../types';
 
 export default class NervosGetAddress extends BaseMethod<HardwareNervosGetAddress[]> {
   hasBundle = false;

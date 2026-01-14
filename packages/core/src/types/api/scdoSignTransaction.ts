@@ -1,4 +1,4 @@
-import { ScdoSignedTx as HardwareScdoSignedTx } from '@onekeyfe/hd-transport';
+import type { ScdoSignedTx as HardwareScdoSignedTx } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type ScdoSignedTx = {

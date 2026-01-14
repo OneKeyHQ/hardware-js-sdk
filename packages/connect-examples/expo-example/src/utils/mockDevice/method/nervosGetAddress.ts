@@ -1,10 +1,12 @@
-import type { NervosGetAddressParams, Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { generateAddress } from '@ckb-lumos/helpers';
 import { utils } from '@ckb-lumos/base';
 import { getConfig } from '@ckb-lumos/config-manager';
 import { bytesToHex } from '@noble/hashes/utils';
+
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 import { addHexPrefix } from '../../hexstring';
+
+import type { NervosGetAddressParams, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 function publicKeyToAddress(publicKey: Uint8Array): string {
   const publicKeyHex = addHexPrefix(bytesToHex(publicKey)) ?? '';

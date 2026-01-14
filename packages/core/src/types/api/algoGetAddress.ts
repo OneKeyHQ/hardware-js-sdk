@@ -1,4 +1,4 @@
-import { AlgorandAddress as HardwareAlgoGetAddress } from '@onekeyfe/hd-transport';
+import type { AlgorandAddress as HardwareAlgoGetAddress } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type AlgoAddress = {

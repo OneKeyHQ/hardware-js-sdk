@@ -1,5 +1,5 @@
-import { KnownDevice } from '../device';
-import { Response } from '../params';
+import type { KnownDevice } from '../device';
+import type { Response } from '../params';
 
 export declare function promptWebDeviceAccess(options?: {
   deviceSerialNumberFromUI?: string;

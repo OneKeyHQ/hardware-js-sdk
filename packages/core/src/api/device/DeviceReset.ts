@@ -1,6 +1,7 @@
-import { ResetDevice } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
+
+import type { ResetDevice } from '@onekeyfe/hd-transport';
 
 export default class DeviceReset extends BaseMethod<ResetDevice> {
   init() {

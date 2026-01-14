@@ -1,5 +1,6 @@
 import EVMSignTransaction from '../src/api/evm/EVMSignTransaction';
-import { EVMTransactionEIP7702 } from '../src/types';
+
+import type { EVMTransactionEIP7702 } from '../src/types';
 
 // Mock the config module to avoid package.json resolution issues
 jest.mock('../src/data/config', () => ({

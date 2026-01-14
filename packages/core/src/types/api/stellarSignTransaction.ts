@@ -1,5 +1,5 @@
-import { StellarSignedTx } from '@onekeyfe/hd-transport';
-import { CommonParams, Response } from '../params';
+import type { StellarSignedTx } from '@onekeyfe/hd-transport';
+import type { CommonParams, Response } from '../params';
 
 export type StellarAsset = {
   type: 0 | 1 | 2; // 0: native, 1: credit_alphanum4, 2: credit_alphanum12

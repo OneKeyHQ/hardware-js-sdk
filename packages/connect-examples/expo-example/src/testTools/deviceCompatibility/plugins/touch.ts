@@ -1,5 +1,6 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
-import { DevicePlugin } from '../DeviceCompatibility';
+
+import type { DevicePlugin } from '../DeviceCompatibility';
 
 export const touchPlugin: DevicePlugin = {
   deviceType: EDeviceType.Touch,

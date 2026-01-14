@@ -1,0 +1,163 @@
+---
+title: React Native BLE (hd-ble-sdk)
+---
+
+# React Native BLE (hd-ble-sdk)
+
+> **注意：**
+> 演示：React Native / Expo 示例 → [react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/develop/packages/connect-examples/react-native-demo)
+
+
+本指南展示如何使用纯 React Native BLE 堆栈与 `@onekeyfe/hd-ble-sdk` 和 `@onekeyfe/hd-transport-react-native`。无需 WebView 或底层适配器。链 API 的使用方式与快速开始中相同。
+
+## 安装
+
+我们建议在应用层安装 RN 原生依赖，以便自动链接将原生模块包含在您的 Dev Client 构建中：
+
+```bash
+npm i @onekeyfe/hd-ble-sdk @onekeyfe/hd-transport-react-native \
+      @onekeyfe/react-native-ble-utils react-native-ble-plx \
+      buffer process react-native-get-random-values react-native-url-polyfill
+```
+
+在您的应用入口（例如 `index.js` 或 `App.tsx`）：
+
+```ts
+// Polyfills（根据项目需要调整）
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
+// @ts-ignore
+global.Buffer = global.Buffer || require('buffer').Buffer;
+// @ts-ignore
+global.process = global.process || require('process');
+
+// 在 SDK 初始化之前注册 RN transport 副作用
+import '@onekeyfe/hd-transport-react-native';
+
+import HardwareSDK from '@onekeyfe/hd-ble-sdk';
+```
+
+## Android 设置
+
+在 `AndroidManifest.xml` 中添加权限（Android 12+）：
+
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+```
+
+在运行时请求 `BLUETOOTH_SCAN` 和 `BLUETOOTH_CONNECT`（Android 12+ 还需要位置权限）。确保系统位置开关已打开。
+
+## iOS 设置
+
+添加到 `Info.plist`：
+
+- `NSBluetoothAlwaysUsageDescription`（必需）
+- 可选的 `NSBluetoothPeripheralUsageDescription` 用于旧版 iOS
+- 如果您的应用使用相机（例如二维码扫描），添加 `NSCameraUsageDescription`
+
+如果使用 Expo，您可以在 `app.json` 中的 `expo.ios.infoPlist` 和 `expo.android.permissions` 下声明这些。
+
+## Metro 配置（polyfills 和 exports）
+
+映射 Node 核心 API 并为像 `@noble/hashes/blake2b` 这样的子路径导入启用包导出：
+
+```js
+// metro.config.js
+config.resolver.extraNodeModules = {
+  buffer: require.resolve('buffer/'),
+  crypto: require.resolve('crypto-browserify'),
+  stream: require.resolve('stream-browserify'),
+  process: require.resolve('process/browser'),
+  events: require.resolve('events/'),
+  http: require.resolve('http-browserify'),
+  https: require.resolve('https-browserify'),
+  zlib: require.resolve('browserify-zlib'),
+  util: require.resolve('util/'),
+  url: require.resolve('url/'),
+  path: require.resolve('path-browserify'),
+};
+config.resolver.unstable_enablePackageExports = true;
+```
+
+## 构建 Dev Client（真实设备）
+
+Expo Go 不包含您的原生 BLE 模块。构建 Dev Client：
+
+```bash
+# iOS
+expo run:ios --device
+
+# Android
+expo run:android --device
+
+# 为 Dev Client 启动 bundler
+expo start --dev-client -c
+```
+
+## 初始化并订阅事件
+
+```ts
+export async function setupBle() {
+  await HardwareSDK.init({
+    env: 'react-native',                 // React Native BLE transport
+    debug: __DEV__,
+    fetchConfig: true,
+  });
+
+  // 订阅 UI 事件（PIN / 密码短语 / 确认）
+  // import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core'
+  // HardwareSDK.on(UI_EVENT, (msg) => { /* 打开对话框并通过 HardwareSDK.uiResponse(...) 回复 */ });
+}
+```
+
+## 发现设备并识别 device_id
+
+```ts
+const devices = await HardwareSDK.searchDevices();
+if (!devices.success) throw new Error(devices.payload.error);
+
+// BLE 返回 id + name；获取 features 以获得 device_id
+const candidate = devices.payload[0];
+const connectId = candidate.connectId;
+
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+const deviceId = features.payload.device_id;
+```
+
+保存 `connectId` 和 `deviceId`（大多数链 API 都需要两者）。
+
+## 第一个调用示例（BTC 地址）
+
+```ts
+const res = await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: false,
+});
+
+if (res.success) {
+  console.log('BTC 地址:', res.payload.address);
+} else {
+  console.error('错误:', res.payload.error, res.payload.code);
+}
+```
+
+## 提示
+
+- 始终尽早订阅 `UI_EVENT`，以免 PIN/密码短语/确认阻塞请求。参见 [配置事件](../../api-reference#events-ui)。
+- 保持 BLE 权限与操作系统版本同步。在物理设备上测试。
+- 更多示例请查看：[react-native-demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo)
+
+## 继续
+
+- [快速开始](../../getting-started)
+- [错误码](../../api-reference#error-codes)、[通用参数](../../core-api-guide#common-params)
+- 协议帧（64 字节，仅供参考）：[见底层传输插件](../../concepts/low-level-plugin#消息协议包含在底层传输中)

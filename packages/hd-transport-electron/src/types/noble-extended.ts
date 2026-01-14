@@ -3,7 +3,7 @@
  * Supplements @types/noble with additional interfaces
  */
 
-import type { Peripheral, Characteristic } from '@stoprocent/noble';
+import type { Characteristic, Peripheral } from '@stoprocent/noble';
 import type { OneKeyDeviceInfoBase } from '@onekeyfe/hd-transport';
 
 // Device info interface for our API

@@ -1,5 +1,6 @@
-import { singlePubkeyTestCount24Two, batchPubkeyTestCount24Two } from './count24_two/index';
-import { PubkeyBatchTestCase, PubkeyTestCase } from '../types';
+import { batchPubkeyTestCount24Two, singlePubkeyTestCount24Two } from './count24_two/index';
+
+import type { PubkeyBatchTestCase, PubkeyTestCase } from '../types';
 
 export const testCases: PubkeyTestCase[] = [...singlePubkeyTestCount24Two];
 

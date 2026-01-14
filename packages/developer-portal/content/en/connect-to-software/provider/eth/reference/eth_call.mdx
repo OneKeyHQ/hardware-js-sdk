@@ -1,0 +1,107 @@
+---
+title: eth_call
+description: Execute a read-only contract call
+---
+
+# eth_call
+
+Executes a new message call immediately without creating a transaction on the blockchain. This is used for reading data from smart contracts.
+
+---
+
+## Parameters
+
+| Index | Type | Description |
+|-------|------|-------------|
+| 0 | `object` | Transaction call object |
+| 1 | `string` | Block number or tag (`latest`, `earliest`, `pending`) |
+
+### Transaction Call Object
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `to` | `string` | Yes | Contract address |
+| `data` | `string` | No | Encoded function call data |
+| `from` | `string` | No | Sender address (for context) |
+| `gas` | `string` | No | Gas limit (hex) |
+| `gasPrice` | `string` | No | Gas price (hex) |
+| `value` | `string` | No | Value in wei (hex) |
+
+---
+
+## Returns
+
+`string` - The return data of the call (hex encoded)
+
+---
+
+## Example
+
+### Read ERC-20 Balance
+
+```typescript
+// balanceOf(address) selector: 0x70a08231
+const address = '0xYourAddress...'.slice(2).padStart(64, '0')
+const data = '0x70a08231' + address
+
+const balance = await window.$onekey.ethereum.request({
+  method: 'eth_call',
+  params: [{
+    to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    data: data
+  }, 'latest']
+})
+
+console.log('Balance:', parseInt(balance, 16))
+```
+
+### Read Contract Name
+
+```typescript
+// name() selector: 0x06fdde03
+const name = await window.$onekey.ethereum.request({
+  method: 'eth_call',
+  params: [{
+    to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    data: '0x06fdde03'
+  }, 'latest']
+})
+
+// Decode the result (ABI encoded string)
+console.log('Contract name:', decodeString(name))
+```
+
+### Using ethers.js
+
+```typescript
+import { Contract, BrowserProvider } from 'ethers'
+
+const provider = new BrowserProvider(window.$onekey.ethereum)
+
+const contract = new Contract(
+  '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  ['function balanceOf(address) view returns (uint256)'],
+  provider
+)
+
+const balance = await contract.balanceOf('0xYourAddress...')
+console.log('USDC Balance:', balance.toString())
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32000 | Execution reverted | Contract call reverted |
+| -32602 | Invalid params | Invalid call parameters |
+
+---
+
+## Notes
+
+- This method does not consume gas or modify state
+- The `from` address is optional but may affect the result for some contracts
+- Always use `latest` for most up-to-date state
+- For complex contract interactions, consider using ethers.js or web3.js

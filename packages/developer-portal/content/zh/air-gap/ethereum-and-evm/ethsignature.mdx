@@ -1,0 +1,57 @@
+---
+title: EthSignature
+---
+
+# EthSignature
+
+`EthSignature` 类表示以太坊签名。
+
+用于解析设备返回的签名结果。
+
+## 参数
+
+| 参数 | 类型 | 描述 |
+|-----------|------|-------------|
+| `signature` | `Buffer` | 签名数据（65 字节：r + s + v） |
+| `requestId` | `Buffer` | 请求 ID（可选） |
+| `origin` | `string` | 来源信息（可选） |
+
+## UR 示例
+
+```
+UR:ETH-SIGNATURE/OTADTPDAGDSWNNYAHGTOKPFPIAPANNROLNSAVYDTHHAOHDFPCATKCPPFYLENGAGLMKMUCAYKFPFSDREOMENTPKBGEONDCHFDNBKOSSTPDWETSGBZDNCMCHKPNYDMKIDPTDRYJSDRTKCTIOFPQZHFLNSKVACLMNIYTKLGISFRWLKTZTREAEAXIYGWJTIHGRIHKKPLGDEEDS
+```
+
+## 解码示例
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { EthSignature } from '@keystonehq/bc-ur-registry-eth';
+
+const dec = new URDecoder();
+// 将每个扫描的帧字符串推入解码器
+// dec.receivePart(frame)
+
+if (dec.isComplete()) {
+  const ur = dec.resultUR(); // ur.type 应为 'eth-signature'
+  const sig = EthSignature.fromCBOR(ur.cbor);
+  
+  const requestId = sig.getRequestId();
+  const signature = sig.getSignature();
+  
+  // 提取 r, s, v 组件
+  const r = signature.slice(0, 32);
+  const s = signature.slice(32, 64);
+  const v = signature.slice(64, 65);
+  
+  // 附加到交易并广播
+}
+```
+
+## 签名格式
+
+签名为 65 字节：
+- `r`（32 字节）：ECDSA 签名的第一部分
+- `s`（32 字节）：ECDSA 签名的第二部分
+- `v`（1 字节）：恢复 ID
+

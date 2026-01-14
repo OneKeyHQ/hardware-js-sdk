@@ -1,7 +1,8 @@
 /* eslint-disable vars-on-top */
 
-import type { ConnectSettings } from '../types';
 import { DEFAULT_DOMAIN, getSDKVersion } from '../data/config';
+
+import type { ConnectSettings } from '../types';
 
 export const DEFAULT_PRIORITY = 2;
 

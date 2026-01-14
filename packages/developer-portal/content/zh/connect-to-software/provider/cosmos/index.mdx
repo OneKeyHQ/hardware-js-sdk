@@ -1,0 +1,328 @@
+---
+title: Cosmos
+description: 通过 OneKey 的 Keplr 兼容 Provider 集成 Cosmos
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Cosmos
+
+使用 OneKey 的 Keplr 兼容 Provider 集成 Cosmos 生态系统链。通过 `window.$onekey.cosmos` 访问。
+
+<Callout type="info">
+OneKey 的 Cosmos Provider 完全兼容 Keplr 钱包接口，迁移无缝衔接。
+</Callout>
+
+---
+
+## 快速链接
+
+- [API 参考](#api-参考)
+- [链管理](#链管理)
+- [消息签名](#消息签名)
+- [发送交易](#发送交易)
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey Cosmos provider
+const provider = window.$onekey?.cosmos
+
+if (!provider) {
+  throw new Error('未检测到 OneKey Cosmos provider')
+}
+
+// 检查是否为 OneKey
+console.log('Provider:', provider.isOneKey ? 'OneKey' : '未知')
+```
+
+---
+
+## 快速开始
+
+### 连接到链
+
+```typescript
+const chainId = 'cosmoshub-4'
+
+// 启用链 - 返回密钥信息
+const key = await provider.enable(chainId)
+
+// 或同时启用多条链
+await provider.enable(['cosmoshub-4', 'osmosis-1', 'juno-1'])
+```
+
+### 获取账户信息
+
+```typescript
+const chainId = 'cosmoshub-4'
+const key = await provider.getKey(chainId)
+
+console.log({
+  name: key.name,           // 账户名称
+  algo: key.algo,           // 签名算法 (secp256k1)
+  pubKey: key.pubKey,       // 公钥 (Uint8Array)
+  address: key.address,     // Bech32 地址 (Uint8Array)
+  bech32Address: key.bech32Address,  // Bech32 格式地址
+  isNanoLedger: key.isNanoLedger,    // 硬件钱包标识
+})
+```
+
+---
+
+## 链管理
+
+### 添加自定义链
+
+使用 `experimentalSuggestChain` 添加未原生支持的链：
+
+```typescript
+await provider.experimentalSuggestChain({
+  chainId: 'my-chain-1',
+  chainName: 'My Custom Chain',
+  rpc: 'https://rpc.mychain.io',
+  rest: 'https://lcd.mychain.io',
+  bip44: { coinType: 118 },
+  bech32Config: {
+    bech32PrefixAccAddr: 'mychain',
+    bech32PrefixAccPub: 'mychainpub',
+    bech32PrefixValAddr: 'mychainvaloper',
+    bech32PrefixValPub: 'mychainvaloperpub',
+    bech32PrefixConsAddr: 'mychainvalcons',
+    bech32PrefixConsPub: 'mychainvalconspub',
+  },
+  currencies: [{
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+  }],
+  feeCurrencies: [{
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+    gasPriceStep: { low: 0.01, average: 0.025, high: 0.04 },
+  }],
+  stakeCurrency: {
+    coinDenom: 'TOKEN',
+    coinMinimalDenom: 'utoken',
+    coinDecimals: 6,
+  },
+})
+```
+
+### 断开连接
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## 消息签名
+
+### Sign Amino (传统方式)
+
+用于传统 Amino 编码的交易：
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = {
+  chain_id: chainId,
+  account_number: '0',
+  sequence: '0',
+  fee: {
+    amount: [{ denom: 'uatom', amount: '5000' }],
+    gas: '200000',
+  },
+  msgs: [{
+    type: 'cosmos-sdk/MsgSend',
+    value: {
+      from_address: signer,
+      to_address: 'cosmos1...',
+      amount: [{ denom: 'uatom', amount: '1000000' }],
+    },
+  }],
+  memo: '',
+}
+
+const result = await provider.signAmino(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,       // 已签名文档
+  signature: result.signature, // { pub_key, signature }
+})
+```
+
+### Sign Direct (Protobuf)
+
+用于现代 Protobuf 编码的交易：
+
+```typescript
+import { makeSignDoc } from '@cosmjs/proto-signing'
+
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = makeSignDoc(
+  bodyBytes,      // 交易体
+  authInfoBytes,  // 包含手续费的授权信息
+  chainId,
+  accountNumber
+)
+
+const result = await provider.signDirect(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,
+  signature: result.signature,
+})
+```
+
+### 签名任意数据
+
+用于签名任意消息（适用于身份验证）：
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+const data = 'Login to MyApp at 2024-01-01T00:00:00Z'
+
+const signature = await provider.signArbitrary(chainId, signer, data)
+
+// 验证签名
+const isValid = await provider.verifyArbitrary(chainId, signer, data, signature)
+console.log('签名有效:', isValid)
+```
+
+---
+
+## 发送交易
+
+### 广播交易
+
+```typescript
+const chainId = 'cosmoshub-4'
+const txBytes = new Uint8Array([...]) // 已签名的交易字节
+
+// 广播模式: 'block', 'sync', 'async'
+const result = await provider.sendTx(chainId, txBytes, 'sync')
+
+console.log('交易哈希:', result)
+```
+
+---
+
+## 离线签名器
+
+获取用于 CosmJS 的离线签名器：
+
+```typescript
+import { SigningStargateClient } from '@cosmjs/stargate'
+
+const chainId = 'cosmoshub-4'
+
+// 自动检测最佳签名器类型
+const offlineSigner = await provider.getOfflineSignerAuto(chainId)
+
+// 或使用特定签名器类型
+const aminoSigner = provider.getOfflineSignerOnlyAmino(chainId)
+const directSigner = provider.getOfflineSigner(chainId)
+
+// 与 CosmJS 配合使用
+const client = await SigningStargateClient.connectWithSigner(
+  'https://rpc.cosmos.network',
+  offlineSigner
+)
+
+// 发送代币
+const result = await client.sendTokens(
+  senderAddress,
+  recipientAddress,
+  [{ denom: 'uatom', amount: '1000000' }],
+  { amount: [{ denom: 'uatom', amount: '5000' }], gas: '200000' }
+)
+```
+
+---
+
+## API 参考
+
+### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `enable(chainIds)` | 启用链并获取密钥信息 |
+| `disable(chainIds)` | 禁用链 |
+| `disconnect()` | 断开所有链的连接 |
+| `getKey(chainId)` | 获取链的账户密钥 |
+| `signAmino(chainId, signer, signDoc)` | 签名 Amino 编码的交易 |
+| `signDirect(chainId, signer, signDoc)` | 签名 Protobuf 编码的交易 |
+| `sendTx(chainId, tx, mode)` | 广播已签名的交易 |
+| `signArbitrary(chainId, signer, data)` | 签名任意消息 |
+| `verifyArbitrary(chainId, signer, data, signature)` | 验证签名 |
+| `experimentalSuggestChain(chainInfo)` | 添加自定义链 |
+| `getOfflineSigner(chainId)` | 获取 Direct 离线签名器 |
+| `getOfflineSignerOnlyAmino(chainId)` | 获取仅 Amino 离线签名器 |
+| `getOfflineSignerAuto(chainId)` | 自动检测最佳签名器类型 |
+
+### Key 接口
+
+```typescript
+interface Key {
+  name: string              // 可读名称
+  algo: string              // 签名算法
+  pubKey: Uint8Array        // 公钥字节
+  address: Uint8Array       // 地址字节
+  bech32Address: string     // Bech32 格式地址
+  isNanoLedger: boolean     // 是否为硬件钱包
+  isKeystone: boolean       // 是否为 Keystone 硬件
+}
+```
+
+### 支持的链
+
+| 链 | Chain ID | 原生支持 |
+|----|----------|----------|
+| Cosmos Hub | `cosmoshub-4` | 是 |
+| Osmosis | `osmosis-1` | 是 |
+| Juno | `juno-1` | 是 |
+| Stargaze | `stargaze-1` | 是 |
+| Akash | `akashnet-2` | 是 |
+| Secret Network | `secret-4` | 是 |
+| 自定义 | 任意 | 通过 `experimentalSuggestChain` |
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  await provider.enable('cosmoshub-4')
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了请求')
+  } else if (error.message.includes('not supported')) {
+    console.log('链不支持，请尝试 experimentalSuggestChain')
+  } else {
+    console.error('连接失败:', error)
+  }
+}
+```
+
+---
+
+## 从 Keplr 迁移
+
+OneKey 的 Cosmos provider 兼容 Keplr。只需更改 provider 检测代码：
+
+```typescript
+// 之前 (仅 Keplr)
+const provider = window.keplr
+
+// 之后 (OneKey 优先，Keplr 回退)
+const provider = window.$onekey?.cosmos || window.keplr
+```

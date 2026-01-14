@@ -1,0 +1,168 @@
+---
+title: 迁移到 common-connect-sdk
+---
+
+# 迁移到 common-connect-sdk
+
+从 Bridge 迁移到 WebUSB，并切换到 `@onekeyfe/hd-common-connect-sdk`。
+
+---
+
+## 环境要求
+
+- Chromium 内核浏览器（Chrome/Edge 桌面版）
+- Node.js 18+（推荐 LTS 版本）
+
+---
+
+## 变更概览
+
+- SDK 入口：`@onekeyfe/hd-web-sdk` → `@onekeyfe/hd-common-connect-sdk`
+- 初始化选项：使用 `env: 'webusb'`；不再需要 `connectSrc`（无 iframe）
+- 权限流程：调用 `navigator.usb.requestDevice()`（必须由用户手势触发）并使用官方过滤器 `ONEKEY_WEBUSB_FILTER`
+- 事件系统：使用 `@onekeyfe/hd-core` 的 `UI_EVENT / DEVICE` 事件处理用户交互（PIN/Passphrase 等）
+- 移除 Bridge 相关逻辑：删除 `checkBridgeStatus()` 和所有 Bridge 检查/提示
+- 业务 API 基本不变：如 `searchDevices / getFeatures / btcGetAddress`
+
+---
+
+## 安装
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
+```
+
+---
+
+## 初始化（hd-common-connect-sdk + WebUSB）
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({
+  env: 'webusb',
+  debug: process.env.NODE_ENV !== 'production',
+  fetchConfig: true,
+});
+```
+
+- 与 `hd-web-sdk` 不同，这里不需要 `connectSrc`（无 iframe 依赖）。
+- 建议启用 `fetchConfig: true` 以获取设备能力和提示配置。
+
+---
+
+## 绑定 UI 和设备事件（PIN / Passphrase / 插拔）
+
+```ts
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE, DEVICE } from '@onekeyfe/hd-core';
+
+function bindHardwareEvents() {
+  HardwareSDK.on(UI_EVENT, async (message: any) => {
+    switch (message.type) {
+      case UI_REQUEST.REQUEST_PIN: {
+        // 生产环境中，替换为您的 PIN 输入 UI
+        await HardwareSDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PIN,
+          // 优先在设备上输入 PIN（更安全）
+          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+        });
+        break;
+      }
+
+      case UI_REQUEST.REQUEST_PASSPHRASE: {
+        // 生产环境中，替换为您的 Passphrase UI（设备或软件输入）
+        await HardwareSDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+          payload: { passphraseOnDevice: true, value: '' },
+        });
+        break;
+      }
+
+      default:
+        break;
+    }
+  });
+
+  HardwareSDK.on(DEVICE.CONNECT, (payload: any) => {
+    console.log('设备已连接:', payload);
+  });
+  HardwareSDK.on(DEVICE.DISCONNECT, (payload: any) => {
+    console.log('设备已断开:', payload);
+  });
+}
+
+bindHardwareEvents();
+```
+
+- 尽早订阅 `UI_EVENT`，以便处理 PIN/Passphrase 提示，避免流程卡住。
+- 详情参见：[配置事件](../../api-reference#events-ui)
+
+---
+
+## 授权（WebUSB 选择器 + 官方过滤器）
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// 重要：必须由用户手势触发（如按钮点击），否则浏览器会阻止
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+---
+
+## 枚举设备并进行首次调用
+
+```ts
+// 1) 枚举设备
+const list = await HardwareSDK.searchDevices();
+if (!list.success) throw new Error(list.payload.error);
+const { connectId, deviceId } = list.payload[0] ?? {};
+
+// 2) (可选) 确认 device_id
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+const resolvedDeviceId = features.payload.device_id ?? deviceId;
+
+// 3) 示例：获取 BTC 地址
+const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: false,
+});
+
+if (r.success) {
+  console.log('BTC 地址:', r.payload.address);
+} else {
+  console.error('错误:', r.payload.error, r.payload.code);
+}
+```
+
+---
+
+## 清理和检查清单
+
+- 依赖替换：移除 `@onekeyfe/hd-web-sdk`，使用 `@onekeyfe/hd-common-connect-sdk`
+- 初始化变更：
+  - 旧：`env: 'web'` + `connectSrc: 'https://jssdk.onekey.so/.../'`
+  - 新：`env: 'webusb'`（无 `connectSrc`）
+- 移除 Bridge 相关逻辑：如 `checkBridgeStatus()`、Bridge 安装/重启提示
+- 绑定 `UI_EVENT / DEVICE`：确保处理 PIN/Passphrase 和设备插拔事件
+- 不要在获得权限前自动枚举：`requestDevice()` 必须通过用户手势调用
+- 兼容性提示：如果 `navigator.usb` 不存在，提示用户切换到支持 WebUSB 的浏览器
+
+---
+
+## 常见问题
+
+- HTTP 下没有权限提示？→ 使用 HTTPS
+- UI 请求似乎卡住？→ 尽早订阅 `UI_EVENT` 并通过 `uiResponse` 响应
+- 还在使用 `connectSrc` 或 `HdWebSdk.HardwareWebSdk`？→ 已迁移到 `hd-common-connect-sdk`；不再需要 iframe
+- 在用户手势之外调用 `requestDevice`？→ Chrome 会阻止；必须由点击等手势触发
+
+---
+
+## 延伸阅读
+
+- WebUSB 深入解析和完整示例：[WebUSB 连接指南](../../transport/web-usb)
+- 事件和交互：[配置事件](../../api-reference#events-ui)
+- API 参考和参数：[Hardware SDK API 参考](../api-reference)、[通用参数](../../core-api-guide#common-params)、[错误码](../../api-reference#error-codes)

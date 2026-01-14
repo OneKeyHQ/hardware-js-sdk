@@ -1,8 +1,9 @@
-import { StarcoinVerifyMessage as HardwareStarcoinVerifyMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { StarcoinVerifyMessage as HardwareStarcoinVerifyMessage } from '@onekeyfe/hd-transport';
 
 export default class EVMSignMessage extends BaseMethod<HardwareStarcoinVerifyMessage> {
   init() {

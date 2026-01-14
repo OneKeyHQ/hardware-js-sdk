@@ -1,7 +1,8 @@
-import { EventEmitter } from 'events';
-import { CallMethod, CoreMessage } from './events';
-import { CoreApi } from './types/api';
 import { createCoreApi } from './inject';
+
+import type { EventEmitter } from 'events';
+import type { CallMethod, CoreMessage } from './events';
+import type { CoreApi } from './types/api';
 
 type IAddHardwareGlobalEventListener = (coreMessage: CoreMessage) => void;
 

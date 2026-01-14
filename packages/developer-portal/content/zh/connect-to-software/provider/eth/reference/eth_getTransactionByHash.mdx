@@ -1,0 +1,107 @@
+---
+title: eth_getTransactionByHash
+description: 通过哈希获取交易详情
+---
+
+# eth_getTransactionByHash
+
+通过交易哈希返回交易信息。
+
+---
+
+## 参数
+
+| 索引 | 类型 | 说明 |
+|------|------|------|
+| 0 | `string` | 交易哈希（32 字节） |
+
+---
+
+## 返回值
+
+`object | null` - 交易对象，如果未找到则为 null
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `hash` | `string` | 交易哈希 |
+| `nonce` | `string` | 发送方 nonce（十六进制） |
+| `blockHash` | `string` | 区块哈希（待处理时为 null） |
+| `blockNumber` | `string` | 区块号（待处理时为 null） |
+| `transactionIndex` | `string` | 区块中的索引（待处理时为 null） |
+| `from` | `string` | 发送方地址 |
+| `to` | `string` | 接收方地址（合约创建时为 null） |
+| `value` | `string` | 转账金额（十六进制 wei） |
+| `gasPrice` | `string` | Gas 价格（十六进制） |
+| `gas` | `string` | Gas 限制（十六进制） |
+| `input` | `string` | 交易数据 |
+| `v` | `string` | ECDSA 恢复 ID |
+| `r` | `string` | ECDSA 签名 r |
+| `s` | `string` | ECDSA 签名 s |
+
+---
+
+## 示例
+
+```typescript
+const tx = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionByHash',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (tx) {
+  console.log('发送方:', tx.from)
+  console.log('接收方:', tx.to)
+  console.log('金额:', parseInt(tx.value, 16))
+  console.log('状态:', tx.blockHash ? '已确认' : '待处理')
+}
+```
+
+### 发送后追踪交易
+
+```typescript
+async function sendAndTrack(txParams) {
+  // 发送交易
+  const txHash = await window.$onekey.ethereum.request({
+    method: 'eth_sendTransaction',
+    params: [txParams]
+  })
+
+  console.log('交易已发送:', txHash)
+
+  // 轮询交易详情
+  const checkTx = async () => {
+    const tx = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionByHash',
+      params: [txHash]
+    })
+
+    if (tx && tx.blockHash) {
+      console.log('交易已在区块中确认:', parseInt(tx.blockNumber, 16))
+      return tx
+    }
+
+    // 仍在待处理，继续检查
+    await new Promise(r => setTimeout(r, 2000))
+    return checkTx()
+  }
+
+  return checkTx()
+}
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| -32602 | Invalid params | 交易哈希无效 |
+
+---
+
+## 说明
+
+- 如果交易未找到，返回 `null`
+- 待处理的交易 `blockHash` 和 `blockNumber` 为 null
+- 要获取交易状态（成功/失败），请使用 [eth_getTransactionReceipt](./eth_getTransactionReceipt)
+- 交易数据在交易被确认后仍然持久存在

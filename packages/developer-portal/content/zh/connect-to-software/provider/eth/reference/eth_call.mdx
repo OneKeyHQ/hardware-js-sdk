@@ -1,0 +1,107 @@
+---
+title: eth_call
+description: 执行只读合约调用
+---
+
+# eth_call
+
+立即执行消息调用，不会在区块链上创建交易。用于从智能合约读取数据。
+
+---
+
+## 参数
+
+| 索引 | 类型 | 说明 |
+|------|------|------|
+| 0 | `object` | 交易调用对象 |
+| 1 | `string` | 区块号或标签（`latest`、`earliest`、`pending`） |
+
+### 交易调用对象
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `to` | `string` | 是 | 合约地址 |
+| `data` | `string` | 否 | 编码后的函数调用数据 |
+| `from` | `string` | 否 | 发送方地址（提供上下文） |
+| `gas` | `string` | 否 | Gas 限制（十六进制） |
+| `gasPrice` | `string` | 否 | Gas 价格（十六进制） |
+| `value` | `string` | 否 | 金额，单位 wei（十六进制） |
+
+---
+
+## 返回值
+
+`string` - 调用的返回数据（十六进制编码）
+
+---
+
+## 示例
+
+### 读取 ERC-20 余额
+
+```typescript
+// balanceOf(address) 选择器: 0x70a08231
+const address = '0x你的地址...'.slice(2).padStart(64, '0')
+const data = '0x70a08231' + address
+
+const balance = await window.$onekey.ethereum.request({
+  method: 'eth_call',
+  params: [{
+    to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    data: data
+  }, 'latest']
+})
+
+console.log('余额:', parseInt(balance, 16))
+```
+
+### 读取合约名称
+
+```typescript
+// name() 选择器: 0x06fdde03
+const name = await window.$onekey.ethereum.request({
+  method: 'eth_call',
+  params: [{
+    to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    data: '0x06fdde03'
+  }, 'latest']
+})
+
+// 解码结果（ABI 编码的字符串）
+console.log('合约名称:', decodeString(name))
+```
+
+### 使用 ethers.js
+
+```typescript
+import { Contract, BrowserProvider } from 'ethers'
+
+const provider = new BrowserProvider(window.$onekey.ethereum)
+
+const contract = new Contract(
+  '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  ['function balanceOf(address) view returns (uint256)'],
+  provider
+)
+
+const balance = await contract.balanceOf('0x你的地址...')
+console.log('USDC 余额:', balance.toString())
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| -32000 | Execution reverted | 合约调用回滚 |
+| -32602 | Invalid params | 调用参数无效 |
+
+---
+
+## 说明
+
+- 此方法不消耗 Gas，也不修改状态
+- `from` 地址是可选的，但可能影响某些合约的结果
+- 使用 `latest` 获取最新状态
+- 对于复杂的合约交互，建议使用 ethers.js 或 web3.js

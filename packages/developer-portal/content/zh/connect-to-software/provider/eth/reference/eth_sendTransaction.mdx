@@ -1,0 +1,99 @@
+---
+title: eth_sendTransaction
+description: 发送交易到网络
+---
+
+# eth_sendTransaction
+
+创建交易并提示用户确认。成功后返回交易哈希。
+
+---
+
+## 参数
+
+`Array` 包含一个交易对象：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `from` | `string` | 是 | 发送方地址 |
+| `to` | `string` | 否 | 接收方地址（部署合约时省略） |
+| `value` | `string` | 否 | 发送金额，单位 wei（十六进制） |
+| `data` | `string` | 否 | 合约调用数据或字节码 |
+| `gas` | `string` | 否 | Gas 限制（十六进制） |
+| `gasPrice` | `string` | 否 | Gas 价格，用于传统交易（十六进制） |
+| `maxFeePerGas` | `string` | 否 | 最大 Gas 费用，用于 EIP-1559（十六进制） |
+| `maxPriorityFeePerGas` | `string` | 否 | 最大优先费用，用于 EIP-1559（十六进制） |
+| `nonce` | `string` | 否 | 交易 nonce（十六进制） |
+
+---
+
+## 返回值
+
+`string` - 交易哈希（32 字节十六进制字符串）
+
+---
+
+## 示例
+
+### 发送 ETH
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0x你的地址...',
+    to: '0x接收方地址...',
+    value: '0xDE0B6B3A7640000', // 1 ETH（wei）
+  }]
+})
+
+console.log('交易哈希:', txHash)
+```
+
+### 调用合约方法
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0x你的地址...',
+    to: '0x合约地址...',
+    data: '0xa9059cbb...', // 编码后的函数调用
+    gas: '0x5208',
+  }]
+})
+```
+
+### EIP-1559 交易
+
+```typescript
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: '0x你的地址...',
+    to: '0x接收方地址...',
+    value: '0xDE0B6B3A7640000',
+    maxFeePerGas: '0x2540BE400',      // 10 Gwei
+    maxPriorityFeePerGas: '0x3B9ACA00', // 1 Gwei
+  }]
+})
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| 4001 | User rejected the request | 用户拒绝交易 |
+| -32000 | Insufficient funds | 余额不足 |
+| -32602 | Invalid params | 交易参数无效 |
+
+---
+
+## 说明
+
+- 所有数值都使用带 `0x` 前缀的十六进制字符串
+- 如未提供 `gas`，钱包会自动估算
+- 对于支持 EIP-1559 的链，建议使用 `maxFeePerGas` 而非 `gasPrice`
+- `from` 地址必须是用户已连接的账户

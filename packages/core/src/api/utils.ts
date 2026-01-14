@@ -1,6 +1,8 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import * as ApiMethods from './index';
-import { IFrameCallMessage } from '../events';
+
+import type { IFrameCallMessage } from '../events';
 
 export function findMethod(message: IFrameCallMessage & { id?: number }) {
   const { method } = message.payload;

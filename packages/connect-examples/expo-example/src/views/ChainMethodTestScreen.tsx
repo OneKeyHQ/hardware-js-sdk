@@ -1,6 +1,7 @@
 import React from 'react';
 import { Stack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import { DeviceProvider } from '../provider/DeviceProvider';
 import { CommonParamsProvider } from '../provider/CommonParamsProvider';
 import { HardwareInputPinDialogProvider } from '../provider/HardwareInputPinProvider';

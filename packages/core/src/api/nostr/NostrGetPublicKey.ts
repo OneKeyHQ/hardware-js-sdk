@@ -1,10 +1,11 @@
-import { NostrGetPublicKey as GetPublicKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { BTCGetAddressParams } from '../../types/api/btcGetAddress';
-import { NostrPublicKey } from '../../types/api/nostrGetPublicKey';
+
+import type { NostrGetPublicKey as GetPublicKey } from '@onekeyfe/hd-transport';
+import type { BTCGetAddressParams } from '../../types/api/btcGetAddress';
+import type { NostrPublicKey } from '../../types/api/nostrGetPublicKey';
 
 export default class NostrGetPublicKey extends BaseMethod<GetPublicKey[]> {
   hasBundle = false;

@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-
 import { Stack, Text, View } from 'tamagui';
 import { useIntl } from 'react-intl';
-import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { AddressBatchTestCase } from './types';
-import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 
+import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import passphraseTestCase from './data/count24_two/passphrase_empty';
 import { fullPath, replaceTemplate } from './data/utils';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
@@ -17,13 +13,17 @@ import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import {
-  handleSkipInRequest,
-  handleSkipInResponse,
   checkBatchCompatibility,
   getSkippedPaths,
+  handleSkipInRequest,
+  handleSkipInResponse,
 } from '../deviceCompatibility';
 import { useDevice } from '../../provider/DeviceProvider';
 import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
+
+import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { AddressBatchTestCase } from './types';
 
 type TestCaseDataType = AddressBatchTestCase['data'][0];
 

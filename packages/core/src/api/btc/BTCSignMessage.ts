@@ -1,4 +1,3 @@
-import { SignMessage } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -6,6 +5,8 @@ import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { getCoinAndScriptType } from './helpers/btcParamsUtils';
 import { getBitcoinForkVersionRange } from './helpers/versionLimit';
+
+import type { SignMessage } from '@onekeyfe/hd-transport';
 
 export default class BTCSignMessage extends BaseMethod<SignMessage> {
   init() {

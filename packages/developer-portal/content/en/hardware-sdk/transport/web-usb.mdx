@@ -1,0 +1,271 @@
+---
+slug: /hardware/transport/webusb
+---
+
+# WebUSB Connection Guide
+
+> **Note:**
+Demo: Playground (supports emulator) → [hardware-example.onekey.so](https://hardware-example.onekey.so/)
+
+
+Use this step‑by‑step guide to wire WebUSB in the browser with `@onekeyfe/hd-common-connect-sdk`. Once connected, you can call any chain API (BTC/EVM/etc.) as in Quick Start.
+
+Focus: WebUSB only.
+
+## Step 1. Requirements
+
+- Serve your app over HTTPS (WebUSB is blocked on insecure origins)
+- A browser that supports WebUSB (Chrome/Edge desktop)
+- A connected and unlocked OneKey device
+
+## Step 2. Install
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-shared @onekeyfe/hd-core
+```
+## Step 3. Initialize and bind events
+
+Initialize the SDK during app startup and bind UI/device events so PIN/Passphrase and confirmations work end-to-end.
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE, DEVICE } from '@onekeyfe/hd-core';
+
+export async function setupWebUsb() {
+  await HardwareSDK.init({
+    env: 'webusb',
+    debug: process.env.NODE_ENV !== 'production',
+    fetchConfig: true,
+  });
+
+  bindHardwareEvents();
+}
+
+function bindHardwareEvents() {
+  HardwareSDK.on(UI_EVENT, async (message: any) => {
+    switch (message.type) {
+      case UI_REQUEST.REQUEST_PIN: {
+        // Show your PIN UI and respond via uiResponse
+        const pinResult = await showPinDialog();
+        if (pinResult.mode === 'device') {
+          await HardwareSDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PIN,
+            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+          });
+        } else {
+          await HardwareSDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PIN,
+            payload: pinResult.value,
+          });
+        }
+        break;
+      }
+
+      case UI_REQUEST.REQUEST_PASSPHRASE: {
+        const passResult = await showPassphraseDialog();
+        if (passResult.mode === 'device') {
+          await HardwareSDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: { passphraseOnDevice: true, value: '' },
+          });
+        } else {
+          await HardwareSDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: { value: passResult.value, passphraseOnDevice: false, save: passResult.save },
+          });
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+  });
+
+  HardwareSDK.on(DEVICE.CONNECT, (payload: any) => {
+    console.log('Device connected:', payload);
+  });
+  HardwareSDK.on(DEVICE.DISCONNECT, (payload: any) => {
+    console.log('Device disconnected:', payload);
+  });
+}
+```
+
+### Notes
+- Subscribe early to `UI_EVENT` so requests don't stall while waiting for PIN/Passphrase. See [Config Event](/en/hardware-sdk/core-api-guide#events-ui).
+- PIN: prefer on-device entry (`@@ONEKEY_INPUT_PIN_IN_DEVICE`). If you provide software input, use the blind keypad mapping (`7,8,9,4,5,6,1,2,3`).
+- Passphrase: support on-device input or software input, and optionally `save` for session caching.
+- Device events help you update UI if cables are unplugged.
+
+
+## Step 4. User authorization (chooser dialog with official filter)
+
+Important: Must be triggered by a user gesture (e.g., clicking a button) due to Chrome security restrictions; automatic device discovery is not allowed before permission.
+
+Use the ONEKEY_WEBUSB_FILTER filters so the chooser only shows supported devices.
+
+```tsx
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+export function AuthorizeUsbButton() {
+  return (
+    <button
+      onClick={async () => {
+        await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+        // After authorization, enumerate via the SDK
+      }}
+    >
+      Authorize USB (WebUSB)
+    </button>
+  );
+}
+```
+## Step 5. Enumerate and pick a device
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+
+// Example: choose the first device
+const { connectId, deviceId } = result.payload[0] ?? {};
+```
+
+- USB results usually include `deviceId` in `searchDevices()`.
+- Persist `connectId`/`deviceId` for subsequent calls.
+
+## Step 6. Get features (confirm device_id when needed)
+
+```ts
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+
+const resolvedDeviceId = features.payload.device_id;
+```
+
+## Step 7. First call example (BTC address)
+
+```ts
+const res = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: false,
+});
+
+if (res.success) {
+  console.log('BTC address:', res.payload.address);
+} else {
+  console.error('Error:', res.payload.error, res.payload.code);
+}
+```
+## Appendix: Minimal UI helpers
+
+```ts
+// Blind keypad map (matches hardware positional mapping)
+const BLIND_KEYBOARD_MAP = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+
+function showPinDialog(): Promise<{ mode: 'device'|'software'; value?: string }>{
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    const dialog = document.createElement('div');
+
+    const title = document.createElement('div');
+    title.textContent = 'Enter PIN';
+
+    const hint = document.createElement('div');
+    hint.textContent = 'Use device input for best security, or enter via blind keypad.';
+
+    const display = document.createElement('div');
+
+    const keypad = document.createElement('div');
+    const pin: string[] = [];
+    BLIND_KEYBOARD_MAP.forEach((mapped, idx) => {
+      const btn = document.createElement('button');
+      btn.textContent = String(idx + 1);
+      btn.onclick = () => {
+        pin.push(mapped);
+        display.textContent = '•'.repeat(pin.length);
+      };
+      keypad.appendChild(btn);
+    });
+
+    const actions = document.createElement('div');
+    const useDeviceBtn = document.createElement('button');
+    useDeviceBtn.textContent = 'Enter on Device';
+    useDeviceBtn.onclick = () => { document.body.removeChild(overlay); resolve({ mode: 'device' }); };
+
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = 'Clear';
+    clearBtn.onclick = () => { pin.splice(0, pin.length); display.textContent = ''; };
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.onclick = () => {
+      const value = pin.join('');
+      document.body.removeChild(overlay);
+      resolve({ mode: 'software', value });
+    };
+
+    actions.appendChild(useDeviceBtn);
+    actions.appendChild(clearBtn);
+    actions.appendChild(confirmBtn);
+
+    dialog.appendChild(title);
+    dialog.appendChild(hint);
+    dialog.appendChild(display);
+    dialog.appendChild(keypad);
+    dialog.appendChild(actions);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+  });
+}
+
+function showPassphraseDialog(): Promise<{ mode: 'device'|'software'; value: string; save: boolean }>{
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    const dialog = document.createElement('div');
+
+    const title = document.createElement('div');
+    title.textContent = 'Enter Passphrase';
+
+    const input = document.createElement('input');
+    input.type = 'password';
+
+    const saveWrap = document.createElement('label');
+    const saveBox = document.createElement('input');
+    saveBox.type = 'checkbox';
+    saveWrap.appendChild(saveBox);
+    saveWrap.appendChild(document.createTextNode(' Save for session'));
+
+    const actions = document.createElement('div');
+    const useDeviceBtn = document.createElement('button');
+    useDeviceBtn.textContent = 'Enter on Device';
+    useDeviceBtn.onclick = () => { document.body.removeChild(overlay); resolve({ mode: 'device', value: '', save: false }); };
+
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = 'Submit';
+    submitBtn.onclick = () => {
+      const value = input.value || '';
+      const save = !!saveBox.checked;
+      document.body.removeChild(overlay);
+      resolve({ mode: 'software', value, save });
+    };
+
+    actions.appendChild(useDeviceBtn);
+    actions.appendChild(submitBtn);
+
+    dialog.appendChild(title);
+    dialog.appendChild(input);
+    dialog.appendChild(saveWrap);
+    dialog.appendChild(actions);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+  });
+}
+```
+
+## Continue
+
+- [Getting Started](../../getting-started)
+- [Error Code](/en/hardware-sdk/core-api-guide#error-codes), [Common Params](/en/hardware-sdk/core-api-guide#common-params)

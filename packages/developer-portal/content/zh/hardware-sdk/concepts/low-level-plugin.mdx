@@ -1,0 +1,104 @@
+---
+title: 底层传输插件
+---
+
+# 底层传输插件（Low-level Transport Plugin）
+
+> 仅在 WebUSB / React Native BLE / 官方原生适配器无法满足需求时使用。你需要自管设备生命周期和 64 字节帧，维护成本更高。
+
+我们的蓝牙 SDK 基于 React Native。如果你使用 Swift/Kotlin/Flutter 等非 RN 技术栈，引入 RN 依赖可能不合适。可通过 LowlevelTransportSharedPlugin 自行适配底层传输，负责“连接/断开/收发数据”协议。
+
+原生示例（均基于低层插件）：
+
+- [Android 原生](../transport/android) — WebView + JSBridge + Nordic BLE
+- [iOS 原生](../transport/ios) — WebView + JSBridge + CoreBluetooth
+- [Flutter 原生](../transport/flutter) — WebView + platform channel + BLE
+
+传输使用 64 字节帧：插件负责逐帧收发 64 字节 hex，SDK 负责跨帧组装/拆包；最后一帧按协议填充。
+
+详见下方“消息协议”。
+
+### LowlevelTransportSharedPlugin 接口
+
+```typescript
+export type LowLevelDevice = { id: string; name: string };
+export type LowlevelTransportSharedPlugin = {
+  enumerate: () => Promise<LowLevelDevice[]>;
+  send: (uuid: string, data: string) => Promise<void>;
+  receive: () => Promise<string>;
+  connect: (uuid: string) => Promise<void>;
+  disconnect: (uuid: string) => Promise<void>;
+
+  init: () => Promise<void>;
+  version: string;
+};
+```
+
+### 示例（iOS demo）
+
+Swift 侧通过 WebView + CoreBluetooth 桥接 JS SDK：
+
+```typescript
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'
+
+function createLowlevelPlugin() {
+  const plugin = {
+    enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
+    send: (uuid, data) => {
+      // TODO: 发送 64 字节帧
+    },
+    receive: () => {
+      // 返回一帧 64 字节 hex；SDK 负责组装完整消息
+      return Promise.resolve('a1b2c3...');
+    },
+    connect: (uuid) => {
+      // TODO: 连接设备
+    },
+    disconnect: (uuid) => {
+      // TODO: 断开设备
+    },
+
+    init: () => {
+      // TODO: 初始化
+    },
+
+    version: 'OneKey-1.0'
+  }
+  return plugin
+}
+
+const plugin = createLowlevelPlugin()
+
+const settings = {
+  env: 'lowlevel', // 启用底层传输需设置 env=lowlevel
+  debug: true
+}
+
+HardwareSDK.init(settings, undefined, plugin)
+```
+
+## 消息协议（64 字节帧）
+
+首帧：
+
+| Offset | Length | Type | Content |
+| --- | --- | --- | --- |
+| 0 | 3 | char\[3] | '?##' 魔数 |
+| 3 | 2 | BE uint16\_t | Message type number |
+| 5 | 4 | BE uint32\_t | Message size |
+| 9 | 55 | uint8\_t\[55] | 前 55 字节 protobuf 消息（零填充） |
+
+后续帧：
+
+| Offset | Length | Type | Content |
+| --- | --- | --- | --- |
+| 0 | 1 | char\[1] | '?' 魔数 |
+| 1 | 63 | uint8\_t\[63] | 剩余 protobuf 字节（零填充） |
+
+逐帧收发 64 字节 hex，SDK 负责组装完整消息。
+
+## 下一步
+
+- iOS BLE（原生，底层适配）→ [iOS 指南](../transport/ios)
+- Android BLE（原生，底层适配）→ [Android 指南](../transport/android)
+- Flutter BLE（原生，底层适配）→ [Flutter 指南](../transport/flutter)

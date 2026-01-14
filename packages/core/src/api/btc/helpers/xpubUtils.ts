@@ -1,4 +1,5 @@
 import { sha256 } from '@noble/hashes/sha256';
+
 import type { HDNodeType, InputScriptType } from '@onekeyfe/hd-transport';
 
 // 定义版本字节常量

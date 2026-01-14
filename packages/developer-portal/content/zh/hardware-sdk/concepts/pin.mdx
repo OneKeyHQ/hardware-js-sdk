@@ -1,0 +1,78 @@
+---
+title: PIN（核心指南）
+---
+
+# PIN（核心指南）
+
+处理 OneKey 设备 PIN 码的基本规则。
+
+## 关键要点
+
+- 设备锁定门控：当设备锁定时，受保护的调用会发出 `UI_REQUEST.REQUEST_PIN`。
+- Pro/Touch：PIN 码只能在硬件设备上输入（不支持软件输入）。
+- 其他型号：支持盲输 PIN（基于位置）软件输入，但出于安全考虑建议在设备上输入。
+
+## 支持矩阵（软件 PIN 输入）
+
+使用此表格快速确定某个型号是否支持软件端盲输 PIN。为了最佳安全性，建议所有型号都在设备上输入 PIN；仅在确实必要且仅在支持的型号上启用软件盲输 PIN。
+
+| 设备 | 软件盲输 PIN | 仅设备输入 |
+| --- | --- | --- |
+| OneKey Classic | 支持 | 否 |
+| OneKey Classic 1s | 支持 | 否 |
+| OneKey Classic 1s Pure | 支持 | 否 |
+| OneKey Mini | 支持 | 否 |
+| OneKey Touch | 不支持 | 是 |
+| OneKey Pro | 不支持 | 是 |
+
+## UI 预期
+
+- 显示单个 PIN 提示，包含两个操作：
+  - 在设备上输入（推荐；Pro/Touch 必须使用）
+  - 在此屏幕上输入（盲输 PIN）- 固定 3x3 键盘（1-9），掩码输入，永不显示真实数字
+- 收到 `UI_REQUEST.CLOSE_UI_WINDOW` 时关闭对话框。
+
+### 盲输 PIN 映射（软件键盘）
+
+固定键盘布局（软件 UI）：
+
+```
+7 8 9
+4 5 6
+1 2 3
+```
+
+映射数组（索引 0..8 将软件标签 1..9 映射到转换后的数字）：
+
+```ts
+const BLIND_KEYBOARD_MAP = ['7','8','9','4','5','6','1','2','3'];
+
+function onSoftwareKey(label: number) {
+  // label 是来自固定键盘的 1..9
+  transformedPin += BLIND_KEYBOARD_MAP[label - 1];
+}
+```
+
+示例：如果用户点击软件键 "1, 9"，转换后变为 `7`（来自索引 0）然后 `3`（来自索引 8）= `73`。通过 `uiResponse` 发送此转换后的字符串。
+
+
+## 事件到响应
+
+```ts
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, (msg) => {
+  if (msg.type === UI_REQUEST.REQUEST_PIN) {
+    // 选项 A：在设备上输入
+    HardwareSDK.uiResponse({
+      type: UI_RESPONSE.RECEIVE_PIN,
+      payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+    });
+
+    // 选项 B：盲输 PIN（Pro/Touch 设备不支持）
+    // const transformed = '73'; // 从键盘位置派生
+    // HardwareSDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: transformed });
+
+  }
+});
+```

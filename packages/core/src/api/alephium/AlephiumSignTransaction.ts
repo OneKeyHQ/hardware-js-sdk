@@ -5,11 +5,12 @@ import {
 } from '@onekeyfe/hd-transport';
 import { bytesToHex } from '@noble/hashes/utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { AlephiumSignTransactionParams } from '../../types';
+import type { AlephiumSignTransactionParams } from '../../types';
 import type { TypedResponseMessage } from '../../device/DeviceCommands';
 
 export default class AlephiumSignTransaction extends BaseMethod<HardwareAlephiumSignTx> {

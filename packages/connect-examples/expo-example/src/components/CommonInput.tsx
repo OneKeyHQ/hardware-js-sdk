@@ -1,6 +1,5 @@
 import { random } from 'lodash';
 import { useCallback, useRef } from 'react';
-
 import { Input, Label, Stack } from 'tamagui';
 
 export type CommonInputProps = {

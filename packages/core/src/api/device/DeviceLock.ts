@@ -1,5 +1,6 @@
-import { LockDevice } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
+
+import type { LockDevice } from '@onekeyfe/hd-transport';
 
 export default class DeviceLock extends BaseMethod<LockDevice> {
   init() {

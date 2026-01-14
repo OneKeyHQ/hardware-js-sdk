@@ -1,0 +1,361 @@
+---
+title: cardanoGetAddress
+---
+
+# cardanoGetAddress
+
+## 使用要求
+
+* 固件版本要求
+  * Touch: 4.1.0
+  * Classic/Mini: 3.0.0
+
+## Cardano：获取地址
+
+在设备上显示由给定 BIP32-Ed25519 路径派生的请求地址，并将其返回给调用者。用户会看到所请求密钥的描述，并被要求在 OneKey 上确认导出。
+
+```typescript
+const response = await HardwareSDK.cardanoGetAddress(connectId, deviceId, params)
+```
+
+### 参数
+
+[可选通用参数](../../../core-api-guide#common-params)
+
+**导出单个地址**
+
+* `addressParameters` - _必需_ 见下方描述
+* `protocolMagic` - _必需_ `Integer` 主网为 764824073，Preprod 测试网为 1，Preview 测试网为 2
+* `networkId` - _必需_ `Integer` 主网为 1，测试网为 0
+* `address` - _可选_ `string` 用于验证的地址（请阅读下方 `处理按钮请求` 部分）
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `derivationType` - _可选_ `CardanoDerivationType` 枚举。决定使用的派生类型。默认设置为 ICARUS=1
+* `isCheck` - _可选_ `boolean` 仅检查基础地址
+
+**导出批量地址**
+
+* `bundle` - 包含单个地址字段的对象 `Array`
+
+**地址参数**
+
+* `addressType` - _必需_ `CardanoAddressType`/`number` - 可以使用 flow `CARDANO.ADDRESS_TYPE` 对象或 typescript `CardanoAddressType` 枚举。支持所有地址类型。
+* `path` - _必需_ `string | Array<number>` 最小长度为 `5`。
+* `stakingPath` - _可选_ `string | Array<number>` 最小长度为 `5`。用于基础地址和奖励地址派生
+* `stakingKeyHash` - _可选_ `string` 质押密钥哈希的十六进制字符串。用于基础地址派生（作为 `stakingPath` 的替代）
+* `certificatePointer` - _可选_ CardanoCertificatePointer 对象。必须包含 `number` 类型的 `blockIndex`、`txIndex` 和 `certificateIndex`。用于指针地址派生。
+* `paymentScriptHash` - _可选_ `string` 支付脚本哈希的十六进制字符串。
+* `stakingScriptHash` - _可选_ `string` 质押脚本哈希的十六进制字符串。
+
+
+
+### 示例
+
+显示第一个 Cardano 账户的 Byron 地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.BYRON,
+        path: "m/44'/1815'/0'/0/0",
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示第一个 Cardano 账户的基础地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.BASE,
+        path: "m/1852'/1815'/0'/0/0",
+        stakingPath: "m/1852'/1815'/0'/2/0",
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示带有脚本支付部分的基础地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.BASE_SCRIPT_KEY,
+        paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
+        stakingPath: "m/1852'/1815'/0'/2/0",
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示带有脚本质押部分的基础地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.BASE_KEY_SCRIPT,
+        path: "m/1852'/1815'/0'/0/0",
+        stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示支付和质押部分都是脚本的基础地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.BASE_SCRIPT_SCRIPT,
+        paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
+        stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示第一个 Cardano 账户的指针地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.POINTER,
+        path: "m/1852'/1815'/0'/0/0",
+        certificatePointer: {
+            blockIndex: 1,
+            txIndex: 2,
+            certificateIndex: 3,
+        },
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示指针脚本地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.POINTER_SCRIPT,
+        paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
+        certificatePointer: {
+            blockIndex: 1,
+            txIndex: 2,
+            certificateIndex: 3,
+        },
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示第一个 Cardano 账户的企业地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.ENTERPRISE,
+        path: "m/1852'/1815'/0'/0/0",
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示企业脚本地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.ENTERPRISE_SCRIPT,
+        paymentScriptHash: '0d5acbf6a1dfb0c8724e60df314987315ccbf78bb6c0f9b6f3d568fe',
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示第一个 Cardano 账户的奖励地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.REWARD,
+        stakingPath: "m/1852'/1815'/0'/0/0",
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+显示奖励脚本地址：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    addressParameters: {
+        addressType: CardanoAddressType.REWARD_SCRIPT,
+        stakingScriptHash: '8d7bebc7a58f1c7b5fb7c9391071ecd3b51b032695522f8c555343a9',
+    },
+    protocolMagic: 764824073,
+    networkId: 1,
+});
+```
+
+返回一批 Cardano 地址而不在设备上显示：
+
+```javascript
+HardwareSDK.cardanoGetAddress(connectId, deviceId, {
+    bundle: [
+        // Byron 地址，账户 1，地址 1
+        {
+            addressParameters: {
+                addressType: 8,
+                path: "m/44'/1815'/0'/0/0",
+            },
+            protocolMagic: 764824073,
+            networkId: 1,
+            showOnOneKey: false,
+        },
+        // 带有质押密钥哈希的基础地址，账户 1，地址 1
+        {
+            addressParameters: {
+                addressType: 0,
+                path: "m/1852'/1815'/0'/0/0",
+                stakingKeyHash: '1bc428e4720702ebd5dab4fb175324c192dc9bb76cc5da956e3c8dff',
+            },
+            protocolMagic: 764824073,
+            networkId: 1,
+            showOnOneKey: false,
+        },
+        // Byron 地址，账户 2，地址 3，测试网
+        {
+            addressParameters: {
+                addressType: 8,
+                path: "m/44'/1815'/1'/0/2",
+            },
+            protocolMagic: 1,
+            networkId: 0,
+            showOnOneKey: false,
+        },
+    ],
+});
+```
+
+#### 返回结果 <a href="#result" id="result"></a>
+
+只有一个地址的结果
+
+```javascript
+{
+    success: true,
+    payload: {
+        addressParameters: {
+            addressType: number,
+            path: Array<number>, // 强化路径
+            stakingPath?: Array<number>, // 强化路径
+            stakingKeyHash?: string,
+            certificatePointer?: {
+                blockIndex: number,
+                txIndex: number,
+                certificatePointer: number,
+            },
+            paymentScriptHash?: string,
+            stakingScriptHash?: string,
+        }
+        serializedPath?: string,
+        serializedStakingPath?: string,
+        protocolMagic: number,
+        networkId: number,
+        address: string,
+        xpub: string,
+        stakeAddress: string, // 如果创建了基础地址，则会一起创建质押地址
+    }
+}
+```
+
+批量地址的结果
+
+```javascript
+{
+    success: true,
+    payload: [
+        {
+            addressParameters: {
+                addressType: number,
+                path: Array<number>, // 强化路径
+                stakingPath?: Array<number>, // 强化路径
+                stakingKeyHash?: string,
+                certificatePointer?: {
+                    blockIndex: number,
+                    txIndex: number,
+                    certificatePointer: number,
+                },
+                paymentScriptHash?: string,
+                stakingScriptHash?: string,
+            }
+            serializedPath?: string,
+            serializedStakingPath?: string,
+            protocolMagic: number,
+            networkId: number,
+            address: string,
+        },
+        {
+            addressParameters: {
+                addressType: number,
+                path: Array<number>, // 强化路径
+                stakingPath?: Array<number>, // 强化路径
+                stakingKeyHash?: string,
+                certificatePointer?: {
+                    blockIndex: number,
+                    txIndex: number,
+                    certificatePointer: number,
+                },
+                paymentScriptHash?: string,
+                stakingScriptHash?: string,
+            }
+            serializedPath?: string,
+            serializedStakingPath?: string,
+            protocolMagic: number,
+            networkId: number,
+            address: string,
+        },
+        {
+            addressParameters: {
+                addressType: number,
+                path: Array<number>, // 强化路径
+                stakingPath?: Array<number>, // 强化路径
+                stakingKeyHash?: string,
+                certificatePointer?: {
+                    blockIndex: number,
+                    txIndex: number,
+                    certificatePointer: number,
+                },
+                paymentScriptHash?: string,
+                stakingScriptHash?: string,
+            }
+            serializedPath?: string,
+            serializedStakingPath?: string,
+            protocolMagic: number,
+            networkId: number,
+            address: string,
+        },
+    ]
+}
+```
+
+错误
+
+```javascript
+{
+    success: false,
+    payload: {
+        error: string // 错误信息
+    }
+}
+```

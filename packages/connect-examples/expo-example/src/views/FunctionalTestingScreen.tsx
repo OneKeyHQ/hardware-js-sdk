@@ -1,4 +1,5 @@
 import React from 'react';
+
 import PageView from '../components/ui/Page';
 import PanelView from '../components/ui/Panel';
 import { DeviceProvider } from '../provider/DeviceProvider';

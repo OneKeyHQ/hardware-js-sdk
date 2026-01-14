@@ -3,6 +3,7 @@
 import BN from 'bn.js';
 import { Buffer } from 'buffer';
 import varint from 'varint';
+
 import { MAX_UINT_32, ec, sqrtm1 } from './crypto-util-data.js';
 
 /**

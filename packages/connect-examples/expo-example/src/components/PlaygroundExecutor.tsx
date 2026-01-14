@@ -1,7 +1,7 @@
 import { useCallback, useContext, useState } from 'react';
-
 import { useIntl } from 'react-intl';
 import { CoreApi } from '@onekeyfe/hd-core';
+
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { useDevice } from '../provider/DeviceProvider';
 import { useCommonParams } from '../provider/CommonParamsProvider';

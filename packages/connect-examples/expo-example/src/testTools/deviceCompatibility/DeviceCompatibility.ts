@@ -5,8 +5,10 @@
 
 import { useMemo } from 'react';
 import { getDeviceType as getDeviceTypeFromSDK } from '@onekeyfe/hd-core';
-import { EDeviceType } from '@onekeyfe/hd-shared';
+
 import { useDevice } from '../../provider/DeviceProvider';
+
+import type { EDeviceType } from '@onekeyfe/hd-shared';
 
 // 设备插件配置
 export interface DevicePlugin {

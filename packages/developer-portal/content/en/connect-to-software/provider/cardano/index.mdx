@@ -1,0 +1,454 @@
+---
+title: Cardano
+description: Cardano integration via OneKey's CIP-30 compatible provider
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Cardano
+
+Integrate Cardano blockchain using OneKey's CIP-30 compatible provider. Access via `window.cardano.onekey` or `window.cardano.nami`.
+
+<Callout type="info">
+OneKey implements CIP-30 (Cardano dApp Connector), ensuring compatibility with all Cardano dApps. It also provides Nami wallet compatibility.
+</Callout>
+
+---
+
+## Quick Links
+
+- [API Reference](#api-reference)
+- [Connecting](#connecting)
+- [Transactions](#transactions)
+- [Data Signing](#data-signing)
+
+---
+
+## Provider Detection
+
+```typescript
+// OneKey provides both onekey and nami interfaces
+const onekey = window.cardano?.onekey
+const nami = window.cardano?.nami
+
+// Check availability
+if (!onekey) {
+  throw new Error('OneKey Cardano provider not detected')
+}
+
+// Get wallet info
+console.log('Name:', onekey.name) // 'OneKey'
+console.log('API Version:', onekey.apiVersion) // '0.1.0'
+console.log('Icon:', onekey.icon)
+```
+
+---
+
+## Quick Start
+
+### Enable Wallet
+
+```typescript
+// Request wallet access
+const api = await window.cardano.onekey.enable()
+
+// Now you can use the full API
+const networkId = await api.getNetworkId()
+console.log('Network:', networkId === 1 ? 'Mainnet' : 'Testnet')
+```
+
+### Check if Enabled
+
+```typescript
+const isEnabled = await window.cardano.onekey.isEnabled()
+
+if (isEnabled) {
+  const api = await window.cardano.onekey.enable()
+  // Use API...
+}
+```
+
+---
+
+## Account Information
+
+### Get Network ID
+
+```typescript
+const api = await window.cardano.onekey.enable()
+const networkId = await api.getNetworkId()
+
+// 0 = Testnet, 1 = Mainnet
+console.log('Network:', networkId)
+```
+
+### Get Balance
+
+```typescript
+const balance = await api.getBalance()
+// Returns CBOR-encoded value (hex string)
+console.log('Balance (CBOR):', balance)
+
+// Decode using cardano-serialization-lib
+import { Value } from '@emurgo/cardano-serialization-lib-browser'
+const value = Value.from_bytes(Buffer.from(balance, 'hex'))
+const lovelace = value.coin().to_str()
+console.log('Balance:', parseInt(lovelace) / 1000000, 'ADA')
+```
+
+### Get Addresses
+
+```typescript
+// Get used addresses (addresses with transaction history)
+const usedAddresses = await api.getUsedAddresses()
+console.log('Used addresses:', usedAddresses)
+
+// Get unused addresses (fresh addresses)
+const unusedAddresses = await api.getUnusedAddresses()
+console.log('Unused addresses:', unusedAddresses)
+
+// Get change address
+const changeAddress = await api.getChangeAddress()
+console.log('Change address:', changeAddress)
+
+// Get reward/staking addresses
+const rewardAddresses = await api.getRewardAddresses()
+console.log('Reward addresses:', rewardAddresses)
+```
+
+### Get UTxOs
+
+```typescript
+// Get all UTxOs
+const utxos = await api.getUtxos()
+console.log('UTxOs:', utxos)
+
+// Get UTxOs with minimum amount
+const utxosWithAmount = await api.getUtxos(
+  '1000000' // Minimum 1 ADA in lovelace (CBOR encoded)
+)
+
+// With pagination
+const paginatedUtxos = await api.getUtxos(undefined, {
+  page: 0,
+  limit: 10,
+})
+```
+
+---
+
+## Transactions
+
+### Sign Transaction
+
+```typescript
+// transaction should be CBOR-encoded hex string
+const signedTx = await api.signTx(transactionCbor, partialSign)
+
+// partialSign: boolean
+// - false: sign all inputs owned by wallet
+// - true: sign only inputs explicitly owned (for multi-sig)
+
+console.log('Signed TX:', signedTx)
+```
+
+### Submit Transaction
+
+```typescript
+// Submit signed transaction
+const txHash = await api.submitTx(signedTransactionCbor)
+console.log('Transaction hash:', txHash)
+```
+
+### Complete Transaction Flow
+
+```typescript
+import {
+  TransactionBuilder,
+  TransactionBuilderConfigBuilder,
+  LinearFee,
+  BigNum,
+  Address,
+  TransactionOutput,
+  Value,
+} from '@emurgo/cardano-serialization-lib-browser'
+
+async function sendAda(recipientAddress, amountLovelace) {
+  const api = await window.cardano.onekey.enable()
+
+  // Get UTxOs
+  const utxos = await api.getUtxos()
+  const changeAddress = await api.getChangeAddress()
+
+  // Build transaction
+  const txBuilder = TransactionBuilder.new(
+    TransactionBuilderConfigBuilder.new()
+      .fee_algo(LinearFee.new(
+        BigNum.from_str('44'),
+        BigNum.from_str('155381')
+      ))
+      .pool_deposit(BigNum.from_str('500000000'))
+      .key_deposit(BigNum.from_str('2000000'))
+      .max_value_size(5000)
+      .max_tx_size(16384)
+      .coins_per_utxo_byte(BigNum.from_str('4310'))
+      .build()
+  )
+
+  // Add inputs from UTxOs
+  utxos.forEach(utxo => {
+    // Add UTxO as input...
+  })
+
+  // Add output
+  txBuilder.add_output(
+    TransactionOutput.new(
+      Address.from_bech32(recipientAddress),
+      Value.new(BigNum.from_str(amountLovelace))
+    )
+  )
+
+  // Set change address
+  txBuilder.add_change_if_needed(Address.from_bech32(changeAddress))
+
+  // Build transaction
+  const tx = txBuilder.build_tx()
+  const txCbor = Buffer.from(tx.to_bytes()).toString('hex')
+
+  // Sign
+  const signedTxCbor = await api.signTx(txCbor, false)
+
+  // Submit
+  const txHash = await api.submitTx(signedTxCbor)
+  console.log('TX Hash:', txHash)
+
+  return txHash
+}
+```
+
+---
+
+## Data Signing
+
+### Sign Data (CIP-8)
+
+Sign arbitrary data for authentication:
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+const addresses = await api.getUsedAddresses()
+const address = addresses[0]
+
+// Message to sign
+const payload = Buffer.from('Hello Cardano!').toString('hex')
+
+const signature = await api.signData(address, payload)
+
+console.log({
+  signature: signature.signature, // COSE_Sign1 signature
+  key: signature.key,             // COSE_Key public key
+})
+```
+
+### Verify Signature
+
+```typescript
+import { COSESign1, COSEKey } from '@emurgo/cardano-message-signing-browser'
+
+const coseSign1 = COSESign1.from_bytes(
+  Buffer.from(signature.signature, 'hex')
+)
+const coseKey = COSEKey.from_bytes(
+  Buffer.from(signature.key, 'hex')
+)
+
+// Get the signed payload
+const signedPayload = coseSign1.payload()
+
+// Verify signature
+const publicKey = coseKey.header(0) // Get Ed25519 key
+// Verification logic...
+```
+
+---
+
+## Event Handling
+
+### Listen for Account Changes
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+// Nami-compatible event API
+api.experimental.on('accountChange', (addresses) => {
+  console.log('Account changed:', addresses)
+})
+```
+
+---
+
+## API Reference
+
+### Wallet Interface (CIP-30)
+
+| Property/Method | Description |
+|-----------------|-------------|
+| `name` | Wallet name ('OneKey') |
+| `icon` | Wallet icon URL |
+| `apiVersion` | API version |
+| `isEnabled()` | Check if enabled |
+| `enable()` | Request wallet access |
+
+### dApp API (after enable)
+
+| Method | Description |
+|--------|-------------|
+| `getNetworkId()` | Get network (0=testnet, 1=mainnet) |
+| `getBalance()` | Get total balance (CBOR) |
+| `getUtxos(amount?, paginate?)` | Get UTxOs |
+| `getUsedAddresses()` | Get used addresses |
+| `getUnusedAddresses()` | Get unused addresses |
+| `getChangeAddress()` | Get change address |
+| `getRewardAddresses()` | Get staking addresses |
+| `signTx(tx, partialSign?)` | Sign transaction |
+| `signData(addr, payload)` | Sign data (CIP-8) |
+| `submitTx(tx)` | Submit transaction |
+
+### Experimental API
+
+| Method | Description |
+|--------|-------------|
+| `experimental.getCollateral()` | Get collateral UTxOs |
+| `experimental.on(event, cb)` | Subscribe to events |
+| `experimental.off()` | Unsubscribe |
+
+### Types
+
+```typescript
+type Cbor = string // Hex-encoded CBOR
+
+interface Paginate {
+  page: number
+  limit: number
+}
+
+interface Cip30DataSignature {
+  signature: string // COSE_Sign1 hex
+  key: string       // COSE_Key hex
+}
+
+type NetworkId = 0 | 1 // 0=testnet, 1=mainnet
+```
+
+### Events
+
+| Event | Description |
+|-------|-------------|
+| `accountChange` | Account changed |
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  const api = await window.cardano.onekey.enable()
+} catch (error) {
+  if (error.code === -1) {
+    console.log('User rejected connection')
+  } else if (error.code === -2) {
+    console.log('Account not found')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+### Common Errors
+
+| Code | Description |
+|------|-------------|
+| -1 | User rejected |
+| -2 | Account not found |
+| -3 | Invalid network |
+
+---
+
+## Using with Lucid
+
+[Lucid](https://github.com/spacebudz/lucid) provides a simpler API:
+
+```bash
+npm install lucid-cardano
+```
+
+```typescript
+import { Lucid } from 'lucid-cardano'
+
+// Initialize Lucid with OneKey
+const lucid = await Lucid.new(
+  new Blockfrost('https://cardano-mainnet.blockfrost.io/api', 'your-api-key'),
+  'Mainnet'
+)
+
+// Connect OneKey
+const api = await window.cardano.onekey.enable()
+lucid.selectWallet(api)
+
+// Send ADA
+const tx = await lucid
+  .newTx()
+  .payToAddress('addr1...', { lovelace: 5000000n })
+  .complete()
+
+const signedTx = await tx.sign().complete()
+const txHash = await signedTx.submit()
+
+console.log('TX Hash:', txHash)
+```
+
+---
+
+## Using with Mesh
+
+[Mesh](https://meshjs.dev/) is another popular Cardano SDK:
+
+```bash
+npm install @meshsdk/core
+```
+
+```typescript
+import { BrowserWallet, Transaction } from '@meshsdk/core'
+
+// Connect to OneKey
+const wallet = await BrowserWallet.enable('onekey')
+
+// Get wallet info
+const balance = await wallet.getBalance()
+const addresses = await wallet.getUsedAddresses()
+
+// Build and send transaction
+const tx = new Transaction({ initiator: wallet })
+  .sendLovelace('addr1...', '5000000')
+
+const unsignedTx = await tx.build()
+const signedTx = await wallet.signTx(unsignedTx)
+const txHash = await wallet.submitTx(signedTx)
+```
+
+---
+
+## Nami Compatibility
+
+OneKey provides Nami wallet compatibility:
+
+```typescript
+// Access via Nami interface
+const nami = window.cardano.nami
+const api = await nami.enable()
+
+// Same API as OneKey
+const balance = await api.getBalance()
+```
+

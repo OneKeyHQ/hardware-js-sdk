@@ -1,5 +1,5 @@
+import type { PROTO } from '../../constants';
 import type { CommonParams, Response } from '../params';
-import { PROTO } from '../../constants';
 
 export type CardanoPublicKey = {
   path: number[];

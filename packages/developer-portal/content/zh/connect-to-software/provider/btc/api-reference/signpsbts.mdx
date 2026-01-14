@@ -1,0 +1,90 @@
+---
+title: signPsbts
+---
+
+# signPsbts
+
+## signPsbts
+
+一次签名多个 PSBT。此方法将遍历所有匹配当前地址的输入进行签名。
+
+#### 钱包和地址类型兼容性
+
+| 钱包类型   | 型号           | 支持的地址类型                         |
+| ---------- | -------------- | -------------------------------------- |
+| 软件钱包   | 全部           | p2wpkh (原生隔离见证), p2tr (Taproot)  |
+| 硬件钱包   | Pro, Classic1S | p2tr (Taproot)                         |
+
+#### 方法
+
+```typescript
+async function signPsbts(
+    psbtHexs: string[],
+    options?: {
+        autoFinalized?: boolean;
+        toSignInputs?: Array<{
+            index: number;
+            address?: string;
+            publicKey?: string;
+            sighashTypes?: number[];
+            disableTweakSigner?: boolean;
+            useTweakedSigner?: boolean;
+        }>;
+    },
+): Promise<string[]>
+```
+
+#### 参数
+
+* `psbtHexs` — _必填_ `string[]` 要签名的 PSBT 十六进制字符串数组
+* `options` — _可选_ `object`
+  * `autoFinalized` — _可选_ `boolean` 签名后是否完成 PSBT，默认为 `true`
+  * `toSignInputs` — _可选_ `array` 指定要签名的输入
+    * `index` — _必填_ `number` 要签名的输入索引
+    * `address` — _可选_ `string` 用于签名的对应私钥（指定 address 或 publicKey 之一）
+    * `publicKey` — _可选_ `string` 用于签名的对应私钥（指定 address 或 publicKey 之一）
+    * `sighashTypes` — _可选_ `number[]` 可选的签名哈希类型
+    * `disableTweakSigner` — _可选_ `boolean` 默认为 `false`。设置为 `true` 以在签名 Taproot 输入时使用原始私钥
+    * `useTweakedSigner` — _可选_ `boolean` 强制是否使用 tweaked 签名器；优先级高于 `disableTweakSigner`
+
+#### 返回值
+
+* `Promise<string[]>` 签名后的 PSBT 十六进制字符串数组
+
+#### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+try {
+    const psbtHexs = [
+        "70736274ff01007d...",
+        "70736274ff01007d..."
+    ];
+
+    const signeds = await provider.signPsbts(psbtHexs, {
+        autoFinalized: true,
+        toSignInputs: [
+            {
+                index: 0,
+                publicKey: "02abc...",
+                useTweakedSigner: true
+            },
+            {
+                index: 1,
+                address: "bc1p...",
+                disableTweakSigner: true
+            }
+        ]
+    });
+
+    console.log(signeds);
+} catch (e) {
+    console.log(e);
+}
+```
+
+#### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/XWOPaPY" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

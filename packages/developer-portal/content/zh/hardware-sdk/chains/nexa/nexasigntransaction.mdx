@@ -1,0 +1,77 @@
+---
+title: nexaSignTransaction
+---
+
+# nexaSignTransaction
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.4.0
+  * Classic/Mini: 3.2.0
+
+## Nexa：签名交易
+
+请求设备使用由给定 BIP32 路径派生的私钥对给定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.nexaSignTransaction(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `inputs` - _必需_ `Array` 交易输入
+  * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+  * `message` - _必需_ `string` 序列化交易字符串的类型
+  * `prefix` - _必需_ `string` 地址前缀。默认设置为 `nexatest`
+  * `scheme` - _可选_ `string` 加密算法模式。默认设置为 `schnorr`
+* `outputs` - _必需_ `Array` 交易输出
+  * `satoshis` - _必需_ `number | string` 交易金额
+  * `script` - _必需_ `string` 交易脚本
+  * `scriptVersion` - _必需_ `number` 交易脚本版本
+
+
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.nexaSignTransaction(
+  connectId,
+  deviceId,
+  {
+    inputs: [
+      {
+         path: "m/44'/29223'/0'/0/0",
+         message: '000578c6c76f10156fbc7ee4a8faa7a4e92b6adadc978abf66ae70f13a03b75d36cd7a6acc0967cc9f2f632f585cb7b4297873858c23233792767fd4ae662ec1093bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e70665044026cad0dba749a112e0d2ea420fa68e0218453db6bb0744e44eb51edc76af8bb6871190000000000',
+         prefix: 'nexatest',
+      }
+    ],
+  }
+);
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    index: 0,
+    signature: "signed data"
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

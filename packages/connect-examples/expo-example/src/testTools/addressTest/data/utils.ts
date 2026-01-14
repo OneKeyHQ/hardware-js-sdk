@@ -1,11 +1,12 @@
 import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from '../baseParams';
-import {
+
+import type {
   AddressBatchCaseData,
   AddressBatchTestCase,
   AddressCaseData,
   AddressTestCase,
 } from '../types';
-import { AddressTestCaseData } from './types';
+import type { AddressTestCaseData } from './types';
 
 export function fullPath(data: AddressTestCaseData): AddressTestCaseData {
   const newParams = data.data.map((item, index) => {

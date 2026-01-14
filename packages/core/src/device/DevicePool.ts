@@ -1,10 +1,13 @@
 import EventEmitter from 'events';
-import { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
+
 // eslint-disable-next-line import/no-cycle
-import { Device, InitOptions } from './Device';
+import { Device } from './Device';
 import { DEVICE } from '../events';
+import { LoggerNames, getDeviceUUID, getLogger } from '../utils';
+
+import type { InitOptions } from './Device';
+import type { OneKeyDeviceInfo as DeviceDescriptor } from '@onekeyfe/hd-transport';
 import type DeviceConnector from './DeviceConnector';
-import { getDeviceUUID, getLogger, LoggerNames } from '../utils';
 
 const Log = getLogger(LoggerNames.DevicePool);
 

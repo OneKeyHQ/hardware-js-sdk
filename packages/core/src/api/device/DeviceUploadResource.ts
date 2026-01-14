@@ -1,20 +1,19 @@
 import semver from 'semver';
 import { EDeviceType, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import { bytesToHex } from '@noble/hashes/utils';
-import { ResourceUpload } from '@onekeyfe/hd-transport';
 import { blake2s } from '@noble/hashes/blake2s';
 import { isEmpty } from 'lodash';
-import { TypedResponseMessage } from '../../device/DeviceCommands';
-import {
-  DeviceModelToTypes,
-  DeviceUploadResourceParams,
-  DeviceUploadResourceResponse,
-} from '../../types';
+
+import { DeviceModelToTypes } from '../../types';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { hexToBytes } from '../helpers/hexUtils';
-import { getDeviceType, getDeviceFirmwareVersion } from '../../utils';
+import { getDeviceFirmwareVersion, getDeviceType } from '../../utils';
 import { PROTO } from '../../constants';
+
+import type { DeviceUploadResourceParams, DeviceUploadResourceResponse } from '../../types';
+import type { TypedResponseMessage } from '../../device/DeviceCommands';
+import type { ResourceUpload } from '@onekeyfe/hd-transport';
 
 export default class DeviceUploadResource extends BaseMethod<ResourceUpload> {
   paramsData = {

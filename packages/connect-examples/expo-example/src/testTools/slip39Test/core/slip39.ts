@@ -6,12 +6,12 @@
 import {
   MIN_ENTROPY_BITS,
   bitsToBytes,
-  generateIdentifier,
-  crypt,
-  splitSecret,
   combineMnemonics,
-  validateMnemonic,
+  crypt,
   encodeMnemonic,
+  generateIdentifier,
+  splitSecret,
+  validateMnemonic,
 } from './slip39Utils';
 import { Slip39Node } from './slip39Node';
 

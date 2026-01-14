@@ -1,9 +1,11 @@
 import memoizee from 'memoizee';
 import { Platform } from 'react-native';
-import { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
-import { importSdk, importLowLevelSDK } from './importSdk';
+
+import { importLowLevelSDK, importSdk } from './importSdk';
 import { CONNECT_SRC } from '../constants/connect';
 import { getItem } from './storeUtil';
+
+import type { ConnectSettings, CoreApi, LowLevelCoreApi } from '@onekeyfe/hd-core';
 import type { ConnectionType } from '../atoms/deviceConnectAtoms';
 
 // eslint-disable-next-line import/no-mutable-exports

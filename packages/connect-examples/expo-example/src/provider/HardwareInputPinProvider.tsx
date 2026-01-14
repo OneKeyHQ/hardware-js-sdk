@@ -1,6 +1,10 @@
-import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo } from 'react';
-import { Features, supportInputPinOnSoftware, UI_RESPONSE } from '@onekeyfe/hd-core';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { UI_RESPONSE, supportInputPinOnSoftware } from '@onekeyfe/hd-core';
+
 import { ReceivePin } from '../components/ReceivePin';
+
+import type { Features } from '@onekeyfe/hd-core';
+import type { ReactNode } from 'react';
 
 interface DialogState {
   isOpen: boolean;

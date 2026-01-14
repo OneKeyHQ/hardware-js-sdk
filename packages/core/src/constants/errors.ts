@@ -1,4 +1,4 @@
-import { HardwareError, ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 export const safeThrowError = (error: any) => {
   if (error instanceof HardwareError) {

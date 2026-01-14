@@ -1,5 +1,3 @@
-import type { SLIP39TestCaseData } from '../types';
-
 import { count20OneNormal } from './count20_one/normal';
 import { count20OnePassphraseEmpty } from './count20_one/passphrase_empty';
 import { count20OnePassphrase1 } from './count20_one/passphrase_1';
@@ -20,6 +18,8 @@ import { count33TwoNormal } from './count33_two/normal';
 import { count33TwoPassphraseEmpty } from './count33_two/passphrase_empty';
 import { count33TwoPassphrase1 } from './count33_two/passphrase_1';
 import { count33TwoPassphrase2 } from './count33_two/passphrase_2';
+
+import type { SLIP39TestCaseData } from '../types';
 
 export const allPubkeyTestCases: SLIP39TestCaseData[] = [
   count20OneNormal,

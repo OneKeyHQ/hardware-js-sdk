@@ -2,8 +2,9 @@ import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { AptosGetAddressParams, AptosPublicKey } from '../../types';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { AptosGetAddressParams, AptosPublicKey } from '../../types';
 
 export default class AptosGetPublicKey extends BaseMethod<any> {
   hasBundle = false;

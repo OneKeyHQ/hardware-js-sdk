@@ -1,0 +1,62 @@
+---
+title: Solana
+---
+
+# Solana
+
+Solana 离线签名的 UR 注册表类型。
+
+## 数据类型
+
+- 请求 UR：`sol-sign-request`（交易/消息字节 + BIP-44 路径）
+- 响应 UR：`sol-signature`
+
+## 流程
+
+1. 准备 Solana 交易或消息字节，推导路径
+2. 构建 `sol-sign-request`，显示为动画二维码
+3. 扫描设备响应 → 解码 `sol-signature` → 附加到交易
+4. 提交到 Solana 网络
+
+## 示例
+
+### 构建 Solana 签名请求（UR）
+
+```ts
+import { SolSignRequest, SignType } from '@keystonehq/bc-ur-registry-sol';
+import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
+import { airGapUrUtils } from '@keystonehq/keystone-sdk';
+
+// BIP44: m/44'/501'/0'
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 501, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+]);
+
+const req = new SolSignRequest({
+  signData: Buffer.from(rawTxBytes), // 交易或消息字节
+  derivationPath: keypath,
+  signType: SignType.Transaction,    // 或 SignType.Message
+});
+
+const ur = req.toUR();
+const frames = airGapUrUtils.urToQrcode(ur);
+```
+
+### 解码 Solana 签名（UR）
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { SolSignature } from '@keystonehq/bc-ur-registry-sol';
+
+const dec = new URDecoder();
+// 对每个扫描的帧执行 dec.receivePart(frameString)
+if (dec.isComplete()) {
+  const ur = dec.resultUR();           // 'sol-signature'
+  const sig = SolSignature.fromCBOR(ur.cbor);
+  const signature = sig.getSignature();
+  // 将签名附加到交易并提交
+}
+```
+

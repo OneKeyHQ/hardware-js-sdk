@@ -1,7 +1,9 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import { validatePath } from '../../helpers/pathUtils';
 import { validateParams } from '../../helpers/paramsValidator';
 import { PROTO } from '../../../constants';
+
 import type { CardanoAddressParameters } from '../../../types/api/cardano';
 
 export const validateAddressParameters = (addressParameters: CardanoAddressParameters) => {

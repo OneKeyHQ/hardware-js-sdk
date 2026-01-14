@@ -1,5 +1,6 @@
 import { EDeviceType } from '@onekeyfe/hd-shared';
-import { DevicePlugin } from '../DeviceCompatibility';
+
+import type { DevicePlugin } from '../DeviceCompatibility';
 
 export const classic1sPlugin: DevicePlugin = {
   deviceType: EDeviceType.Classic1s,

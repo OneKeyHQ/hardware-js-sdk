@@ -1,0 +1,59 @@
+---
+title: 建立连接
+---
+
+# 建立连接
+
+要开始与 OneKey 交互，你必须首先建立连接。此连接请求将提示用户授权分享其账户 ID 和公钥，并表明他们愿意进一步交互。
+
+一旦首次建立权限，Web 应用的域名将被加入白名单，以便后续的连接请求。
+
+同样，应用端和用户端都可以终止连接。
+
+## 连接（登录）
+
+连接 OneKey 的**推荐**且**最简单**的方式是调用 `provider.requestSignIn()`。不过，provider 也提供了 `request` JSON RPC 接口。
+
+
+### requestSignIn()
+```javascript
+try {
+  const res = await provider.requestSignIn();
+  console.log('requestSignIn', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+
+### request()
+```javascript
+try {
+  const res = await provider.request({
+    method: 'near_requestAccounts',
+  });
+  console.log('near_requestAccounts', res.accounts);
+} catch(error){
+  // { code: 4001, message: 'User rejected the request.' }
+}
+```
+
+
+
+## 断开连接（登出）
+
+断开连接与连接类似，但断开连接可以由钱包端发起。
+
+
+### signOut()
+```javascript
+provider.signOut();
+```
+
+
+### request()
+```javascript
+provider.request({ method: 'near_signOut' });
+```
+
+

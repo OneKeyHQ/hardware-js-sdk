@@ -1,0 +1,422 @@
+---
+title: Algorand
+description: 通过 OneKey 的 Provider 集成 Algorand
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Algorand
+
+使用 OneKey 的 Provider 集成 Algorand 区块链。通过 `window.$onekey.algo` 访问。
+
+<Callout type="info">
+OneKey 的 Algorand Provider 支持传统接口和 ARC-0001 兼容接口。
+</Callout>
+
+---
+
+## 快速链接
+
+- [API 参考](#api-参考)
+- [连接钱包](#连接钱包)
+- [交易](#交易)
+- [消息签名](#消息签名)
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey Algorand provider
+const provider = window.$onekey?.algo
+
+if (!provider) {
+  throw new Error('未检测到 OneKey Algorand provider')
+}
+
+// 检查兼容性
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## 快速开始
+
+### 连接（传统 API）
+
+```typescript
+const { address } = await provider.connect()
+console.log('已连接:', address)
+
+// 检查连接状态
+console.log('isConnected:', provider.isConnected)
+console.log('地址:', provider.address)
+```
+
+### 启用 (ARC-0001)
+
+```typescript
+const result = await provider.enable({
+  genesisID: 'mainnet-v1.0',
+  genesisHash: 'wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=',
+})
+
+console.log('账户:', result.accounts)
+console.log('Genesis Hash:', result.genesisHash)
+```
+
+### 断开连接
+
+```typescript
+await provider.disconnect()
+console.log('已断开连接')
+```
+
+---
+
+## 交易
+
+### 签名交易 (ARC-0001)
+
+签名一个或多个交易：
+
+```typescript
+import algosdk from 'algosdk'
+
+// 创建交易
+const suggestedParams = await algodClient.getTransactionParams().do()
+
+const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+  from: senderAddress,
+  to: recipientAddress,
+  amount: 1000000, // 1 ALGO (微 Algos)
+  suggestedParams,
+})
+
+// 准备签名
+const walletTxns = [{
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}]
+
+// 签名
+const signedTxns = await provider.signTxns(walletTxns)
+
+console.log('已签名交易:', signedTxns)
+```
+
+### 签名多个交易
+
+```typescript
+// 交易分组
+const txns = [txn1, txn2, txn3]
+algosdk.assignGroupID(txns)
+
+// 准备签名
+const walletTxns = txns.map(txn => ({
+  txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+}))
+
+// 全部签名
+const signedTxns = await provider.signTxns(walletTxns)
+```
+
+### 部分签名（多签）
+
+```typescript
+// 只签名组中的特定交易
+const walletTxns = [
+  { txn: encodedTxn1 },
+  { txn: encodedTxn2, signers: [] }, // 跳过这个
+  { txn: encodedTxn3 },
+]
+
+const signedTxns = await provider.signTxns(walletTxns)
+// signedTxns[1] 将为 null
+```
+
+### 广播交易
+
+广播已签名的交易：
+
+```typescript
+const result = await provider.postTxns(signedTxns)
+console.log('交易 IDs:', result.txIDs)
+```
+
+### 签名并广播
+
+一步完成签名和广播：
+
+```typescript
+const result = await provider.signAndPostTxns(walletTxns)
+console.log('交易 IDs:', result.txIDs)
+```
+
+---
+
+## 传统交易 API
+
+### 签名交易（传统）
+
+```typescript
+// 创建交易为 Uint8Array
+const txnBytes = algosdk.encodeUnsignedTransaction(txn)
+
+// 签名
+const signedTxnBytes = await provider.signTransaction([txnBytes])
+
+// 发送
+const { txId } = await algodClient.sendRawTransaction(signedTxnBytes[0]).do()
+```
+
+### 签名并发送（传统）
+
+```typescript
+const result = await provider.signAndSendTransaction([txnBytes])
+console.log('交易 ID:', result.txId)
+```
+
+---
+
+## 消息签名
+
+### 签名任意消息
+
+```typescript
+const message = new TextEncoder().encode('Hello Algorand!')
+
+const { signature, address } = await provider.signMessage(
+  message,
+  'utf8' // 或 'base64'
+)
+
+console.log('签名:', signature)
+console.log('签名者:', address)
+```
+
+### 验证签名
+
+```typescript
+import nacl from 'tweetnacl'
+
+const message = new TextEncoder().encode('Hello Algorand!')
+const { signature } = await provider.signMessage(message)
+
+// 从地址获取公钥
+const publicKey = algosdk.decodeAddress(provider.address).publicKey
+
+const isValid = nacl.sign.detached.verify(message, signature, publicKey)
+console.log('有效:', isValid)
+```
+
+---
+
+## 事件处理
+
+### 监听账户变化
+
+```typescript
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('账户已变更:', address)
+  } else {
+    console.log('已断开连接')
+  }
+})
+```
+
+### 监听连接
+
+```typescript
+provider.on('connect', ({ address }) => {
+  console.log('已连接:', address)
+})
+
+provider.on('disconnect', () => {
+  console.log('已断开连接')
+})
+```
+
+---
+
+## 使用 Algod 客户端
+
+### 从 Provider 获取客户端
+
+```typescript
+// 获取预配置的客户端
+const algodClient = await provider.getAlgodv2Client()
+const indexerClient = await provider.getIndexerClient()
+
+// 使用客户端
+const status = await algodClient.status().do()
+console.log('网络状态:', status)
+```
+
+### 手动设置客户端
+
+```typescript
+import algosdk from 'algosdk'
+
+const algodClient = new algosdk.Algodv2(
+  '', // Token（公共节点不需要）
+  'https://mainnet-api.algonode.cloud',
+  ''
+)
+
+const indexerClient = new algosdk.Indexer(
+  '',
+  'https://mainnet-idx.algonode.cloud',
+  ''
+)
+```
+
+---
+
+## API 参考
+
+### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `connect()` | 连接钱包（传统） |
+| `disconnect()` | 断开钱包连接 |
+| `enable(opts?)` | 启用钱包 (ARC-0001) |
+| `signTxns(transactions)` | 签名交易 (ARC-0001) |
+| `postTxns(signedTxns)` | 广播交易 |
+| `signAndPostTxns(transactions)` | 签名并广播 |
+| `signTransaction(txns)` | 签名交易（传统） |
+| `signAndSendTransaction(txns)` | 签名并发送（传统） |
+| `signMessage(message, encoding?)` | 签名任意消息 |
+| `getAlgodv2Client()` | 获取 Algod 客户端 |
+| `getIndexerClient()` | 获取 Indexer 客户端 |
+
+### 类型
+
+```typescript
+interface EnableOpts {
+  genesisID?: string
+  genesisHash?: string
+}
+
+interface EnableResult {
+  genesisID: string
+  genesisHash: string
+  accounts: string[]
+}
+
+interface WalletTransaction {
+  txn: string                  // Base64 编码的未签名交易
+  signers?: string[]           // 应该签名的地址（空 = 跳过）
+  stxn?: string                // 预签名的交易
+  message?: string             // 显示的消息
+  msig?: MultisigMetadata
+  authAddr?: string            // Rekeyed auth 地址
+}
+
+interface SignTxnsResult {
+  // Base64 已签名交易数组（跳过的为 null）
+  [index: number]: string | null
+}
+
+interface PostTxnsResult {
+  txIDs: string[]
+}
+
+interface TransactionResult {
+  txId: string
+}
+```
+
+### 属性
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `isConnected` | `boolean` | 连接状态 |
+| `address` | `string \| null` | 已连接地址 |
+| `isOneKey` | `boolean` | OneKey 标识 |
+
+### 事件
+
+| 事件 | 参数 | 说明 |
+|------|------|------|
+| `connect` | `{ address }` | 钱包已连接 |
+| `disconnect` | - | 钱包已断开连接 |
+| `accountChanged` | `address` | 账户已变更 |
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const signedTxns = await provider.signTxns(walletTxns)
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了请求')
+  } else if (error.code === 4100) {
+    console.log('钱包已锁定')
+  } else {
+    console.error('错误:', error.message)
+  }
+}
+```
+
+### 常见错误码
+
+| 错误码 | 说明 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| 4100 | 未授权 |
+| 4200 | 不支持的方法 |
+| 4300 | 无效的输入 |
+
+---
+
+## 完整示例
+
+```typescript
+import algosdk from 'algosdk'
+
+async function sendAlgo() {
+  // 连接
+  const provider = window.$onekey?.algo
+  const { address } = await provider.connect()
+
+  // 设置客户端
+  const algodClient = new algosdk.Algodv2(
+    '',
+    'https://mainnet-api.algonode.cloud',
+    ''
+  )
+
+  // 获取参数
+  const suggestedParams = await algodClient.getTransactionParams().do()
+
+  // 创建交易
+  const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: address,
+    to: 'RECIPIENT_ADDRESS',
+    amount: 1000000, // 1 ALGO
+    suggestedParams,
+  })
+
+  // 签名
+  const walletTxns = [{
+    txn: Buffer.from(algosdk.encodeUnsignedTransaction(txn)).toString('base64'),
+  }]
+
+  const signedTxns = await provider.signTxns(walletTxns)
+
+  // 发送
+  const { txId } = await algodClient.sendRawTransaction(
+    Buffer.from(signedTxns[0], 'base64')
+  ).do()
+
+  console.log('交易 ID:', txId)
+
+  // 等待确认
+  await algosdk.waitForConfirmation(algodClient, txId, 4)
+  console.log('已确认!')
+}
+```

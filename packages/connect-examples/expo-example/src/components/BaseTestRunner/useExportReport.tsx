@@ -1,11 +1,13 @@
 import { useContext, useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
 
-import { TestCaseDataWithKey } from './types';
 import { downloadFile } from '../../utils/downloadUtils';
 import { TestRunnerContext } from './Context/TestRunnerProvider';
-import { ItemVerifyState, itemVerifyStateAtom } from './Context/TestRunnerVerifyProvider';
+import { itemVerifyStateAtom } from './Context/TestRunnerVerifyProvider';
 import { getDeviceInfo } from '../../utils/deviceUtils';
+
+import type { ItemVerifyState } from './Context/TestRunnerVerifyProvider';
+import type { TestCaseDataWithKey } from './types';
 
 export default function useExportReport<T>({
   fileName = 'TestReport',

@@ -3,13 +3,14 @@ import { PROTO } from '../../constants';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 import {
-  validateAddressParameters,
-  addressParametersToProto,
   addressParametersFromProto,
+  addressParametersToProto,
+  validateAddressParameters,
 } from './helper/addressParameters';
 import { serializedPath } from '../helpers/pathUtils';
-import { CardanoGetAddressParams, CardanoAddress } from '../../types/api/cardanoGetAddress';
-import { CardanoGetAddressMethodParams } from '../../types';
+
+import type { CardanoAddress, CardanoGetAddressParams } from '../../types/api/cardanoGetAddress';
+import type { CardanoGetAddressMethodParams } from '../../types';
 
 export default class CardanoGetAddress extends BaseMethod<CardanoGetAddressParams[]> {
   hasBundle?: boolean;

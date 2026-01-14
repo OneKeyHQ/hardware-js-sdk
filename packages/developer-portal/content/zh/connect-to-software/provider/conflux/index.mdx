@@ -1,0 +1,370 @@
+---
+title: Conflux
+description: 通过 OneKey 的 Fluent 兼容 Provider 集成 Conflux
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Conflux
+
+使用 OneKey 的 Fluent 兼容 Provider 集成 Conflux 区块链。通过 `window.$onekey.conflux` 访问。
+
+<Callout type="info">
+OneKey 的 Conflux Provider 同时兼容 ConfluxPortal 和 Fluent 钱包接口。
+</Callout>
+
+---
+
+## 快速链接
+
+- [API 参考](#api-参考)
+- [连接钱包](#连接钱包)
+- [交易](#交易)
+- [配合 js-conflux-sdk 使用](#配合-js-conflux-sdk-使用)
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey Conflux provider
+const provider = window.$onekey?.conflux
+
+if (!provider) {
+  throw new Error('未检测到 OneKey Conflux provider')
+}
+
+// 检查兼容性标志
+console.log('isConfluxPortal:', provider.isConfluxPortal) // true
+console.log('isFluent:', provider.isFluent) // true
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## 快速开始
+
+### 请求账户
+
+```typescript
+const accounts = await provider.request({
+  method: 'cfx_requestAccounts'
+})
+
+console.log('已连接:', accounts[0])
+```
+
+### 检查连接
+
+```typescript
+if (provider.isConnected()) {
+  const accounts = await provider.request({ method: 'cfx_accounts' })
+  console.log('账户:', accounts)
+}
+```
+
+---
+
+## 账户和网络
+
+### 获取链 ID
+
+```typescript
+const chainId = await provider.request({ method: 'cfx_chainId' })
+console.log('链 ID:', chainId) // 例如主网为 '0x405'
+```
+
+### 获取网络版本
+
+```typescript
+const networkId = await provider.request({ method: 'net_version' })
+console.log('网络 ID:', networkId) // 例如主网为 '1029'
+```
+
+### 获取余额
+
+```typescript
+const balance = await provider.request({
+  method: 'cfx_getBalance',
+  params: [address, 'latest_state']
+})
+
+console.log('余额:', balance) // 单位 Drip (1 CFX = 10^18 Drip)
+```
+
+---
+
+## 交易
+
+### 发送交易
+
+```typescript
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000', // 1 CFX (Drip, 十六进制)
+    gas: '0x5208', // 21000
+  }]
+})
+
+console.log('交易哈希:', txHash)
+```
+
+### 带 Gas 估算的发送
+
+```typescript
+// 先估算 gas
+const gasEstimate = await provider.request({
+  method: 'cfx_estimateGasAndCollateral',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+  }]
+})
+
+// 使用估算值发送
+const txHash = await provider.request({
+  method: 'cfx_sendTransaction',
+  params: [{
+    from: senderAddress,
+    to: recipientAddress,
+    value: '0xDE0B6B3A7640000',
+    gas: gasEstimate.gasLimit,
+    storageLimit: gasEstimate.storageCollateralized,
+  }]
+})
+```
+
+### 调用合约
+
+```typescript
+const result = await provider.request({
+  method: 'cfx_call',
+  params: [{
+    to: contractAddress,
+    data: encodedFunctionCall,
+  }, 'latest_state']
+})
+
+console.log('结果:', result)
+```
+
+---
+
+## 事件处理
+
+### 监听账户变化
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts.length === 0) {
+    console.log('已断开连接')
+  } else {
+    console.log('账户已变更:', accounts[0])
+  }
+})
+```
+
+### 监听链变化
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('链已变更:', chainId)
+  // 建议重新加载页面
+  window.location.reload()
+})
+```
+
+### 监听连接
+
+```typescript
+provider.on('connect', ({ chainId, networkId }) => {
+  console.log('已连接到:', chainId, networkId)
+})
+
+provider.on('disconnect', () => {
+  console.log('已断开连接')
+})
+```
+
+---
+
+## 配合 js-conflux-sdk 使用
+
+### 设置
+
+```bash
+npm install js-conflux-sdk
+```
+
+### 连接 Provider
+
+```typescript
+import { Conflux } from 'js-conflux-sdk'
+
+const conflux = new Conflux({
+  url: 'https://main.confluxrpc.com',
+  networkId: 1029,
+})
+
+// 使用 OneKey provider 进行签名
+conflux.provider = provider
+```
+
+### 使用 SDK 发送交易
+
+```typescript
+// 创建并发送交易
+const tx = await conflux.cfx.sendTransaction({
+  from: senderAddress,
+  to: recipientAddress,
+  value: Conflux.Drip.fromCFX(1), // 1 CFX
+})
+
+console.log('交易:', tx)
+
+// 等待确认
+const receipt = await tx.executed()
+console.log('回执:', receipt)
+```
+
+### 合约交互
+
+```typescript
+const contract = conflux.Contract({
+  abi: contractABI,
+  address: contractAddress,
+})
+
+// 读取
+const result = await contract.someViewFunction().call()
+
+// 写入
+const tx = await contract.someWriteFunction(param1, param2).sendTransaction({
+  from: senderAddress,
+})
+
+const receipt = await tx.executed()
+```
+
+---
+
+## API 参考
+
+### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `request({ method, params })` | 发送 JSON-RPC 请求 |
+| `isConnected()` | 检查连接状态 |
+| `on(event, callback)` | 订阅事件 |
+| `off(event, callback)` | 取消订阅事件 |
+
+### RPC 方法
+
+| 方法 | 说明 |
+|------|------|
+| `cfx_requestAccounts` | 请求连接 |
+| `cfx_accounts` | 获取已连接账户 |
+| `cfx_chainId` | 获取链 ID |
+| `cfx_sendTransaction` | 发送交易 |
+| `cfx_call` | 调用合约（只读） |
+| `cfx_estimateGasAndCollateral` | 估算 gas |
+| `cfx_getBalance` | 获取账户余额 |
+| `cfx_getTransactionByHash` | 获取交易 |
+| `cfx_getTransactionReceipt` | 获取回执 |
+| `net_version` | 获取网络 ID |
+
+### 事件
+
+| 事件 | 参数 | 说明 |
+|------|------|------|
+| `connect` | `{ chainId, networkId }` | 已连接到网络 |
+| `disconnect` | - | 已断开连接 |
+| `chainChanged` | `chainId` | 网络已变更 |
+| `accountsChanged` | `accounts[]` | 账户已变更 |
+
+### 网络
+
+| 网络 | 链 ID (十六进制) | 网络 ID |
+|------|-----------------|---------|
+| 主网 | `0x405` | 1029 |
+| 测试网 | `0x1` | 1 |
+
+---
+
+## 已弃用方法
+
+这些方法仍然可用但已弃用：
+
+```typescript
+// 已弃用: 使用 request({ method: 'cfx_requestAccounts' })
+await provider.enable()
+
+// 已弃用: 使用 request()
+await provider.send({ method: 'cfx_accounts' })
+await provider.sendAsync({ method: 'cfx_accounts' }, callback)
+
+// 已弃用: 使用 request({ method: 'cfx_chainId' })
+provider.chainId
+
+// 已弃用: 使用 request({ method: 'net_version' })
+provider.networkVersion
+
+// 已弃用: 使用 request({ method: 'cfx_accounts' })
+provider.selectedAddress
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const accounts = await provider.request({
+    method: 'cfx_requestAccounts'
+  })
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了请求')
+  } else if (error.code === -32603) {
+    console.log('内部错误')
+  } else {
+    console.error('错误:', error.message)
+  }
+}
+```
+
+### 常见错误码
+
+| 错误码 | 说明 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| -32700 | 解析错误 |
+| -32600 | 无效请求 |
+| -32601 | 方法未找到 |
+| -32602 | 无效参数 |
+| -32603 | 内部错误 |
+
+---
+
+## 地址格式
+
+Conflux 使用 base32 地址 (CIP-37)：
+
+```typescript
+// 主网: cfx:...
+// 测试网: cfxtest:...
+
+// 主网地址示例
+const address = 'cfx:aak2rra2njvd77ezwjvx04kkds9fzagfe6ku8scz91'
+
+// 使用 js-conflux-sdk 在格式之间转换
+import { format } from 'js-conflux-sdk'
+
+const hexAddress = format.hexAddress(address)
+const base32Address = format.address(hexAddress, 1029) // networkId
+```

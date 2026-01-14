@@ -1,10 +1,12 @@
 /* eslint-disable no-bitwise */
-import type { NexaGetAddressParams, Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { sha256 } from '@noble/hashes/sha256';
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { encodeAddress } from '@nexajs/address';
-import { encodeDataPush, OP } from '@nexajs/script';
+import { OP, encodeDataPush } from '@nexajs/script';
+
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { NexaGetAddressParams, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 enum ENexaAddressType {
   PayToPublicKeyHash = 'P2PKH',

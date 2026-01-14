@@ -1,9 +1,10 @@
-import { NEMGetAddress as HardwareNEMGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
-import { validatePath, serializedPath } from '../helpers/pathUtils';
+import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { NEMAddress, NEMGetAddressParams } from '../../types';
+
+import type { NEMGetAddress as HardwareNEMGetAddress } from '@onekeyfe/hd-transport';
+import type { NEMAddress, NEMGetAddressParams } from '../../types';
 
 const MAINNET = 0x68; // 104
 

@@ -4,7 +4,7 @@ import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
 
 import type { TronGetAddress as HardwareTronGetAddress } from '@onekeyfe/hd-transport';
-import type { TronGetAddressParams, TronAddress } from '../../types';
+import type { TronAddress, TronGetAddressParams } from '../../types';
 
 export default class TronGetAddress extends BaseMethod<HardwareTronGetAddress[]> {
   hasBundle = false;

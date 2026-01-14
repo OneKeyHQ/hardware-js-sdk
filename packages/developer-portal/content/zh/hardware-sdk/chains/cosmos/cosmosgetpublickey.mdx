@@ -1,0 +1,98 @@
+---
+title: cosmosGetPublicKey
+---
+
+# cosmosGetPublicKey
+
+## 使用要求
+
+* 固件版本要求
+  * Touch: 4.0.0
+  * Classic/Mini: 2.10.0
+
+## Cosmos：获取公钥
+
+获取由给定 BIP32 路径派生的 BIP32 扩展公钥。用户会看到所请求密钥的描述，并被要求确认导出。
+
+```typescript
+const result = await HardwareSDK.cosmosGetPublicKey(connectId, deviceId, params);
+```
+
+## 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+### 导出单个公钥
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `1`。
+* `curve` - _可选_ `string` 椭圆曲线算法，默认为 `secp256k1`
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+
+#### 导出批量公钥
+
+* `bundle` - 包含 `path`、`showOnOneKey`、`curve` 字段的对象 `Array`
+
+### 示例
+
+返回第五个 Cosmos 账户的公钥：
+
+```typescript
+HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
+    path: "m/44'/118'/0'/0/0",
+    curve: 'secp256k1',
+    showOnOneKey: true
+});
+```
+
+返回多个 Cosmos 账户的批量公钥：
+
+```typescript
+HardwareSDK.cosmosGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/118'/0'/0/0" }, // 账户 1
+        { path: "m/44'/118'/1'/0/0" }, // 账户 2
+        { path: "m/44'/118'/2'/0/0" }, // 账户 3
+    ]
+});
+```
+
+### 返回结果
+
+只有一个公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string, // 强化路径
+        publicKey: string
+    }
+}
+```
+
+[了解更多关于 BIP32 序列化格式](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
+
+批量公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path: serializedPath, publicKey }, // 账户 1
+        { path: serializedPath, publicKey }, // 账户 2
+        { path: serializedPath, publicKey }, // 账户 3
+    ]
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

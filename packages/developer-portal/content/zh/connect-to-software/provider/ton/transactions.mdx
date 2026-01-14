@@ -1,0 +1,179 @@
+---
+title: 交易
+description: 使用 OneKey 在 TON 上发送交易
+---
+
+import { Callout } from 'nextra/components'
+
+# 交易
+
+了解如何在 TON 上发送交易。
+
+---
+
+## 发送交易
+
+使用 `send` 方法和 `sendTransaction` 发送 TON：
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600, // 10 分钟有效期
+      messages: [
+        {
+          address: '0:1234...', // 接收地址（原始格式）
+          amount: '1000000000', // 金额（nanotons，1 TON = 10^9 nanotons）
+        }
+      ]
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('交易 BOC:', result.result)
+} else {
+  console.error('交易失败:', result.error.message)
+}
+```
+
+---
+
+## 发送多条消息
+
+TON 每笔交易最多支持 4 条消息：
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient1...',
+          amount: '500000000', // 0.5 TON
+        },
+        {
+          address: '0:recipient2...',
+          amount: '300000000', // 0.3 TON
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## 带 Payload 发送
+
+包含 payload 用于智能合约交互：
+
+```typescript
+import { beginCell } from '@ton/core'
+
+// 创建评论 cell
+const comment = beginCell()
+  .storeUint(0, 32) // 评论操作码
+  .storeStringTail('来自 dApp 的问候！')
+  .endCell()
+
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient...',
+          amount: '100000000',
+          payload: comment.toBoc().toString('base64'),
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## 带 StateInit 发送
+
+部署合约或初始化状态：
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:contract...',
+          amount: '50000000',
+          stateInit: stateInitBoc.toString('base64'), // Base64 编码的 StateInit
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## 使用 SDK 发送交易
+
+```tsx
+import { useTonConnectUI } from '@tonconnect/ui-react'
+
+function SendButton() {
+  const [tonConnectUI] = useTonConnectUI()
+
+  const handleSend = async () => {
+    const result = await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: 'EQA...',
+          amount: '1000000000',
+        }
+      ]
+    })
+    console.log('BOC:', result.boc)
+  }
+
+  return <button onClick={handleSend}>发送 1 TON</button>
+}
+```
+
+---
+
+## 地址格式
+
+TON 使用不同的地址格式：
+
+```typescript
+import { Address } from '@ton/core'
+
+// 原始格式（provider 中使用）
+const raw = '0:1234567890abcdef...'
+
+// 用户友好格式（可弹回）
+const friendly = Address.parse(raw).toString()
+// 例如 'EQASdf...'
+
+// 不可弹回格式
+const nonBounceable = Address.parse(raw).toString({ bounceable: false })
+// 例如 'UQASdf...'
+
+// 从友好格式转换为原始格式
+const addr = Address.parse('EQASdf...')
+const rawAddress = `${addr.workChain}:${addr.hash.toString('hex')}`
+```
+

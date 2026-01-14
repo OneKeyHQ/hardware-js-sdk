@@ -1,6 +1,7 @@
-import { TypedCall } from '@onekeyfe/hd-transport';
-import { EVMTransaction, EVMTransactionEIP1559, EVMTransactionEIP7702 } from '../../../types';
 import { evmSignTx, evmSignTxEip1559, evmSignTxEip7702 } from '../latest/signTransaction';
+
+import type { TypedCall } from '@onekeyfe/hd-transport';
+import type { EVMTransaction, EVMTransactionEIP1559, EVMTransactionEIP7702 } from '../../../types';
 
 export const signTransaction = async ({
   typedCall,

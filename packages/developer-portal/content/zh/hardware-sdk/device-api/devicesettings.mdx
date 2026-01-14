@@ -1,0 +1,64 @@
+---
+title: deviceSettings
+---
+
+# deviceSettings
+
+## 设备设置
+
+建议每次只修改一个属性，因为需要在设备上进行确认。
+
+```typescript
+const result = await HardwareSDK.deviceSettings(connectId, params);
+```
+
+## 参数
+
+[**可选通用参数**](../common-params)
+
+* `language` - _可选_ `string` 设备语言，[ISO 639-1 代码](https://en.wikipedia.org/wiki/List\_of\_ISO\_639-1\_codes)
+* `label` - _可选_ `string` 设备名称
+* `usePassphrase` - _可选_ `boolean` 是否开启 Passphrase
+* `homescreen` - _可选_ `string` 通过十六进制字符串修改主屏幕壁纸
+* `autoLockDelayMs` - _可选_ `number` 自动锁定时间（毫秒）
+* `displayRotation` - _可选_ `number` 屏幕旋转角度
+* `passphraseAlwaysOnDevice` - _可选_ `boolean` 不提示输入 Passphrase，强制在设备上输入
+*   `safetyChecks` - _可选_ `string` 安全检查级别，设置为 Prompt 以限制路径命名空间强制执行
+
+    0: Strict
+    1: PromptAlways
+    2: PromptTemporarily
+
+```
+* `experimentalFeatures` - _可选_ `boolean` 启用实验性消息类型
+
+## 示例
+
+```typescript
+HardwareSDK.deviceSettings(connectId, {
+    label: 'My OneKey Wallet'
+});
+```
+
+## 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: string
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

@@ -1,0 +1,264 @@
+---
+title: 核心接口指南
+---
+
+# 硬件 SDK 核心接口指南
+
+单页深度指南：Happy Path + 参数/事件/安全/错误处理，一页掌握。
+
+## 快速流程
+<div id="request-basics" />
+
+- 方法签名：`HardwareSDK.method(connectId, deviceId?, params)` → `Promise<{ success, payload }>`，先判 `success` 再读 `payload`。
+- 标识获取：`connectId` 来自 `searchDevices`（同一设备稳定不变，设备重置不影响）；`deviceId` 来自 `getFeatures`（BLE 必填，WebUSB 建议带）。设备重置/恢复后需刷新 `deviceId`。
+- UI 事件订阅：入口订阅一次 `UI_EVENT`，只在输入类 `UI_REQUEST` 时调用 `uiResponse`（PIN/Passphrase/Bootloader 选择），多设备按设备路由事件。
+- 参数检查：按链校验 HD Path；复用隐藏钱包用 `initSession + passphraseState`；同一设备串行调用避免死锁。
+
+```ts
+const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+});
+
+if (!res.success) throw new Error(res.payload.error);
+console.log(res.payload.address);
+```
+
+### 交互流程图
+
+<div style={{ display: 'flex', justifyContent: 'center' }}>
+  <img
+    src="/images/core-api-guide/core-api-flow-zh.svg"
+    alt="硬件 SDK 请求/响应流程图"
+    style={{ maxWidth: '780px', width: '100%' }}
+  />
+</div>
+
+## 核心标识与环境
+
+| 项 | 作用 | 获取/刷新 | 注意点 |
+| --- | --- | --- | --- |
+| `connectId` | 连接标识，决定路由到哪台设备/连接 | `searchDevices()` | 同一设备稳定不变（设备重置不影响）；WebUSB/Bridge 通常等于序列号；BLE 为系统层标识（Android MAC / iOS UUID）。 |
+| `deviceId` | 当前种子/钱包状态标识 | `getFeatures(connectId)` | 设备重置/擦除/恢复/换种子后会变；敏感操作会校验避免错设备。 |
+
+- `connectId + deviceId` 成对缓存；遇到 `DeviceCheckDeviceIdError`、设备重置或切换设备时重新 `getFeatures`。
+- SDK 组合：`@onekeyfe/hd-common-connect-sdk` + `@onekeyfe/hd-core` + `@onekeyfe/hd-shared`，与固件/Bridge 版本对齐。
+- 运行环境：`webusb` 需 HTTPS + 用户手势；`react-native` 需 BLE + 常见定位权限；`lowlevel` 需 64 字节帧自定义适配。
+- 设备/固件：尽量用最新稳定版，Bootloader 模式部分 API 不可用；Bridge 需保持运行且端口空闲。
+
+### 需要传哪些标识？
+
+- 不需要标识：`init` / 事件订阅 (`on`/`off`) / `searchDevices` / `getLogs` / `checkBridgeStatus` / `checkFirmwareTypeAvailable` / `updateSettings` / `switchTransport` / `dispose` / `uiResponse`（仅需 payload）。
+- 仅需 `connectId`：`getFeatures` / `getPassphraseState` / `cancel` / 设备管理与固件类接口（如 `deviceSettings`、`deviceReset`、`deviceWipe`、`checkFirmwareRelease` 等）。
+- 需要 `connectId + deviceId`：链相关签名/地址/公钥/加解密/证明类接口（如 EVM/BTC/Solana/Nostr/TON/`allNetworkGetAddress`/`cipherKeyValue` 等）。
+
+## 推荐生命周期
+
+标准闭环：`init → search → getFeatures(connectId) → 订阅 UI/DEVICE/FIRMWARE → 调用 + uiResponse → cleanup`
+
+```ts
+import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+
+// 1) 幂等初始化，一般在应用入口执行一次
+await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+
+// 2) 发现设备
+const devices = await HardwareSDK.searchDevices();
+if (!devices.length) throw new Error('No device');
+const [{ connectId }] = devices;
+
+// 3) 获取 deviceId（BLE 必需，WebUSB 建议）
+const features = await HardwareSDK.getFeatures(connectId);
+const deviceId = features?.payload?.device_id;
+
+// 4) 订阅 UI 事件，在回调中再调用 uiResponse
+HardwareSDK.on(UI_REQUEST.REQUEST_PIN, () => {
+  // 打开 UI，收集输入后调用 uiResponse
+});
+HardwareSDK.on(UI_REQUEST.REQUEST_PASSPHRASE, () => {});
+
+// 5) 发起链调用（EVM 示例）
+await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+});
+```
+
+并发/清理：同一设备串行调用，切换设备时刷新 `getFeatures`；页面销毁时移除监听，只有在需要重置传输状态时调用 `HardwareSDK.dispose()`。
+
+## 参数与路径（重点）
+
+### 通用参数速查（CommonParams）
+
+| 参数 | 作用 | 典型场景 |
+| --- | --- | --- |
+| `initSession?: boolean` | 强制调用硬件进行会话初始化，可配合获取 passphrase 状态 | 首次调用前预建会话，减少后续提示 |
+| `passphraseState?: string` | 隐藏钱包标识，调用时携带以绑定对应隐藏钱包 | 使用隐藏钱包时必传，保持同一个隐藏钱包 |
+| `useEmptyPassphrase?: boolean` | 强制标准钱包 | 避免误用隐藏钱包 |
+| `deriveCardano?: boolean` | 预先派生 Cardano | 会话内首次 Cardano 调用 |
+| `retryCount?` / `pollIntervalTime?` / `timeout?` | 轮询/超时调优 | BLE 或网络不稳定场景 |
+| `detectBootloaderDevice?: boolean` | Bootloader 时快速失败 | 提示退出 Bootloader |
+| `skipWebDevicePrompt?: boolean` | 跳过 WebUSB 设备选择 | 复用已授权设备 |
+| `keepSession?` | （不推荐使用，已废弃） | 请改用 `initSession + passphraseState` 组合 |
+
+组合示例：
+
+```ts
+// 隐藏钱包 + 连续调用，避免重复提示
+const commonParams = {
+  initSession: true,
+  keepSession: true,
+  passphraseState: 'hidden-wallet-id',
+};
+
+await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  messageHex,
+  ...commonParams,
+});
+```
+
+## HD Path 与账户选择
+
+- 规则：`path: string | number[]` 遵循 BIP44；ed25519 链（Solana、NEAR 等）需全硬化。
+- 常用路径：
+
+| 链 | 示例路径 | 说明 |
+| --- | --- | --- |
+| EVM | `m/44'/60'/0'/0/0` | 标准 EVM |
+| BTC（Nested SegWit） | `m/49'/0'/0'/0/0` | Native SegWit 用 84' |
+| Solana | `m/44'/501'/0'/0'` | 全硬化 |
+| NEAR | `m/44'/397'/0'/0'/1'` | 全硬化 |
+| Cardano | `m/1852'/1815'/0'/0/0` | 质押路径 `.../2/0` |
+| TRON | `m/44'/195'/0'/0/0` | EVM 风格路径 |
+
+- 数组示例：`[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
+- 若报 forbidden path，检查长度/硬化是否符合该链要求，并参考对应链文档。
+
+## 事件与 UI 响应
+
+- 事件通道：`UI_EVENT`（交互提示）、`DEVICE_EVENT`（连接/能力变化）、`FIRMWARE_EVENT`（可升级信息）。入口订阅，退出时清理。
+- 只对输入型请求调用 `uiResponse`，其他通知用于 UI 提示即可。
+- 同时连接多台设备时，按设备路由事件，避免串音。
+
+**需要 `uiResponse` 的 UI 请求**
+
+| UI_REQUEST | 触发时机 | 应答 |
+| --- | --- | --- |
+| `REQUEST_PIN` | 受保护调用且设备被锁定 | `UI_RESPONSE.RECEIVE_PIN`（盲输或在设备输入） |
+| `REQUEST_PASSPHRASE` | 软件输入隐藏钱包口令 | `UI_RESPONSE.RECEIVE_PASSPHRASE`（`value`、`passphraseOnDevice`、`attachPinOnDevice`、`save`） |
+| `REQUEST_PASSPHRASE_ON_DEVICE` | 设备输入隐藏钱包口令 | `UI_RESPONSE.RECEIVE_PASSPHRASE`（`passphraseOnDevice: true`） |
+| `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Web Bootloader 设备选择 | `UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE`（`deviceId`） |
+
+**仅展示的 UI 请求（无需响应）**
+
+| UI_REQUEST | 作用 |
+| --- | --- |
+| `REQUEST_BUTTON` | 提示在设备确认 |
+| `DEVICE_PROGRESS` | 长耗时进度 |
+| `FIRMWARE_PROCESSING` / `FIRMWARE_PROGRESS` / `FIRMWARE_TIP` | 固件升级/处理状态 |
+| `BLUETOOTH_PERMISSION` / `LOCATION_PERMISSION` | BLE 权限提示 |
+| `BOOTLOADER` / `REQUIRE_MODE` / `NOT_INITIALIZE` / `FIRMWARE_NOT_SUPPORTED` | 模式/支持性提示 |
+
+**需要关注的设备/固件事件**
+
+| 通道 | 事件 | 含义 | 建议动作 |
+| --- | --- | --- | --- |
+| `DEVICE_EVENT` | `CONNECT` | 设备接入且可用 | 刷新设备列表，可自动选中 |
+| `DEVICE_EVENT` | `DISCONNECT` | 设备拔出或 BLE 断开 | 标记会话失效，提示重新连接 |
+| `DEVICE_EVENT` | `ACQUIRE` | 传输会话开始 | 阻塞并发请求，标记设备忙 |
+| `DEVICE_EVENT` | `RELEASE` | 传输会话结束 | 允许队列中的下一个请求 |
+| `DEVICE_EVENT` | `CHANGED` | 功能变更（如解锁后） | 重新执行 `getFeatures`，刷新缓存的 `deviceId` |
+| `DEVICE_EVENT` | `USED_ELSEWHERE` | 存在传输冲突 | 提示关闭其他应用/Bridge |
+| `DEVICE_EVENT` | `UNREADABLE` | 权限或驱动异常 | 提示重新授权或检查驱动 |
+| `DEVICE_EVENT` | `BUTTON` | 设备等待确认 | 在 UI 呈现“请在设备确认” |
+| `DEVICE_EVENT` | `PIN` | 设备等待 PIN | 保持 PIN 输入流程 |
+| `DEVICE_EVENT` | `PASSPHRASE` | 设备等待软件口令 | 保持口令输入流程 |
+| `DEVICE_EVENT` | `PASSPHRASE_ON_DEVICE` | 设备等待在机输入口令 | 显示“请在设备输入口令” |
+| `DEVICE_EVENT` | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Bootloader 设备选择中 | 保持设备选择界面直至完成 |
+| `DEVICE_EVENT` | `FEATURES` | 能力快照 | 缓存能力信息 |
+| `DEVICE_EVENT` | `SUPPORT_FEATURES` | 支持矩阵快照 | 缓存支持情况 |
+| `FIRMWARE_EVENT` | `RELEASE_INFO` | 新固件信息 | 在安全时机提示升级 |
+| `FIRMWARE_EVENT` | `BLE_RELEASE_INFO` | 新 BLE 固件信息 | 在安全时机提示升级 |
+
+**接线模板（最小可用）**
+
+```ts
+import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+
+const handleUiEvent = (msg: any) => {
+  switch (msg.type) {
+    case UI_REQUEST.REQUEST_PIN:
+      openPinModal(({ value }) =>
+        HardwareSDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: value })
+      );
+      return;
+    case UI_REQUEST.REQUEST_PASSPHRASE:
+      openPassphraseModal(({ value, onDevice, save }) =>
+        HardwareSDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+          payload: { value, passphraseOnDevice: onDevice, attachPinOnDevice: false, save },
+        })
+      );
+      return;
+    case UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
+      showDeviceList((deviceId) =>
+        HardwareSDK.uiResponse({
+          type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+          payload: { deviceId },
+        })
+      );
+      return;
+    default:
+      console.log('UI event', msg.type, msg.payload);
+  }
+};
+
+HardwareSDK.on(UI_EVENT, handleUiEvent);
+```
+
+## PIN 与 Passphrase 安全
+
+- PIN：Pro/Touch 仅设备输入；其他机型支持盲输但优先设备输入。
+
+```ts
+const BLIND_KEYBOARD_MAP = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: BLIND_KEYBOARD_MAP[label - 1],
+});
+```
+
+- Passphrase：标准钱包=默认空口令；隐藏钱包=非空口令（大小写敏感）。
+  - 最安全：`passphraseOnDevice: true`
+  - 软件输入：`{ value, passphraseOnDevice: false, save: true }` 仅会话内缓存，不要持久化明文。
+  - 避免误用隐藏钱包：方法参数中加 `useEmptyPassphrase: true`。
+
+## 错误码到行动（分组示例）
+
+| 分组 | 常见原因 | 建议动作 |
+| --- | --- | --- |
+| Device (101–118, 200) | 模式错误、设备忙、device_id 不匹配、未初始化 | 确认设备模式，重连后重新 `init + getFeatures` |
+| IFrame (300–305) | 未 init、加载/超时/被拦截 | 确保 `init` 成功且未被 CSP/iframe 阻挡 |
+| Method/Firmware (400–418) | 参数错误、需固件升级、禁用路径 | 校验参数/HD Path，提示升级固件 |
+| Transport (600–603) | 传输未配置、并发调用、protobuf 错误 | 检查 env/Bridge，串行调用，对齐 SDK 版本 |
+| Bluetooth (700–722) | 扫描/权限/连接/超时 | 检查蓝牙/定位权限与电量距离，重试连接 |
+| Runtime/Bridge (800–821) | PIN/动作被取消、Bridge 权限/超时、盲签关闭 | 重试或提示安装/启动 Bridge，确保签名模式 |
+| Web device (901–902) | WebUSB/蓝牙未授权或弹窗失败 | 提示重新授权；确保 HTTPS + 用户手势 |
+
+更多细节：参考 [`HardwareError.ts`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/shared/src/HardwareError.ts) 获取完整错误定义与 payload 结构。
+
+处理模式：错误码 → “用户文案 + 开发者动作”映射；在 UI 提供重试/检查设备/升级固件按钮。
+
+## 快速检查清单
+
+1) 初始化一次，确认 env/权限/HTTPS；保存 `connectId` + `deviceId`  
+2) 订阅 UI/DEVICE/FIRMWARE，事件后再调用 `uiResponse`  
+3) 同一设备串行调用；按需组合 CommonParams（keepSession/passphraseState）  
+4) 使用合规 HD Path；异常时检查链文档与硬化规则  
+5) 错误码映射到用户文案与开发者操作；必要时提示升级固件/Bridge  
+
+## 相关链接
+
+- 快速开始（安装 + 首次调用）：[快速开始](/zh/hardware-sdk/getting-started)
+- 传输适配：WebUSB · React Native BLE · iOS/Android 底层适配
+- 链 API：侧边栏按链分类的 `sign` / `getAddress` 方法页
+- 迁移指南：bridge-to-common-connect/WebUSB 迁移文档

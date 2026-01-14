@@ -53,7 +53,9 @@
     "dev:transport-web-device": "cd ./packages/hd-transport-web-device && yarn dev",
     "dev:transport-electron": "cd ./packages/hd-transport-electron && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
-    "debug:watcher": "node ./scripts/monitor.js"
+    "debug:watcher": "node ./scripts/monitor.js",
+    "dev:docs": "cd ./packages/developer-portal && yarn dev",
+    "build:docs": "cd ./packages/developer-portal && yarn build"
   },
   "resolutions": {
     "pbkdf2": "3.1.3",

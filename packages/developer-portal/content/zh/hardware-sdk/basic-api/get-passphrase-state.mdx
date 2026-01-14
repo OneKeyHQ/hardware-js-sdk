@@ -1,0 +1,44 @@
+---
+title: 获取密码短语状态
+---
+
+# 获取密码短语状态
+
+## 获取设备的 passphraseState
+
+请求此 API 将提示用户输入密码短语。此方法将返回一个字符串结果，可用作后续 API 的 `passphraseState` 请求参数。SDK 会将此参数与用户的输入进行比较。如果结果匹配，参数将被缓存以减少用户输入并改善用户体验。
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+### 参数
+
+[**可选通用参数**](../common-params)
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.getPassphraseState(connectId);
+```
+
+### 返回结果
+
+```
+{
+    success: true,
+    payload: string
+}
+```
+
+### 错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误消息
+        code: number // 错误码
+    }
+}
+```

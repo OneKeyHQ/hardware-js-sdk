@@ -1,0 +1,105 @@
+---
+title: dApp 集成
+description: 将你的 dApp 与 OneKey 钱包集成
+---
+
+import { Callout } from 'nextra/components'
+
+# dApp 集成
+
+连接你的 dApp 到 OneKey 钱包，支持 EVM 和 20+ 条非 EVM 链。
+
+## 选择集成方式
+
+| 方式 | 适用场景 | 框架 |
+|------|----------|------|
+| [**RainbowKit**](/zh/connect-to-software/wallet-ui/rainbowkit) | 现成钱包 UI，React 应用 | React |
+| [**Web3Modal**](/zh/connect-to-software/wallet-ui/web3modal) | 多框架钱包 UI | React / Vue / JS |
+| [**Web3-Onboard**](/zh/connect-to-software/wallet-ui/web3-onboard) | 高度定制化，多框架支持 | React / Vue / JS |
+| [**Wagmi**](/zh/connect-to-software/react-hooks/wagmi) | 自定义 UI + React hooks | React |
+| [**Provider API**](/zh/connect-to-software/provider/eth) | 完全控制，无依赖 | 任意 |
+
+<Callout>
+**快速建议：** React 应用使用 RainbowKit，Vue/原生 JS 使用 Web3Modal 或 Web3-Onboard。
+</Callout>
+
+---
+
+## 快速开始
+
+### RainbowKit (React)
+
+```bash
+npm install @rainbow-me/rainbowkit wagmi viem @tanstack/react-query
+```
+
+```tsx filename="App.tsx"
+import '@rainbow-me/rainbowkit/styles.css'
+import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { WagmiProvider } from 'wagmi'
+import { mainnet } from 'wagmi/chains'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const config = getDefaultConfig({
+  appName: 'My dApp',
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // 从 cloud.walletconnect.com 获取
+  chains: [mainnet],
+})
+
+export default function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={new QueryClient()}>
+        <RainbowKitProvider>
+          <ConnectButton />
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+[完整指南](/zh/connect-to-software/wallet-ui/rainbowkit)
+
+### Provider API（无依赖）
+
+```typescript
+// 使用 EIP-6963 检测 OneKey
+const providers = []
+window.addEventListener('eip6963:announceProvider', (e) => providers.push(e.detail))
+window.dispatchEvent(new Event('eip6963:requestProvider'))
+
+// 查找并连接 OneKey
+const onekey = providers.find(p => p.info.rdns === 'so.onekey.app.wallet')
+const accounts = await onekey.provider.request({ method: 'eth_requestAccounts' })
+```
+
+[完整指南](/zh/connect-to-software/provider/eth)
+
+---
+
+## OneKey 检测
+
+| 属性 | 值 |
+|------|-----|
+| EIP-6963 `rdns` | `so.onekey.app.wallet` |
+| Provider | `window.$onekey.ethereum` |
+
+---
+
+## 支持的链
+
+**EVM：** Ethereum, Polygon, BSC, Arbitrum, Optimism, Base 及所有 EVM 兼容链
+
+**非 EVM：** [Bitcoin](/zh/connect-to-software/provider/btc), [Solana](/zh/connect-to-software/provider/solana), [Cosmos](/zh/connect-to-software/provider/cosmos), [Aptos](/zh/connect-to-software/provider/aptos), [Sui](/zh/connect-to-software/provider/sui), [TON](/zh/connect-to-software/provider/ton), [TRON](/zh/connect-to-software/provider/tron), [Polkadot](/zh/connect-to-software/provider/polkadot), [Cardano](/zh/connect-to-software/provider/cardano), [NEAR](/zh/connect-to-software/provider/near) 等
+
+[查看所有 Provider API](/zh/connect-to-software/provider/eth)
+
+---
+
+## 资源
+
+- **更新日志：** [cross-inpage-provider releases](https://github.com/OneKeyHQ/cross-inpage-provider/releases)
+- **源代码：** [cross-inpage-provider](https://github.com/OneKeyHQ/cross-inpage-provider)
+- **问题反馈：** [GitHub Issues](https://github.com/OneKeyHQ/cross-inpage-provider/issues)
+- **在线演示：** [Provider 示例](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example)

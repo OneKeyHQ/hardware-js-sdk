@@ -1,0 +1,51 @@
+---
+title: eth_requestAccounts
+description: Request user's Ethereum accounts
+---
+
+# eth_requestAccounts
+
+Requests that the user provides an Ethereum address to be identified by. This method will trigger a connection popup if the user is not already connected.
+
+---
+
+## Parameters
+
+None
+
+---
+
+## Returns
+
+`string[]` - An array of Ethereum addresses. Currently returns a single address.
+
+---
+
+## Example
+
+```typescript
+const accounts = await window.$onekey.ethereum.request({
+  method: 'eth_requestAccounts'
+})
+
+console.log('Connected account:', accounts[0])
+// "0x742d35Cc6634C0532925a3b844Bc9e7595f..."
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User rejected the request | User denied the connection request |
+| -32002 | Request already pending | A previous request is still waiting for user response |
+
+---
+
+## Notes
+
+- This method should only be called in response to a user action (e.g., button click)
+- If the user is already connected, this method returns the connected accounts without showing a popup
+- Equivalent to the deprecated `ethereum.enable()` method
+- Specified by [EIP-1102](https://eips.ethereum.org/EIPS/eip-1102)

@@ -1,19 +1,21 @@
 import { RawIntlProvider } from 'react-intl';
 import React, {
+  Suspense,
   createContext,
+  memo,
   useContext,
   useEffect,
-  useState,
   useMemo,
-  memo,
-  Suspense,
+  useState,
 } from 'react';
 import { isFunction } from 'lodash';
 import { Text } from 'tamagui';
-import { appLocale } from './AppLocale';
-import { ILocaleSymbol, LOCALES } from '../../../locale';
 
+import { appLocale } from './AppLocale';
+import { LOCALES } from '../../../locale';
 import { useLocaleLanguage } from '../../hooks/useLocaleLanguage';
+
+import type { ILocaleSymbol } from '../../../locale';
 
 const AppLocaleContext = createContext<{
   locale: ILocaleSymbol | undefined;

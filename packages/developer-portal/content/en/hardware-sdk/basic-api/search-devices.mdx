@@ -1,0 +1,59 @@
+---
+title: Search Devices
+---
+
+# Search Devices
+
+## Search device
+
+Searches for connected devices and returns the search results to the developer as an array. \
+\
+In the case of USB connections, the returned data already contains device details. \
+\
+In the case of Bluetooth device search, the data returned contains only the device name and device connectId, and the developer selects the device that needs to be paired before getting the device information.
+
+```typescript
+const response = await HardwareSDK.searchDevices();
+```
+
+### Params
+
+* empty
+
+### Example
+
+```typescript
+HardwareSDK.searchDevices().then(result => {
+    console.log(`device list: ${result}`)
+});
+```
+
+Result
+
+```typescript
+{
+    success: true,
+    payload: [
+        {
+            "connectId": string, // device connection id (stable for the same device; reset does not change it)
+            "uuid": string, // device unique id 
+            "deviceType": string, // device type, 'classic' | 'mini' | 'touch' | 'pro'
+            "deviceId": string, // device id; changes after reset/wipe/recovery; only returned when using the webusb transport of @onekeyfe/hd-common-connect-sdk.
+            "path": string, // device serial number when USB is connected via WebUSB
+            "name": string, // bluetooth name for the device
+        },
+    ]
+}
+```
+
+Error
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // error message
+        code: number // error code
+    }
+}
+```

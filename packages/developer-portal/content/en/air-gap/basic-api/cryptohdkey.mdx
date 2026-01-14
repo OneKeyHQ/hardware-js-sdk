@@ -1,0 +1,59 @@
+---
+title: CryptoHDKey
+---
+
+# CryptoHDKey
+
+The `CryptoHDKey` class represents hierarchical deterministic key information.
+
+This is an instruction provided by the OneKey hardware, which includes the extended public key information.
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `isMaster` | `boolean` | Whether it is a master key |
+| `isPrivateKey` | `boolean` | Whether it is a private key |
+| `key` | `Buffer` | The key data |
+| `chainCode` | `Buffer` | The chain code |
+| `useInfo` | [`CryptoCoinInfo`](../cryptocoininfo) | Usage information |
+| `origin` | [`CryptoKeypath`](../cryptokeypath) | The origin path |
+| `children` | [`CryptoKeypath`](../cryptokeypath) | The children path |
+| `parentFingerprint` | `Buffer` | The parent fingerprint |
+| `name` | `string` | The name (optional) |
+| `note` | `string` | The note (optional) |
+
+### Note Values
+
+- `'account.standard'` – BIP44 Standard account
+- `'account.ledger_live'` – Ledger Live account
+- `'account.ledger_legacy'` – Ledger Legacy account
+
+## UR Example
+
+```
+UR:CRYPTO-HDKEY/PDAXHDCLAOZTRDKBTKFPRFKBCWVEWYBGDPNTCPVLEOENJSWMBKFTLTRESNWTNLTLMKJYVYMWBSAAHDCXCSBNNLLNBZIAJZTPKPPKJOSTCEZSJEKGYKJOCSKNHFTPSWTIGHVABDIEGTBWWLTEAHTAADEHOYADCSFNAMTAADDYOYADLNCSDWYKCSFNYKAEYKATTAADDYOYADLRAEWKLAWKAYAEASINFPIAIAJLKPJTJYCXEHBKKOGHISINJKCXINJKCXHSC
+```
+
+## Decoding Example
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { CryptoHDKey } from '@keystonehq/bc-ur-registry';
+
+const dec = new URDecoder();
+// push each scanned frame string into the decoder
+// dec.receivePart(frame)
+
+if (dec.isComplete()) {
+  const ur = dec.resultUR(); // ur.type should be 'crypto-hdkey'
+  const hdkey = CryptoHDKey.fromCBOR(ur.cbor);
+  
+  const name = hdkey.getName();
+  const note = hdkey.getNote();
+  const chainCode = hdkey.getChainCode();
+  const origin = hdkey.getOrigin();
+  const xfp = origin?.getSourceFingerprint();
+}
+```
+

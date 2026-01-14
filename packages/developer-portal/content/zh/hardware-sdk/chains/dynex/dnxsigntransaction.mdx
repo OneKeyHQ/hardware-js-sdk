@@ -1,0 +1,92 @@
+---
+title: dnxSignTransaction
+---
+
+# dnxSignTransaction
+
+### Dynex：签名交易
+
+使用由给定 BIP32 路径派生的私钥对给定的 Dynex 交易进行签名。用户需要在 OneKey 上确认交易详情。
+
+```typescript
+const result = await HardwareSDK.dnxSignTransaction(connectId, deviceId, params);
+```
+
+#### 使用要求
+
+* 固件版本要求
+  * Classic: 3.8.0
+
+#### 参数
+
+connectId: `string`
+
+* 连接的唯一标识符
+
+deviceId: `string`
+
+* 硬件设备的唯一标识符
+
+params: `object`
+
+* path: `string` - BIP32 路径（例如 "m/44'/0'/0'/0/0"）[必需]
+* inputs: `array` - 交易输入数组 [必需]
+  * prevIndex: `number` - 前一个输出索引
+  * globalIndex: `number` - 全局索引
+  * txPubkey: `string` - 交易公钥
+  * prevOutPubkey: `string` - 前一个输出公钥
+  * amount: `string` - 输入金额
+* toAddress: `string` - 目标地址 [必需]
+* amount: `string` - 交易金额 [必需]
+* fee: `string` - 交易手续费 [必需]
+* paymentIdHex: `string` - 可选的支付 ID（必须为 32 字节）
+
+#### 示例
+
+```typescript
+const response = await HardwareSDK.dnxSignTransaction('connect1', 'device1', {
+    path: "m/44'/0'/0'/0/0",
+    inputs: [{
+        prevIndex: 0,
+        globalIndex: 323,
+        txPubkey: "0d708b68003ae5fee4c9f9aad56a8cfdb0a5dcbcdd2e3fc18eb813349457a78c",
+        prevOutPubkey: "ff4df9a9fc83e48f2c0242c4d94f3906546a889950bccd8ba4392f3e7886c3a1",
+        amount: "1000000000"
+    }],
+    toAddress: "XwmxTF8FxAy2s5cvtS62oSGxY3fzvDcgo2CiJ6rrpz9te68sApSDs3LQihubFtpsfT5z6NYHZzMKUjavNpTkW46i2dYgHBULG",
+    amount: "1000000000",
+    fee: "100000",
+});
+```
+
+#### 返回结果
+
+成功响应：
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: string,              // 用于签名的 BIP32 路径
+        txKey: {
+            ephemeralTxSecKey: string,  // 交易私钥
+            ephemeralTxPubKey: string   // 交易公钥
+        },
+        computedKeyImages: string[],    // 计算的密钥镜像数组
+        signatures: string[],           // 签名数组
+        outputKeys: string[]            // 输出密钥数组
+    }
+}
+```
+
+错误响应：
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code: number
+    }
+}
+```

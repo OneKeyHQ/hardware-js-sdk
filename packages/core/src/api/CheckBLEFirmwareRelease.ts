@@ -1,5 +1,4 @@
 import { BaseMethod } from './BaseMethod';
-
 import { UI_REQUEST } from '../constants/ui-request';
 import { getBleFirmwareReleaseInfo } from './firmware/releaseHelper';
 

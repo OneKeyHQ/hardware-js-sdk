@@ -1,0 +1,129 @@
+---
+title: 快速开始
+description: 使用 OneKey Provider 连接 Algorand
+---
+
+import { Callout } from 'nextra/components'
+
+# 快速开始
+
+了解如何检测、连接和与 Algorand 进行交互。
+
+<Callout type="info">
+OneKey 的 Algorand provider 同时支持旧版和 ARC-0001 兼容接口。
+</Callout>
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey Algorand provider
+const provider = window.$onekey?.algo
+
+if (!provider) {
+  throw new Error('未检测到 OneKey Algorand provider')
+}
+
+// 检查兼容性
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## 连接（旧版 API）
+
+```typescript
+const { address } = await provider.connect()
+console.log('已连接:', address)
+
+// 检查连接状态
+console.log('isConnected:', provider.isConnected)
+console.log('地址:', provider.address)
+```
+
+---
+
+## 启用 (ARC-0001)
+
+```typescript
+const result = await provider.enable({
+  genesisID: 'mainnet-v1.0',
+  genesisHash: 'wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=',
+})
+
+console.log('账户:', result.accounts)
+console.log('创世哈希:', result.genesisHash)
+```
+
+---
+
+## 断开连接
+
+```typescript
+await provider.disconnect()
+console.log('已断开连接')
+```
+
+---
+
+## 事件处理
+
+### 监听账户变更
+
+```typescript
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('账户已变更:', address)
+  } else {
+    console.log('已断开连接')
+  }
+})
+```
+
+### 监听连接
+
+```typescript
+provider.on('connect', ({ address }) => {
+  console.log('已连接:', address)
+})
+
+provider.on('disconnect', () => {
+  console.log('已断开连接')
+})
+```
+
+---
+
+## 与 Algod 客户端配合使用
+
+### 从 Provider 获取客户端
+
+```typescript
+// 获取预配置的客户端
+const algodClient = await provider.getAlgodv2Client()
+const indexerClient = await provider.getIndexerClient()
+
+// 使用客户端
+const status = await algodClient.status().do()
+console.log('网络状态:', status)
+```
+
+### 手动设置客户端
+
+```typescript
+import algosdk from 'algosdk'
+
+const algodClient = new algosdk.Algodv2(
+  '', // Token（公共节点不需要）
+  'https://mainnet-api.algonode.cloud',
+  ''
+)
+
+const indexerClient = new algosdk.Indexer(
+  '',
+  'https://mainnet-idx.algonode.cloud',
+  ''
+)
+```
+

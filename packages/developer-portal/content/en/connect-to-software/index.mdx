@@ -1,0 +1,105 @@
+---
+title: dApp Integration
+description: Integrate your dApp with OneKey wallet
+---
+
+import { Callout } from 'nextra/components'
+
+# dApp Integration
+
+Connect your dApp to OneKey wallet with support for EVM and 20+ non-EVM chains.
+
+## Choose Your Method
+
+| Method | Best For | Framework |
+|--------|----------|-----------|
+| [**RainbowKit**](/en/connect-to-software/wallet-ui/rainbowkit) | Ready-made wallet UI, React apps | React |
+| [**Web3Modal**](/en/connect-to-software/wallet-ui/web3modal) | Multi-framework wallet UI | React / Vue / JS |
+| [**Web3-Onboard**](/en/connect-to-software/wallet-ui/web3-onboard) | Extensive customization, multi-framework | React / Vue / JS |
+| [**Wagmi**](/en/connect-to-software/react-hooks/wagmi) | Custom UI with React hooks | React |
+| [**Provider API**](/en/connect-to-software/provider/eth) | Full control, no dependencies | Any |
+
+<Callout>
+**Quick recommendation:** Use RainbowKit for React apps, Web3Modal or Web3-Onboard for Vue/vanilla JS.
+</Callout>
+
+---
+
+## Quick Start
+
+### RainbowKit (React)
+
+```bash
+npm install @rainbow-me/rainbowkit wagmi viem @tanstack/react-query
+```
+
+```tsx filename="App.tsx"
+import '@rainbow-me/rainbowkit/styles.css'
+import { getDefaultConfig, RainbowKitProvider, ConnectButton } from '@rainbow-me/rainbowkit'
+import { WagmiProvider } from 'wagmi'
+import { mainnet } from 'wagmi/chains'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const config = getDefaultConfig({
+  appName: 'My dApp',
+  projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from cloud.walletconnect.com
+  chains: [mainnet],
+})
+
+export default function App() {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={new QueryClient()}>
+        <RainbowKitProvider>
+          <ConnectButton />
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+[Full Guide](/en/connect-to-software/wallet-ui/rainbowkit)
+
+### Provider API (No Dependencies)
+
+```typescript
+// Detect OneKey using EIP-6963
+const providers = []
+window.addEventListener('eip6963:announceProvider', (e) => providers.push(e.detail))
+window.dispatchEvent(new Event('eip6963:requestProvider'))
+
+// Find and connect to OneKey
+const onekey = providers.find(p => p.info.rdns === 'so.onekey.app.wallet')
+const accounts = await onekey.provider.request({ method: 'eth_requestAccounts' })
+```
+
+[Full Guide](/en/connect-to-software/provider/eth)
+
+---
+
+## OneKey Detection
+
+| Property | Value |
+|----------|-------|
+| EIP-6963 `rdns` | `so.onekey.app.wallet` |
+| Provider | `window.$onekey.ethereum` |
+
+---
+
+## Supported Chains
+
+**EVM:** Ethereum, Polygon, BSC, Arbitrum, Optimism, Base, and all EVM-compatible chains
+
+**Non-EVM:** [Bitcoin](/en/connect-to-software/provider/btc), [Solana](/en/connect-to-software/provider/solana), [Cosmos](/en/connect-to-software/provider/cosmos), [Aptos](/en/connect-to-software/provider/aptos), [Sui](/en/connect-to-software/provider/sui), [TON](/en/connect-to-software/provider/ton), [TRON](/en/connect-to-software/provider/tron), [Polkadot](/en/connect-to-software/provider/polkadot), [Cardano](/en/connect-to-software/provider/cardano), [NEAR](/en/connect-to-software/provider/near), and more
+
+[View all Provider APIs](/en/connect-to-software/provider/eth)
+
+---
+
+## Resources
+
+- **Changelog:** [cross-inpage-provider releases](https://github.com/OneKeyHQ/cross-inpage-provider/releases)
+- **Source Code:** [cross-inpage-provider](https://github.com/OneKeyHQ/cross-inpage-provider)
+- **Issues:** [GitHub Issues](https://github.com/OneKeyHQ/cross-inpage-provider/issues)
+- **Live Demo:** [Provider Example](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example)

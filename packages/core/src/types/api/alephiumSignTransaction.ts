@@ -1,4 +1,4 @@
-import { AlephiumSignedTx as HardwareAlephiumSignedTx } from '@onekeyfe/hd-transport';
+import type { AlephiumSignedTx as HardwareAlephiumSignedTx } from '@onekeyfe/hd-transport';
 import type { CommonParams, Response } from '../params';
 
 export type AlephiumSignedTx = {

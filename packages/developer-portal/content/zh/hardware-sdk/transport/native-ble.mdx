@@ -1,0 +1,32 @@
+---
+title: "原生 BLE"
+description: "面向 Android/iOS/Flutter 的 Bluetooth Low Energy 传输"
+---
+
+# 原生 BLE
+
+在原生移动应用中使用 `@onekeyfe/hd-common-connect-sdk`，通过 BLE 转发硬件请求。JavaScript 逻辑可以运行在 WebView 或自定义 JS 引擎中，底层的数据收发由原生 BLE 栈完成。本页面作为入口，帮助你快速抵达各个平台的详细指南，并避免文档路径跳转失败。
+
+## 何时使用原生 BLE
+
+- 你掌控整个原生应用（Android、iOS、Flutter），并愿意在其中嵌入 WebView 或 JS 运行环境，将 OneKey 硬件交互委托给原生 BLE。
+- 你需要直接访问系统 BLE 权限、配对流程或定制化 UI（例如 Swift/Kotlin/Flutter 代码）来提升体验。
+- 你希望重用 `@onekeyfe/hd-common-connect-sdk` 的 JavaScript 接口，同时本地处理 BLE 传输细节。
+
+## 平台指南
+
+| 平台 | 重点 | 指南 |
+| --- | --- | --- |
+| Android | Nordic BLE、权限、配对与 JS Bridge 方案 | [Android（原生）](/zh/hardware-sdk/transport/android) |
+| iOS | CoreBluetooth、配对辅助及事件转发 | [iOS（原生）](/zh/hardware-sdk/transport/ios) |
+| Flutter | Flutter 插件 + 原生桥接示例 | [Flutter（原生）](/zh/hardware-sdk/transport/flutter) |
+
+需要跨平台的 React Native 方案？请参考 [React Native 蓝牙](/zh/hardware-sdk/transport/react-native-ble)。
+
+## 核心概念
+
+- 先阅读 [底层传输插件与协议](/zh/hardware-sdk/concepts/low-level-plugin)，掌握 64 字节协议与消息封装结构。
+- 尽早订阅 `UI_EVENT`，避免 PIN/密码短语/确认对话阻塞消息队列。
+- 与 Web 方案共用同一套 `HardwareSDK` 适配器，原生代码只需将 BLE 数据包转发给 JavaScript。
+
+通过让首页和导航直接跳转到本页面，可以确保 `/hardware-sdk/transport/native-ble` 始终有内容，并避免无效路径导致的 404。

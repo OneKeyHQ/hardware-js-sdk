@@ -2,14 +2,8 @@ import semver from 'semver';
 import { get } from 'lodash';
 import BigNumber from 'bignumber.js';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import {
-  EthereumTypedDataSignature,
-  EthereumTypedDataStructAck,
-  MessageKey,
-  MessageResponse,
-  TypedCall,
-  Enum_Capability,
-} from '@onekeyfe/hd-transport';
+import { Enum_Capability } from '@onekeyfe/hd-transport';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
@@ -28,6 +22,14 @@ import { signTypedHash } from './latest/signTypedHash';
 import { signTypedData as signTypedDataLegacyV1 } from './legacyV1/signTypedData';
 import { signTypedData } from './latest/signTypedData';
 import { encodeData, getFieldType, parseArrayType } from '../helpers/typeNameUtils';
+
+import type {
+  EthereumTypedDataSignature,
+  EthereumTypedDataStructAck,
+  MessageKey,
+  MessageResponse,
+  TypedCall,
+} from '@onekeyfe/hd-transport';
 
 export type EVMSignTypedDataParams = {
   addressN: number[];

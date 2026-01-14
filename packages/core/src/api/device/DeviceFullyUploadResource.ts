@@ -1,13 +1,16 @@
-import { Deferred, EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType } from '@onekeyfe/hd-shared';
 import semver from 'semver';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { getSysResourceBinary } from '../firmware/getBinary';
 import { updateResources } from '../firmware/uploadFirmware';
-import { getDeviceType, getDeviceFirmwareVersion, getFirmwareType } from '../../utils';
+import { getDeviceFirmwareVersion, getDeviceType, getFirmwareType } from '../../utils';
 import { createUiMessage } from '../../events/ui-request';
-import type { KnownDevice, Features } from '../../types';
 import { DataManager } from '../../data-manager';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type { Features, KnownDevice } from '../../types';
 import type { DeviceFullyUploadResourceParams } from '../../types/api/deviceFullyUploadResource';
 
 export default class DeviceFullyUploadResource extends BaseMethod {

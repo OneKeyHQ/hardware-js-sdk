@@ -1,9 +1,10 @@
-import { Root } from 'protobufjs/light';
 import ByteBuffer from 'bytebuffer';
 
 import * as decodeProtobuf from './protobuf/decode';
 import * as decodeProtocol from './protocol/decode';
 import { createMessageFromType } from './protobuf/messages';
+
+import type { Root } from 'protobufjs/light';
 
 export function receiveOne(messages: Root, data: string) {
   const bytebuffer = ByteBuffer.wrap(data, 'hex');

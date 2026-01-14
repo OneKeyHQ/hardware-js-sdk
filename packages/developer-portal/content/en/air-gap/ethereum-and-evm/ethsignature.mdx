@@ -1,0 +1,57 @@
+---
+title: EthSignature
+---
+
+# EthSignature
+
+The `EthSignature` class represents an Ethereum signature.
+
+Used to parse the signed result returned by the device.
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `signature` | `Buffer` | The signature data (65 bytes: r + s + v) |
+| `requestId` | `Buffer` | The request ID (optional) |
+| `origin` | `string` | The origin information (optional) |
+
+## UR Example
+
+```
+UR:ETH-SIGNATURE/OTADTPDAGDSWNNYAHGTOKPFPIAPANNROLNSAVYDTHHAOHDFPCATKCPPFYLENGAGLMKMUCAYKFPFSDREOMENTPKBGEONDCHFDNBKOSSTPDWETSGBZDNCMCHKPNYDMKIDPTDRYJSDRTKCTIOFPQZHFLNSKVACLMNIYTKLGISFRWLKTZTREAEAXIYGWJTIHGRIHKKPLGDEEDS
+```
+
+## Decoding Example
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { EthSignature } from '@keystonehq/bc-ur-registry-eth';
+
+const dec = new URDecoder();
+// push each scanned frame string into the decoder
+// dec.receivePart(frame)
+
+if (dec.isComplete()) {
+  const ur = dec.resultUR(); // ur.type should be 'eth-signature'
+  const sig = EthSignature.fromCBOR(ur.cbor);
+  
+  const requestId = sig.getRequestId();
+  const signature = sig.getSignature();
+  
+  // Extract r, s, v components
+  const r = signature.slice(0, 32);
+  const s = signature.slice(32, 64);
+  const v = signature.slice(64, 65);
+  
+  // Attach to transaction and broadcast
+}
+```
+
+## Signature Format
+
+The signature is 65 bytes:
+- `r` (32 bytes): First part of ECDSA signature
+- `s` (32 bytes): Second part of ECDSA signature
+- `v` (1 byte): Recovery ID
+

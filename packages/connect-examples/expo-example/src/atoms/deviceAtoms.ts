@@ -1,4 +1,5 @@
 import { atom } from 'jotai';
+
 import type { Device } from '../components/DeviceList';
 
 export const selectDeviceAtom = atom<Device | null | undefined>(null);

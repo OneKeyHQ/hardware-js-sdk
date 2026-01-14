@@ -1,0 +1,142 @@
+---
+title: 签名
+description: 在 Cosmos 链上签署消息和交易
+---
+
+import { Callout } from 'nextra/components'
+
+# 签名
+
+了解如何使用 OneKey 的 Cosmos provider 签署交易和消息。
+
+---
+
+## Amino 签名（旧版）
+
+用于旧版 Amino 编码的交易：
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = {
+  chain_id: chainId,
+  account_number: '0',
+  sequence: '0',
+  fee: {
+    amount: [{ denom: 'uatom', amount: '5000' }],
+    gas: '200000',
+  },
+  msgs: [{
+    type: 'cosmos-sdk/MsgSend',
+    value: {
+      from_address: signer,
+      to_address: 'cosmos1...',
+      amount: [{ denom: 'uatom', amount: '1000000' }],
+    },
+  }],
+  memo: '',
+}
+
+const result = await provider.signAmino(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,       // 已签名的文档
+  signature: result.signature, // { pub_key, signature }
+})
+```
+
+---
+
+## Direct 签名（Protobuf）
+
+用于现代 Protobuf 编码的交易：
+
+```typescript
+import { makeSignDoc } from '@cosmjs/proto-signing'
+
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+
+const signDoc = makeSignDoc(
+  bodyBytes,      // 交易体
+  authInfoBytes,  // 包含手续费的认证信息
+  chainId,
+  accountNumber
+)
+
+const result = await provider.signDirect(chainId, signer, signDoc)
+
+console.log({
+  signed: result.signed,
+  signature: result.signature,
+})
+```
+
+---
+
+## 签署任意数据
+
+用于签署任意消息（适用于身份验证）：
+
+```typescript
+const chainId = 'cosmoshub-4'
+const signer = 'cosmos1...'
+const data = '登录 MyApp 时间：2024-01-01T00:00:00Z'
+
+const signature = await provider.signArbitrary(chainId, signer, data)
+
+// 验证签名
+const isValid = await provider.verifyArbitrary(chainId, signer, data, signature)
+console.log('签名有效:', isValid)
+```
+
+---
+
+## 广播交易
+
+```typescript
+const chainId = 'cosmoshub-4'
+const txBytes = new Uint8Array([...]) // 已签名的交易字节
+
+// 广播模式: 'block', 'sync', 'async'
+const result = await provider.sendTx(chainId, txBytes, 'sync')
+
+console.log('交易哈希:', result)
+```
+
+---
+
+## 签署以太坊数据
+
+用于支持以太坊签名的链（如 Evmos）：
+
+```typescript
+const result = await provider.signEthereum(
+  chainId,
+  signer,
+  data,       // 要签署的消息
+  'message'   // 类型: 'message' | 'transaction'
+)
+
+console.log('签名:', result)
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  await provider.enable('cosmoshub-4')
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了请求')
+  } else if (error.message.includes('not supported')) {
+    console.log('不支持该链，请尝试 experimentalSuggestChain')
+  } else {
+    console.error('连接失败:', error)
+  }
+}
+```
+

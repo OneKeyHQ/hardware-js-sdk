@@ -2,29 +2,27 @@ import HttpTransport from '@onekeyfe/hd-transport-http';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 import { WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import {
-  PostMessageEvent,
-  IFRAME,
-  parseMessage,
-  DataManager,
-  parseConnectSettings,
-  IFrameInit,
-  createIFrameMessage,
-  createErrorMessage,
-  initCore,
-  switchTransport,
-  Core,
   CORE_EVENT,
-  getLogger,
-  LoggerNames,
+  DataManager,
+  IFRAME,
   LogBlockEvent,
-  ConnectSettings,
+  LoggerNames,
+  createErrorMessage,
+  createIFrameMessage,
+  getLogger,
+  initCore,
+  parseConnectSettings,
+  parseMessage,
+  switchTransport,
 } from '@onekeyfe/hd-core';
 import { get } from 'lodash';
-import { getOrigin } from '../utils/urlUtils';
-import { sendMessage, createJsBridge } from '../utils/bridgeUtils';
 
+import { getOrigin } from '../utils/urlUtils';
+import { createJsBridge, sendMessage } from '../utils/bridgeUtils';
 import JSBridgeConfig from './bridge-config';
 import { isExtensionWhitelisted, isOriginWhitelisted } from '..';
+
+import type { ConnectSettings, Core, IFrameInit, PostMessageEvent } from '@onekeyfe/hd-core';
 
 let _core: Core | undefined;
 const Log = getLogger(LoggerNames.Iframe);

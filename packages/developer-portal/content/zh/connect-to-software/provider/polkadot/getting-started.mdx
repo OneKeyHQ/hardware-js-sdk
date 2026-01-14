@@ -1,0 +1,134 @@
+---
+title: 快速开始
+description: 使用 OneKey 的 Polkadot.js 兼容 Provider 连接 Polkadot
+---
+
+import { Callout } from 'nextra/components'
+
+# 快速开始
+
+了解如何检测、连接和与 Polkadot 及 Substrate 链进行交互。
+
+<Callout type="info">
+OneKey 实现了 Polkadot.js 扩展接口，确保与所有 Substrate dApp 兼容。
+</Callout>
+
+---
+
+## Provider 检测
+
+```typescript
+// OneKey 注册为 Polkadot.js 扩展
+const provider = window.$onekey?.polkadot
+
+// 或使用标准的 web3Enable API
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+```
+
+---
+
+## 启用扩展
+
+```typescript
+// 直接使用 OneKey provider
+const enabled = await provider.web3Enable('My dApp')
+
+if (enabled) {
+  const accounts = await provider.web3Accounts()
+  console.log('账户:', accounts)
+}
+```
+
+---
+
+## 使用 Polkadot.js Extension API（推荐）
+
+```typescript
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+// 启用所有扩展（包括 OneKey）
+const extensions = await web3Enable('My dApp')
+
+if (extensions.length === 0) {
+  throw new Error('未找到扩展')
+}
+
+// 获取所有账户
+const allAccounts = await web3Accounts()
+console.log('账户:', allAccounts)
+```
+
+---
+
+## 获取账户
+
+```typescript
+const accounts = await provider.web3Accounts()
+
+accounts.forEach(account => {
+  console.log({
+    address: account.address,     // Substrate 地址
+    name: account.name,           // 账户名称
+    type: account.type,           // 'sr25519' | 'ed25519' | 'ecdsa'
+    genesisHash: account.genesisHash, // 可选的链创世哈希
+  })
+})
+```
+
+---
+
+## 订阅账户变更
+
+```typescript
+const unsubscribe = provider.web3AccountsSubscribe((accounts) => {
+  console.log('账户已变更:', accounts)
+})
+
+// 稍后: unsubscribe()
+```
+
+---
+
+## 与 Polkadot.js API 配合使用
+
+### 安装
+
+```bash
+npm install @polkadot/api @polkadot/extension-dapp
+```
+
+### 连接并签署交易
+
+```typescript
+import { ApiPromise, WsProvider } from '@polkadot/api'
+import { web3Enable, web3FromAddress, web3Accounts } from '@polkadot/extension-dapp'
+
+// 启用扩展
+await web3Enable('My dApp')
+
+// 获取账户
+const accounts = await web3Accounts()
+const account = accounts[0]
+
+// 连接到链
+const wsProvider = new WsProvider('wss://rpc.polkadot.io')
+const api = await ApiPromise.create({ provider: wsProvider })
+
+// 获取注入器
+const injector = await web3FromAddress(account.address)
+
+// 创建并签署交易
+const tx = api.tx.balances.transfer(
+  recipientAddress,
+  1000000000000 // 1 DOT (10^12 planck)
+)
+
+// 签署并发送
+const hash = await tx.signAndSend(
+  account.address,
+  { signer: injector.signer }
+)
+
+console.log('交易哈希:', hash.toHex())
+```
+

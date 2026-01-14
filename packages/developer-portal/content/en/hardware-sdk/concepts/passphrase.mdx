@@ -1,0 +1,48 @@
+---
+title: Passphrase
+---
+
+# Passphrase
+
+Rules and best practices for handling passphrases (hidden wallets).
+
+## Core concepts
+
+- Standard wallet = seed + empty passphrase; hidden wallet = seed + non-empty passphrase (case sensitive).
+- Passphrases cannot be recovered; back them up securely.
+- Force the standard wallet by setting `useEmptyPassphrase: true`.
+
+## App behaviors
+
+### Proactive strategy (recommended)
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'",
+  useEmptyPassphrase: true,
+});
+```
+
+### Reactive strategy (event driven)
+
+```ts
+// On-device input (preferred)
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: { passphraseOnDevice: true, value: '' },
+});
+
+// Software input (optionally cache for this session)
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: { value, passphraseOnDevice: false, save: true },
+});
+```
+
+## Session & caching
+
+- `passphraseState`: fetch once via Get Passphrase State; combine with `keepSession`/`initSession` to reduce repeated prompts.
+
+## Security tips
+
+- Do not log or persist passphrases; prefer on-device input whenever possible.

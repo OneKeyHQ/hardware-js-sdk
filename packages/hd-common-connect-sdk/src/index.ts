@@ -1,34 +1,38 @@
 import EventEmitter from 'events';
 import HardwareSdk, {
-  ConnectSettings,
-  enableLog,
-  parseConnectSettings,
-  initCore,
-  Core,
-  createErrorMessage,
   CORE_EVENT,
-  CoreMessage,
-  IFRAME,
-  UI_EVENT,
-  UiResponseEvent,
-  LOG_EVENT,
-  getLogger,
-  LoggerNames,
-  setLoggerPostMessage,
-  FIRMWARE_EVENT,
-  DEVICE_EVENT,
   DEVICE,
-  LowLevelCoreApi,
-  createUiMessage,
+  DEVICE_EVENT,
+  FIRMWARE_EVENT,
+  IFRAME,
+  LOG_EVENT,
+  LoggerNames,
+  UI_EVENT,
   UI_REQUEST,
+  createErrorMessage,
+  createUiMessage,
+  enableLog,
   executeCallback,
+  getLogger,
+  initCore,
+  parseConnectSettings,
+  setLoggerPostMessage,
 } from '@onekeyfe/hd-core';
-import { ERRORS, createDeferred, Deferred, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import HttpTransport from '@onekeyfe/hd-transport-http';
-import { WebUsbTransport, ElectronBleTransport } from '@onekeyfe/hd-transport-web-device';
+import { ElectronBleTransport, WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
+import type {
+  ConnectSettings,
+  Core,
+  CoreMessage,
+  LowLevelCoreApi,
+  UiResponseEvent,
+} from '@onekeyfe/hd-core';
+import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);

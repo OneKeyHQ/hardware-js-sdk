@@ -1,0 +1,164 @@
+---
+title: Web3Modal (AppKit)
+description: Integrate OneKey with Web3Modal / Reown AppKit
+---
+
+import { Callout } from 'nextra/components'
+
+# Web3Modal (AppKit)
+
+WalletConnect's official wallet connection UI, now part of Reown AppKit. Provides multi-chain support and mobile wallet connections.
+
+<Callout type="info">
+Web3Modal has been rebranded to Reown AppKit. Both package names work, but `@reown/appkit` is recommended for new projects.
+</Callout>
+
+---
+
+## Installation
+
+```bash
+npm install @reown/appkit @reown/appkit-adapter-wagmi wagmi viem @tanstack/react-query
+```
+
+---
+
+## Basic Setup
+
+```tsx filename="App.tsx"
+import { createAppKit } from '@reown/appkit/react'
+import { WagmiProvider } from 'wagmi'
+import { mainnet, polygon, arbitrum } from '@reown/appkit/networks'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+
+// 1. Get projectId from https://cloud.reown.com
+const projectId = 'YOUR_PROJECT_ID'
+
+// 2. Configure networks
+const networks = [mainnet, polygon, arbitrum]
+
+// 3. Create wagmi adapter
+const wagmiAdapter = new WagmiAdapter({
+  projectId,
+  networks,
+})
+
+// 4. Create modal
+createAppKit({
+  adapters: [wagmiAdapter],
+  networks,
+  projectId,
+  metadata: {
+    name: 'My dApp',
+    description: 'My dApp description',
+    url: 'https://mydapp.com',
+    icons: ['https://mydapp.com/icon.png'],
+  },
+})
+
+const queryClient = new QueryClient()
+
+export default function App() {
+  return (
+    <WagmiProvider config={wagmiAdapter.wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        {/* Use the web component */}
+        <appkit-button />
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
+}
+```
+
+---
+
+## Feature OneKey
+
+To prioritize OneKey in the wallet list:
+
+```tsx
+createAppKit({
+  adapters: [wagmiAdapter],
+  networks,
+  projectId,
+  featuredWalletIds: [
+    // OneKey Wallet ID from WalletConnect Explorer
+    '1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c',
+  ],
+  // Optional: Only show specific wallets
+  includeWalletIds: [
+    '1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c',
+    // Add other wallet IDs as needed
+  ],
+})
+```
+
+---
+
+## Customization
+
+### Theme
+
+```tsx
+createAppKit({
+  // ...
+  themeMode: 'dark', // or 'light'
+  themeVariables: {
+    '--w3m-accent': '#00B812', // OneKey green
+    '--w3m-border-radius-master': '8px',
+  },
+})
+```
+
+### Custom Button
+
+```tsx
+import { useAppKit } from '@reown/appkit/react'
+
+function CustomButton() {
+  const { open } = useAppKit()
+
+  return (
+    <button onClick={() => open()}>
+      Connect Wallet
+    </button>
+  )
+}
+```
+
+---
+
+## Hooks
+
+Use wagmi hooks after connection:
+
+```tsx
+import { useAccount, useDisconnect } from 'wagmi'
+import { useAppKit } from '@reown/appkit/react'
+
+function Wallet() {
+  const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
+  const { open } = useAppKit()
+
+  if (!isConnected) {
+    return <button onClick={() => open()}>Connect</button>
+  }
+
+  return (
+    <div>
+      <p>{address}</p>
+      <button onClick={() => disconnect()}>Disconnect</button>
+    </div>
+  )
+}
+```
+
+---
+
+## Resources
+
+- [Reown AppKit Documentation](https://docs.reown.com/appkit/overview)
+- [WalletConnect Wallet Guide - OneKey](https://walletguide.walletconnect.network/?search=onekey)
+- [Get Project ID](https://cloud.reown.com)

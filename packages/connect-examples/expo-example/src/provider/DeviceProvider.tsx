@@ -1,7 +1,7 @@
-import React, { useMemo, memo } from 'react';
-
+import React, { memo, useMemo } from 'react';
 import { Stack } from 'tamagui';
 import { useAtomValue } from 'jotai';
+
 import { DeviceList } from '../components/DeviceList';
 import { selectDeviceAtom } from '../atoms/deviceAtoms';
 

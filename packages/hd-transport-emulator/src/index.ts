@@ -1,8 +1,10 @@
 import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
+
 import { request as http } from './http';
 import { DEFAULT_URL } from './constants';
+
+import type { AcquireInput, OneKeyDeviceInfoWithSession } from '@onekeyfe/hd-transport';
 
 const { check, buildOne, receiveOne, parseConfigure } = transport;
 

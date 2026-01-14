@@ -4,6 +4,7 @@ import {
   getDeviceType,
   getDeviceUUID,
 } from '@onekeyfe/hd-core';
+
 import type { Features, OnekeyFeatures } from '@onekeyfe/hd-transport';
 
 export const getReleaseUrl = ({ features }: { features?: Features }) => {

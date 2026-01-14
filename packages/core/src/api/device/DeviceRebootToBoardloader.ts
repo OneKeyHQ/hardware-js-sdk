@@ -1,4 +1,5 @@
 import { BaseMethod } from '../BaseMethod';
+
 import type { RebootToBoardloaderParams } from '../../types/api/deviceRebootToBoardloader';
 
 // Reboot BoardLoader

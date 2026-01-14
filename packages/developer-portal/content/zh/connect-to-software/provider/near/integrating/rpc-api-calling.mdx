@@ -1,0 +1,44 @@
+---
+title: RPC API 调用
+---
+
+# RPC API 调用
+
+OneKey 使用 `provider.request({ method, params })` 方法来封装 [NEAR RPC API](https://docs.near.org/docs/api/rpc)。
+
+你可以通过此方法调用任何 RPC API，例如：
+
+[https://docs.near.org/docs/api/rpc/network#node-status](https://docs.near.org/docs/api/rpc/network#node-status)
+
+```javascript
+const res = await provider.request({
+  'method': 'status',
+});
+console.log('RPC Call: status', res);
+```
+
+[https://docs.near.org/docs/api/rpc/gas#gas-price](https://docs.near.org/docs/api/rpc/gas#gas-price)
+
+```javascript
+const res = await provider.request({
+  'method': 'gas_price',
+  'params': [null],
+});
+console.log('RPC Call: gas_price', res);
+```
+
+[https://docs.near.org/docs/api/rpc/access-keys#view-access-key-list](https://docs.near.org/docs/api/rpc/access-keys#view-access-key-list)
+
+```javascript
+const res = await provider.request({
+  'method': 'query',
+  'params': {
+    'request_type': 'view_access_key_list',
+    'account_id':
+      'c3be856133196da252d0f1083614cdc87a85c8aa8abeaf87daff1520355eec53',
+    'finality': 'optimistic',
+  },
+});
+console.log('RPC Call: view_access_key_list', res);
+```
+

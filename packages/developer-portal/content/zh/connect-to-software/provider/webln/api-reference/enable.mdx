@@ -1,0 +1,32 @@
+---
+title: enable
+---
+
+# enable
+
+要开始交互，首先需要获取适当的权限。调用 `webln.enable()` 将提示用户允许使用浏览器的 Web 访问功能。之后，你可以自由调用任何其他 API 方法。
+
+### 方法
+
+```typescript
+async function enable(): void
+```
+
+
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+async provider.enable()
+
+```
+
+
+
+### 演示
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/dyaqWoy" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

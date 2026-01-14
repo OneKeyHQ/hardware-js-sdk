@@ -1,6 +1,6 @@
+import type { IBLEFirmwareReleaseInfo } from '../settings';
 import type { Response } from '../params';
 import type { IDeviceBLEFirmwareStatus } from '../device';
-import { IBLEFirmwareReleaseInfo } from '../settings';
 
 type BleFirmwareRelease = {
   status: IDeviceBLEFirmwareStatus;

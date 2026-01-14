@@ -1,0 +1,131 @@
+---
+title: wallet_addEthereumChain
+description: 向钱包添加新的以太坊链
+---
+
+# wallet_addEthereumChain
+
+请求钱包添加新链。如果链已存在，钱包可能会切换到该链。
+
+---
+
+## 参数
+
+`Array` 包含一个链配置对象：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `chainId` | `string` | 是 | 链 ID（带 0x 前缀的十六进制） |
+| `chainName` | `string` | 是 | 可读的链名称 |
+| `nativeCurrency` | `object` | 是 | 原生代币信息 |
+| `nativeCurrency.name` | `string` | 是 | 代币名称 |
+| `nativeCurrency.symbol` | `string` | 是 | 代币符号（2-6 个字符） |
+| `nativeCurrency.decimals` | `number` | 是 | 代币精度（通常为 18） |
+| `rpcUrls` | `string[]` | 是 | RPC URL 数组（至少一个） |
+| `blockExplorerUrls` | `string[]` | 否 | 区块浏览器 URL 数组 |
+| `iconUrls` | `string[]` | 否 | 图标 URL 数组（目前不使用） |
+
+---
+
+## 返回值
+
+成功时返回 `null`
+
+---
+
+## 示例
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x89',
+    chainName: 'Polygon Mainnet',
+    nativeCurrency: {
+      name: 'MATIC',
+      symbol: 'MATIC',
+      decimals: 18
+    },
+    rpcUrls: ['https://polygon-rpc.com'],
+    blockExplorerUrls: ['https://polygonscan.com']
+  }]
+})
+```
+
+### 添加 Base
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x2105',
+    chainName: 'Base',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://mainnet.base.org'],
+    blockExplorerUrls: ['https://basescan.org']
+  }]
+})
+```
+
+### 添加 Arbitrum
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0xa4b1',
+    chainName: 'Arbitrum One',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://arb1.arbitrum.io/rpc'],
+    blockExplorerUrls: ['https://arbiscan.io']
+  }]
+})
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| 4001 | User rejected the request | 用户拒绝添加链 |
+| -32602 | Invalid params | 链配置无效 |
+
+---
+
+## 说明
+
+- 仅使用 `rpcUrls` 和 `blockExplorerUrls` 数组的第一个元素
+- 钱包会验证 RPC 端点是否正确响应
+- 某些钱包不支持添加非 18 位精度的原生代币
+- 遵循 [EIP-3085](https://eips.ethereum.org/EIPS/eip-3085) 规范
+
+### 组合添加和切换
+
+```typescript
+async function switchToChain(chainConfig) {
+  try {
+    await window.$onekey.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: chainConfig.chainId }]
+    })
+  } catch (error) {
+    if (error.code === 4902) {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [chainConfig]
+      })
+    } else {
+      throw error
+    }
+  }
+}
+```

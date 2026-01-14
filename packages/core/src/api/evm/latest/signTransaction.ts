@@ -1,4 +1,15 @@
-import {
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+import { cutString } from '../../helpers/stringUtils';
+import { addHexPrefix, stripHexStartZeroes } from '../../helpers/hexUtils';
+
+import type {
+  EVMSignedTx,
+  EVMTransaction,
+  EVMTransactionEIP1559,
+  EVMTransactionEIP7702,
+} from '../../../types';
+import type {
   EthereumAuthorizationSignature,
   EthereumSignTx,
   EthereumSignTxEIP1559,
@@ -8,15 +19,6 @@ import {
   MessageResponse,
   TypedCall,
 } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import {
-  EVMSignedTx,
-  EVMTransaction,
-  EVMTransactionEIP1559,
-  EVMTransactionEIP7702,
-} from '../../../types';
-import { cutString } from '../../helpers/stringUtils';
-import { stripHexStartZeroes, addHexPrefix } from '../../helpers/hexUtils';
 
 export const processTxRequest = async ({
   typedCall,

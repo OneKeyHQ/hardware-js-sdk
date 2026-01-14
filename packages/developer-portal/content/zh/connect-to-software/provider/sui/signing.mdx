@@ -1,0 +1,99 @@
+---
+title: 签名
+description: 使用 OneKey 在 Sui 上签署消息
+---
+
+import { Callout } from 'nextra/components'
+
+# 签名
+
+了解如何签署消息用于身份验证。
+
+---
+
+## 签署个人消息
+
+签署任意消息用于身份验证：
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+const [account] = await provider.getAccounts()
+const chain = await provider.getActiveChain()
+
+const result = await provider.signPersonalMessage({
+  message,
+  account,
+  chain,
+})
+
+console.log({
+  signature: result.signature,   // Base64 编码的签名
+  bytes: result.bytes,           // 已签名的消息字节
+})
+```
+
+---
+
+## 签署消息（旧版）
+
+```typescript
+const message = new TextEncoder().encode('Hello, Sui!')
+const [account] = await provider.getAccounts()
+const chain = await provider.getActiveChain()
+
+const result = await provider.signMessage({
+  message,
+  account,
+  chain,
+})
+
+console.log({
+  signature: result.signature,
+  messageBytes: result.messageBytes,
+})
+```
+
+---
+
+## 验证签名
+
+```typescript
+import { verifyPersonalMessage } from '@mysten/sui.js/verify'
+
+const message = new TextEncoder().encode('Hello, Sui!')
+const [account] = await provider.getAccounts()
+const chain = await provider.getActiveChain()
+const { signature } = await provider.signPersonalMessage({ message, account, chain })
+
+const accounts = await provider.getAccounts()
+const publicKey = accounts[0].publicKey
+
+const isValid = await verifyPersonalMessage(message, signature)
+console.log('签名有效:', isValid)
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  await provider.requestPermissions()
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了连接请求')
+  } else {
+    console.error('连接错误:', error.message)
+  }
+}
+```
+
+---
+
+## 常见错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| 4100 | 未授权 |
+| -32603 | 内部错误 |

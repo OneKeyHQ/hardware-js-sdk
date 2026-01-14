@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import {
-  KaspaSignTransactionParams,
-  KaspaSignInputParams,
-  KaspaSignOutputParams,
-} from '../../../types';
 import { SignatureType } from './SignatureType';
 import { HashWriter } from './HashWriter';
+
+import type {
+  KaspaSignInputParams,
+  KaspaSignOutputParams,
+  KaspaSignTransactionParams,
+} from '../../../types';
 
 export function zeroHash() {
   return Buffer.alloc(32);

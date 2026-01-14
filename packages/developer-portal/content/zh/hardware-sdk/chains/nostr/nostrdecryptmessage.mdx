@@ -1,0 +1,72 @@
+---
+title: nostrDecryptMessage
+---
+
+# nostrDecryptMessage
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.6.0
+  * Classic/Mini: 3.5.0
+  * Classic1s: 3.6.0
+
+## Nostr：解密消息
+
+请求设备使用由给定 BIP32 路径派生的私钥解密消息。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.nostrDecryptMessage(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `pubkey` - _必需_ `string` 公钥。
+* `ciphertext` - _必需_ `string` 加密的消息。
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`。
+
+
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.nostrDecryptMessage(
+  connectId,
+  deviceId,
+  {
+     path: "m/44'/1237'/0'/0/0",
+     pubkey: '2118c65161c7d68b4bdbe1374f658532670057ab1bb0c99937d0ff7cff45cb5e',
+     ciphertext: 'VpWFJ7JDFv16jL7pBZ1shw==?iv=$1tPpwGD3Ic1RTVXJx1ZG7Q==',
+     showOnOneKey: true,
+  }
+);
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: string;
+    pubkey: string;
+    ciphertext: string;
+    decryptedMessage: string;
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

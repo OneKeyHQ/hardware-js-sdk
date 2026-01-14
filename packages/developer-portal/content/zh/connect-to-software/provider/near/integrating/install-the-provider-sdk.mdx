@@ -1,0 +1,37 @@
+---
+title: 安装 Provider SDK
+---
+
+# 安装 Provider SDK
+
+> **注意：**
+Provider SDK 需要安装 [OneKey 浏览器扩展](https://www.onekey.so/low-level-transport-plugin)（版本 >= 2.3.2）才能使用
+
+
+我们提供了一个名为 [onekey-near-provider](https://www.npmjs.com/package/@onekeyfe/onekey-near-provider) 的 npm 包作为 SDK，同时还需要安装 [near-api-js](https://www.npmjs.com/package/near-api-js)。
+
+你可以在 [Github](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/providers/onekey-near-provider) 查看 SDK 源代码，完整示例代码在[这里](https://github.com/OneKeyHQ/cross-inpage-provider/tree/master/packages/example)。
+
+```bash
+# 使用 npm
+npm install near-api-js @onekeyfe/onekey-near-provider
+
+# 使用 yarn
+yarn add near-api-js @onekeyfe/onekey-near-provider
+
+```
+
+然后你可以创建 provider 实例。
+
+```javascript
+import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider';
+
+const provider = new OneKeyNearProvider();
+
+```
+
+> **警告：**
+**注意：** Provider SDK 不兼容 SSR。
+
+如果你使用包含 SSR 功能的 [next.js](https://nextjs.org/)，可以查看这篇文档了解如何[无 SSR 动态导入](https://nextjs.org/docs/advanced-features/dynamic-import#with-no-ssr)。
+

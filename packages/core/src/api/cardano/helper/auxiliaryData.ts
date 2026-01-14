@@ -1,17 +1,19 @@
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
 import {
-  validateAddressParameters,
   addressParametersToProto,
   modifyAddressParametersForBackwardsCompatibility,
+  validateAddressParameters,
 } from './addressParameters';
 import { validateParams } from '../../helpers/paramsValidator';
 import { validatePath } from '../../helpers/pathUtils';
+
+import type { PROTO } from '../../../constants';
 import type {
   CardanoAuxiliaryData,
-  CardanoCVoteRegistrationParameters,
   CardanoCVoteRegistrationDelegation,
+  CardanoCVoteRegistrationParameters,
 } from '../../../types/api/cardano';
-import { PROTO } from '../../../constants';
 
 const MAX_DELEGATION_COUNT = 32;
 

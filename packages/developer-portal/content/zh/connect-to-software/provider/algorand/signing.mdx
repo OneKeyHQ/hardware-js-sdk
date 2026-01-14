@@ -1,0 +1,73 @@
+---
+title: 签名
+description: 使用 OneKey 在 Algorand 上签署消息
+---
+
+import { Callout } from 'nextra/components'
+
+# 签名
+
+了解如何在 Algorand 上签署消息用于身份验证。
+
+---
+
+## 签署任意消息
+
+```typescript
+const message = new TextEncoder().encode('Hello Algorand!')
+
+const { signature, address } = await provider.signMessage(
+  message,
+  'utf8' // 或 'base64'
+)
+
+console.log('签名:', signature)
+console.log('签名者:', address)
+```
+
+---
+
+## 验证签名
+
+```typescript
+import nacl from 'tweetnacl'
+
+const message = new TextEncoder().encode('Hello Algorand!')
+const { signature } = await provider.signMessage(message)
+
+// 从地址获取公钥
+const publicKey = algosdk.decodeAddress(provider.address).publicKey
+
+const isValid = nacl.sign.detached.verify(message, signature, publicKey)
+console.log('有效:', isValid)
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const signedTxns = await provider.signTxns(walletTxns)
+} catch (error) {
+  if (error.code === 4001) {
+    console.log('用户拒绝了请求')
+  } else if (error.code === 4100) {
+    console.log('钱包已锁定')
+  } else {
+    console.error('错误:', error.message)
+  }
+}
+```
+
+---
+
+## 常见错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| 4100 | 未授权 |
+| 4200 | 不支持的方法 |
+| 4300 | 无效的输入 |
+

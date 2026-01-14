@@ -3,12 +3,12 @@ import { Checkbox, type CheckedState, H5, Label, Stack, Text, XStack } from 'tam
 import { Check as CheckIcon } from '@tamagui/lucide-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import { getFirmwareType, type Features, type OnekeyFeatures } from '@onekeyfe/hd-core';
+import { type Features, type OnekeyFeatures, getFirmwareType } from '@onekeyfe/hd-core';
 import { Platform } from 'react-native';
 import { useIntl } from 'react-intl';
 import { EDeviceType, EFirmwareType } from '@onekeyfe/hd-shared';
 import { useAtomValue, useSetAtom } from 'jotai';
-import type { IDeviceListInstance } from '../../components/DeviceList';
+
 import PageView from '../../components/ui/Page';
 import PanelView from '../../components/ui/Panel';
 import { Button } from '../../components/ui/Button';
@@ -24,6 +24,8 @@ import { getDeviceBasicInfo } from '../../utils/deviceUtils';
 import { HardwareInputPinDialogProvider } from '../../provider/HardwareInputPinProvider';
 import { useMedia } from '../../provider/MediaProvider';
 import { selectDeviceAtom } from '../../atoms/deviceAtoms';
+
+import type { IDeviceListInstance } from '../../components/DeviceList';
 
 type UpdateType = 'ble' | 'firmware' | 'source' | 'bootloader';
 type UpdateState = {

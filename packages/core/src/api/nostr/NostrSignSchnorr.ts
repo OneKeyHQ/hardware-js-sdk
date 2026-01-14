@@ -1,8 +1,9 @@
-import { NostrSignSchnorr as SignSchnorr } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
+
+import type { NostrSignSchnorr as SignSchnorr } from '@onekeyfe/hd-transport';
 
 export default class NostrSignSchnorr extends BaseMethod<SignSchnorr> {
   hasBundle = false;

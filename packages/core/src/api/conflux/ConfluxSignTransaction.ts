@@ -1,18 +1,19 @@
-import { ConfluxSignTx, ConfluxTxRequest } from '@onekeyfe/hd-transport';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import {
-  ConfluxSignedTx,
-  ConfluxSignTransactionParams,
-  ConfluxTransaction,
-} from '../../types/api/confluxSignTransaction';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
-import { SchemaParam, validateParams } from '../helpers/paramsValidator';
-
+import { validateParams } from '../helpers/paramsValidator';
 import { cutString } from '../helpers/stringUtils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
+
+import type { SchemaParam } from '../helpers/paramsValidator';
+import type {
+  ConfluxSignTransactionParams,
+  ConfluxSignedTx,
+  ConfluxTransaction,
+} from '../../types/api/confluxSignTransaction';
+import type { ConfluxSignTx, ConfluxTxRequest } from '@onekeyfe/hd-transport';
 
 export default class ConfluxSignTransaction extends BaseMethod {
   addressN: number[] = [];

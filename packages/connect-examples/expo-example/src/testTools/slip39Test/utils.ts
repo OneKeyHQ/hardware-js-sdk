@@ -3,7 +3,7 @@
  * 统一处理地址和公钥测试数据的转换
  */
 
-import {
+import type {
   SLIP39BatchTestCase,
   SLIP39BatchTestCaseData,
   SLIP39BatchTestCaseExtra,

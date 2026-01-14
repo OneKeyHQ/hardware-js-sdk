@@ -1,0 +1,50 @@
+---
+title: deviceChangePin
+---
+
+# deviceChangePin
+
+## 修改设备 PIN 码
+
+修改设备的 PIN 码。
+
+```typescript
+const result = await HardwareSDK.deviceChangePin(connectId, params);
+```
+
+## 参数
+
+[**可选通用参数**](../common-params)
+
+* `remove` - _可选_ `boolean` 请求移除 PIN 码。
+
+## 示例
+
+```typescript
+HardwareSDK.deviceChangePin(connectId, {
+    remove: false
+});
+```
+
+## 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: string
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

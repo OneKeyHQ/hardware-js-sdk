@@ -1,0 +1,71 @@
+---
+title: eth_requestAccounts
+description: 请求用户连接账户
+---
+
+# eth_requestAccounts
+
+请求用户授权 dApp 访问其账户。这是连接钱包的主要方法，会弹出连接确认弹窗。
+
+---
+
+## 参数
+
+无
+
+---
+
+## 返回值
+
+`string[]` - 已授权的账户地址数组
+
+---
+
+## 示例
+
+```typescript
+const accounts = await window.$onekey.ethereum.request({
+  method: 'eth_requestAccounts'
+})
+
+console.log('已连接账户:', accounts[0])
+```
+
+### 连接按钮实现
+
+```typescript
+async function connectWallet() {
+  try {
+    const accounts = await window.$onekey.ethereum.request({
+      method: 'eth_requestAccounts'
+    })
+    console.log('已连接:', accounts[0])
+    return accounts[0]
+  } catch (error) {
+    if (error.code === 4001) {
+      console.log('用户拒绝连接')
+    } else {
+      console.error('连接失败:', error)
+    }
+    throw error
+  }
+}
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| 4001 | User rejected the request | 用户拒绝连接请求 |
+| -32002 | Request already pending | 已有待处理的连接请求 |
+
+---
+
+## 说明
+
+- 首次调用时会显示连接弹窗
+- 如果用户已连接，直接返回账户地址
+- 连接状态持久化，重新加载页面后仍然有效
+- 遵循 [EIP-1102](https://eips.ethereum.org/EIPS/eip-1102) 规范

@@ -1,9 +1,10 @@
-import { SolanaGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { SolanaAddress, SolanaGetAddressParams } from '../../types';
+
+import type { SolanaGetAddress } from '@onekeyfe/hd-transport';
+import type { SolanaAddress, SolanaGetAddressParams } from '../../types';
 
 export default class SolGetAddress extends BaseMethod<SolanaGetAddress[]> {
   hasBundle = false;

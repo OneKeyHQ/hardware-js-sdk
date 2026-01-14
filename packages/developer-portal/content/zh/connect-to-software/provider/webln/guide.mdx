@@ -1,0 +1,68 @@
+---
+title: 指南
+---
+
+# 指南
+
+## 概述
+
+本指南帮助用户了解如何使用 OneKey 闪电网络 Provider API 构建比特币闪电网络应用。
+
+### 构建 Web 应用的**使用场景**
+
+* 接受闪电网络支付
+* 去中心化身份应用
+
+## 安装
+
+#### 1. 下载 OneKey 钱包
+
+下载 [OneKey 钱包](https://onekey.so/zh_CN/download?client=browserExtension)。安装 OneKey 浏览器扩展。
+
+#### 2. API 注入说明
+
+* OneKey 浏览器扩展会将 `Provider API` 注入到访问的网站中。
+* 提供两种类型的 API：`window.webln` 和 `window.$onekey.webln`。
+* 推荐使用 `window.$onekey.webln`。
+
+> 两种 API 功能相同，只是名称不同。
+
+### 检测 Provider API 支持
+
+在开始使用 WebLN 之前，需要检查浏览器是否支持，通过检查 `window.webln` 变量是否定义：
+
+```javascript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+if (!provider) {
+  alert("Provider 不可用。");
+}
+```
+
+### 连接到 OneKey
+
+在使用以下 API 之前，首先需要使用 `provider.enable` 方法请求用户授权访问相关账户。
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+provider.enable()
+```
+
+只有在用户授权后才能调用其他 API。
+
+## API
+
+**明确需求**：识别所需功能，调用相关接口
+
+* 获取用户的比特币闪电网络节点信息：[`provider.getInfo`](../api-reference/getinfo)
+* 发送支付：[`provider.sendPayment`](../api-reference/sendpayment)
+* 请求发票以接收付款：[`provider.makeInvoice`](../api-reference/makeinvoice)
+* 请求签名任意消息：[`provider.signMessage`](../api-reference/signmessage)
+
+**更多接口**：[查看详情](../api-reference/)
+
+## 事件
+
+* **关键操作**：如账户切换
+* **更多信息**：[查看更多](../event)

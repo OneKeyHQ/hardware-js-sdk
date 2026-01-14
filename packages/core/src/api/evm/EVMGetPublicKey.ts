@@ -1,14 +1,15 @@
-import { EthereumGetPublicKey, EthereumGetPublicKeyOneKey } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { EVMGetPublicKeyParams, EVMPublicKey } from '../../types';
 import { supportBatchPublicKey } from '../../utils/deviceFeaturesUtils';
 import TransportManager from '../../data-manager/TransportManager';
 import getPublicKey from './latest/getPublicKey';
 import getPublicKeyLegacyV1 from './legacyV1/getPublicKey';
 import { batchGetPublickeys } from '../helpers/batchGetPublickeys';
+
+import type { EVMGetPublicKeyParams, EVMPublicKey } from '../../types';
+import type { EthereumGetPublicKey, EthereumGetPublicKeyOneKey } from '@onekeyfe/hd-transport';
 
 export default class EVMGetPublicKey extends BaseMethod<EthereumGetPublicKeyOneKey[]> {
   hasBundle = false;

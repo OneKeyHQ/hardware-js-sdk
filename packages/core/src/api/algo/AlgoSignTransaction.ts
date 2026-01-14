@@ -1,9 +1,10 @@
-import { AlgorandSignTx as HardwareAlgorandSignTx } from '@onekeyfe/hd-transport';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { SolanaSignTransactionParams } from '../../types';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { SolanaSignTransactionParams } from '../../types';
+import type { AlgorandSignTx as HardwareAlgorandSignTx } from '@onekeyfe/hd-transport';
 
 export default class AlgoSignTransaction extends BaseMethod<HardwareAlgorandSignTx> {
   hasBundle = false;

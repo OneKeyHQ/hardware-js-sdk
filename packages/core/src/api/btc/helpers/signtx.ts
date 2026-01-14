@@ -1,16 +1,17 @@
-import {
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+import type {
   TxInputType,
   TxOutputType,
   TxRequest,
   TxRequestSerializedType,
   TypedCall,
 } from '@onekeyfe/hd-transport';
-import {
+import type {
   RefTransaction,
   SignedTransaction,
   TransactionOptions,
 } from '@onekeyfe/hd-core/src/types/api/btcSignTransaction';
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 type RefTxs = { [hash: string]: RefTransaction };
 type Props = {

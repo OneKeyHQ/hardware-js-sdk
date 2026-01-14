@@ -1,11 +1,13 @@
-import { SignPsbt } from '@onekeyfe/hd-transport';
-import { HardwareErrorCode, TypedError, EDeviceType } from '@onekeyfe/hd-shared';
+import { EDeviceType, HardwareErrorCode, TypedError } from '@onekeyfe/hd-shared';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
 import { getCoinInfo } from './helpers/btcParamsUtils';
 import { getDeviceType } from '../../utils';
+
+import type { SignPsbt } from '@onekeyfe/hd-transport';
 
 export default class BTCSignPsbt extends BaseMethod<SignPsbt> {
   init() {

@@ -1,6 +1,7 @@
-import { Deferred } from '@onekeyfe/hd-shared';
+import { LoggerNames, getLogger } from '../utils';
+
+import type { Deferred } from '@onekeyfe/hd-shared';
 import type { BaseMethod } from '../api/BaseMethod';
-import { getLogger, LoggerNames } from '../utils';
 
 const Log = getLogger(LoggerNames.Core);
 export type RequestTask = {

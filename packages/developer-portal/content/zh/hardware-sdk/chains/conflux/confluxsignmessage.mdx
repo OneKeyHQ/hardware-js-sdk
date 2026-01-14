@@ -1,0 +1,65 @@
+---
+title: confluxSignMessage
+---
+
+# confluxSignMessage
+
+## 使用要求
+
+* 固件版本要求
+  * Touch: 3.0.0
+  * Classic/Mini: 2.4.0
+
+## Conflux：签名消息 <a href="#ethereum-sign-message" id="ethereum-sign-message"></a>
+
+请求设备使用由给定 BIP32 路径派生的私钥对消息进行签名。
+
+```typescript
+const result = await HardwareSDK.confluxSignMessage(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `messageHex` - _必需_ `string` 要签名的十六进制文本消息
+
+### 示例
+
+```typescript
+// 原始消息
+const message = "Hello World";
+
+// 转换为十六进制
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.confluxSignMessage(connectId, deviceId, {
+    path: "m/44'/503'/0'/0/0",
+    message: messageHex
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string;
+        address: string;
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

@@ -1,0 +1,123 @@
+---
+title: eth_getTransactionReceipt
+description: 获取包含执行结果的交易回执
+---
+
+# eth_getTransactionReceipt
+
+通过交易哈希返回交易回执。回执包含交易执行的信息，包括状态和日志。
+
+---
+
+## 参数
+
+| 索引 | 类型 | 说明 |
+|------|------|------|
+| 0 | `string` | 交易哈希（32 字节） |
+
+---
+
+## 返回值
+
+`object | null` - 回执对象，如果尚未确认则为 null
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `transactionHash` | `string` | 交易哈希 |
+| `transactionIndex` | `string` | 区块中的索引（十六进制） |
+| `blockHash` | `string` | 区块哈希 |
+| `blockNumber` | `string` | 区块号（十六进制） |
+| `from` | `string` | 发送方地址 |
+| `to` | `string` | 接收方地址 |
+| `cumulativeGasUsed` | `string` | 区块中累计使用的 Gas |
+| `gasUsed` | `string` | 此交易使用的 Gas（十六进制） |
+| `contractAddress` | `string` | 创建的合约地址（如适用） |
+| `logs` | `array` | 日志对象数组 |
+| `logsBloom` | `string` | 日志的布隆过滤器 |
+| `status` | `string` | `0x1`（成功）或 `0x0`（失败） |
+| `effectiveGasPrice` | `string` | 实际支付的 Gas 价格（十六进制） |
+
+---
+
+## 示例
+
+```typescript
+const receipt = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionReceipt',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (receipt) {
+  const success = receipt.status === '0x1'
+  console.log('交易', success ? '成功' : '失败')
+  console.log('使用 Gas:', parseInt(receipt.gasUsed, 16))
+  console.log('日志数量:', receipt.logs.length)
+}
+```
+
+### 等待回执
+
+```typescript
+async function waitForReceipt(txHash, timeout = 60000) {
+  const start = Date.now()
+
+  while (Date.now() - start < timeout) {
+    const receipt = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionReceipt',
+      params: [txHash]
+    })
+
+    if (receipt) {
+      return receipt
+    }
+
+    await new Promise(r => setTimeout(r, 2000))
+  }
+
+  throw new Error('等待交易回执超时')
+}
+
+// 使用
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [txParams]
+})
+
+const receipt = await waitForReceipt(txHash)
+console.log('交易状态:', receipt.status === '0x1' ? '成功' : '失败')
+```
+
+### 解析合约事件
+
+```typescript
+// 获取回执后，解析 Transfer 事件日志
+const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+
+const transferLogs = receipt.logs.filter(
+  log => log.topics[0] === transferTopic
+)
+
+transferLogs.forEach(log => {
+  const from = '0x' + log.topics[1].slice(26)
+  const to = '0x' + log.topics[2].slice(26)
+  const value = parseInt(log.data, 16)
+  console.log(`转账: ${from} -> ${to}: ${value}`)
+})
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| -32602 | Invalid params | 交易哈希无效 |
+
+---
+
+## 说明
+
+- 待处理的交易（尚未确认）返回 `null`
+- `status` 字段：`0x1` = 成功，`0x0` = 回滚
+- `contractAddress` 仅在合约创建交易中存在
+- 使用 `logs` 解析交易中触发的事件

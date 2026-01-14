@@ -1,6 +1,7 @@
 import { ADDRESS_INDEX_MARK, CHANGE_MARK, INDEX_MARK, baseParams } from '../baseParams';
-import { PubkeyTestCase } from '../types';
-import { PubkeyTestCaseData } from './types';
+
+import type { PubkeyTestCase } from '../types';
+import type { PubkeyTestCaseData } from './types';
 
 export function fullPath(data: PubkeyTestCaseData): PubkeyTestCaseData {
   const newParams = data.data.map((item, index) => {

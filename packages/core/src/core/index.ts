@@ -1,8 +1,8 @@
 import semver from 'semver';
 import EventEmitter from 'events';
 import {
-  ERROR_CODES_REQUIRE_RELEASE,
   ERRORS,
+  ERROR_CODES_REQUIRE_RELEASE,
   HardwareError,
   HardwareErrorCode,
   createDefectiveFirmwareError,

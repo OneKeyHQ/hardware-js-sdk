@@ -1,4 +1,5 @@
 import semver from 'semver';
+
 import { UI_REQUEST } from '../constants/ui-request';
 import { fixVersion } from '../utils/deviceFeaturesUtils';
 import { BaseMethod } from './BaseMethod';

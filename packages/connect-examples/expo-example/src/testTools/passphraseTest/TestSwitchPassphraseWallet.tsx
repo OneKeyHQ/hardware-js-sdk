@@ -1,24 +1,25 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-
 import { Stack, Text } from 'tamagui';
 import { useIntl } from 'react-intl';
 import { get } from 'lodash';
+
 import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import { SwitchInput } from '../../components/SwitchInput';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import { CommonInput } from '../../components/CommonInput';
-import { TestChain } from './utils';
 import PanelView from '../../components/ui/Panel';
 import { baseParams } from '../addressTest/baseParams';
 import { replaceTemplate } from '../addressTest/data/utils';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
+
+import type { TestChain } from './utils';
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { TestCase, TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 
 type TestCaseDataType = {
   id: string;

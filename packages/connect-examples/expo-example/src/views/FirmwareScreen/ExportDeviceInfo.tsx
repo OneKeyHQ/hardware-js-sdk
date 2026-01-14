@@ -1,9 +1,11 @@
-import { Features } from '@onekeyfe/hd-core';
 import { useIntl } from 'react-intl';
+
 import { Button } from '../../components/ui/Button';
 import { downloadFile } from '../../utils/downloadUtils';
 import { useDeviceFieldContext } from './DeviceFieldContext';
 import { getDeviceBasicInfo } from '../../utils/deviceUtils';
+
+import type { Features } from '@onekeyfe/hd-core';
 
 export const deviceInfoKeys = [
   //   ['device_id', 'label'],

@@ -1,0 +1,31 @@
+---
+title: getChain
+---
+
+# getChain
+
+Get chain of current account
+
+### Method
+
+```typescript
+async function getChain(): {
+  enum: string;
+  name: string;
+  network: string;
+}
+```
+
+### Response
+
+The chain object.
+
+### Example
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const chain = await provider.getChain();
+console.log(chain);
+```
+

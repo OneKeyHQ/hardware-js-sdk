@@ -1,7 +1,10 @@
 import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
-import { CoreApi, getDeviceType } from '@onekeyfe/hd-core';
+import { getDeviceType } from '@onekeyfe/hd-core';
+
 import { selectDeviceAtom } from '../../atoms/deviceAtoms';
+
+import type { CoreApi } from '@onekeyfe/hd-core';
 
 type Device = {
   connectId: string;

@@ -1,0 +1,57 @@
+---
+title: getInscriptions
+---
+
+# getInscriptions
+
+列出当前账户的铭文。
+
+### 方法
+
+```typescript
+async function getInscriptions(cursor: number, size: number): InscriptionResponse
+```
+
+### 参数
+
+* `cursor` — _可选_ `number` 起始索引，默认为 `0`
+* `size` — _可选_ `number` 查询数量，默认为 `20`
+
+### 响应
+
+```typescript
+export type InscriptionResponse = {
+  total: number;       // 总数
+  list: InscriptionInfo[];  // 铭文列表
+};
+
+export type InscriptionInfo = {
+  inscriptionId: string;       // 铭文 ID
+  inscriptionNumber: number;   // 铭文编号
+  address: string;             // 地址
+  outputValue: number;         // 输出值
+  preview: string;             // 预览
+  content: string;             // 内容
+  contentLength: number;       // 内容长度
+  contentType: string;         // 内容类型
+  timestamp: number;           // 时间戳
+  genesisTransaction: string;  // 创世交易
+  location: string;            // 位置
+  output: string;              // 输出
+  offset: number;              // 偏移量
+};
+```
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const inscriptions = async provider.getInscriptions();
+
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/MWLqvEv" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

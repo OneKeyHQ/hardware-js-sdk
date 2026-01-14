@@ -1,4 +1,4 @@
-import { SignatureType } from '../../api/kaspa/helpers/SignatureType';
+import type { SignatureType } from '../../api/kaspa/helpers/SignatureType';
 import type { CommonParams, Response } from '../params';
 
 export type KaspaSignature = {

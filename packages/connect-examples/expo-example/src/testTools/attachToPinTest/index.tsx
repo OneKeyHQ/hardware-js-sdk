@@ -1,22 +1,25 @@
 import { Stack, Text, XStack, YStack, ZStack } from 'tamagui';
 import React, { useCallback, useContext, useEffect } from 'react';
-import { createStore, Provider, useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
+import { Provider, createStore, useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
 import { Toast, useToastController, useToastState } from '@tamagui/toast';
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+
 import PanelView from '../../components/ui/Panel';
 import { Button } from '../../components/ui/Button';
 import {
+  accountsAtom,
   addHiddenWalletAtom,
-  requestStatusAtom,
   addWalletAtom,
-  walletByDeviceConnectIdAtom,
   checkAccountAddressAtom,
   deleteWalletAtom,
-  accountsAtom,
+  requestStatusAtom,
+  walletByDeviceConnectIdAtom,
 } from './atoms';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
 import { useHardwarePassphraseDialog } from '../../provider/HardwarePassphraseProvider';
+
+import type { CoreMessage } from '@onekeyfe/hd-core';
 
 function AccountLists({ walletId }: { walletId: string }) {
   const toast = useToastController();

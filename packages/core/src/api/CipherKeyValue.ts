@@ -1,10 +1,11 @@
-import { CipherKeyValue as HardwareCipherKeyValue } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../constants/ui-request';
 import { serializedPath, validatePath } from './helpers/pathUtils';
 import { BaseMethod } from './BaseMethod';
 import { validateParams } from './helpers/paramsValidator';
-import { CipheredKeyValue, CipheredKeyValueParams } from '../types';
 import { formatAnyHex } from './helpers/hexUtils';
+
+import type { CipheredKeyValue, CipheredKeyValueParams } from '../types';
+import type { CipherKeyValue as HardwareCipherKeyValue } from '@onekeyfe/hd-transport';
 
 export default class CipherKeyValue extends BaseMethod<HardwareCipherKeyValue[]> {
   hasBundle = false;

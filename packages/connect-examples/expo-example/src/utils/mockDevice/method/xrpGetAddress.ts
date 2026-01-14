@@ -1,10 +1,12 @@
 /* eslint-disable no-bitwise */
-import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { encodeAccountID } from 'ripple-address-codec';
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { sha256 } from '@noble/hashes/sha256';
+
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 function publicKeyToAddress(publicKey: Uint8Array): string {
   const pub = bytesToHex(publicKey).toUpperCase();

@@ -1,23 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { CoreMessage, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { Picker } from '@react-native-picker/picker';
-
-import { Stack, Text, View, YStack, Separator } from 'tamagui';
+import { Separator, Stack, Text, View, YStack } from 'tamagui';
 import { useIntl } from 'react-intl';
-import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
-import { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 
+import { TestRunnerView } from '../../components/BaseTestRunner/TestRunnerView';
 import { useRunnerTest } from '../../components/BaseTestRunner/useRunnerTest';
 import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
-import { slip39StateInstances, type Slip39StateManager } from './slip39StateManager';
-
+import { type Slip39StateManager, slip39StateInstances } from './slip39StateManager';
 import { convertToBundleFormat } from './utils';
 import { batchAddressTests } from './addressData';
-import { SLIP39BatchTestCase } from './types';
+
+import type { CoreMessage } from '@onekeyfe/hd-core';
+import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
+import type { SLIP39BatchTestCase } from './types';
 
 type TestCaseDataType = SLIP39BatchTestCase['data'][0];
 type ResultViewProps = {

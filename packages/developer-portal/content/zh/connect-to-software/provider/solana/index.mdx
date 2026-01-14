@@ -1,0 +1,35 @@
+---
+description: 通过 OneKey Provider 进行 Solana 集成 — 检测、连接、发送交易和签名消息
+slug: /dapp/chains/solana
+---
+
+# Solana
+
+在 Web 应用中使用 OneKey 的 Solana Provider。
+
+## 快速链接
+
+- [检测 Provider](detecting-the-provider)
+- [建立连接](establishing-a-connection)
+- [发送交易](sending-a-transaction)
+- [签署消息](signing-a-message)
+
+## 最小示例
+
+```js
+// 检测
+const provider = window?.$onekey?.solana || window?.solana
+if (!provider?.isOneKey) throw new Error('未检测到 OneKey Solana Provider')
+
+// 连接
+const { publicKey } = await provider.connect()
+console.log(publicKey.toString())
+```
+
+## 事件
+
+- `connect`, `disconnect`, `accountChanged`
+
+## 常见错误
+
+- 4001: 用户拒绝了请求

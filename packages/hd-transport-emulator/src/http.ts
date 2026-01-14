@@ -1,6 +1,8 @@
-import axios, { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
 import { HardwareError, HardwareErrorCode } from '@onekeyfe/hd-shared';
 import secureJSON from 'secure-json-parse';
+
+import type { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 
 export type HttpRequestOptions = {
   body?: Array<any> | Record<string, unknown> | string;

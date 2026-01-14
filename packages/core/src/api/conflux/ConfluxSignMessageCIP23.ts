@@ -1,9 +1,10 @@
-import { ConfluxSignMessageCIP23 as HardwareConfluxSignMessageCIP23 } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
 import { formatAnyHex } from '../helpers/hexUtils';
+
+import type { ConfluxSignMessageCIP23 as HardwareConfluxSignMessageCIP23 } from '@onekeyfe/hd-transport';
 
 export default class ConfluxSignMessageCIP23 extends BaseMethod<HardwareConfluxSignMessageCIP23> {
   init() {

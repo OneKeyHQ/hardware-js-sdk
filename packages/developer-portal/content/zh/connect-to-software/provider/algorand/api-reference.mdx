@@ -1,0 +1,111 @@
+---
+title: API 参考
+description: OneKey Algorand provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey Algorand provider 方法和类型的完整参考。
+
+---
+
+## 方法
+
+| 方法 | 描述 |
+|------|------|
+| `connect()` | 连接钱包（旧版） |
+| `disconnect()` | 断开钱包连接 |
+| `enable(opts?)` | 启用钱包 (ARC-0001) |
+| `signTxns(transactions)` | 签署交易 (ARC-0001) |
+| `postTxns(signedTxns)` | 广播交易 |
+| `signAndPostTxns(transactions)` | 签署并广播 |
+| `signTransaction(txns)` | 签署交易（旧版） |
+| `signAndSendTransaction(txns)` | 签署并发送（旧版） |
+| `signMessage(message, encoding?)` | 签署任意消息 |
+| `getAlgodv2Client()` | 获取 Algod 客户端 |
+| `getIndexerClient()` | 获取 Indexer 客户端 |
+
+---
+
+## 类型
+
+### Enable 选项
+
+```typescript
+interface EnableOpts {
+  genesisID?: string
+  genesisHash?: string
+}
+```
+
+### Enable 结果
+
+```typescript
+interface EnableResult {
+  genesisID: string
+  genesisHash: string
+  accounts: string[]
+}
+```
+
+### 钱包交易
+
+```typescript
+interface WalletTransaction {
+  txn: string                  // Base64 编码的未签名交易
+  signers?: string[]           // 应该签名的地址（空 = 跳过）
+  stxn?: string                // 预签名的交易
+  message?: string             // 要显示的消息
+  msig?: MultisigMetadata
+  authAddr?: string            // 重新授权的认证地址
+}
+```
+
+### SignTxns 结果
+
+```typescript
+interface SignTxnsResult {
+  // Base64 已签名交易数组（跳过的为 null）
+  [index: number]: string | null
+}
+```
+
+### PostTxns 结果
+
+```typescript
+interface PostTxnsResult {
+  txIDs: string[]
+}
+```
+
+---
+
+## 属性
+
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `isConnected` | `boolean` | 连接状态 |
+| `address` | `string \| null` | 已连接的地址 |
+| `isOneKey` | `boolean` | OneKey 标识 |
+
+---
+
+## 事件
+
+| 事件 | 参数 | 描述 |
+|------|------|------|
+| `connect` | `{ address }` | 钱包已连接 |
+| `disconnect` | - | 钱包已断开连接 |
+| `accountChanged` | `address` | 账户已变更 |
+
+---
+
+## 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| 4100 | 未授权 |
+| 4200 | 不支持的方法 |
+| 4300 | 无效的输入 |
+

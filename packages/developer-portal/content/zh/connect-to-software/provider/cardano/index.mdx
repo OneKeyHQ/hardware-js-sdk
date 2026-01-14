@@ -1,0 +1,453 @@
+---
+title: Cardano
+description: 通过 OneKey 的 CIP-30 兼容 Provider 集成 Cardano
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# Cardano
+
+使用 OneKey 的 CIP-30 兼容 Provider 集成 Cardano 区块链。通过 `window.cardano.onekey` 或 `window.cardano.nami` 访问。
+
+<Callout type="info">
+OneKey 实现了 CIP-30 (Cardano dApp Connector)，确保与所有 Cardano dApp 兼容。同时提供 Nami 钱包兼容性。
+</Callout>
+
+---
+
+## 快速链接
+
+- [API 参考](#api-参考)
+- [连接钱包](#连接钱包)
+- [交易](#交易)
+- [数据签名](#数据签名)
+
+---
+
+## Provider 检测
+
+```typescript
+// OneKey 提供 onekey 和 nami 两种接口
+const onekey = window.cardano?.onekey
+const nami = window.cardano?.nami
+
+// 检查可用性
+if (!onekey) {
+  throw new Error('未检测到 OneKey Cardano provider')
+}
+
+// 获取钱包信息
+console.log('名称:', onekey.name) // 'OneKey'
+console.log('API 版本:', onekey.apiVersion) // '0.1.0'
+console.log('图标:', onekey.icon)
+```
+
+---
+
+## 快速开始
+
+### 启用钱包
+
+```typescript
+// 请求钱包访问权限
+const api = await window.cardano.onekey.enable()
+
+// 现在可以使用完整的 API
+const networkId = await api.getNetworkId()
+console.log('网络:', networkId === 1 ? '主网' : '测试网')
+```
+
+### 检查是否已启用
+
+```typescript
+const isEnabled = await window.cardano.onekey.isEnabled()
+
+if (isEnabled) {
+  const api = await window.cardano.onekey.enable()
+  // 使用 API...
+}
+```
+
+---
+
+## 账户信息
+
+### 获取网络 ID
+
+```typescript
+const api = await window.cardano.onekey.enable()
+const networkId = await api.getNetworkId()
+
+// 0 = 测试网, 1 = 主网
+console.log('网络:', networkId)
+```
+
+### 获取余额
+
+```typescript
+const balance = await api.getBalance()
+// 返回 CBOR 编码的值（十六进制字符串）
+console.log('余额 (CBOR):', balance)
+
+// 使用 cardano-serialization-lib 解码
+import { Value } from '@emurgo/cardano-serialization-lib-browser'
+const value = Value.from_bytes(Buffer.from(balance, 'hex'))
+const lovelace = value.coin().to_str()
+console.log('余额:', parseInt(lovelace) / 1000000, 'ADA')
+```
+
+### 获取地址
+
+```typescript
+// 获取已使用的地址（有交易历史的地址）
+const usedAddresses = await api.getUsedAddresses()
+console.log('已使用地址:', usedAddresses)
+
+// 获取未使用的地址（新地址）
+const unusedAddresses = await api.getUnusedAddresses()
+console.log('未使用地址:', unusedAddresses)
+
+// 获取找零地址
+const changeAddress = await api.getChangeAddress()
+console.log('找零地址:', changeAddress)
+
+// 获取奖励/质押地址
+const rewardAddresses = await api.getRewardAddresses()
+console.log('奖励地址:', rewardAddresses)
+```
+
+### 获取 UTxOs
+
+```typescript
+// 获取所有 UTxOs
+const utxos = await api.getUtxos()
+console.log('UTxOs:', utxos)
+
+// 获取满足最小金额的 UTxOs
+const utxosWithAmount = await api.getUtxos(
+  '1000000' // 最少 1 ADA (CBOR 编码)
+)
+
+// 分页获取
+const paginatedUtxos = await api.getUtxos(undefined, {
+  page: 0,
+  limit: 10,
+})
+```
+
+---
+
+## 交易
+
+### 签名交易
+
+```typescript
+// transaction 应为 CBOR 编码的十六进制字符串
+const signedTx = await api.signTx(transactionCbor, partialSign)
+
+// partialSign: boolean
+// - false: 签名钱包拥有的所有输入
+// - true: 仅签名明确拥有的输入（用于多签）
+
+console.log('已签名交易:', signedTx)
+```
+
+### 提交交易
+
+```typescript
+// 提交已签名的交易
+const txHash = await api.submitTx(signedTransactionCbor)
+console.log('交易哈希:', txHash)
+```
+
+### 完整的交易流程
+
+```typescript
+import {
+  TransactionBuilder,
+  TransactionBuilderConfigBuilder,
+  LinearFee,
+  BigNum,
+  Address,
+  TransactionOutput,
+  Value,
+} from '@emurgo/cardano-serialization-lib-browser'
+
+async function sendAda(recipientAddress, amountLovelace) {
+  const api = await window.cardano.onekey.enable()
+
+  // 获取 UTxOs
+  const utxos = await api.getUtxos()
+  const changeAddress = await api.getChangeAddress()
+
+  // 构建交易
+  const txBuilder = TransactionBuilder.new(
+    TransactionBuilderConfigBuilder.new()
+      .fee_algo(LinearFee.new(
+        BigNum.from_str('44'),
+        BigNum.from_str('155381')
+      ))
+      .pool_deposit(BigNum.from_str('500000000'))
+      .key_deposit(BigNum.from_str('2000000'))
+      .max_value_size(5000)
+      .max_tx_size(16384)
+      .coins_per_utxo_byte(BigNum.from_str('4310'))
+      .build()
+  )
+
+  // 从 UTxOs 添加输入
+  utxos.forEach(utxo => {
+    // 添加 UTxO 作为输入...
+  })
+
+  // 添加输出
+  txBuilder.add_output(
+    TransactionOutput.new(
+      Address.from_bech32(recipientAddress),
+      Value.new(BigNum.from_str(amountLovelace))
+    )
+  )
+
+  // 设置找零地址
+  txBuilder.add_change_if_needed(Address.from_bech32(changeAddress))
+
+  // 构建交易
+  const tx = txBuilder.build_tx()
+  const txCbor = Buffer.from(tx.to_bytes()).toString('hex')
+
+  // 签名
+  const signedTxCbor = await api.signTx(txCbor, false)
+
+  // 提交
+  const txHash = await api.submitTx(signedTxCbor)
+  console.log('交易哈希:', txHash)
+
+  return txHash
+}
+```
+
+---
+
+## 数据签名
+
+### 签名数据 (CIP-8)
+
+签名任意数据用于身份验证：
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+const addresses = await api.getUsedAddresses()
+const address = addresses[0]
+
+// 要签名的消息
+const payload = Buffer.from('Hello Cardano!').toString('hex')
+
+const signature = await api.signData(address, payload)
+
+console.log({
+  signature: signature.signature, // COSE_Sign1 签名
+  key: signature.key,             // COSE_Key 公钥
+})
+```
+
+### 验证签名
+
+```typescript
+import { COSESign1, COSEKey } from '@emurgo/cardano-message-signing-browser'
+
+const coseSign1 = COSESign1.from_bytes(
+  Buffer.from(signature.signature, 'hex')
+)
+const coseKey = COSEKey.from_bytes(
+  Buffer.from(signature.key, 'hex')
+)
+
+// 获取已签名的 payload
+const signedPayload = coseSign1.payload()
+
+// 验证签名
+const publicKey = coseKey.header(0) // 获取 Ed25519 密钥
+// 验证逻辑...
+```
+
+---
+
+## 事件处理
+
+### 监听账户变化
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+// Nami 兼容的事件 API
+api.experimental.on('accountChange', (addresses) => {
+  console.log('账户已变更:', addresses)
+})
+```
+
+---
+
+## API 参考
+
+### 钱包接口 (CIP-30)
+
+| 属性/方法 | 说明 |
+|-----------|------|
+| `name` | 钱包名称 ('OneKey') |
+| `icon` | 钱包图标 URL |
+| `apiVersion` | API 版本 |
+| `isEnabled()` | 检查是否已启用 |
+| `enable()` | 请求钱包访问权限 |
+
+### dApp API（启用后）
+
+| 方法 | 说明 |
+|------|------|
+| `getNetworkId()` | 获取网络 (0=测试网, 1=主网) |
+| `getBalance()` | 获取总余额 (CBOR) |
+| `getUtxos(amount?, paginate?)` | 获取 UTxOs |
+| `getUsedAddresses()` | 获取已使用地址 |
+| `getUnusedAddresses()` | 获取未使用地址 |
+| `getChangeAddress()` | 获取找零地址 |
+| `getRewardAddresses()` | 获取质押地址 |
+| `signTx(tx, partialSign?)` | 签名交易 |
+| `signData(addr, payload)` | 签名数据 (CIP-8) |
+| `submitTx(tx)` | 提交交易 |
+
+### 实验性 API
+
+| 方法 | 说明 |
+|------|------|
+| `experimental.getCollateral()` | 获取抵押 UTxOs |
+| `experimental.on(event, cb)` | 订阅事件 |
+| `experimental.off()` | 取消订阅 |
+
+### 类型
+
+```typescript
+type Cbor = string // 十六进制编码的 CBOR
+
+interface Paginate {
+  page: number
+  limit: number
+}
+
+interface Cip30DataSignature {
+  signature: string // COSE_Sign1 十六进制
+  key: string       // COSE_Key 十六进制
+}
+
+type NetworkId = 0 | 1 // 0=测试网, 1=主网
+```
+
+### 事件
+
+| 事件 | 说明 |
+|------|------|
+| `accountChange` | 账户已变更 |
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const api = await window.cardano.onekey.enable()
+} catch (error) {
+  if (error.code === -1) {
+    console.log('用户拒绝了连接')
+  } else if (error.code === -2) {
+    console.log('未找到账户')
+  } else {
+    console.error('错误:', error.message)
+  }
+}
+```
+
+### 常见错误
+
+| 错误码 | 说明 |
+|--------|------|
+| -1 | 用户拒绝 |
+| -2 | 未找到账户 |
+| -3 | 无效的网络 |
+
+---
+
+## 使用 Lucid
+
+[Lucid](https://github.com/spacebudz/lucid) 提供了更简单的 API：
+
+```bash
+npm install lucid-cardano
+```
+
+```typescript
+import { Lucid } from 'lucid-cardano'
+
+// 使用 OneKey 初始化 Lucid
+const lucid = await Lucid.new(
+  new Blockfrost('https://cardano-mainnet.blockfrost.io/api', 'your-api-key'),
+  'Mainnet'
+)
+
+// 连接 OneKey
+const api = await window.cardano.onekey.enable()
+lucid.selectWallet(api)
+
+// 发送 ADA
+const tx = await lucid
+  .newTx()
+  .payToAddress('addr1...', { lovelace: 5000000n })
+  .complete()
+
+const signedTx = await tx.sign().complete()
+const txHash = await signedTx.submit()
+
+console.log('交易哈希:', txHash)
+```
+
+---
+
+## 使用 Mesh
+
+[Mesh](https://meshjs.dev/) 是另一个流行的 Cardano SDK：
+
+```bash
+npm install @meshsdk/core
+```
+
+```typescript
+import { BrowserWallet, Transaction } from '@meshsdk/core'
+
+// 连接到 OneKey
+const wallet = await BrowserWallet.enable('onekey')
+
+// 获取钱包信息
+const balance = await wallet.getBalance()
+const addresses = await wallet.getUsedAddresses()
+
+// 构建并发送交易
+const tx = new Transaction({ initiator: wallet })
+  .sendLovelace('addr1...', '5000000')
+
+const unsignedTx = await tx.build()
+const signedTx = await wallet.signTx(unsignedTx)
+const txHash = await wallet.submitTx(signedTx)
+```
+
+---
+
+## Nami 兼容性
+
+OneKey 提供 Nami 钱包兼容性：
+
+```typescript
+// 通过 Nami 接口访问
+const nami = window.cardano.nami
+const api = await nami.enable()
+
+// 与 OneKey 相同的 API
+const balance = await api.getBalance()
+```

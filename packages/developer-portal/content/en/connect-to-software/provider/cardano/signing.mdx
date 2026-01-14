@@ -1,0 +1,84 @@
+---
+title: Signing
+description: Sign data on Cardano using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Signing
+
+Learn how to sign data for authentication on Cardano.
+
+---
+
+## Sign Data (CIP-8)
+
+Sign arbitrary data for authentication:
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+const addresses = await api.getUsedAddresses()
+const address = addresses[0]
+
+// Message to sign
+const payload = Buffer.from('Hello Cardano!').toString('hex')
+
+const signature = await api.signData(address, payload)
+
+console.log({
+  signature: signature.signature, // COSE_Sign1 signature
+  key: signature.key,             // COSE_Key public key
+})
+```
+
+---
+
+## Verify Signature
+
+```typescript
+import { COSESign1, COSEKey } from '@emurgo/cardano-message-signing-browser'
+
+const coseSign1 = COSESign1.from_bytes(
+  Buffer.from(signature.signature, 'hex')
+)
+const coseKey = COSEKey.from_bytes(
+  Buffer.from(signature.key, 'hex')
+)
+
+// Get the signed payload
+const signedPayload = coseSign1.payload()
+
+// Verify signature
+const publicKey = coseKey.header(0) // Get Ed25519 key
+// Verification logic...
+```
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  const api = await window.cardano.onekey.enable()
+} catch (error) {
+  if (error.code === -1) {
+    console.log('User rejected connection')
+  } else if (error.code === -2) {
+    console.log('Account not found')
+  } else {
+    console.error('Error:', error.message)
+  }
+}
+```
+
+---
+
+## Common Errors
+
+| Code | Description |
+|------|-------------|
+| -1 | User rejected |
+| -2 | Account not found |
+| -3 | Invalid network |
+

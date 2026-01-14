@@ -1,0 +1,94 @@
+---
+title: 迁移到 web-sdk + WebUSB
+---
+
+# 迁移到 web-sdk + WebUSB
+
+将 Bridge 替换为 WebUSB，保持使用 `@onekeyfe/hd-web-sdk`。
+
+---
+
+## 环境要求
+
+- Chromium 内核浏览器（Chrome/Edge 桌面版）
+- Node.js 18+（推荐 LTS 版本）
+
+---
+
+## 变更概览
+
+- 使用 `env: 'webusb'` 初始化 SDK
+  - （Bridge (env: `web`) → WebUSB (env: `webusb`)）
+- 更新 hd-web-sdk 的 `connectSrc` 到最新 iframe 主机版本（如 `https://jssdk.onekey.so/1.1.16/`）
+- 通过 `navigator.usb.requestDevice()` 配合官方 OneKey 过滤器请求用户授权 — 由于 Chrome 安全限制，必须由用户手势触发（如按钮点击）；在获得权限前不允许自动设备发现
+- Bridge 相关检查已弃用（如 `checkBridgeStatus()`）
+- 其他 SDK 用法保持不变
+
+---
+
+## 初始化（hd-web-sdk + WebUSB）
+
+```ts
+import HdWebSdk from '@onekeyfe/hd-web-sdk';
+
+// 与 expo-example 相同的模式：默认导出 → .HardwareWebSdk
+const HardwareSDK = HdWebSdk.HardwareWebSdk;
+
+await HardwareSDK.init({
+  env: 'webusb',
+  // hd-web-sdk 使用 iframe 主机；保持 connectSrc 配置
+  connectSrc: 'https://jssdk.onekey.so/1.1.16/',
+  debug: true,
+  fetchConfig: true,
+});
+```
+
+---
+
+## 授权（WebUSB 选择器 + 官方过滤器）
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// 重要：必须由用户手势触发（如按钮点击）
+// Chrome 安全策略不允许在获得权限前自动发现 USB 设备
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+---
+
+## 枚举设备并进行首次调用
+
+```ts
+// 1) 枚举设备
+const list = await HardwareSDK.searchDevices();
+if (!list.success) throw new Error(list.payload.error);
+const { connectId, deviceId } = list.payload[0] ?? {};
+
+// 2) (可选) 获取 features 以解析 device_id
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+const resolvedDeviceId = features.payload.device_id ?? deviceId;
+
+// 3) 示例：获取 BTC 地址
+const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: false,
+});
+
+if (r.success) {
+  console.log('BTC 地址:', r.payload.address);
+} else {
+  console.error('错误:', r.payload.error, r.payload.code);
+}
+```
+
+---
+
+## 清理和检查清单
+
+- 移除 Bridge 相关检查/CTA（如 `checkBridgeStatus()`）
+- 在 hd-web-sdk 初始化中保持最新的 `connectSrc`（iframe 主机）
+- 检测 `navigator.usb` 特性，如不支持则显示友好提示
+- 其他 SDK 方法和 UI 流程保持不变

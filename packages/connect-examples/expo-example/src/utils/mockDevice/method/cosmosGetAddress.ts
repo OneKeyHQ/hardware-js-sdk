@@ -1,9 +1,11 @@
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
-import { CosmosGetAddressParams, Success, Unsuccessful } from '@onekeyfe/hd-core';
 import { bech32 } from '@scure/base';
+
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
+
+import type { CosmosGetAddressParams, Success, Unsuccessful } from '@onekeyfe/hd-core';
 
 export type ICurveName = 'secp256k1' | 'nistp256' | 'ed25519';
 

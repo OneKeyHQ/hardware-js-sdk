@@ -1,0 +1,263 @@
+---
+title: Provider API
+---
+
+# Provider API
+
+OneKey 浏览器扩展会在用户访问的网站中注入一个全局 API 到 `window.$onekey.ethereum`。此 API 允许网站请求用户的以太坊账户，读取用户连接的区块链数据，并建议用户签署消息和交易。Provider 对象的存在表明这是一个以太坊用户。
+
+以太坊 JavaScript Provider API 由 [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193) 规范定义。
+
+### Provider 检测
+
+推荐：EIP-6963 多钱包检测（避免多个扩展安装时的冲突）
+
+```js
+let onekeyProvider = null
+const providers = []
+
+function onAnnounceProvider(event) {
+  const { info, provider } = event.detail || {}
+  providers.push({ info, provider })
+  // 明确优先选择 OneKey
+  if (info?.name === 'OneKey' || info?.rdns?.includes('onekey')) {
+    onekeyProvider = provider
+  }
+}
+
+window.addEventListener('eip6963:announceProvider', onAnnounceProvider)
+window.dispatchEvent(new Event('eip6963:requestProvider'))
+
+// 稍后在应用初始化时选择一个 provider
+setTimeout(() => {
+  const picked = onekeyProvider || providers.find(p => p.info?.name)?.provider
+  if (!picked) console.warn('没有通过 EIP-6963 声明的钱包 provider')
+  // startApp(picked)
+}, 300)
+```
+
+备选方案：OneKey 优先策略，保持与通用注入 provider 的兼容性。
+
+```javascript
+const provider = window?.$onekey?.ethereum
+  || window?.ethereum?.providers?.find((p) => p?.isOneKey || p?.onekey)
+  || window?.ethereum;
+
+if (!provider) {
+  throw new Error('未检测到 OneKey provider');
+}
+```
+
+### 基本用法
+
+对于任何非简单的以太坊 Web 应用（dApp）来说，你需要完成三个基本任务：
+
+1. **检测以太坊 Provider：** 首先需要确认用户是否安装了像 OneKey 这样的钱包。推荐使用 **EIP-6963** 标准，如上文 **Provider 检测** 部分所述。
+2. **访问用户账户：** 检测到 provider 后，需要请求查看用户账户的权限。这几乎总是通过在 provider 对象上调用 `eth_requestAccounts` 方法来完成。
+3. **监控网络变更：** 用户可以随时切换不同的网络（如以太坊主网和 Sepolia）。你的 dApp 必须监听 `chainChanged` 事件以了解当前连接的网络。
+
+Provider 对象是构建完整 Web3 应用的基本工具。虽然你可以直接使用 provider API 进行所有交互，但许多开发者更喜欢使用便捷库来简化开发。我们推荐经过社区验证的强大库，如 [**ethers.js**](https://ethers.io/) 或 [**viem**](https://viem.sh/)，它们提供更高级的抽象和实用工具。
+
+### 链 ID
+
+以下是 OneKey 默认支持的以太坊链 ID。访问 [chainlist.org](https://chainlist.org/) 获取完整列表。
+
+| 十六进制 | 十进制   | 网络                          | 状态   |
+| -------- | -------- | ----------------------------- | ------ |
+| 0x1      | 1        | 以太坊主网                    | 运行中 |
+| 0x38     | 56       | 币安智能链（主网）            | 运行中 |
+| 0x80     | 128      | 火币生态链（主网）            | 运行中 |
+| 0x89     | 137      | Polygon (Matic) 主网          | 运行中 |
+| 0xfa     | 250      | Fantom 主网                   | 运行中 |
+| 0xaa36a7 | 11155111 | Sepolia 测试网                | 活跃   |
+
+### 方法
+
+获取 provider 对象（例如通过 EIP-6963）后，你可以使用以下 EIP-1193 方法与用户钱包交互。
+
+#### `eth_requestAccounts`
+
+使用 `eth_requestAccounts` 从用户钱包请求一个或多个账户。调用此方法通常会向用户显示连接请求弹窗。
+
+```javascript
+try {
+  const accounts = await window.$onekey.ethereum.request({ method: 'eth_requestAccounts' });
+  // 处理账户
+} catch (error) {
+  // 处理错误，例如用户拒绝请求
+}
+```
+
+#### `window.$onekey.ethereum.isConnected()`
+
+> **提示**\
+> 注意此方法与用户账户无关。\
+> 你可能经常会看到"已连接"一词用于描述 Web3 网站是否可以访问用户账户。然而在 provider 接口中，"已连接"和"已断开"指的是 provider 是否可以向当前链发起 RPC 请求。
+
+```typescript
+window.$onekey.ethereum.isConnected(): boolean;
+```
+
+如果 provider 已连接到当前链则返回 `true`，否则返回 `false`。
+
+如果 provider 未连接，需要重新加载页面以重新建立连接。更多信息请参阅 `connect` 和 `disconnect` 事件。
+
+#### `window.$onekey.ethereum.request(args)`
+
+```typescript
+interface RequestArguments {
+  method: string;
+  params?: unknown[] | object;
+}
+
+window.$onekey.ethereum.request(args: RequestArguments): Promise<unknown>;
+```
+
+使用 `request` 通过 OneKey 浏览器扩展向以太坊提交 RPC 请求。它返回一个 `Promise`，解析为 RPC 方法调用的结果。
+
+`params` 和返回值根据 RPC 方法不同而变化。实际上，如果方法有任何 `params`，它们几乎总是 `Array<any>` 类型。
+
+如果请求因任何原因失败，`Promise` 将以以太坊 RPC 错误拒绝。
+
+OneKey 浏览器扩展支持大多数标准化的以太坊 RPC 方法，以及一些其他钱包可能不支持的方法。
+
+详情请参阅 [RPC API](../rpc-api)。
+
+**示例**
+
+```javascript
+const params = [
+    {
+        from: '0xb60e8dd61c5d32be8058bb8eb970870f0java7233155',
+        to: '0xd46e8dd67c5d32be8058bb8eb970870f07244567',
+        gas: '0x76c0', // 30400
+        gasPrice: '0x9184e72a000', // 10000000000000
+        value: '0x9184e72a', // 2441406250
+        data: '0xd46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675',
+     },
+ ];
+
+window.$onekey.ethereum.request({
+    method: 'eth_sendTransaction',
+    params,
+}).then((result) => {
+    // 结果根据 RPC 方法不同而变化。
+    // 例如，此方法成功时将返回交易哈希十六进制字符串。
+    })
+    .catch((error) => {
+        // 如果请求失败，Promise 将以错误拒绝。
+    });
+```
+
+### 事件
+
+OneKey 浏览器扩展 provider 实现了 [Node.js `EventEmitter` API](https://nodejs.org/api/events.html#events_class_eventemitter)。本节详细介绍通过该 API 发出的事件。
+
+关于 `EventEmitter` 的指南有很多，你可以像这样监听事件：
+
+```javascript
+window.$onekey.ethereum.on('accountsChanged', (accounts) => {
+  // 处理新账户，或没有账户的情况。
+  // "accounts" 始终是一个数组，但可能为空。
+});
+
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  // 处理新链。
+  // 正确处理链变更可能比较复杂。
+  // 我们建议重新加载页面，除非你有充分的理由不这样做。
+  window.location.reload();
+});
+```
+
+#### `connect`
+
+```typescript
+interface ConnectInfo {
+  chainId: string;
+}
+
+window.$onekey.ethereum.on('connect', handler: (connectInfo: ConnectInfo) => void);
+```
+
+当 OneKey 浏览器扩展 provider 首次能够向链提交 RPC 请求时，会发出此事件。
+
+我们建议使用 `connect` 事件处理程序和 `window.$onekey.ethereum.isConnected()` 方法来确定 provider 何时/是否已连接。
+
+#### `disconnect`
+
+```typescript
+window.$onekey.ethereum.on('disconnect', handler: (error: ProviderRpcError) => void);
+```
+
+如果 OneKey provider 无法向任何链提交 RPC 请求，则会发出此事件。一般来说，这只会因为网络连接问题或某些意外错误而发生。
+
+一旦发出 `disconnect`，provider 将不接受任何新请求，直到重新建立与链的连接，这需要重新加载页面。你也可以使用 `window.$onekey.ethereum.isConnected()` 方法来确定 provider 是否断开连接。
+
+#### `accountsChanged`
+
+```typescript
+window.$onekey.ethereum.on('accountsChanged', handler: (accounts: Array<string>) => void);
+```
+
+每当 `eth_accounts` RPC 方法的返回值发生变化时，OneKey provider 都会发出此事件。`eth_accounts` 返回一个数组，要么为空，要么包含单个账户地址。返回的地址（如果有）是调用者被允许访问的最近使用的账户地址。调用者通过其 URL 来源进行识别，这意味着所有具有相同来源的网站共享相同的权限。
+
+这意味着每当用户公开的账户地址发生变化时，都会发出 `accountsChanged`。
+
+> **提示**\
+> 我们计划在不久的将来允许 `eth_accounts` 数组包含多个地址。
+
+#### `chainChanged`
+
+> **提示**\
+> 有关 OneKey 浏览器扩展的默认链及其链 ID，请参阅链 ID 部分。
+
+```typescript
+window.$onekey.ethereum.on('chainChanged', handler: (chainId: string) => void);
+```
+
+当前连接的链发生变化时，OneKey 浏览器扩展 provider 会发出此事件。
+
+所有 RPC 请求都提交到当前连接的链。因此，通过监听此事件来跟踪当前链 ID 非常重要。
+
+处理此事件的常见方式是重新加载页面：
+
+```javascript
+window.$onekey.ethereum.on('chainChanged', (_chainId) => window.location.reload());
+```
+
+#### `message`
+
+```typescript
+interface ProviderMessage {
+  type: string;
+  data: unknown;
+}
+
+window.$onekey.ethereum.on('message', handler: (message: ProviderMessage) => void);
+```
+
+当 OneKey provider 收到需要通知消费者的消息时，会发出此事件。消息类型由 `type` 字符串标识。
+
+RPC 订阅更新是 `message` 事件的常见用例。例如，如果你使用 `eth_subscribe` 创建订阅，每个订阅更新都会作为类型为 `eth_subscription` 的 `message` 事件发出。
+
+### 错误
+
+OneKey provider 抛出或返回的所有错误都遵循此接口：
+
+```typescript
+interface ProviderRpcError extends Error {
+  message: string;
+  code: number;
+  data?: unknown;
+}
+```
+
+`window.$onekey.ethereum.request(args)` 方法会立即抛出错误。你通常可以使用 `code` 属性来确定请求失败的原因。
+
+常见错误码及其含义包括：
+
+* **4001**：请求被用户拒绝。
+* **-32602**：参数无效。
+* **-32603**：内部错误。
+
+完整的错误列表请参阅 [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193#provider-errors) 和 [EIP-1474](https://eips.ethereum.org/EIPS/eip-1474)。

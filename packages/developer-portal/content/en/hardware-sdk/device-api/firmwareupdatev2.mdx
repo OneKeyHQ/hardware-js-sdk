@@ -1,0 +1,57 @@
+---
+title: firmwareUpdateV2
+---
+
+# firmwareUpdateV2
+
+## Firmware update (V2)
+
+Next‑gen firmware update flow. Supports downloading and updating Main firmware and BLE firmware. You must explicitly pass a `platform`.
+
+```typescript
+const res = await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  updateType: 'firmware', // or 'ble'
+  // Option A: version-based update (recommended)
+  version: [2, 10, 0],
+  // Option B: custom binary (use with caution)
+  // binary: ArrayBuffer,
+  // Optional flags
+  forcedUpdateRes: false,
+  isUpdateBootloader: false,
+});
+```
+
+### Params
+
+[Optional common params](../common-params)
+
+- `platform` - required `"native" | "desktop" | "ext" | "web" | "web-embed"` execution environment
+- `updateType` - required `'firmware' | 'ble'` update target (main firmware or BLE)
+- `version` - optional `number[]` target version as a 3‑part array; downloads official firmware for that version
+- `binary` - optional `ArrayBuffer` custom firmware binary; use with caution
+- `forcedUpdateRes` - optional `boolean` force updating resource package
+- `isUpdateBootloader` - optional `boolean` include Bootloader update
+
+### Result
+
+```typescript
+{
+  success: true,
+  payload: {
+    // success indicator from lower layer
+  }
+}
+```
+
+### Error
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code: number   // error code
+  }
+}
+```

@@ -1,4 +1,4 @@
-import { screen, app, BrowserWindow, session, ipcMain, shell } from 'electron';
+import { BrowserWindow, app, ipcMain, screen, session, shell } from 'electron';
 import path from 'path';
 import isDevelopment from 'electron-is-dev';
 import { format as formatUrl } from 'url';
@@ -6,6 +6,7 @@ import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 import { exec } from 'child_process';
 import { initNobleBleSupport } from '@onekeyfe/hd-transport-electron';
+
 import initProcess, { restartBridge } from './process';
 import { ipcMessageKeys } from './config';
 

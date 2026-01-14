@@ -1,5 +1,5 @@
+import type { LowLevelCoreApi } from '../../lowLevelInject';
 import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
-import { LowLevelCoreApi } from '../../lowLevelInject';
 import type { ConnectSettings } from '../settings';
 
 export declare function init(

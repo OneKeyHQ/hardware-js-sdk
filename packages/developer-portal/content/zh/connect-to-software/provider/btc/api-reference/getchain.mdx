@@ -1,0 +1,31 @@
+---
+title: getChain
+---
+
+# getChain
+
+获取当前账户的链信息
+
+### 方法
+
+```typescript
+async function getChain(): {
+  enum: string;
+  name: string;
+  network: string;
+}
+```
+
+### 返回值
+
+链对象信息。
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const chain = await provider.getChain();
+console.log(chain);
+```
+

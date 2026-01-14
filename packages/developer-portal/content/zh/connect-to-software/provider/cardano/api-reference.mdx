@@ -1,0 +1,86 @@
+---
+title: API 参考
+description: OneKey Cardano provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey Cardano provider 方法和类型的完整参考。
+
+---
+
+## 钱包接口 (CIP-30)
+
+| 属性/方法 | 描述 |
+|-----------|------|
+| `name` | 钱包名称 ('OneKey') |
+| `icon` | 钱包图标 URL |
+| `apiVersion` | API 版本 |
+| `isEnabled()` | 检查是否已启用 |
+| `enable()` | 请求钱包访问 |
+
+---
+
+## dApp API (enable 之后)
+
+| 方法 | 描述 |
+|------|------|
+| `getNetworkId()` | 获取网络 (0=测试网, 1=主网) |
+| `getBalance()` | 获取总余额 (CBOR) |
+| `getUtxos(amount?, paginate?)` | 获取 UTxO |
+| `getUsedAddresses()` | 获取已使用的地址 |
+| `getUnusedAddresses()` | 获取未使用的地址 |
+| `getChangeAddress()` | 获取找零地址 |
+| `getRewardAddresses()` | 获取质押地址 |
+| `signTx(tx, partialSign?)` | 签署交易 |
+| `signData(addr, payload)` | 签署数据 (CIP-8) |
+| `submitTx(tx)` | 提交交易 |
+
+---
+
+## 实验性 API
+
+| 方法 | 描述 |
+|------|------|
+| `experimental.getCollateral()` | 获取抵押 UTxO |
+| `experimental.on(event, cb)` | 订阅事件 |
+| `experimental.off()` | 取消订阅 |
+
+---
+
+## 类型
+
+```typescript
+type Cbor = string // 十六进制编码的 CBOR
+
+interface Paginate {
+  page: number
+  limit: number
+}
+
+interface Cip30DataSignature {
+  signature: string // COSE_Sign1 十六进制
+  key: string       // COSE_Key 十六进制
+}
+
+type NetworkId = 0 | 1 // 0=测试网, 1=主网
+```
+
+---
+
+## 事件
+
+| 事件 | 描述 |
+|------|------|
+| `accountChange` | 账户已变更 |
+
+---
+
+## 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| -1 | 用户拒绝 |
+| -2 | 未找到账户 |
+| -3 | 无效的网络 |
+

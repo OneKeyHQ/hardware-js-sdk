@@ -1,0 +1,98 @@
+---
+title: btcGetPublicKey
+---
+
+# btcGetPublicKey
+
+## Bitcoin：获取公钥
+
+获取由给定 BIP32 路径派生的 BIP32 扩展公钥。用户会看到所请求密钥的描述，并被要求确认导出。
+
+```typescript
+const result = await HardwareSDK.btcGetPublicKey(connectId, deviceId, params);
+```
+
+## 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+### 导出单个公钥
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `1`。[更多信息](../../../api-reference#hd-path)
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+* `coin` - _可选_ `string` 决定 coins.json 文件中指定的网络定义。可以使用币种的 `shortcut`、`name` 或 `label`。如果未设置 `coin`，API 将尝试从 `path` 获取网络定义。
+* `scriptType` - _可选_ InputScriptType，地址脚本类型
+
+#### 导出批量公钥
+
+* `bundle` - 包含 `path`、`coin` 字段的对象 `Array`
+
+### 示例
+
+返回第五个比特币账户的公钥：
+
+```typescript
+HardwareSDK.btcGetPublicKey(connectId, deviceId, {
+    path: "m/49'/0'/4'",
+    coin: "btc"
+});
+```
+
+返回多个比特币账户的批量公钥：
+
+```typescript
+HardwareSDK.btcGetPublicKey(connectId, deviceId, {
+    bundle: [
+        { path: "m/49'/0'/0'" }, // 账户 1
+        { path: "m/49'/0'/1'" }, // 账户 2
+        { path: "m/49'/0'/2'" }  // 账户 3
+    ]
+});
+```
+
+### 返回结果
+
+只有一个公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: Array<number>, // 强化路径
+        xpub: string,        // 传统格式的 xpub
+        xpubSegwit?: string, // segwit 账户可选：segwit 格式的 xpub
+        chainCode: string,   // BIP32 序列化格式
+        childNum: number,    // BIP32 序列化格式
+        publicKey: string,   // BIP32 序列化格式
+        fingerprint: number, // BIP32 序列化格式
+        depth: number,       // BIP32 序列化格式
+    }
+}
+```
+
+[了解更多关于 BIP32 序列化格式](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
+
+批量公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }, // 账户 1
+        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }, // 账户 2
+        { path, serializedPath, xpub, xpubSegwit?, chainCode, childNum, publicKey, fingerprint, depth }  // 账户 3
+    ]
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

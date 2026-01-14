@@ -1,20 +1,23 @@
-import {
-  TonSignMessage as HardwareTonSignMessage,
-  TonSignedMessage,
-  TonTxAck,
-} from '@onekeyfe/hd-transport';
 import semver from 'semver';
 import BigNumber from 'bignumber.js';
 import { isEmpty } from 'lodash';
+
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
-import { DeviceFirmwareRange, DeviceModelToTypes, TonSignMessageParams } from '../../types';
+import { DeviceModelToTypes } from '../../types';
 import { getDeviceFirmwareVersion, getDeviceType, getMethodVersionRange } from '../../utils';
 import { formatAnyHex, stripHexStartZeroes } from '../helpers/hexUtils';
-import type { TonSignedMessageResponse } from '../../types/api/tonSignMessage';
 import { cutString } from '../helpers/stringUtils';
+
+import type { DeviceFirmwareRange, TonSignMessageParams } from '../../types';
+import type {
+  TonSignMessage as HardwareTonSignMessage,
+  TonSignedMessage,
+  TonTxAck,
+} from '@onekeyfe/hd-transport';
+import type { TonSignedMessageResponse } from '../../types/api/tonSignMessage';
 
 export default class TonSignMessage extends BaseMethod<HardwareTonSignMessage> {
   initState: string | null = null;

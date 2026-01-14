@@ -1,0 +1,131 @@
+---
+title: wallet_addEthereumChain
+description: Add a new Ethereum chain to the wallet
+---
+
+# wallet_addEthereumChain
+
+Requests that the wallet adds a new chain. If the chain already exists, the wallet may switch to it.
+
+---
+
+## Parameters
+
+`Array` containing a single chain configuration object:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `chainId` | `string` | Yes | Chain ID (hex string with 0x prefix) |
+| `chainName` | `string` | Yes | Human-readable chain name |
+| `nativeCurrency` | `object` | Yes | Native currency info |
+| `nativeCurrency.name` | `string` | Yes | Currency name |
+| `nativeCurrency.symbol` | `string` | Yes | Currency symbol (2-6 chars) |
+| `nativeCurrency.decimals` | `number` | Yes | Currency decimals (usually 18) |
+| `rpcUrls` | `string[]` | Yes | Array of RPC URLs (at least one) |
+| `blockExplorerUrls` | `string[]` | No | Array of block explorer URLs |
+| `iconUrls` | `string[]` | No | Array of icon URLs (currently ignored) |
+
+---
+
+## Returns
+
+`null` on success
+
+---
+
+## Example
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x89',
+    chainName: 'Polygon Mainnet',
+    nativeCurrency: {
+      name: 'MATIC',
+      symbol: 'MATIC',
+      decimals: 18
+    },
+    rpcUrls: ['https://polygon-rpc.com'],
+    blockExplorerUrls: ['https://polygonscan.com']
+  }]
+})
+```
+
+### Add Base
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x2105',
+    chainName: 'Base',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://mainnet.base.org'],
+    blockExplorerUrls: ['https://basescan.org']
+  }]
+})
+```
+
+### Add Arbitrum
+
+```typescript
+await window.$onekey.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0xa4b1',
+    chainName: 'Arbitrum One',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://arb1.arbitrum.io/rpc'],
+    blockExplorerUrls: ['https://arbiscan.io']
+  }]
+})
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User rejected the request | User denied adding the chain |
+| -32602 | Invalid params | Invalid chain configuration |
+
+---
+
+## Notes
+
+- Only the first element of `rpcUrls` and `blockExplorerUrls` arrays is used
+- The wallet validates that the RPC endpoint responds correctly
+- Cannot add chains with non-18 decimal native currencies (in some wallets)
+- Specified by [EIP-3085](https://eips.ethereum.org/EIPS/eip-3085)
+
+### Combined Add and Switch
+
+```typescript
+async function switchToChain(chainConfig) {
+  try {
+    await window.$onekey.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: chainConfig.chainId }]
+    })
+  } catch (error) {
+    if (error.code === 4902) {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [chainConfig]
+      })
+    } else {
+      throw error
+    }
+  }
+}
+```

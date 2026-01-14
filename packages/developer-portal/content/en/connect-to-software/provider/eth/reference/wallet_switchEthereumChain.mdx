@@ -1,0 +1,84 @@
+---
+title: wallet_switchEthereumChain
+description: Switch to a different Ethereum chain
+---
+
+# wallet_switchEthereumChain
+
+Requests that the wallet switch to the specified chain. If the chain is not already configured in the wallet, an error will be thrown.
+
+---
+
+## Parameters
+
+`Array` containing a single object:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `chainId` | `string` | Yes | Chain ID (hex string with 0x prefix) |
+
+---
+
+## Returns
+
+`null` on success
+
+---
+
+## Example
+
+```typescript
+try {
+  await window.$onekey.ethereum.request({
+    method: 'wallet_switchEthereumChain',
+    params: [{ chainId: '0x89' }] // Polygon
+  })
+  console.log('Switched to Polygon')
+} catch (error) {
+  if (error.code === 4902) {
+    // Chain not added, try adding it
+    await window.$onekey.ethereum.request({
+      method: 'wallet_addEthereumChain',
+      params: [{ /* chain config */ }]
+    })
+  }
+}
+```
+
+### Common Chain IDs
+
+| Chain | Chain ID (Hex) | Chain ID (Decimal) |
+|-------|----------------|-------------------|
+| Ethereum | `0x1` | 1 |
+| Polygon | `0x89` | 137 |
+| BSC | `0x38` | 56 |
+| Arbitrum | `0xa4b1` | 42161 |
+| Optimism | `0xa` | 10 |
+| Base | `0x2105` | 8453 |
+| Avalanche | `0xa86a` | 43114 |
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User rejected the request | User denied the switch |
+| 4902 | Unrecognized chain ID | Chain not configured in wallet |
+
+---
+
+## Notes
+
+- If chain is not configured, use [wallet_addEthereumChain](./wallet_addEthereumChain) first
+- User may need to approve the switch
+- Listen to `chainChanged` event to detect when switch completes
+- Specified by [EIP-3326](https://eips.ethereum.org/EIPS/eip-3326)
+
+```typescript
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  console.log('Chain changed to:', chainId)
+  // Recommended: reload the page
+  window.location.reload()
+})
+```

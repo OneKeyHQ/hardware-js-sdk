@@ -1,0 +1,262 @@
+---
+title: Core API Guide
+---
+
+# Hardware SDK Core API Guide
+
+Single-page guide for integrators: happy path + params/events/safety/error handling in one place.
+
+## Quick flow
+<div id="request-basics" />
+
+- Call shape: `HardwareSDK.method(connectId, deviceId?, params)` → `Promise<{ success, payload }>`; always guard on `success` before touching `payload`.
+- Identifiers: `connectId` from `searchDevices` (stable for the same device; reset does not change it); `deviceId` from `getFeatures` (required for BLE, recommended for WebUSB). Refresh `deviceId` after reset/recovery.
+- UI contract: subscribe `UI_EVENT` once; only call `uiResponse` on input-type `UI_REQUEST` (PIN/Passphrase/Bootloader select). Route per device when multiple devices are connected.
+- Param hygiene: validate HD Path per chain; reuse hidden wallet with `initSession + passphraseState`; serialize calls per device to avoid deadlocks.
+
+```ts
+const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+});
+
+if (!res.success) throw new Error(res.payload.error);
+console.log(res.payload.address);
+```
+
+### Interaction flow (visual)
+<div style={{ display: 'flex', justifyContent: 'center' }}>
+  <img
+    src="/images/core-api-guide/core-api-flow-en.svg"
+    alt="Hardware SDK request/response flow"
+    style={{ maxWidth: '780px', width: '100%' }}
+  />
+</div>
+
+## Core identifiers & environments
+
+| Item | Purpose | How to get/refresh | Notes |
+| --- | --- | --- | --- |
+| `connectId` | Connection identifier; routes calls to a specific device/connection | `searchDevices()` | Stable for the same device (reset does not change it); WebUSB/Bridge ≈ device serial; BLE = OS-level identifier (Android MAC / iOS UUID). |
+| `deviceId` | Current seed/wallet-state identifier | `getFeatures(connectId)` | Changes after reset/wipe/recovery/seed switch; used to prevent signing on the wrong seed. |
+
+- Cache `connectId + deviceId` as a pair; on `DeviceCheckDeviceIdError`, device reset, or device switch, re-run `getFeatures`.
+- SDK set: `@onekeyfe/hd-common-connect-sdk` + `@onekeyfe/hd-core` + `@onekeyfe/hd-shared`; align versions with firmware/Bridge.
+- Runtime: `webusb` needs HTTPS + user gesture; `react-native` needs BLE + often location permission; `lowlevel` needs 64-byte frame adapter.
+- Device/firmware: stay on latest stable; some APIs fail in Bootloader; Bridge must run and keep port free.
+
+### Which identifiers are required?
+
+- No identifiers: `init` / event handlers (`on`/`off`) / `searchDevices` / `getLogs` / `checkBridgeStatus` / `checkFirmwareTypeAvailable` / `updateSettings` / `switchTransport` / `dispose` / `uiResponse` (payload only).
+- `connectId` only: `getFeatures` / `getPassphraseState` / `cancel` / device management & firmware APIs (e.g., `deviceSettings`, `deviceReset`, `deviceWipe`, `checkFirmwareRelease`).
+- `connectId + deviceId`: chain signing/address/public key/encryption/proof APIs (e.g., EVM/BTC/Solana/Nostr/TON/`allNetworkGetAddress`/`cipherKeyValue`).
+
+## Standard lifecycle (recommended)
+
+Standard loop: `init → search → getFeatures(connectId) → subscribe UI/DEVICE/FIRMWARE → call + uiResponse → cleanup`
+
+```ts
+import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+
+// 1) Idempotent init (do once at app entry)
+await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+
+// 2) Discover devices
+const devices = await HardwareSDK.searchDevices();
+if (!devices.length) throw new Error('No device');
+const [{ connectId }] = devices;
+
+// 3) Resolve deviceId (required for BLE; recommended for WebUSB)
+const features = await HardwareSDK.getFeatures(connectId);
+const deviceId = features?.payload?.device_id;
+
+// 4) Subscribe UI events; respond only on request
+HardwareSDK.on(UI_REQUEST.REQUEST_PIN, () => {
+  // open UI, collect input, then call uiResponse
+});
+HardwareSDK.on(UI_REQUEST.REQUEST_PASSPHRASE, () => {});
+
+// 5) Make a chain call (EVM example)
+await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+});
+```
+
+Concurrency/cleanup: serialize per device; refresh `getFeatures` when switching devices; remove listeners on unmount; call `HardwareSDK.dispose()` only when transport reset is needed.
+
+## Params & paths (essentials)
+
+### Common params
+
+| Param | Purpose | Typical usage |
+| --- | --- | --- |
+| `initSession?: boolean` | Force a hardware session init; can pair with passphrase state retrieval | Pre-build session before first call to reduce prompts |
+| `passphraseState?: string` | Hidden wallet identifier; include to bind to that hidden wallet | Required when using a hidden wallet to stay on the same one |
+| `useEmptyPassphrase?: boolean` | Force standard wallet (empty) | Prevent accidental hidden wallet |
+| `deriveCardano?: boolean` | Pre-derive Cardano | First Cardano call in a session |
+| `retryCount?` / `pollIntervalTime?` / `timeout?` | Polling/timeout tuning | BLE or flaky network scenarios |
+| `detectBootloaderDevice?: boolean` | Fail fast in Bootloader | Ask user to exit Bootloader |
+| `skipWebDevicePrompt?: boolean` | Skip WebUSB chooser | Reuse prior WebUSB authorization |
+| `keepSession?` | (Deprecated; avoid using) | Use `initSession + passphraseState` instead |
+
+Common combo:
+
+```ts
+// Hidden wallet + multiple calls without repeated prompts
+const commonParams = {
+  initSession: true,
+  keepSession: true,
+  passphraseState: 'hidden-wallet-id',
+};
+
+await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  messageHex,
+  ...commonParams,
+});
+```
+
+### HD path quick ref
+
+- Rule: `path: string | number[]` follows BIP44; ed25519 chains (e.g., Solana, NEAR) must be fully hardened.
+- Common paths:
+
+| Chain | Example path | Notes |
+| --- | --- | --- |
+| EVM | `m/44'/60'/0'/0/0` | Standard EVM account |
+| BTC (Nested SegWit) | `m/49'/0'/0'/0/0` | Use 84' for Native SegWit |
+| Solana | `m/44'/501'/0'/0'` | Fully hardened |
+| NEAR | `m/44'/397'/0'/0'/1'` | Fully hardened |
+| Cardano | `m/1852'/1815'/0'/0/0` | Stake at `.../2/0` |
+| TRON | `m/44'/195'/0'/0/0` | EVM-style path |
+
+- Number array example: `[(44 | 0x80000000) >>> 0, (0 | 0x80000000) >>> 0, 0x80000000, 0, 0]`
+- Forbidden path errors: verify length/hardening per chain; see chain-specific pages in the sidebar.
+
+### Secure input (PIN & passphrase)
+
+- PIN: Pro/Touch require on-device input; others support blind PIN but prefer on-device input.
+
+```ts
+const BLIND_KEYBOARD_MAP = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: BLIND_KEYBOARD_MAP[label - 1],
+});
+```
+
+- Passphrase: empty string = standard wallet; non-empty = hidden wallet (case-sensitive).
+  - Safest: `passphraseOnDevice: true`
+  - Software input: `{ value, passphraseOnDevice: false, save: true }` is session-only; never persist plaintext.
+  - Avoid accidental hidden wallet: add `useEmptyPassphrase: true` in method params.
+
+## Events & UI wiring
+
+- Channels: `UI_EVENT` (prompts), `DEVICE_EVENT` (connection/capability changes), `FIRMWARE_EVENT` (upgrade info). Subscribe once near app start; clean up on exit.
+- Only call `uiResponse` for input requests; use other notifications to drive UI hints; route per device when multiple devices are connected.
+
+**UI requests that require `uiResponse`**
+
+| UI_REQUEST | When it fires | Respond with |
+| --- | --- | --- |
+| `REQUEST_PIN` | Protected call on a locked device | `UI_RESPONSE.RECEIVE_PIN` (`payload` is PIN value or blind PIN map) |
+| `REQUEST_PASSPHRASE` | Hidden wallet selection via software input | `UI_RESPONSE.RECEIVE_PASSPHRASE` (`value`, `passphraseOnDevice`, `attachPinOnDevice`, `save`) |
+| `REQUEST_PASSPHRASE_ON_DEVICE` | Hidden wallet selection on device | `UI_RESPONSE.RECEIVE_PASSPHRASE` (`passphraseOnDevice: true`) |
+| `REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Web Bootloader device chooser | `UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` (`deviceId`) |
+
+**UI notifications (no response needed)**
+
+| UI_REQUEST | Purpose |
+| --- | --- |
+| `REQUEST_BUTTON` | Ask user to confirm on device |
+| `DEVICE_PROGRESS` | Long-running task progress |
+| `FIRMWARE_PROCESSING` / `FIRMWARE_PROGRESS` / `FIRMWARE_TIP` | Firmware upgrade/processing states |
+| `BLUETOOTH_PERMISSION` / `LOCATION_PERMISSION` | System permission prompts for BLE |
+| `BOOTLOADER` / `REQUIRE_MODE` / `NOT_INITIALIZE` / `FIRMWARE_NOT_SUPPORTED` | Mode or support hints to display in UI |
+
+**Device/Firmware events to observe**
+
+| Channel | Event | Meaning | Typical handling |
+| --- | --- | --- | --- |
+| `DEVICE_EVENT` | `CONNECT` | Device attached and available | Refresh device list, optionally auto-select |
+| `DEVICE_EVENT` | `DISCONNECT` | Device removed or BLE lost | Mark session invalid, prompt user to reconnect |
+| `DEVICE_EVENT` | `ACQUIRE` | Transport session started | Gate concurrent calls, mark device busy |
+| `DEVICE_EVENT` | `RELEASE` | Transport session ended | Allow next queued request |
+| `DEVICE_EVENT` | `CHANGED` | Features changed (e.g., after unlock) | Re-fetch `getFeatures` and refresh cached `deviceId` |
+| `DEVICE_EVENT` | `USED_ELSEWHERE` | Transport conflict detected | Ask user to close other apps/bridges |
+| `DEVICE_EVENT` | `UNREADABLE` | Permission or driver issue | Prompt re-authorization or driver check |
+| `DEVICE_EVENT` | `BUTTON` | Device is waiting for confirmation | Show “confirm on device” hint |
+| `DEVICE_EVENT` | `PIN` | Device is waiting for PIN | Keep UI in PIN flow |
+| `DEVICE_EVENT` | `PASSPHRASE` | Device is waiting for software passphrase | Keep UI in passphrase flow |
+| `DEVICE_EVENT` | `PASSPHRASE_ON_DEVICE` | Device is waiting for on-device passphrase | Show device input hint |
+| `DEVICE_EVENT` | `SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE` | Bootloader selection in progress | Keep chooser visible until resolved |
+| `DEVICE_EVENT` | `FEATURES` | Capability snapshot | Cache capabilities for later checks |
+| `DEVICE_EVENT` | `SUPPORT_FEATURES` | Supported capability snapshot | Cache support matrix |
+| `FIRMWARE_EVENT` | `RELEASE_INFO` | New firmware info | Offer upgrade prompt when safe |
+| `FIRMWARE_EVENT` | `BLE_RELEASE_INFO` | New BLE firmware info | Offer upgrade prompt when safe |
+
+**Wiring template**
+
+```ts
+import HardwareSDK, { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-common-connect-sdk';
+
+const handleUiEvent = (msg: any) => {
+  switch (msg.type) {
+    case UI_REQUEST.REQUEST_PIN:
+      openPinModal(({ value }) =>
+        HardwareSDK.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: value })
+      );
+      return;
+    case UI_REQUEST.REQUEST_PASSPHRASE:
+      openPassphraseModal(({ value, onDevice, save }) =>
+        HardwareSDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+          payload: { value, passphraseOnDevice: onDevice, attachPinOnDevice: false, save },
+        })
+      );
+      return;
+    case UI_REQUEST.REQUEST_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE:
+      showDeviceList((deviceId: string) =>
+        HardwareSDK.uiResponse({
+          type: UI_RESPONSE.SELECT_DEVICE_IN_BOOTLOADER_FOR_WEB_DEVICE,
+          payload: { deviceId },
+        })
+      );
+      return;
+    default:
+      console.log('UI event', msg.type, msg.payload);
+  }
+};
+
+HardwareSDK.on(UI_EVENT, handleUiEvent);
+```
+
+## Errors & checklist
+
+| Group | Common causes | Recommended actions |
+| --- | --- | --- |
+| Device (101–118, 200) | Wrong mode, busy, device_id mismatch, not initialized | Ask user to confirm device mode, reconnect, re-run `init` + `getFeatures` |
+| IFrame (300–305) | Init missing, load/timeout/blocked | Ensure `init` succeeded and CSP/iframe allow it |
+| Method/Firmware (400–418) | Bad params, firmware upgrade required, forbidden path | Validate params/HD path, prompt firmware upgrade |
+| Transport (600–603) | Transport not configured, concurrent call, protobuf error | Check env/Bridge, serialize calls, align SDK version |
+| Bluetooth (700–722) | Scan/permission/connect/timeout | Ensure BLE/location permission, proximity/power, retry connect |
+| Runtime/Bridge (800–821) | PIN/action cancelled, Bridge permission/timeout, blind sign disabled | Retry, ask to install/start Bridge, ensure signing mode |
+| Web device (901–902) | WebUSB/Bluetooth not authorized or chooser failure | Ask user to re-authorize; ensure HTTPS + user gesture |
+
+More detail: see [`HardwareError.ts`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/shared/src/HardwareError.ts) for exhaustive definitions and payload shapes.
+
+Pattern: map error → user message + developer action; provide UI buttons for retry/check device/upgrade firmware.
+
+**Quick checklist**
+
+1) Init once; confirm env/permissions/HTTPS; keep `connectId` + `deviceId`  
+2) Subscribe UI/DEVICE/FIRMWARE; send `uiResponse` only after events  
+3) Serialize per device; combine CommonParams (keepSession/passphraseState)  
+4) Use valid HD paths; if errors, check chain docs and hardening rules  
+5) Map error codes to user text and dev actions; prompt firmware/Bridge updates when needed  
+
+**Related links**
+
+- Getting Started (install + first call): [quick start](/en/hardware-sdk/getting-started)
+- Transports: WebUSB · React Native BLE · iOS/Android low-level adapters
+- Chain APIs: sidebar `sign` / `getAddress` method pages by chain
+- Legacy migration: bridge-to-common-connect/WebUSB migration guides

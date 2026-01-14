@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useMemo } from 'react';
-import { CommonParams } from '@onekeyfe/hd-core';
+import React, { createContext, useContext, useMemo, useState } from 'react';
+
+import type { CommonParams } from '@onekeyfe/hd-core';
 
 const defaultParams: CommonParams = {
   keepSession: false,

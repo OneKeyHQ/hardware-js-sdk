@@ -1,20 +1,16 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
-
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Picker } from '@react-native-picker/picker';
-
-import {
-  getHomeScreenDefaultList,
-  getHomeScreenHex,
-  getDeviceType,
-  IDeviceType,
-} from '@onekeyfe/hd-core';
+import { getDeviceType, getHomeScreenDefaultList, getHomeScreenHex } from '@onekeyfe/hd-core';
 import { Label, Stack, XStack } from 'tamagui';
 import { useIntl } from 'react-intl';
+
 import HardwareSDKContext from '../provider/HardwareSDKContext';
 import { useCommonParams } from '../provider/CommonParamsProvider';
 import { useDevice } from '../provider/DeviceProvider';
 import PanelView from './ui/Panel';
 import { Button } from './ui/Button';
+
+import type { IDeviceType } from '@onekeyfe/hd-core';
 
 export default function ChangeScreenComponent() {
   const intl = useIntl();

@@ -1,0 +1,493 @@
+---
+title: TON
+description: 通过 OneKey 的 TON Connect 兼容 Provider 集成 TON
+---
+
+import { Callout, Tabs } from 'nextra/components'
+
+# TON
+
+使用 OneKey 的 TON Connect 兼容 Provider 集成 TON 区块链。通过 `window.$onekey.tonconnect` 访问。
+
+<Callout type="info">
+OneKey 实现了 TON Connect 2.0 协议，确保与所有 TON dApp 兼容。
+</Callout>
+
+---
+
+## 快速链接
+
+- [API 参考](#api-参考)
+- [连接钱包](#连接钱包)
+- [交易](#交易)
+- [数据签名](#数据签名)
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey TON provider
+const provider = window.$onekey?.tonconnect
+
+if (!provider) {
+  throw new Error('未检测到 OneKey TON provider')
+}
+
+// 检查设备和钱包信息
+console.log('设备:', provider.deviceInfo)
+console.log('钱包:', provider.walletInfo)
+console.log('协议版本:', provider.protocolVersion) // 2
+```
+
+---
+
+## 快速开始
+
+### 连接钱包
+
+```typescript
+// 基本连接
+const connectEvent = await provider.connect()
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(
+    item => item.name === 'ton_addr'
+  )
+  console.log('已连接:', addressItem.address)
+} else {
+  console.error('连接失败:', connectEvent.payload.message)
+}
+```
+
+### 使用 Manifest 连接
+
+对于生产应用，需要提供 manifest URL：
+
+```typescript
+const connectRequest = {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    { name: 'ton_proof', payload: 'your-challenge-string' }
+  ]
+}
+
+const connectEvent = await provider.connect(2, connectRequest)
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  console.log('地址:', addressItem.address)
+  console.log('证明:', proofItem?.proof)
+}
+```
+
+### 应用 Manifest 格式
+
+在应用根目录创建 `tonconnect-manifest.json`：
+
+```json
+{
+  "url": "https://yourapp.com",
+  "name": "Your App Name",
+  "iconUrl": "https://yourapp.com/icon.png",
+  "termsOfUseUrl": "https://yourapp.com/terms",
+  "privacyPolicyUrl": "https://yourapp.com/privacy"
+}
+```
+
+### 恢复连接
+
+恢复之前的会话：
+
+```typescript
+const connectEvent = await provider.restoreConnection()
+
+if (connectEvent.event === 'connect') {
+  console.log('会话已恢复')
+}
+```
+
+### 断开连接
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## 交易
+
+### 发送交易
+
+使用 `send` 方法和 `sendTransaction` 发送 TON：
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600, // 10 分钟有效期
+      messages: [
+        {
+          address: '0:1234...', // 接收方地址（原始格式）
+          amount: '1000000000', // 金额，单位 nanotons (1 TON = 10^9 nanotons)
+        }
+      ]
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('交易 BOC:', result.result)
+} else {
+  console.error('交易失败:', result.error.message)
+}
+```
+
+### 发送多条消息
+
+TON 支持每笔交易最多 4 条消息：
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient1...',
+          amount: '500000000', // 0.5 TON
+        },
+        {
+          address: '0:recipient2...',
+          amount: '300000000', // 0.3 TON
+        }
+      ]
+    })
+  ]
+})
+```
+
+### 发送带 Payload 的交易
+
+包含 payload 用于智能合约交互：
+
+```typescript
+import { beginCell } from '@ton/core'
+
+// 创建评论 cell
+const comment = beginCell()
+  .storeUint(0, 32) // 评论操作码
+  .storeStringTail('Hello from dApp!')
+  .endCell()
+
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient...',
+          amount: '100000000',
+          payload: comment.toBoc().toString('base64'),
+        }
+      ]
+    })
+  ]
+})
+```
+
+### 发送带 StateInit 的交易
+
+部署合约或初始化状态：
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:contract...',
+          amount: '50000000',
+          stateInit: stateInitBoc.toString('base64'), // Base64 编码的 StateInit
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## 数据签名
+
+### 签名任意数据
+
+签名数据 cell 用于链下验证：
+
+```typescript
+const result = await provider.send({
+  method: 'signData',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      schema_crc: 0, // 自定义 schema 标识符
+      cell: cellBoc.toString('base64'), // Base64 编码的待签名 cell
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('签名:', result.result.signature) // Base64 签名
+  console.log('时间戳:', result.result.timestamp) // UNIX 时间戳
+}
+```
+
+### 签名证明（身份验证）
+
+在连接时请求证明用于身份验证：
+
+```typescript
+const connectEvent = await provider.connect(2, {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    {
+      name: 'ton_proof',
+      payload: 'your-server-generated-challenge' // 用于防重放的 nonce
+    }
+  ]
+})
+
+if (connectEvent.event === 'connect') {
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  if (proofItem) {
+    // 将证明发送到后端进行验证
+    const proof = proofItem.proof
+    console.log({
+      signature: proof.signature,
+      timestamp: proof.timestamp,
+      domain: proof.domain,
+      payload: proof.payload,
+    })
+  }
+}
+```
+
+---
+
+## 事件处理
+
+### 监听事件
+
+```typescript
+provider.listen((event) => {
+  console.log('钱包事件:', event)
+})
+
+// 或使用特定的事件监听器
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('账户已变更:', address)
+  } else {
+    console.log('已断开连接')
+  }
+})
+
+provider.on('disconnect', () => {
+  console.log('钱包已断开连接')
+})
+```
+
+---
+
+## API 参考
+
+### 方法
+
+| 方法 | 说明 |
+|------|------|
+| `connect(version?, request?)` | 连接钱包 |
+| `restoreConnection()` | 恢复之前的会话 |
+| `disconnect()` | 断开钱包连接 |
+| `send(message)` | 发送 RPC 请求 |
+| `listen(callback)` | 监听钱包事件 |
+
+### Send 方法
+
+| 方法 | 说明 |
+|------|------|
+| `sendTransaction` | 发送 TON 或与合约交互 |
+| `signData` | 签名任意数据 cell |
+| `disconnect` | 通过 RPC 断开连接 |
+
+### 类型
+
+```typescript
+interface AccountInfo {
+  address: string      // 原始地址 (0:<hex>)
+  network: string      // 网络 ID (-239 主网, -3 测试网)
+  publicKey: string    // 十六进制公钥（无 0x）
+  walletStateInit: string // Base64 编码的 state init
+}
+
+interface TransactionRequest {
+  valid_until?: number  // 有效期 UNIX 时间戳
+  network?: string      // 网络 ID
+  from?: string         // 发送方地址
+  messages: Message[]   // 最多 4 条消息
+}
+
+interface Message {
+  address: string      // 接收方（原始格式）
+  amount: string       // 金额，单位 nanotons
+  payload?: string     // Base64 BOC 用于合约调用
+  stateInit?: string   // Base64 StateInit 用于部署
+}
+
+interface SignDataRequest {
+  schema_crc: number   // Schema 标识符
+  cell: string         // Base64 编码的 cell
+  publicKey?: string   // 可选的特定密钥
+}
+
+interface SignDataResult {
+  signature: string    // Base64 签名
+  timestamp: number    // UNIX 时间戳 (UTC)
+}
+
+interface DeviceInfo {
+  platform: string     // 'iphone' | 'android' | 'windows' | 'mac' | 'linux'
+  appName: string      // 'onekey'
+  appVersion: string   // 钱包版本
+  maxProtocolVersion: number // 2
+  features: string[]   // 支持的功能
+}
+```
+
+### 错误码
+
+| 错误码 | 说明 |
+|--------|------|
+| 0 | 未知错误 |
+| 1 | 请求格式错误 |
+| 100 | 未知应用 |
+| 300 | 用户拒绝请求 |
+| 400 | 方法不支持 |
+
+---
+
+## 使用 TON Connect SDK
+
+对于 React 应用，使用官方的 TON Connect SDK：
+
+```bash
+npm install @tonconnect/ui-react
+```
+
+```tsx
+import { TonConnectUIProvider, TonConnectButton } from '@tonconnect/ui-react'
+
+function App() {
+  return (
+    <TonConnectUIProvider manifestUrl="https://yourapp.com/tonconnect-manifest.json">
+      <TonConnectButton />
+      <YourApp />
+    </TonConnectUIProvider>
+  )
+}
+```
+
+OneKey 会被 TON Connect SDK 自动检测到。
+
+### 使用 SDK 发送交易
+
+```tsx
+import { useTonConnectUI } from '@tonconnect/ui-react'
+
+function SendButton() {
+  const [tonConnectUI] = useTonConnectUI()
+
+  const handleSend = async () => {
+    const result = await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: 'EQA...',
+          amount: '1000000000',
+        }
+      ]
+    })
+    console.log('BOC:', result.boc)
+  }
+
+  return <button onClick={handleSend}>发送 1 TON</button>
+}
+```
+
+---
+
+## 地址格式
+
+TON 使用不同的地址格式：
+
+```typescript
+import { Address } from '@ton/core'
+
+// 原始格式（provider 中使用）
+const raw = '0:1234567890abcdef...'
+
+// 用户友好格式（可弹回）
+const friendly = Address.parse(raw).toString()
+// 例如 'EQASdf...'
+
+// 不可弹回格式
+const nonBounceable = Address.parse(raw).toString({ bounceable: false })
+// 例如 'UQASdf...'
+
+// 从友好格式转换为原始格式
+const addr = Address.parse('EQASdf...')
+const rawAddress = `${addr.workChain}:${addr.hash.toString('hex')}`
+```
+
+---
+
+## 错误处理
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [/* ... */]
+})
+
+if ('error' in result) {
+  switch (result.error.code) {
+    case 300:
+      console.log('用户拒绝了交易')
+      break
+    case 1:
+      console.log('请求格式错误 - 请检查参数')
+      break
+    case 400:
+      console.log('方法不支持')
+      break
+    default:
+      console.error('错误:', result.error.message)
+  }
+} else {
+  console.log('成功:', result.result)
+}
+```

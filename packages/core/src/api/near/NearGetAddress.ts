@@ -1,9 +1,10 @@
-import { NearGetAddress as HardwareNearGetAddress } from '@onekeyfe/hd-transport';
 import { UI_REQUEST } from '../../constants/ui-request';
 import { serializedPath, validatePath } from '../helpers/pathUtils';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams, validateResult } from '../helpers/paramsValidator';
-import { NearGetAddressParams, NearAddress } from '../../types';
+
+import type { NearGetAddress as HardwareNearGetAddress } from '@onekeyfe/hd-transport';
+import type { NearAddress, NearGetAddressParams } from '../../types';
 
 export default class NearGetAddress extends BaseMethod<HardwareNearGetAddress[]> {
   hasBundle = false;

@@ -1,0 +1,168 @@
+---
+title: Migrate to common-connect-sdk
+---
+
+# Migrate to common-connect-sdk
+
+Migrate from Bridge to WebUSB and switch SDK entry to `@onekeyfe/hd-common-connect-sdk`.
+
+---
+
+## Requirements
+
+- Chromium browsers (Chrome/Edge desktop)
+- Node.js 18+ (LTS recommended)
+
+---
+
+## What Changed (At a Glance)
+
+- SDK entry: `@onekeyfe/hd-web-sdk` → `@onekeyfe/hd-common-connect-sdk`
+- Init options: use `env: 'webusb'`; no more `connectSrc` (no iframe)
+- Permission flow: call `navigator.usb.requestDevice()` (must be triggered by a user gesture) with the official filter `ONEKEY_WEBUSB_FILTER`
+- Event system: use `@onekeyfe/hd-core` `UI_EVENT / DEVICE` events for user interaction (PIN/Passphrase, etc.)
+- Bridge-specific logic removed: drop `checkBridgeStatus()` and all Bridge checks/prompts
+- Business APIs mostly unchanged: e.g., `searchDevices / getFeatures / btcGetAddress`
+
+---
+
+## Install
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-core @onekeyfe/hd-shared
+```
+
+---
+
+## Initialize (hd-common-connect-sdk + WebUSB)
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({
+  env: 'webusb',
+  debug: process.env.NODE_ENV !== 'production',
+  fetchConfig: true,
+});
+```
+
+- Unlike `hd-web-sdk`, you do not need `connectSrc` here (no iframe dependency).
+- It is recommended to enable `fetchConfig: true` to fetch device capability and hint configurations.
+
+---
+
+## Bind UI and Device Events (PIN / Passphrase / Plug-Unplug)
+
+```ts
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE, DEVICE } from '@onekeyfe/hd-core';
+
+function bindHardwareEvents() {
+  HardwareSDK.on(UI_EVENT, async (message: any) => {
+    switch (message.type) {
+      case UI_REQUEST.REQUEST_PIN: {
+        // In production, replace with your PIN input UI
+        await HardwareSDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PIN,
+          // Prefer entering PIN on the device (more secure)
+          payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+        });
+        break;
+      }
+
+      case UI_REQUEST.REQUEST_PASSPHRASE: {
+        // In production, replace with your Passphrase UI (device or software input)
+        await HardwareSDK.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+          payload: { passphraseOnDevice: true, value: '' },
+        });
+        break;
+      }
+
+      default:
+        break;
+    }
+  });
+
+  HardwareSDK.on(DEVICE.CONNECT, (payload: any) => {
+    console.log('Device connected:', payload);
+  });
+  HardwareSDK.on(DEVICE.DISCONNECT, (payload: any) => {
+    console.log('Device disconnected:', payload);
+  });
+}
+
+bindHardwareEvents();
+```
+
+- Subscribe to `UI_EVENT` as early as possible so PIN/Passphrase prompts are handled and flows don't stall.
+- For details, see: [Config Event](/en/hardware-sdk/core-api-guide#events-ui)
+
+---
+
+## Authorization (WebUSB Picker + Official Filter)
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Important: must be triggered by a user gesture (e.g., button click) or the browser will block it
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+---
+
+## Enumerate Devices and First Call
+
+```ts
+// 1) Enumerate
+const list = await HardwareSDK.searchDevices();
+if (!list.success) throw new Error(list.payload.error);
+const { connectId, deviceId } = list.payload[0] ?? {};
+
+// 2) (Optional) Confirm device_id
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+const resolvedDeviceId = features.payload.device_id ?? deviceId;
+
+// 3) Example: get a BTC address
+const r = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: false,
+});
+
+if (r.success) {
+  console.log('BTC address:', r.payload.address);
+} else {
+  console.error('Error:', r.payload.error, r.payload.code);
+}
+```
+
+---
+
+## Cleanup and Checklist
+
+- Dependency swap: remove `@onekeyfe/hd-web-sdk`, use `@onekeyfe/hd-common-connect-sdk` instead
+- Initialization changes:
+  - Old: `env: 'web'` + `connectSrc: 'https://jssdk.onekey.so/.../'`
+  - New: `env: 'webusb'` (no `connectSrc`)
+- Remove Bridge-only logic: e.g., `checkBridgeStatus()`, Bridge install/restart prompts
+- Bind `UI_EVENT / DEVICE`: ensure PIN/Passphrase and device plug/unplug events are handled
+- Don't auto-enumerate before permission: `requestDevice()` must be called via a user gesture
+- Compatibility tip: if `navigator.usb` is missing, ask users to switch to a WebUSB-capable browser
+
+---
+
+## FAQ
+
+- No permission prompt on HTTP? → Serve over HTTPS
+- UI requests seem stuck? → Subscribe to `UI_EVENT` early and respond via `uiResponse`
+- Still using `connectSrc` or `HdWebSdk.HardwareWebSdk`? → Migrated to `hd-common-connect-sdk`; iframe is no longer needed
+- Called `requestDevice` outside a user gesture? → Chrome blocks it; must be triggered by a click or similar gesture
+
+---
+
+## Further Reading
+
+- WebUSB deep dive and full example: [WebUSB Connection Guide](../../transport/web-usb)
+- Events and interactions: [Config Event](/en/hardware-sdk/core-api-guide#events-ui)
+- API references and params: [Hardware SDK API References](/en/hardware-sdk/core-api-guide), [Common Params](/en/hardware-sdk/core-api-guide#common-params), [Error Codes](/en/hardware-sdk/core-api-guide#error-codes)

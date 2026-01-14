@@ -1,0 +1,71 @@
+---
+title: firmwareUpdateV3
+---
+
+# firmwareUpdateV3
+
+## 固件更新 (V3)
+
+全新的更新流程（仅限 Pro 系列）。支持在单个流程中根据需要更新引导加载程序、主固件、蓝牙固件和资源包。
+
+- 设备：仅限 OneKey Pro
+- 引导要求：Boot 版本 >= 4.8.0
+
+```typescript
+const res = await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+
+  // 方式 A：指定版本号（可选择任意子集）
+  firmwareVersion: [4, 10, 0],
+  bleVersion: [4, 10, 0],
+  bootloaderVersion: [4, 8, 0],
+
+  // 方式 B：自定义二进制文件（按需使用）
+  // firmwareBinary: ArrayBuffer,
+  // bleBinary: ArrayBuffer,
+  // bootloaderBinary: ArrayBuffer,
+  // resourceBinary: ArrayBuffer,
+
+  // 可选：强制更新资源包
+  forcedUpdateRes: false,
+});
+```
+
+### 参数
+
+[可选通用参数](../common-params)
+
+- `platform` - 必需 `"native" | "desktop" | "ext" | "web" | "web-embed"` 执行环境
+- `firmwareVersion` - 可选 `number[]` 目标主固件版本
+- `firmwareBinary` - 可选 `ArrayBuffer` 自定义主固件
+- `bleVersion` - 可选 `number[]` 目标蓝牙固件版本
+- `bleBinary` - 可选 `ArrayBuffer` 自定义蓝牙固件
+- `bootloaderVersion` - 可选 `number[]` 目标引导加载程序版本
+- `bootloaderBinary` - 可选 `ArrayBuffer` 自定义引导加载程序
+- `resourceBinary` - 可选 `ArrayBuffer` 资源包二进制文件
+- `forcedUpdateRes` - 可选 `boolean` 强制更新资源包
+
+### 返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### 错误
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // 错误信息
+    code: number   // 错误码
+  }
+}
+```

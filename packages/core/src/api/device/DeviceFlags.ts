@@ -1,6 +1,7 @@
-import { ApplyFlags } from '@onekeyfe/hd-transport';
 import { BaseMethod } from '../BaseMethod';
 import { validateParams } from '../helpers/paramsValidator';
+
+import type { ApplyFlags } from '@onekeyfe/hd-transport';
 
 export default class DeviceFlags extends BaseMethod<ApplyFlags> {
   init() {

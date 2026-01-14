@@ -1,0 +1,59 @@
+---
+title: Passphrase（核心指南）
+---
+
+# Passphrase（核心指南）
+
+处理 OneKey 设备 Passphrase（隐藏钱包）的基本规则。
+
+## 关键要点
+
+- 标准钱包 vs 隐藏钱包：
+  - 标准钱包 = 助记词 + 空密码短语
+  - 隐藏钱包 = 助记词 + 非空密码短语（区分大小写；任何更改 = 不同的钱包）
+- 责任：不可恢复。请安全备份；需要完全匹配。
+- 相关：要在调用中强制使用标准钱包，请设置 `useEmptyPassphrase: true`
+
+
+## 应用行为
+
+使用 Passphrase 的两种方式：
+
+1) 主动意图（推荐）
+- 为单次调用强制使用标准钱包：
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'",
+  useEmptyPassphrase: true,
+});
+```
+
+2) 响应式事件处理
+- 在 `UI_REQUEST.REQUEST_PASSPHRASE` 时，显示单个提示，包含两个操作：
+  - 在设备上输入（首选）：
+    ```ts
+    HardwareSDK.uiResponse({
+      type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+      payload: { passphraseOnDevice: true, value: '' },
+    });
+    ```
+  - 在此屏幕上输入（软件输入；可选择为会话缓存）：
+    ```ts
+    HardwareSDK.uiResponse({
+      type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+      payload: { value, passphraseOnDevice: false, save: true },
+    });
+    ```
+
+## 缓存与会话
+
+- `passphraseState`：通过 [获取 Passphrase 状态](../basic-api/get-passphrase-state) 获取一次，并在 [通用参数](../common-params) 中传入，以减少重复提示。
+- 结合 `keepSession` / `initSession` 使用，可减少流程中的交互次数。
+
+## 注意事项
+
+- 不要记录或持久化 Passphrase；掩码输入。
+- 建议在设备上输入以获得更好的安全性。
+- Pro/Touch：PIN 必须在设备上输入；Passphrase 仍可在设备或软件中输入（建议使用设备）。
+
+另请参阅：[通用参数](../common-params)，[事件配置](../../api-reference#events-ui)。

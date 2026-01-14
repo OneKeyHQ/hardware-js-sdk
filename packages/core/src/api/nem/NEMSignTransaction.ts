@@ -1,4 +1,11 @@
-import {
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
+
+import { UI_REQUEST } from '../../constants/ui-request';
+import { validatePath } from '../helpers/pathUtils';
+import { BaseMethod } from '../BaseMethod';
+import { validateParams } from '../helpers/paramsValidator';
+
+import type {
   NEMAggregateModification,
   NEMImportanceTransfer,
   NEMMosaicCreation,
@@ -9,13 +16,7 @@ import {
   NEMTransactionCommon,
   NEMTransfer,
 } from '@onekeyfe/hd-transport';
-
-import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
-import { UI_REQUEST } from '../../constants/ui-request';
-import { validatePath } from '../helpers/pathUtils';
-import { BaseMethod } from '../BaseMethod';
-import { validateParams } from '../helpers/paramsValidator';
-import {
+import type {
   NEMAggregateModificationTransaction,
   NEMImportanceTransaction,
   NEMMosaicCreationTransaction,

@@ -3,7 +3,7 @@ import { createAnimations } from '@tamagui/animations-react-native';
 import { createMedia } from '@tamagui/react-native-media-driver';
 import { shorthands } from '@tamagui/shorthands';
 import { themes } from '@tamagui/themes';
-import { Variable, createTamagui, createTokens } from 'tamagui';
+import { createTamagui, createTokens } from 'tamagui';
 
 import {
   brand,
@@ -25,6 +25,8 @@ import {
   success,
   successDark,
 } from './colors';
+
+import type { Variable } from 'tamagui';
 
 const animations = createAnimations({
   bouncy: {

@@ -1,5 +1,6 @@
 import { COINTYPE_MARK, baseParams } from './baseParams';
-import { TestCaseDataType } from './data';
+
+import type { TestCaseDataType } from './data';
 import type { SecurityCheckTestCase } from './types';
 
 export function fullPath(data: TestCaseDataType[]): TestCaseDataType[] {

@@ -1,14 +1,16 @@
-import { Stack, Group, H3, YGroup, ListItem, Sheet, XStack, Text } from 'tamagui';
+import { Group, H3, ListItem, Sheet, Stack, Text, XStack, YGroup } from 'tamagui';
 import { useNavigation, useRoute } from '@react-navigation/core';
 import { Menu } from '@tamagui/lucide-icons';
-
-import React, { useCallback, useMemo, useState, memo } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
+
 import { Routes } from '../../route';
 import { Button } from './Button';
 import LocaleToggleButton from './LocaleToggleButton';
-import { MenuItem, MenuListItem } from './MenuListItem';
+import { MenuListItem } from './MenuListItem';
 import { useMedia } from '../../provider/MediaProvider';
+
+import type { MenuItem } from './MenuListItem';
 
 // 菜单项数组
 const menuItems: MenuItem[] = [

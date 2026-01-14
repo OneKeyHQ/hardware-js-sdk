@@ -1,0 +1,29 @@
+---
+title: getPublicKey
+---
+
+# getPublicKey
+
+### 方法
+
+```typescript
+async function getPublicKey(): string
+```
+
+### 响应
+
+返回十六进制格式的公钥
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const pubkey = async provider.getPublicKey()
+
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/ExremGa" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

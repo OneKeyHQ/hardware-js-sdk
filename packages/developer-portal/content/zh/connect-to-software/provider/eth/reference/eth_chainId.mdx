@@ -1,0 +1,132 @@
+---
+title: eth_chainId
+description: 获取当前链 ID
+---
+
+# eth_chainId
+
+返回当前连接网络的链 ID。链 ID 用于防止跨不同网络的重放攻击。
+
+---
+
+## 参数
+
+无
+
+---
+
+## 返回值
+
+`string` - 链 ID（十六进制字符串）
+
+---
+
+## 示例
+
+```typescript
+const chainId = await window.$onekey.ethereum.request({
+  method: 'eth_chainId'
+})
+
+console.log('链 ID (十六进制):', chainId)
+console.log('链 ID (十进制):', parseInt(chainId, 16))
+```
+
+### 检查网络
+
+```typescript
+const CHAIN_IDS = {
+  ETHEREUM: '0x1',
+  POLYGON: '0x89',
+  BSC: '0x38',
+  ARBITRUM: '0xa4b1',
+  OPTIMISM: '0xa',
+  BASE: '0x2105'
+}
+
+async function checkNetwork() {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  switch (chainId) {
+    case CHAIN_IDS.ETHEREUM:
+      console.log('已连接到以太坊主网')
+      break
+    case CHAIN_IDS.POLYGON:
+      console.log('已连接到 Polygon')
+      break
+    default:
+      console.log('已连接到链:', parseInt(chainId, 16))
+  }
+
+  return chainId
+}
+```
+
+### 要求特定网络
+
+```typescript
+async function requireNetwork(requiredChainId) {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  if (chainId !== requiredChainId) {
+    try {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: requiredChainId }]
+      })
+    } catch (error) {
+      if (error.code === 4902) {
+        throw new Error('请先将此网络添加到钱包')
+      }
+      throw error
+    }
+  }
+}
+
+// 使用
+await requireNetwork('0x1') // 要求以太坊主网
+```
+
+---
+
+## 常用链 ID
+
+| 网络 | 十六进制 | 十进制 |
+|------|---------|--------|
+| Ethereum 主网 | `0x1` | 1 |
+| Goerli 测试网 | `0x5` | 5 |
+| Sepolia 测试网 | `0xaa36a7` | 11155111 |
+| Polygon | `0x89` | 137 |
+| BSC | `0x38` | 56 |
+| Arbitrum One | `0xa4b1` | 42161 |
+| Optimism | `0xa` | 10 |
+| Base | `0x2105` | 8453 |
+| Avalanche C-Chain | `0xa86a` | 43114 |
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| -32603 | Internal error | Provider 错误 |
+
+---
+
+## 说明
+
+- 链 ID 始终以带 `0x` 前缀的十六进制字符串返回
+- 监听 `chainChanged` 事件以检测网络切换
+- 遵循 [EIP-695](https://eips.ethereum.org/EIPS/eip-695) 规范
+
+```typescript
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  console.log('网络已切换到:', chainId)
+  // 建议：重新加载页面
+  window.location.reload()
+})
+```
