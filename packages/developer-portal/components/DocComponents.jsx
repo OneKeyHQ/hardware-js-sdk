@@ -390,6 +390,8 @@ export function Roadmap({ items = [] }) {
 // Dropdown-style selector for chain APIs
 // ============================================
 export function ChainSelector({ chains = [], currentChain, basePath = '' }) {
+  const allowedChainValues = new Set(chains.map((chain) => String(chain.value)))
+
   return (
     <div className="my-6">
       <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
@@ -400,9 +402,14 @@ export function ChainSelector({ chains = [], currentChain, basePath = '' }) {
           className="w-full md:w-64 appearance-none bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-4 py-2.5 pr-10 text-sm font-medium text-zinc-900 dark:text-white cursor-pointer hover:border-[#00B812] focus:border-[#00B812] focus:ring-2 focus:ring-[#00B812]/20 focus:outline-none transition-all"
           defaultValue={currentChain}
           onChange={(e) => {
-            if (typeof window !== 'undefined') {
-              window.location.href = `${basePath}/${e.target.value}`
+            if (typeof window === 'undefined') {
+              return
             }
+            const selected = String(e.target.value).trim()
+            if (!allowedChainValues.has(selected)) {
+              return
+            }
+            window.location.href = `${basePath}/${selected}`
           }}
         >
           {chains.map((chain) => (
