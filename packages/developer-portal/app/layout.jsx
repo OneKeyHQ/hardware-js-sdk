@@ -10,7 +10,7 @@ export const metadata = {
   description: 'Official developer documentation for OneKey hardware and software integration.',
 }
 
-const WIDGET_SRC = ''
+const WIDGET_SRC = '';
 const ENABLE_CSP_META = false
 
 function getWidgetConfig() {
