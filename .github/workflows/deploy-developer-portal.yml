@@ -2,11 +2,6 @@ name: Build Developer Portal
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - onekey
-    paths:
-      - 'packages/developer-portal/**'
 
 jobs:
   build:
