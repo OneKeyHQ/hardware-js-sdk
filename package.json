@@ -12,8 +12,7 @@
       "packages/*",
       "packages/connect-examples/expo-example",
       "packages/connect-examples/electron-example",
-      "packages/connect-examples/expo-playground",
-      "packages/developer-portal"
+      "packages/connect-examples/expo-playground"
     ],
     "nohoist": [
       "**/electron",
