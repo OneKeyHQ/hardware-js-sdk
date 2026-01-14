@@ -13,8 +13,24 @@ function getImageSrc(source) {
 
 function isBadgeImage(src, width, height) {
   if (!src) return false;
-  const lower = src.toLowerCase();
-  if (lower.includes("shields.io") || lower.includes("badge.fury.io")) return true;
+
+  // Prefer hostname-based checks over substring checks to avoid matching
+  // attacker-controlled URLs that merely contain these domains in the path/query.
+  try {
+    const url = new URL(src, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === "shields.io" ||
+      hostname.endsWith(".shields.io") ||
+      hostname === "badge.fury.io" ||
+      hostname.endsWith(".badge.fury.io")
+    ) {
+      return true;
+    }
+  } catch {
+    // If src is not a valid URL, fall through to size-based heuristics.
+  }
+
   if (typeof width === "number" && width <= 40) return true;
   if (typeof height === "number" && height <= 40) return true;
   return false;
