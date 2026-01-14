@@ -1,0 +1,315 @@
+---
+title: 简介
+---
+
+import { ExternalLink, Play, Monitor } from 'lucide-react'
+
+# 简介
+
+面向开发者的 OneKey 硬件钱包集成文档，适用于 Web 和原生应用。本指南涵盖 SDK 安装、初始化、设备发现、UI 提示处理，以及首次签名调用。
+
+## 选择传输协议
+
+USB 场景一律推荐 `@onekeyfe/hd-common-connect-sdk`。`@onekeyfe/hd-web-sdk` 仅用于插件端（iframe 嵌入形式）。
+
+### 连接方式
+
+| 方式 | 描述 | 支持机型 |
+|------|------|----------|
+| **USB / WebUSB** | 有线 USB；Web 使用 WebUSB，原生使用底层插件 | 所有 OneKey 设备 |
+| **Bluetooth BLE（原生）** | 原生 App 的 BLE；不支持 Web Bluetooth | Pro、Touch、Classic 1s / Classic 1s Pure；**Mini 不支持 BLE** |
+| **Air-Gap（二维码）** | 离线扫码签名 | 仅 OneKey Pro |
+
+### 平台指南
+
+| 平台（技术栈） | 传输协议 | SDK 包 | 指南 |
+|----------------|----------|--------|------|
+| Web（浏览器） | WebUSB | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [WebUSB 连接指南](/zh/hardware-sdk/transport/web-usb) |
+| React Native | 蓝牙 | [@onekeyfe/hd-ble-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/hd-ble-sdk) | [React Native 蓝牙](/zh/hardware-sdk/transport/react-native-ble) |
+| Android（原生） | 蓝牙 | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Android 蓝牙](/zh/hardware-sdk/transport/android) |
+| iOS（原生） | 蓝牙 | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [iOS 蓝牙](/zh/hardware-sdk/transport/ios) |
+| Flutter | 蓝牙 | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Flutter 蓝牙](/zh/hardware-sdk/transport/flutter) |
+
+![传输架构](/images/transport/transport-architecture-zh.svg)
+
+低层协议与自定义通道参考：[底层传输插件与协议](/zh/hardware-sdk/concepts/low-level-plugin)
+
+## 安装 SDK
+
+按运行时选择一个入口安装：
+
+```bash
+# Web / 桌面 WebUSB（推荐）
+npm i @onekeyfe/hd-common-connect-sdk
+
+# React Native BLE
+npm i @onekeyfe/hd-ble-sdk
+
+# 原生宿主 + 底层插件（Android/iOS/Flutter 桥接）
+npm i @onekeyfe/hd-common-connect-sdk
+
+# 插件端 iframe（仅插件端）
+npm i @onekeyfe/hd-web-sdk
+```
+
+传输细节：
+- WebUSB：[WebUSB 指南](/zh/hardware-sdk/transport/web-usb)
+- React Native BLE：[BLE 指南](/zh/hardware-sdk/transport/react-native-ble)
+- 原生 Android / iOS / Flutter：通过底层传输插件桥接 JS，见各平台页面。
+- 自定义通道与协议：[底层传输插件与协议](/zh/hardware-sdk/concepts/low-level-plugin)
+
+## 初始化 SDK
+
+按照运行时选择对应的初始化方式，避免混用。
+
+### Web / 桌面 WebUSB
+
+使用 `@onekeyfe/hd-common-connect-sdk`：
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({
+  env: 'webusb',
+  debug: process.env.NODE_ENV !== 'production',
+  fetchConfig: true,
+});
+```
+
+### React Native BLE
+
+使用 `@onekeyfe/hd-ble-sdk`：
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-ble-sdk';
+
+await HardwareSDK.init({
+  debug: __DEV__,
+});
+```
+
+### 原生桥接 / 低层协议
+
+使用 `@onekeyfe/hd-common-connect-sdk`：
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({
+  env: 'lowlevel',
+  debug: process.env.NODE_ENV !== 'production',
+  fetchConfig: true,
+});
+```
+
+| 环境 | 使用场景 |
+|------|----------|
+| `webusb` | 浏览器 WebUSB（无 iframe） |
+| `lowlevel` | 原生应用通过底层适配器桥接 JS |
+| `react-native` | 基于自定义 RN 桥或 Electron BLE |
+| `emulator` | 使用内置模拟器 |
+
+### 插件端 Iframe
+
+使用 `@onekeyfe/hd-web-sdk`（仅插件端）：
+
+```ts
+import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
+
+await HardwareSDK.init({
+  debug: process.env.NODE_ENV !== 'production',
+  connectSrc: 'https://jssdk.onekey.so/1.1.19/', // iframe host
+});
+```
+
+## 绑定事件
+
+设置设备连接和 UI 提示的事件监听器：
+
+```ts
+import { UI_EVENT, UI_REQUEST, DEVICE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, async (message) => {
+  switch (message.type) {
+    case UI_REQUEST.REQUEST_PIN:
+      // 处理 PIN 输入（见下文）
+      break;
+    case UI_REQUEST.REQUEST_PASSPHRASE:
+      // 处理密码短语输入（见下文）
+      break;
+  }
+});
+
+HardwareSDK.on(DEVICE.CONNECT, (payload) => console.log('已连接:', payload));
+HardwareSDK.on(DEVICE.DISCONNECT, (payload) => console.log('已断开:', payload));
+```
+
+## 发现设备
+
+### WebUSB 授权（浏览器）
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// 触发浏览器设备选择器
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+### 搜索设备
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+
+const devices = result.payload;
+// [{ connectId, deviceId?, name, deviceType, ... }]
+```
+
+### 获取设备特征
+
+从 `connectId` 解析 `device_id`（BLE 连接必需）：
+
+```ts
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+
+const deviceId = features.payload.device_id;
+```
+
+> **重要：** `connectId` 可长期缓存（设备重置不影响）；`device_id` 在设备重置/恢复后会变化，需要重新 `getFeatures` 刷新。
+
+## 处理 PIN 输入
+
+当执行受保护的调用且设备已锁定时，处理 `REQUEST_PIN`：
+
+```ts
+import { UI_RESPONSE } from '@onekeyfe/hd-core';
+
+// 方式 1：在设备上输入（推荐）
+await HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE'
+});
+
+// 方式 2：软件盲输 PIN（Pro/Touch 不支持）
+await HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: userInputPin  // 例如 '1234'
+});
+```
+
+> **注意：** OneKey Pro 和 Touch 设备仅支持设备端 PIN 输入。
+
+## 处理密码短语
+
+访问隐藏钱包时，处理 `REQUEST_PASSPHRASE`：
+
+```ts
+// 方式 1：在设备上输入（最安全）
+await HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: { passphraseOnDevice: true, value: '' }
+});
+
+// 方式 2：软件输入，可选会话缓存
+await HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: { value: userPassphrase, passphraseOnDevice: false, save: true }
+});
+```
+
+强制使用标准钱包（跳过密码短语），在任意方法调用中添加 `useEmptyPassphrase: true`。
+
+## 首次签名调用
+
+示例：签名 EVM 消息（EIP-191 personal_sign）：
+
+```ts
+const message = 'Hello OneKey';
+const messageHex = Buffer.from(message).toString('hex');
+
+const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  path: "m/44'/60'/0'",
+  messageHex,
+  chainId: 1,
+});
+
+if (!res.success) throw new Error(res.payload.error);
+
+console.log('地址:', res.payload.address);
+console.log('签名:', res.payload.signature);
+```
+
+import { DeviceCompatibilityTable } from '../../../components/DeviceCompatibilityTable'
+
+## 设备与传输兼容性
+
+<DeviceCompatibilityTable locale="zh" />
+
+> **Air-Gap 模式：** OneKey Pro 支持通过二维码进行离线签名（Air-Gap）— 无需 USB 或蓝牙连接，提供最高级别的安全性。详见 [Air-Gap 集成](/zh/air-gap)。
+
+## 核心包
+
+| 包名 | 用途 | NPM | 版本 |
+|------|------|-----|------|
+| `@onekeyfe/hd-common-connect-sdk` | 统一的 Web/原生 SDK 接口；推荐作为传输层入口 | [npm](https://www.npmjs.com/package/@onekeyfe/hd-common-connect-sdk) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-common-connect-sdk.svg)](https://www.npmjs.com/package/@onekeyfe/hd-common-connect-sdk) |
+| `@onekeyfe/hd-ble-sdk` | 纯 React Native 蓝牙协议栈（推荐用于 RN 项目） | [npm](https://www.npmjs.com/package/@onekeyfe/hd-ble-sdk) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-ble-sdk.svg)](https://www.npmjs.com/package/@onekeyfe/hd-ble-sdk) |
+| `@onekeyfe/hd-transport-react-native` | React Native 传输层副作用/桥接 | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-react-native) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-react-native.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-react-native) |
+| `@onekeyfe/hd-transport-web-device` | Web 环境设备访问传输层 | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-web-device) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-web-device.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-web-device) |
+| `@onekeyfe/hd-transport-emulator` | 模拟器传输层（无需物理设备即可开发和测试） | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-emulator) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-emulator.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-emulator) |
+| `@onekeyfe/hd-transport-http` | HTTP 桥接传输层 | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-http) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-http.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-http) |
+| `@onekeyfe/hd-transport-lowlevel` | 底层主机适配器协议（用于原生集成） | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-lowlevel) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-lowlevel.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-lowlevel) |
+| `@onekeyfe/hd-core` | 核心事件、常量、消息处理 | [npm](https://www.npmjs.com/package/@onekeyfe/hd-core) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-core.svg)](https://www.npmjs.com/package/@onekeyfe/hd-core) |
+| `@onekeyfe/hd-shared` | 共享工具和类型 | [npm](https://www.npmjs.com/package/@onekeyfe/hd-shared) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-shared.svg)](https://www.npmjs.com/package/@onekeyfe/hd-shared) |
+| `@onekeyfe/hd-web-sdk` | Web SDK 封装（不推荐；建议使用 hd-common-connect-sdk） | [npm](https://www.npmjs.com/package/@onekeyfe/hd-web-sdk) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-web-sdk.svg)](https://www.npmjs.com/package/@onekeyfe/hd-web-sdk) |
+
+- 更新日志：[releases](https://github.com/OneKeyHQ/hardware-js-sdk/releases)
+
+## API 参考
+
+- 各链 API：[硬件 SDK 核心 API 指南](/zh/hardware-sdk/core-api-guide)
+- 事件和 UI 响应：[事件配置](/zh/hardware-sdk/core-api-guide#events-ui)
+- 如何解锁设备：[PIN 码](/zh/hardware-sdk/concepts/pin)
+- 需要密码短语支持？[什么是 Passphrase](/zh/hardware-sdk/concepts/passphrase)
+
+## 概念和进阶主题
+
+- 消息协议（用于调试底层传输）：[低层传输插件](/zh/hardware-sdk/concepts/low-level-plugin#message-protocol)
+
+## 支持
+
+致用户：本文档主要面向开发者。如果您在使用我们的产品时遇到问题，请查阅帮助中心或提交工单。
+
+- [帮助中心](https://help.onekey.so)
+- [讨论区](https://github.com/OneKeyHQ/hardware-js-sdk/discussions)
+- [问题反馈](https://github.com/OneKeyHQ/hardware-js-sdk/issues)
+
+## 相关仓库
+
+- [OneKey App (app-monorepo)](https://github.com/OneKeyHQ/app-monorepo)
+- [OneKey 固件](https://github.com/OneKeyHQ/firmware)
+- [OneKey 硬件 JS SDK](https://github.com/OneKeyHQ/hardware-js-sdk)
+
+---
+
+## 立即体验
+
+<div className="mt-4 flex flex-wrap gap-3">
+  <a
+    href="/zh/hardware-sdk/playground"
+    className="group inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-all hover:border-emerald-500/50 hover:bg-emerald-50 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
+  >
+    <Play className="h-4 w-4" strokeWidth={1.5} />
+    交互演示
+  </a>
+  <a
+    href="https://hardware-example.onekey.so/#/emulator"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-all hover:border-blue-500/50 hover:bg-blue-50 hover:text-blue-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10 dark:hover:text-blue-400"
+  >
+    <Monitor className="h-4 w-4" strokeWidth={1.5} />
+    在线模拟器
+    <ExternalLink className="h-3 w-3 opacity-50" strokeWidth={2} />
+  </a>
+</div>

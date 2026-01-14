@@ -1,0 +1,168 @@
+---
+title: 交易
+description: 使用 OneKey 在 Cardano 上发送交易
+---
+
+import { Callout } from 'nextra/components'
+
+# 交易
+
+了解如何在 Cardano 上签署和提交交易。
+
+---
+
+## 签署交易
+
+```typescript
+// transaction 应该是 CBOR 编码的十六进制字符串
+const signedTx = await api.signTx(transactionCbor, partialSign)
+
+// partialSign: boolean
+// - false: 签署钱包拥有的所有输入
+// - true: 仅签署明确拥有的输入（用于多签）
+
+console.log('已签名的交易:', signedTx)
+```
+
+---
+
+## 提交交易
+
+```typescript
+// 提交已签名的交易
+const txHash = await api.submitTx(signedTransactionCbor)
+console.log('交易哈希:', txHash)
+```
+
+---
+
+## 完整的交易流程
+
+```typescript
+import {
+  TransactionBuilder,
+  TransactionBuilderConfigBuilder,
+  LinearFee,
+  BigNum,
+  Address,
+  TransactionOutput,
+  Value,
+} from '@emurgo/cardano-serialization-lib-browser'
+
+async function sendAda(recipientAddress, amountLovelace) {
+  const api = await window.cardano.onekey.enable()
+
+  // 获取 UTxO
+  const utxos = await api.getUtxos()
+  const changeAddress = await api.getChangeAddress()
+
+  // 构建交易
+  const txBuilder = TransactionBuilder.new(
+    TransactionBuilderConfigBuilder.new()
+      .fee_algo(LinearFee.new(
+        BigNum.from_str('44'),
+        BigNum.from_str('155381')
+      ))
+      .pool_deposit(BigNum.from_str('500000000'))
+      .key_deposit(BigNum.from_str('2000000'))
+      .max_value_size(5000)
+      .max_tx_size(16384)
+      .coins_per_utxo_byte(BigNum.from_str('4310'))
+      .build()
+  )
+
+  // 从 UTxO 添加输入
+  utxos.forEach(utxo => {
+    // 添加 UTxO 作为输入...
+  })
+
+  // 添加输出
+  txBuilder.add_output(
+    TransactionOutput.new(
+      Address.from_bech32(recipientAddress),
+      Value.new(BigNum.from_str(amountLovelace))
+    )
+  )
+
+  // 设置找零地址
+  txBuilder.add_change_if_needed(Address.from_bech32(changeAddress))
+
+  // 构建交易
+  const tx = txBuilder.build_tx()
+  const txCbor = Buffer.from(tx.to_bytes()).toString('hex')
+
+  // 签名
+  const signedTxCbor = await api.signTx(txCbor, false)
+
+  // 提交
+  const txHash = await api.submitTx(signedTxCbor)
+  console.log('交易哈希:', txHash)
+
+  return txHash
+}
+```
+
+---
+
+## 使用 Lucid
+
+[Lucid](https://github.com/spacebudz/lucid) 提供更简单的 API：
+
+```bash
+npm install lucid-cardano
+```
+
+```typescript
+import { Lucid } from 'lucid-cardano'
+
+// 使用 OneKey 初始化 Lucid
+const lucid = await Lucid.new(
+  new Blockfrost('https://cardano-mainnet.blockfrost.io/api', 'your-api-key'),
+  'Mainnet'
+)
+
+// 连接 OneKey
+const api = await window.cardano.onekey.enable()
+lucid.selectWallet(api)
+
+// 发送 ADA
+const tx = await lucid
+  .newTx()
+  .payToAddress('addr1...', { lovelace: 5000000n })
+  .complete()
+
+const signedTx = await tx.sign().complete()
+const txHash = await signedTx.submit()
+
+console.log('交易哈希:', txHash)
+```
+
+---
+
+## 使用 Mesh
+
+[Mesh](https://meshjs.dev/) 是另一个流行的 Cardano SDK：
+
+```bash
+npm install @meshsdk/core
+```
+
+```typescript
+import { BrowserWallet, Transaction } from '@meshsdk/core'
+
+// 连接到 OneKey
+const wallet = await BrowserWallet.enable('onekey')
+
+// 获取钱包信息
+const balance = await wallet.getBalance()
+const addresses = await wallet.getUsedAddresses()
+
+// 构建并发送交易
+const tx = new Transaction({ initiator: wallet })
+  .sendLovelace('addr1...', '5000000')
+
+const unsignedTx = await tx.build()
+const signedTx = await wallet.signTx(unsignedTx)
+const txHash = await wallet.submitTx(signedTx)
+```
+

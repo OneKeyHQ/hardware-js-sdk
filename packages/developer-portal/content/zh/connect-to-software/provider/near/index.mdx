@@ -1,0 +1,82 @@
+---
+title: NEAR Provider
+description: 将 NEAR 协议集成到你的 dApp 中 — 检测 Provider、连接账户、发送交易和签名消息
+---
+
+# NEAR
+
+使用 OneKey 的 NEAR provider 将 NEAR 协议集成到你的 dApp 中。OneKey 提供完全兼容的 NEAR 钱包接口，可与现有的 NEAR dApp 无缝配合。
+
+## 功能特性
+
+- 账户连接和管理
+- 交易签名和发送
+- 消息签名
+- 网络切换（mainnet/testnet）
+- 完整的 RPC API 支持
+
+## 安装
+
+```bash
+npm install @onekeyfe/onekey-near-provider
+# 或
+yarn add @onekeyfe/onekey-near-provider
+```
+
+## 快速开始
+
+```typescript
+import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider'
+
+// 创建 provider 实例
+const provider = new OneKeyNearProvider()
+
+// 请求账户访问
+const accounts = await provider.request({ method: 'near_accounts' })
+console.log('已连接账户:', accounts)
+
+// 获取当前网络
+const network = await provider.request({ method: 'near_network' })
+console.log('当前网络:', network)
+```
+
+## 文档
+
+### 入门指南
+- [介绍](introduction) - NEAR provider 概述
+- [安装 Provider SDK](integrating/install-the-provider-sdk) - 安装说明
+
+### 集成指南
+- [检测 Provider](integrating/detecting-the-provider) - 检查 OneKey 是否已安装
+- [建立连接](integrating/establishing-a-connection) - 连接用户账户
+- [访问账户](integrating/accessing-accounts) - 获取账户信息
+- [检测 Provider 网络](integrating/detecting-provider-network) - 检查当前网络
+- [监听账户和网络状态](integrating/watch-accounts-and-network-status) - 订阅状态变化
+
+### 交易和签名
+- [发送交易](integrating/sending-transactions) - 创建和发送交易
+- [签名消息](integrating/signing-messages) - 签名任意消息
+- [RPC API 调用](integrating/rpc-api-calling) - 直接 RPC 访问
+
+### 高级
+- [调试日志](integrating/debug-logging) - 启用调试模式
+- [从 NEAR Web Wallet 迁移](integrating/migrate-from-near-web-wallet) - 迁移指南
+
+### 参考
+- [API 参考](reference/api-reference) - 完整 API 文档
+- [故障排除](reference/trouble-shooting) - 常见问题和解决方案
+- [示例和演示](resources/example-and-demo) - 示例代码
+- [常见问题](resources/faq) - 常见问题解答
+
+## 错误处理
+
+| 错误码 | 消息 | 描述 |
+|------|---------|-------------|
+| 4001 | User Rejected | 用户拒绝了请求 |
+| -32602 | Invalid Params | 方法参数无效 |
+| -32603 | Internal Error | 内部 JSON-RPC 错误 |
+
+## 相关资源
+
+- [NEAR 文档](https://docs.near.org/)
+- [OneKey GitHub](https://github.com/OneKeyHQ)

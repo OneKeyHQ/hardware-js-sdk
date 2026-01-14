@@ -1,0 +1,30 @@
+---
+title: switchChain
+---
+
+# switchChain
+
+切换链
+
+### 方法
+
+```typescript
+async function switchChain(chain: string): {
+  enum: string;
+  name: string;
+  network: string;
+}
+```
+
+### 参数
+
+链枚举值。例如：`BITCOIN_MAINNET`, `BITCOIN_TESTNET`
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+await provider.switchChain("BITCOIN_TESTNET");
+```
+

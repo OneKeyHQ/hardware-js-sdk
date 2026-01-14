@@ -1,0 +1,47 @@
+---
+title: 响应 UI 事件
+---
+
+# 响应 UI 事件
+
+### 向设备传输数据
+
+向设备传输数据，目前支持 PIN 和密码短语的数据传输。
+
+```typescript
+const response = await HardwareSDK.uiResponse(response);
+
+```
+
+### 参数
+
+[**可选通用参数**](../common-params)
+
+* `type` - _必填_ `string`。响应类型：`ui-receive_pin` 或 `ui-receive_passphrase`
+* `payload` - _必填_ `object`
+
+#### 返回 PIN 码结果
+
+```typescript
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: ${pin_value},
+});
+```
+
+* 如果在软件端输入 PIN，替换 `pin_value` 的内容。如果需要在硬件端输入 PIN，将 `pin_value` 设置为 `@@ONEKEY_INPUT_PIN_IN_DEVICE`。
+
+#### 返回密码短语结果
+
+```typescript
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: {
+    value: ${passphrase_value},
+    passphraseOnDevice: false,
+    save: false,
+  },
+});
+```
+
+* 如果需要在设备上输入密码短语，将 value 设置为 '' 并将 passphraseOnDevice 设置为 true。

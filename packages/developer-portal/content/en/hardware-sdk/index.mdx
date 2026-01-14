@@ -1,0 +1,315 @@
+---
+title: Introduction
+---
+
+import { ExternalLink, Play, Monitor } from 'lucide-react'
+
+# Introduction
+
+Developer-focused documentation for integrating OneKey hardware in Web and Native apps. This guide covers SDK installation, initialization, device discovery, UI prompts, and your first signing call.
+
+## Choose Your Transport
+
+USB integrations should use `@onekeyfe/hd-common-connect-sdk`; use `@onekeyfe/hd-web-sdk` only when the host mandates an iframe/plugin setup.
+
+### Connection Methods
+
+| Method | Description | Supported devices |
+|--------|-------------|-------------------|
+| **USB / WebUSB** | Wired USB; Web via WebUSB, native via low-level plugin | All OneKey devices |
+| **Bluetooth BLE (native)** | Native apps over BLE (not Web Bluetooth); requires OS Bluetooth & permission | OneKey Pro, Touch, Classic 1s / Classic 1s Pure; **Mini does not support BLE** |
+| **Air-Gap (QR)** | Offline QR signing | OneKey Pro only |
+
+### Platform Guide
+
+| Platform (Stack) | Transport | SDK Package | Guide |
+|------------------|-----------|-------------|-------|
+| Web (Browser) | WebUSB | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [WebUSB Connection Guide](/en/hardware-sdk/transport/web-usb) |
+| React Native | BLE | [@onekeyfe/hd-ble-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/hd-ble-sdk) | [React Native BLE](/en/hardware-sdk/transport/react-native-ble) |
+| Android (Native) | BLE | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Android BLE](/en/hardware-sdk/transport/android) |
+| iOS (Native) | BLE | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [iOS BLE](/en/hardware-sdk/transport/ios) |
+| Flutter | BLE | [@onekeyfe/hd-common-connect-sdk](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-common-connect-sdk) | [Flutter BLE](/en/hardware-sdk/transport/flutter) |
+
+![Transport architecture](/images/transport/transport-architecture-en.svg)
+
+Low-level protocol and custom channels: [Low-Level Transport Plugin & Protocol](/en/hardware-sdk/concepts/low-level-plugin)
+
+## Install SDK
+
+Pick one entry by runtime:
+
+```bash
+# Web / desktop WebUSB (recommended)
+npm i @onekeyfe/hd-common-connect-sdk
+
+# React Native BLE
+npm i @onekeyfe/hd-ble-sdk
+
+# Native host with low-level plugin (Android/iOS/Flutter bridge)
+npm i @onekeyfe/hd-common-connect-sdk
+
+# Plugin iframe host only (plugin-only)
+npm i @onekeyfe/hd-web-sdk
+```
+
+Transport details:
+- WebUSB: [WebUSB guide](/en/hardware-sdk/transport/web-usb)
+- React Native BLE: [BLE guide](/en/hardware-sdk/transport/react-native-ble)
+- Native Android / iOS / Flutter: bridge JS calls through low-level transport plugins (see pages for examples).
+- Custom channel & protocol: [Low-Level Transport Plugin & Protocol](/en/hardware-sdk/concepts/low-level-plugin)
+
+## Initialize the SDK
+
+Use the initialization method that matches your runtime—avoid mixing SDK entries.
+
+### Web / Desktop WebUSB
+
+Use `@onekeyfe/hd-common-connect-sdk`:
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({
+  env: 'webusb',
+  debug: process.env.NODE_ENV !== 'production',
+  fetchConfig: true,
+});
+```
+
+### React Native BLE
+
+Use `@onekeyfe/hd-ble-sdk`:
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-ble-sdk';
+
+await HardwareSDK.init({
+  debug: __DEV__,
+});
+```
+
+### Native Bridge / Low-level
+
+Use `@onekeyfe/hd-common-connect-sdk`:
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({
+  env: 'lowlevel',
+  debug: process.env.NODE_ENV !== 'production',
+  fetchConfig: true,
+});
+```
+
+| Environment | Use Case |
+|-------------|----------|
+| `webusb` | Browser WebUSB (no iframe) |
+| `lowlevel` | Native apps bridging JS via low-level adapter |
+| `react-native` | Custom RN bridge or Electron BLE |
+| `emulator` | Built-in emulator transport |
+
+### Plugin Iframe Host
+
+Use `@onekeyfe/hd-web-sdk` (plugin-only):
+
+```ts
+import { HardwareSDK } from '@onekeyfe/hd-web-sdk';
+
+await HardwareSDK.init({
+  debug: process.env.NODE_ENV !== 'production',
+  connectSrc: 'https://jssdk.onekey.so/1.1.19/', // iframe host
+});
+```
+
+## Bind Events
+
+Set up event listeners for device connection and UI prompts:
+
+```ts
+import { UI_EVENT, UI_REQUEST, DEVICE } from '@onekeyfe/hd-core';
+
+HardwareSDK.on(UI_EVENT, async (message) => {
+  switch (message.type) {
+    case UI_REQUEST.REQUEST_PIN:
+      // Handle PIN entry (see below)
+      break;
+    case UI_REQUEST.REQUEST_PASSPHRASE:
+      // Handle passphrase entry (see below)
+      break;
+  }
+});
+
+HardwareSDK.on(DEVICE.CONNECT, (payload) => console.log('Connected:', payload));
+HardwareSDK.on(DEVICE.DISCONNECT, (payload) => console.log('Disconnected:', payload));
+```
+
+## Discover Devices
+
+### WebUSB Authorization (Browser)
+
+```ts
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+// Trigger browser's device chooser
+await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+```
+
+### Search Devices
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+
+const devices = result.payload;
+// [{ connectId, deviceId?, name, deviceType, ... }]
+```
+
+### Get Device Features
+
+Resolve `device_id` from `connectId` (required for BLE connections):
+
+```ts
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+
+const deviceId = features.payload.device_id;
+```
+
+> **Important:** `connectId` is stable for the same device (reset does not change it); `device_id` changes after reset/recovery and must be refreshed via `getFeatures`.
+
+## Handle PIN Entry
+
+When a protected call is made and the device is locked, handle `REQUEST_PIN`:
+
+```ts
+import { UI_RESPONSE } from '@onekeyfe/hd-core';
+
+// Option 1: Enter on device (recommended)
+await HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE'
+});
+
+// Option 2: Software blind PIN (not supported on Pro/Touch)
+await HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PIN,
+  payload: userInputPin  // e.g., '1234'
+});
+```
+
+> **Note:** OneKey Pro and Touch devices only support on-device PIN entry.
+
+## Handle Passphrase
+
+For hidden wallet access, handle `REQUEST_PASSPHRASE`:
+
+```ts
+// Option 1: Enter on device (most secure)
+await HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: { passphraseOnDevice: true, value: '' }
+});
+
+// Option 2: Software input with optional session cache
+await HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: { value: userPassphrase, passphraseOnDevice: false, save: true }
+});
+```
+
+To force standard wallet (skip passphrase), add `useEmptyPassphrase: true` to any method call.
+
+## First Signing Call
+
+Example: Sign an EVM message (EIP-191 personal_sign):
+
+```ts
+const message = 'Hello OneKey';
+const messageHex = Buffer.from(message).toString('hex');
+
+const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  path: "m/44'/60'/0'",
+  messageHex,
+  chainId: 1,
+});
+
+if (!res.success) throw new Error(res.payload.error);
+
+console.log('Address:', res.payload.address);
+console.log('Signature:', res.payload.signature);
+```
+
+import { DeviceCompatibilityTable } from '../../../components/DeviceCompatibilityTable'
+
+## Device and Transport Compatibility
+
+<DeviceCompatibilityTable locale="en" />
+
+> **Air-Gap Mode:** OneKey Pro supports air-gapped signing via QR codes — no USB or Bluetooth connection required, providing the highest level of security. See [Air-Gap Integration](/en/air-gap) for details.
+
+## Core Packages
+
+| Package | Purpose | NPM | Version |
+|---------|---------|-----|---------|
+| `@onekeyfe/hd-common-connect-sdk` | Unified SDK surface for Web/Native; recommended entry for transports | [npm](https://www.npmjs.com/package/@onekeyfe/hd-common-connect-sdk) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-common-connect-sdk.svg)](https://www.npmjs.com/package/@onekeyfe/hd-common-connect-sdk) |
+| `@onekeyfe/hd-ble-sdk` | Pure React Native BLE stack (recommended for RN projects) | [npm](https://www.npmjs.com/package/@onekeyfe/hd-ble-sdk) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-ble-sdk.svg)](https://www.npmjs.com/package/@onekeyfe/hd-ble-sdk) |
+| `@onekeyfe/hd-transport-react-native` | React Native transport side-effects/bridge | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-react-native) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-react-native.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-react-native) |
+| `@onekeyfe/hd-transport-web-device` | Web transport for device access in web contexts | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-web-device) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-web-device.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-web-device) |
+| `@onekeyfe/hd-transport-emulator` | Emulator transport (develop and test without a physical device) | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-emulator) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-emulator.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-emulator) |
+| `@onekeyfe/hd-transport-http` | HTTP bridge transport | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-http) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-http.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-http) |
+| `@onekeyfe/hd-transport-lowlevel` | Low-level host adapter contract (for native integrations) | [npm](https://www.npmjs.com/package/@onekeyfe/hd-transport-lowlevel) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-transport-lowlevel.svg)](https://www.npmjs.com/package/@onekeyfe/hd-transport-lowlevel) |
+| `@onekeyfe/hd-core` | Core events, constants, message wiring | [npm](https://www.npmjs.com/package/@onekeyfe/hd-core) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-core.svg)](https://www.npmjs.com/package/@onekeyfe/hd-core) |
+| `@onekeyfe/hd-shared` | Shared utilities and types | [npm](https://www.npmjs.com/package/@onekeyfe/hd-shared) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-shared.svg)](https://www.npmjs.com/package/@onekeyfe/hd-shared) |
+| `@onekeyfe/hd-web-sdk` | Web SDK wrapper (not recommended; prefer hd-common-connect-sdk) | [npm](https://www.npmjs.com/package/@onekeyfe/hd-web-sdk) | [![npm](https://img.shields.io/npm/v/%40onekeyfe%2Fhd-web-sdk.svg)](https://www.npmjs.com/package/@onekeyfe/hd-web-sdk) |
+
+- Changelog: [releases](https://github.com/OneKeyHQ/hardware-js-sdk/releases)
+
+## API References
+
+- Per-chain APIs: [Hardware SDK Core API Guide](/en/hardware-sdk/core-api-guide)
+- Events and UI responses: [Config Event](/en/hardware-sdk/core-api-guide#events-ui)
+- How to unlock the device: [PIN Code](/en/hardware-sdk/concepts/pin)
+- Need support for passphrases? [What is Passphrase](/en/hardware-sdk/concepts/passphrase)
+
+## Concepts and Advanced Topics
+
+- Message protocol (for debugging low-level transports): [Low-level transport plugin](/en/hardware-sdk/concepts/low-level-plugin#message-protocol)
+
+## Support
+
+For users: This documentation is primarily for developers. If you encounter issues while using our products, please consult our Help Center or submit a support ticket.
+
+- [Help Center](https://help.onekey.so)
+- [Discussions](https://github.com/OneKeyHQ/hardware-js-sdk/discussions)
+- [Issues](https://github.com/OneKeyHQ/hardware-js-sdk/issues)
+
+## Related Repositories
+
+- [OneKey App (app-monorepo)](https://github.com/OneKeyHQ/app-monorepo)
+- [OneKey Firmware](https://github.com/OneKeyHQ/firmware)
+- [OneKey Hardware JS SDK](https://github.com/OneKeyHQ/hardware-js-sdk)
+
+---
+
+## Try It Out
+
+<div className="mt-4 flex flex-wrap gap-3">
+  <a
+    href="/en/hardware-sdk/playground"
+    className="group inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-all hover:border-emerald-500/50 hover:bg-emerald-50 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
+  >
+    <Play className="h-4 w-4" strokeWidth={1.5} />
+    Interactive Playground
+  </a>
+  <a
+    href="https://hardware-example.onekey.so/#/emulator"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-all hover:border-blue-500/50 hover:bg-blue-50 hover:text-blue-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10 dark:hover:text-blue-400"
+  >
+    <Monitor className="h-4 w-4" strokeWidth={1.5} />
+    Online Emulator
+    <ExternalLink className="h-3 w-3 opacity-50" strokeWidth={2} />
+  </a>
+</div>

@@ -1,0 +1,65 @@
+---
+title: Tron
+---
+
+# Tron
+
+Tron offline signing via UR uses the same animated QR transport pattern.
+
+## Data Types
+
+- Request UR: `tron-sign-request`
+- Response UR: `tron-signature`
+
+> Tron helpers are provided by our QR wallet SDK and follow standard UR patterns.
+
+## Flow
+
+1. Construct a Tron sign request (transaction/message + BIP-44 path)
+2. Encode as UR and display as animated QR
+3. Scan device response and decode signature
+4. Broadcast to the Tron network
+
+## Examples
+
+### Build Tron sign request (UR)
+
+```ts
+import { TronSignRequest } from '@keystonehq/bc-ur-registry-tron';
+import { CryptoKeypath, PathComponent } from '@keystonehq/bc-ur-registry';
+import { airGapUrUtils } from '@keystonehq/keystone-sdk';
+
+// BIP44: m/44'/195'/0'/0/0
+const keypath = new CryptoKeypath([
+  new PathComponent({ index: 44, hardened: true }),
+  new PathComponent({ index: 195, hardened: true }),
+  new PathComponent({ index: 0, hardened: true }),
+  new PathComponent({ index: 0, hardened: false }),
+  new PathComponent({ index: 0, hardened: false }),
+]);
+
+const req = new TronSignRequest({
+  signData: Buffer.from(rawTxHex, 'hex'),
+  derivationPath: keypath,
+});
+
+const ur = req.toUR();
+const frames = airGapUrUtils.urToQrcode(ur);
+```
+
+### Decode Tron signature (UR)
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { TronSignature } from '@keystonehq/bc-ur-registry-tron';
+
+const dec = new URDecoder();
+// dec.receivePart(frameString) for each scanned frame
+if (dec.isComplete()) {
+  const ur = dec.resultUR();            // 'tron-signature'
+  const sig = TronSignature.fromCBOR(ur.cbor);
+  const signature = sig.getSignature();
+  // broadcast signed transaction to Tron network
+}
+```
+

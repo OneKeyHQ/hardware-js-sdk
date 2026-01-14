@@ -1,0 +1,56 @@
+---
+title: 签名并发送交易
+---
+
+# 签名并发送交易
+
+创建交易后，Web 应用可以请求用户的 OneKey 钱包使用其账户私钥和 NEAR JSON RPC 连接来签名并发送交易。
+
+到目前为止，**最简单**且**推荐**的方式是使用 provider 上的 `requestSignTransactions` 方法，但也可以使用 `request` 方法。
+
+在这两种情况下，调用都将返回一个包含 `transactionHashes` 对象的 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)。
+
+
+### requestSignTransactions()
+```javascript
+const transaction = ... // 首先创建交易
+
+const res = await provider.requestSignTransactions({
+  transactions: [transaction], // 必须是数组类型
+});
+console.log('requestSignTransactions', res, res.transactionHashes);
+
+```
+
+
+### request()
+```javascript
+const transaction = ... // 首先创建交易
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transaction], // 必须是数组类型
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+
+
+
+交易也可以在调用方法之前先序列化为 **`base64`** 字符串。
+
+```javascript
+const transaction = ... // 首先创建交易
+
+const transactionSerialized = transaction.encode().toString('base64');
+
+const res = await provider.request({
+  method: 'near_sendTransactions',
+  params: {
+    transactions: [transactionSerialized], // 必须是数组类型
+  },
+});
+console.log('near_sendTransactions', res, res.transactionHashes);
+```
+

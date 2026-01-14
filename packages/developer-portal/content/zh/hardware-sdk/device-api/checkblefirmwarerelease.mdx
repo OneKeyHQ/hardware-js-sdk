@@ -1,0 +1,57 @@
+---
+title: checkBLEFirmwareRelease
+---
+
+# checkBLEFirmwareRelease
+
+## 检查蓝牙固件版本
+
+检查设备当前蓝牙固件版本状态。
+
+```typescript
+const response = await HardwareSDK.checkBLEFirmwareRelease(connectId);
+```
+
+### 参数
+
+[可选通用参数](../common-params)
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.checkBLEFirmwareRelease(connectId);
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        status: string, // 当前固件状态，'valid' | 'outdated' | 'required' | 'unknown' | 'none'
+        // 'valid' 表示无需更新
+        // 'outdated' 表示有可用更新
+        // 'required' 表示必须更新
+        // 'unknown' 和 'none' 表示无法获取版本号
+        changelog: [], // 更新日志
+        release: {     // 最新版本信息
+          required: boolean,
+          version: Array<number>,
+          url: string,
+          webUpdate: string,
+          changelog: Record<string, string>
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

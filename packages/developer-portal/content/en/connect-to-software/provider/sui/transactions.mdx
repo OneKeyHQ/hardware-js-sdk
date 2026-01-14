@@ -1,0 +1,168 @@
+---
+title: Transactions
+description: Send transactions on Sui using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Transactions
+
+Learn how to sign and execute transactions on Sui.
+
+---
+
+## Sign and Execute Transaction Block
+
+```typescript
+import { TransactionBlock } from '@mysten/sui.js/transactions'
+
+// Create transaction block
+const txb = new TransactionBlock()
+
+// Add a transfer
+txb.transferObjects(
+  [txb.object('0xobject_id')],
+  txb.pure('0xrecipient_address')
+)
+
+// Or send SUI
+const [coin] = txb.splitCoins(txb.gas, [txb.pure(1000000000)]) // 1 SUI
+txb.transferObjects([coin], txb.pure('0xrecipient_address'))
+
+// Sign and execute
+const result = await provider.signAndExecuteTransactionBlock({
+  transactionBlock: txb,
+  options: {
+    showEffects: true,
+    showEvents: true,
+    showObjectChanges: true,
+  },
+})
+
+console.log({
+  digest: result.digest,
+  effects: result.effects,
+  events: result.events,
+})
+```
+
+---
+
+## Sign Transaction Block (Without Executing)
+
+```typescript
+const txb = new TransactionBlock()
+// ... build transaction
+
+const signedTxb = await provider.signTransactionBlock({
+  transactionBlock: txb,
+})
+
+console.log({
+  transactionBlockBytes: signedTxb.transactionBlockBytes,
+  signature: signedTxb.signature,
+})
+
+// Execute later using Sui SDK
+// const result = await suiClient.executeTransactionBlock({
+//   transactionBlock: signedTxb.transactionBlockBytes,
+//   signature: signedTxb.signature,
+// })
+```
+
+---
+
+## Sign and Execute Transaction (New API)
+
+```typescript
+// Using the newer signAndExecuteTransaction API
+const result = await provider.signAndExecuteTransaction({
+  transaction: txb,
+  options: {
+    showEffects: true,
+  },
+})
+```
+
+---
+
+## Sign Transaction (New API)
+
+```typescript
+const signedTxn = await provider.signTransaction({
+  transaction: txb,
+})
+```
+
+---
+
+## Smart Contract Interaction
+
+### Move Call
+
+```typescript
+const txb = new TransactionBlock()
+
+// Call a Move function
+txb.moveCall({
+  target: '0xpackage::module::function',
+  arguments: [
+    txb.pure('arg1'),
+    txb.object('0xobject_id'),
+  ],
+  typeArguments: ['0x2::sui::SUI'],
+})
+
+const result = await provider.signAndExecuteTransactionBlock({
+  transactionBlock: txb,
+})
+```
+
+---
+
+## Publish Package
+
+```typescript
+const txb = new TransactionBlock()
+
+const [upgradeCap] = txb.publish({
+  modules: compiledModules,
+  dependencies: [
+    '0x1', // Move stdlib
+    '0x2', // Sui framework
+  ],
+})
+
+txb.transferObjects([upgradeCap], txb.pure(senderAddress))
+
+const result = await provider.signAndExecuteTransactionBlock({
+  transactionBlock: txb,
+})
+```
+
+---
+
+## Using with Sui SDK
+
+```typescript
+import { SuiClient } from '@mysten/sui.js/client'
+
+const client = new SuiClient({ url: 'https://fullnode.mainnet.sui.io' })
+
+// Get balance
+const balance = await client.getBalance({
+  owner: accountAddress,
+})
+
+// Get objects
+const objects = await client.getOwnedObjects({
+  owner: accountAddress,
+})
+
+// Get transaction
+const txn = await client.getTransactionBlock({
+  digest: txDigest,
+  options: { showEffects: true },
+})
+```
+

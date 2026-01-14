@@ -1,0 +1,44 @@
+---
+title: sendInscription
+---
+
+# sendInscription
+
+发送铭文
+
+### 方法
+
+```typescript
+async function sendInscription(
+    toAddress: string,
+    inscriptionId: string,
+    options?: { feeRate: number }
+): string
+```
+
+### 参数
+
+* `toAddress` — _必填_ `string` 接收地址
+* `inscriptionId` — _必填_ `string` 铭文 ID
+* `options` — _可选_
+  * `feeRate` — _必填_ `number` 网络费率
+
+### 响应
+
+`txid` — `string`
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const address = "010203"
+const inscription = "010203"
+const txid = async provider.sendInscription(address, inscription);
+
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/MWLqvVE" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

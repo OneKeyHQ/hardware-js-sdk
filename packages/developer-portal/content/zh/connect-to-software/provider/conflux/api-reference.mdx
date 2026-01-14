@@ -1,0 +1,85 @@
+---
+title: API 参考
+description: OneKey Conflux provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey Conflux provider 方法和类型的完整参考。
+
+---
+
+## 方法
+
+| 方法 | 描述 |
+|------|------|
+| `request({ method, params })` | 发送 JSON-RPC 请求 |
+| `isConnected()` | 检查连接状态 |
+| `on(event, callback)` | 订阅事件 |
+| `off(event, callback)` | 取消订阅事件 |
+
+---
+
+## RPC 方法
+
+| 方法 | 描述 |
+|------|------|
+| `cfx_requestAccounts` | 请求连接 |
+| `cfx_accounts` | 获取已连接的账户 |
+| `cfx_chainId` | 获取链 ID |
+| `cfx_sendTransaction` | 发送交易 |
+| `cfx_call` | 调用合约（只读） |
+| `cfx_estimateGasAndCollateral` | 估算 gas |
+| `cfx_getBalance` | 获取账户余额 |
+| `cfx_getTransactionByHash` | 获取交易 |
+| `cfx_getTransactionReceipt` | 获取收据 |
+| `net_version` | 获取网络 ID |
+
+---
+
+## 事件
+
+| 事件 | 参数 | 描述 |
+|------|------|------|
+| `connect` | `{ chainId, networkId }` | 已连接到网络 |
+| `disconnect` | - | 已断开连接 |
+| `chainChanged` | `chainId` | 网络已变更 |
+| `accountsChanged` | `accounts[]` | 账户已变更 |
+
+---
+
+## 已弃用的方法
+
+这些方法仍然有效但已弃用：
+
+```typescript
+// 已弃用：使用 request({ method: 'cfx_requestAccounts' })
+await provider.enable()
+
+// 已弃用：使用 request()
+await provider.send({ method: 'cfx_accounts' })
+await provider.sendAsync({ method: 'cfx_accounts' }, callback)
+
+// 已弃用：使用 request({ method: 'cfx_chainId' })
+provider.chainId
+
+// 已弃用：使用 request({ method: 'net_version' })
+provider.networkVersion
+
+// 已弃用：使用 request({ method: 'cfx_accounts' })
+provider.selectedAddress
+```
+
+---
+
+## 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 4001 | 用户拒绝请求 |
+| -32700 | 解析错误 |
+| -32600 | 无效的请求 |
+| -32601 | 方法未找到 |
+| -32602 | 无效的参数 |
+| -32603 | 内部错误 |
+

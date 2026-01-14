@@ -1,0 +1,153 @@
+---
+title: 交易
+description: 使用 OneKey 在 Aptos 上发送交易
+---
+
+import { Callout } from 'nextra/components'
+
+# 交易
+
+了解如何在 Aptos 上签署和提交交易。
+
+---
+
+## 签署并提交交易
+
+```typescript
+// 简单的 APT 转账
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: [
+    '0x1234...', // 接收地址
+    '100000000', // 金额（Octas，1 APT = 100000000 Octas）
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+
+console.log('交易哈希:', response.hash)
+```
+
+---
+
+## 签署交易（不提交）
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::coin::transfer',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: ['0x1234...', '100000000'],
+}
+
+const signedTxn = await provider.signTransaction(payload)
+
+// 稍后使用 Aptos SDK 提交
+// const pendingTxn = await client.submitTransaction(signedTxn)
+```
+
+---
+
+## 签署交易 V2（BCS 序列化）
+
+用于 BCS 序列化交易的高级用例：
+
+```typescript
+import { BCS } from 'aptos'
+
+const rawTransaction = /* BCS 序列化的原始交易 */
+
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'simple', // 'simple' 或 'multi_agent'
+  asFeePayer: false,
+})
+```
+
+---
+
+## 交易选项
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: ['0x1234...', '100000000'],
+}
+
+const options = {
+  max_gas_amount: '10000',
+  gas_unit_price: '100',
+  expiration_timestamp_secs: Math.floor(Date.now() / 1000) + 600, // 10 分钟
+}
+
+const response = await provider.signAndSubmitTransaction(payload, options)
+```
+
+---
+
+## 智能合约交互
+
+### 调用视图函数
+
+```typescript
+// 视图函数不需要签名
+const result = await client.view({
+  function: '0x1::coin::balance',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: [accountAddress],
+})
+
+console.log('余额:', result[0])
+```
+
+### 调用入口函数
+
+```typescript
+// 铸造 NFT 示例
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x3::token::create_collection_script',
+  type_arguments: [],
+  arguments: [
+    'My Collection',           // 集合名称
+    'Description',             // 描述
+    'https://example.com',     // URI
+    '1000',                    // 最大供应量
+    [false, false, false],     // 可变性配置
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+```
+
+---
+
+## 多代理交易
+
+用于需要多个签名者的交易：
+
+```typescript
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'multi_agent',
+})
+```
+
+---
+
+## 代付手续费交易
+
+作为代付方签署赞助交易：
+
+```typescript
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'simple',
+  asFeePayer: true,
+})
+```
+

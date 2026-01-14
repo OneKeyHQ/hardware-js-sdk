@@ -1,0 +1,113 @@
+---
+title: nostrSignEvent
+---
+
+# nostrSignEvent
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.6.0
+  * Classic/Mini: 3.5.0
+  * Classic1s: 3.6.0
+
+## Nostr：签名 Nostr 事件
+
+请求设备使用由给定 BIP32 路径派生的私钥对给定的 Nostr 事件进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.nostrSignEvent(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `event` - _必需_ `NostrEvent` Nostr 事件。
+
+```
+enum EventKind {
+  Metadata = 0,
+  Text = 1,
+  RelayRec = 2,
+  Contacts = 3,
+  DM = 4,
+  Deleted = 5,
+  Reaction = 7,
+  BadgeAward = 8,
+  ChannelCreation = 40,
+  ChannelMetadata = 41,
+  ChannelMessage = 42,
+  ChannelHideMessage = 43,
+  Reporting = 1984,
+  ZapRequest = 9734,
+  Zap = 9735,
+  RelayListMetadata = 10002,
+  ClientAuthentication = 22242,
+  NostrConnect = 24133,
+  ProfileBadges = 30008,
+  BadgeDefinition = 30009,
+  LongFormContent = 30023,
+  ApplicationSpecificData = 30078,
+}
+
+type NostrEvent = {
+  id?: string;
+  kind: EventKind;
+  pubkey?: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+  sig?: string;
+};
+```
+
+
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.nostrSignEvent(
+  connectId,
+  deviceId,
+  {
+    path: string,
+    event: {
+      kind: 1,
+      content: 'Hello world',
+      tags: [],
+      created_at: 1702268010,
+    },
+  }
+);
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    event: {
+      kind: 1,
+      content: 'Hello world',
+      tags: [],
+      created_at: 1702268010,
+      sig: '',
+    },
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

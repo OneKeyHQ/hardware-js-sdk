@@ -1,0 +1,57 @@
+---
+title: firmwareUpdateV2
+---
+
+# firmwareUpdateV2
+
+## 固件更新 (V2)
+
+新一代固件更新流程。支持下载和更新主固件及蓝牙固件。必须显式传入 `platform` 参数。
+
+```typescript
+const res = await HardwareSDK.firmwareUpdateV2(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+  updateType: 'firmware', // 或 'ble'
+  // 方式 A：基于版本号更新（推荐）
+  version: [2, 10, 0],
+  // 方式 B：自定义二进制文件（谨慎使用）
+  // binary: ArrayBuffer,
+  // 可选标志
+  forcedUpdateRes: false,
+  isUpdateBootloader: false,
+});
+```
+
+### 参数
+
+[可选通用参数](../common-params)
+
+- `platform` - 必需 `"native" | "desktop" | "ext" | "web" | "web-embed"` 执行环境
+- `updateType` - 必需 `'firmware' | 'ble'` 更新目标（主固件或蓝牙）
+- `version` - 可选 `number[]` 目标版本号，3 位数组；会下载该版本的官方固件
+- `binary` - 可选 `ArrayBuffer` 自定义固件二进制文件；谨慎使用
+- `forcedUpdateRes` - 可选 `boolean` 强制更新资源包
+- `isUpdateBootloader` - 可选 `boolean` 包含引导加载程序更新
+
+### 返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    // 底层返回的成功标识
+  }
+}
+```
+
+### 错误
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // 错误信息
+    code: number   // 错误码
+  }
+}
+```

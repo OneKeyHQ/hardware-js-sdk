@@ -1,0 +1,72 @@
+---
+title: benfenSignMessage
+---
+
+# benfenSignMessage
+
+**使用要求**
+
+* 固件版本要求
+  * Pro: 4.12.0
+
+### Benfen：签名消息
+
+使用由给定 BIP32 路径派生的私钥对消息进行签名。用户需要在 OneKey 设备上确认操作。
+
+
+
+```typescript
+const result = await HardwareSDK.benfenSignMessage(connectId, deviceId,{
+  path: "m/44'/728'/0'/0'/0'",
+  messageHex: "68656c6c6f" // 十六进制格式的 "hello"
+});
+```
+
+#### 参数
+
+**可选通用参数**
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `messageHex` - _必需_ `string` 十六进制格式的待签名消息
+
+#### 返回值
+
+* `success` - _boolean_ 成功时为 true
+* `payload`
+  * `signature` - _string_ 十六进制格式的签名
+  * `address` - _string_ 用于签名的 BFC 格式地址
+
+示例：
+
+```typescript
+const params = {
+  path: "m/44'/728'/0'/0'/0'",
+  messageHex: "68656c6c6f" // 十六进制格式的 "hello"
+};
+
+const response = await HardwareSDK.benfenSignMessage(connectId, deviceId, params);
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    signature: string,
+    address: string.
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

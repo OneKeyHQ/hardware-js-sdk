@@ -1,0 +1,84 @@
+---
+title: wallet_getPermissions
+description: Get current permissions for the dApp
+---
+
+# wallet_getPermissions
+
+Returns the current permissions granted to the dApp. This method does not prompt the user.
+
+---
+
+## Parameters
+
+None
+
+---
+
+## Returns
+
+`Array` of permission objects:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `parentCapability` | `string` | The permission name |
+| `date` | `number` | Timestamp when granted |
+| `caveats` | `array` | Restrictions on the permission |
+
+---
+
+## Example
+
+```typescript
+const permissions = await window.$onekey.ethereum.request({
+  method: 'wallet_getPermissions'
+})
+
+console.log('Current permissions:', permissions)
+
+// Check if connected
+const isConnected = permissions.some(
+  p => p.parentCapability === 'eth_accounts'
+)
+console.log('Is connected:', isConnected)
+```
+
+### Permission Check Utility
+
+```typescript
+async function checkPermissions() {
+  const permissions = await window.$onekey.ethereum.request({
+    method: 'wallet_getPermissions'
+  })
+
+  return {
+    hasAccounts: permissions.some(p => p.parentCapability === 'eth_accounts'),
+    permissions
+  }
+}
+
+const { hasAccounts } = await checkPermissions()
+if (!hasAccounts) {
+  // Request connection
+  await window.$onekey.ethereum.request({
+    method: 'eth_requestAccounts'
+  })
+}
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32603 | Internal error | Provider error |
+
+---
+
+## Notes
+
+- Returns an empty array if no permissions are granted
+- Does not prompt the user for any action
+- Useful for checking connection state without triggering a prompt
+- Specified by [EIP-2255](https://eips.ethereum.org/EIPS/eip-2255)

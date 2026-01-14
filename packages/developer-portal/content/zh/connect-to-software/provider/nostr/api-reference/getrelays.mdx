@@ -1,0 +1,29 @@
+---
+title: getRelays
+---
+
+# getRelays
+
+### 方法
+
+```typescript
+async function getRelays(): { [url: string]: {read: boolean, write: boolean} }
+```
+
+### 响应
+
+返回中继 URL 到中继策略的基本映射
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const event = async provider.getRelays()
+
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/vYbzmoJ" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

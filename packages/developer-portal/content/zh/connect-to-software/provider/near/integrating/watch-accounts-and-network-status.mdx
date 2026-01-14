@@ -1,0 +1,35 @@
+---
+title: 监听账户和网络状态
+---
+
+# 监听账户和网络状态
+
+OneKey provider 会发出一些事件，你可以监听已连接账户或网络的变化，并更新 Web 应用的状态。
+
+### 添加事件监听器
+
+```javascript
+// accountsChanged
+const onAccountsChanged = (payload) => {
+  const accountId = payload?.accounts?.[0]?.accountId || '';
+  console.log('onAccountsChanged', accountId);
+}
+provider.on('accountsChanged', onAccountsChanged);
+
+
+// networkChanged
+const onNetworkChanged = (payload) => {
+  console.log('onNetworkChanged', payload.networkId);
+}
+provider.on('networkChanged', onNetworkChanged);
+```
+
+### 移除事件监听器
+
+另外，当你完成监听后不要忘记移除监听器（例如在 React 组件卸载时）：
+
+```javascript
+provider.off('accountsChanged', onAccountsChanged);
+provider.off('networkChanged', onNetworkChanged);
+```
+

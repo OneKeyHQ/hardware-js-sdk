@@ -1,0 +1,110 @@
+---
+title: eth_estimateGas
+description: Estimate gas required for a transaction
+---
+
+# eth_estimateGas
+
+Generates and returns an estimate of how much gas is necessary to allow the transaction to complete. The transaction will not be added to the blockchain.
+
+---
+
+## Parameters
+
+| Index | Type | Description |
+|-------|------|-------------|
+| 0 | `object` | Transaction object |
+| 1 | `string` | Block number or tag (optional) |
+
+### Transaction Object
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `from` | `string` | No | Sender address |
+| `to` | `string` | No | Recipient address |
+| `data` | `string` | No | Contract call data |
+| `value` | `string` | No | Value in wei (hex) |
+| `gas` | `string` | No | Gas limit (hex) |
+| `gasPrice` | `string` | No | Gas price (hex) |
+
+---
+
+## Returns
+
+`string` - The estimated gas amount (hex)
+
+---
+
+## Example
+
+### Estimate ETH Transfer
+
+```typescript
+const gasEstimate = await window.$onekey.ethereum.request({
+  method: 'eth_estimateGas',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xRecipientAddress...',
+    value: '0xDE0B6B3A7640000' // 1 ETH
+  }]
+})
+
+console.log('Estimated gas:', parseInt(gasEstimate, 16))
+// Simple ETH transfer: ~21000
+```
+
+### Estimate Contract Call
+
+```typescript
+const gasEstimate = await window.$onekey.ethereum.request({
+  method: 'eth_estimateGas',
+  params: [{
+    from: '0xYourAddress...',
+    to: '0xContractAddress...',
+    data: '0xa9059cbb...' // transfer(address,uint256)
+  }]
+})
+
+console.log('Estimated gas:', parseInt(gasEstimate, 16))
+```
+
+### Add Safety Buffer
+
+```typescript
+async function estimateGasWithBuffer(tx, bufferPercent = 20) {
+  const estimate = await window.$onekey.ethereum.request({
+    method: 'eth_estimateGas',
+    params: [tx]
+  })
+
+  const gas = parseInt(estimate, 16)
+  const bufferedGas = Math.ceil(gas * (1 + bufferPercent / 100))
+
+  return '0x' + bufferedGas.toString(16)
+}
+
+const safeGasLimit = await estimateGasWithBuffer({
+  from: accounts[0],
+  to: contractAddress,
+  data: encodedData
+})
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32000 | Execution reverted | Transaction would fail |
+| -32000 | Insufficient funds | Not enough balance |
+| -32602 | Invalid params | Invalid transaction parameters |
+
+---
+
+## Notes
+
+- The estimate may not be exact; transactions can use more or less gas
+- Add a buffer (10-20%) to the estimate for safety
+- If estimation fails, the transaction would likely fail too
+- Estimation considers the current blockchain state

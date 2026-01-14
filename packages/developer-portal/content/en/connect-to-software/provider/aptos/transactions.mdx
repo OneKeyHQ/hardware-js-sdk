@@ -1,0 +1,153 @@
+---
+title: Transactions
+description: Send transactions on Aptos using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Transactions
+
+Learn how to sign and submit transactions on Aptos.
+
+---
+
+## Sign and Submit Transaction
+
+```typescript
+// Simple APT transfer
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: [
+    '0x1234...', // Recipient address
+    '100000000', // Amount in Octas (1 APT = 100000000 Octas)
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+
+console.log('Transaction hash:', response.hash)
+```
+
+---
+
+## Sign Transaction (Without Submitting)
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::coin::transfer',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: ['0x1234...', '100000000'],
+}
+
+const signedTxn = await provider.signTransaction(payload)
+
+// Submit later using Aptos SDK
+// const pendingTxn = await client.submitTransaction(signedTxn)
+```
+
+---
+
+## Sign Transaction V2 (BCS Serialized)
+
+For advanced use cases with BCS-serialized transactions:
+
+```typescript
+import { BCS } from 'aptos'
+
+const rawTransaction = /* BCS serialized raw transaction */
+
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'simple', // 'simple' or 'multi_agent'
+  asFeePayer: false,
+})
+```
+
+---
+
+## Transaction Options
+
+```typescript
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x1::aptos_account::transfer',
+  type_arguments: [],
+  arguments: ['0x1234...', '100000000'],
+}
+
+const options = {
+  max_gas_amount: '10000',
+  gas_unit_price: '100',
+  expiration_timestamp_secs: Math.floor(Date.now() / 1000) + 600, // 10 min
+}
+
+const response = await provider.signAndSubmitTransaction(payload, options)
+```
+
+---
+
+## Smart Contract Interaction
+
+### Call View Function
+
+```typescript
+// View functions don't require signing
+const result = await client.view({
+  function: '0x1::coin::balance',
+  type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  arguments: [accountAddress],
+})
+
+console.log('Balance:', result[0])
+```
+
+### Call Entry Function
+
+```typescript
+// Mint NFT example
+const payload = {
+  type: 'entry_function_payload',
+  function: '0x3::token::create_collection_script',
+  type_arguments: [],
+  arguments: [
+    'My Collection',           // Collection name
+    'Description',             // Description
+    'https://example.com',     // URI
+    '1000',                    // Maximum supply
+    [false, false, false],     // Mutability config
+  ],
+}
+
+const response = await provider.signAndSubmitTransaction(payload)
+```
+
+---
+
+## Multi-Agent Transactions
+
+For transactions requiring multiple signers:
+
+```typescript
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'multi_agent',
+})
+```
+
+---
+
+## Fee Payer Transactions
+
+Sign as a fee payer for sponsored transactions:
+
+```typescript
+const signedTxn = await provider.signTransactionV2({
+  transaction: rawTransaction,
+  transactionType: 'simple',
+  asFeePayer: true,
+})
+```
+

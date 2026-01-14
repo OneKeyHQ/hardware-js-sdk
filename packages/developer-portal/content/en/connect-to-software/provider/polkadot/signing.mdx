@@ -1,0 +1,167 @@
+---
+title: Signing
+description: Sign transactions and messages on Polkadot using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Signing
+
+Learn how to sign transactions and messages on Polkadot.
+
+---
+
+## Sign Transaction Payload
+
+Sign extrinsic payloads:
+
+```typescript
+import { web3FromAddress } from '@polkadot/extension-dapp'
+
+// Get injector for specific account
+const injector = await web3FromAddress(accountAddress)
+
+// Sign payload
+const payload = {
+  address: accountAddress,
+  blockHash: '0x...',
+  blockNumber: '0x...',
+  era: '0x...',
+  genesisHash: '0x...',
+  method: '0x...',
+  nonce: '0x...',
+  specVersion: '0x...',
+  tip: '0x...',
+  transactionVersion: '0x...',
+  signedExtensions: [...],
+  version: 4,
+}
+
+const result = await provider.web3SignPayload(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature, // Hex signature
+})
+```
+
+---
+
+## Sign Raw Message
+
+```typescript
+const payload = {
+  address: accountAddress,
+  data: '0x48656c6c6f', // Hex-encoded message
+  type: 'bytes',
+}
+
+const result = await provider.web3SignRaw(payload)
+
+console.log({
+  id: result.id,
+  signature: result.signature,
+})
+```
+
+---
+
+## Listen for Transaction Events
+
+```typescript
+await tx.signAndSend(
+  account.address,
+  { signer: injector.signer },
+  ({ status, events }) => {
+    if (status.isInBlock) {
+      console.log('In block:', status.asInBlock.toHex())
+    }
+    if (status.isFinalized) {
+      console.log('Finalized:', status.asFinalized.toHex())
+
+      events.forEach(({ event }) => {
+        if (api.events.system.ExtrinsicSuccess.is(event)) {
+          console.log('Transaction succeeded')
+        }
+        if (api.events.system.ExtrinsicFailed.is(event)) {
+          console.log('Transaction failed')
+        }
+      })
+    }
+  }
+)
+```
+
+---
+
+## RPC Methods
+
+### Send RPC Request
+
+```typescript
+const response = await provider.web3RpcSend({
+  method: 'chain_getHeader',
+  params: [],
+})
+
+console.log('Latest header:', response.result)
+```
+
+### Subscribe to RPC Events
+
+```typescript
+const subscriptionId = await provider.web3RpcSubscribe(
+  {
+    method: 'chain_subscribeNewHeads',
+    params: [],
+  },
+  (response) => {
+    console.log('New block:', response.result)
+  }
+)
+
+// Unsubscribe later
+await provider.web3RpcUnSubscribe()
+```
+
+---
+
+## Error Handling
+
+```typescript
+try {
+  const result = await provider.web3SignPayload(payload)
+} catch (error) {
+  if (error.message === 'Cancelled') {
+    console.log('User cancelled signing')
+  } else {
+    console.error('Signing failed:', error)
+  }
+}
+```
+
+---
+
+## Using with React
+
+```tsx
+import { useState, useEffect } from 'react'
+import { web3Enable, web3Accounts } from '@polkadot/extension-dapp'
+
+function usePolkadotWallet() {
+  const [accounts, setAccounts] = useState([])
+  const [isConnected, setIsConnected] = useState(false)
+
+  const connect = async () => {
+    const extensions = await web3Enable('My dApp')
+    if (extensions.length > 0) {
+      const allAccounts = await web3Accounts()
+      setAccounts(allAccounts)
+      setIsConnected(true)
+    }
+  }
+
+  return { accounts, isConnected, connect }
+}
+```
+

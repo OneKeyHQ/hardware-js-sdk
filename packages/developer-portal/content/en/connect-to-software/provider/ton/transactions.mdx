@@ -1,0 +1,179 @@
+---
+title: Transactions
+description: Send transactions on TON using OneKey
+---
+
+import { Callout } from 'nextra/components'
+
+# Transactions
+
+Learn how to send transactions on TON.
+
+---
+
+## Send Transaction
+
+Send TON using the `send` method with `sendTransaction`:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600, // 10 min validity
+      messages: [
+        {
+          address: '0:1234...', // Recipient address (raw format)
+          amount: '1000000000', // Amount in nanotons (1 TON = 10^9 nanotons)
+        }
+      ]
+    })
+  ]
+})
+
+if ('result' in result) {
+  console.log('Transaction BOC:', result.result)
+} else {
+  console.error('Transaction failed:', result.error.message)
+}
+```
+
+---
+
+## Send Multiple Messages
+
+TON supports up to 4 messages per transaction:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient1...',
+          amount: '500000000', // 0.5 TON
+        },
+        {
+          address: '0:recipient2...',
+          amount: '300000000', // 0.3 TON
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## Send with Payload
+
+Include a payload for smart contract interactions:
+
+```typescript
+import { beginCell } from '@ton/core'
+
+// Create a comment cell
+const comment = beginCell()
+  .storeUint(0, 32) // comment op code
+  .storeStringTail('Hello from dApp!')
+  .endCell()
+
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:recipient...',
+          amount: '100000000',
+          payload: comment.toBoc().toString('base64'),
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## Send with StateInit
+
+Deploy a contract or initialize state:
+
+```typescript
+const result = await provider.send({
+  method: 'sendTransaction',
+  id: Date.now().toString(),
+  params: [
+    JSON.stringify({
+      valid_until: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: '0:contract...',
+          amount: '50000000',
+          stateInit: stateInitBoc.toString('base64'), // Base64 encoded StateInit
+        }
+      ]
+    })
+  ]
+})
+```
+
+---
+
+## Send Transaction with SDK
+
+```tsx
+import { useTonConnectUI } from '@tonconnect/ui-react'
+
+function SendButton() {
+  const [tonConnectUI] = useTonConnectUI()
+
+  const handleSend = async () => {
+    const result = await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 600,
+      messages: [
+        {
+          address: 'EQA...',
+          amount: '1000000000',
+        }
+      ]
+    })
+    console.log('BOC:', result.boc)
+  }
+
+  return <button onClick={handleSend}>Send 1 TON</button>
+}
+```
+
+---
+
+## Address Formats
+
+TON uses different address formats:
+
+```typescript
+import { Address } from '@ton/core'
+
+// Raw format (used in provider)
+const raw = '0:1234567890abcdef...'
+
+// User-friendly format (bounceable)
+const friendly = Address.parse(raw).toString()
+// e.g., 'EQASdf...'
+
+// Non-bounceable format
+const nonBounceable = Address.parse(raw).toString({ bounceable: false })
+// e.g., 'UQASdf...'
+
+// Convert from friendly to raw
+const addr = Address.parse('EQASdf...')
+const rawAddress = `${addr.workChain}:${addr.hash.toString('hex')}`
+```
+

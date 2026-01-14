@@ -1,0 +1,54 @@
+---
+title: Bitcoin (PSBT)
+---
+
+# Bitcoin (PSBT)
+
+使用动画 UR 码进行 PSBT 离线签名。
+
+## 数据类型
+
+- 请求/响应 UR 类型：`crypto-psbt`
+- 另见：[基础 API](../basic-api)（UR 原语和数据结构）
+
+## 流程
+
+1. 使用钱包后端构建未签名的 PSBT
+2. 将 PSBT 编码为 UR（`crypto-psbt`），显示为动画二维码
+3. 设备扫描 → 返回已签名的 PSBT（`crypto-psbt`）
+4. 完成并广播
+
+> **提示**：保持 PSBT 大小在实际二维码限制内；根据需要拆分为多帧。
+
+## 示例
+
+### 编码未签名 PSBT → 动画二维码
+
+```ts
+import { CryptoPSBT } from '@keystonehq/bc-ur-registry-btc';
+import { airGapUrUtils } from '@keystonehq/keystone-sdk';
+
+const psbtBytes = Buffer.from(unsignedPsbtBase64, 'base64');
+const req = CryptoPSBT.fromPSBT(psbtBytes); // 或 new CryptoPSBT(psbtBytes)
+const ur = req.toUR();
+const frames = airGapUrUtils.urToQrcode(ur); // 在 UI 中渲染帧
+```
+
+### 解码动画二维码 → 已签名 PSBT
+
+```ts
+import { URDecoder } from '@ngraveio/bc-ur';
+import { CryptoPSBT } from '@keystonehq/bc-ur-registry-btc';
+
+const dec = new URDecoder();
+// 对于从相机扫描的每个帧字符串：
+// dec.receivePart(frameString)
+
+if (dec.isComplete()) {
+  const ur = dec.resultUR();              // ur.type 应为 'crypto-psbt'
+  const psbt = CryptoPSBT.fromCBOR(ur.cbor);
+  const signedPsbt = psbt.getPSBT();      // 已签名（或部分签名）的 PSBT Buffer
+  // 使用后端完成并广播
+}
+```
+

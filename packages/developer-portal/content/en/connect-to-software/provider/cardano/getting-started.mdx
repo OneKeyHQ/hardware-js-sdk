@@ -1,0 +1,160 @@
+---
+title: Getting Started
+description: Connect to Cardano using OneKey's CIP-30 compatible provider
+---
+
+import { Callout } from 'nextra/components'
+
+# Getting Started
+
+Learn how to detect, connect, and interact with Cardano using OneKey's provider.
+
+<Callout type="info">
+OneKey implements CIP-30 (Cardano dApp Connector), ensuring compatibility with all Cardano dApps. It also provides Nami wallet compatibility.
+</Callout>
+
+---
+
+## Provider Detection
+
+```typescript
+// OneKey provides both onekey and nami interfaces
+const onekey = window.cardano?.onekey
+const nami = window.cardano?.nami
+
+// Check availability
+if (!onekey) {
+  throw new Error('OneKey Cardano provider not detected')
+}
+
+// Get wallet info
+console.log('Name:', onekey.name) // 'OneKey'
+console.log('API Version:', onekey.apiVersion) // '0.1.0'
+console.log('Icon:', onekey.icon)
+```
+
+---
+
+## Enable Wallet
+
+```typescript
+// Request wallet access
+const api = await window.cardano.onekey.enable()
+
+// Now you can use the full API
+const networkId = await api.getNetworkId()
+console.log('Network:', networkId === 1 ? 'Mainnet' : 'Testnet')
+```
+
+---
+
+## Check if Enabled
+
+```typescript
+const isEnabled = await window.cardano.onekey.isEnabled()
+
+if (isEnabled) {
+  const api = await window.cardano.onekey.enable()
+  // Use API...
+}
+```
+
+---
+
+## Get Network ID
+
+```typescript
+const api = await window.cardano.onekey.enable()
+const networkId = await api.getNetworkId()
+
+// 0 = Testnet, 1 = Mainnet
+console.log('Network:', networkId)
+```
+
+---
+
+## Get Balance
+
+```typescript
+const balance = await api.getBalance()
+// Returns CBOR-encoded value (hex string)
+console.log('Balance (CBOR):', balance)
+
+// Decode using cardano-serialization-lib
+import { Value } from '@emurgo/cardano-serialization-lib-browser'
+const value = Value.from_bytes(Buffer.from(balance, 'hex'))
+const lovelace = value.coin().to_str()
+console.log('Balance:', parseInt(lovelace) / 1000000, 'ADA')
+```
+
+---
+
+## Get Addresses
+
+```typescript
+// Get used addresses (addresses with transaction history)
+const usedAddresses = await api.getUsedAddresses()
+console.log('Used addresses:', usedAddresses)
+
+// Get unused addresses (fresh addresses)
+const unusedAddresses = await api.getUnusedAddresses()
+console.log('Unused addresses:', unusedAddresses)
+
+// Get change address
+const changeAddress = await api.getChangeAddress()
+console.log('Change address:', changeAddress)
+
+// Get reward/staking addresses
+const rewardAddresses = await api.getRewardAddresses()
+console.log('Reward addresses:', rewardAddresses)
+```
+
+---
+
+## Get UTxOs
+
+```typescript
+// Get all UTxOs
+const utxos = await api.getUtxos()
+console.log('UTxOs:', utxos)
+
+// Get UTxOs with minimum amount
+const utxosWithAmount = await api.getUtxos(
+  '1000000' // Minimum 1 ADA in lovelace (CBOR encoded)
+)
+
+// With pagination
+const paginatedUtxos = await api.getUtxos(undefined, {
+  page: 0,
+  limit: 10,
+})
+```
+
+---
+
+## Event Handling
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+// Nami-compatible event API
+api.experimental.on('accountChange', (addresses) => {
+  console.log('Account changed:', addresses)
+})
+```
+
+---
+
+## Nami Compatibility
+
+OneKey provides Nami wallet compatibility:
+
+```typescript
+// Access via Nami interface
+const nami = window.cardano.nami
+const api = await nami.enable()
+
+// Same API as OneKey
+const balance = await api.getBalance()
+```
+

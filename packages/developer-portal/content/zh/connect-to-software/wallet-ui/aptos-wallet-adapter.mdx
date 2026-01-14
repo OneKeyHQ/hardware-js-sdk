@@ -1,0 +1,233 @@
+---
+title: Aptos Wallet Adapter
+description: 在 React dApp 中集成 OneKey 与 Aptos Wallet Adapter
+---
+
+import { Callout } from 'nextra/components'
+
+# Aptos Wallet Adapter
+
+Aptos 官方的 React 钱包连接库。OneKey 通过 Wallet Standard 自动被检测，无需额外配置。
+
+<Callout type="info">
+OneKey 会被 Aptos Wallet Adapter 自动检测。钱包会直接出现在连接弹窗中，无需额外设置。
+</Callout>
+
+---
+
+## 安装
+
+```bash
+npm install @aptos-labs/wallet-adapter-react @aptos-labs/ts-sdk
+```
+
+---
+
+## 基础设置
+
+使用 `AptosWalletAdapterProvider` 包裹你的应用：
+
+```tsx filename="App.tsx"
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider autoConnect={true}>
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+---
+
+## 钱包连接
+
+### 连接按钮
+
+```tsx filename="ConnectButton.tsx"
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+
+function ConnectButton() {
+  const { connect, disconnect, account, connected, wallets } = useWallet()
+
+  if (connected && account) {
+    return (
+      <div>
+        <p>已连接: {account.address.slice(0, 6)}...{account.address.slice(-4)}</p>
+        <button onClick={disconnect}>断开连接</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {wallets?.map((wallet) => (
+        <button
+          key={wallet.name}
+          onClick={() => connect(wallet.name)}
+        >
+          <img src={wallet.icon} alt={wallet.name} width={24} />
+          {wallet.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+```
+
+### 钱包选择弹窗
+
+如需更精美的 UI，可以使用内置的弹窗组件或自定义：
+
+```tsx filename="WalletModal.tsx"
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { useState } from 'react'
+
+function WalletModal() {
+  const { wallets, connect } = useWallet()
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <>
+      <button onClick={() => setIsOpen(true)}>连接钱包</button>
+
+      {isOpen && (
+        <div className="modal">
+          <h2>选择钱包</h2>
+          {wallets?.map((wallet) => (
+            <button
+              key={wallet.name}
+              onClick={() => {
+                connect(wallet.name)
+                setIsOpen(false)
+              }}
+            >
+              <img src={wallet.icon} alt={wallet.name} width={24} />
+              {wallet.name}
+            </button>
+          ))}
+          <button onClick={() => setIsOpen(false)}>关闭</button>
+        </div>
+      )}
+    </>
+  )
+}
+```
+
+---
+
+## 交易
+
+### 签名并提交交易
+
+```tsx
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { Aptos, AptosConfig, Network } from '@aptos-labs/ts-sdk'
+
+function TransferAPT() {
+  const { account, signAndSubmitTransaction } = useWallet()
+
+  const config = new AptosConfig({ network: Network.MAINNET })
+  const aptos = new Aptos(config)
+
+  const handleTransfer = async () => {
+    if (!account) return
+
+    const response = await signAndSubmitTransaction({
+      sender: account.address,
+      data: {
+        function: '0x1::aptos_account::transfer',
+        functionArguments: [
+          '0x1234...', // 接收地址
+          100000000,   // 金额（单位: octas，1 APT = 100000000）
+        ],
+      },
+    })
+
+    // 等待交易确认
+    const result = await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    })
+
+    console.log('交易已确认:', result)
+  }
+
+  return <button onClick={handleTransfer}>转账 APT</button>
+}
+```
+
+### 签名消息
+
+```tsx
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+
+function SignMessage() {
+  const { signMessage, account } = useWallet()
+
+  const handleSign = async () => {
+    const response = await signMessage({
+      message: '欢迎使用 My dApp!',
+      nonce: crypto.randomUUID(),
+    })
+
+    console.log('签名:', response.signature)
+    console.log('完整消息:', response.fullMessage)
+  }
+
+  return <button onClick={handleSign}>签名消息</button>
+}
+```
+
+---
+
+## 网络配置
+
+在 Provider 中配置网络：
+
+```tsx
+import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+import { Network } from '@aptos-labs/ts-sdk'
+
+function App() {
+  return (
+    <AptosWalletAdapterProvider
+      autoConnect={true}
+      dappConfig={{
+        network: Network.MAINNET,
+        // 可选: 指定额外的网络配置
+        aptosApiKeys: {
+          [Network.MAINNET]: 'YOUR_API_KEY',
+          [Network.TESTNET]: 'YOUR_TESTNET_KEY',
+        },
+      }}
+    >
+      <YourApp />
+    </AptosWalletAdapterProvider>
+  )
+}
+```
+
+---
+
+## Hooks 参考
+
+| Hook | 描述 |
+|------|------|
+| `useWallet()` | 钱包连接和交易的主要 Hook |
+| `account` | 当前连接的账户 |
+| `connected` | 连接状态 |
+| `wallets` | 可用钱包列表 |
+| `connect(walletName)` | 连接到指定钱包 |
+| `disconnect()` | 断开当前钱包 |
+| `signAndSubmitTransaction(payload)` | 签名并提交交易 |
+| `signMessage(request)` | 签名任意消息 |
+| `network` | 当前网络信息 |
+
+---
+
+## 相关资源
+
+- [Aptos Wallet Adapter 官方文档](https://aptos.dev/en/build/sdks/wallet-adapter)
+- [Aptos TypeScript SDK](https://aptos.dev/en/build/sdks/ts-sdk)
+- [Aptos Provider API](/zh/connect-to-software/provider/aptos)

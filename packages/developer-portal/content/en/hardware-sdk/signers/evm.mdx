@@ -1,0 +1,314 @@
+---
+title: EVM Signer
+---
+
+# EVM Signer
+
+End-to-end EVM signing guide. Covers address confirmation, EIP‑1559/Legacy transactions, personal_sign, and EIP‑712 typed data. Content is aligned with hardware-js-sdk behavior (Promise responses + UI events) and mirrors the Chinese page.
+
+## Index
+
+1. [How it works](#how-it-works)
+2. [Installation](#installation)
+3. [Initialization](#initialization)
+4. [Common scenarios](#common-scenarios)
+   - [Get Address](#scenario-1-get-address)
+   - [Sign Transaction (1559 / Legacy)](#scenario-2-sign-transaction)
+   - [Sign Message (personal_sign)](#scenario-3-sign-message)
+   - [Sign Typed Data (EIP-712)](#scenario-4-sign-typed-data)
+5. [Interaction & Status](#interaction--status)
+6. [Examples](#examples)
+7. [Validation & Troubleshooting](#validation--troubleshooting)
+
+## How it works
+
+- `HardwareSDK` talks to the OneKey device app; APIs return `Promise<{ success, payload }>`.
+- User interaction is driven by `UI_REQUEST` events (PIN, passphrase, confirm address/tx/message/typed data/app open).
+- The device shows path/account, recipient, amount, chainId, fee summary; long `data` is often summarized as a hash.
+- Host serializes and verifies with `ethers`/`viem`, then broadcasts via RPC.
+
+## Installation
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## Initialization
+
+- Keep firmware up to date; Web requires HTTPS + user gestures; BLE needs proper permission.
+- Before signing, call `evmGetAddress(showOnOneKey: true)` once to confirm path/account on device.
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+const [{ connectId }] = await HardwareSDK.searchDevices();
+const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+```
+
+## Common scenarios
+
+### Scenario 1: Get Address
+
+```ts
+const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  showOnOneKey: true,
+  chainId: 1,
+});
+// res.payload.address, publicKey?, chainCode?
+```
+
+**Parameters**
+
+- `path` (string | number[]): required; BIP44 path.
+- `showOnOneKey?` (boolean): optional; display and confirm on device.
+- `chainId?` (number): optional; chainId shown on device.
+
+**Returns**
+
+```ts
+Promise<{ success, payload: { address, path, publicKey?, chainCode? } }>
+```
+
+---
+
+### Scenario 2: Sign Transaction
+
+Supports EIP‑1559 (`type: 2`) and Legacy.
+
+```ts
+const { success, payload } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: tx,
+  chainId: 1,
+  keepSession: true,
+  domain: 'ens.example', // optional
+});
+// payload: { v, r, s }
+```
+
+**Parameters**
+
+- `path`: required.
+- `transaction`: required.
+  - 1559: `to` `value` `data` `nonce` `gasLimit` `maxFeePerGas` `maxPriorityFeePerGas` `chainId` `type: 2`
+  - Legacy: `to` `value` `data` `nonce` `gasLimit` `gasPrice` `chainId`
+- `chainId`: required.
+- `keepSession?`: optional; reuse session for multiple calls.
+- `domain?`: optional; domain label (e.g., ENS) for device display.
+
+**Returns**
+
+```ts
+Promise<{ success, payload: { v, r, s } }>
+```
+
+---
+
+### Scenario 3: Sign Message (personal_sign)
+
+```ts
+const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  messageHex,
+  chainId: 1,
+});
+// res.payload.signature
+```
+
+**Parameters**
+
+- `path`: required.
+- `messageHex`: required; message to hex (with/without `0x`).
+- `chainId?`: optional; shown on device.
+
+**Returns**
+
+```ts
+Promise<{ success, payload: { signature } }>
+```
+
+---
+
+### Scenario 4: Sign Typed Data (EIP-712)
+
+```ts
+const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  data: typedData,
+  chainId: 1,
+});
+// res.payload.signature
+```
+
+**Parameters**
+
+- `path`: required.
+- `data`: required; EIP‑712 JSON v4 with `domain/types/primaryType/message`.
+- `chainId`: required.
+
+TypedData shape:
+
+```ts
+interface TypedData {
+  domain: {
+    name?: string;
+    version?: string;
+    chainId?: number;
+    verifyingContract?: string;
+    salt?: string;
+  };
+  types: Record<string, Array<{ name: string; type: string }>>;
+  primaryType: string;
+  message: Record<string, unknown>;
+}
+```
+
+**Returns**
+
+```ts
+Promise<{ success, payload: { signature } }>
+```
+
+## Interaction & Status
+
+- APIs resolve when the operation finishes; user prompts are surfaced via `UI_REQUEST` events.
+- Common prompts: unlock device, open EVM app, verify address, sign transaction, sign personal message, sign typed data.
+- For repeated calls, use `keepSession` to reduce PIN/passphrase prompts; run calls serially per device.
+
+## Examples
+
+### EIP-1559 transaction
+
+```ts
+import HardwareSDK, { UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
+import { serialize, TransactionTypes } from '@ethersproject/transactions';
+
+await HardwareSDK.init({ env: 'webusb', debug: false });
+
+const [{ connectId }] = await HardwareSDK.searchDevices();
+const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+
+HardwareSDK.on(UI_REQUEST.REQUEST_PIN, () => {
+  // Prompt PIN (prefer on-device); then call uiResponse if needed
+});
+
+const accountPath = "m/44'/60'/0'/0/0";
+await HardwareSDK.evmGetAddress(connectId, deviceId, { path: accountPath, showOnOneKey: true });
+
+const tx = {
+  to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+  value: '0x0',
+  data: '0x',
+  nonce: '0x0',
+  gasLimit: '0x5208',
+  maxFeePerGas: '0x3b9aca00',
+  maxPriorityFeePerGas: '0x59682f00',
+  chainId: 1,
+};
+
+const { success, payload: sig } = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: accountPath,
+  transaction: tx,
+  chainId: 1,
+  keepSession: true,
+});
+
+const rawTx = serialize({ ...tx, type: TransactionTypes.eip1559 }, {
+  r: sig.r,
+  s: sig.s,
+  v: Number(sig.v),
+});
+
+// Broadcast with your RPC provider, e.g. ethers.js provider.sendTransaction(rawTx)
+```
+
+### Legacy transaction (gasPrice)
+
+```ts
+const legacyTx = {
+  to: '0xRecipient',
+  value: '0x2386f26fc10000', // 0.01 ETH
+  data: '0x',
+  nonce: '0x1',
+  gasLimit: '0x5208',
+  gasPrice: '0x3b9aca00', // 1 gwei
+  chainId: 1,
+};
+
+const sig = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: accountPath,
+  transaction: legacyTx,
+  chainId: 1,
+});
+```
+
+### Message (personal_sign / EIP-191)
+
+```ts
+const message = 'Hello OneKey';
+const messageHex = Buffer.from(message).toString('hex');
+
+const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
+  path: accountPath,
+  messageHex,
+  chainId: 1,
+});
+// res.payload.signature -> verify with ethers.verifyMessage(message, signature)
+```
+
+### Typed data (EIP-712)
+
+```ts
+const typedData = {
+  types: {
+    EIP712Domain: [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person' },
+      { name: 'contents', type: 'string' },
+    ],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' },
+    ],
+  },
+  primaryType: 'Mail',
+  domain: {
+    name: 'Ether Mail',
+    version: '1',
+    chainId: 1,
+    verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+  },
+  message: {
+    from: { name: 'Cow', wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826' },
+    to: { name: 'Bob', wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB' },
+    contents: 'Hello, Bob!',
+  },
+};
+
+const res = await HardwareSDK.evmSignTypedData(connectId, deviceId, {
+  path: accountPath,
+  data: typedData,
+  chainId: 1,
+});
+// res.payload.signature -> recover with ethers.verifyTypedData(domain, types, message, signature)
+```
+
+## Validation & Troubleshooting
+
+- Verify on device: path/account, recipient, amount, chainId, fee summary; ensure they match your UI.
+- Gas: 1559 requires `maxFeePerGas + maxPriorityFeePerGas`; Legacy uses `gasPrice` only.
+- Message/Typed Data: show clear summaries/hashes in UI to avoid phishing; recover signer with `ethers.verifyMessage` / `ethers.verifyTypedData`.
+- Common issues:
+  - Path mismatch: default `m/44'/60'/0'/0/0`, increment account/address as needed; confirm once with `showOnOneKey`.
+- ChainId mismatch: must match the target network.
+- Large `data` may be rejected; simplify if necessary.
+- Repeated passphrase prompts: combine `keepSession` with passphrase state and serialize calls per device.
+- User reject/timeout: surface retry/cancel; do not auto-replay.
+See chain docs: [evmSignTransaction](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) · [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) · [evmSignTypedData](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntypeddata).

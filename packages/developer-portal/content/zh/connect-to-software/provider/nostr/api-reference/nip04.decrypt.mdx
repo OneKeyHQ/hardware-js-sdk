@@ -1,0 +1,35 @@
+---
+title: nip04.decrypt
+---
+
+# nip04.decrypt
+
+### 方法
+
+```
+async function nip04.decrypt(pubkey, message): string
+```
+
+### 参数
+
+* `pubkey` — _必填_ `string` 公钥
+* `message` — _必填_ `string` 要解密的字符串
+
+### 响应
+
+返回 NIP-04 规范中指定的解密文本
+
+### 示例
+
+```javascript
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const message = "要加密的数据";
+const encrypted = await provider.nip04.encrypt(pubkey, message);
+const decrypted = await provider.nip04.decrypt(pubkey, encrypted); // 要加密的数据
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/rNPZwaa" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

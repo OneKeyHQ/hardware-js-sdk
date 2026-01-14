@@ -1,0 +1,75 @@
+---
+title: personal_sign
+description: Sign a message with an Ethereum account
+---
+
+# personal_sign
+
+Signs a message with the specified account. The message is prefixed with `"\x19Ethereum Signed Message:\n"` before signing to prevent signing malicious transactions.
+
+---
+
+## Parameters
+
+| Index | Type | Description |
+|-------|------|-------------|
+| 0 | `string` | Message to sign (hex encoded) |
+| 1 | `string` | Address to sign with |
+
+---
+
+## Returns
+
+`string` - The signature (65-byte hex string)
+
+---
+
+## Example
+
+```typescript
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Buffer.from(message, 'utf8').toString('hex')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+console.log('Signature:', signature)
+```
+
+### Using ethers.js
+
+```typescript
+import { hashMessage, recoverAddress } from 'ethers'
+
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Buffer.from(message, 'utf8').toString('hex')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+// Verify signature
+const recoveredAddress = recoverAddress(hashMessage(message), signature)
+console.log('Verified:', recoveredAddress === accounts[0])
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User rejected the request | User denied the signature request |
+| -32602 | Invalid params | Invalid message or address |
+
+---
+
+## Notes
+
+- Message must be hex encoded with `0x` prefix
+- The actual signed message is: `"\x19Ethereum Signed Message:\n" + len(message) + message`
+- For signing typed data, use [eth_signTypedData_v4](./eth_signTypedData_v4) instead
+- Specified by [EIP-191](https://eips.ethereum.org/EIPS/eip-191)

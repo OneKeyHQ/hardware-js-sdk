@@ -1,0 +1,129 @@
+---
+title: Getting Started
+description: Connect to Algorand using OneKey's provider
+---
+
+import { Callout } from 'nextra/components'
+
+# Getting Started
+
+Learn how to detect, connect, and interact with Algorand using OneKey's provider.
+
+<Callout type="info">
+OneKey's Algorand provider supports both legacy and ARC-0001 compliant interfaces.
+</Callout>
+
+---
+
+## Provider Detection
+
+```typescript
+// Detect OneKey Algorand provider
+const provider = window.$onekey?.algo
+
+if (!provider) {
+  throw new Error('OneKey Algorand provider not detected')
+}
+
+// Check compatibility
+console.log('isOneKey:', provider.isOneKey) // true
+```
+
+---
+
+## Connect (Legacy API)
+
+```typescript
+const { address } = await provider.connect()
+console.log('Connected:', address)
+
+// Check connection status
+console.log('isConnected:', provider.isConnected)
+console.log('Address:', provider.address)
+```
+
+---
+
+## Enable (ARC-0001)
+
+```typescript
+const result = await provider.enable({
+  genesisID: 'mainnet-v1.0',
+  genesisHash: 'wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=',
+})
+
+console.log('Accounts:', result.accounts)
+console.log('Genesis Hash:', result.genesisHash)
+```
+
+---
+
+## Disconnect
+
+```typescript
+await provider.disconnect()
+console.log('Disconnected')
+```
+
+---
+
+## Event Handling
+
+### Listen for Account Changes
+
+```typescript
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('Account changed:', address)
+  } else {
+    console.log('Disconnected')
+  }
+})
+```
+
+### Listen for Connection
+
+```typescript
+provider.on('connect', ({ address }) => {
+  console.log('Connected:', address)
+})
+
+provider.on('disconnect', () => {
+  console.log('Disconnected')
+})
+```
+
+---
+
+## Using with Algod Client
+
+### Get Client from Provider
+
+```typescript
+// Get pre-configured clients
+const algodClient = await provider.getAlgodv2Client()
+const indexerClient = await provider.getIndexerClient()
+
+// Use clients
+const status = await algodClient.status().do()
+console.log('Network status:', status)
+```
+
+### Manual Client Setup
+
+```typescript
+import algosdk from 'algosdk'
+
+const algodClient = new algosdk.Algodv2(
+  '', // Token (not needed for public nodes)
+  'https://mainnet-api.algonode.cloud',
+  ''
+)
+
+const indexerClient = new algosdk.Indexer(
+  '',
+  'https://mainnet-idx.algonode.cloud',
+  ''
+)
+```
+

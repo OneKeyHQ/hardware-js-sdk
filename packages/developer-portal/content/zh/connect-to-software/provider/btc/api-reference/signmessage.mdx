@@ -1,0 +1,62 @@
+---
+title: signMessage
+---
+
+# signMessage
+
+### 钱包和地址类型支持矩阵
+
+| 签名方法       | 钱包类型                  | 支持的地址类型            |
+| -------------- | ------------------------- | ------------------------- |
+| ECDSA          | 软件钱包 & 硬件钱包       | P2PKH, P2SH, P2WPKH, P2TR |
+| BIP322-Simple  | 软件钱包                  | P2WPKH, P2TR              |
+| BIP322-Simple  | 硬件钱包 (Pro, Classic1S) | P2TR                      |
+
+使用 ECDSA 或 BIP322-Simple 签名方法对消息进行签名。
+
+#### 方法
+
+```typescript
+async function signMessage(
+  message: string,
+  type?: "ecdsa" | "bip322-simple"
+): Promise<string>
+```
+
+#### 参数
+
+* `message` — _必填_ `string` 要签名的字符串
+* `type` — _可选_ `string` 签名方法类型，"ecdsa" 或 "bip322-simple"。默认为 "ecdsa"
+
+#### 返回值
+
+`signature` — `string` 签名后的消息签名
+
+#### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+// 使用 ECDSA 签名（默认）
+try {
+  const message = "Hello OneKey";
+  const signature = await provider.signMessage(message);
+  console.log("ECDSA 签名:", signature);
+} catch (e) {
+  console.error("ECDSA 签名错误:", e);
+}
+
+// 使用 BIP322-Simple 签名
+try {
+  const message = "Hello OneKey";
+  const signature = await provider.signMessage(message, "bip322-simple");
+  console.log("BIP322-Simple 签名:", signature);
+} catch (e) {
+  console.error("BIP322-Simple 签名错误:", e);
+}
+```
+
+#### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/OJdojZM" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

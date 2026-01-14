@@ -1,0 +1,56 @@
+---
+title: evmVerifyMessage
+---
+
+# evmVerifyMessage
+
+## 以太坊：验证消息
+
+请求设备使用签名者地址和签名来验证消息。
+
+```typescript
+const result = await HardwareSDK.evmVerifyMessage(connectId, deviceId, params);
+```
+
+## 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `address` - _必需_ `string` 签名者地址。"0x" 前缀是可选的
+* `messageHex` - _必需_ `string` 十六进制文本格式的已签名消息
+* `signature` - _必需_ `string` 十六进制格式的签名。"0x" 前缀是可选的
+* `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
+
+## 示例
+
+```typescript
+HardwareSDK.evmVerifyMessage(connectId, deviceId, {
+    address: "0xdA0b608bdb1a4A154325C854607c68950b4F1a34",
+    message: "Example message",
+    signature: "11dc86c631ef5d9388c5e245501d571b864af1a717cbbb3ca1f6dacbf330742957242aa52b36bbe7bb46dce6ff0ead0548cc5a5ce76d0aaed166fd40cb3fc6e51c",
+    chainId: 1
+});
+```
+
+## 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        message: "Message verified"
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误代码
+    }
+}
+```

@@ -1,0 +1,30 @@
+---
+title: switchChain
+---
+
+# switchChain
+
+Switch chain
+
+### Method
+
+```typescript
+async function switchChain(chain: string): {
+  enum: string;
+  name: string;
+  network: string;
+}
+```
+
+### Params
+
+The chain enum. e.g. `BITCOIN_MAINNET`, `BITCOIN_TESTNET`
+
+### Example
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+await provider.switchChain("BITCOIN_TESTNET");
+```
+

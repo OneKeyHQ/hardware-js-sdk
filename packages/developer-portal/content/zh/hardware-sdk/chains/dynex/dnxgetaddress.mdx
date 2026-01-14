@@ -1,0 +1,97 @@
+---
+title: dnxGetAddress
+---
+
+# dnxGetAddress
+
+### Dynex：获取地址
+
+在设备上显示由给定 BIP32 路径派生的请求地址，并将其返回给调用者。用户需要在 OneKey 上确认导出。
+
+```typescript
+const result = await HardwareSDK.dnxGetAddress(connectId, deviceId, params);
+```
+
+#### 使用要求
+
+* 固件版本要求
+  * Classic: 3.8.0
+
+#### 参数
+
+connectId: `string`
+
+* 连接的唯一标识符
+
+deviceId: `string`
+
+* 硬件设备的唯一标识符
+
+params: `object`
+
+* path: `string` - BIP32 路径（例如 "m/44'/29538'/0'/0/0"）[必需]
+* showOnOneKey: `boolean` - 是否在设备上显示地址（默认：true）
+
+批量获取地址：
+
+* bundle: 包含上述参数的对象数组
+
+#### 示例
+
+```typescript
+// 获取单个地址
+const response = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    path: "m/44'/29538'/0'/0/0",
+    showOnOneKey: true
+});
+
+// 获取多个地址
+const bundle = await HardwareSDK.dnxGetAddress('connect1', 'device1', {
+    bundle: [
+        { path: "m/44'/29538'/0'/0/0", showOnOneKey: false },
+        { path: "m/44'/29538'/0'/0/1", showOnOneKey: false }
+    ]
+});
+```
+
+#### 返回结果
+
+单个地址的成功响应：
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // Dynex 地址
+        path: string        // 使用的 BIP32 路径
+    }
+}
+```
+
+多个地址的成功响应：
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: string },
+        { address: string, path: string }
+    ]
+}
+```
+
+错误响应：
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code: number
+    }
+}
+```
+
+#### 固件要求
+
+* 最低固件版本：3.8.0

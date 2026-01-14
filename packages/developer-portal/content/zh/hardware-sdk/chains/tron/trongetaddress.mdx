@@ -1,0 +1,87 @@
+---
+title: tronGetAddress
+---
+
+# tronGetAddress
+
+## TRON：获取地址
+
+在设备上显示由给定 BIP32 路径派生的请求地址，并将其返回给调用者。用户需要在 OneKey 上确认导出。
+
+```typescript
+const response = await HardwareSDK.tronGetAddress(connectId, deviceId, params)
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+**导出单个地址**
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 5。[更多信息](../../../api-reference#hd-path)
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+
+**导出批量地址**
+
+* `bundle` - 包含 `path` 和 `showOnOneKey` 字段的对象 `Array`
+
+#### 示例
+
+显示第一个 TRON 账户的地址：
+
+```typescript
+HardwareSDK.tronGetAddress(connectId, deviceId, {
+    path: "m/44'/195'/0'/0/0"
+});
+```
+
+返回批量 TRON 地址，不在设备上显示：
+
+```typescript
+HardwareSDK.tronGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/195'/0'/0/0", showOnOneKey: false }, // 账户 1
+        { path: "m/44'/195'/1'/0/0", showOnOneKey: false }, // 账户 2
+        { path: "m/44'/195'/2'/0/0", showOnOneKey: false }  // 账户 3
+    ]
+});
+```
+
+#### 返回结果
+
+只有一个地址的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,     // 显示的地址
+        path: Array<number> // 强化路径
+    }
+}
+```
+
+按 FIFO 排序的批量地址结果
+
+```typescript
+{
+    success: true,
+    payload: [
+        { address: string, path: Array<number> }, // 账户 1
+        { address: string, path: Array<number> }, // 账户 2
+        { address: string, path: Array<number> }  // 账户 3
+    ]
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

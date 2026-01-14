@@ -1,0 +1,62 @@
+---
+title: alephiumSignTransaction
+---
+
+# alephiumSignTransaction
+
+### 使用要求
+
+* 固件版本要求
+  * Touch: 4.10.0
+
+### Alephium：签名交易
+
+使用由给定 BIP32 路径派生的私钥对 Alephium 交易进行签名。用户需要在 OneKey 设备上确认操作。
+
+```typescript
+const result = await HardwareSDK.alephiumSignTransaction(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    rawTx: "00010080004e20c1174876e80001f3bf9d774d87e65e79a72d5482da5ef35aac8d0b930b394bdd67586930f6ae7b4fd8362b0003f6bd3137b3cadbad59a73527c3b8e26429bba093722a59639f22af9d2adb477302c40de0b6b3a7640000001e98167f559360e002c3f3ceb3cc95c1dad848403f0296c76439093d2b9879ac00000000000000000000c43c7a13049ed60800001e98167f559360e002c3f3ceb3cc95c1dad848403f0296c76439093d2b9879ac00000000000000000000"
+});
+```
+
+#### 参数
+
+[可选通用参数](../../../core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 3
+* `rawTx` - _必需_ `string` 十六进制格式的原始交易
+
+#### 示例
+
+```typescript
+const response = await HardwareSDK.alephiumSignTransaction(connectId, deviceId, {
+    path: "m/44'/1234'/0'/0/0",
+    rawTx: "0x0123...",
+    scriptOpt: "p2pkh"
+});
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    signature: string,
+    address: string.
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

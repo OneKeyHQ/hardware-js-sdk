@@ -1,0 +1,75 @@
+---
+title: personal_sign
+description: 使用以太坊账户签名消息
+---
+
+# personal_sign
+
+使用指定账户签名消息。消息会自动添加 `"\x19Ethereum Signed Message:\n"` 前缀以防止签名恶意交易。
+
+---
+
+## 参数
+
+| 索引 | 类型 | 说明 |
+|------|------|------|
+| 0 | `string` | 要签名的消息（十六进制编码） |
+| 1 | `string` | 签名账户地址 |
+
+---
+
+## 返回值
+
+`string` - 签名（65 字节十六进制字符串）
+
+---
+
+## 示例
+
+```typescript
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Buffer.from(message, 'utf8').toString('hex')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+console.log('签名:', signature)
+```
+
+### 使用 ethers.js
+
+```typescript
+import { hashMessage, recoverAddress } from 'ethers'
+
+const message = 'Hello, OneKey!'
+const hexMessage = '0x' + Buffer.from(message, 'utf8').toString('hex')
+
+const signature = await window.$onekey.ethereum.request({
+  method: 'personal_sign',
+  params: [hexMessage, accounts[0]]
+})
+
+// 验证签名
+const recoveredAddress = recoverAddress(hashMessage(message), signature)
+console.log('验证通过:', recoveredAddress === accounts[0])
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| 4001 | User rejected the request | 用户拒绝签名请求 |
+| -32602 | Invalid params | 消息或地址无效 |
+
+---
+
+## 说明
+
+- 消息必须是带 `0x` 前缀的十六进制编码
+- 实际签名的消息格式为：`"\x19Ethereum Signed Message:\n" + len(message) + message`
+- 签名结构化数据请使用 [eth_signTypedData_v4](./eth_signTypedData_v4)
+- 遵循 [EIP-191](https://eips.ethereum.org/EIPS/eip-191) 规范

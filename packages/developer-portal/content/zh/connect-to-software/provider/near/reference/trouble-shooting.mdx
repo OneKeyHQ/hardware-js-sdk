@@ -1,0 +1,28 @@
+---
+title: 故障排除
+---
+
+# 故障排除
+
+在[建立连接](../integrating/establishing-a-connection)、[发送交易](../integrating/sending-transactions/README)、[签名消息](../integrating/signing-messages)或 [RPC API 调用](../integrating/rpc-api-calling)中向 OneKey 发出请求时，OneKey 可能会返回错误。以下是错误代码及其含义。这些错误代码参考了以太坊上的 [EIP-1474](https://eips.ethereum.org/EIPS/eip-1474#error-codes) 和 [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193#provider-errors)。
+
+| **错误码** | **标题**             | **描述**                                                          |
+| -------- | --------------------- | ------------------------------------------------------------------------ |
+| 4001     | 用户拒绝请求 | 用户通过 OneKey 拒绝了请求。                                |
+| 4100     | 未授权          | 请求的方法和/或账户未经用户授权。 |
+| 4500     | 请求超时       | 此 Web3 provider 的请求超时。                            |
+| -32603   | 内部错误        | OneKey 内部出现问题。                                      |
+| -32000   | 无效输入         | 参数缺失或无效。                                           |
+| -32601   | 方法未找到      | OneKey 无法识别该方法。                                    |
+
+通常，这些错误很容易解析，并且同时包含错误代码和说明。例如：
+
+```javascript
+try {
+  await provider.requestSignTransactions({ transactions: [...] });
+} catch (err) {
+  //  {code: 4100, message: 'The requested method and/or account has not been authorized by the user.'}
+}
+
+```
+

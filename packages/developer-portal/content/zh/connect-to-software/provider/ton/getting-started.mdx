@@ -1,0 +1,163 @@
+---
+title: 快速开始
+description: 使用 OneKey 的 TON Connect 兼容 Provider 连接 TON
+---
+
+import { Callout } from 'nextra/components'
+
+# 快速开始
+
+了解如何检测、连接和与 TON 进行交互。
+
+<Callout type="info">
+OneKey 实现了 TON Connect 2.0 协议，确保与所有 TON dApp 兼容。
+</Callout>
+
+---
+
+## Provider 检测
+
+```typescript
+// 检测 OneKey TON provider
+const provider = window.$onekey?.tonconnect
+
+if (!provider) {
+  throw new Error('未检测到 OneKey TON provider')
+}
+
+// 检查设备和钱包信息
+console.log('设备:', provider.deviceInfo)
+console.log('钱包:', provider.walletInfo)
+console.log('协议版本:', provider.protocolVersion) // 2
+```
+
+---
+
+## 连接钱包
+
+```typescript
+// 基本连接
+const connectEvent = await provider.connect()
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(
+    item => item.name === 'ton_addr'
+  )
+  console.log('已连接:', addressItem.address)
+} else {
+  console.error('连接失败:', connectEvent.payload.message)
+}
+```
+
+---
+
+## 使用 Manifest 连接
+
+对于生产环境应用，提供 manifest URL：
+
+```typescript
+const connectRequest = {
+  manifestUrl: 'https://yourapp.com/tonconnect-manifest.json',
+  items: [
+    { name: 'ton_addr' },
+    { name: 'ton_proof', payload: 'your-challenge-string' }
+  ]
+}
+
+const connectEvent = await provider.connect(2, connectRequest)
+
+if (connectEvent.event === 'connect') {
+  const addressItem = connectEvent.payload.items.find(i => i.name === 'ton_addr')
+  const proofItem = connectEvent.payload.items.find(i => i.name === 'ton_proof')
+
+  console.log('地址:', addressItem.address)
+  console.log('证明:', proofItem?.proof)
+}
+```
+
+---
+
+## 应用 Manifest 格式
+
+在应用根目录创建 `tonconnect-manifest.json`：
+
+```json
+{
+  "url": "https://yourapp.com",
+  "name": "Your App Name",
+  "iconUrl": "https://yourapp.com/icon.png",
+  "termsOfUseUrl": "https://yourapp.com/terms",
+  "privacyPolicyUrl": "https://yourapp.com/privacy"
+}
+```
+
+---
+
+## 恢复连接
+
+恢复之前的会话：
+
+```typescript
+const connectEvent = await provider.restoreConnection()
+
+if (connectEvent.event === 'connect') {
+  console.log('会话已恢复')
+}
+```
+
+---
+
+## 断开连接
+
+```typescript
+await provider.disconnect()
+```
+
+---
+
+## 事件处理
+
+```typescript
+provider.listen((event) => {
+  console.log('钱包事件:', event)
+})
+
+// 或使用特定的事件监听器
+provider.on('accountChanged', (address) => {
+  if (address) {
+    console.log('账户已变更:', address)
+  } else {
+    console.log('已断开连接')
+  }
+})
+
+provider.on('disconnect', () => {
+  console.log('钱包已断开连接')
+})
+```
+
+---
+
+## 使用 TON Connect SDK
+
+对于 React 应用，使用官方的 TON Connect SDK：
+
+```bash
+npm install @tonconnect/ui-react
+```
+
+```tsx
+import { TonConnectUIProvider, TonConnectButton } from '@tonconnect/ui-react'
+
+function App() {
+  return (
+    <TonConnectUIProvider manifestUrl="https://yourapp.com/tonconnect-manifest.json">
+      <TonConnectButton />
+      <YourApp />
+    </TonConnectUIProvider>
+  )
+}
+```
+
+OneKey 会被 TON Connect SDK 自动检测。
+

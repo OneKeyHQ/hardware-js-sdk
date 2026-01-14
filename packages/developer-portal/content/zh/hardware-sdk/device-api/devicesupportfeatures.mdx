@@ -1,0 +1,46 @@
+---
+title: deviceSupportFeatures
+---
+
+# deviceSupportFeatures
+
+### 检测硬件支持的功能
+
+```typescript
+const response = await HardwareSDK.deviceSupportFeatures(connectId);
+```
+
+### 参数
+
+[可选通用参数](../common-params)
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.deviceSupportFeatures(connectId);
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+      inputPinOnSoftware: boolean, // 可以在软件端解锁设备
+      modifyHomescreen: boolean, // 可以修改壁纸
+      device: Device // 设备信息
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

@@ -1,0 +1,146 @@
+---
+title: wallet_watchAsset
+description: Add a token to the wallet's tracked list
+---
+
+# wallet_watchAsset
+
+Requests that the wallet tracks a new token. This will prompt the user to add the specified token to their wallet's list of tracked tokens.
+
+---
+
+## Parameters
+
+`object` containing:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `string` | Yes | Token type (currently only `ERC20`) |
+| `options` | `object` | Yes | Token details |
+| `options.address` | `string` | Yes | Token contract address |
+| `options.symbol` | `string` | Yes | Token symbol (1-11 characters) |
+| `options.decimals` | `number` | Yes | Token decimals |
+| `options.image` | `string` | No | URL to token image |
+
+---
+
+## Returns
+
+`boolean` - `true` if token was added, `false` otherwise
+
+---
+
+## Example
+
+```typescript
+const wasAdded = await window.$onekey.ethereum.request({
+  method: 'wallet_watchAsset',
+  params: {
+    type: 'ERC20',
+    options: {
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      symbol: 'USDC',
+      decimals: 6,
+      image: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png'
+    }
+  }
+})
+
+if (wasAdded) {
+  console.log('Token added to wallet')
+} else {
+  console.log('User declined to add token')
+}
+```
+
+### Add Multiple Tokens
+
+```typescript
+const tokens = [
+  {
+    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    symbol: 'USDC',
+    decimals: 6
+  },
+  {
+    address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    symbol: 'USDT',
+    decimals: 6
+  },
+  {
+    address: '0x6B175474E89094C44Da98b954EescdecAD3F9c6',
+    symbol: 'DAI',
+    decimals: 18
+  }
+]
+
+async function addTokens(tokenList) {
+  for (const token of tokenList) {
+    try {
+      await window.$onekey.ethereum.request({
+        method: 'wallet_watchAsset',
+        params: {
+          type: 'ERC20',
+          options: token
+        }
+      })
+    } catch (error) {
+      console.error(`Failed to add ${token.symbol}:`, error)
+    }
+  }
+}
+```
+
+### Add Custom Project Token
+
+```typescript
+async function suggestToken() {
+  const chainId = await window.$onekey.ethereum.request({
+    method: 'eth_chainId'
+  })
+
+  // Different addresses per network
+  const tokenAddresses = {
+    '0x1': '0x...MainnetAddress',
+    '0x89': '0x...PolygonAddress',
+    '0xa4b1': '0x...ArbitrumAddress'
+  }
+
+  const address = tokenAddresses[chainId]
+  if (!address) {
+    throw new Error('Token not available on this network')
+  }
+
+  return window.$onekey.ethereum.request({
+    method: 'wallet_watchAsset',
+    params: {
+      type: 'ERC20',
+      options: {
+        address,
+        symbol: 'TOKEN',
+        decimals: 18,
+        image: 'https://example.com/token-logo.png'
+      }
+    }
+  })
+}
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User rejected the request | User declined to add the token |
+| -32602 | Invalid params | Invalid token parameters |
+
+---
+
+## Notes
+
+- Currently only `ERC20` type is supported
+- The wallet may already track the token (still returns `true`)
+- Image URL should be HTTPS and accessible
+- Symbol should match the on-chain symbol for best UX
+- Specified by [EIP-747](https://eips.ethereum.org/EIPS/eip-747)

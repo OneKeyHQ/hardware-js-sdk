@@ -1,0 +1,74 @@
+---
+title: eth_accounts
+description: 获取已连接的账户地址
+---
+
+# eth_accounts
+
+返回已授权给当前 dApp 的账户地址列表。不会触发连接弹窗。
+
+---
+
+## 参数
+
+无
+
+---
+
+## 返回值
+
+`string[]` - 已授权的账户地址数组（未连接时返回空数组）
+
+---
+
+## 示例
+
+```typescript
+const accounts = await window.$onekey.ethereum.request({
+  method: 'eth_accounts'
+})
+
+if (accounts.length > 0) {
+  console.log('已连接账户:', accounts[0])
+} else {
+  console.log('未连接钱包')
+}
+```
+
+### 检查连接状态
+
+```typescript
+async function checkConnection() {
+  const accounts = await window.$onekey.ethereum.request({
+    method: 'eth_accounts'
+  })
+  return accounts.length > 0 ? accounts[0] : null
+}
+
+const account = await checkConnection()
+if (account) {
+  console.log('已连接:', account)
+} else {
+  // 需要用户连接
+  await window.$onekey.ethereum.request({
+    method: 'eth_requestAccounts'
+  })
+}
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| -32603 | Internal error | Provider 内部错误 |
+
+---
+
+## 说明
+
+- 此方法不会触发连接弹窗
+- 适合在页面加载时检查连接状态
+- 如需请求连接，请使用 [eth_requestAccounts](./eth_requestAccounts)
+- 监听 `accountsChanged` 事件以响应账户切换

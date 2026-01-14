@@ -1,0 +1,84 @@
+---
+title: wallet_switchEthereumChain
+description: 切换到指定的以太坊链
+---
+
+# wallet_switchEthereumChain
+
+请求钱包切换到指定的链。如果钱包尚未配置该链，将抛出错误。
+
+---
+
+## 参数
+
+`Array` 包含一个对象：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `chainId` | `string` | 是 | 链 ID（带 0x 前缀的十六进制） |
+
+---
+
+## 返回值
+
+成功时返回 `null`
+
+---
+
+## 示例
+
+```typescript
+try {
+  await window.$onekey.ethereum.request({
+    method: 'wallet_switchEthereumChain',
+    params: [{ chainId: '0x89' }] // Polygon
+  })
+  console.log('已切换到 Polygon')
+} catch (error) {
+  if (error.code === 4902) {
+    // 链未添加，尝试添加
+    await window.$onekey.ethereum.request({
+      method: 'wallet_addEthereumChain',
+      params: [{ /* 链配置 */ }]
+    })
+  }
+}
+```
+
+### 常用链 ID
+
+| 链 | 十六进制 | 十进制 |
+|-----|---------|--------|
+| Ethereum | `0x1` | 1 |
+| Polygon | `0x89` | 137 |
+| BSC | `0x38` | 56 |
+| Arbitrum | `0xa4b1` | 42161 |
+| Optimism | `0xa` | 10 |
+| Base | `0x2105` | 8453 |
+| Avalanche | `0xa86a` | 43114 |
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| 4001 | User rejected the request | 用户拒绝切换 |
+| 4902 | Unrecognized chain ID | 链未在钱包中配置 |
+
+---
+
+## 说明
+
+- 如果链未配置，需先使用 [wallet_addEthereumChain](./wallet_addEthereumChain) 添加
+- 用户可能需要确认切换操作
+- 监听 `chainChanged` 事件以检测切换完成
+- 遵循 [EIP-3326](https://eips.ethereum.org/EIPS/eip-3326) 规范
+
+```typescript
+window.$onekey.ethereum.on('chainChanged', (chainId) => {
+  console.log('已切换到链:', chainId)
+  // 建议：重新加载页面
+  window.location.reload()
+})
+```

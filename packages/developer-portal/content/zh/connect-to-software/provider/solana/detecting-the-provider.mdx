@@ -1,0 +1,33 @@
+---
+title: 检测 Provider
+---
+
+# 检测 Provider
+
+要检测用户是否已安装 OneKey，Web 应用应检查 `window.$onekey.solana` 对象是否存在。
+
+OneKey 浏览器扩展、OneKey 移动应用和 OneKey 桌面版内置浏览器都会将 `$onekey.solana` 对象注入到用户访问的任何 Web 应用的 `window` 中。
+
+如果 `window.$onekey.solana` 对象存在，Solana 应用可以通过 `window.$onekey.solana` 处的 API 与 OneKey 交互。为了支持旧版集成，此 `solana` 对象也可在 `window.solana` 处访问。
+
+要检测是否安装了 OneKey，应用应检查额外的 `isOneKey` 标志。
+
+```javascript
+const isOneKeyInstalled = window.$onekey?.solana?.isOneKey;
+```
+
+如果未安装 OneKey，我们建议将用户重定向到 [https://onekey.so/download/?client=browserExtension](https://onekey.so/zh_CN/download/?client=browserExtension)。完整代码如下所示：
+
+```javascript
+const getProvider = () => {
+  if ('$onekey' in window) {
+    const provider = window.$onekey?.solana;
+
+    if (provider?.isOneKey) {
+      return provider;
+    }
+  }
+
+  window.open('https://onekey.so/download/?client=browserExtension', '_blank');
+};
+```

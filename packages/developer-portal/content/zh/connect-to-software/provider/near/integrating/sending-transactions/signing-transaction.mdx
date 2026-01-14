@@ -1,0 +1,22 @@
+---
+title: 签名交易
+---
+
+# 签名交易
+
+签名交易但不发送。
+
+方法调用将返回一个包含 `signatures` 的 [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) 对象。
+
+```javascript
+const transaction = ... // 首先创建交易
+
+const res = await provider.request({
+  method: 'near_signTransactions',
+  params: {
+    transactions: [transaction], // 必须是数组类型
+  },
+});
+console.log('near_signTransactions', res, res.signatures);
+```
+

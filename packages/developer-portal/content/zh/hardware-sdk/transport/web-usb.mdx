@@ -1,0 +1,274 @@
+---
+slug: /hardware/transport/webusb
+---
+
+# WebUSB 连接指南
+
+> **注意：**
+> 演示：Playground（支持模拟器）→ [hardware-example.onekey.so](https://hardware-example.onekey.so/)
+
+
+使用本分步指南在浏览器中通过 `@onekeyfe/hd-common-connect-sdk` 接入 WebUSB。连接后，您可以像快速开始中那样调用任何链 API（BTC/EVM 等）。
+
+重点：仅适用于 WebUSB。
+
+## 步骤 1. 要求
+
+- 通过 HTTPS 提供您的应用（WebUSB 在不安全的源上被阻止）
+- 支持 WebUSB 的浏览器（Chrome/Edge 桌面版）
+- 已连接并解锁的 OneKey 设备
+
+## 步骤 2. 安装
+
+```bash
+npm i @onekeyfe/hd-common-connect-sdk @onekeyfe/hd-shared @onekeyfe/hd-core
+```
+
+## 步骤 3. 初始化并绑定事件
+
+在应用启动时初始化 SDK 并绑定 UI/设备事件，以便 PIN/密码短语和确认能够端到端工作。
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import { UI_EVENT, UI_REQUEST, UI_RESPONSE, DEVICE } from '@onekeyfe/hd-core';
+
+export async function setupWebUsb() {
+  await HardwareSDK.init({
+    env: 'webusb',
+    debug: process.env.NODE_ENV !== 'production',
+    fetchConfig: true,
+  });
+
+  bindHardwareEvents();
+}
+
+function bindHardwareEvents() {
+  HardwareSDK.on(UI_EVENT, async (message: any) => {
+    switch (message.type) {
+      case UI_REQUEST.REQUEST_PIN: {
+        // 显示您的 PIN UI 并通过 uiResponse 响应
+        const pinResult = await showPinDialog();
+        if (pinResult.mode === 'device') {
+          await HardwareSDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PIN,
+            payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+          });
+        } else {
+          await HardwareSDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PIN,
+            payload: pinResult.value,
+          });
+        }
+        break;
+      }
+
+      case UI_REQUEST.REQUEST_PASSPHRASE: {
+        const passResult = await showPassphraseDialog();
+        if (passResult.mode === 'device') {
+          await HardwareSDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: { passphraseOnDevice: true, value: '' },
+          });
+        } else {
+          await HardwareSDK.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: { value: passResult.value, passphraseOnDevice: false, save: passResult.save },
+          });
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+  });
+
+  HardwareSDK.on(DEVICE.CONNECT, (payload: any) => {
+    console.log('设备已连接:', payload);
+  });
+  HardwareSDK.on(DEVICE.DISCONNECT, (payload: any) => {
+    console.log('设备已断开:', payload);
+  });
+}
+```
+
+### 注意事项
+- 尽早订阅 `UI_EVENT`，以免请求在等待 PIN/密码短语时停滞。参见 [配置事件](../../api-reference#events-ui)。
+- PIN：优先使用设备端输入（`@@ONEKEY_INPUT_PIN_IN_DEVICE`）。如果提供软件输入，请使用盲键盘映射（`7,8,9,4,5,6,1,2,3`）。
+- 密码短语：支持设备端输入或软件输入，可选择 `save` 用于会话缓存。
+- 设备事件有助于在电缆拔出时更新 UI。
+
+
+## 步骤 4. 用户授权（带官方过滤器的选择器对话框）
+
+重要：由于 Chrome 安全限制，必须由用户手势触发（例如点击按钮）；在获得权限之前不允许自动设备发现。
+
+使用 ONEKEY_WEBUSB_FILTER 过滤器，使选择器只显示支持的设备。
+
+```tsx
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+
+export function AuthorizeUsbButton() {
+  return (
+    <button
+      onClick={async () => {
+        await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
+        // 授权后，通过 SDK 枚举
+      }}
+    >
+      授权 USB (WebUSB)
+    </button>
+  );
+}
+```
+
+## 步骤 5. 枚举并选择设备
+
+```ts
+const result = await HardwareSDK.searchDevices();
+if (!result.success) throw new Error(result.payload.error);
+
+// 示例：选择第一个设备
+const { connectId, deviceId } = result.payload[0] ?? {};
+```
+
+- USB 结果通常在 `searchDevices()` 中包含 `deviceId`。
+- 保存 `connectId`/`deviceId` 用于后续调用。
+
+## 步骤 6. 获取特性（需要时确认 device_id）
+
+```ts
+const features = await HardwareSDK.getFeatures(connectId);
+if (!features.success) throw new Error(features.payload.error);
+
+const resolvedDeviceId = features.payload.device_id;
+```
+
+## 步骤 7. 第一个调用示例（BTC 地址）
+
+```ts
+const res = await HardwareSDK.btcGetAddress(connectId, resolvedDeviceId, {
+  path: "m/44'/0'/0'/0/0",
+  coin: 'btc',
+  showOnOneKey: false,
+});
+
+if (res.success) {
+  console.log('BTC 地址:', res.payload.address);
+} else {
+  console.error('错误:', res.payload.error, res.payload.code);
+}
+```
+
+## 附录：最小 UI 辅助函数
+
+```ts
+// 盲键盘映射（匹配硬件位置映射）
+const BLIND_KEYBOARD_MAP = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+
+function showPinDialog(): Promise<{ mode: 'device'|'software'; value?: string }>{
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    const dialog = document.createElement('div');
+
+    const title = document.createElement('div');
+    title.textContent = '输入 PIN';
+
+    const hint = document.createElement('div');
+    hint.textContent = '使用设备输入以获得最佳安全性，或通过盲键盘输入。';
+
+    const display = document.createElement('div');
+
+    const keypad = document.createElement('div');
+    const pin: string[] = [];
+    BLIND_KEYBOARD_MAP.forEach((mapped, idx) => {
+      const btn = document.createElement('button');
+      btn.textContent = String(idx + 1);
+      btn.onclick = () => {
+        pin.push(mapped);
+        display.textContent = '•'.repeat(pin.length);
+      };
+      keypad.appendChild(btn);
+    });
+
+    const actions = document.createElement('div');
+    const useDeviceBtn = document.createElement('button');
+    useDeviceBtn.textContent = '在设备上输入';
+    useDeviceBtn.onclick = () => { document.body.removeChild(overlay); resolve({ mode: 'device' }); };
+
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = '清除';
+    clearBtn.onclick = () => { pin.splice(0, pin.length); display.textContent = ''; };
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = '确认';
+    confirmBtn.onclick = () => {
+      const value = pin.join('');
+      document.body.removeChild(overlay);
+      resolve({ mode: 'software', value });
+    };
+
+    actions.appendChild(useDeviceBtn);
+    actions.appendChild(clearBtn);
+    actions.appendChild(confirmBtn);
+
+    dialog.appendChild(title);
+    dialog.appendChild(hint);
+    dialog.appendChild(display);
+    dialog.appendChild(keypad);
+    dialog.appendChild(actions);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+  });
+}
+
+function showPassphraseDialog(): Promise<{ mode: 'device'|'software'; value: string; save: boolean }>{
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    const dialog = document.createElement('div');
+
+    const title = document.createElement('div');
+    title.textContent = '输入密码短语';
+
+    const input = document.createElement('input');
+    input.type = 'password';
+
+    const saveWrap = document.createElement('label');
+    const saveBox = document.createElement('input');
+    saveBox.type = 'checkbox';
+    saveWrap.appendChild(saveBox);
+    saveWrap.appendChild(document.createTextNode(' 为会话保存'));
+
+    const actions = document.createElement('div');
+    const useDeviceBtn = document.createElement('button');
+    useDeviceBtn.textContent = '在设备上输入';
+    useDeviceBtn.onclick = () => { document.body.removeChild(overlay); resolve({ mode: 'device', value: '', save: false }); };
+
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = '提交';
+    submitBtn.onclick = () => {
+      const value = input.value || '';
+      const save = !!saveBox.checked;
+      document.body.removeChild(overlay);
+      resolve({ mode: 'software', value, save });
+    };
+
+    actions.appendChild(useDeviceBtn);
+    actions.appendChild(submitBtn);
+
+    dialog.appendChild(title);
+    dialog.appendChild(input);
+    dialog.appendChild(saveWrap);
+    dialog.appendChild(actions);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+  });
+}
+```
+
+## 继续
+
+- [快速开始](../../getting-started)
+- [错误码](../../api-reference#error-codes)、[通用参数](../../core-api-guide#common-params)

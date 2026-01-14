@@ -1,0 +1,131 @@
+---
+title: Solana Signer
+---
+
+# Solana Signer
+
+Solana hardware signing guide. Covers address confirmation and message/transaction signing with fixed hardened path and serialized `rawTx`. Aligned with hardware-js-sdk (Promise responses + UI events).
+
+## Index
+
+1. [How it works](#how-it-works)
+2. [Installation](#installation)
+3. [Initialization](#initialization)
+4. [Common scenarios](#common-scenarios)
+   - [Get Address](#scenario-1-get-address)
+   - [Sign Transaction](#scenario-2-sign-transaction)
+5. [Interaction & Status](#interaction--status)
+6. [Example](#example)
+7. [Validation & Troubleshooting](#validation--troubleshooting)
+
+## How it works
+
+OneKey Solana signer uses `HardwareSDK` to talk to the device app. You pass a serialized `rawTx` (base64/hex); the device displays source/destination, amount, and fee summary, then returns a signature. Host attaches the signature with `@solana/web3.js` and verifies against the public key from `solGetAddress`.
+
+- Path is fixed, fully hardened, length 4: `m/44'/501'/account'/0'`.
+- Ensure the message/tx includes a fresh recent blockhash.
+
+## Installation
+
+```bash
+npm i @onekeyfe/hd-core @onekeyfe/hd-common-connect-sdk
+```
+
+## Initialization
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+await HardwareSDK.init({ env: 'webusb', fetchConfig: true, debug: false });
+const [{ connectId }] = await HardwareSDK.searchDevices();
+const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+```
+
+## Common scenarios
+
+### Scenario 1: Get Address
+
+```ts
+const res = await HardwareSDK.solGetAddress(connectId, deviceId, {
+  path: "m/44'/501'/0'/0'",
+  showOnOneKey: true,
+});
+// res.payload.address, publicKey?, path
+```
+
+**Parameters**
+
+- `path`: required; must follow `44'/501'/account'/0'`.
+- `showOnOneKey?`: optional; display and confirm on device.
+
+**Returns**
+
+```ts
+Promise<{ success, payload: { address, path, publicKey? } }>
+```
+
+---
+
+### Scenario 2: Sign Transaction
+
+```ts
+const res = await HardwareSDK.solSignTransaction(connectId, deviceId, {
+  path: "m/44'/501'/0'/0'",
+  rawTx,
+  keepSession: true,
+});
+// res.payload.signature
+```
+
+**Parameters**
+
+- `path`: required; hardened, length 4.
+- `rawTx`: required; serialized Solana message/tx (base64 or hex).
+- `keepSession?`: optional; reuse session for multiple signatures.
+
+**Returns**
+
+```ts
+Promise<{ success, payload: { signature } }>
+```
+
+## Interaction & Status
+
+- APIs resolve on completion; user prompts surface via `UI_REQUEST` (unlock device, open Solana app, confirm transaction).
+- Run calls serially per device; `keepSession` helps reduce repeated prompts.
+
+## Example
+
+```ts
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+
+await HardwareSDK.init({ env: 'webusb', debug: false });
+
+const [{ connectId }] = await HardwareSDK.searchDevices();
+const deviceId = (await HardwareSDK.getFeatures(connectId)).payload?.device_id;
+
+const path = "m/44'/501'/0'/0'";
+await HardwareSDK.solGetAddress(connectId, deviceId, { path, showOnOneKey: true });
+
+const rawTx =
+  '4301355cc18d85809872bcbd63cb6ea5ac3c2814a1bacf2e50d8ec62367211917b79ecd1f1a98fa0d793d7cb92ebd9a479dc6aba0ae8570253aa87c0da32db5ed2bd401f3bbee52c2bc55761fd8486fae2e28f46499282f4267b8b90fc8c1cc97bb659b6cc927f2ec1701ef2928ddb84759ba5c557f549db';
+
+const { success, payload } = await HardwareSDK.solSignTransaction(connectId, deviceId, {
+  path,
+  rawTx,
+  keepSession: true,
+});
+
+if (success) {
+  console.info('signature:', payload.signature);
+}
+```
+
+## Validation & Troubleshooting
+
+- Path: must follow `44'/501'/account'/0'`; other paths are rejected.
+- Message/tx: include fresh `recentBlockhash`, correct accounts, and instruction order.
+- Device review: path/account, destination, amount, fee summary must match your UI.
+- Host verify: attach signature with `@solana/web3.js`, confirm the signer equals `solGetAddress` result.
+- Common issues: oversized messages or unsupported instructions; split/adjust if rejected. Serial per device; offer retry/cancel on rejection/timeout.
+
+See method doc: [solSignTransaction](/en/hardware-sdk/chains/solana/solsigntransaction).

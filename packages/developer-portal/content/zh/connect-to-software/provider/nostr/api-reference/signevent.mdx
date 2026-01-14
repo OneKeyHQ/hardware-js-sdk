@@ -1,0 +1,74 @@
+---
+title: signEvent
+---
+
+# signEvent
+
+### 方法
+
+```
+async function signEvent(event: UnsignedEvent): Event
+```
+
+### 参数
+
+* `event` — _必填_ `object`
+  * `kind` — _必填_ `number`
+  * `content` — _必填_ `string`
+  * `tags` — _必填_ `Array<Array<string>>`
+  * `created_at` — _必填_ `number`
+
+```typescript
+export type UnsignedEvent = {
+  kind: EventKind;
+  content: string;
+  tags: string[][];
+  created_at: number;
+};
+
+export enum EventKind {
+  Metadata = 0,   // 元数据
+  Text = 1,       // 文本
+  RelayRec = 2,   // 中继推荐
+  Contacts = 3,   // 联系人
+  DM = 4,         // 私信
+  Deleted = 5,    // 已删除
+}
+```
+
+### 响应
+
+接受一个事件对象，添加 `id`、`pubkey` 和 `sig` 后返回
+
+### 结果
+
+```typescript
+export type Event = {
+  id: string;
+  kind: EventKind;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+  sig: string;
+};
+```
+
+### 示例
+
+```typescript
+const event = {
+  created_at: 1700000000,
+  kind: 1,
+  content: "OneKey",
+  tags: [],
+};
+const provider = (window.$onekey && window.$onekey.nostr) || window.nostr;
+
+const signedEvent = await provider.signEvent(event);
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/YzBOVgV" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

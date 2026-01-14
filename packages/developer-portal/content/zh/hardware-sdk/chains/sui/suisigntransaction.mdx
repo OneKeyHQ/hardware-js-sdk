@@ -1,0 +1,67 @@
+---
+title: suiSignTransaction
+---
+
+# suiSignTransaction
+
+## Sui：签名交易
+
+请求设备使用由给定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.suiSignTransaction(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `rawTx` - _必需_ `string` 序列化交易字符串。
+
+
+
+#### rawTx 大小限制
+
+* Classic、Mini 固件版本低于 3.6.0 时，数据大小上限为 4KB。
+* Classic、Mini 固件版本大于或等于 3.6.0 时，数据大小上限为 6KB。
+
+
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.suiSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/784'/0'/0'/0'",
+    rawTx: "5472616e73616374696f6e446174613a3a0005012da3a446433920a4a290f834710575bd943631de0200000000000000207a7b5943ca4bfa227033fa7c6ddb452c7f7f8a18f73f1058b4ac07a14d22e0a5017cb14a7a318219299f008f31e977808c96e372a60140420f0000000000c68311c708918b26fa85b4ded86977baf81086872da3a446433920a4a290f834710575bd943631de0200000000000000207a7b5943ca4bfa227033fa7c6ddb452c7f7f8a18f73f1058b4ac07a14d22e0a501000000000000007a00000000000000"
+  }
+);
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    path: "m/44'/784'/0'/0'/0'",
+    public_key: string,
+    signature: string
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

@@ -1,0 +1,123 @@
+---
+title: eth_getTransactionReceipt
+description: Get transaction receipt with execution result
+---
+
+# eth_getTransactionReceipt
+
+Returns the receipt of a transaction by transaction hash. The receipt contains information about the transaction execution including status and logs.
+
+---
+
+## Parameters
+
+| Index | Type | Description |
+|-------|------|-------------|
+| 0 | `string` | Transaction hash (32 bytes) |
+
+---
+
+## Returns
+
+`object | null` - Receipt object or null if not mined yet
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `transactionHash` | `string` | Transaction hash |
+| `transactionIndex` | `string` | Index in block (hex) |
+| `blockHash` | `string` | Block hash |
+| `blockNumber` | `string` | Block number (hex) |
+| `from` | `string` | Sender address |
+| `to` | `string` | Recipient address |
+| `cumulativeGasUsed` | `string` | Total gas used in block up to this tx |
+| `gasUsed` | `string` | Gas used by this tx (hex) |
+| `contractAddress` | `string` | Created contract address (if applicable) |
+| `logs` | `array` | Array of log objects |
+| `logsBloom` | `string` | Bloom filter for logs |
+| `status` | `string` | `0x1` (success) or `0x0` (failure) |
+| `effectiveGasPrice` | `string` | Actual gas price paid (hex) |
+
+---
+
+## Example
+
+```typescript
+const receipt = await window.$onekey.ethereum.request({
+  method: 'eth_getTransactionReceipt',
+  params: ['0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b']
+})
+
+if (receipt) {
+  const success = receipt.status === '0x1'
+  console.log('Transaction', success ? 'succeeded' : 'failed')
+  console.log('Gas used:', parseInt(receipt.gasUsed, 16))
+  console.log('Logs:', receipt.logs.length)
+}
+```
+
+### Wait for Receipt
+
+```typescript
+async function waitForReceipt(txHash, timeout = 60000) {
+  const start = Date.now()
+
+  while (Date.now() - start < timeout) {
+    const receipt = await window.$onekey.ethereum.request({
+      method: 'eth_getTransactionReceipt',
+      params: [txHash]
+    })
+
+    if (receipt) {
+      return receipt
+    }
+
+    await new Promise(r => setTimeout(r, 2000))
+  }
+
+  throw new Error('Transaction receipt timeout')
+}
+
+// Usage
+const txHash = await window.$onekey.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [txParams]
+})
+
+const receipt = await waitForReceipt(txHash)
+console.log('Transaction status:', receipt.status === '0x1' ? 'Success' : 'Failed')
+```
+
+### Parse Contract Events
+
+```typescript
+// After getting receipt, parse Transfer event logs
+const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+
+const transferLogs = receipt.logs.filter(
+  log => log.topics[0] === transferTopic
+)
+
+transferLogs.forEach(log => {
+  const from = '0x' + log.topics[1].slice(26)
+  const to = '0x' + log.topics[2].slice(26)
+  const value = parseInt(log.data, 16)
+  console.log(`Transfer: ${from} -> ${to}: ${value}`)
+})
+```
+
+---
+
+## Errors
+
+| Code | Message | Description |
+|------|---------|-------------|
+| -32602 | Invalid params | Invalid transaction hash |
+
+---
+
+## Notes
+
+- Returns `null` for pending transactions (not yet mined)
+- `status` field: `0x1` = success, `0x0` = reverted
+- `contractAddress` is only present for contract creation transactions
+- Use `logs` to parse emitted events from the transaction

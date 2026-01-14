@@ -1,0 +1,39 @@
+---
+title: sendPayment
+---
+
+# sendPayment
+
+请求用户为发票进行支付。应用需要提供一个 BOLT-11 发票
+
+### 方法
+
+```typescript
+async function sendPayment(paymentRequest: string): SendPaymentResponse
+```
+
+* `paymentRequest`:  你希望用户支付的发票 (lnbc...)
+
+### 响应
+
+```typescript
+interface SendPaymentResponse {
+  preimage: string;
+}
+```
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+const invoice = "lnbc100xxxx";
+await provider.enable();
+const info = await provider.sendPayment(invoice);
+```
+
+### 演示
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/OJdomvO" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

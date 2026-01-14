@@ -1,0 +1,27 @@
+---
+title: getAccounts
+---
+
+# getAccounts
+
+获取当前账户的地址
+
+### 方法
+
+```typescript
+async function getAccounts(): string[]
+```
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const accounts = async provider.getAccounts()
+
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/qBgMXRM" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

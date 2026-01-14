@@ -1,0 +1,71 @@
+---
+title: firmwareUpdateV3
+---
+
+# firmwareUpdateV3
+
+## Firmware update (V3)
+
+All‑new update flow (Pro only). Supports updating Bootloader, Main firmware, BLE firmware and the resource package in a single flow as needed.
+
+- Device: OneKey Pro only
+- Boot requirement: Boot version ≥ 4.8.0
+
+```typescript
+const res = await HardwareSDK.firmwareUpdateV3(connectId, {
+  platform: 'desktop', // 'native' | 'desktop' | 'ext' | 'web' | 'web-embed'
+
+  // Option A: specify versions (pick any subset)
+  firmwareVersion: [4, 10, 0],
+  bleVersion: [4, 10, 0],
+  bootloaderVersion: [4, 8, 0],
+
+  // Option B: custom binaries (as needed)
+  // firmwareBinary: ArrayBuffer,
+  // bleBinary: ArrayBuffer,
+  // bootloaderBinary: ArrayBuffer,
+  // resourceBinary: ArrayBuffer,
+
+  // Optional: force updating resource package
+  forcedUpdateRes: false,
+});
+```
+
+### Params
+
+[Optional common params](../common-params)
+
+- `platform` - required `"native" | "desktop" | "ext" | "web" | "web-embed"` execution environment
+- `firmwareVersion` - optional `number[]` target main firmware version
+- `firmwareBinary` - optional `ArrayBuffer` custom main firmware
+- `bleVersion` - optional `number[]` target BLE firmware version
+- `bleBinary` - optional `ArrayBuffer` custom BLE firmware
+- `bootloaderVersion` - optional `number[]` target Bootloader version
+- `bootloaderBinary` - optional `ArrayBuffer` custom Bootloader
+- `resourceBinary` - optional `ArrayBuffer` resource package binary
+- `forcedUpdateRes` - optional `boolean` force updating resource package
+
+### Result
+
+```typescript
+{
+  success: true,
+  payload: {
+    bleVersion: string,
+    firmwareVersion: string,
+    bootloaderVersion: string,
+  }
+}
+```
+
+### Error
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: string, // error message
+    code: number   // error code
+  }
+}
+```

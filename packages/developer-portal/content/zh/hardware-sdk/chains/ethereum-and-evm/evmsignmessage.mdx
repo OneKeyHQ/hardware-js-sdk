@@ -1,0 +1,65 @@
+---
+title: evmSignMessage
+---
+
+# evmSignMessage
+
+### 以太坊：签名消息
+
+请求设备使用由给定 BIP32 路径派生的私钥对消息进行签名。
+
+* **遵循 EIP-191 personal_sign 标准**
+* **不适用于 EIP-712 类型化数据签名**
+* **使用** [**evmSignTypedData**](../evmsigntypeddata) **来签名 EIP-712（v3 和 v4）**
+
+```typescript
+const result = await HardwareSDK.evmSignMessage(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `messageHex` - _必需_ `string` 要签名的十六进制文本消息
+* `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
+
+### 示例
+
+```typescript
+// 原始消息
+const message = "Hello OneKey";
+
+// 转换为十六进制
+const messageHex = Buffer.from(message).toString('hex');
+
+HardwareSDK.evmSignMessage(connectId, deviceId, {
+    path: "m/44'/60'/0'",
+    messageHex: messageHex,
+    chainId: 1
+});
+```
+
+#### 返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        address: string,
+        signature: string,
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误代码
+    }
+}
+```

@@ -1,0 +1,45 @@
+---
+title: Air-Gap (Offline QR Signing)
+---
+
+# Air-Gap (Offline QR Signing)
+
+Build a "device stays offline" signing loop using UR-encoded QR codes.
+
+## How it Works
+
+1. **Build Request**: Create a sign request UR payload (per chain), render as animated QR frames
+2. **Device Scans**: Device scans QR, verifies details on-screen, signs offline
+3. **Get Signature**: Device displays signature UR as animated QR
+4. **Broadcast**: App scans response, verifies, and broadcasts via your network
+
+## Quick Start by Chain
+
+| Chain | Request Type | Response Type |
+|-------|-------------|---------------|
+| [Ethereum & EVM](./ethereum-and-evm) | `eth-sign-request` | `eth-signature` |
+| [Bitcoin (PSBT)](./bitcoin) | `crypto-psbt` | `crypto-psbt` |
+| [Solana](./solana) | `sol-sign-request` | `sol-signature` |
+| [Tron](./tron) | `tron-sign-request` | `tron-signature` |
+
+## API Reference
+
+- [Basic API](./basic-api) – Core UR types: `CryptoHDKey`, `CryptoCoinInfo`, `CryptoKeypath`
+
+## Packages
+
+```bash
+# Keystone SDK & UR registries
+npm install @keystonehq/keystone-sdk @keystonehq/bc-ur-registry-eth
+
+# UR primitives
+npm install @ngraveio/bc-ur
+```
+
+## Demo & Examples
+
+- **React Native Demo**: [GitHub Air-Gap Demo](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap)
+  - Scanner: [AirGapScanner.tsx](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/connect-examples/react-native-demo/air-gap/src/components/AirGapScanner.tsx)
+  - Chain helpers: [sdk/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/react-native-demo/air-gap/sdk)
+
+> **Note**: Air-Gap is offline by design. There is no online browser playground.

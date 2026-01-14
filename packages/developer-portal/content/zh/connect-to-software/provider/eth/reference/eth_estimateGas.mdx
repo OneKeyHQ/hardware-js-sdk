@@ -1,0 +1,110 @@
+---
+title: eth_estimateGas
+description: 估算交易所需的 Gas
+---
+
+# eth_estimateGas
+
+生成并返回完成交易所需的 Gas 估算值。交易不会被添加到区块链。
+
+---
+
+## 参数
+
+| 索引 | 类型 | 说明 |
+|------|------|------|
+| 0 | `object` | 交易对象 |
+| 1 | `string` | 区块号或标签（可选） |
+
+### 交易对象
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `from` | `string` | 否 | 发送方地址 |
+| `to` | `string` | 否 | 接收方地址 |
+| `data` | `string` | 否 | 合约调用数据 |
+| `value` | `string` | 否 | 金额，单位 wei（十六进制） |
+| `gas` | `string` | 否 | Gas 限制（十六进制） |
+| `gasPrice` | `string` | 否 | Gas 价格（十六进制） |
+
+---
+
+## 返回值
+
+`string` - 估算的 Gas 数量（十六进制）
+
+---
+
+## 示例
+
+### 估算 ETH 转账
+
+```typescript
+const gasEstimate = await window.$onekey.ethereum.request({
+  method: 'eth_estimateGas',
+  params: [{
+    from: '0x你的地址...',
+    to: '0x接收方地址...',
+    value: '0xDE0B6B3A7640000' // 1 ETH
+  }]
+})
+
+console.log('估算 Gas:', parseInt(gasEstimate, 16))
+// 简单 ETH 转账: ~21000
+```
+
+### 估算合约调用
+
+```typescript
+const gasEstimate = await window.$onekey.ethereum.request({
+  method: 'eth_estimateGas',
+  params: [{
+    from: '0x你的地址...',
+    to: '0x合约地址...',
+    data: '0xa9059cbb...' // transfer(address,uint256)
+  }]
+})
+
+console.log('估算 Gas:', parseInt(gasEstimate, 16))
+```
+
+### 添加安全缓冲
+
+```typescript
+async function estimateGasWithBuffer(tx, bufferPercent = 20) {
+  const estimate = await window.$onekey.ethereum.request({
+    method: 'eth_estimateGas',
+    params: [tx]
+  })
+
+  const gas = parseInt(estimate, 16)
+  const bufferedGas = Math.ceil(gas * (1 + bufferPercent / 100))
+
+  return '0x' + bufferedGas.toString(16)
+}
+
+const safeGasLimit = await estimateGasWithBuffer({
+  from: accounts[0],
+  to: contractAddress,
+  data: encodedData
+})
+```
+
+---
+
+## 错误码
+
+| 错误码 | 消息 | 说明 |
+|--------|------|------|
+| -32000 | Execution reverted | 交易会失败 |
+| -32000 | Insufficient funds | 余额不足 |
+| -32602 | Invalid params | 交易参数无效 |
+
+---
+
+## 说明
+
+- 估算值可能不准确；交易可能使用更多或更少的 Gas
+- 建议在估算值基础上增加 10-20% 的缓冲
+- 如果估算失败，交易很可能也会失败
+- 估算基于当前区块链状态

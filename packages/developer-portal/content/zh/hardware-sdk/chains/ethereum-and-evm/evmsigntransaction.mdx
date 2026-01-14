@@ -1,0 +1,189 @@
+---
+title: evmSignTransaction
+---
+
+# evmSignTransaction
+
+### 以太坊：签名交易
+
+* 使用 `evmSignTransaction` 来签名交易
+* 支持 EIP-1559 和 Legacy 交易。（但请确保你使用的 RPC 节点支持你所使用的类型）
+
+请求设备使用由给定 BIP32 路径派生的私钥对给定交易进行签名。用户会被要求在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `transaction` - _必需_ `Object` 类型为 `EthereumTransactionEIP1559|EthereumSignTransaction`，每个字段的 "0x" 前缀是可选的
+* `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
+
+### 示例
+
+#### EIP1559（[伦敦升级后](https://ethereum.org/en/developers/docs/gas/#post-london)）
+
+如果同时定义了 `maxFeePerGas` 和 `maxPriorityFeePerGas` 参数，交易将按照 [EIP1559](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559) 中引入的新类型进行签名。
+
+```typescript
+HardwareSDK.evmSignTransaction(connectId, deviceId, {
+    path: "m/44'/60'/0'",
+    transaction: {
+        to: '0xd0d6d6c5fe4a677d343cc433536bb717bae167dd',
+        value: '0xf4240',
+        data: '0xa',
+        chainId: 1,
+        nonce: '0x0',
+        maxFeePerGas: '0x14',
+        maxPriorityFeePerGas: '0x0',
+        gasLimit: '0x14',
+    },
+    chainId: 1
+});
+
+```
+
+Legacy
+
+```typescript
+HardwareSDK.evmSignTransaction(connectId, deviceId, {
+    path: "m/44'/60'/0'",
+    transaction: {
+        to: "0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8",
+        value: "0xf4240",
+        data: "0x01",
+        chainId: 1,
+        nonce: "0x0",
+        gasLimit: "0x5208",
+        gasPrice: "0xbebc200"
+    },
+    chainId: 1
+});
+```
+
+返回结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        v: string, // 带有 "0x" 前缀的十六进制字符串
+        r: string, // 带有 "0x" 前缀的十六进制字符串
+        s: string, // 带有 "0x" 前缀的十六进制字符串
+    }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误代码
+    }
+}
+```
+
+
+
+### 交易签名和广播示例
+
+```typescript
+import type { UnsignedTransaction } from '@ethersproject/transactions';
+import { TransactionTypes, serialize } from '@ethersproject/transactions';
+import { keccak256 } from '@ethersproject/keccak256';
+function buildSignedTxFromSignatureEvm({
+  tx,
+  signature,
+}: {
+  tx: UnsignedTransaction;
+  signature: {
+    v: string | number; // '0x11' , '17', 17
+    r: string; // 前缀 0x
+    s: string; // 前缀 0x
+  };
+}) {
+  const { r, s, v } = signature;
+  /**
+   * sdk legacy 返回 {v,r,s}; eip1559 返回 {recoveryParam,r,s}
+   * splitSignature 自动将 v 转换为 recoveryParam
+   */
+  const sig = splitSignature({
+    v: Number(v),
+    r,
+    s,
+  });
+  const rawTx = serialize(tx, sig);
+  const txid = keccak256(rawTx);
+  return {
+    rawTx,
+    txid,
+  };
+}
+
+// 1. 创建交易参数
+const txParams = {
+    to: '0x7314e0f1c0e28474bdb6be3e2c3e0453255188f8',
+    value: '0x0', // 如果没有值则默认为 0
+    data: '0x', // 空数据
+    chainId: 1,
+    nonce: '0x0',
+    // 对于 EIP-1559 交易
+    maxFeePerGas: '0x14', // 20
+    maxPriorityFeePerGas: '0x0', // 0
+    gasLimit: '0x5208', // 21000
+    // 对于 legacy 交易
+    // gasPrice: '0x14', //
+};
+
+// 2. 签名交易
+const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, {
+    path: "m/44'/60'/0'",
+    transaction: txParams,
+    ...deviceCommonParams
+});
+
+// 3. 构建已签名交易
+const baseTx = {
+    to: txParams.to,
+    nonce: parseInt(txParams.nonce, 16),
+    gasLimit: txParams.gasLimit
+    data: txParams.data,
+    value: txParams.value,
+    chainId: txParams.chainId,
+};
+
+// 添加 EIP-1559 特定字段
+const isEIP1559 = txParams?.maxFeePerGas || txParams?.maxPriorityFeePerGas;
+if (isEIP1559) {
+    Object.assign(baseTx, {
+      type: TransactionTypes.eip1559,
+      maxFeePerGas: txParams?.maxFeePerGas
+      maxPriorityFeePerGas: txParams?.maxPriorityFeePerGas
+    });
+} else {
+    Object.assign(baseTx, {
+      gasPrice: txParams.gasPrice,
+    });
+}
+
+// 4. 使用签名构建最终交易
+const { rawTx, txid } = buildSignedTxFromSignatureEvm({
+    tx: baseTx,
+    signature: result.payload
+});
+
+// 5. 广播交易
+// const provider = new ethers.providers.JsonRpcProvider();
+// const broadcastedTx = await provider.sendTransaction(rawTx);
+
+// 6. 等待确认
+// const receipt = await broadcastedTx.wait();
+// console.log('交易已确认:', receipt);
+```

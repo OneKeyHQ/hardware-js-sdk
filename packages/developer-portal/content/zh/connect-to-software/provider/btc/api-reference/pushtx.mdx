@@ -1,0 +1,36 @@
+---
+title: pushTx
+---
+
+# pushTx
+
+推送交易
+
+### 方法
+
+```typescript
+async function pushTx(rawtx: string): string
+```
+
+### 参数
+
+* `rawtx` — _必填_ `string` 要推送的原始交易
+
+### 响应
+
+`txid` — `string`
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.btc) || window.unisat;
+
+const rawtx = "010203"
+const txid = async provider.pushTx(rawtx);
+
+```
+
+### 演示
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/VwgGzxO" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

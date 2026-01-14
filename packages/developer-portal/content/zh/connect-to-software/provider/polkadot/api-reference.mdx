@@ -1,0 +1,92 @@
+---
+title: API 参考
+description: OneKey Polkadot provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey Polkadot provider 方法和类型的完整参考。
+
+---
+
+## 方法
+
+| 方法 | 描述 |
+|------|------|
+| `web3Enable(dappName)` | 为 dApp 启用扩展 |
+| `web3Accounts(anyType?)` | 获取所有账户 |
+| `web3AccountsSubscribe(callback)` | 订阅账户变更 |
+| `web3SignPayload(payload)` | 签署交易 payload |
+| `web3SignRaw(payload)` | 签署原始消息 |
+| `web3RpcSend(request)` | 发送 RPC 请求 |
+| `web3RpcSubscribe(request, callback)` | 订阅 RPC 事件 |
+| `web3RpcUnSubscribe()` | 取消所有订阅 |
+| `web3RpcListProviders()` | 列出 RPC 提供者 |
+| `web3RpcStartProvider(key)` | 启动特定提供者 |
+
+---
+
+## 类型
+
+### 注入账户
+
+```typescript
+interface InjectedAccount {
+  address: string          // Substrate 地址
+  name?: string            // 账户名称
+  type?: 'sr25519' | 'ed25519' | 'ecdsa'
+  genesisHash?: string     // 可选的链限制
+}
+```
+
+### 签名者 Payload JSON
+
+```typescript
+interface SignerPayloadJSON {
+  address: string
+  blockHash: string
+  blockNumber: string
+  era: string
+  genesisHash: string
+  method: string
+  nonce: string
+  specVersion: string
+  tip: string
+  transactionVersion: string
+  signedExtensions: string[]
+  version: number
+}
+```
+
+### 签名者 Payload Raw
+
+```typescript
+interface SignerPayloadRaw {
+  address: string
+  data: string             // 十六进制编码的数据
+  type: 'bytes' | 'payload'
+}
+```
+
+### 签名结果
+
+```typescript
+interface SignerResult {
+  id: number
+  signature: string        // 十六进制签名
+}
+```
+
+---
+
+## 支持的链
+
+| 链 | 描述 |
+|----|------|
+| Polkadot | 主中继链 |
+| Kusama | 金丝雀网络 |
+| Acala | DeFi 中心 |
+| Moonbeam | EVM 兼容 |
+| Astar | 智能合约平台 |
+| 任意 Substrate | 自定义链 |
+

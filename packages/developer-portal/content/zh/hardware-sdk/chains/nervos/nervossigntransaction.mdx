@@ -1,0 +1,74 @@
+---
+title: nervosSignTransaction
+---
+
+# nervosSignTransaction
+
+### Nervos：签名交易
+
+使用由给定 BIP32 路径派生的私钥对给定的 Nervos 交易进行签名。用户需要在 OneKey 上确认交易详情。
+
+```typescript
+const result = await HardwareSDK.nervosSignTransaction(connectId, deviceId, params);
+```
+
+#### 使用要求
+
+* 固件版本要求
+  * Touch: 4.9.0
+  * mini: 3.7.0
+
+#### 参数
+
+connectId: `string`
+
+* 连接的唯一标识符
+
+deviceId: `string`
+
+* 硬件设备的唯一标识符
+
+params: `object`
+
+* path: `string` - BIP32 路径（例如 "m/44'/309'/0'/0/0"）\[必需]
+* rawTx: `string` - 十六进制格式的原始交易数据 \[必需]
+* witnessHex: `string` - 十六进制格式的见证数据 \[必需]
+* network: `string` - 网络名称（例如 "ckb"、"ckb\_testnet"）\[必需]
+
+#### 示例
+
+```typescript
+const response = await HardwareSDK.nervosSignTransaction('connect1', 'device1', {
+    path: "m/44'/309'/0'/0/0",
+    rawTx: "b00100001c000000200000006e00000072000000ce0000009c010000000000000200000071a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c0000000001c7813f6a415144643970c2e88e0bb6ca6a8edc5dd7c1022746f628284a9936d50000000000000000000200000000000000000000003ccb539e56ce1acaeb53db6a6ce939132c5f462e7eb686556f3ba308b4c402080100000000000000000000004f4803ed365e368fb6ac0048961883edf1a98daf20a3d73a54d26e4aa601d7d300000000ce0000000c0000006d000000610000001000000018000000610000000002648901000000490000001000000030000000310000009bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce801140000006655cba91b01e4f8e3ecb40d1fb6241a9033115a610000001000000018000000610000009651104802000000490000001000000030000000310000009bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce80114000000fb36a5944e2626089db2f37e9a5cb4a6eff55c82140000000c000000100000000000000000000000",
+    witnessHex: "55000000100000005500000055000000410000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    network: "ckb"
+});
+```
+
+#### 返回结果
+
+成功响应：
+
+```typescript
+{
+    success: true,
+    payload: {
+        signature: string,  // 十六进制格式的签名
+        address: string,   // 签名交易的地址
+        path: string      // 用于签名的 BIP32 路径
+    }
+}
+```
+
+错误响应：
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string,
+        code: number
+    }
+}
+```

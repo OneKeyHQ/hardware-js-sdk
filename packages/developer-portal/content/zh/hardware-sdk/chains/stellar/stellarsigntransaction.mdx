@@ -1,0 +1,95 @@
+---
+title: stellarSignTransaction
+---
+
+# stellarSignTransaction
+
+## Stellar：签名交易
+
+请求设备使用由给定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+
+```typescript
+const result = await HardwareSDK.stellarSignTransaction(connectId, deviceId, params);
+```
+
+### 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+* `path` - _必需_ `string | Array<number>` **长度为 `3`，这是一个特殊的链。** [更多信息](../../../api-reference#hd-path)
+* `networkPassphrase` - _必需_ `string` 网络密码短语
+* `transaction` - _必需_ `Object` StellarTransaction 类型
+
+#### StellarTransaction 类型
+
+```typescript
+export type StellarTransaction = {
+  source: string;
+  fee: number;
+  sequence: string | number;
+  timebounds?: {
+    minTime: number;
+    maxTime: number;
+  };
+  memo?: {
+    type: 0 | 1 | 2 | 3 | 4;
+    id?: string;
+    text?: string;
+    hash?: string | Buffer;
+  };
+  operations: StellarOperation[];
+};
+```
+
+### 示例
+
+```typescript
+const response = await HardwareSDK.stellarSignTransaction(
+  connectId,
+  deviceId,
+  {
+    path: "m/44'/148'/0'",
+    networkPassphrase: "Test SDF Network ; September 2015",
+    transaction: {
+        source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+        fee: 200,
+        sequence: 4238497296,
+        memo: {
+            type: 0,
+        },
+        operations: [
+            {
+                type: "payment",
+                source: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+                destination: "GAXSFOOGF4ELO5HT5PTN23T5XE6D5QWL3YBHBH2HWOFEJNYYMRJENJR",
+                amount: "10000"
+            }
+        ]
+    }
+  }
+);
+```
+
+返回结果
+
+```typescript
+{
+  success: true,
+  payload: {
+    public_key: string,
+    signature: string.
+  }
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

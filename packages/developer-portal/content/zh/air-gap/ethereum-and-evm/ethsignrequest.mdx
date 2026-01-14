@@ -1,0 +1,105 @@
+---
+title: EthSignRequest
+---
+
+# EthSignRequest
+
+`EthSignRequest` 类处理以太坊签名请求。
+
+用于向设备发送签名请求。
+
+## DataType 枚举
+
+```typescript
+enum DataType {
+  transaction = 1,      // Legacy 交易（RLP 编码的未签名数据）
+  typedData = 2,        // EIP-712 类型数据（JSON 字符串的字节）
+  personalMessage = 3,  // 个人消息签名
+  typedTransaction = 4  // 类型化交易（EIP-1559）
+}
+```
+
+## 参数
+
+| 参数 | 类型 | 描述 |
+|-----------|------|-------------|
+| `requestId` | `Buffer` | 唯一请求 ID（UUID） |
+| `signData` | `Buffer` | 待签名数据 |
+| `dataType` | `DataType` | 签名数据类型 |
+| `chainId` | `number` | 链 ID（可选） |
+| `derivationPath` | [`CryptoKeypath`](../basic-api/cryptokeypath) | 派生路径 |
+| `address` | `Buffer` | 签名地址（可选） |
+| `origin` | `string` | 请求来源（可选） |
+
+## UR 示例
+
+```
+UR:ETH-SIGN-REQUEST/ONADTPDAGDSWNNYAHGTOKPFPIAPANNROLNSAVYDTHHAOHDECAOWFLYLDLFAAUELPATAEGWSOLALPBAVYGUYTHNLFGMAYMWSGBYZOIYHTRDCFBANBFPBNDSPRJPNSDLGLBYIMJELTCNLNWZJLSEAEAELARTAXAAAACSLDAHTAADDYOEADLECSDWYKCSFNYKAEYKAEWKADWKAOCYTIZSYLCNSSDKGOCA
+```
+
+## 示例
+
+### EIP-1559 交易
+
+```ts
+import { KeystoneEthereumSDK } from '@keystonehq/keystone-sdk';
+
+const eth = new KeystoneEthereumSDK();
+const ur = eth.generateSignRequest({
+  requestId,                // uuid 字符串
+  signData: unsignedTxHex,  // 不带 0x 的十六进制
+  dataType: 4,              // typedTransaction
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  chainId: 1,
+  origin: 'your-app',
+});
+// 将 UR 编码为动画二维码帧并显示
+```
+
+### Legacy 交易
+
+```ts
+const ur = eth.generateSignRequest({
+  requestId,
+  signData: unsignedLegacyHex,
+  dataType: 1,              // transaction
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  chainId: 1,
+  origin: 'your-app',
+});
+```
+
+### EIP-712 TypedData
+
+```ts
+const dataHex = Buffer.from(typedDataJson, 'utf8').toString('hex');
+const ur = eth.generateSignRequest({
+  requestId,
+  signData: dataHex,
+  dataType: 2,              // typedData
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  origin: 'your-app',
+});
+```
+
+### Personal Message
+
+```ts
+const dataHex = Buffer.from(message, 'utf8').toString('hex');
+const ur = eth.generateSignRequest({
+  requestId,
+  signData: dataHex,
+  dataType: 3,              // personalMessage
+  path: "m/44'/60'/0'/0/0",
+  xfp: '12345678',
+  origin: 'your-app',
+});
+```
+
+## 下一步
+
+设备签名后，使用 [EthSignature](../ethsignature) 解码响应。
+

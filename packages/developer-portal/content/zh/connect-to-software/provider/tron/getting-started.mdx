@@ -1,0 +1,166 @@
+---
+title: 快速开始
+description: 使用 OneKey 的 TronLink 兼容 Provider 连接 TRON
+---
+
+import { Callout } from 'nextra/components'
+
+# 快速开始
+
+了解如何检测、连接和与 TRON 进行交互。
+
+<Callout type="info">
+OneKey 的 TRON provider 完全兼容 TronLink，包括 TronWeb 和 SunWeb 实例。
+</Callout>
+
+---
+
+## Provider 检测
+
+```typescript
+// OneKey 同时注入 provider 和 TronWeb 实例
+const provider = window.$onekey?.tron
+
+// 连接后 TronWeb 全局可用
+const tronWeb = window.tronWeb
+
+if (!provider) {
+  throw new Error('未检测到 OneKey TRON provider')
+}
+
+// 检查是否兼容 TronLink
+console.log('isTronLink:', provider.isTronLink) // true
+```
+
+---
+
+## 请求账户
+
+```typescript
+// 请求连接
+const result = await provider.request({
+  method: 'tron_requestAccounts'
+})
+
+if (result.code === 200) {
+  console.log('已连接！')
+  const address = tronWeb.defaultAddress.base58
+  console.log('地址:', address)
+} else {
+  console.log('连接被拒绝:', result.message)
+}
+```
+
+---
+
+## 检查连接状态
+
+```typescript
+// 检查 TronWeb 是否就绪
+if (tronWeb && tronWeb.ready) {
+  console.log('已连接:', tronWeb.defaultAddress.base58)
+} else {
+  console.log('未连接')
+}
+```
+
+---
+
+## 使用 TronWeb
+
+连接后，TronWeb 实例全局可用：
+
+### 获取余额
+
+```typescript
+const balance = await tronWeb.trx.getBalance(tronWeb.defaultAddress.base58)
+console.log('余额:', tronWeb.fromSun(balance), 'TRX')
+```
+
+### 发送 TRX
+
+```typescript
+const tx = await tronWeb.trx.sendTransaction(
+  'TRecipientAddress...',
+  tronWeb.toSun(10) // 10 TRX
+)
+
+console.log('交易:', tx.txid)
+```
+
+### 发送 TRC20 代币
+
+```typescript
+const contractAddress = 'TTokenContractAddress...'
+const contract = await tronWeb.contract().at(contractAddress)
+
+// 获取精度
+const decimals = await contract.decimals().call()
+
+// 转账代币
+const amount = 100 * (10 ** decimals) // 100 个代币
+const tx = await contract.transfer(
+  'TRecipientAddress...',
+  amount
+).send()
+
+console.log('交易:', tx)
+```
+
+---
+
+## 事件处理
+
+### 监听账户变更
+
+```typescript
+provider.on('accountsChanged', (accounts) => {
+  if (accounts[0]) {
+    console.log('账户已变更:', accounts[0])
+  } else {
+    console.log('已断开连接')
+  }
+})
+```
+
+### 监听网络变更
+
+```typescript
+provider.on('chainChanged', (chainId) => {
+  console.log('网络已变更:', chainId)
+  // 建议在网络变更时刷新页面
+})
+```
+
+### Window 事件（TronLink 兼容）
+
+```typescript
+// 监听 TronLink 初始化
+window.addEventListener('tronLink#initialized', () => {
+  console.log('TronLink 已初始化')
+})
+
+// 监听消息
+window.addEventListener('message', (event) => {
+  if (event.data.isTronLink) {
+    const { action, data } = event.data.message
+    console.log('TronLink 事件:', action, data)
+  }
+})
+```
+
+---
+
+## 从 TronLink 迁移
+
+OneKey 与 TronLink 兼容。更新您的检测逻辑：
+
+```typescript
+// 之前（仅 TronLink）
+const tronWeb = window.tronWeb
+
+// 之后（OneKey 优先，TronLink 作为备选）
+const provider = window.$onekey?.tron || window.tronLink
+const tronWeb = window.tronWeb // 两者都会注入这个
+```
+

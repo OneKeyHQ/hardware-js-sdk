@@ -1,0 +1,65 @@
+---
+title: makeInvoice
+---
+
+# makeInvoice
+
+请求用户创建一个供 Web 应用使用的发票。这将返回一个 [BOLT-11](https://github.com/lightningnetwork/lightning-rfc/blob/master/11-payment-encoding) 发票。发票可以通过以下几种方式请求：
+
+* 通过指定明确的 `amount`，用户的 Provider 应强制用户生成具有特定金额的发票
+* 通过指定 `minimumAmount` 和/或 `maximumAmount`，用户的 Provider 应强制用户生成金额受该范围约束的发票
+* 当未设置明确的 `amount` 时，用户可以自由输入金额
+
+金额以聪（satoshis）为单位。对于大金额，建议使用大数库如 [bn.js](https://www.npmjs.com/package/bn.js) 或 [big.js](https://www.npmjs.com/package/big.js)，因为 JavaScript 数字是 IEEE-754 双精度浮点数，对于大整数可能会丢失精度。
+
+### 方法
+
+```typescript
+async function makeInvoice(args: RequestInvoiceArgs): RequestInvoiceResponse
+```
+
+### 参数
+
+* `event` — _必填_ `object`
+  * `amount` — _可选_ `string|number`  要发送的聪数
+  * `defaultAmount` — _可选_ `string|number`
+  * `minimumAmount` — _可选_ `string|number`
+  * `maximumAmount` — _可选_ `string|number`
+  * `defaultMemo` — _可选_ `string`
+
+```typescript
+interface RequestInvoiceArgs {
+  amount?: string | number; // 单位是聪
+  defaultAmount?: string | number; // 单位是聪
+  minimumAmount?: string | number; // 单位是聪
+  maximumAmount?: string | number; // 单位是聪
+  defaultMemo?: string;
+}
+```
+
+### 响应
+
+```typescript
+interface RequestInvoiceResponse {
+  paymentRequest: string;
+  paymentHash: string;
+  rHash: string;
+}
+```
+
+### 示例
+
+```typescript
+const provider = (window.$onekey && window.$onekey.webln) || window.webln;
+
+await provider.enable();
+const invoice = await provider.makeInvoice({
+  amount: 1000,
+});
+```
+
+### 演示
+
+
+<iframe src="https://codepen.io/OneKeyHQ/pen/ZEwMKvw" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
+

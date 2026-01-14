@@ -1,0 +1,84 @@
+---
+title: 签名
+description: 使用 OneKey 在 Cardano 上签署数据
+---
+
+import { Callout } from 'nextra/components'
+
+# 签名
+
+了解如何在 Cardano 上签署数据用于身份验证。
+
+---
+
+## 签署数据 (CIP-8)
+
+签署任意数据用于身份验证：
+
+```typescript
+const api = await window.cardano.onekey.enable()
+
+const addresses = await api.getUsedAddresses()
+const address = addresses[0]
+
+// 要签署的消息
+const payload = Buffer.from('Hello Cardano!').toString('hex')
+
+const signature = await api.signData(address, payload)
+
+console.log({
+  signature: signature.signature, // COSE_Sign1 签名
+  key: signature.key,             // COSE_Key 公钥
+})
+```
+
+---
+
+## 验证签名
+
+```typescript
+import { COSESign1, COSEKey } from '@emurgo/cardano-message-signing-browser'
+
+const coseSign1 = COSESign1.from_bytes(
+  Buffer.from(signature.signature, 'hex')
+)
+const coseKey = COSEKey.from_bytes(
+  Buffer.from(signature.key, 'hex')
+)
+
+// 获取已签名的 payload
+const signedPayload = coseSign1.payload()
+
+// 验证签名
+const publicKey = coseKey.header(0) // 获取 Ed25519 密钥
+// 验证逻辑...
+```
+
+---
+
+## 错误处理
+
+```typescript
+try {
+  const api = await window.cardano.onekey.enable()
+} catch (error) {
+  if (error.code === -1) {
+    console.log('用户拒绝了连接')
+  } else if (error.code === -2) {
+    console.log('未找到账户')
+  } else {
+    console.error('错误:', error.message)
+  }
+}
+```
+
+---
+
+## 常见错误
+
+| 错误码 | 描述 |
+|--------|------|
+| -1 | 用户拒绝 |
+| -2 | 未找到账户 |
+| -3 | 无效的网络 |
+

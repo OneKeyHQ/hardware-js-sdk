@@ -1,0 +1,32 @@
+---
+title: "Native BLE"
+description: "Bluetooth Low Energy transport for Android/iOS/Flutter hosts"
+---
+
+# Native BLE
+
+Use `@onekeyfe/hd-common-connect-sdk` in a native mobile context to forward hardware transport calls over BLE. The SDK runs JavaScript in a WebView or JS engine while native Bluetooth communication happens in the host app. This guide surface helps you jump to the platform-specific instructions and avoid 404s when browsing the docs.
+
+## When to choose native BLE
+
+- You control the entire native app experience (Android, iOS, Flutter) and can host a WebView or JS runtime that forwards `send`/`receive` over BLE.
+- You need fine-grained access to OS-level BLE permissions, pairing workflows, or custom UI that is easier to build in Swift/Kotlin or Flutter than in React Native.
+- You want to reuse the `@onekeyfe/hd-common-connect-sdk` JavaScript API while keeping the native BLE stack in-house.
+
+## Platform guides
+
+| Platform | Highlights | Guide |
+| --- | --- | --- |
+| Android | Nordic BLE bridge, pairing, permissions, and JS bridge wiring | [Android (Native)](/en/hardware-sdk/transport/android) |
+| iOS | CoreBluetooth setup, pairing helpers, and JS event plumbing | [iOS (Native)](/en/hardware-sdk/transport/ios) |
+| Flutter | Flutter plugin wiring + native host bridge examples | [Flutter (Native)](/en/hardware-sdk/transport/flutter) |
+
+Need a cross-platform React Native experience? Use the [React Native BLE](/en/hardware-sdk/transport/react-native-ble) guide instead.
+
+## Core concepts
+
+- Read [Low-Level Transport Plugin & Protocol](/en/hardware-sdk/concepts/low-level-plugin) before wiring native BLE to understand the 64-byte payload structure and message framing.
+- Subscribe early to `UI_EVENT` so PIN/Passphrase confirmations and prompts do not stall the request queue.
+- Reuse the same `HardwareSDK` adapter used in the Web guide; the native code simply forwards BLE packets instead of WebUSB.
+
+By pointing your landing page and nav straight to this entry point, the site can guarantee that `/hardware-sdk/transport/native-ble` resolves to meaningful content and that the sub-links never return 404.

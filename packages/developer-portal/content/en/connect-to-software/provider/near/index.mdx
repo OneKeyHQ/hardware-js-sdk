@@ -1,0 +1,82 @@
+---
+title: NEAR Provider
+description: Integrate NEAR Protocol into your dApp with OneKey wallet — detect provider, connect accounts, send transactions, and sign messages
+---
+
+# NEAR
+
+Integrate NEAR Protocol into your dApp using OneKey's NEAR provider. OneKey provides a fully compatible NEAR wallet interface that works seamlessly with existing NEAR dApps.
+
+## Features
+
+- Account connection and management
+- Transaction signing and sending
+- Message signing
+- Network switching (mainnet/testnet)
+- Full RPC API support
+
+## Installation
+
+```bash
+npm install @onekeyfe/onekey-near-provider
+# or
+yarn add @onekeyfe/onekey-near-provider
+```
+
+## Quick Start
+
+```typescript
+import { OneKeyNearProvider } from '@onekeyfe/onekey-near-provider'
+
+// Create provider instance
+const provider = new OneKeyNearProvider()
+
+// Request account access
+const accounts = await provider.request({ method: 'near_accounts' })
+console.log('Connected accounts:', accounts)
+
+// Get current network
+const network = await provider.request({ method: 'near_network' })
+console.log('Current network:', network)
+```
+
+## Documentation
+
+### Getting Started
+- [Introduction](introduction) - Overview of the NEAR provider
+- [Install the Provider SDK](integrating/install-the-provider-sdk) - Setup instructions
+
+### Integration Guides
+- [Detecting the Provider](integrating/detecting-the-provider) - Check if OneKey is installed
+- [Establishing a Connection](integrating/establishing-a-connection) - Connect to user accounts
+- [Accessing Accounts](integrating/accessing-accounts) - Get account information
+- [Detecting Provider Network](integrating/detecting-provider-network) - Check current network
+- [Watch Accounts & Network Status](integrating/watch-accounts-and-network-status) - Subscribe to changes
+
+### Transactions & Signing
+- [Sending Transactions](integrating/sending-transactions) - Create and send transactions
+- [Signing Messages](integrating/signing-messages) - Sign arbitrary messages
+- [RPC API Calling](integrating/rpc-api-calling) - Direct RPC access
+
+### Advanced
+- [Debug Logging](integrating/debug-logging) - Enable debug mode
+- [Migrate from NEAR Web Wallet](integrating/migrate-from-near-web-wallet) - Migration guide
+
+### Reference
+- [API Reference](reference/api-reference) - Complete API documentation
+- [Troubleshooting](reference/trouble-shooting) - Common issues and solutions
+- [Examples & Demo](resources/example-and-demo) - Sample code
+- [FAQ](resources/faq) - Frequently asked questions
+
+## Error Handling
+
+| Code | Message | Description |
+|------|---------|-------------|
+| 4001 | User Rejected | User denied the request |
+| -32602 | Invalid Params | Method parameters are invalid |
+| -32603 | Internal Error | Internal JSON-RPC error |
+
+## Related Resources
+
+- [NEAR Documentation](https://docs.near.org/)
+- [OneKey GitHub](https://github.com/OneKeyHQ)

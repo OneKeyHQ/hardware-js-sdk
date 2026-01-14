@@ -1,0 +1,106 @@
+---
+title: polkadotGetAddress
+---
+
+# polkadotGetAddress
+
+## 使用要求
+
+* 固件版本要求
+  * Touch: 4.3.0
+  * Classic/Mini: 3.0.0
+* Joystream 链固件版本要求
+  * Touch: 4.7.0
+  * Classic/Mini: 3.6.0
+* Manta 链固件版本要求
+  * Touch: 4.9.0
+  * Classic/Mini: 3.7.0
+
+## Polkadot：获取地址
+
+获取由给定 BIP32 路径派生的 BIP32 扩展公钥。用户会看到所请求密钥的描述，并被要求确认导出。
+
+```typescript
+const result = await HardwareSDK.polkadotGetAddress(connectId, deviceId, params);
+```
+
+## 参数
+
+[**可选通用参数**](../../../core-api-guide#common-params)
+
+### 导出单个公钥
+
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `prefix` - _必需_ `string` 地址前缀。默认设置为 `nexatest`
+* `network` - _必需_ `string` 网络名称，默认设置为 `polkadot`
+* `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
+
+
+
+#### 导出批量公钥
+
+* `bundle` - 包含 `path`、`coin` 字段的对象 `Array`
+
+### 示例
+
+返回第一个 Polkadot 账户的公钥：
+
+```typescript
+HardwareSDK.polkadotGetAddress(connectId, deviceId, {
+    path: "m/44'/354'/0'/0'/0'",
+    showOnOneKey: true,
+    isTestnet: false
+});
+```
+
+返回多个 Polkadot 账户的批量公钥：
+
+```typescript
+HardwareSDK.polkadotGetAddress(connectId, deviceId, {
+    bundle: [
+        { path: "m/44'/354'/0'/0'/1'" }, // 账户 1
+        { path: "m/44'/354'/0'/0'/2'" }, // 账户 2
+        { path: "m/44'/354'/0'/0'/3'" }  // 账户 3
+    ]
+});
+```
+
+### 返回结果
+
+只有一个公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: {
+        path: Array<number>, // 强化路径
+        address: string,   // 地址
+        publicKey: string, // 公钥
+    }
+}
+```
+
+批量公钥的结果
+
+```typescript
+{
+    success: true,
+    payload: [
+        { path, address, publicKey }, // 账户 1
+        { path, address, publicKey }, // 账户 2
+        { path, address, publicKey }, // 账户 3
+    ]
+}
+```
+
+错误
+
+```typescript
+{
+    success: false,
+    payload: {
+        error: string, // 错误信息
+        code: number // 错误码
+    }
+}
+```

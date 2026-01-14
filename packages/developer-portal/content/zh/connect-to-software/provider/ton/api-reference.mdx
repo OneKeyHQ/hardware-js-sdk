@@ -1,0 +1,129 @@
+---
+title: API 参考
+description: OneKey TON provider 完整 API 参考
+---
+
+# API 参考
+
+OneKey TON provider 方法和类型的完整参考。
+
+---
+
+## 方法
+
+| 方法 | 描述 |
+|------|------|
+| `connect(version?, request?)` | 连接钱包 |
+| `restoreConnection()` | 恢复之前的会话 |
+| `disconnect()` | 断开钱包连接 |
+| `send(message)` | 发送 RPC 请求 |
+| `listen(callback)` | 监听钱包事件 |
+
+---
+
+## Send 方法
+
+| 方法 | 描述 |
+|------|------|
+| `sendTransaction` | 发送 TON 或与合约交互 |
+| `signData` | 签署任意数据 cell |
+| `disconnect` | 通过 RPC 断开连接 |
+
+---
+
+## 类型
+
+### 账户信息
+
+```typescript
+interface AccountInfo {
+  address: string      // 原始地址 (0:<hex>)
+  network: string      // 网络 ID (-239 主网, -3 测试网)
+  publicKey: string    // 十六进制公钥（无 0x 前缀）
+  walletStateInit: string // Base64 编码的状态初始化
+}
+```
+
+### 交易请求
+
+```typescript
+interface TransactionRequest {
+  valid_until?: number  // 有效期 UNIX 时间戳
+  network?: string      // 网络 ID
+  from?: string         // 发送者地址
+  messages: Message[]   // 最多 4 条消息
+}
+```
+
+### 消息
+
+```typescript
+interface Message {
+  address: string      // 接收者（原始格式）
+  amount: string       // 金额（nanotons）
+  payload?: string     // 合约调用的 Base64 BOC
+  stateInit?: string   // 部署用的 Base64 StateInit
+}
+```
+
+### 签署数据请求
+
+```typescript
+interface SignDataRequest {
+  schema_crc: number   // Schema 标识符
+  cell: string         // Base64 编码的 cell
+  publicKey?: string   // 可选的特定密钥
+}
+```
+
+### 签署数据结果
+
+```typescript
+interface SignDataResult {
+  signature: string    // Base64 签名
+  timestamp: number    // UNIX 时间戳 (UTC)
+}
+```
+
+### 设备信息
+
+```typescript
+interface DeviceInfo {
+  platform: string     // 'iphone' | 'android' | 'windows' | 'mac' | 'linux'
+  appName: string      // 'onekey'
+  appVersion: string   // 钱包版本
+  maxProtocolVersion: number // 2
+  features: string[]   // 支持的功能
+}
+```
+
+---
+
+## 网络
+
+| 网络 | 网络 ID |
+|------|---------|
+| 主网 | -239 |
+| 测试网 | -3 |
+
+---
+
+## 事件
+
+| 事件 | 描述 |
+|------|------|
+| `accountChanged` | 账户已变更 |
+| `disconnect` | 钱包已断开连接 |
+
+---
+
+## 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 0 | 未知错误 |
+| 1 | 请求错误 |
+| 100 | 未知应用 |
+| 300 | 用户拒绝请求 |
+| 400 | 不支持的方法 |
+
