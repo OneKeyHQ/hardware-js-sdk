@@ -1,8 +1,8 @@
 import {
   type AlephiumSignedTx,
   type AlephiumSignTx as HardwareAlephiumSignTx,
-,
-  TypedCall} from '@onekeyfe/hd-transport';
+  TypedCall,
+} from '@onekeyfe/hd-transport';
 import { bytesToHex } from '@noble/hashes/utils';
 import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
