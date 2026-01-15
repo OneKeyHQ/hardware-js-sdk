@@ -26,7 +26,6 @@ jobs:
       - name: Build Developer Portal
         working-directory: packages/developer-portal
         env:
-          NEXT_PUBLIC_BASE_PATH: /${{ github.sha }}
           NEXT_PUBLIC_ASSET_PREFIX: /${{ github.sha }}
         run: yarn build
 
