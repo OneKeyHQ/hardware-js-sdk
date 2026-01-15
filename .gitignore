@@ -11,7 +11,7 @@ node_modules
 !.vscode/tasks.json
 !.vscode/settings.json
 !.vscode/*.code-snippets
-
+developer-portal/
 logs
 *.log
 .yarnclean

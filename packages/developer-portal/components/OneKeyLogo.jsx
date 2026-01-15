@@ -1,12 +1,10 @@
 'use client'
 
 import Image from 'next/image'
+import { getAssetPath } from '../utils/assets'
 
 export function OneKeyLogo({ size = 32, className = '' }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH
-    ? process.env.NEXT_PUBLIC_BASE_PATH.replace(/\/$/, '')
-    : ''
-  const iconSrc = `${basePath}/icons/onekey.png`
+  const iconSrc = getAssetPath('/icons/onekey.png')
 
   return (
     <Image

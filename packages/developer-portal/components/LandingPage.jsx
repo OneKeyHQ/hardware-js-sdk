@@ -12,12 +12,13 @@ import {
   ChevronDown,
   X,
 } from 'lucide-react'
+import { getAssetPath } from '../utils/assets'
 
-const heroSecurity05 = '/landing-page/security-05.svg'
-const heroSecurity04 = '/landing-page/security-04.svg'
-const heroSecurity03 = '/landing-page/security-03.svg'
-const heroSecurity02 = '/landing-page/security-02.svg'
-const heroSecurity01 = '/landing-page/security-01.svg'
+const heroSecurity05 = getAssetPath('/landing-page/security-05.svg')
+const heroSecurity04 = getAssetPath('/landing-page/security-04.svg')
+const heroSecurity03 = getAssetPath('/landing-page/security-03.svg')
+const heroSecurity02 = getAssetPath('/landing-page/security-02.svg')
+const heroSecurity01 = getAssetPath('/landing-page/security-01.svg')
 
 const getFooterData = (isZh, locale) => {
   const portalColumn = {
@@ -147,7 +148,7 @@ export function LandingPage({ locale = 'en' }) {
       icon: Usb,
       href: `/${locale}/connect-to-software/provider`,
       cta: copy.viewDocs,
-      iconSrc: '/landing-page/icon-provider.svg',
+      iconSrc: getAssetPath('/landing-page/icon-provider.svg'),
     },
     {
       title: isZh ? 'Web3Modal UI 组件' : 'Web3Modal UI Kit',
@@ -155,7 +156,7 @@ export function LandingPage({ locale = 'en' }) {
       icon: Bluetooth,
       href: `/${locale}/connect-to-software/wallet-ui/web3modal`,
       cta: copy.viewDocs,
-      iconSrc: '/landing-page/icon-web3Modal.svg',
+      iconSrc: getAssetPath('/landing-page/icon-web3Modal.svg'),
     },
   ]
 
@@ -175,7 +176,7 @@ export function LandingPage({ locale = 'en' }) {
         <section
           className="relative w-full overflow-hidden"
           style={{
-            backgroundImage: "url('/landing-page/hero-bg.svg')",
+            backgroundImage: `url('${getAssetPath('/landing-page/hero-bg.svg')}')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center bottom',
           }}
@@ -209,7 +210,7 @@ export function LandingPage({ locale = 'en' }) {
               >
                 {copy.ctaPrimary}
                 <img
-                  src="/Button/Icon/logo.svg"
+                  src={getAssetPath('/Button/Icon/logo.svg')}
                   alt=""
                   className="size-[24px]"
                 />
@@ -336,7 +337,7 @@ export function LandingPage({ locale = 'en' }) {
               </div>
             </div>
             <img
-              src="/landing-page/device.png"
+              src={getAssetPath('/landing-page/device.png')}
               alt="OneKey device"
               className="pointer-events-none hidden size-[400px] object-contain lg:absolute lg:right-[40px] lg:top-[-80px] lg:block"
             />
@@ -349,7 +350,7 @@ export function LandingPage({ locale = 'en' }) {
           <div className="flex shrink-0 flex-col gap-[10px]">
             <div className="flex flex-col gap-[16px]">
               <img
-                src="/landing-page/onekey-brand.svg"
+                src={getAssetPath('/landing-page/onekey-brand.svg')}
                 alt="OneKey"
                 className="h-[57px] w-[233px]"
               />
@@ -390,7 +391,7 @@ export function LandingPage({ locale = 'en' }) {
                   rel="noopener noreferrer"
                   aria-label="Twitter"
                 >
-                  <img src="/landing-page/social/twitter.svg" alt="" className="size-[24px]" />
+                  <img src={getAssetPath('/landing-page/social/twitter.svg')} alt="" className="size-[24px]" />
                 </a>
                 <a
                   href="https://github.com/OneKeyHQ"
@@ -398,7 +399,7 @@ export function LandingPage({ locale = 'en' }) {
                   rel="noopener noreferrer"
                   aria-label="GitHub"
                 >
-                  <img src="/landing-page/social/github.svg" alt="" className="size-[24px]" />
+                  <img src={getAssetPath('/landing-page/social/github.svg')} alt="" className="size-[24px]" />
                 </a>
                 <a
                   href="https://discord.gg/onekey"
@@ -406,7 +407,7 @@ export function LandingPage({ locale = 'en' }) {
                   rel="noopener noreferrer"
                   aria-label="Discord"
                 >
-                  <img src="/landing-page/social/discord.svg" alt="" className="size-[24px]" />
+                  <img src={getAssetPath('/landing-page/social/discord.svg')} alt="" className="size-[24px]" />
                 </a>
               </div>
               <div className="flex flex-col gap-[16px]">
@@ -417,13 +418,13 @@ export function LandingPage({ locale = 'en' }) {
                     rel="noopener noreferrer"
                   >
                     <img
-                      src="/landing-page/badge-osi.svg"
+                      src={getAssetPath('/landing-page/badge-osi.svg')}
                       alt="Open Source"
                       className="h-[33px] w-[96px]"
                     />
                   </a>
                   <img
-                    src="/landing-page/badge-cceal.svg"
+                    src={getAssetPath('/landing-page/badge-cceal.svg')}
                     alt="CCEAL 5+ ISO 27001"
                     className="h-[32px] w-[108px]"
                   />

@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { Check, X } from 'lucide-react'
+import { getAssetPath } from '../utils/assets'
 
 const devices = [
   {
@@ -65,9 +66,6 @@ function SupportBadge({ supported }) {
 
 export function DeviceCompatibilityTable({ locale = 'en' }) {
   const isZh = locale === 'zh'
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH
-    ? process.env.NEXT_PUBLIC_BASE_PATH.replace(/\/$/, '')
-    : ''
 
   const labels = {
     en: {
@@ -126,7 +124,7 @@ export function DeviceCompatibilityTable({ locale = 'en' }) {
                     {/* Device Image */}
                     <div className="w-14 h-14 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden transition-transform duration-200 group-hover:scale-105">
                       <Image
-                        src={`${basePath}${device.image}`}
+                        src={getAssetPath(device.image)}
                         alt={device.name}
                         width={48}
                         height={48}

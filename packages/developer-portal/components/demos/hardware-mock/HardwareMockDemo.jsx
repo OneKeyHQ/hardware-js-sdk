@@ -409,7 +409,7 @@ export function HardwareMockDemo({ locale = 'zh' }) {
   const commandOptions = useMemo(() => getCommandOptions(locale), [locale])
 
   const basePath = useMemo(() => {
-    return (process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || '').trim()
+    return (process.env.NEXT_PUBLIC_ASSET_PREFIX?.replace(/\/$/, '') || '').trim()
   }, [])
 
   const machine = useMemo(() => createHardwareMockMachine({ basePath }), [basePath])
