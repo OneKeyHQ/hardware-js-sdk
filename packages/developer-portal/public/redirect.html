@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Redirecting... | OneKey Developers</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #fafafa;
+      color: #666;
+    }
+    .loader {
+      text-align: center;
+    }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid #e5e5e5;
+      border-top-color: #00B812;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <p>Redirecting...</p>
+  </div>
+
+  <script>
+    (function() {
+      // 当前部署的版本 SHA（构建时由环境变量注入）
+      var CURRENT_SHA = '__DEPLOY_SHA__';
+
+      // 获取当前路径
+      var path = window.location.pathname;
+      var search = window.location.search || '';
+      var hash = window.location.hash || '';
+
+      // 构建重定向 URL
+      var targetUrl = '/' + CURRENT_SHA + path + search + hash;
+
+      // 执行重定向
+      window.location.replace(targetUrl);
+    })();
+  </script>
+
+  <noscript>
+    <p>Please enable JavaScript to continue.</p>
+  </noscript>
+</body>
+</html>

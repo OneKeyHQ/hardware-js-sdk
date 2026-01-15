@@ -26,8 +26,16 @@ jobs:
       - name: Build Developer Portal
         working-directory: packages/developer-portal
         env:
-          NEXT_PUBLIC_ASSET_PREFIX: /developer/${{ github.sha }}
+          NEXT_PUBLIC_ASSET_PREFIX: /${{ github.sha }}
         run: yarn build
+
+      - name: Inject Deploy SHA into redirect.html
+        working-directory: packages/developer-portal
+        run: |
+          # Replace placeholder with actual commit SHA
+          sed -i "s/__DEPLOY_SHA__/${{ github.sha }}/g" out/redirect.html
+          echo "Injected SHA: ${{ github.sha }}"
+          cat out/redirect.html | head -50
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
