@@ -13,25 +13,37 @@ export default {
       copyPage: false,
     },
   },
-  'connect-to-hardware': {
-    title: 'Connect to hardware',
+  'hardware-sdk': {
+    title: 'Hardware Integration',
     type: 'menu',
     items: {
-      'hardware-sdk': { title: 'Hardware JS SDK', href: '/en/hardware-sdk' },
-      'air-gap': { title: 'Air-Gap', href: '/en/air-gap' },
+      overview: { title: 'Overview', href: '/en/hardware-sdk' },
+      transport: { title: 'Transport', href: '/en/hardware-sdk/transport' },
+      signers: { title: 'Signer Guides', href: '/en/hardware-sdk/signers' },
+      'core-api': { title: 'Core API', href: '/en/hardware-sdk/core-api-guide' },
+      playground: { title: 'Playground', href: '/en/hardware-sdk/playground' },
     },
   },
-  'hardware-sdk': {
-    title: 'hardware-sdk',
-    type: 'page',
+  'connect-to-software': {
+    title: 'dApp Integration',
+    type: 'menu',
+    items: {
+      overview: { title: 'Quick Start', href: '/en/connect-to-software' },
+      provider: { title: 'Provider API', href: '/en/connect-to-software/provider' },
+      'wallet-ui': { title: 'Wallet UI', href: '/en/connect-to-software/wallet-ui' },
+      'react-hooks': { title: 'React Hooks', href: '/en/connect-to-software/react-hooks' },
+    },
   },
   'air-gap': {
-    title: 'Air Gap',
-    type: 'page',
-  },
-  'connect-to-software': {
-    title: 'Connect to Software',
-    type: 'page',
+    title: 'Offline Signing',
+    type: 'menu',
+    items: {
+      overview: { title: 'Overview', href: '/en/air-gap' },
+      'basic-api': { title: 'Basic API', href: '/en/air-gap/basic-api' },
+      ethereum: { title: 'Ethereum & EVM', href: '/en/air-gap/ethereum-and-evm' },
+      bitcoin: { title: 'Bitcoin (PSBT)', href: '/en/air-gap/bitcoin' },
+      solana: { title: 'Solana', href: '/en/air-gap/solana' },
+    },
   },
   changelog: {
     title: 'Changelog',

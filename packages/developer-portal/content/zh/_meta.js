@@ -13,25 +13,37 @@ export default {
       copyPage: false,
     },
   },
-  'connect-to-hardware': {
-    title: '连接硬件',
+  'hardware-sdk': {
+    title: '硬件接入',
     type: 'menu',
     items: {
-      'hardware-sdk': { title: '硬件 JS SDK', href: '/zh/hardware-sdk' },
-      'air-gap': { title: 'Air-Gap 离线签名', href: '/zh/air-gap' },
+      overview: { title: '概览', href: '/zh/hardware-sdk' },
+      transport: { title: '传输层', href: '/zh/hardware-sdk/transport' },
+      signers: { title: '签名指南', href: '/zh/hardware-sdk/signers' },
+      'core-api': { title: '核心 API', href: '/zh/hardware-sdk/core-api-guide' },
+      playground: { title: 'Playground', href: '/zh/hardware-sdk/playground' },
     },
   },
-  'hardware-sdk': {
-    title: 'hardware-sdk',
-    type: 'page',
+  'connect-to-software': {
+    title: 'dApp 接入',
+    type: 'menu',
+    items: {
+      overview: { title: '快速开始', href: '/zh/connect-to-software' },
+      provider: { title: 'Provider API', href: '/zh/connect-to-software/provider' },
+      'wallet-ui': { title: '钱包 UI', href: '/zh/connect-to-software/wallet-ui' },
+      'react-hooks': { title: 'React Hooks', href: '/zh/connect-to-software/react-hooks' },
+    },
   },
   'air-gap': {
-    title: 'Air Gap',
-    type: 'page',
-  },
-  'connect-to-software': {
-    title: '连接软件',
-    type: 'page',
+    title: 'Air-Gap 签名',
+    type: 'menu',
+    items: {
+      overview: { title: '概览', href: '/zh/air-gap' },
+      'basic-api': { title: '基础 API', href: '/zh/air-gap/basic-api' },
+      ethereum: { title: 'Ethereum & EVM', href: '/zh/air-gap/ethereum-and-evm' },
+      bitcoin: { title: 'Bitcoin (PSBT)', href: '/zh/air-gap/bitcoin' },
+      solana: { title: 'Solana', href: '/zh/air-gap/solana' },
+    },
   },
   changelog: {
     title: '更新日志',
