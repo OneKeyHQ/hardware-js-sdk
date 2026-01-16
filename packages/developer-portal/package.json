@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next",
-    "build": "next build",
+    "build": "next build && pagefind --site out --output-subdir _pagefind",
     "start": "npx serve@latest out",
     "clean": "rimraf out .next"
   },
