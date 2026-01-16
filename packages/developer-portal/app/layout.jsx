@@ -7,6 +7,10 @@ export const metadata = {
     template: '%s - OneKey Developers'
   },
   description: 'Official developer documentation for OneKey hardware and software integration.',
+  icons: {
+    icon: '/icons/onekey.png',
+    apple: '/icons/onekey.png',
+  },
 }
 
 export default function RootLayout({ children }) {

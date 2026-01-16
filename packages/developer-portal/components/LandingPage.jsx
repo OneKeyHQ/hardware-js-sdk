@@ -183,7 +183,7 @@ export function LandingPage({ locale = 'en' }) {
           <div className="relative mx-auto h-[810px] w-full max-w-[1440px]">
             <div className="absolute left-[64px] top-[169px] z-10 flex w-[711px] flex-col gap-[0px]">
               <h1 className="text-[52px] font-semibold leading-[56px]">
-                <span className="bg-gradient-to-r from-white from-[24%] to-[#16d629] bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-[#57E668] to-[#16D629] bg-clip-text text-transparent">
                   {copy.heroTitle}
                 </span>
               </h1>
@@ -200,19 +200,15 @@ export function LandingPage({ locale = 'en' }) {
                     section.scrollIntoView({ behavior: 'smooth' })
                   }
                 }}
-                className="flex w-[223px] items-center justify-center gap-[8px] rounded-[50px] px-[32px] py-[18px] text-[16px] font-medium text-[#101111]"
+                className="flex items-center justify-center rounded-[50px] px-[32px] py-[18px] text-[16px] font-medium hover:opacity-90 transition-opacity"
                 style={{
                   backgroundImage:
                     'linear-gradient(90deg, rgb(79, 245, 95) 0%, rgb(33, 233, 53) 100%)',
                   color: '#101111',
+                  cursor: 'pointer',
                 }}
               >
                 {copy.ctaPrimary}
-                <img
-                  src="/Button/Icon/logo.svg"
-                  alt=""
-                  className="size-[24px]"
-                />
               </button>
               <Link
                 href={`/${locale}/changelog`}
@@ -255,8 +251,8 @@ export function LandingPage({ locale = 'en' }) {
           className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]"
         >
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <p className="text-[40px] font-medium leading-[46px]">{copy.hardwareTitle}</p>
-            <p className="text-[16px] text-white/70">
+            <p className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.hardwareTitle}</p>
+            <p className="text-[16px]" style={{ color: '#FFFFFF' }}>
               {copy.hardwareSubtitle}
             </p>
           </div>
@@ -270,8 +266,8 @@ export function LandingPage({ locale = 'en' }) {
 
         <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]">
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <p className="text-[40px] font-medium leading-[46px]">{copy.dappTitle}</p>
-            <p className="text-[16px] text-white/70">
+            <p className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.dappTitle}</p>
+            <p className="text-[16px]" style={{ color: '#FFFFFF' }}>
               {copy.dappSubtitle}
             </p>
           </div>
@@ -285,8 +281,8 @@ export function LandingPage({ locale = 'en' }) {
 
         <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]">
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <p className="text-[40px] font-medium leading-[46px]">{copy.offlineTitle}</p>
-            <p className="text-[16px] text-white/70">
+            <p className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.offlineTitle}</p>
+            <p className="text-[16px]" style={{ color: '#FFFFFF' }}>
               {copy.offlineSubtitle}
             </p>
           </div>
