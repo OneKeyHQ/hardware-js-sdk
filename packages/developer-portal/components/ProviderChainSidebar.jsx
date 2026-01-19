@@ -309,6 +309,7 @@ export function ProviderChainSidebar({ lang = 'en' }) {
                           <li key={child.id}>
                             <Link
                               href={childPath}
+                              prefetch={false}
                               className={`block py-1 text-xs transition-colors rounded px-1.5
                                 ${isChildActive ? 'sidebar-link-active' : 'sidebar-link'}`}
                             >
@@ -324,6 +325,7 @@ export function ProviderChainSidebar({ lang = 'en' }) {
                 // Regular link item
                 <Link
                   href={pagePath}
+                  prefetch={false}
                   className={`block py-1.5 text-sm transition-colors rounded px-1.5
                     ${isActive ? 'sidebar-link-active' : 'sidebar-link'}`}
                 >

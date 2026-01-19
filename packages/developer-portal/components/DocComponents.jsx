@@ -125,6 +125,7 @@ export function Card({ icon, title, description, href, tags = [], external = fal
   const wrapperProps = href
     ? {
         href,
+        prefetch: false,
         target: external ? '_blank' : undefined,
         rel: external ? 'noopener noreferrer' : undefined,
       }
@@ -236,6 +237,7 @@ export function DecisionCard({ question, options = [] }) {
           <Link
             key={idx}
             href={opt.href || '#'}
+            prefetch={false}
             className="flex items-start gap-3 p-4 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:border-[#00B812] transition-colors no-underline group"
           >
             <div className="p-2 bg-zinc-100 dark:bg-zinc-700 rounded-lg group-hover:bg-[#00B812] group-hover:text-white transition-colors">
@@ -317,6 +319,7 @@ export function QuickActions({ actions = [] }) {
           <Link
             key={idx}
             href={href}
+            prefetch={false}
             target={action.external ? '_blank' : undefined}
             rel={action.external ? 'noopener noreferrer' : undefined}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-colors no-underline ${
@@ -453,6 +456,7 @@ export function DecisionFlow({ title, steps = [] }) {
                 <Link
                   key={optIdx}
                   href={opt.href || '#'}
+                  prefetch={false}
                   className="flex items-center gap-3 p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-[#00B812] hover:shadow-md transition-all no-underline group"
                 >
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${opt.highlight ? 'bg-[#00B812] text-white' : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 group-hover:bg-[#00B812] group-hover:text-white'} transition-colors`}>

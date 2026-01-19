@@ -339,6 +339,7 @@ export function ChainMethodsSidebar({ lang = 'en' }) {
             <li key={method.id}>
               <Link
                 href={methodPath}
+                prefetch={false}
                 className={`flex rounded px-2 py-1.5 text-sm transition-colors
                   ${isActive ? 'sidebar-link-active' : 'sidebar-link'}`}
               >
