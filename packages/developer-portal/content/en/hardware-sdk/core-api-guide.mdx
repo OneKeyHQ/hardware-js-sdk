@@ -46,9 +46,11 @@ console.log(res.payload.address);
 
 ### Which identifiers are required?
 
-- No identifiers: `init` / event handlers (`on`/`off`) / `searchDevices` / `getLogs` / `checkBridgeStatus` / `checkFirmwareTypeAvailable` / `updateSettings` / `switchTransport` / `dispose` / `uiResponse` (payload only).
-- `connectId` only: `getFeatures` / `getPassphraseState` / `cancel` / device management & firmware APIs (e.g., `deviceSettings`, `deviceReset`, `deviceWipe`, `checkFirmwareRelease`).
-- `connectId + deviceId`: chain signing/address/public key/encryption/proof APIs (e.g., EVM/BTC/Solana/Nostr/TON/`allNetworkGetAddress`/`cipherKeyValue`).
+| Requirement | Description | Example APIs |
+| :--- | :--- | :--- |
+| 🟢 No identifiers | SDK init, config, event management | `init` `on/off` `searchDevices` `getLogs` `dispose` `uiResponse` |
+| 🟡 `connectId` only | Device management, status, firmware ops | `getFeatures` `getPassphraseState` `cancel` `deviceSettings` `deviceReset` |
+| 🔵 `connectId` + `deviceId` | Blockchain signing, address, encryption | `evmSignTransaction` `btcSignTransaction` `solanaSignMessage` `allNetworkGetAddress` |
 
 ## Standard lifecycle (recommended)
 
@@ -245,14 +247,6 @@ HardwareSDK.on(UI_EVENT, handleUiEvent);
 More detail: see [`HardwareError.ts`](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/shared/src/HardwareError.ts) for exhaustive definitions and payload shapes.
 
 Pattern: map error → user message + developer action; provide UI buttons for retry/check device/upgrade firmware.
-
-**Quick checklist**
-
-1) Init once; confirm env/permissions/HTTPS; keep `connectId` + `deviceId`  
-2) Subscribe UI/DEVICE/FIRMWARE; send `uiResponse` only after events  
-3) Serialize per device; combine CommonParams (keepSession/passphraseState)  
-4) Use valid HD paths; if errors, check chain docs and hardening rules  
-5) Map error codes to user text and dev actions; prompt firmware/Bridge updates when needed  
 
 **Related links**
 

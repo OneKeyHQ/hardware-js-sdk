@@ -425,7 +425,18 @@ export function LandingPage({ locale = 'en' }) {
                   />
                 </div>
                 <p className="text-[12px] leading-[15px] text-white/60">
-                  2022 OneKey, Inc. All rights reserved.
+                  Since 2019 - {new Date().getFullYear()} | OneKey Limited All Rights Reserved
+                </p>
+                <p className="mt-2 text-[11px] leading-[14px] text-white/40 font-mono">
+                  SDK v{process.env.NEXT_PUBLIC_SDK_VERSION || 'dev'}
+                  {process.env.NEXT_PUBLIC_COMMIT_SHORT && process.env.NEXT_PUBLIC_COMMIT_SHORT !== 'local' && (
+                    <> · <a
+                      href={`https://github.com/OneKeyHQ/hardware-js-sdk/commit/${process.env.NEXT_PUBLIC_COMMIT_ID || ''}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-white/60 transition-colors"
+                    >{process.env.NEXT_PUBLIC_COMMIT_SHORT}</a></>
+                  )}
                 </p>
               </div>
             </div>

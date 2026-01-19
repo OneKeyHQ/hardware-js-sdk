@@ -13,24 +13,26 @@ export default {
       copyPage: false,
     },
   },
-  'connect-to-hardware': {
-    title: 'Connect to hardware',
+  // Navigation menus with dropdown items
+  'hardware-sdk': {
+    title: 'Hardware Integration',
     type: 'menu',
     items: {
-      'hardware-sdk': { title: 'Hardware JS SDK', href: '/en/hardware-sdk' },
-      'air-gap': { title: 'Air-Gap', href: '/en/air-gap' },
+      'web-usb': { title: 'WebUSB Connection', href: '/en/hardware-sdk/transport/web-usb' },
+      'react-native-ble': { title: 'React Native BLE', href: '/en/hardware-sdk/transport/react-native-ble' },
+      'native-ble': { title: 'Native Mobile BLE', href: '/en/hardware-sdk/transport/native-ble' },
     },
   },
-  'hardware-sdk': {
-    title: 'hardware-sdk',
-    type: 'page',
+  'connect-to-software': {
+    title: 'dApp Integration',
+    type: 'menu',
+    items: {
+      provider: { title: 'Provider API', href: '/en/connect-to-software/provider' },
+      web3modal: { title: 'Web3Modal UI Kit', href: '/en/connect-to-software/wallet-ui/web3modal' },
+    },
   },
   'air-gap': {
-    title: 'Air Gap',
-    type: 'page',
-  },
-  'connect-to-software': {
-    title: 'Connect to Software',
+    title: 'Offline Signing',
     type: 'page',
   },
   changelog: {
