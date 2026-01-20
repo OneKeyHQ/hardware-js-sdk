@@ -6,23 +6,25 @@
 /* eslint-disable @typescript-eslint/no-var-requires, import/no-extraneous-dependencies */
 
 import {
-  isOnekeyDevice,
   EOneKeyBleMessageKeys,
-  ONEKEY_SERVICE_UUID,
-  ONEKEY_WRITE_CHARACTERISTIC_UUID,
-  ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
-  isHeaderChunk,
   ERRORS,
   HardwareErrorCode,
+  ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
+  ONEKEY_SERVICE_UUID,
+  ONEKEY_WRITE_CHARACTERISTIC_UUID,
+  isHeaderChunk,
+  isOnekeyDevice,
   wait,
 } from '@onekeyfe/hd-shared';
 import { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
-import type { WebContents, IpcMainInvokeEvent } from 'electron';
-import type { Peripheral, Service, Characteristic } from '@stoprocent/noble';
 import pRetry from 'p-retry';
-import type { NobleModule, Logger, DeviceInfo, CharacteristicPair } from './types/noble-extended';
+
 import { safeLog } from './types/noble-extended';
 import { softRefreshSubscription } from './ble-ops';
+
+import type { IpcMainInvokeEvent, WebContents } from 'electron';
+import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
+import type { CharacteristicPair, DeviceInfo, Logger, NobleModule } from './types/noble-extended';
 
 // Noble will be dynamically imported to avoid bundlinpissues
 let noble: NobleModule | null = null;
@@ -52,6 +54,13 @@ const subscribedDevices = new Map<string, boolean>(); // Track subscription stat
 
 // 🔒 Subscription operation state tracking to prevent race conditions
 const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' | 'idle'>();
+
+// 🔒 Targeted scan state - simpler approach without extra listeners
+// Only one targeted scan can be active at a time
+let activeTargetedScan: {
+  targetDeviceId: string;
+  resolve: (peripheral: Peripheral | null) => void;
+} | null = null;
 
 // Packet reassembly state for each device
 interface PacketAssemblyState {
@@ -684,6 +693,18 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
 
   // Cache the device in both maps
   discoveredDevices.set(peripheral.id, peripheral);
+
+  // 🔒 FIX: Check if there's an active targeted scan waiting for this device
+  // This eliminates the need for extra listeners in performTargetedScan
+  if (activeTargetedScan && peripheral.id === activeTargetedScan.targetDeviceId) {
+    logger?.info('[NobleBLE] Target device found during targeted scan:', peripheral.id);
+    const { resolve } = activeTargetedScan;
+    activeTargetedScan = null; // Clear the state before resolving
+    if (noble) {
+      noble.stopScanning();
+    }
+    resolve(peripheral);
+  }
 }
 
 // Ensure discover listener is properly set up
@@ -715,8 +736,19 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
   // Ensure discover listener is properly set up before targeted scanning
   ensureDiscoverListener();
 
+  // 🔒 FIX: Cancel any previous targeted scan (only one can be active at a time)
+  if (activeTargetedScan) {
+    logger?.debug('[NobleBLE] Cancelling previous targeted scan for device:', activeTargetedScan.targetDeviceId);
+    activeTargetedScan.resolve(null);
+    activeTargetedScan = null;
+  }
+
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
+      // Clear the active scan state on timeout
+      if (activeTargetedScan?.targetDeviceId === targetDeviceId) {
+        activeTargetedScan = null;
+      }
       if (noble) {
         noble.stopScanning();
       }
@@ -724,40 +756,24 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
       resolve(null);
     }, FAST_SCAN_TIMEOUT);
 
-    // Set up discovery handler for target device
-    const onDiscover = (peripheral: Peripheral) => {
-      if (peripheral.id === targetDeviceId) {
+    // 🔒 FIX: Set the active targeted scan state
+    // handleDeviceDiscovered will check this and resolve when target is found
+    activeTargetedScan = {
+      targetDeviceId,
+      resolve: (peripheral) => {
         clearTimeout(timeout);
-        if (noble) {
-          noble.stopScanning();
-          noble.removeListener('discover', onDiscover);
-        }
-
-        // Cache the found device
-        discoveredDevices.set(peripheral.id, peripheral);
-
-        logger?.info('[NobleBLE] OneKey device found during targeted scan:', {
-          id: peripheral.id,
-          name: peripheral.advertisement?.localName || 'Unknown',
-        });
-
         resolve(peripheral);
-      }
+      },
     };
 
-    // Remove any existing discover listeners to prevent memory leaks
-    if (noble) {
-      noble.removeListener('discover', onDiscover);
-      noble.on('discover', onDiscover);
-    }
-
-    // Start scanning
+    // Start scanning - the global discover listener will handle device discovery
+    // No need to add extra listeners here, avoiding listener leaks
     if (noble) {
       noble.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
         if (error) {
           clearTimeout(timeout);
-          if (noble) {
-            noble.removeListener('discover', onDiscover);
+          if (activeTargetedScan?.targetDeviceId === targetDeviceId) {
+            activeTargetedScan = null;
           }
           logger?.error('[NobleBLE] Failed to start targeted scan:', error);
           reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
@@ -1121,8 +1137,9 @@ async function discoverServicesAndCharacteristicsWithRetry(
         targetUUIDs: ONEKEY_SERVICE_UUIDS,
       });
 
-      // Strategy: Force reconnect on 3rd attempt to clear potential state issues
-      if (attemptNumber === 3) {
+      // 🔒 FIX: Force reconnect on 2nd attempt (instead of 3rd) to reduce connection delay
+      // Combined with the 500ms stabilization delay after connect, this reduces total time from ~5s to ~2s
+      if (attemptNumber === 2) {
         logger?.info('[NobleBLE] Attempting force reconnect to clear connection state...');
         try {
           await forceReconnectPeripheral(peripheral, deviceId);
@@ -1312,6 +1329,10 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
       // Set up unified disconnect listener
       setupDisconnectListener(connectedPeripheral, deviceId, webContents);
+
+      // 🔒 FIX: Add stabilization delay after connect before service discovery
+      // macOS Noble BLE often returns empty services if queried too quickly after connect
+      await wait(500);
 
       try {
         const characteristics = await connectAndDiscoverWithFreshScan(deviceId);
