@@ -19,37 +19,37 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Get SDK Version
+        id: version
+        run: |
+          SDK_VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "sdk_version=$SDK_VERSION" >> $GITHUB_OUTPUT
+
       - name: Install Dependencies (Developer Portal)
-        working-directory: packages/developer-portal
+        working-directory: packages/connect-examples/developer-portal
         run: yarn install
 
       - name: Build Developer Portal
-        working-directory: packages/developer-portal
+        working-directory: packages/connect-examples/developer-portal
         env:
           NEXT_PUBLIC_SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
           NEXT_PUBLIC_COMMIT_ID: ${{ github.sha }}
           NEXT_PUBLIC_COMMIT_SHORT: ${{ github.sha }}
           NEXT_PUBLIC_BUILD_TIME: ${{ github.event.repository.updated_at }}
-        run: |
-          # Get SDK version from core package
-          SDK_VERSION=$(node -p "require('../core/package.json').version")
-          export NEXT_PUBLIC_SDK_VERSION=$SDK_VERSION
-          export NEXT_PUBLIC_COMMIT_SHORT=${GITHUB_SHA:0:7}
-          export NEXT_PUBLIC_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          echo "Building with SDK_VERSION=$SDK_VERSION, COMMIT=${GITHUB_SHA:0:7}"
-          yarn build
+        run: yarn build
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: developer-portal-${{ github.sha }}
-          path: ./packages/developer-portal/out/
+          path: ./packages/connect-examples/developer-portal/out/
           retention-days: 7
 
       - name: Summary
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **SDK Version**: ${{ steps.version.outputs.sdk_version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
