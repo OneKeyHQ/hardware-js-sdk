@@ -1,5 +1,21 @@
 # OneKey Hardware SDK - Claude 文档指引
 
+## 📚 Context7 文档支持
+
+本项目已在 Context7 上索引，可通过 MCP 工具获取最新文档和代码示例：
+
+```json
+{
+  "url": "https://context7.com/onekeyhq/hardware-js-sdk",
+  "library_id": "/onekeyhq/hardware-js-sdk"
+}
+```
+
+**使用方法**：
+- 使用 `mcp__context7__get-library-docs` 工具获取文档
+- Library ID: `/onekeyhq/hardware-js-sdk`
+- 可指定 topic 参数聚焦特定主题，如 `transport`、`signing`、`bip39` 等
+
 ## 📁 问题分流指引
 
 根据问题类型，请参考对应的专业文档：
