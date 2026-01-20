@@ -6,25 +6,23 @@
 /* eslint-disable @typescript-eslint/no-var-requires, import/no-extraneous-dependencies */
 
 import {
+  isOnekeyDevice,
   EOneKeyBleMessageKeys,
-  ERRORS,
-  HardwareErrorCode,
-  ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   ONEKEY_SERVICE_UUID,
   ONEKEY_WRITE_CHARACTERISTIC_UUID,
+  ONEKEY_NOTIFY_CHARACTERISTIC_UUID,
   isHeaderChunk,
-  isOnekeyDevice,
+  ERRORS,
+  HardwareErrorCode,
   wait,
 } from '@onekeyfe/hd-shared';
 import { COMMON_HEADER_SIZE } from '@onekeyfe/hd-transport';
+import type { WebContents, IpcMainInvokeEvent } from 'electron';
+import type { Peripheral, Service, Characteristic } from '@stoprocent/noble';
 import pRetry from 'p-retry';
-
+import type { NobleModule, Logger, DeviceInfo, CharacteristicPair } from './types/noble-extended';
 import { safeLog } from './types/noble-extended';
 import { softRefreshSubscription } from './ble-ops';
-
-import type { IpcMainInvokeEvent, WebContents } from 'electron';
-import type { Characteristic, Peripheral, Service } from '@stoprocent/noble';
-import type { CharacteristicPair, DeviceInfo, Logger, NobleModule } from './types/noble-extended';
 
 // Noble will be dynamically imported to avoid bundlinpissues
 let noble: NobleModule | null = null;
