@@ -13,11 +13,11 @@ import {
   X,
 } from 'lucide-react'
 
-const heroSecurity05 = '/landing-page/security-05.svg'
-const heroSecurity04 = '/landing-page/security-04.svg'
-const heroSecurity03 = '/landing-page/security-03.svg'
-const heroSecurity02 = '/landing-page/security-02.svg'
-const heroSecurity01 = '/landing-page/security-01.svg'
+const heroSecurity05 = '/landing-page/security-05.png'
+const heroSecurity04 = '/landing-page/security-04.png'
+const heroSecurity03 = '/landing-page/security-03.png'
+const heroSecurity02 = '/landing-page/security-02.png'
+const heroSecurity01 = '/landing-page/security-01.png'
 
 const getFooterData = (isZh, locale) => {
   const portalColumn = {
@@ -57,13 +57,13 @@ const IntegrationCard = ({ title, description, icon: Icon, iconSrc, href, cta, c
             <Icon className="size-[20px] text-white" />
           )}
         </div>
-        <p className="text-[24px] font-semibold leading-[30px] text-white">
+        <span className="text-[24px] font-semibold leading-[30px]" style={{ color: '#FFFFFF' }}>
           {title}
-        </p>
+        </span>
       </div>
-      <p className="text-[16px] leading-[20px] text-white/70">
+      <span className="text-[16px] leading-[20px]" style={{ color: '#FFFFFFB2' }}>
         {description}
-      </p>
+      </span>
     </div>
     <div className="flex items-center gap-[4px] text-[#16d629]">
       <span className="text-[18px] leading-[20px]">{cta}</span>
@@ -197,7 +197,9 @@ export function LandingPage({ locale = 'en' }) {
                 onClick={() => {
                   const section = document.getElementById('hardware-integration')
                   if (section) {
-                    section.scrollIntoView({ behavior: 'smooth' })
+                    const offset = 160
+                    const sectionTop = section.getBoundingClientRect().top + window.scrollY
+                    window.scrollTo({ top: sectionTop - offset, behavior: 'smooth' })
                   }
                 }}
                 className="flex items-center justify-center rounded-[50px] px-[32px] py-[18px] text-[16px] font-medium hover:opacity-90 transition-opacity"
@@ -251,47 +253,44 @@ export function LandingPage({ locale = 'en' }) {
           className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]"
         >
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <p className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.hardwareTitle}</p>
-            <p className="text-[16px]" style={{ color: '#FFFFFF' }}>
+            <h2 className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.hardwareTitle}</h2>
+            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.hardwareSubtitle}
-            </p>
+            </span>
           </div>
           <div className="mt-[24px] grid w-full grid-cols-1 gap-[32px] lg:grid-cols-3">
             {integrationCards.map((card) => (
               <IntegrationCard key={card.title} {...card} />
             ))}
           </div>
-          <div className="mt-[24px] h-[1px] w-full bg-white/30" />
         </section>
 
         <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]">
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <p className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.dappTitle}</p>
-            <p className="text-[16px]" style={{ color: '#FFFFFF' }}>
+            <h2 className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.dappTitle}</h2>
+            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.dappSubtitle}
-            </p>
+            </span>
           </div>
-          <div className="mt-[24px] grid w-full grid-cols-1 gap-[32px] lg:grid-cols-2">
+          <div className="mt-[24px] grid w-full grid-cols-1 gap-[32px] lg:grid-cols-3">
             {dappCards.map((card) => (
               <IntegrationCard key={card.title} {...card} />
             ))}
           </div>
-          <div className="mt-[24px] h-[1px] w-full bg-white/30" />
         </section>
 
         <section className="mx-auto flex w-full max-w-[1440px] flex-col items-center px-[64px]">
           <div className="flex w-full flex-col items-center gap-[8px] text-center">
-            <p className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.offlineTitle}</p>
-            <p className="text-[16px]" style={{ color: '#FFFFFF' }}>
+            <h2 className="text-[40px] font-medium leading-[46px]" style={{ color: '#FFFFFF' }}>{copy.offlineTitle}</h2>
+            <span className="text-[16px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
               {copy.offlineSubtitle}
-            </p>
+            </span>
           </div>
-          <div className="mt-[24px] grid w-full grid-cols-1 gap-[32px] lg:grid-cols-2">
+          <div className="mt-[24px] grid w-full grid-cols-1 gap-[32px] lg:grid-cols-3">
             {offlineCards.map((card) => (
-              <IntegrationCard key={card.title} className="lg:col-span-1" {...card} />
+              <IntegrationCard key={card.title} {...card} />
             ))}
           </div>
-          <div className="mt-[24px] h-[1px] w-full bg-white/30" />
         </section>
 
         <section className="mx-auto w-full max-w-[1440px] px-[64px]">
@@ -340,23 +339,23 @@ export function LandingPage({ locale = 'en' }) {
         </section>
       </main>
 
-      <footer className="mt-[120px] w-full rounded-t-[64px] bg-[#101111]">
-        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-[80px] px-[64px] py-[120px] lg:flex-row lg:gap-[133px]">
-          <div className="flex shrink-0 flex-col gap-[10px]">
-            <div className="flex flex-col gap-[16px]">
+      <footer className="mt-[180px] w-full bg-[#101111]">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col px-[64px] pb-[80px]">
+          <div className="flex flex-col gap-[80px] lg:flex-row lg:gap-[120px]">
+            <div className="flex shrink-0 flex-col gap-[32px]">
               <img
                 src="/landing-page/onekey-brand.svg"
                 alt="OneKey"
-                className="h-[57px] w-[233px]"
+                className="h-[40px] w-auto"
               />
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                  className="flex w-fit items-center gap-[8px] rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white"
+                  className="flex w-fit items-center gap-[8px] rounded-[50px] border border-white/20 px-[20px] py-[10px] text-[14px] font-medium text-white"
                 >
                   {isZh ? '中文' : 'English'}
-                  <ChevronDown className={`size-[24px] transition-transform ${showLanguageMenu ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`size-[16px] transition-transform ${showLanguageMenu ? 'rotate-180' : ''}`} />
                 </button>
                 {showLanguageMenu && (
                   <div className="absolute left-0 top-full z-20 mt-[8px] flex flex-col overflow-hidden rounded-[12px] border border-white/10 bg-[#1a1a1a]">
@@ -378,82 +377,19 @@ export function LandingPage({ locale = 'en' }) {
                 )}
               </div>
             </div>
-            <div className="flex flex-col gap-[24px] pt-[10px]">
-              <div className="flex items-center gap-[16px]">
-                <a
-                  href="https://twitter.com/onekeyHQ"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Twitter"
-                >
-                  <img src="/landing-page/social/twitter.svg" alt="" className="size-[24px]" />
-                </a>
-                <a
-                  href="https://github.com/OneKeyHQ"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="GitHub"
-                >
-                  <img src="/landing-page/social/github.svg" alt="" className="size-[24px]" />
-                </a>
-                <a
-                  href="https://discord.gg/onekey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Discord"
-                >
-                  <img src="/landing-page/social/discord.svg" alt="" className="size-[24px]" />
-                </a>
-              </div>
-              <div className="flex flex-col gap-[16px]">
-                <div className="flex items-center gap-[16px]">
-                  <a
-                    href="https://github.com/OneKeyHQ"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <img
-                      src="/landing-page/badge-osi.svg"
-                      alt="Open Source"
-                      className="h-[33px] w-[96px]"
-                    />
-                  </a>
-                  <img
-                    src="/landing-page/badge-cceal.svg"
-                    alt="CCEAL 5+ ISO 27001"
-                    className="h-[32px] w-[108px]"
-                  />
-                </div>
-                <p className="text-[12px] leading-[15px] text-white/60">
-                  Since 2019 - {new Date().getFullYear()} | OneKey Limited All Rights Reserved
-                </p>
-                <p className="mt-2 text-[11px] leading-[14px] text-white/40 font-mono">
-                  SDK v{process.env.NEXT_PUBLIC_SDK_VERSION || 'dev'}
-                  {process.env.NEXT_PUBLIC_COMMIT_SHORT && process.env.NEXT_PUBLIC_COMMIT_SHORT !== 'local' && (
-                    <> · <a
-                      href={`https://github.com/OneKeyHQ/hardware-js-sdk/commit/${process.env.NEXT_PUBLIC_COMMIT_ID || ''}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-white/60 transition-colors"
-                    >{process.env.NEXT_PUBLIC_COMMIT_SHORT}</a></>
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <div className="flex flex-1 flex-col gap-[80px]">
-            <div className="flex flex-wrap gap-[40px] lg:gap-[80px]">
-              <div className="flex flex-col gap-[32px]">
-                <p className="text-[14px] font-medium leading-[20px] text-white/60">
+            <div className="flex flex-1 flex-wrap gap-[60px] lg:gap-[120px]">
+              <div className="flex flex-col gap-[24px]">
+                <span className="text-[14px] leading-[20px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
                   {getFooterData(isZh, locale).portalColumn.title}
-                </p>
+                </span>
                 <div className="flex flex-col gap-[16px]">
                   {getFooterData(isZh, locale).portalColumn.items.map((item) => (
                     <a
                       key={item.label}
                       href={item.href}
-                      className="text-[16px] leading-[20px] text-white hover:text-white/80"
+                      className="text-[14px] leading-[20px] hover:opacity-80"
+                      style={{ color: '#FFFFFF' }}
                       target={item.href.startsWith('http') ? '_blank' : undefined}
                       rel={item.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                     >
@@ -463,16 +399,17 @@ export function LandingPage({ locale = 'en' }) {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-[32px]">
-                <p className="text-[14px] font-medium leading-[17px] text-white/60">
+              <div className="flex flex-col gap-[24px]">
+                <span className="text-[14px] leading-[20px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
                   {getFooterData(isZh, locale).legalColumn.title}
-                </p>
+                </span>
                 <div className="flex flex-col gap-[16px]">
                   {getFooterData(isZh, locale).legalColumn.items.map((item) => (
                     <a
                       key={item.label}
                       href={item.href}
-                      className="text-[16px] font-medium leading-[20px] text-white hover:text-white/80"
+                      className="text-[14px] font-medium leading-[20px] hover:opacity-80"
+                      style={{ color: '#FFFFFF' }}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -482,12 +419,61 @@ export function LandingPage({ locale = 'en' }) {
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="flex flex-col gap-[16px]">
+          <div className="mt-[100px] flex flex-col gap-[28px]">
+            <div className="flex items-center gap-[16px]">
+              <a
+                href="https://twitter.com/onekeyHQ"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Twitter"
+              >
+                <img src="/landing-page/social/twitter.svg" alt="" className="size-[24px]" />
+              </a>
+              <a
+                href="https://github.com/OneKeyHQ"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="GitHub"
+              >
+                <img src="/landing-page/social/github.svg" alt="" className="size-[24px]" />
+              </a>
+              <a
+                href="https://discord.gg/onekey"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Discord"
+              >
+                <img src="/landing-page/social/discord.svg" alt="" className="size-[24px]" />
+              </a>
+            </div>
+            <div className="flex items-center gap-[16px]">
+              <a
+                href="https://github.com/OneKeyHQ"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  src="/landing-page/badge-osi.svg"
+                  alt="Open Source"
+                  className="h-[28px] w-auto"
+                />
+              </a>
+              <img
+                src="/landing-page/badge-cceal.svg"
+                alt="CEPREI ISO/IEC 27001"
+                className="h-[28px] w-auto"
+              />
+            </div>
+            <div className="flex items-center gap-[24px]">
+              <span className="text-[12px] leading-[16px]" style={{ color: 'rgba(255, 255, 255, 0.4)' }}>
+                {new Date().getFullYear()} OneKey, Inc. All rights reserved.
+              </span>
               <button
                 type="button"
                 onClick={() => setShowSubscribeModal(true)}
-                className="w-fit rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white hover:bg-white/10"
+                className="w-fit rounded-[50px] border border-white/20 px-[24px] py-[10px] text-[14px] font-medium text-white hover:bg-white/10"
               >
                 {isZh ? '订阅我们的通知' : 'Subscribe to our notifications'}
               </button>
