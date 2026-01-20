@@ -25,7 +25,19 @@ jobs:
 
       - name: Build Developer Portal
         working-directory: packages/developer-portal
-        run: yarn build
+        env:
+          NEXT_PUBLIC_SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+          NEXT_PUBLIC_COMMIT_ID: ${{ github.sha }}
+          NEXT_PUBLIC_COMMIT_SHORT: ${{ github.sha }}
+          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.repository.updated_at }}
+        run: |
+          # Get SDK version from core package
+          SDK_VERSION=$(node -p "require('../core/package.json').version")
+          export NEXT_PUBLIC_SDK_VERSION=$SDK_VERSION
+          export NEXT_PUBLIC_COMMIT_SHORT=${GITHUB_SHA:0:7}
+          export NEXT_PUBLIC_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "Building with SDK_VERSION=$SDK_VERSION, COMMIT=${GITHUB_SHA:0:7}"
+          yarn build
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

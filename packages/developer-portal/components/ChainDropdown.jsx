@@ -44,33 +44,34 @@ export function ChainDropdown({
     chain.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Combined effect: mount state + event listeners
   useEffect(() => {
     setMounted(true)
-  }, [])
 
-  // Close on outside click
-  useEffect(() => {
+    // Close on outside click
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false)
         setSearchQuery('')
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
-  // Close on Escape key
-  useEffect(() => {
+    // Close on Escape key
     function handleKeyDown(event) {
-      if (event.key === 'Escape' && isOpen) {
+      if (event.key === 'Escape') {
         setIsOpen(false)
         setSearchQuery('')
       }
     }
+
+    document.addEventListener('mousedown', handleClickOutside)
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen])
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   const handleToggle = () => {
     if (!disabled && mounted) {

@@ -6,7 +6,6 @@ import { Anchor, Button } from 'nextra/components'
 import { useFSRoute } from 'nextra/hooks'
 import { ArrowRightIcon, MenuIcon } from 'nextra/icons'
 import { setMenu, useConfig, useMenu, useThemeConfig } from 'nextra-theme-docs'
-import { useTheme } from 'next-themes'
 
 const classes = {
   link: cn(
@@ -23,22 +22,13 @@ const sanitizeMenuId = (menu) => {
   return `onekey-navbar-${base.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()}`
 }
 
-const menuButtonClass = ({ focus }) =>
-  cn(classes.link, 'x:items-center x:flex x:gap-1.5 x:cursor-pointer', focus && 'x:nextra-focus')
-
-const menuItemClass = ({ active }) =>
-  cn(
-    'x:block x:py-1.5 x:transition-colors x:ps-3 x:pe-9',
-    active ? 'x:text-gray-900 x:dark:text-zinc-100' : 'x:text-gray-600 x:dark:text-zinc-300'
-  )
-
 const menuItemsClass = cn(
-  'x:focus-visible:nextra-focus',
+  'x:outline-none',
   'nextra-scrollbar x:motion-reduce:transition-none',
   'x:origin-top x:transition x:duration-200 x:ease-out x:data-closed:scale-95 x:data-closed:opacity-0',
-  'x:border x:border-gray-200 x:dark:border-zinc-800',
+  'x:border x:border-zinc-700',
   'x:z-30 x:rounded-md x:py-1 x:text-sm x:shadow-lg',
-  'x:backdrop-blur-md x:bg-white x:text-gray-800 x:dark:bg-[#0B0F14] x:dark:text-zinc-100 x:dark:shadow-[0_12px_30px_rgba(0,0,0,0.6)]',
+  'x:backdrop-blur-md x:bg-[#0B0F14] x:text-zinc-100 x:shadow-[0_12px_30px_rgba(0,0,0,0.6)]',
   'x:max-h-[min(calc(100vh-5rem),256px)]!'
 )
 
@@ -49,8 +39,7 @@ const menuAnchor = {
 }
 
 const NavbarMenu = ({ menu, children }) => {
-  const { resolvedTheme } = useTheme()
-  const isDark = resolvedTheme === 'dark'
+  // Site is always dark mode (forcedTheme: 'dark' in layout)
   const routes =
     menu.children?.reduce((acc, child) => {
       if (child?.name) acc[child.name] = child
@@ -61,30 +50,54 @@ const NavbarMenu = ({ menu, children }) => {
     <MenuItem
       as={Anchor}
       href={item.href || routes[key]?.route}
-      className={menuItemClass}
       key={key}
     >
-      {item.title}
+      {({ active }) => (
+        <span
+          className="block py-1.5 transition-colors ps-3 pe-9"
+          style={{
+            color: active ? '#f4f4f5' : '#d4d4d8',
+            backgroundColor: active ? '#27272a' : 'transparent'
+          }}
+        >
+          {item.title}
+        </span>
+      )}
     </MenuItem>
   ))
 
   return (
     <Menu>
-      <MenuButton id={sanitizeMenuId(menu)} className={menuButtonClass}>
-        {children}
-        <ArrowRightIcon height="14" className="x:*:origin-center x:*:transition-transform x:*:rotate-90" />
-      </MenuButton>
-      <MenuItems
-        transition
-        className={menuItemsClass}
-        anchor={menuAnchor}
-        style={{
-          backgroundColor: isDark ? '#0B0F14' : '#FFFFFF',
-          color: isDark ? '#E4E4E7' : '#1F2937'
-        }}
-      >
-        {menuItems}
-      </MenuItems>
+      {({ open }) => (
+        <>
+          <MenuButton
+            id={sanitizeMenuId(menu)}
+            className={cn(
+              classes.link,
+              'x:items-center x:flex x:gap-1.5 x:cursor-pointer x:outline-none'
+            )}
+            style={{ color: open ? '#ffffff' : '#a1a1aa' }}
+          >
+            {children}
+            <ArrowRightIcon
+              height="14"
+              className="x:*:origin-center x:*:transition-transform x:*:rotate-90"
+              style={{ opacity: open ? 1 : 0.7 }}
+            />
+          </MenuButton>
+          <MenuItems
+            transition
+            className={menuItemsClass}
+            anchor={menuAnchor}
+            style={{
+              backgroundColor: '#0B0F14',
+              color: '#E4E4E7'
+            }}
+          >
+            {menuItems}
+          </MenuItems>
+        </>
+      )}
     </Menu>
   )
 }
@@ -123,9 +136,12 @@ export function OneKeyClientNavbar({ children, className }) {
         href={href}
         className={cn(
           classes.link,
-          'x:aria-[current]:font-medium x:aria-[current]:subpixel-antialiased x:aria-[current]:text-current'
+          'x:aria-[current]:font-medium x:aria-[current]:subpixel-antialiased'
         )}
         aria-current={isCurrentPage || undefined}
+        style={{
+          color: isCurrentPage ? '#e4e4e7' : '#a1a1aa'
+        }}
       >
         {page.title}
       </Anchor>

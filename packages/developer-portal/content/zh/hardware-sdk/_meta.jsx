@@ -13,7 +13,7 @@ export default {
   transport: '传输协议',
   signers: '交易签名指引',
   '---api': { type: 'separator', title: 'API' },
-  'core-api-guide': '核心接口速查',
+  'core-api-guide': '开发指南',
   'basic-api': '基础 API',
   'device-api': '设备 API',
   // Chain Methods - custom sidebar selector

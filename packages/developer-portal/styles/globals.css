@@ -1020,18 +1020,6 @@ nav[aria-label="Table of contents"] a[aria-current="true"] {
   }
 }
 
-/* Dark navbar dropdown panel - non-important override */
-html.dark header.nextra-navbar [data-headlessui-state][role="menu"].nextra-scrollbar {
-  background-color: #111827;
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
-}
-
-html.dark header.nextra-navbar [data-headlessui-state][role="menu"].nextra-scrollbar a,
-html.dark header.nextra-navbar [data-headlessui-state][role="menu"].nextra-scrollbar button,
-html.dark header.nextra-navbar [data-headlessui-state][role="menu"].nextra-scrollbar span {
-  color: #e4e4e7;
-}
 
 
 /* ============================================
@@ -1435,24 +1423,24 @@ hr {
 .dark table,
 .dark th,
 .dark td {
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .dark article h2 {
-  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Dark mode link underlines */
-.dark a {
-  text-decoration-color: rgba(255, 255, 255, 0.3) !important;
+/* Dark mode link underlines - exclude navbar dropdown links */
+.dark a:not(header.nextra-navbar a) {
+  text-decoration-color: rgba(255, 255, 255, 0.3);
 }
 
 .dark article a {
-  text-decoration-color: rgba(255, 255, 255, 0.2) !important;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
 }
 
 .dark article a:hover {
-  text-decoration-color: rgba(255, 255, 255, 0.5) !important;
+  text-decoration-color: rgba(255, 255, 255, 0.5);
 }
 
 /* ============================================
@@ -2242,4 +2230,41 @@ li:has(> .hardware-product-sidebar) {
 
 .dark .chain-dropdown input::placeholder {
   color: #71717a !important;
+}
+
+/* ============================================
+   Navbar Dropdown Dark Mode - Final Override
+   Place at end of file for highest specificity
+   ============================================ */
+
+/* Target Nextra's folder dropdown menus specifically */
+html.dark header.nextra-navbar ul[role="menu"],
+html.dark header.nextra-navbar div[class*="nextra-scrollbar"][role="menu"] {
+  background-color: #18181b;
+  border: 1px solid #3f3f46;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+/* Dropdown menu links */
+html.dark header.nextra-navbar ul[role="menu"] a,
+html.dark header.nextra-navbar div[role="menu"] a {
+  color: #d4d4d8;
+  text-decoration: none;
+}
+
+html.dark header.nextra-navbar ul[role="menu"] a:hover,
+html.dark header.nextra-navbar div[role="menu"] a:hover {
+  color: #ffffff;
+  background-color: #27272a;
+}
+
+/* Navbar top-level items */
+html.dark header.nextra-navbar nav ul > li > a,
+html.dark header.nextra-navbar nav ul > li > button {
+  color: #a1a1aa;
+}
+
+html.dark header.nextra-navbar nav ul > li > a:hover,
+html.dark header.nextra-navbar nav ul > li > button:hover {
+  color: #ffffff;
 }

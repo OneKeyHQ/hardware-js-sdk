@@ -13,24 +13,26 @@ export default {
       copyPage: false,
     },
   },
-  'connect-to-hardware': {
-    title: '连接硬件',
+  // 导航菜单及下拉项
+  'hardware-sdk': {
+    title: '硬件接入',
     type: 'menu',
     items: {
-      'hardware-sdk': { title: '硬件 JS SDK', href: '/zh/hardware-sdk' },
-      'air-gap': { title: 'Air-Gap 离线签名', href: '/zh/air-gap' },
+      'web-usb': { title: 'WebUSB 连接', href: '/zh/hardware-sdk/transport/web-usb' },
+      'react-native-ble': { title: 'React Native BLE', href: '/zh/hardware-sdk/transport/react-native-ble' },
+      'native-ble': { title: '原生移动端 BLE', href: '/zh/hardware-sdk/transport/native-ble' },
     },
   },
-  'hardware-sdk': {
-    title: 'hardware-sdk',
-    type: 'page',
+  'connect-to-software': {
+    title: 'dApp 接入',
+    type: 'menu',
+    items: {
+      provider: { title: 'Provider API', href: '/zh/connect-to-software/provider' },
+      web3modal: { title: 'Web3Modal UI 组件', href: '/zh/connect-to-software/wallet-ui/web3modal' },
+    },
   },
   'air-gap': {
-    title: 'Air Gap',
-    type: 'page',
-  },
-  'connect-to-software': {
-    title: '连接软件',
+    title: '离线签名',
     type: 'page',
   },
   changelog: {
