@@ -10,7 +10,6 @@
   "workspaces": {
     "packages": [
       "packages/*",
-      "!packages/developer-portal",
       "packages/connect-examples/expo-example",
       "packages/connect-examples/electron-example",
       "packages/connect-examples/expo-playground"
@@ -55,8 +54,8 @@
     "dev:transport-electron": "cd ./packages/hd-transport-electron && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
     "debug:watcher": "node ./scripts/monitor.js",
-    "dev:docs": "cd ./packages/developer-portal && yarn dev",
-    "build:docs": "cd ./packages/developer-portal && yarn build"
+    "dev:docs": "cd ./packages/connect-examples/developer-portal && yarn dev",
+    "build:docs": "cd ./packages/connect-examples/developer-portal && yarn build"
   },
   "resolutions": {
     "pbkdf2": "3.1.3",
