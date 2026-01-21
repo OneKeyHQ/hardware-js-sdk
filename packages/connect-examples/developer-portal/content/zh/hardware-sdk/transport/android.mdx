@@ -6,10 +6,87 @@ title: Android：通过蓝牙连接（原生）
 
 > **注意：**
 > 演示：原生 Android 示例（WebView + JSBridge + Nordic BLE）→ [native-android-example](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example)
-> 本页基于《[底层传输插件](../../concepts/low-level-plugin)》与消息协议，建议先阅读接口与 64 字节帧格式。
+> 本页基于《[底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin)》— 建议先阅读，了解 BLE 消息格式和协议详情。
 
 
 本指南展示如何通过底层适配器在原生 Android 宿主中集成 `@onekeyfe/hd-common-connect-sdk`。JavaScript 包在 WebView 中运行；传输调用被转发到原生（Nordic BLE）并桥接回 JS。
+
+## 关键：BLE 连接流程
+
+Android BLE 需要特定的连接顺序。**跳过步骤会导致静默失败。**
+
+```
+1. ensureBonded()           // 连接前先配对 (60s 超时)
+2. connect()                // GATT 连接 (15s 超时)
+3. delay(500ms)             // 等待稳定
+4. discoverServices()       // 服务发现
+5. delay(500ms)             // 发现后等待
+6. startNotifications()     // 带重试机制 (3 次尝试)
+```
+
+### 为什么要先配对？
+
+OneKey 设备需要安全的 BLE 配对。不配对会导致：
+- `startNotifications()` 可能静默失败
+- 设备有响应但 SDK 报告"设备未找到"
+- 间歇性连接断开
+
+### 连接代码示例
+
+```kotlin
+suspend fun connectWithBonding(deviceAddress: String) {
+    // 步骤 1: 确保已配对
+    val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
+    if (device.bondState != BluetoothDevice.BOND_BONDED) {
+        device.createBond()
+        // 等待配对 (用户必须确认配对对话框)
+        delay(60000) // 或使用 BroadcastReceiver 监听 BOND_BONDED
+    }
+
+    // 步骤 2: GATT 连接
+    val gatt = device.connectGatt(context, false, gattCallback)
+
+    // 步骤 3: 等待稳定
+    delay(500)
+
+    // 步骤 4: 发现服务 (在 onConnectionStateChange 中触发)
+    gatt.discoverServices()
+
+    // 步骤 5: 发现后等待
+    delay(500)
+
+    // 步骤 6: 带重试启动通知
+    startNotificationsWithRetry(gatt, maxRetries = 3)
+}
+
+suspend fun startNotificationsWithRetry(gatt: BluetoothGatt, maxRetries: Int) {
+    repeat(maxRetries) { attempt ->
+        try {
+            gatt.setCharacteristicNotification(notifyCharacteristic, true)
+            // 写入描述符以启用通知
+            val descriptor = notifyCharacteristic.getDescriptor(CCCD_UUID)
+            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            gatt.writeDescriptor(descriptor)
+            return // 成功
+        } catch (e: Exception) {
+            delay((attempt + 1) * 1000L) // 递增退避
+        }
+    }
+    throw Exception("$maxRetries 次尝试后启动通知失败")
+}
+```
+
+### 推荐超时时间
+
+| 操作 | 超时 |
+|------|------|
+| 配对 (用户确认) | 60 秒 |
+| GATT 连接 | 15 秒 |
+| 连接后延迟 | 500ms |
+| 服务发现 | 15 秒 |
+| 发现后延迟 | 500ms |
+| 通知设置 | 15 秒 |
+| 重试退避 | 1s, 2s, 3s |
 
 关键库：
 - WebView JS 桥接：`com.smallbuer:jsbridge:1.0.7`
@@ -18,10 +95,7 @@ title: Android：通过蓝牙连接（原生）
   - `no.nordicsemi.android.kotlin.ble:client:1.1.0`
   - 原因：`BleScannerSettings` 中的 `includeStoredBondedDevices` 需要 > 1.0.9
 
-OneKey BLE UUID：
-- 服务：`00000001-0000-1000-8000-00805f9b34fb`
-- 写入：`00000002-0000-1000-8000-00805f9b34fb`
-- 通知：`00000003-0000-1000-8000-00805f9b34fb`
+OneKey BLE UUID：参见 [底层传输插件 - 快速参考](/zh/hardware-sdk/concepts/low-level-plugin#快速参考)
 
 ## 步骤 1. Gradle 和 Manifest
 
@@ -205,7 +279,7 @@ webview.registerHandler("disconnect", BridgeHandler { _, cb ->
 
 ## 步骤 8. UI 事件（PIN / Passphrase）
 
-在您的 JS 包中处理 `UI_EVENT` 并使用 `HardwareSDK.uiResponse` 响应。参见 [事件配置](../../api-reference#events-ui) 了解事件连接，以及 WebUSB 指南了解最小的、生产就绪的对话框。
+在您的 JS 包中处理 `UI_EVENT` 并使用 `HardwareSDK.uiResponse` 响应。参见 [事件配置](/zh/hardware-sdk/core-api-guide#events-ui) 了解事件连接，以及 WebUSB 指南了解最小的、生产就绪的对话框。
 
 - 设备上的 PIN：`payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE'`
 - 设备上的 Passphrase：`{ passphraseOnDevice: true, value: '' }`
@@ -219,5 +293,4 @@ webview.registerHandler("disconnect", BridgeHandler { _, cb ->
 
 ## 参考
 
-- 消息协议（64 字节帧）：[见底层传输插件](../../concepts/low-level-plugin#消息协议包含在底层传输中)
-- 底层传输插件契约：[底层传输插件](../../concepts/low-level-plugin)
+- [底层传输插件](/zh/hardware-sdk/concepts/low-level-plugin) — BLE 协议、消息格式、UUID 参考

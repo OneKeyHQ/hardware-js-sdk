@@ -4,7 +4,7 @@ title: EVM Signer
 
 # EVM Signer
 
-EVM 硬件签名全链路指南，基于 @onekeyfe/hd-core 的能力，覆盖地址确认、EIP‑1559 / Legacy 交易、personal_sign、EIP‑712 等场景。文档双语呈现，便于集成者对照使用。
+EVM 硬件签名全链路指南，基于 @onekeyfe/hd-core 的能力，覆盖地址确认、EIP‑1559 / Legacy 交易、personal_sign、EIP‑712 等场景。
 
 ## 目录
 
@@ -26,11 +26,11 @@ EVM 签名通过 `HardwareSDK` 与 OneKey 硬件 App 通信，内部使用 APDU 
 
 EVM 签名的基本链路：
 
-1) 主机侧构造参数（路径、交易/消息数据、chainId 等）。  
+1) 应用端构造参数（路径、交易/消息数据、chainId 等）。  
 2) SDK 建立会话并发送命令，设备进入审阅流程。  
 3) 设备显示路径、地址、金额、Gas、ChainId、消息摘要或 Typed Data 域。  
 4) 用户确认后返回签名 `{ r, s, v }` 或十六进制签名。  
-5) 主机使用 `ethers` / `viem` 进行序列化、验签并广播。
+5) 应用端使用 `ethers` / `viem` 进行序列化、验签并广播。
 
 > 中文思路：把“能跑、看得懂、能验签”作为首要目标，任何字段都以链上广播与设备显示一致为准。
 
