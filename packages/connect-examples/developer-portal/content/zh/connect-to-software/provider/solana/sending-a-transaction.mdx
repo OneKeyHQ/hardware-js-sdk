@@ -18,7 +18,7 @@ Web 应用连接到 OneKey 后，可以提示用户授权代表他们发送交�
 
 如果接受，OneKey 将使用用户的私钥签名交易并通过 Solana JSON RPC 连接提交。到目前为止，**最简单**且最**推荐**的方式是使用 Provider 上的 `signAndSendTransaction` 方法，但也可以使用 `request`。在这两种情况下，调用都将返回一个包含 `signature` 的对象的 [Promise](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise)。
 
-### signAndSendTransaction
+### 使用 signAndSendTransaction 方法
 ```javascript
 const provider = getProvider(); // 参见"检测 Provider"
 const network = "<NETWORK_URL>";
@@ -28,7 +28,7 @@ const { signature } = await provider.signAndSendTransaction(transaction);
 await connection.getSignatureStatus(signature);
 ```
 
-### Request
+### 使用 request 方法
 ```javascript
 const provider = getProvider(); // 参见"检测 Provider"
 const network = "<NETWORK_URL>";
@@ -55,7 +55,7 @@ await connection.getSignatureStatus(signature);
 
 交易签名后，应用可以通过 [web3js 的 `sendRawTransaction`](https://solana-labs.github.io/solana-web3.js/classes/Connection.html#sendRawTransaction) 自行提交交易。
 
-### signTransaction
+### 使用 signTransaction 方法
 ```javascript
 const provider = getProvider();
 const network = "<NETWORK_URL>";
@@ -65,7 +65,7 @@ const signedTransaction = await provider.signTransaction(transaction);
 const signature = await connection.sendRawTransaction(signedTransaction.serialize());
 ```
 
-### Request
+### 使用 request 方法
 ```javascript
 const provider = getProvider();
 const network = "<NETWORK_URL>";
@@ -84,12 +84,12 @@ const signature = await connection.sendRawTransaction(signedTransaction.serializ
 
 也可以一次签名并发送多个交易。这通过 Provider 上的 `signAllTransactions` 方法暴露。
 
-### signAllTransactions
+### 使用 signAllTransactions 方法
 ```javascript
 const signedTransactions = await provider.signAllTransactions(transactions);
 ```
 
-### request
+### 使用 request 方法
 ```javascript
 const message = transactions.map(transaction => {
     return bs58.encode(transaction.serializeMessage());

@@ -6,7 +6,7 @@ title: starcoinGetPublicKey
 
 ## Starcoin：获取公钥
 
-获取由给定 BIP32 路径派生的 BIP32 扩展公钥。用户会看到所请求密钥的描述，并被要求确认导出。
+获取指定 BIP32 路径派生的扩展公钥。用户需要确认导出。
 
 ```typescript
 const result = await HardwareSDK.starcoinGetPublicKey(connectId, deviceId, params);
@@ -62,7 +62,7 @@ HardwareSDK.starcoinGetPublicKey(connectId, deviceId, {
 }
 ```
 
-[阅读更多关于 BIP32 序列化格式](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
+[了解更多关于 BIP32 序列化格式](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#Serialization\_format)
 
 返回批量公钥的结果
 
