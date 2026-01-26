@@ -1,7 +1,7 @@
 import { BleErrorCode } from 'react-native-ble-plx';
 import { LoggerNames, getLogger, wait } from '@onekeyfe/hd-core';
 
-import type { Characteristic, Device } from 'react-native-ble-plx';
+import type { Characteristic, Device, Subscription } from 'react-native-ble-plx';
 // import { wait } from '@onekeyfe/hd-core/src/utils';
 
 const Log = getLogger(LoggerNames.HdBleTransport);
@@ -19,7 +19,9 @@ export default class BleTransport {
 
   notifyCharacteristic: Characteristic;
 
-  nofitySubscription?: () => void;
+  notifySubscription?: Subscription;
+
+  disconnectSubscription?: Subscription;
 
   static MAX_RETRIES = 5;
 
