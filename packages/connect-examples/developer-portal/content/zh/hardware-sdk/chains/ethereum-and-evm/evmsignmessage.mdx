@@ -6,7 +6,7 @@ title: evmSignMessage
 
 ### 以太坊：签名消息
 
-请求设备使用由给定 BIP32 路径派生的私钥对消息进行签名。
+使用指定 BIP32 路径派生的私钥对消息进行签名。
 
 * **遵循 EIP-191 personal_sign 标准**
 * **不适用于 EIP-712 类型化数据签名**
@@ -59,7 +59,7 @@ HardwareSDK.evmSignMessage(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误代码
+        code: number // 错误码
     }
 }
 ```

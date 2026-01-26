@@ -12,7 +12,7 @@ title: aptosGetPublicKey
 
 ## Aptos：获取公钥
 
-获取由给定 BIP32 路径派生的 BIP32 扩展公钥。用户会看到所请求密钥的描述，并被要求确认导出。
+获取指定 BIP32 路径派生的扩展公钥。用户需要确认导出。
 
 ```typescript
 const result = await HardwareSDK.aptosGetPublicKey(connectId, deviceId, params);

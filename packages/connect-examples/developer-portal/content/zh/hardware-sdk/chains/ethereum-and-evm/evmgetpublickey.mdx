@@ -6,7 +6,7 @@ title: evmGetPublicKey
 
 ## 以太坊：获取公钥
 
-检索由给定 BIP32 路径派生的 BIP32 扩展公钥。用户会看到所请求密钥的描述，并被要求确认导出。
+获取指定 BIP32 路径派生的扩展公钥。用户需要确认导出。
 
 ```typescript
 const result = await HardwareSDK.evmGetPublicKey(connectId, deviceId, params);
@@ -87,7 +87,7 @@ HardwareSDK.evmGetPublicKey(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误代码
+        code: number // 错误码
     }
 }
 ```

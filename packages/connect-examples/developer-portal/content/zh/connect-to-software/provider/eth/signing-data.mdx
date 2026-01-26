@@ -1,108 +1,108 @@
 ---
-title: Signing Data
+title: 签署数据
 ---
 
-# Signing Data
+# 签署数据
 
-Since OneKey makes cryptographic keys available to each user, websites can use these signatures for a variety of uses. Here are a few guides related to specific use cases:
+由于 OneKey 为每位用户提供了加密密钥，网站可以利用这些签名实现多种用途。以下是一些特定用例的指南：
 
-* [Authenticating websites](https://medium.com/hackernoon/writing-for-blockchain-wallet-signature-request-messages-6ede721160d5)
+* [网站身份验证](https://medium.com/hackernoon/writing-for-blockchain-wallet-signature-request-messages-6ede721160d5)
 
-### Signing Data with OneKey <a href="#signing-data-with-onekey" id="signing-data-with-onekey"></a>
+### 使用 OneKey 签署数据
 
-If you’d like to jump to some working signature examples, [you can visit this repository](https://github.com/danfinlay/js-eth-personal-sign-examples).
+如需查看可运行的签名示例，[可以访问此仓库](https://github.com/danfinlay/js-eth-personal-sign-examples)。
 
-If you’d like to read our JavaScript implementations of these methods, they are all available in the npm package [eth-sig-util](https://github.com/onekeyhq/eth-sig-util).
+如需了解这些方法的 JavaScript 实现，可以在 npm 包 [eth-sig-util](https://github.com/onekeyhq/eth-sig-util) 中找到。
 
-### A Brief History <a href="#a-brief-history" id="a-brief-history"></a>
+### 简要历史
 
-There are currently six signing methods in OneKey, and you might wonder the history of these methods. Studying the history of these methods has some lessons in it for the emergent lessons of decentralized standards emergence. Our current five methods are:
+OneKey 目前提供六种签名方法，您可能想了解这些方法的发展历程。研究这些方法的历史，对于理解去中心化标准的演进过程很有帮助。我们目前的六种方法是：
 
-* `eth_sign` (**Deprecated,** unsafety)
+* `eth_sign`（**已弃用**，不安全）
 * `personal_sign`
-* `signTypedData` (currently identical to `signTypedData_v1`)
+* `signTypedData`（目前与 `signTypedData_v1` 相同）
 * `signTypedData_v1`
 * `signTypedData_v3`
 * `signTypedData_v4`
 
-There are likely to be many more over time. When OneKey first started, the Provider API wasn’t designed to be exposed to untrusted websites, and so some considerations weren’t taken as seriously as they were later.
+随着时间的推移，可能还会出现更多方法。OneKey 最初启动时，Provider API 并非设计用于暴露给不受信任的网站，因此某些安全考虑当时没有得到足够重视。
 
-In particular, the method `eth_sign` is an open-ended signing method that allows signing an arbitrary hash, which means it can be used to sign transactions, or any other data, making it a dangerous phishing risk.
+特别是 `eth_sign` 方法是一种开放式签名方法，允许签署任意哈希，这意味着它可以用于签署交易或任何其他数据，存在严重的钓鱼风险。
 
-For this reason, we make this method show the most frightening possible message to the user, and generally discourage using this method in production. However, some applications (usually admin panels internal to teams) use this method for the sake of its ease of use, and so we have continued to support it for the sake of not breaking the workflows of active projects.
+因此，我们让此方法向用户显示最严厉的警告信息，并且通常不建议在生产环境中使用。但是，某些应用程序（通常是团队内部的管理面板）出于易用性考虑仍在使用此方法，所以我们继续支持它以避免破坏现有项目的工作流程。
 
-Eventually, the `personal_sign` [spec](https://github.com/ethereum/go-ethereum/pull/2940) was proposed, which added a prefix to the data so it could not impersonate transactions. We also made this method able to display human readable text when UTF-8 encoded, making it a popular choice for site logins.
+后来，`personal_sign` [规范](https://github.com/ethereum/go-ethereum/pull/2940) 被提出，它在数据前添加了前缀，使其无法冒充交易。我们还使此方法能够在 UTF-8 编码时显示人类可读的文本，使其成为网站登录的流行选择。
 
-However, the text-prefix made those signatures expensive to verify on-chain, and so with the help of the [0xProtocol](https://0x.org/) team and [SpankChain](https://spankchain.com/), the [EIP-712](https://eips.ethereum.org/EIPS/eip-712) spec was written.
+然而，文本前缀使这些签名在链上验证时变得昂贵，因此在 [0xProtocol](https://0x.org/) 团队和 [SpankChain](https://spankchain.com/) 的帮助下，[EIP-712](https://eips.ethereum.org/EIPS/eip-712) 规范应运而生。
 
-The strange part of EIP-712, and this decentralized standards ecosystem, is that the proposal changed several times while retaining the same EIP. This means what we initially implemented as `signTypedData` was the earliest proposed version, while other groups implemented later versions under the same method name.
+EIP-712 的特殊之处，也是这个去中心化标准生态系统的特殊之处在于，该提案在保留相同 EIP 编号的情况下多次修改。这意味着我们最初实现的 `signTypedData` 是最早提出的版本，而其他团队在相同的方法名下实现了后来的版本。
 
-To avoid compatibility issues between clients, we recommend using the hard-versioned method names `signTypedData_v1` and `signTypedData_v3`. The missing `v2` represents an intermediary design that was implemented by the Cipher browser, so that we have room to implement it if there is ever enough developer demand for it.
+为避免客户端之间的兼容性问题，我们建议使用带有明确版本号的方法名 `signTypedData_v1` 和 `signTypedData_v3`。缺失的 `v2` 代表一个中间设计，由 Cipher 浏览器实现，如果开发者有足够的需求，我们有空间实现它。
 
-In the future, it may help to have method names include a hash of their exact proposal, since in a decentralized ecosystem, there is no absolute source of truth of what a given name should map to. Instead, we are forced to invent new patterns of collaboration, where we can drive forward and innovate, while simultaneously avoiding creating a brittle ecosystem by changing our meanings out from under the words.
+未来，如果方法名能包含其确切提案的哈希值可能会有所帮助，因为在去中心化生态系统中，没有绝对的真相来源来确定给定名称应该映射到什么。相反，我们被迫发明新的协作模式，在推动创新的同时，避免通过改变词语的含义来创建脆弱的生态系统。
 
-I hope this has been a useful introduction to the history of our signing methods!
+希望这对了解我们签名方法的历史有所帮助！
 
-### Sign Typed Data v1 <a href="#sign-typed-data-v1" id="sign-typed-data-v1"></a>
+### Sign Typed Data v1
 
-This early version of the spec lacked some later security improvements, and should generally be neglected in favor of [signTypedData\_v3](#sign-typed-data-v3).
+这个规范的早期版本缺少后来的一些安全改进，通常应该使用 [signTypedData\_v3](#sign-typed-data-v3) 来代替。
 
-The `signTypedData` family has a few major design considerations:
+`signTypedData` 系列有几个主要的设计考虑：
 
-* Cheap to verify on chain
-* Still somewhat human readable
-* Hard to phish signatures
+* 链上验证成本低
+* 仍然具有一定的人类可读性
+* 难以进行签名钓鱼
 
-If on-chain verifiability cost is a high priority for you, you might want to consider it.
+如果链上验证成本是您的首要考虑因素，您可能需要考虑使用它。
 
-### Sign Typed Data v3 <a href="#sign-typed-data-v3" id="sign-typed-data-v3"></a>
+### Sign Typed Data v3
 
-The method `signTypedData_v3` currently represents the latest version of the [EIP-712 spec](https://eips.ethereum.org/EIPS/eip-712), making it the most secure method for signing cheap-to-verify data on-chain that we have yet.
+`signTypedData_v3` 方法目前代表 [EIP-712 规范](https://eips.ethereum.org/EIPS/eip-712) 的最新版本，使其成为我们目前拥有的最安全的链上低成本数据验证签名方法。
 
-This does not mean it is perfect, and we do already have a `v4` in prototype stage (which supports recursive structs and arrays), but we do intend to protect this namespace and keep it compatible going forwards.
+这并不意味着它是完美的，我们确实已经有一个处于原型阶段的 `v4`（支持递归结构和数组），但我们确实打算保护这个命名空间并保持其向前兼容。
 
-Hopefully soon we will also have good examples for parsing method input into structs for verification on-chain (great contribution opportunity!)
+希望很快我们也能有好的示例来解析方法输入为结构体以进行链上验证（这是一个很好的贡献机会！）
 
-### Sign Typed Data v4 <a href="#sign-typed-data-v4" id="sign-typed-data-v4"></a>
+### Sign Typed Data v4
 
-The method `signTypedData_v4` currently represents the latest version of the [EIP-712 spec](https://eips.ethereum.org/EIPS/eip-712), with added support for arrays and with a breaking fix for the way structs are encoded.
+`signTypedData_v4` 方法目前代表 [EIP-712 规范](https://eips.ethereum.org/EIPS/eip-712) 的最新版本，增加了对数组的支持，并对结构体编码方式进行了重大修复。
 
-This does not mean it is perfect, and does not mean we will not eventually have a `v5`, but we do intend to protect this namespace and keep it compatible going forwards.
+这并不意味着它是完美的，也不意味着我们最终不会有 `v5`，但我们确实打算保护这个命名空间并保持其向前兼容。
 
-Hopefully soon we will also have good examples for parsing method input into structs for verification on-chain (great contribution opportunity!)
+希望很快我们也能有好的示例来解析方法输入为结构体以进行链上验证（这是一个很好的贡献机会！）
 
-#### Sign Typed Data Message Parameters <a href="#sign-typed-data-message-parameters" id="sign-typed-data-message-parameters"></a>
+#### Sign Typed Data 消息参数
 
-`domain`: The Domain or domain signature is important because it:
+`domain`：Domain 或域签名很重要，因为它：
 
-* Will only be accepted for a specific website/contract.
-* Makes sure signatures are valid only where they are intended to be valid.
-* Allows you have a unique contract that verifies the address.
-* This is a bunch of information that restricts where the signature is valid.
-* This is the domain of validity. Could be a contract, a url, ect.
-* What needs to be put in here specifically what the DApp tells you.
-* Makes sure your signature(s) don't collide with other signatures.
+* 只会被特定的网站/合约接受
+* 确保签名仅在预期的地方有效
+* 允许您拥有一个验证地址的唯一合约
+* 这是一组限制签名有效范围的信息
+* 这是有效性的域。可以是合约、URL 等
+* 具体需要放入什么内容取决于 DApp 的要求
+* 确保您的签名不会与其他签名冲突
 
-`chainId`: The chainId tell you what chain you're on and this is important because:
+`chainId`：链 ID 告诉您所在的链，这很重要，因为：
 
-* It makes sure signatures signed on Rinkeby are not valid on another chain, such as the Ethereum Main Net.
+* 它确保在 Rinkeby 上签署的签名在其他链（如以太坊主网）上无效
 
-`name`: This is primarily for UX(User Experience) purposes.
+`name`：这主要用于用户体验目的。
 
-* For example, as a user, you're using an Ether Mail app and a dialog comes up for cryptokitties exchange, this would arouse suspicion due to what the name is on the signature.
+* 例如，作为用户，您正在使用 Ether Mail 应用，但弹出的对话框是 CryptoKitties 交换，这会因为签名上的名称而引起怀疑。
 
-`verifyingContract`: This is an extra layer of assurance. Even if two developers end up creating an app with the same name, they will never have the same contract address.(You can add another field `salt` but it's complete overkill and unnecessary)
+`verifyingContract`：这是一个额外的保障层。即使两个开发者最终创建了同名的应用，他们也永远不会有相同的合约地址。（您可以添加另一个字段 `salt`，但这完全是过度设计且不必要的）
 
-* If you are unsure of the name this will show the contract responsible for message verification.
-* This field will also take a url.
+* 如果您不确定名称，这将显示负责消息验证的合约
+* 此字段也可以是 URL
 
-`version`: This tell you the current version of the domain object.
+`version`：这告诉您 domain 对象的当前版本。
 
-`message`: Completely open to what you would like the structure of it to be. Every field is optional.
+`message`：结构完全开放，由您自行决定。每个字段都是可选的。
 
-Below is an example of signing typed data with OneKey. Reference [here](https://github.com/danfinlay/js-eth-personal-sign-examples)
+下面是使用 OneKey 签署 typed data 的示例。参考 [这里](https://github.com/danfinlay/js-eth-personal-sign-examples)
 
-#### Example <a href="#example" id="example"></a>
+#### 示例
 
 
 <iframe src="https://codesandbox.io/embed/ethereum-provider-signdata-demo-67nn3q?autoresize=1&fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>

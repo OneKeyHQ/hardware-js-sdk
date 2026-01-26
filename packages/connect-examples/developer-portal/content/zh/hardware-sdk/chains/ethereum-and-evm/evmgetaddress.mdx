@@ -6,7 +6,7 @@ title: evmGetAddress
 
 ## 以太坊：获取地址
 
-在设备上显示由给定 BIP32 路径派生的请求地址，并将其返回给调用者。用户会看到所请求密钥的描述，并被要求在 OneKey 上确认导出。
+显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
 
 ```typescript
 const response = await HardwareSDK.evmGetAddress(connectId, deviceId, params)
@@ -84,7 +84,7 @@ HardwareSDK.evmGetAddress({
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误代码
+        code: number // 错误码
     }
 }
 ```

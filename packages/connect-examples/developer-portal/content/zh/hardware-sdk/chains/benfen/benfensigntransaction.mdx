@@ -8,7 +8,7 @@ title: benfenSignTransaction
 
 ### Benfen：签名交易
 
-请求设备使用由给定 BIP32 路径派生的私钥对给定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
 
 ```typescript
 const result = await HardwareSDK.benfenSignTransaction(connectId, deviceId, {
@@ -23,7 +23,7 @@ const result = await HardwareSDK.benfenSignTransaction(connectId, deviceId, {
 **可选通用参数**
 
 * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
-* `rawTx` - _必需_ `string` 十六进制格式的序列化交易字符串类型
+* `rawTx` - _必需_ `string` 十六进制格式的序列化交易字符串
 * `coinType` - _可选_ `string` 代币类型标识符
 
 #### 返回值

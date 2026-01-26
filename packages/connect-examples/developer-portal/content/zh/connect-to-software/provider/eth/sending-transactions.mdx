@@ -1,29 +1,29 @@
 ---
-title: Sending Transactions
+title: 发送交易
 ---
 
-# Sending Transactions
+# 发送交易
 
-## Sending Transactions
+## 发送交易
 
-Transactions are a formal action on a blockchain. They are always initiated in OneKey Browser Extension with a call to the `eth_sendTransaction` method. They can involve a simple sending of ether, may result in sending tokens, creating a new smart contract, or changing state on the blockchain in any number of ways. They are always initiated by a signature from an _external account_, or a simple key pair.
+交易是区块链上的正式操作。在 OneKey 浏览器扩展中，交易始终通过调用 `eth_sendTransaction` 方法发起。交易可以是简单的以太币转账，也可以是发送代币、创建新的智能合约，或以任何方式改变区块链上的状态。交易始终由*外部账户*（即简单的密钥对）的签名发起。
 
-In OneKey Browser Extension, using the `onekey.request` method directly, sending a transaction will involve composing an options object like this:
+在 OneKey 浏览器扩展中，直接使用 `onekey.request` 方法发送交易需要构造如下的选项对象：
 
 ```javascript
-const transactionParameters = {  
-    nonce: '0x00', // ignored by OneKey Browser Extension  
-    gasPrice: '0x09184e72a000', // customizable by user during OneKey Browser Extension confirmation.  
-    gas: '0x2710', // customizable by user during OneKey Browser Extension confirmation.  
-    to: '0x0000000000000000000000000000000000000000', // Required except during contract publications.  
-    from: connectedAddress, // must match user's active address.  
-    value: '0x00', // Only required to send ether to the recipient from the initiating external account.  
-    data: '0x7f7465737432000000000000000000000000000000000000000000000000000000600057', // Optional, but used for defining smart contract creation and interaction.  
-    chainId: '0x3', // Used to prevent transaction reuse across blockchains. Auto-filled by OneKey Browser Extension.
+const transactionParameters = {
+    nonce: '0x00', // OneKey 浏览器扩展会忽略此参数
+    gasPrice: '0x09184e72a000', // 用户可在 OneKey 浏览器扩展确认时自定义
+    gas: '0x2710', // 用户可在 OneKey 浏览器扩展确认时自定义
+    to: '0x0000000000000000000000000000000000000000', // 除合约创建外必填
+    from: connectedAddress, // 必须与用户当前活跃地址匹配
+    value: '0x00', // 仅在从发起的外部账户向接收方发送以太币时必填
+    data: '0x7f7465737432000000000000000000000000000000000000000000000000000000600057', // 可选，用于定义智能合约创建和交互
+    chainId: '0x3', // 用于防止跨链交易重放，OneKey 浏览器扩展会自动填充
 };
 
-// txHash is a hex string
-// As with any RPC call, it may throw an error
+// txHash 是十六进制字符串
+// 与任何 RPC 调用一样，可能会抛出错误
 const provider = (window.$onekey && window.$onekey.ethereum) || window.ethereum;
 const txHash = await provider.request({
     method: 'eth_sendTransaction',
@@ -31,60 +31,59 @@ const txHash = await provider.request({
 });
 ```
 
-### Example[#](https://docs.onekey.so/en/Extension/Guide/sending-transactions#example) <a href="#example" id="example"></a>
-
+### 示例
 
 <iframe src="https://codesandbox.io/embed/ethereum-provider-signtransactions-demo-2glt4y?autoresize=1&fontsize=14&hidenavigation=1&theme=dark" width="100%" height="400" frameBorder="0" allowFullScreen></iframe>
 
 
-### Transaction Parameters <a href="#transaction-parameters" id="transaction-parameters"></a>
+### 交易参数
 
-Many transaction parameters are handled for you by OneKey Browser Extension, but it's good to know what all the parameters do.
+OneKey 浏览器扩展会为您处理许多交易参数，但了解所有参数的作用仍然很有帮助。
 
-#### Nonce \[ignored] <a href="#nonce-ignored" id="nonce-ignored"></a>
+#### Nonce（已忽略）
 
-This field is ignored by OneKey Browser Extension.
+OneKey 浏览器扩展会忽略此字段。
 
-In Ethereum every transaction has a nonce. This is so that each transaction can only be processed by the blockchain once. Additionally, to be a valid transaction, the nonce must either be `0`, or a transaction with the previous number must have already been processed.
+在以太坊中，每笔交易都有一个 nonce。这是为了确保每笔交易只能被区块链处理一次。此外，要成为有效交易，nonce 必须为 `0`，或者前一个编号的交易必须已被处理。
 
-That means that transactions are always processed in order for a given account, and so incrementing nonces is a very sensitive matter that is easy to mess up, especially when a user is interacting with multiple applications with pending transactions using the same account, potentially across multiple devices.
+这意味着对于给定账户，交易始终按顺序处理，因此递增 nonce 是一个非常敏感的操作，很容易出错，特别是当用户使用同一账户在多个应用程序中进行待处理交易时，可能还跨越多个设备。
 
-For these reasons, OneKey Browser Extension currently does not provide application developers any way to customize the nonce of transactions it suggests, and instead assists the user in managing their transaction queue themselves.
+出于这些原因，OneKey 浏览器扩展目前不向应用程序开发者提供自定义其建议交易的 nonce 的方法，而是帮助用户自己管理其交易队列。
 
-#### Gas Price \[optional] <a href="#gas-price-optional" id="gas-price-optional"></a>
+#### Gas Price（可选）
 
-Optional parameter - best used on private blockchains.
+可选参数 - 最适合在私有区块链上使用。
 
-In Ethereum, the pool of pending transactions offer their gas price as a sort of auction bid to the validators to include this transaction in a block in exchange for a transaction fee. That means high gas prices can mean faster processing, but also more expensive transactions.
+在以太坊中，待处理交易池会将其 gas 价格作为一种拍卖出价，提供给验证者，以换取将此交易包含在区块中并收取交易费用。这意味着高 gas 价格可能意味着更快的处理速度，但也意味着更昂贵的交易。
 
-OneKey Browser Extension helps users select a competitive gas price on the Ethereum Main Network and popular test networks. We make requests to an API maintained by our friends at MyCrypto and allow users to choose between "slow," "medium," and "fast" options for their gas price.
+OneKey 浏览器扩展帮助用户在以太坊主网和流行的测试网络上选择有竞争力的 gas 价格。我们向 MyCrypto 的朋友维护的 API 发起请求，并允许用户在"慢速"、"中等"和"快速"选项之间进行选择。
 
-We cannot know about the gas market on all blockchains because it requires some deep analysis. For this reason, while you can safely ignore this parameter on our main hosted networks, you may want to suggest a gas price in situations where your application knows more about the target network than we do.
+我们无法了解所有区块链上的 gas 市场情况，因为这需要深入分析。因此，虽然在我们主要托管的网络上您可以安全地忽略此参数，但在您的应用程序比我们更了解目标网络的情况下，您可能需要建议一个 gas 价格。
 
-#### Gas Limit \[optional] <a href="#gas-limit-optional" id="gas-limit-optional"></a>
+#### Gas Limit（可选）
 
-Optional parameter. Rarely useful to Dapp developers.
+可选参数。对 DApp 开发者很少有用。
 
-Gas limit is a highly optional parameter, and we automatically calculate a reasonable price for it. You will probably know that your smart contract benefits from a custom gas limit if it ever does for some reason.
+Gas limit 是一个高度可选的参数，我们会自动为其计算合理的价格。如果您的智能合约因某种原因确实受益于自定义 gas limit，您可能会知道的。
 
-#### To \[semi-optional] <a href="#to-semi-optional" id="to-semi-optional"></a>
+#### To（半可选）
 
-A hex-encoded Ethereum address. Required for transactions with a recipient (all transactions except for contract creation).
+十六进制编码的以太坊地址。对于有接收方的交易（除合约创建外的所有交易）是必填的。
 
-Contract creation occurs when there is no `to` value but there is a `data` value.
+当没有 `to` 值但有 `data` 值时，会发生合约创建。
 
-#### Value \[optional] <a href="#value-optional" id="value-optional"></a>
+#### Value（可选）
 
-Hex-encoded value of the network's native currency to send. On the Main Ethereum network, this is [ether](https://www.ethereum.org/eth), which is denominated in _wei_, which is `1e-18` ether.
+十六进制编码的网络原生货币发送值。在以太坊主网上，这是 [ether](https://www.ethereum.org/eth)，以 *wei* 为单位，即 `1e-18` ether。
 
-Please note that these numbers often used in Ethereum are far higher precision than native JavaScript numbers, and can cause unpredictable behavior if not anticipated. For this reason, we highly recommend using [BN.js](https://github.com/indutny/bn.js/) when manipulating values intended for the blockchain.
+请注意，以太坊中经常使用的这些数字的精度远高于原生 JavaScript 数字，如果不加以预期可能会导致不可预测的行为。因此，我们强烈建议在操作用于区块链的值时使用 [BN.js](https://github.com/indutny/bn.js/)。
 
-#### Data \[semi-optional] <a href="#data-semi-optional" id="data-semi-optional"></a>
+#### Data（半可选）
 
-Required for smart contract creation.
+智能合约创建时必填。
 
-This field is also used for specifying contract methods and their parameters. You can learn more about how that data is encoded on [the solidity ABI spec](https://solidity.readthedocs.io/en/develop/abi-spec.html).
+此字段也用于指定合约方法及其参数。您可以在 [Solidity ABI 规范](https://solidity.readthedocs.io/en/develop/abi-spec.html) 中了解更多关于数据编码的信息。
 
-#### Chain ID \[currently ignored] <a href="#chain-id-currently-ignored" id="chain-id-currently-ignored"></a>
+#### Chain ID（目前已忽略）
 
-Chain ID is currently derived by the user's current selected network at `onekey.networkVersion`. In the future we will probably allow a way to connect to multiple networks at once, at which point this parameter will become important, so it may be useful to be in the habit of including now.
+Chain ID 目前从用户当前选择的网络（`onekey.networkVersion`）派生。将来我们可能会允许同时连接多个网络，届时此参数将变得重要，因此养成现在就包含它的习惯可能会有所帮助。
