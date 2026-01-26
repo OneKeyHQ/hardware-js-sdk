@@ -6,10 +6,87 @@ title: "Android: Connect via Bluetooth (Native)"
 
 > **Note:**
 > Demo: Native Android example (WebView + JSBridge + Nordic BLE) → [native-android-example](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/connect-examples/native-android-example)
-> This guide builds on the [Low-Level Transport Plugin](../../concepts/low-level-plugin) and its 64-byte message protocol—read that first.
+> This guide builds on the [Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin) — read that first for BLE message format and protocol details.
 
 
 This guide shows how to integrate `@onekeyfe/hd-common-connect-sdk` in a native Android host via a low-level adapter. The JavaScript bundle runs in a WebView; transport calls are forwarded to native (Nordic BLE) and bridged back to JS.
+
+## Critical: BLE Connection Flow
+
+Android BLE requires a specific connection sequence. **Skipping steps will cause silent failures.**
+
+```
+1. ensureBonded()           // Bond BEFORE connecting (60s timeout)
+2. connect()                // GATT connection (15s timeout)
+3. delay(500ms)             // Wait for stability
+4. discoverServices()       // Service discovery
+5. delay(500ms)             // Wait after discovery
+6. startNotifications()     // With retry mechanism (3 attempts)
+```
+
+### Why Bonding First?
+
+OneKey devices require a secure BLE bond. Without bonding:
+- `startNotifications()` may fail silently
+- Device responds but SDK reports "Device not found"
+- Intermittent connection drops
+
+### Connection Code Example
+
+```kotlin
+suspend fun connectWithBonding(deviceAddress: String) {
+    // Step 1: Ensure bonded
+    val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
+    if (device.bondState != BluetoothDevice.BOND_BONDED) {
+        device.createBond()
+        // Wait for bonding (user must confirm pairing dialog)
+        delay(60000) // or use BroadcastReceiver for BOND_BONDED
+    }
+
+    // Step 2: GATT connect
+    val gatt = device.connectGatt(context, false, gattCallback)
+
+    // Step 3: Wait for stability
+    delay(500)
+
+    // Step 4: Discover services (triggered in onConnectionStateChange)
+    gatt.discoverServices()
+
+    // Step 5: Wait after discovery
+    delay(500)
+
+    // Step 6: Start notifications with retry
+    startNotificationsWithRetry(gatt, maxRetries = 3)
+}
+
+suspend fun startNotificationsWithRetry(gatt: BluetoothGatt, maxRetries: Int) {
+    repeat(maxRetries) { attempt ->
+        try {
+            gatt.setCharacteristicNotification(notifyCharacteristic, true)
+            // Write descriptor to enable notifications
+            val descriptor = notifyCharacteristic.getDescriptor(CCCD_UUID)
+            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            gatt.writeDescriptor(descriptor)
+            return // Success
+        } catch (e: Exception) {
+            delay((attempt + 1) * 1000L) // Incremental backoff
+        }
+    }
+    throw Exception("Failed to start notifications after $maxRetries attempts")
+}
+```
+
+### Recommended Timeouts
+
+| Operation | Timeout |
+|-----------|---------|
+| Bonding (user confirmation) | 60 seconds |
+| GATT connect | 15 seconds |
+| Post-connect delay | 500ms |
+| Service discovery | 15 seconds |
+| Post-discovery delay | 500ms |
+| Notification setup | 15 seconds |
+| Retry backoff | 1s, 2s, 3s |
 
 Key libraries:
 - WebView JS bridge: `com.smallbuer:jsbridge:1.0.7`
@@ -18,10 +95,7 @@ Key libraries:
   - `no.nordicsemi.android.kotlin.ble:client:1.1.0`
   - Reason: `includeStoredBondedDevices` in `BleScannerSettings` requires > 1.0.9
 
-OneKey BLE UUIDs:
-- Service: `00000001-0000-1000-8000-00805f9b34fb`
-- Write:   `00000002-0000-1000-8000-00805f9b34fb`
-- Notify:  `00000003-0000-1000-8000-00805f9b34fb`
+OneKey BLE UUIDs: See [Low-Level Transport Plugin - Quick Reference](/en/hardware-sdk/concepts/low-level-plugin#quick-reference)
 
 ## Step 1. Gradle and Manifest
 
@@ -219,5 +293,4 @@ Handle `UI_EVENT` in your JS bundle and respond with `HardwareSDK.uiResponse`. S
 
 ## References
 
-- Message Protocol (64‑byte framing): [See Low-Level Transport Plugin](../../concepts/low-level-plugin#message-protocol-part-of-low-level-transport)
-- Low‑level transport plugin contract: [Low-level Transport Plugin](../../concepts/low-level-plugin)
+- [Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin) — BLE protocol, message format, UUID reference

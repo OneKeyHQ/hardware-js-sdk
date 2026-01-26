@@ -13,7 +13,7 @@ title: nostrSignEvent
 
 ## Nostr：签名 Nostr 事件
 
-请求设备使用由给定 BIP32 路径派生的私钥对给定的 Nostr 事件进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定 BIP32 路径派生的私钥对 Nostr 事件进行签名。用户需要在 OneKey 上确认签名详情。
 
 ```typescript
 const result = await HardwareSDK.nostrSignEvent(connectId, deviceId, params);

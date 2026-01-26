@@ -11,18 +11,18 @@ title: 签署消息
 1. 提供一个 **hex** 或 **UTF-8** 编码的字符串作为 Uint8Array。
 2. 请求通过用户的 OneKey 钱包签署编码后的消息。
 
-### signMessage
+### 使用 signMessage 方法
 ```javascript
 const provider = getProvider();
-const message = `为避免数字盗狗者，请在下方签名以通过 CryptoCorgis 进行身份验证`;
+const message = `为防止数字资产被盗，请在下方签名以通过 CryptoCorgis 进行身份验证`;
 const encodedMessage = new TextEncoder().encode(message);
 const signedMessage = await provider.signMessage(encodedMessage, "utf8");
 ```
 
-### request
+### 使用 request 方法
 ```javascript
 const provider = getProvider();
-const message = `为避免数字盗狗者，请在下方签名以通过 CryptoCorgis 进行身份验证`;
+const message = `为防止数字资产被盗，请在下方签名以通过 CryptoCorgis 进行身份验证`;
 const encodedMessage = new TextEncoder().encode(message);
 const signedMessage = await provider.request({
     method: "signMessage",
@@ -39,7 +39,7 @@ const signedMessage = await provider.request({
 
 用于签署支持版本的链下消息（适用于身份验证和验证）：
 
-### solSignOffchainMessage
+### 使用 solSignOffchainMessage 方法
 ```javascript
 const provider = getProvider();
 const message = "签署此消息以验证您的身份";

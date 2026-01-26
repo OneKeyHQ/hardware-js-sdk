@@ -4,21 +4,41 @@ title: 底层传输插件
 
 # 底层传输插件（Low-level Transport Plugin）
 
-> 仅在 WebUSB / React Native BLE / 官方原生适配器无法满足需求时使用。你需要自管设备生命周期和 64 字节帧，维护成本更高。
+> 仅在 WebUSB / React Native BLE 无法满足需求时使用。你需要自管设备生命周期和消息帧处理，维护成本更高。
 
-我们的蓝牙 SDK 基于 React Native。如果你使用 Swift/Kotlin/Flutter 等非 RN 技术栈，引入 RN 依赖可能不合适。可通过 LowlevelTransportSharedPlugin 自行适配底层传输，负责“连接/断开/收发数据”协议。
+我们的蓝牙 SDK 基于 React Native。如果你使用 Swift/Kotlin/Flutter 等非 RN 技术栈，引入 RN 依赖可能不合适。可通过 LowlevelTransportSharedPlugin 自行适配底层传输，负责"连接/断开/收发数据"协议。
+
+## 快速参考
+
+### OneKey BLE UUID
+
+| 用途 | UUID |
+|------|------|
+| 服务 | `00000001-0000-1000-8000-00805f9b34fb` |
+| 写入特征 | `00000002-0000-1000-8000-00805f9b34fb` |
+| 通知特征 | `00000003-0000-1000-8000-00805f9b34fb` |
+
+### BLE 头部数据示例
+
+收到的第一个 BLE 数据包（头部包）示例：
+
+```
+原始数据: 3F 23 23 00 02 00 00 00 0A 12 08 ...
+         │  │  │  │  │  │        │  └─ Protobuf 载荷开始
+         │  │  │  │  │  └────────┴─ 载荷长度: 0x0000000A = 10 字节
+         │  │  │  └──┴─ 消息类型: 0x0002
+         └──┴──┴─ Magic: 0x3F 0x23 0x23 (固定标识)
+```
+
+检测头部包：**前 3 字节为 `3F 23 23`**
 
 原生示例（均基于低层插件）：
 
-- [Android 原生](../transport/android) — WebView + JSBridge + Nordic BLE
-- [iOS 原生](../transport/ios) — WebView + JSBridge + CoreBluetooth
-- [Flutter 原生](../transport/flutter) — WebView + platform channel + BLE
+- [Android 原生](/zh/hardware-sdk/transport/android) — WebView + JSBridge + Nordic BLE
+- [iOS 原生](/zh/hardware-sdk/transport/ios) — WebView + JSBridge + CoreBluetooth
+- [Flutter 原生](/zh/hardware-sdk/transport/flutter) — WebView + platform channel + BLE
 
-传输使用 64 字节帧：插件负责逐帧收发 64 字节 hex，SDK 负责跨帧组装/拆包；最后一帧按协议填充。
-
-详见下方“消息协议”。
-
-### LowlevelTransportSharedPlugin 接口
+## LowlevelTransportSharedPlugin 接口
 
 ```typescript
 export type LowLevelDevice = { id: string; name: string };
@@ -28,77 +48,181 @@ export type LowlevelTransportSharedPlugin = {
   receive: () => Promise<string>;
   connect: (uuid: string) => Promise<void>;
   disconnect: (uuid: string) => Promise<void>;
-
   init: () => Promise<void>;
   version: string;
 };
 ```
 
-### 示例（iOS demo）
+## WebUSB vs BLE：协议差异
 
-Swift 侧通过 WebView + CoreBluetooth 桥接 JS SDK：
+**重要：** WebUSB（桌面端）和 BLE（移动端）的传输协议不同：
+
+| | WebUSB (桌面端) | BLE (原生移动端) |
+|---|---|---|
+| 数据包大小 | 固定 64 字节 | 可变长度 (取决于 MTU) |
+| 每个包前缀 | 所有包都有 `0x3F` | 仅头部包有 `0x3F 0x23 0x23` |
+| 填充 | 零填充到 64 字节 | 无需填充 |
+| `receive()` 返回 | 每次一个 64 字节帧 | **完整重组后的消息** |
+
+---
+
+## WebUSB 协议（桌面端）
+
+传输使用固定 64 字节帧，SDK 负责消息组装。
+
+> **Magic bytes 说明:** `0x3F 0x23 0x23` 是协议固定的标识字节，用于识别数据包的起始位置。
+
+**首帧：**
+
+| Offset | Length | Content |
+|--------|--------|---------|
+| 0 | 3 | Magic: `0x3F 0x23 0x23` |
+| 3 | 2 | 消息类型 (大端 u16) |
+| 5 | 4 | 载荷长度 (大端 u32) |
+| 9 | 55 | 前 55 字节 protobuf（零填充）|
+
+**后续帧：**
+
+| Offset | Length | Content |
+|--------|--------|---------|
+| 0 | 1 | Magic: `0x3F` |
+| 1 | 63 | 剩余 protobuf 字节（零填充）|
+
+---
+
+## BLE 协议（原生移动端）
+
+BLE 使用可变长度块，**插件必须自行重组完整消息**。
+
+### 数据包格式
+
+**头部块（消息第一个包）：**
+
+```
+┌─────────┬──────────────┬──────────┬──────────────┬─────────────┐
+│ Byte 0  │  Byte 1-2    │ Byte 3-4 │  Byte 5-8    │  Byte 9+    │
+├─────────┼──────────────┼──────────┼──────────────┼─────────────┤
+│  0x3F   │  0x23 0x23   │  Type    │   Length     │  Payload... │
+│ (Magic) │   (Magic)    │ (大端u16)│  (大端u32)   │             │
+└─────────┴──────────────┴──────────┴──────────────┴─────────────┘
+```
+
+**后续块：** 仅包含原始载荷数据，无任何前缀。
+
+### 头部检测
+
+```typescript
+function isHeaderChunk(data: Uint8Array): boolean {
+  return data.length >= 9 &&
+         data[0] === 0x3F &&  // '?'
+         data[1] === 0x23 &&  // '#'
+         data[2] === 0x23     // '#'
+}
+```
+
+### 读取载荷长度（大端序）
+
+```typescript
+function readUint32BE(buffer: Uint8Array, offset: number): number {
+  return (
+    (buffer[offset] << 24) |
+    (buffer[offset + 1] << 16) |
+    (buffer[offset + 2] << 8) |
+    buffer[offset + 3]
+  ) >>> 0
+}
+
+// 用法: payloadLength = readUint32BE(data, 5)
+```
+
+### 消息重组示例
+
+```typescript
+class BleMessageAssembler {
+  private buffer: number[] = []
+  private expectedLength = 0
+  private resolve: ((hex: string) => void) | null = null
+
+  onNotification(data: Uint8Array): void {
+    if (this.isHeader(data)) {
+      this.expectedLength = this.readUint32BE(data, 5)
+      this.buffer = [...data.subarray(3)]  // 跳过 3F 23 23
+    } else {
+      this.buffer.push(...data)
+    }
+
+    // 检查完成: buffer = Type(2) + Length(4) + Payload
+    if (this.buffer.length - 6 >= this.expectedLength) {
+      const hex = this.toHex(new Uint8Array(this.buffer))
+      this.buffer = []
+      this.expectedLength = 0
+      if (this.resolve) {
+        this.resolve(hex)
+        this.resolve = null
+      }
+    }
+  }
+
+  receive(): Promise<string> {
+    return new Promise(resolve => { this.resolve = resolve })
+  }
+
+  private isHeader(d: Uint8Array): boolean {
+    return d.length >= 9 && d[0] === 0x3F && d[1] === 0x23 && d[2] === 0x23
+  }
+
+  private readUint32BE(b: Uint8Array, o: number): number {
+    return ((b[o] << 24) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]) >>> 0
+  }
+
+  private toHex(arr: Uint8Array): string {
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+  }
+}
+```
+
+### 常见错误
+
+```typescript
+// ❌ 错误: 重新分片成 64 字节包
+receive() { return this.messageQueue.shift() }
+
+// ✅ 正确: 返回完整重组后的消息
+receive() { return this.completeMessagePromise }
+```
+
+```typescript
+// ❌ 低效: 字符串拼接
+let buffer = ''
+buffer += dataViewToHex(chunk)
+
+// ✅ 更好: 使用数组
+let buffer: number[] = []
+buffer.push(...chunk)
+```
+
+---
+
+## 初始化示例
 
 ```typescript
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk'
 
-function createLowlevelPlugin() {
-  const plugin = {
-    enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
-    send: (uuid, data) => {
-      // TODO: 发送 64 字节帧
-    },
-    receive: () => {
-      // 返回一帧 64 字节 hex；SDK 负责组装完整消息
-      return Promise.resolve('a1b2c3...');
-    },
-    connect: (uuid) => {
-      // TODO: 连接设备
-    },
-    disconnect: (uuid) => {
-      // TODO: 断开设备
-    },
-
-    init: () => {
-      // TODO: 初始化
-    },
-
-    version: 'OneKey-1.0'
-  }
-  return plugin
+const plugin = {
+  enumerate: () => Promise.resolve([{ id: 'foo', name: 'bar' }]),
+  send: (uuid, data) => { /* 发送 hex 数据 */ },
+  receive: () => { /* WebUSB: 64字节帧 / BLE: 完整消息 */ },
+  connect: (uuid) => { /* BLE Android: 先配对! */ },
+  disconnect: (uuid) => { /* 清理连接 */ },
+  init: () => { /* 初始化 BLE 栈 */ },
+  version: 'OneKey-1.0'
 }
 
-const plugin = createLowlevelPlugin()
-
-const settings = {
-  env: 'lowlevel', // 启用底层传输需设置 env=lowlevel
-  debug: true
-}
-
-HardwareSDK.init(settings, undefined, plugin)
+HardwareSDK.init({ env: 'lowlevel', debug: true }, undefined, plugin)
 ```
-
-## 消息协议（64 字节帧）
-
-首帧：
-
-| Offset | Length | Type | Content |
-| --- | --- | --- | --- |
-| 0 | 3 | char\[3] | '?##' 魔数 |
-| 3 | 2 | BE uint16\_t | Message type number |
-| 5 | 4 | BE uint32\_t | Message size |
-| 9 | 55 | uint8\_t\[55] | 前 55 字节 protobuf 消息（零填充） |
-
-后续帧：
-
-| Offset | Length | Type | Content |
-| --- | --- | --- | --- |
-| 0 | 1 | char\[1] | '?' 魔数 |
-| 1 | 63 | uint8\_t\[63] | 剩余 protobuf 字节（零填充） |
-
-逐帧收发 64 字节 hex，SDK 负责组装完整消息。
 
 ## 下一步
 
-- iOS BLE（原生，底层适配）→ [iOS 指南](../transport/ios)
-- Android BLE（原生，底层适配）→ [Android 指南](../transport/android)
-- Flutter BLE（原生，底层适配）→ [Flutter 指南](../transport/flutter)
+- [Android 指南](/zh/hardware-sdk/transport/android) — 配对流程、延时、重试
+- [iOS 指南](/zh/hardware-sdk/transport/ios) — CoreBluetooth 实现
+- [Flutter 指南](/zh/hardware-sdk/transport/flutter) — Platform channel 桥接

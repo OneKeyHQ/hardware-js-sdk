@@ -12,19 +12,19 @@ title: 建立连接
 
 连接到 OneKey 的**推荐**且**最简单**的方式是调用 `window.$onekey.solana.connect()`。不过，Provider 也暴露了 `request` JSON RPC 接口。
 
-### Connect
+### 使用 connect 方法
 ```javascript
 const provider = getProvider(); // 参见"检测 Provider"
 try {
     const resp = await provider.connect();
     console.log(resp.publicKey.toString());
-    // 26qv4GCcx98RihuK3c4T6ozB3J7L6VwCuFVc7Ta2A3Uo 
+    // 26qv4GCcx98RihuK3c4T6ozB3J7L6VwCuFVc7Ta2A3Uo
 } catch (err) {
     // { code: 4001, message: 'User rejected the request.' }
 }
 ```
 
-### Request
+### 使用 request 方法
 ```javascript
 const provider = getProvider(); // 参见"检测 Provider"
 try {
@@ -52,25 +52,25 @@ console.log(provider.isConnected);
 // true
 ```
 
-### 急切连接
+### 自动重连
 
-Web 应用首次连接到 OneKey 后，它就变成了受信任的应用。一旦受信任，应用就可以在后续访问或页面刷新时自动连接到 OneKey，而无需提示用户授权。这称为"急切连接"。
+Web 应用首次连接到 OneKey 后，它就成为已授权的应用。获得授权后，应用可以在后续访问或页面刷新时自动连接到 OneKey，而无需再次提示用户授权。这称为"自动重连"。
 
 要实现这一点，应用应在 `connect()` 调用中传递 `onlyIfTrusted` 选项。
 
-### Connect
+### 使用 connect 方法
 ```javascript
 provider.connect({ onlyIfTrusted: true });
 ```
 
-### Request
+### 使用 request 方法
 ```javascript
 window.$onekey.solana.request({ method: "connect", params: { onlyIfTrusted: true }});
 ```
 
-如果存在此标志，OneKey 只会在应用受信任时急切连接并发出 `connect` 事件。如果应用不受信任，OneKey 将抛出 `4001` 错误并保持断开连接状态，直到提示用户在没有 `onlyIfTrusted` 标志的情况下连接。无论哪种情况，OneKey 都不会打开弹窗，这使得在所有页面加载时使用都很方便。
+如果存在此标志，OneKey 只会在应用已获授权时自动重连并发出 `connect` 事件。如果应用未获授权，OneKey 将抛出 `4001` 错误并保持断开连接状态，直到提示用户在没有 `onlyIfTrusted` 标志的情况下连接。无论哪种情况，OneKey 都不会打开弹窗，这使得在所有页面加载时使用都很方便。
 
-以下是 React 应用如何急切连接到 OneKey 的示例。
+以下是 React 应用如何自动重连到 OneKey 的示例。
 
 ```javascript
 import { useEffect } from "react";
@@ -79,7 +79,7 @@ useEffect(() => {
     // 将自动连接到 OneKey，或不执行任何操作。
     provider.connect({ onlyIfTrusted: true })
         .then(({ publicKey }) => {
-            // 处理成功的急切连接
+            // 处理成功的自动重连
         });
         .catch(() => {
             // 照常处理连接失败
@@ -89,18 +89,18 @@ useEffect(() => {
 
 有关实时演示，请参阅我们沙盒中的 `handleConnect` 部分。
 
-如果钱包从受信任的应用断开连接，然后稍后尝试重新连接，OneKey 仍会急切连接。一旦应用受信任，OneKey 只会在用户从其"受信任应用"设置中撤销应用时才要求用户批准连接请求。
+如果钱包从已授权的应用断开连接，然后稍后尝试重新连接，OneKey 仍会自动重连。应用获得授权后，只有当用户在"已授权应用"设置中撤销该应用时，OneKey 才会再次要求用户批准连接请求。
 
 ## 断开连接
 
 断开连接与连接的过程相同。但是，钱包也可以发起断开连接，而不是应用本身。
 
-### disconnect
+### 使用 disconnect 方法
 ```javascript
 provider.disconnect();
 ```
 
-### request
+### 使用 request 方法
 ```javascript
 provider.request({ method: "disconnect" });
 ```
@@ -118,7 +118,7 @@ useEffect(() => {
     setPubKey(publicKey);
   });
 
-  // 用户断开连接后忘记其公钥
+  // 用户断开连接后清除其公钥
   provider.on("disconnect", () => {
     setPubKey(null);
   });

@@ -20,13 +20,13 @@ Solana 硬件签名全链路指南，覆盖地址确认与交易/消息签名，
 
 ## 工作原理
 
-通过 `HardwareSDK` 与设备 App 通信，设备会展示序列化 `rawTx`（仅接受十六进制字符串，`0x` 可选）中的来源/目标/金额/费用摘要，确认后返回签名；主机将签名附加到交易（`@solana/web3.js`）并验证公钥。
+通过 `HardwareSDK` 与设备 App 通信，设备会展示序列化 `rawTx`（仅接受十六进制字符串，`0x` 可选）中的来源/目标/金额/费用摘要，确认后返回签名；应用端将签名附加到交易（`@solana/web3.js`）并验证公钥。
 
 关键点：
 
 - 路径固定为全硬化、长度 4：`m/44'/501'/account'/0'`（如 `m/44'/501'/0'/0'`）。
 - `rawTx` 只接受十六进制字符串，若拿到 `Transaction`/`VersionedTransaction`，请先 `Buffer.from(tx.serialize()).toString('hex')`。
-- 需要主机侧自行构造并序列化消息/交易（含 recent blockhash）；若为 Versioned Tx，固件需 Classic1s ≥ `3.1.0`、Touch ≥ `4.3.0`。
+- 需要应用端自行构造并序列化消息/交易（含 recent blockhash）；若为 Versioned Tx，固件需 Classic1s ≥ `3.1.0`、Touch ≥ `4.3.0`。
 
 ## 安装
 
