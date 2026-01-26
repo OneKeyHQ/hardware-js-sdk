@@ -738,7 +738,10 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
 
   // 🔒 FIX: Cancel any previous targeted scan (only one can be active at a time)
   if (activeTargetedScan) {
-    logger?.debug('[NobleBLE] Cancelling previous targeted scan for device:', activeTargetedScan.targetDeviceId);
+    logger?.debug(
+      '[NobleBLE] Cancelling previous targeted scan for device:',
+      activeTargetedScan.targetDeviceId
+    );
     activeTargetedScan.resolve(null);
     activeTargetedScan = null;
   }
@@ -760,7 +763,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     // handleDeviceDiscovered will check this and resolve when target is found
     activeTargetedScan = {
       targetDeviceId,
-      resolve: (peripheral) => {
+      resolve: peripheral => {
         clearTimeout(timeout);
         resolve(peripheral);
       },
