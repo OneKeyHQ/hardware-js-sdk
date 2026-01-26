@@ -6,9 +6,9 @@ title: evmSignTypedData
 
 ### 以太坊：签名类型化数据
 
-请求设备使用由给定 BIP32 路径派生的私钥对 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 类型化数据消息进行签名。
+使用指定 BIP32 路径派生的私钥对 [EIP-712](https://eips.ethereum.org/EIPS/eip-712) 类型化数据消息进行签名。
 
-用户会被要求在 OneKey 设备上确认所有签名详情。
+用户需要在 OneKey 设备上确认所有签名详情。
 
 * **支持 EIP-712（v3 和 v4）**
 * **使用 `evmSignTypedData` 来签名类型化结构数据**
@@ -106,7 +106,7 @@ HardwareSDK.evmSignTypedData(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误代码
+        code: number // 错误码
     }
 }
 ```

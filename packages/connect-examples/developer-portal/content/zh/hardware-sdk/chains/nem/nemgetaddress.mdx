@@ -12,7 +12,7 @@ title: nemGetAddress
 
 ## NEM：获取地址
 
-在设备上显示由给定 BIP32 路径派生的请求地址，并将其返回给调用者。用户会看到所请求密钥的描述，并被要求在 OneKey 上确认导出。
+显示指定 BIP32 路径派生的地址，并返回给调用者。用户需要在 OneKey 上确认导出。
 
 ```typescript
 const response = await HardwareSDK.nemGetAddress(connectId, deviceId, params)
@@ -68,7 +68,7 @@ HardwareSDK.nemGetAddress(connectId, deviceId, {
 }
 ```
 
-按先进先出顺序排列的批量地址结果
+按 FIFO 排序的批量地址结果
 
 ```typescript
 {

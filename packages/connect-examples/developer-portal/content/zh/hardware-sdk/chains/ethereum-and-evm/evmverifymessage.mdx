@@ -6,7 +6,7 @@ title: evmVerifyMessage
 
 ## 以太坊：验证消息
 
-请求设备使用签名者地址和签名来验证消息。
+使用签名者地址和签名验证消息。
 
 ```typescript
 const result = await HardwareSDK.evmVerifyMessage(connectId, deviceId, params);
@@ -50,7 +50,7 @@ HardwareSDK.evmVerifyMessage(connectId, deviceId, {
     success: false,
     payload: {
         error: string, // 错误信息
-        code: number // 错误代码
+        code: number // 错误码
     }
 }
 ```

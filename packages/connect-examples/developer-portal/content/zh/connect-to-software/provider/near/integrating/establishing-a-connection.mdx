@@ -15,7 +15,7 @@ title: 建立连接
 连接 OneKey 的**推荐**且**最简单**的方式是调用 `provider.requestSignIn()`。不过，provider 也提供了 `request` JSON RPC 接口。
 
 
-### requestSignIn()
+### 使用 requestSignIn() 方法
 ```javascript
 try {
   const res = await provider.requestSignIn();
@@ -26,7 +26,7 @@ try {
 ```
 
 
-### request()
+### 使用 request() 方法
 ```javascript
 try {
   const res = await provider.request({
@@ -45,13 +45,13 @@ try {
 断开连接与连接类似，但断开连接可以由钱包端发起。
 
 
-### signOut()
+### 使用 signOut() 方法
 ```javascript
 provider.signOut();
 ```
 
 
-### request()
+### 使用 request() 方法
 ```javascript
 provider.request({ method: 'near_signOut' });
 ```

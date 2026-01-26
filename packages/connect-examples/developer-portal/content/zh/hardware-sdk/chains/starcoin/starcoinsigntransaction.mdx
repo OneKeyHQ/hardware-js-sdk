@@ -6,7 +6,7 @@ title: starcoinSignTransaction
 
 ## Starcoin：签名交易
 
-请求设备使用由给定 BIP32 路径派生的私钥对给定交易进行签名。用户需要在 OneKey 上确认所有交易详情。
+使用指定 BIP32 路径派生的私钥对交易进行签名。用户需要在 OneKey 上确认所有交易详情。
 
 ```typescript
 const result = await HardwareSDK.starcoinSignTransaction(connectId, deviceId, params);
@@ -17,7 +17,7 @@ const result = await HardwareSDK.starcoinSignTransaction(connectId, deviceId, pa
 [**可选通用参数**](../../../core-api-guide#common-params)
 
 * `path` — _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
-* `rawTx` - _必需_ `string` 序列化交易字符串的类型
+* `rawTx` - _必需_ `string` 序列化交易字符串
 
 ### 示例
 
