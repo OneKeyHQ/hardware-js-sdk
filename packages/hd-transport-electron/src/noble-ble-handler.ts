@@ -47,7 +47,7 @@ let persistentStateListener: ((state: string) => void) | null = null;
 // Device cache and connection state
 const discoveredDevices = new Map<string, Peripheral>();
 const connectedDevices = new Map<string, Peripheral>();
-const pairedDevices = new Set<string>(); // Windows BLE 设备配对状态跟踪
+const pairedDevices = new Set<string>(); // Windows BLE device pairing status tracking
 const deviceCharacteristics = new Map<string, CharacteristicPair>();
 const notificationCallbacks = new Map<string, (data: string) => void>();
 const subscribedDevices = new Map<string, boolean>(); // Track subscription status
@@ -90,6 +90,7 @@ const DEVICE_SCAN_TIMEOUT = 5000; // 5 seconds for device scanning
 const FAST_SCAN_TIMEOUT = 1500; // 1.5 seconds for fast targeted scanning
 const DEVICE_CHECK_INTERVAL = 500; // 500ms interval for periodic device checks
 const CONNECTION_TIMEOUT = 3000; // 3 seconds for device connection
+const SERVICE_DISCOVERY_TIMEOUT = 10000; // 10 seconds for service discovery
 
 // Write-related constants
 const BLE_PACKET_SIZE = 192;
@@ -382,24 +383,26 @@ async function initializeNoble(): Promise<void> {
 
 // (Removed) cancelPairing: pairing is handled automatically during Windows init now
 
-// ===== 统一的设备清理系统 =====
+// ===== Unified Device Cleanup System =====
 
 /**
- * 设备清理选项
+ * Device cleanup options
  */
 interface DeviceCleanupOptions {
-  /** 是否清理 BLE 连接状态 */
+  /** Whether to clean up BLE connection state */
   cleanupConnection?: boolean;
-  /** 是否发送断开事件 */
+  /** Whether to clean up discovered cache (discoveredDevices Map) */
+  cleanupDiscoveredCache?: boolean;
+  /** Whether to send disconnect event */
   sendDisconnectEvent?: boolean;
-  /** 是否取消正在进行的操作 */
+  /** Whether to cancel ongoing operations */
   cancelOperations?: boolean;
-  /** 清理原因（用于日志） */
+  /** Cleanup reason (for logging) */
   reason?: string;
 }
 
 /**
- * 统一的设备清理函数 - 所有清理操作的唯一入口
+ * Unified device cleanup function - single entry point for all cleanup operations
  */
 function cleanupDevice(
   deviceId: string,
@@ -408,6 +411,7 @@ function cleanupDevice(
 ): void {
   const {
     cleanupConnection = true,
+    cleanupDiscoveredCache = false,
     sendDisconnectEvent = false,
     cancelOperations = true,
     reason = 'unknown',
@@ -417,15 +421,16 @@ function cleanupDevice(
     deviceId,
     reason,
     cleanupConnection,
+    cleanupDiscoveredCache,
     sendDisconnectEvent,
     cancelOperations,
   });
 
-  // 获取设备信息（在清理前）
+  // Get device info before cleanup
   const peripheral = connectedDevices.get(deviceId);
   const deviceName = peripheral?.advertisement?.localName || 'Unknown Device';
 
-  // 1. 清理设备状态
+  // 1. Clean up connection state
   if (cleanupConnection) {
     connectedDevices.delete(deviceId);
     deviceCharacteristics.delete(deviceId);
@@ -433,10 +438,15 @@ function cleanupDevice(
     devicePacketStates.delete(deviceId);
     subscribedDevices.delete(deviceId);
     subscriptionOperations.delete(deviceId);
-    pairedDevices.delete(deviceId); // 清理windows配对状态
+    pairedDevices.delete(deviceId);
   }
 
-  // 2. 发送断开事件（如果需要）
+  // 2. Clean up discovered cache (optional)
+  if (cleanupDiscoveredCache) {
+    discoveredDevices.delete(deviceId);
+  }
+
+  // 3. Send disconnect event (if needed)
   if (sendDisconnectEvent && webContents) {
     webContents.send(EOneKeyBleMessageKeys.BLE_DEVICE_DISCONNECTED, {
       id: deviceId,
@@ -448,7 +458,7 @@ function cleanupDevice(
 }
 
 /**
- * 处理设备断开 - 自动断开的情况
+ * Handle device disconnect - automatic disconnect case
  */
 function handleDeviceDisconnect(deviceId: string, webContents: WebContents): void {
   logger?.error('[NobleBLE] ⚠️  DEVICE DISCONNECT DETECTED:', {
@@ -547,7 +557,7 @@ async function attemptWindowsWriteUntilPaired(
         discoveredDevices.delete(deviceId);
         subscriptionOperations.set(deviceId, 'idle');
         logger?.info('[NobleBLE] Deep cleanup to reset device state to initial', { deviceId });
-        // 置空/重置订阅操作状态，避免后续进入 subscribing 等中间态
+        // Reset subscription operation state to avoid entering intermediate states
         throw ERRORS.TypedError(
           HardwareErrorCode.BleConnectedError,
           `Write failed with abortable error for device ${deviceId}: ${errorMessage}`
@@ -880,12 +890,12 @@ async function stopScanning(): Promise<void> {
   });
 }
 
-// 清理所有 Noble 监听器（用于应用退出时）
+// Clean up all Noble listeners (for app exit)
 function cleanupNobleListeners(): void {
   if (!noble) return;
 
-  // 移除所有监听器以防止内存泄漏
-  // Noble 使用 EventEmitter，需要使用 removeAllListeners
+  // Remove all listeners to prevent memory leaks
+  // Noble uses EventEmitter, need to use removeAllListeners
   try {
     (noble as any).removeAllListeners('discover');
     (noble as any).removeAllListeners('stateChange');
@@ -931,24 +941,65 @@ function getDevice(deviceId: string): DeviceInfo | null {
   };
 }
 
-// Core service discovery function (single attempt)
+// Core service discovery function (single attempt) with timeout and disconnect protection
 async function discoverServicesAndCharacteristics(
   peripheral: Peripheral
 ): Promise<CharacteristicPair> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+
+    // Helper to ensure we only resolve/reject once
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      peripheral.removeListener('disconnect', disconnectHandler);
+      fn();
+    };
+
+    // Timeout protection
+    const timeoutId = setTimeout(() => {
+      settle(() => {
+        logger?.error('[NobleBLE] Service discovery timeout');
+        reject(
+          ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'Service discovery timeout')
+        );
+      });
+    }, SERVICE_DISCOVERY_TIMEOUT);
+
+    // Disconnect handler - reject if device disconnects during discovery
+    const disconnectHandler = () => {
+      settle(() => {
+        logger?.error('[NobleBLE] Device disconnected during service discovery');
+        reject(
+          ERRORS.TypedError(
+            HardwareErrorCode.BleServiceNotFound,
+            'Device disconnected during service discovery'
+          )
+        );
+      });
+    };
+    peripheral.once('disconnect', disconnectHandler);
+
     peripheral.discoverServices(
       ONEKEY_SERVICE_UUIDS,
       (error: Error | undefined, services: Service[]) => {
+        if (settled) return;
+
         if (error) {
-          logger?.error('[NobleBLE] Service discovery failed:', error);
-          reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
+          settle(() => {
+            logger?.error('[NobleBLE] Service discovery failed:', error);
+            reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
+          });
           return;
         }
 
         if (!services || services.length === 0) {
-          reject(
-            ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found')
-          );
+          settle(() => {
+            reject(
+              ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found')
+            );
+          });
           return;
         }
 
@@ -958,10 +1009,16 @@ async function discoverServicesAndCharacteristics(
         // Discover characteristics
         service.discoverCharacteristics(
           [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
-          (error: Error | undefined, characteristics: Characteristic[]) => {
-            if (error) {
-              logger?.error('[NobleBLE] Characteristic discovery failed:', error);
-              reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
+          (charError: Error | undefined, characteristics: Characteristic[]) => {
+            if (settled) return;
+
+            if (charError) {
+              settle(() => {
+                logger?.error('[NobleBLE] Characteristic discovery failed:', charError);
+                reject(
+                  ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, charError.message)
+                );
+              });
               return;
             }
 
@@ -992,22 +1049,26 @@ async function discoverServicesAndCharacteristics(
             });
 
             if (!writeCharacteristic || !notifyCharacteristic) {
-              logger?.error(
-                '[NobleBLE] Missing characteristics - write:',
-                !!writeCharacteristic,
-                'notify:',
-                !!notifyCharacteristic
-              );
-              reject(
-                ERRORS.TypedError(
-                  HardwareErrorCode.BleCharacteristicNotFound,
-                  'Required characteristics not found'
-                )
-              );
+              settle(() => {
+                logger?.error(
+                  '[NobleBLE] Missing characteristics - write:',
+                  !!writeCharacteristic,
+                  'notify:',
+                  !!notifyCharacteristic
+                );
+                reject(
+                  ERRORS.TypedError(
+                    HardwareErrorCode.BleCharacteristicNotFound,
+                    'Required characteristics not found'
+                  )
+                );
+              });
               return;
             }
 
-            resolve({ write: writeCharacteristic, notify: notifyCharacteristic });
+            settle(() => {
+              resolve({ write: writeCharacteristic, notify: notifyCharacteristic });
+            });
           }
         );
       }
@@ -1016,7 +1077,11 @@ async function discoverServicesAndCharacteristics(
 }
 
 // Force reconnect to clear potential connection state issues
-async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string): Promise<void> {
+async function forceReconnectPeripheral(
+  peripheral: Peripheral,
+  deviceId: string,
+  webContents?: WebContents
+): Promise<void> {
   logger?.info('[NobleBLE] Forcing connection reset for device:', deviceId);
 
   // Step 1: Clean up all device state first
@@ -1029,21 +1094,17 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
 
   // Step 2: Force disconnect if connected
   if (peripheral.state === 'connected') {
+    // Remove disconnect listener before intentional disconnect to avoid spurious events
+    peripheral.removeAllListeners('disconnect');
     await new Promise<void>(resolve => {
       peripheral.disconnect(() => {
         logger?.info('[NobleBLE] Force disconnect completed');
         resolve();
       });
     });
-
-    // Wait for complete disconnection
-    await wait(1000);
   }
 
-  // Step 3: Clear any remaining listeners on the peripheral
-  peripheral.removeAllListeners();
-
-  // Step 4: Re-establish connection with longer timeout
+  // Step 3: Re-establish connection
   await new Promise<void>((resolve, reject) => {
     peripheral.connect((error: Error | undefined) => {
       if (error) {
@@ -1057,72 +1118,63 @@ async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string
     });
   });
 
+  // Step 4: Re-setup disconnect listener after reconnect
+  if (webContents) {
+    setupDisconnectListener(peripheral, deviceId, webContents);
+  }
+
   // Wait for connection to stabilize
   await wait(500);
 }
 
-// Enhanced connection with fresh peripheral rescan as last resort
-async function connectAndDiscoverWithFreshScan(deviceId: string): Promise<CharacteristicPair> {
-  logger?.info('[NobleBLE] Attempting connection with fresh peripheral scan as fallback');
-
-  const currentPeripheral = discoveredDevices.get(deviceId);
-
-  // First attempt with existing peripheral
-  if (currentPeripheral) {
-    try {
-      return await discoverServicesAndCharacteristicsWithRetry(currentPeripheral, deviceId);
-    } catch (error) {
-      logger?.error(
-        '[NobleBLE] Service discovery failed with existing peripheral, attempting fresh scan...'
-      );
-    }
-  }
-
-  // Last resort: Fresh scan to get new peripheral object
+// Last resort: Fresh scan to get completely new peripheral object and discover services
+async function freshScanAndDiscover(
+  deviceId: string,
+  webContents: WebContents
+): Promise<CharacteristicPair> {
   logger?.info(
     '[NobleBLE] Performing fresh scan to get new peripheral object for device:',
     deviceId
   );
 
-  try {
-    const freshPeripheral = await performTargetedScan(deviceId);
-    if (!freshPeripheral) {
-      // 深度清理：fresh scan 没有找到设备，强制回到初始状态（状态1）
-      discoveredDevices.delete(deviceId);
-      subscriptionOperations.set(deviceId, 'idle');
-      logger?.info('[NobleBLE] Deep cleanup before throwing DeviceNotFound (fresh scan null)', {
-        deviceId,
-      });
-      throw ERRORS.TypedError(
-        HardwareErrorCode.DeviceNotFound,
-        `Device ${deviceId} not found in fresh scan`
-      );
-    }
-
-    // Update device maps with fresh peripheral
-    discoveredDevices.set(deviceId, freshPeripheral);
-
-    // Connect to fresh peripheral
-    await new Promise<void>((resolve, reject) => {
-      freshPeripheral.connect((error: Error | undefined) => {
-        if (error) {
-          reject(new Error(`Fresh peripheral connection failed: ${error.message}`));
-        } else {
-          connectedDevices.set(deviceId, freshPeripheral);
-          resolve();
-        }
-      });
+  const freshPeripheral = await performTargetedScan(deviceId);
+  if (!freshPeripheral) {
+    // Deep cleanup: fresh scan found no device, reset to initial state
+    discoveredDevices.delete(deviceId);
+    subscriptionOperations.set(deviceId, 'idle');
+    logger?.info('[NobleBLE] Deep cleanup before throwing DeviceNotFound (fresh scan null)', {
+      deviceId,
     });
-
-    // Attempt service discovery with fresh peripheral (single attempt)
-    logger?.info('[NobleBLE] Attempting service discovery with fresh peripheral');
-    await wait(1000); // Give fresh connection more time to stabilize
-
-    return await discoverServicesAndCharacteristics(freshPeripheral);
-  } catch (error) {
-    logger?.error('[NobleBLE] Fresh scan and connection failed:', error);
-    throw error;
+    throw ERRORS.TypedError(
+      HardwareErrorCode.DeviceNotFound,
+      `Device ${deviceId} not found in fresh scan`
+    );
   }
+
+  // Update device maps with fresh peripheral
+  discoveredDevices.set(deviceId, freshPeripheral);
+
+  // Connect to fresh peripheral
+  await new Promise<void>((resolve, reject) => {
+    freshPeripheral.connect((error: Error | undefined) => {
+      if (error) {
+        reject(new Error(`Fresh peripheral connection failed: ${error.message}`));
+      } else {
+        connectedDevices.set(deviceId, freshPeripheral);
+        resolve();
+      }
+    });
+  });
+
+  // Setup disconnect listener for fresh peripheral
+  setupDisconnectListener(freshPeripheral, deviceId, webContents);
+
+  // Wait for connection to stabilize (fresh peripheral doesn't need GATT cache clearing)
+  await wait(500);
+
+  // Attempt service discovery with fresh peripheral
+  logger?.info('[NobleBLE] Attempting service discovery with fresh peripheral');
+  return discoverServicesAndCharacteristics(freshPeripheral);
 }
 
 // Enhanced service discovery with p-retry for robust BLE connection
@@ -1140,19 +1192,6 @@ async function discoverServicesAndCharacteristicsWithRetry(
         targetUUIDs: ONEKEY_SERVICE_UUIDS,
       });
 
-      // 🔒 FIX: Force reconnect on 2nd attempt (instead of 3rd) to reduce connection delay
-      // Combined with the 500ms stabilization delay after connect, this reduces total time from ~5s to ~2s
-      if (attemptNumber === 2) {
-        logger?.info('[NobleBLE] Attempting force reconnect to clear connection state...');
-        try {
-          await forceReconnectPeripheral(peripheral, deviceId);
-        } catch (error) {
-          logger?.error('[NobleBLE] Force reconnect failed:', error);
-          throw error;
-        }
-      }
-
-      // Progressive delay strategy - handled by p-retry, but add extra wait for higher attempts
       if (attemptNumber > 1) {
         logger?.info(`[NobleBLE] Service discovery retry attempt ${attemptNumber}/5`);
       }
@@ -1263,7 +1302,7 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
           ongoingOperation,
           'skip reconnect'
         );
-        // 正在进行订阅操作，避免递归重连造成循环；直接返回，等待订阅流程完成
+        // Ongoing subscription operation, avoid recursive reconnect loop; return and wait for completion
         return;
       }
 
@@ -1293,21 +1332,35 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       // Continue to re-setup the connection properly
     }
 
-    // Wait for the device to stabilize before proceeding
-    await wait(300);
-
-    // Discover services and characteristics with enhanced retry including fresh scan
+    // Force reconnect to clear GATT cache
     try {
-      const characteristics = await connectAndDiscoverWithFreshScan(deviceId);
+      await forceReconnectPeripheral(peripheral, deviceId, webContents);
+    } catch (reconnectError) {
+      logger?.error('[NobleBLE] Force reconnect failed:', reconnectError);
+      throw reconnectError;
+    }
+
+    // Discover services and characteristics
+    try {
+      const characteristics = await discoverServicesAndCharacteristicsWithRetry(
+        peripheral,
+        deviceId
+      );
       deviceCharacteristics.set(deviceId, characteristics);
       logger?.info('[NobleBLE] Device ready for communication:', deviceId);
       return;
     } catch (error) {
-      logger?.error(
-        '[NobleBLE] Service/characteristic discovery failed after all attempts:',
-        error
-      );
-      throw error;
+      // Last resort: fresh scan to get new peripheral object
+      logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', error);
+      try {
+        const characteristics = await freshScanAndDiscover(deviceId, webContents);
+        deviceCharacteristics.set(deviceId, characteristics);
+        logger?.info('[NobleBLE] Device ready for communication (via fresh scan):', deviceId);
+        return;
+      } catch (freshScanError) {
+        logger?.error('[NobleBLE] Fresh scan also failed:', freshScanError);
+        throw freshScanError;
+      }
     }
   }
 
@@ -1330,26 +1383,43 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
       logger?.info('[NobleBLE] Connected to device:', deviceId);
       connectedDevices.set(deviceId, connectedPeripheral);
 
-      // Set up unified disconnect listener
-      setupDisconnectListener(connectedPeripheral, deviceId, webContents);
-
-      // 🔒 FIX: Add stabilization delay after connect before service discovery
-      // macOS Noble BLE often returns empty services if queried too quickly after connect
-      await wait(500);
-
+      // Force reconnect immediately after connect to clear GATT cache
+      // This resolves macOS/Windows GATT cache issues that cause empty service discovery
+      // Note: forceReconnectPeripheral will setup disconnect listener after reconnect
       try {
-        const characteristics = await connectAndDiscoverWithFreshScan(deviceId);
+        await forceReconnectPeripheral(connectedPeripheral, deviceId, webContents);
+      } catch (reconnectError) {
+        logger?.error('[NobleBLE] Force reconnect failed:', reconnectError);
+        connectedPeripheral.disconnect();
+        reject(reconnectError);
+        return;
+      }
+
+      // Discover services and characteristics
+      try {
+        const characteristics = await discoverServicesAndCharacteristicsWithRetry(
+          connectedPeripheral,
+          deviceId
+        );
         deviceCharacteristics.set(deviceId, characteristics);
         logger?.info('[NobleBLE] Device ready for communication:', deviceId);
         resolve();
       } catch (discoveryError) {
+        // Last resort: fresh scan to get new peripheral object
         logger?.error(
-          '[NobleBLE] Service/characteristic discovery failed after all attempts:',
+          '[NobleBLE] Service discovery failed, attempting fresh scan...',
           discoveryError
         );
-        // Disconnect on failure
-        connectedPeripheral.disconnect();
-        reject(discoveryError);
+        try {
+          const characteristics = await freshScanAndDiscover(deviceId, webContents);
+          deviceCharacteristics.set(deviceId, characteristics);
+          logger?.info('[NobleBLE] Device ready for communication (via fresh scan):', deviceId);
+          resolve();
+        } catch (freshScanError) {
+          logger?.error('[NobleBLE] Fresh scan also failed:', freshScanError);
+          connectedPeripheral.disconnect();
+          reject(freshScanError);
+        }
       }
     });
   });
@@ -1496,7 +1566,7 @@ async function subscribeNotifications(
     logger?.info('[NobleBLE] Cleaning up previous notification listeners');
   }
 
-  // 统一清理监听器（避免重复调用）
+  // Clean up listeners uniformly (avoid duplicate calls)
   notifyCharacteristic.removeAllListeners('data');
 
   // Store callback for this device
@@ -1515,7 +1585,7 @@ async function subscribeNotifications(
     deviceId: string,
     notifyCharacteristic: Characteristic
   ): Promise<void> {
-    // 监听器已在上面清理，这里不需要重复清理
+    // Listeners already cleaned up above, no need to repeat
     await new Promise<void>(resolve => {
       notifyCharacteristic.unsubscribe(() => {
         resolve();
@@ -1532,7 +1602,7 @@ async function subscribeNotifications(
     });
 
     notifyCharacteristic.on('data', (data: Buffer) => {
-      // Windows BLE 配对检测：收到任何数据都认为设备已配对
+      // Windows BLE pairing detection: receiving any data means device is paired
       if (!pairedDevices.has(deviceId)) {
         pairedDevices.add(deviceId);
         logger?.info('[NobleBLE] Device paired successfully', { deviceId });
@@ -1660,11 +1730,11 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
 
       for (const deviceId of deviceIds) {
         try {
-          // 取消订阅和断开连接（disconnectDevice 内部会调用 cleanupDevice）
+          // Unsubscribe and disconnect (disconnectDevice calls cleanupDevice internally)
           await unsubscribeNotifications(deviceId).catch(() => {});
           await disconnectDevice(deviceId).catch(() => {});
 
-          // disconnectDevice 已经完成了所有清理工作，无需重复调用 cleanupDevice
+          // disconnectDevice already completed all cleanup, no need to call cleanupDevice again
         } catch (e) {
           logger?.error('[NobleBLE] Cancel pairing cleanup failed', { deviceId, error: e });
         }
@@ -1692,7 +1762,7 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
     webContents.on('destroyed', () => {
       safeLog(logger, 'info', 'Cleaning up Noble BLE handlers');
 
-      // 1. 清理所有连接的设备（统一清理，避免重复）
+      // 1. Clean up all connected devices (unified cleanup, avoid duplicates)
       const deviceIds = Array.from(connectedDevices.keys());
       deviceIds.forEach(deviceId => {
         cleanupDevice(deviceId, undefined, {
@@ -1703,17 +1773,17 @@ export function setupNobleBleHandlers(webContents: WebContents): void {
         });
       });
 
-      // 2. 停止扫描
+      // 2. Stop scanning
       stopScanning();
 
-      // 3. 清理 Noble 监听器
+      // 3. Clean up Noble listeners
       if (noble && persistentStateListener) {
         noble.removeListener('stateChange', persistentStateListener);
         persistentStateListener = null;
       }
       cleanupNobleListeners();
 
-      // 4. 清理发现的设备缓存
+      // 4. Clear discovered devices cache
       discoveredDevices.clear();
 
       safeLog(logger, 'info', 'Noble BLE cleanup completed');
