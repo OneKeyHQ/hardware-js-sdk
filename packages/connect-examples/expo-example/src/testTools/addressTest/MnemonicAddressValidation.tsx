@@ -149,6 +149,10 @@ const testCase: MnemonicAddressTestCase = {
       id: 'benfenGetAddress',
       method: 'benfenGetAddress',
     },
+    {
+      id: 'stellarGetAddress',
+      method: 'stellarGetAddress',
+    },
   ],
 };
 
