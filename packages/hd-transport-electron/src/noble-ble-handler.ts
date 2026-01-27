@@ -694,27 +694,6 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
 function handleDeviceDiscovered(peripheral: Peripheral): void {
   const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
 
-  // 🔒 FIX: Check targeted scan BEFORE the name filter
-  // BLE peripherals may advertise with empty/changed localName after pairing or on some OSes.
-  // If we're doing a targeted scan for a specific device ID, we should match by ID regardless of name.
-  if (activeTargetedScan && peripheral.id === activeTargetedScan.targetDeviceId) {
-    logger?.info('[NobleBLE] Target device found during targeted scan:', {
-      id: peripheral.id,
-      name: deviceName,
-    });
-
-    // Cache the device before resolving
-    discoveredDevices.set(peripheral.id, peripheral);
-
-    const { resolve } = activeTargetedScan;
-    activeTargetedScan = null; // Clear the state before resolving
-    if (noble) {
-      noble.stopScanning();
-    }
-    resolve(peripheral);
-    return;
-  }
-
   // Only process OneKey devices for general discovery
   if (!isOnekeyDevice(deviceName)) {
     return;
@@ -755,7 +734,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
   // Ensure discover listener is properly set up before targeted scanning
   ensureDiscoverListener();
 
-  // 🔒 FIX: Cancel any previous targeted scan (only one can be active at a time)
+  // FIX: Cancel any previous targeted scan (only one can be active at a time)
   if (activeTargetedScan) {
     logger?.debug(
       '[NobleBLE] Cancelling previous targeted scan for device:',
@@ -778,7 +757,7 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
       resolve(null);
     }, FAST_SCAN_TIMEOUT);
 
-    // 🔒 FIX: Set the active targeted scan state
+    // FIX: Set the active targeted scan state
     // handleDeviceDiscovered will check this and resolve when target is found
     activeTargetedScan = {
       targetDeviceId,
