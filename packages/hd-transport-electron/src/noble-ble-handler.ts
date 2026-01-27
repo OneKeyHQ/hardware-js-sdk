@@ -929,146 +929,146 @@ function getDevice(deviceId: string): DeviceInfo | null {
   };
 }
 
-// Core service discovery function (single attempt) with timeout and disconnect protection
+/**
+ * Core service discovery function with timeout and disconnect protection.
+ *
+ * Design: Uses Promise.race + try/finally pattern instead of flags.
+ * - Promisify Noble callbacks → async/await flow control
+ * - Promise.race → handle timeout/disconnect racing
+ * - try/finally → guaranteed cleanup
+ * - No manual flags needed - Promise semantics handle completion
+ */
 async function discoverServicesAndCharacteristics(
   peripheral: Peripheral
 ): Promise<CharacteristicPair> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
+  // Cleanup resources - will be set up and cleaned in try/finally
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let onDisconnect: (() => void) | undefined;
 
-    // Helper to ensure we only resolve/reject once
-    const settle = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeoutId);
-      peripheral.removeListener('disconnect', disconnectHandler);
-      fn();
-    };
+  const cleanup = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (onDisconnect) peripheral.removeListener('disconnect', onDisconnect);
+  };
 
-    // Timeout protection
-    const timeoutId = setTimeout(() => {
-      settle(() => {
-        logger?.error('[NobleBLE] Service discovery timeout');
-        reject(
-          ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'Service discovery timeout')
-        );
-      });
+  // Racing promises for timeout and disconnect
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      logger?.error('[NobleBLE] Service discovery timeout');
+      reject(
+        ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'Service discovery timeout')
+      );
     }, SERVICE_DISCOVERY_TIMEOUT);
-
-    // Disconnect handler - reject if device disconnects during discovery
-    const disconnectHandler = () => {
-      settle(() => {
-        logger?.error('[NobleBLE] Device disconnected during service discovery');
-        reject(
-          ERRORS.TypedError(
-            HardwareErrorCode.BleServiceNotFound,
-            'Device disconnected during service discovery'
-          )
-        );
-      });
-    };
-    peripheral.once('disconnect', disconnectHandler);
-
-    peripheral.discoverServices(
-      ONEKEY_SERVICE_UUIDS,
-      (error: Error | undefined, services: Service[]) => {
-        if (settled) return;
-
-        if (error) {
-          settle(() => {
-            logger?.error('[NobleBLE] Service discovery failed:', error);
-            reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
-          });
-          return;
-        }
-
-        if (!services || services.length === 0) {
-          settle(() => {
-            reject(
-              ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found')
-            );
-          });
-          return;
-        }
-
-        const service = services[0]; // Use first found service
-        logger?.info('[NobleBLE] Found service:', service.uuid);
-
-        // Discover characteristics
-        service.discoverCharacteristics(
-          [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
-          (charError: Error | undefined, characteristics: Characteristic[]) => {
-            if (settled) return;
-
-            if (charError) {
-              settle(() => {
-                logger?.error('[NobleBLE] Characteristic discovery failed:', charError);
-                reject(
-                  ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, charError.message)
-                );
-              });
-              return;
-            }
-
-            // Log discovered characteristics summary
-            logger?.info('[NobleBLE] Discovered characteristics:', {
-              count: characteristics?.length || 0,
-              uuids: characteristics?.map(c => c.uuid) || [],
-            });
-
-            let writeCharacteristic: Characteristic | null = null;
-            let notifyCharacteristic: Characteristic | null = null;
-
-            // Find characteristics by extracting the distinguishing part of UUID
-            for (const characteristic of characteristics) {
-              const uuid = characteristic.uuid.replace(/-/g, '').toLowerCase();
-              const uuidKey = uuid.length >= 8 ? uuid.substring(4, 8) : uuid;
-
-              if (uuidKey === NORMALIZED_WRITE_UUID) {
-                writeCharacteristic = characteristic;
-              } else if (uuidKey === NORMALIZED_NOTIFY_UUID) {
-                notifyCharacteristic = characteristic;
-              }
-            }
-
-            logger?.info('[NobleBLE] Characteristic discovery result:', {
-              writeFound: !!writeCharacteristic,
-              notifyFound: !!notifyCharacteristic,
-            });
-
-            if (!writeCharacteristic || !notifyCharacteristic) {
-              settle(() => {
-                logger?.error(
-                  '[NobleBLE] Missing characteristics - write:',
-                  !!writeCharacteristic,
-                  'notify:',
-                  !!notifyCharacteristic
-                );
-                reject(
-                  ERRORS.TypedError(
-                    HardwareErrorCode.BleCharacteristicNotFound,
-                    'Required characteristics not found'
-                  )
-                );
-              });
-              return;
-            }
-
-            settle(() => {
-              resolve({ write: writeCharacteristic, notify: notifyCharacteristic });
-            });
-          }
-        );
-      }
-    );
   });
+
+  const disconnectPromise = new Promise<never>((_, reject) => {
+    onDisconnect = () => {
+      logger?.error('[NobleBLE] Device disconnected during service discovery');
+      reject(
+        ERRORS.TypedError(
+          HardwareErrorCode.BleServiceNotFound,
+          'Device disconnected during service discovery'
+        )
+      );
+    };
+    peripheral.once('disconnect', onDisconnect);
+  });
+
+  // Main discovery logic as async function
+  const discoveryPromise = (async (): Promise<CharacteristicPair> => {
+    // Step 1: Discover services (promisified)
+    const services = await new Promise<Service[]>((resolve, reject) => {
+      peripheral.discoverServices(ONEKEY_SERVICE_UUIDS, (error, svc) => {
+        if (error) {
+          logger?.error('[NobleBLE] Service discovery failed:', error);
+          reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, error.message));
+        } else {
+          resolve(svc);
+        }
+      });
+    });
+
+    if (!services || services.length === 0) {
+      throw ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'No OneKey services found');
+    }
+
+    const service = services[0];
+    logger?.info('[NobleBLE] Found service:', service.uuid);
+
+    // Step 2: Discover characteristics (promisified)
+    const characteristics = await new Promise<Characteristic[]>((resolve, reject) => {
+      service.discoverCharacteristics(
+        [ONEKEY_WRITE_CHARACTERISTIC_UUID, ONEKEY_NOTIFY_CHARACTERISTIC_UUID],
+        (error, chars) => {
+          if (error) {
+            logger?.error('[NobleBLE] Characteristic discovery failed:', error);
+            reject(ERRORS.TypedError(HardwareErrorCode.BleCharacteristicNotFound, error.message));
+          } else {
+            resolve(chars);
+          }
+        }
+      );
+    });
+
+    // Step 3: Find required characteristics
+    logger?.info('[NobleBLE] Discovered characteristics:', {
+      count: characteristics?.length || 0,
+      uuids: characteristics?.map(c => c.uuid) || [],
+    });
+
+    let writeCharacteristic: Characteristic | null = null;
+    let notifyCharacteristic: Characteristic | null = null;
+
+    for (const characteristic of characteristics) {
+      const uuid = characteristic.uuid.replace(/-/g, '').toLowerCase();
+      const uuidKey = uuid.length >= 8 ? uuid.substring(4, 8) : uuid;
+
+      if (uuidKey === NORMALIZED_WRITE_UUID) {
+        writeCharacteristic = characteristic;
+      } else if (uuidKey === NORMALIZED_NOTIFY_UUID) {
+        notifyCharacteristic = characteristic;
+      }
+    }
+
+    logger?.info('[NobleBLE] Characteristic discovery result:', {
+      writeFound: !!writeCharacteristic,
+      notifyFound: !!notifyCharacteristic,
+    });
+
+    if (!writeCharacteristic || !notifyCharacteristic) {
+      logger?.error(
+        '[NobleBLE] Missing characteristics - write:',
+        !!writeCharacteristic,
+        'notify:',
+        !!notifyCharacteristic
+      );
+      throw ERRORS.TypedError(
+        HardwareErrorCode.BleCharacteristicNotFound,
+        'Required characteristics not found'
+      );
+    }
+
+    return { write: writeCharacteristic, notify: notifyCharacteristic };
+  })();
+
+  // Race between discovery, timeout, and disconnect
+  // Promise.race ensures first completion wins, others are ignored
+  try {
+    return await Promise.race([discoveryPromise, timeoutPromise, disconnectPromise]);
+  } finally {
+    // Guaranteed cleanup regardless of outcome
+    cleanup();
+  }
 }
 
-// Force reconnect to clear potential connection state issues
+/**
+ * Force reconnect to clear potential connection state issues (GATT cache).
+ *
+ * IMPORTANT: This function removes all disconnect listeners during reconnect.
+ * Caller MUST call setupDisconnectListener() after this function returns.
+ */
 async function forceReconnectPeripheral(
   peripheral: Peripheral,
-  deviceId: string,
-  webContents?: WebContents
+  deviceId: string
 ): Promise<void> {
   logger?.info('[NobleBLE] Forcing connection reset for device:', deviceId);
 
@@ -1097,7 +1097,7 @@ async function forceReconnectPeripheral(
     peripheral.connect((error: Error | undefined) => {
       if (error) {
         logger?.error('[NobleBLE] Force reconnect failed:', error);
-        reject(new Error(`Force reconnect failed: ${error.message}`));
+        reject(ERRORS.TypedError(HardwareErrorCode.BleConnectedError, error.message));
       } else {
         logger?.info('[NobleBLE] Force reconnect successful');
         connectedDevices.set(deviceId, peripheral);
@@ -1106,13 +1106,10 @@ async function forceReconnectPeripheral(
     });
   });
 
-  // Step 4: Re-setup disconnect listener after reconnect
-  if (webContents) {
-    setupDisconnectListener(peripheral, deviceId, webContents);
-  }
-
   // Wait for connection to stabilize
   await wait(500);
+
+  // NOTE: Caller MUST call setupDisconnectListener() after this function returns
 }
 
 // Last resort: Fresh scan to get completely new peripheral object and discover services
@@ -1322,7 +1319,9 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
     // Force reconnect to clear GATT cache
     try {
-      await forceReconnectPeripheral(peripheral, deviceId, webContents);
+      await forceReconnectPeripheral(peripheral, deviceId);
+      // Caller responsibility: setup disconnect listener after forceReconnect
+      setupDisconnectListener(peripheral, deviceId, webContents);
     } catch (reconnectError) {
       logger?.error('[NobleBLE] Force reconnect failed:', reconnectError);
       throw reconnectError;
@@ -1373,9 +1372,10 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
 
       // Force reconnect immediately after connect to clear GATT cache
       // This resolves macOS/Windows GATT cache issues that cause empty service discovery
-      // Note: forceReconnectPeripheral will setup disconnect listener after reconnect
       try {
-        await forceReconnectPeripheral(connectedPeripheral, deviceId, webContents);
+        await forceReconnectPeripheral(connectedPeripheral, deviceId);
+        // Caller responsibility: setup disconnect listener after forceReconnect
+        setupDisconnectListener(connectedPeripheral, deviceId, webContents);
       } catch (reconnectError) {
         logger?.error('[NobleBLE] Force reconnect failed:', reconnectError);
         connectedPeripheral.disconnect();
