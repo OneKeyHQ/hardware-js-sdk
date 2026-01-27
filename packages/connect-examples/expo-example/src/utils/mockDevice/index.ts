@@ -13,6 +13,7 @@ import nexaGetAddress from './method/nexaGetAddress';
 import xrpGetAddress from './method/xrpGetAddress';
 import cosmosGetAddress from './method/cosmosGetAddress';
 import benfenGetAddress from './method/benfenGetAddress';
+import stellarGetAddress from './method/stellarGetAddress';
 
 export default {
   btcGetAddress,
@@ -30,4 +31,5 @@ export default {
   xrpGetAddress,
   cosmosGetAddress,
   benfenGetAddress,
+  stellarGetAddress,
 };
