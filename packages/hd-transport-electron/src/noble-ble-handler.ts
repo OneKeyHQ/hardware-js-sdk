@@ -727,15 +727,6 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
   logger?.info('[NobleBLE] Starting targeted scan for device:', targetDeviceId);
 
   return new Promise((resolve, reject) => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-
-    // Cleanup function: clears both timeout and listener
-    // After cleanup, neither can trigger resolve again
-    const cleanup = () => {
-      clearTimeout(timeoutId);
-      nobleInstance.removeListener('discover', onDiscover);
-    };
-
     // Local discover listener - only matches target device
     const onDiscover = (peripheral: Peripheral) => {
       if (peripheral.id === targetDeviceId) {
@@ -743,16 +734,17 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
           id: peripheral.id,
           name: peripheral.advertisement?.localName,
         });
-        cleanup();
+        clearTimeout(timeoutId);
+        nobleInstance.removeListener('discover', onDiscover);
         nobleInstance.stopScanning();
         discoveredDevices.set(peripheral.id, peripheral);
         resolve(peripheral);
       }
     };
 
-    // Timeout handler
-    timeoutId = setTimeout(() => {
-      cleanup();
+    // Timeout handler - must be after onDiscover so it can reference it
+    const timeoutId = setTimeout(() => {
+      nobleInstance.removeListener('discover', onDiscover);
       nobleInstance.stopScanning();
       logger?.info('[NobleBLE] Targeted scan timeout for device:', targetDeviceId);
       resolve(null);
@@ -764,7 +756,8 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
     // Start scanning
     nobleInstance.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
       if (error) {
-        cleanup();
+        clearTimeout(timeoutId);
+        nobleInstance.removeListener('discover', onDiscover);
         logger?.error('[NobleBLE] Failed to start targeted scan:', error);
         reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
         return;
@@ -940,9 +933,7 @@ async function discoverServicesAndCharacteristics(
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
       logger?.error('[NobleBLE] Service discovery timeout');
-      reject(
-        ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'Service discovery timeout')
-      );
+      reject(ERRORS.TypedError(HardwareErrorCode.BleServiceNotFound, 'Service discovery timeout'));
     }, SERVICE_DISCOVERY_TIMEOUT);
   });
 
@@ -1052,10 +1043,7 @@ async function discoverServicesAndCharacteristics(
  * IMPORTANT: This function removes all disconnect listeners during reconnect.
  * Caller MUST call setupDisconnectListener() after this function returns.
  */
-async function forceReconnectPeripheral(
-  peripheral: Peripheral,
-  deviceId: string
-): Promise<void> {
+async function forceReconnectPeripheral(peripheral: Peripheral, deviceId: string): Promise<void> {
   logger?.info('[NobleBLE] Forcing connection reset for device:', deviceId);
 
   // Step 1: Clean up all device state first
@@ -1223,7 +1211,7 @@ async function setupConnectionAndDiscoverServices(
   } catch (error) {
     // Last resort: fresh scan to get new peripheral object
     logger?.error('[NobleBLE] Service discovery failed, attempting fresh scan...', error);
-    return await freshScanAndDiscover(deviceId, webContents);
+    return freshScanAndDiscover(deviceId, webContents);
   }
 }
 
