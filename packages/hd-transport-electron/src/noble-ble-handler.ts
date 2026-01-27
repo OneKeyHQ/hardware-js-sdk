@@ -55,13 +55,6 @@ const subscribedDevices = new Map<string, boolean>(); // Track subscription stat
 // 🔒 Subscription operation state tracking to prevent race conditions
 const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' | 'idle'>();
 
-// 🔒 Targeted scan state - simpler approach without extra listeners
-// Only one targeted scan can be active at a time
-let activeTargetedScan: {
-  targetDeviceId: string;
-  resolve: (peripheral: Peripheral | null) => void;
-} | null = null;
-
 // Packet reassembly state for each device
 interface PacketAssemblyState {
   bufferLength: number;
@@ -690,7 +683,7 @@ async function transmitHexDataToDevice(deviceId: string, hexData: string): Promi
   }
 }
 
-// Handle discovered device
+// Handle discovered device (for general enumeration only)
 function handleDeviceDiscovered(peripheral: Peripheral): void {
   const deviceName = peripheral.advertisement?.localName || 'Unknown Device';
 
@@ -700,8 +693,6 @@ function handleDeviceDiscovered(peripheral: Peripheral): void {
   }
 
   logger?.info('[NobleBLE] Discovered OneKey device:', deviceName);
-
-  // Cache the device in both maps
   discoveredDevices.set(peripheral.id, peripheral);
 }
 
@@ -724,66 +715,62 @@ function ensureDiscoverListener(): void {
 }
 
 // Perform targeted scan for a specific device ID
+// Uses self-contained local listener pattern - no global state needed
 async function performTargetedScan(targetDeviceId: string): Promise<Peripheral | null> {
   if (!noble) {
     throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'Noble not available');
   }
 
+  // Capture noble reference for use in closures (TypeScript narrowing)
+  const nobleInstance = noble;
+
   logger?.info('[NobleBLE] Starting targeted scan for device:', targetDeviceId);
 
-  // Ensure discover listener is properly set up before targeted scanning
-  ensureDiscoverListener();
-
-  // FIX: Cancel any previous targeted scan (only one can be active at a time)
-  if (activeTargetedScan) {
-    logger?.debug(
-      '[NobleBLE] Cancelling previous targeted scan for device:',
-      activeTargetedScan.targetDeviceId
-    );
-    activeTargetedScan.resolve(null);
-    activeTargetedScan = null;
-  }
-
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      // Clear the active scan state on timeout
-      if (activeTargetedScan?.targetDeviceId === targetDeviceId) {
-        activeTargetedScan = null;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    // Cleanup function: clears both timeout and listener
+    // After cleanup, neither can trigger resolve again
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      nobleInstance.removeListener('discover', onDiscover);
+    };
+
+    // Local discover listener - only matches target device
+    const onDiscover = (peripheral: Peripheral) => {
+      if (peripheral.id === targetDeviceId) {
+        logger?.info('[NobleBLE] Target device found during targeted scan:', {
+          id: peripheral.id,
+          name: peripheral.advertisement?.localName,
+        });
+        cleanup();
+        nobleInstance.stopScanning();
+        discoveredDevices.set(peripheral.id, peripheral);
+        resolve(peripheral);
       }
-      if (noble) {
-        noble.stopScanning();
-      }
+    };
+
+    // Timeout handler
+    timeoutId = setTimeout(() => {
+      cleanup();
+      nobleInstance.stopScanning();
       logger?.info('[NobleBLE] Targeted scan timeout for device:', targetDeviceId);
       resolve(null);
     }, FAST_SCAN_TIMEOUT);
 
-    // FIX: Set the active targeted scan state
-    // handleDeviceDiscovered will check this and resolve when target is found
-    activeTargetedScan = {
-      targetDeviceId,
-      resolve: peripheral => {
-        clearTimeout(timeout);
-        resolve(peripheral);
-      },
-    };
+    // Add local listener for this scan
+    nobleInstance.on('discover', onDiscover);
 
-    // Start scanning - the global discover listener will handle device discovery
-    // No need to add extra listeners here, avoiding listener leaks
-    if (noble) {
-      noble.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
-        if (error) {
-          clearTimeout(timeout);
-          if (activeTargetedScan?.targetDeviceId === targetDeviceId) {
-            activeTargetedScan = null;
-          }
-          logger?.error('[NobleBLE] Failed to start targeted scan:', error);
-          reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
-          return;
-        }
-
-        logger?.info('[NobleBLE] Targeted scan started for device:', targetDeviceId);
-      });
-    }
+    // Start scanning
+    nobleInstance.startScanning(ONEKEY_SERVICE_UUIDS, false, (error?: Error) => {
+      if (error) {
+        cleanup();
+        logger?.error('[NobleBLE] Failed to start targeted scan:', error);
+        reject(ERRORS.TypedError(HardwareErrorCode.BleScanError, error.message));
+        return;
+      }
+      logger?.info('[NobleBLE] Targeted scan started for device:', targetDeviceId);
+    });
   });
 }
 
