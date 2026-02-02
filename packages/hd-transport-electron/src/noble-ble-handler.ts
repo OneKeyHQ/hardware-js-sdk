@@ -1117,7 +1117,12 @@ async function freshScanAndDiscover(
   await new Promise<void>((resolve, reject) => {
     freshPeripheral.connect((error: Error | undefined) => {
       if (error) {
-        reject(new Error(`Fresh peripheral connection failed: ${error.message}`));
+        reject(
+          ERRORS.TypedError(
+            HardwareErrorCode.BleConnectedError,
+            `Fresh peripheral connection failed: ${error.message}`
+          )
+        );
       } else {
         connectedDevices.set(deviceId, freshPeripheral);
         resolve();
@@ -1157,7 +1162,10 @@ async function discoverServicesAndCharacteristicsWithRetry(
 
       // Verify connection state before attempting service discovery
       if (peripheral.state !== 'connected') {
-        throw new Error(`Device not connected: ${peripheral.state}`);
+        throw ERRORS.TypedError(
+          HardwareErrorCode.BleConnectedError,
+          `Device not connected: ${peripheral.state}`
+        );
       }
 
       try {
@@ -1359,8 +1367,9 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
         resolve();
       } catch (setupError) {
         logger?.error('[NobleBLE] Connection setup failed:', setupError);
-        connectedPeripheral.disconnect();
-        reject(setupError);
+        connectedPeripheral.disconnect(() => {
+          reject(setupError);
+        });
       }
     });
   });
@@ -1561,12 +1570,14 @@ async function subscribeNotifications(
     });
   }
 
-  await rebuildAppSubscription(deviceId, notifyCharacteristic);
-  subscribedDevices.set(deviceId, true);
-  subscriptionOperations.set(deviceId, 'idle');
+  try {
+    await rebuildAppSubscription(deviceId, notifyCharacteristic);
+    subscribedDevices.set(deviceId, true);
+  } finally {
+    // 🔒 CRITICAL: Always clear operation state (even on error)
+    subscriptionOperations.set(deviceId, 'idle');
+  }
 }
-
-// (moved unsubscribeNotifications above)
 
 // Setup IPC handlers
 export function setupNobleBleHandlers(webContents: WebContents): void {
