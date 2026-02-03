@@ -2953,6 +2953,10 @@
         "address_type": {
           "type": "CardanoAddressType",
           "id": 5
+        },
+        "protocol_magic": {
+          "type": "uint32",
+          "id": 6
         }
       }
     },
