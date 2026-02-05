@@ -8,6 +8,7 @@
   "tab__functional_testing": "功能测试",
   "tab__attach_to_pin_testing": "Attach to Pin 测试",
   "tab__chain_method_test": "链方法批量测试",
+  "tab__automation_test": "自动化测试",
 
   "action__search_device": "搜索设备",
   "action__search_device_webusb": "搜索 WebUSB 设备",
