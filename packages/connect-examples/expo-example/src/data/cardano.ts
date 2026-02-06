@@ -25,6 +25,25 @@ const api: PlaygroundProps[] = [
         },
       },
       {
+        title: 'Get address (Testnet)',
+        value: {
+          addressParameters: {
+            addressType: 0,
+            path: "m/1852'/1815'/0'/0/0",
+            stakingPath: "m/1852'/1815'/0'/2/0",
+            stakingKeyHash: undefined,
+            paymentScriptHash: undefined,
+            stakingScriptHash: undefined,
+          },
+          protocolMagic: 1097911063,
+          networkId: 0,
+          derivationType: 1,
+          address: '',
+          showOnOneKey: false,
+          isCheck: false,
+        },
+      },
+      {
         title: 'Classic Batch Get Address',
         value: {
           bundle: [
@@ -241,6 +260,16 @@ const api: PlaygroundProps[] = [
           message: 'Hello World',
           derivationType: 1,
           networkId: 1,
+        },
+      },
+      {
+        title: 'Sign Message (Testnet)',
+        value: {
+          path: "m/1852'/1815'/0'/0/0",
+          message: 'Hello World',
+          derivationType: 1,
+          networkId: 0,
+          protocolMagic: 1097911063,
         },
       },
     ],
