@@ -1,4 +1,5 @@
 import { COINTYPE_MARK, baseParams } from './baseParams';
+import { compatibilityManager } from '../../deviceCompatibility/DeviceCompatibility';
 
 import type { TestCaseDataType } from './data';
 import type { SecurityCheckTestCase } from './types';
@@ -31,6 +32,23 @@ export function replaceTemplate(key: string, template: string) {
   }
 
   return path;
+}
+
+/**
+ * Get device-specific expected result
+ * Considers device compatibility override configuration
+ */
+export function getDeviceExpected(
+  features: any,
+  method: string,
+  coinType: string,
+  defaultExpected: boolean
+): boolean {
+  const override = compatibilityManager.getExpectedOverride(features, method, coinType);
+  if (override !== undefined) {
+    return override;
+  }
+  return defaultExpected;
 }
 
 export function convertTestData(

@@ -9,10 +9,16 @@ import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest'
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
-import { convertTestData } from './utils';
+import { convertTestData, getDeviceExpected } from './utils';
 import data from './data';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { SwitchInput } from '../../../components/SwitchInput';
+import {
+  checkCompatibilityInParams,
+  handleSkipInRequest,
+  handleSkipInResponse,
+} from '../../deviceCompatibility/helpers';
+import { useDevice } from '../../../provider/DeviceProvider';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
@@ -25,14 +31,26 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'ti
   });
 
   return Promise.race([promise, timeoutPromise]).then(result => {
-    clearTimeout(timeoutHandle); // 清除超时计时器
+    clearTimeout(timeoutHandle);
     return result;
   });
 }
 
 function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const intl = useIntl();
+  const { selectedDevice } = useDevice();
   const title = `${item?.method} ${item.path}`;
+
+  const pathParts = item.path?.split('/') || [];
+  const coinTypePart = pathParts[2] || '';
+  const coinType = coinTypePart.replace("'", '');
+
+  const expected = getDeviceExpected(
+    selectedDevice?.features || {},
+    item.method,
+    coinType,
+    item.expect
+  );
 
   return (
     <>
@@ -41,7 +59,7 @@ function ResultView({ item, itemVerifyState }: ResultViewProps) {
       </Stack>
 
       <Text fontSize={14}>
-        {intl.formatMessage({ id: 'label__expected' })} {item?.expect ? 'success' : 'invalid path'}
+        {intl.formatMessage({ id: 'label__expected' })} {expected ? 'success' : 'invalid path'}
       </Text>
     </>
   );
@@ -88,6 +106,7 @@ function ExecuteView() {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
   const [disableSecurityCheck, setDisableSecurityCheck] = useState(true);
+  const { selectedDevice } = useDevice();
 
   const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
     initHardwareListener: sdk => {
@@ -149,12 +168,17 @@ function ExecuteView() {
         ...params,
       };
 
-      return Promise.resolve({
-        method: item.method,
-        params: requestParams,
-      });
+      // Check compatibility using helper
+      return Promise.resolve(
+        checkCompatibilityInParams(selectedDevice?.features || {}, item.method, requestParams)
+      );
     },
     processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
+      // Handle skipped requests
+      if (requestParams.__skipTest) {
+        return handleSkipInRequest(sdk, method, connectId, deviceId, requestParams);
+      }
+
       const sdkPromise = async () => {
         try {
           // @ts-expect-error
@@ -205,10 +229,29 @@ function ExecuteView() {
       return Promise.resolve(result);
     },
     processResponse: (_, item, __, res) => {
+      // Handle skipped responses
+      const skipResult = handleSkipInResponse(res?.payload, item);
+      if (skipResult.shouldReturn) {
+        return Promise.resolve(skipResult.result);
+      }
+
       const error = '';
 
       const responseError = get(res, 'payload.error', '');
-      const expected = item.expect;
+
+      // Extract coinType from path for device-specific expected result
+      // Path format: m/44'/60'/0' -> coinType = 60
+      const pathParts = item.path?.split('/') || [];
+      const coinTypePart = pathParts[2] || ''; // e.g., "60'"
+      const coinType = coinTypePart.replace("'", ''); // e.g., "60"
+
+      // Use device-specific expected value (if override configured)
+      const expected = getDeviceExpected(
+        selectedDevice?.features || {},
+        item.method,
+        coinType,
+        item.expect
+      );
 
       if (expected === true && !res.success) {
         return Promise.resolve({
@@ -220,7 +263,8 @@ function ExecuteView() {
           !res.success &&
           (responseError.toLowerCase()?.indexOf('invalid path') !== -1 ||
             responseError.toLowerCase()?.indexOf('forbidden key path') !== -1 ||
-            responseError.toLowerCase()?.indexOf('invalid address path') !== -1)
+            responseError.toLowerCase()?.indexOf('invalid address path') !== -1 ||
+            responseError.toLowerCase()?.indexOf('invalid params') !== -1)
         ) {
           return Promise.resolve({
             error: '',

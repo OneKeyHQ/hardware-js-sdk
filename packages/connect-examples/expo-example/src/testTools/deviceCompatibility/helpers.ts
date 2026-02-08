@@ -1,36 +1,38 @@
 /**
- * 设备兼容性检查辅助函数
- * 用于在测试中统一处理兼容性检查逻辑
+ * Device compatibility check helper functions
+ * Unified compatibility check logic for tests
  */
 
+// Ensure plugins are registered
+import './plugins';
 import { compatibilityManager } from './DeviceCompatibility';
 
 /**
- * 在 generateRequestParams 中检查兼容性
- * 检查方法级别和路径级别的兼容性
+ * Check compatibility in generateRequestParams
+ * Checks method-level, path-level and param-level compatibility
  */
 export function checkCompatibilityInParams(
   features: any,
   method: string,
   params: any
 ): { method: string; params: any } {
-  // 1️⃣ 检查方法级别兼容性
+  // 1. Check method-level compatibility
   const methodResult = compatibilityManager.checkMethod(features, method);
 
   if (methodResult.shouldSkip) {
-    console.log(`🚫 跳过方法: ${method} - ${methodResult.reason}`);
+    console.log(`Skip method: ${method} - ${methodResult.reason}`);
     return {
       method,
       params: { __skipTest: true, __skipReason: methodResult.reason },
     };
   }
 
-  // 2️⃣ 检查路径级别兼容性
+  // 2. Check path-level compatibility
   const path = params?.path || params?.addressParameters?.path;
   if (path) {
     const pathResult = compatibilityManager.checkMethod(features, method, path);
     if (pathResult.shouldSkip) {
-      console.log(`🚫 跳过路径: ${method} ${path} - ${pathResult.reason}`);
+      console.log(`Skip path: ${method} ${path} - ${pathResult.reason}`);
       return {
         method,
         params: { __skipTest: true, __skipReason: pathResult.reason },
@@ -38,11 +40,21 @@ export function checkCompatibilityInParams(
     }
   }
 
+  // 3. Check param-level compatibility (e.g. EIP-7702)
+  const paramsResult = compatibilityManager.checkMethod(features, method, { path, params });
+  if (paramsResult.shouldSkip) {
+    console.log(`Skip param condition: ${method} - ${paramsResult.reason}`);
+    return {
+      method,
+      params: { __skipTest: true, __skipReason: paramsResult.reason },
+    };
+  }
+
   return { method, params };
 }
 
 /**
- * 在 processRequest 中拦截跳过的请求
+ * Intercept skipped requests in processRequest
  */
 export async function handleSkipInRequest(
   SDK: any,
@@ -52,37 +64,35 @@ export async function handleSkipInRequest(
   requestParams: any
 ): Promise<{ payload: any; skipVerify: boolean }> {
   if (requestParams.__skipTest) {
-    console.log(`🚫 拦截请求: ${method} - ${requestParams.__skipReason}`);
-    // 返回符合 SDK 响应格式的对象
-    // payload.payload 才是 processResponse 接收到的第一个参数
+    console.log(`Intercept request: ${method} - ${requestParams.__skipReason}`);
     return {
       payload: {
         success: true,
-        payload: requestParams, // 这个会被传入 processResponse
+        payload: requestParams,
       },
       skipVerify: true,
     };
   }
 
-  // 正常调用 SDK
+  // Normal SDK call
   const res = await SDK[method](connectId, deviceId, requestParams);
   return { payload: res, skipVerify: false };
 }
 
 /**
- * 在 processResponse 中处理跳过状态
+ * Handle skip status in processResponse
  */
 export function handleSkipInResponse(
   res: any,
   item: any
 ): { shouldReturn: boolean; result?: { error: string; verifyState: 'skip'; skipReason?: string } } {
   if (res && res.__skipTest) {
-    const skipReason = res.__skipReason || '设备不支持';
-    console.log(`✅ 方法跳过: ${item.method} - ${skipReason}`);
+    const skipReason = res.__skipReason || 'Not supported';
+    console.log(`Method skipped: ${item.method} - ${skipReason}`);
     return {
       shouldReturn: true,
       result: {
-        error: skipReason, // 将跳过原因放入 error 字段，这样 UI 可以显示
+        error: skipReason,
         verifyState: 'skip' as const,
       },
     };
@@ -92,7 +102,7 @@ export function handleSkipInResponse(
 }
 
 /**
- * 过滤 bundle 中不支持的路径
+ * Filter unsupported paths from bundle
  */
 export function filterUnsupportedPaths(
   features: any,
@@ -107,7 +117,7 @@ export function filterUnsupportedPaths(
 
     if (pathResult.shouldSkip) {
       skippedPaths.push(path);
-      console.log(`🚫 跳过路径（已从请求中移除）: ${method} ${path} - ${pathResult.reason}`);
+      console.log(`Skip path (removed from request): ${method} ${path} - ${pathResult.reason}`);
       return false;
     }
     return true;
@@ -117,8 +127,8 @@ export function filterUnsupportedPaths(
 }
 
 /**
- * 批量测试专用：检查兼容性并处理 bundle 路径过滤
- * 用于 TestBatchAddress 的 generateRequestParams
+ * Batch test: check compatibility and filter bundle paths
+ * Used in TestBatchAddress's generateRequestParams
  */
 export function checkBatchCompatibility(
   features: any,
@@ -127,21 +137,21 @@ export function checkBatchCompatibility(
 ): { method: string; params: any } {
   const { method } = item;
 
-  // 1️⃣ 检查方法级别兼容性
+  // 1. Check method-level compatibility
   const methodResult = compatibilityManager.checkMethod(features, method);
   if (methodResult.shouldSkip) {
-    console.log(`🚫 跳过整个方法: ${method} - ${methodResult.reason}`);
+    console.log(`Skip entire method: ${method} - ${methodResult.reason}`);
     return {
       method,
       params: { __skipTest: true, __skipReason: methodResult.reason },
     };
   }
 
-  // 2️⃣ 检查路径级别兼容性
+  // 2. Check path-level compatibility
   const { params } = item;
   let skippedPaths: string[] = [];
 
-  // 如果有 bundle（批量请求），过滤掉不支持的路径
+  // If bundle exists (batch request), filter out unsupported paths
   if (params.bundle && Array.isArray(params.bundle)) {
     const { filteredBundle, skippedPaths: paths } = filterUnsupportedPaths(
       features,
@@ -150,14 +160,14 @@ export function checkBatchCompatibility(
     );
     skippedPaths = paths;
 
-    // 🎯 如果所有路径都被过滤掉，跳过整个测试
+    // If all paths are filtered out, skip the entire test
     if (filteredBundle.length === 0 && params.bundle.length > 0) {
-      console.log(`🚫 跳过整个方法（所有 ${params.bundle.length} 个路径都不支持）: ${method}`);
+      console.log(`Skip entire method (all ${params.bundle.length} paths unsupported): ${method}`);
       return {
         method,
         params: {
           __skipTest: true,
-          __skipReason: `所有 ${params.bundle.length} 个路径都不支持当前设备`,
+          __skipReason: `All ${params.bundle.length} paths are not supported on this device`,
         },
       };
     }
@@ -173,13 +183,13 @@ export function checkBatchCompatibility(
     };
   }
 
-  // 非 bundle 请求（单路径）- 检查所有路径
+  // Non-bundle request (single path) - check all paths
   const allPaths = Object.keys(item.result || {});
   allPaths.forEach(path => {
     const pathResult = compatibilityManager.checkMethod(features, method, path);
     if (pathResult.shouldSkip) {
       skippedPaths.push(path);
-      console.log(`🚫 跳过路径: ${method} ${path} - ${pathResult.reason}`);
+      console.log(`Skip path: ${method} ${path} - ${pathResult.reason}`);
     }
   });
 
@@ -194,8 +204,7 @@ export function checkBatchCompatibility(
 }
 
 /**
- * 从 params 或 response 中提取跳过的路径列表
- * 用于避免重复计算兼容性
+ * Extract skipped paths list from params or response
  */
 export function getSkippedPaths(params: any): string[] {
   return params?.__skippedPaths || [];
