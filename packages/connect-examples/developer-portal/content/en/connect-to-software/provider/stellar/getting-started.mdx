@@ -1,0 +1,45 @@
+---
+title: Getting Started
+description: Detect and use OneKey's Stellar provider
+---
+
+import { Callout } from 'nextra/components'
+
+# Getting Started
+
+Learn how to detect OneKey's Stellar provider and request a Stellar address.
+
+<Callout type="warning">
+Stellar signing typically depends on the correct network passphrase (e.g. Public or Testnet). Make sure you pass the right one when signing.
+</Callout>
+
+---
+
+## Provider Detection
+
+```ts
+const stellar = window.$onekey?.stellar
+
+if (!stellar?.isOneKey) {
+  throw new Error('OneKey Stellar provider not detected')
+}
+```
+
+---
+
+## Get Address (Connect)
+
+```ts
+// Triggers wallet permission / connect flow and returns the address (G...)
+const { address } = await stellar.getAddress()
+console.log('Address:', address)
+```
+
+---
+
+## Get Network
+
+```ts
+const { network, networkPassphrase } = await stellar.getNetwork()
+console.log({ network, networkPassphrase })
+```
