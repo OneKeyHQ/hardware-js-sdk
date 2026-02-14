@@ -4,5 +4,5 @@ import type { DevicePlugin } from '../DeviceCompatibility';
 
 export const touchPlugin: DevicePlugin = {
   deviceType: EDeviceType.Touch,
-  ignoreMethod: [],
+  overrides: [],
 };

@@ -1,6 +1,6 @@
 /**
- * Device Compatibility System
- * Configure methods to skip during testing based on device type
+ * 设备兼容性系统
+ * 通过统一 overrides 规则处理「跳过执行」与「期望覆盖」两类行为
  */
 
 import { useMemo } from 'react';
@@ -10,26 +10,41 @@ import { useDevice } from '../../provider/DeviceProvider';
 
 import type { EDeviceType } from '@onekeyfe/hd-shared';
 
-// Device plugin configuration
-export interface DevicePlugin {
-  deviceType: EDeviceType;
-  ignoreMethod: string[]; // Methods to skip
-  ignoreMethodPath?: Record<string, string[]>; // Method + path combinations to skip
-  ignoreMethodParams?: Record<string, (params: any) => boolean | string>; // Method + param conditions to skip (return true or reason string to skip)
-  // Expected result overrides: used when device behavior differs from default expectations
-  // Format: { method: { coinType: expectedResult } }
-  // e.g. { stellarSignTransaction: { '60': true } } means Classic succeeds with wrong coin type 60
-  expectedOverrides?: Record<string, Record<string, boolean>>;
+export interface DeviceCompatibilityCheckOptions {
+  path?: string;
+  params?: any;
+  key?: string;
+  testContext?: Record<string, any>;
 }
 
-// Compatibility check result
+export interface DeviceCompatibilityRuleContext extends DeviceCompatibilityCheckOptions {
+  method: string;
+  features: any;
+  deviceType: EDeviceType;
+}
+
+export interface DeviceCompatibilityOverride {
+  id: string;
+  methods: string | string[];
+  when?: (context: DeviceCompatibilityRuleContext) => boolean;
+  skip?: string;
+  expected?: boolean;
+}
+
+// 设备插件配置（统一使用 overrides）
+export interface DevicePlugin {
+  deviceType: EDeviceType;
+  overrides?: DeviceCompatibilityOverride[];
+}
+
+// 兼容性检查结果
 export interface CompatibilityResult {
   shouldSkip: boolean;
   reason?: string;
 }
 
 /**
- * Device Compatibility Manager
+ * 设备兼容性管理器
  */
 export class DeviceCompatibilityManager {
   private plugins: Map<EDeviceType, DevicePlugin> = new Map();
@@ -38,93 +53,101 @@ export class DeviceCompatibilityManager {
     this.plugins.set(plugin.deviceType, plugin);
   }
 
-  // Get device type using SDK's precise detection
+  // 使用 SDK 提供的精确设备类型判断
   getDeviceType(features: any): EDeviceType {
     const deviceType = getDeviceTypeFromSDK(features);
     return deviceType as EDeviceType;
   }
 
-  // Check if method should be skipped (supports path-level and param-level checks)
+  private parseCheckOptions(
+    pathOrParams?: string | DeviceCompatibilityCheckOptions
+  ): DeviceCompatibilityCheckOptions {
+    if (typeof pathOrParams === 'string') {
+      return { path: pathOrParams };
+    }
+
+    return pathOrParams || {};
+  }
+
+  private isMethodMatched(rule: DeviceCompatibilityOverride, method: string): boolean {
+    const methods = Array.isArray(rule.methods) ? rule.methods : [rule.methods];
+    return methods.includes(method);
+  }
+
+  private findMatchedOverride(
+    context: DeviceCompatibilityRuleContext,
+    predicate: (rule: DeviceCompatibilityOverride) => boolean
+  ): DeviceCompatibilityOverride | undefined {
+    const plugin = this.plugins.get(context.deviceType);
+    if (!plugin?.overrides?.length) {
+      return undefined;
+    }
+
+    return plugin.overrides.find(rule => {
+      if (!this.isMethodMatched(rule, context.method)) {
+        return false;
+      }
+      if (rule.when && !rule.when(context)) {
+        return false;
+      }
+      return predicate(rule);
+    });
+  }
+
+  // 检查方法是否需要跳过（支持路径级别与参数级别）
   checkMethod(
     features: any,
     method: string,
-    pathOrParams?: string | { path?: string; params?: any }
+    pathOrParams?: string | DeviceCompatibilityCheckOptions
   ): CompatibilityResult {
     const deviceType = this.getDeviceType(features);
-    const plugin = this.plugins.get(deviceType);
+    const options = this.parseCheckOptions(pathOrParams);
+    const context: DeviceCompatibilityRuleContext = {
+      ...options,
+      method,
+      features,
+      deviceType,
+    };
 
-    if (!plugin) {
-      return { shouldSkip: false };
-    }
-
-    // Parse arguments
-    let path: string | undefined;
-    let params: any;
-    if (typeof pathOrParams === 'string') {
-      path = pathOrParams;
-    } else if (pathOrParams) {
-      path = pathOrParams.path;
-      params = pathOrParams.params;
-    }
-
-    // 1. Check if the entire method should be skipped
-    if (plugin.ignoreMethod.includes(method)) {
+    const matchedRule = this.findMatchedOverride(context, rule => typeof rule.skip === 'string');
+    if (matchedRule?.skip) {
       return {
         shouldSkip: true,
-        reason: `${method} is not supported on ${deviceType}`,
+        reason: matchedRule.skip,
       };
-    }
-
-    // 2. Check if specific path should be skipped
-    if (path && plugin.ignoreMethodPath?.[method]) {
-      const ignorePaths = plugin.ignoreMethodPath[method];
-      if (ignorePaths.includes(path)) {
-        return {
-          shouldSkip: true,
-          reason: `${method} path ${path} is not supported on ${deviceType}`,
-        };
-      }
-    }
-
-    // 3. Check if param conditions require skipping
-    if (params && plugin.ignoreMethodParams?.[method]) {
-      const checkFn = plugin.ignoreMethodParams[method];
-      const result = checkFn(params);
-      if (result) {
-        const reason = typeof result === 'string' ? result : `${method} with specific params is not supported on ${deviceType}`;
-        return {
-          shouldSkip: true,
-          reason,
-        };
-      }
     }
 
     return { shouldSkip: false };
   }
 
-  // Get expected result override
-  // Handles cases where different devices have different expected results for the same test case
+  // 获取期望值覆盖（用于同一测试在不同设备上的差异）
   getExpectedOverride(
     features: any,
     method: string,
-    key: string
+    key: string,
+    testContext?: Record<string, any>
   ): boolean | undefined {
     const deviceType = this.getDeviceType(features);
-    const plugin = this.plugins.get(deviceType);
-
-    if (!plugin?.expectedOverrides?.[method]) {
-      return undefined;
-    }
-
-    return plugin.expectedOverrides[method][key];
+    const context: DeviceCompatibilityRuleContext = {
+      method,
+      key,
+      testContext,
+      features,
+      deviceType,
+    };
+    const matchedRule = this.findMatchedOverride(
+      context,
+      rule => typeof rule.expected === 'boolean'
+    );
+    return matchedRule?.expected;
   }
 }
 
-// Global instance
+// 全局实例
 export const compatibilityManager = new DeviceCompatibilityManager();
 
 /**
- * Device Compatibility Hook
+ * 设备兼容性 Hook
  *
  * @example
  * const { shouldSkip, skipReason } = useDeviceCompatibility(method);
@@ -147,7 +170,7 @@ export function useDeviceCompatibility(method: string) {
 }
 
 /**
- * Batch compatibility check (supports path-level)
+ * 批量兼容性检查（支持路径级别）
  */
 export function useBatchDeviceCompatibility(
   methods: string[],
@@ -176,7 +199,7 @@ export function useBatchDeviceCompatibility(
       } else {
         supportedMethods.push(method);
 
-        // Check path-level skipping
+        // 检查路径级别跳过
         if (pathsByMethod?.[method]) {
           const paths = pathsByMethod[method];
           const skippedPaths: string[] = [];

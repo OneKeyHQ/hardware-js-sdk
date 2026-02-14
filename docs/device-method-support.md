@@ -50,8 +50,8 @@
 
 | 方法 | Classic | Classic 1S |
 |-----|---------|-----------|
-| `stellarSignTransaction` (错误 coin type) | 警告后可签名 | 直接拒绝 |
-| `nemSignTransaction` (错误 coin type) | 警告后可签名 | 直接拒绝 |
+| `stellarSignTransaction` (错误 coin type) | 警告后可签名 | 关闭安全检查时可签名，严格模式拒绝 |
+| `nemSignTransaction` (错误 coin type) | 警告后可签名 | 关闭安全检查时可签名，严格模式拒绝 |
 
 ---
 
@@ -62,6 +62,7 @@
 | 方法 | 说明 |
 |-----|------|
 | `dnxGetAddress` | 性能限制 |
+| `dnxSignTransaction` | 性能限制 |
 
 其他方法全部支持。
 
@@ -83,7 +84,7 @@
 
 ---
 
-# 配置文件位置
+# 配置文件位置（overrides 规则）
 
 ```
 packages/connect-examples/expo-example/src/testTools/deviceCompatibility/plugins/

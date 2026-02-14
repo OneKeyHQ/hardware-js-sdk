@@ -2,80 +2,68 @@ import { EDeviceType } from '@onekeyfe/hd-shared';
 
 import type { DevicePlugin } from '../DeviceCompatibility';
 
+const classicUnsupportedMethods = [
+  // 新链能力（固件未支持）
+  'benfenGetAddress',
+  'alephiumGetAddress',
+  'alephiumSignTransaction',
+  'alephiumSignMessage',
+  'scdoGetAddress',
+  'scdoSignTransaction',
+  'scdoSignMessage',
+  'tonGetAddress',
+  'tonSignMessage',
+  'tonSignProof',
+  'neoGetAddress',
+  'neoSignTransaction',
+  // 新特性（当前固件版本未支持）
+  'btcSignPsbt',
+  'aptosSignInMessage',
+  // 设备特定能力
+  'deviceRebootToBoardloader',
+];
+
 export const classicPlugin: DevicePlugin = {
   deviceType: EDeviceType.Classic,
-  ignoreMethod: [
-    // ========== New chains (firmware not supported) ==========
-    'benfenGetAddress',
-
-    // Alephium
-    'alephiumGetAddress',
-    'alephiumSignTransaction',
-    'alephiumSignMessage',
-
-    // SCDO
-    'scdoGetAddress',
-    'scdoSignTransaction',
-    'scdoSignMessage',
-
-    // TON
-    'tonGetAddress',
-    'tonSignMessage',
-    'tonSignProof',
-
-    // NEO
-    'neoGetAddress',
-    'neoSignTransaction',
-
-    // ========== New features (firmware version not supported) ==========
-    // BTC PSBT signing
-    'btcSignPsbt',
-
-    // Aptos Sign-In Message
-    'aptosSignInMessage',
-
-    // ========== Known issues (pending fix) ==========
-    // TODO: aptosSignTransaction causes USB transfer error on Classic
-    // Error: "Failed to execute 'transferIn' on 'USBDevice': A transfer error has occurred."
-    // Likely firmware bug, needs firmware team investigation
-    // Date: 2026-02-06
-    'aptosSignTransaction',
-
-    // Tron Sign Message V2
-    'tronSignMessage',
-
-    // ========== Device-specific features ==========
-    'deviceRebootToBoardloader',
+  overrides: [
+    {
+      id: 'classic-unsupported-methods',
+      methods: classicUnsupportedMethods,
+      skip: 'Classic 固件暂不支持该方法',
+    },
+    {
+      id: 'classic-aptos-transfer-error',
+      methods: 'aptosSignTransaction',
+      skip: 'Classic 上 aptosSignTransaction 存在 USB 传输错误（待固件修复）',
+    },
+    {
+      id: 'classic-tron-sign-message-v2',
+      methods: 'tronSignMessage',
+      skip: 'Classic 暂不支持 tronSignMessage',
+    },
+    {
+      id: 'classic-eip7702',
+      methods: 'evmSignTransaction',
+      when: ({ params }) => Boolean(params?.transaction?.authorizationList),
+      skip: 'Classic 暂不支持 EIP-7702 (authorizationList)',
+    },
+    {
+      id: 'classic-stellar-coin60-expected-success',
+      methods: 'stellarSignTransaction',
+      when: ({ key }) => key === '60',
+      expected: true,
+    },
+    {
+      id: 'classic-nem-coin60-expected-success',
+      methods: 'nemSignTransaction',
+      when: ({ key }) => key === '60',
+      expected: true,
+    },
+    {
+      id: 'classic-sol-coin501-expected-fail',
+      methods: 'solSignTransaction',
+      when: ({ key }) => key === '501',
+      expected: false,
+    },
   ],
-
-  // ========== Param condition filters ==========
-  ignoreMethodParams: {
-    // EIP-7702: check if transaction contains authorizationList
-    evmSignTransaction: params => {
-      if (params?.transaction?.authorizationList) {
-        return 'EIP-7702 (authorizationList) is not supported on Classic';
-      }
-      return false;
-    },
-  },
-
-  // ========== Expected result overrides ==========
-  // Classic firmware shows warning for wrong coin type, user can confirm to proceed
-  // Different from Classic 1S behavior (1S rejects directly)
-  expectedOverrides: {
-    // Stellar: correct coin type is 148, but Classic allows 60 (ETH) after user confirmation
-    stellarSignTransaction: {
-      '60': true,
-    },
-    // NEM: correct coin type is 43, but Classic allows 60 (ETH) after user confirmation
-    nemSignTransaction: {
-      '60': true,
-    },
-    // Solana: Classic returns Invalid params with correct coin type 501
-    // TODO: investigate root cause, may be firmware-specific path depth requirement
-    // Date: 2026-02-06
-    solSignTransaction: {
-      '501': false,
-    },
-  },
 };

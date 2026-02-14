@@ -4,5 +4,5 @@ import type { DevicePlugin } from '../DeviceCompatibility';
 
 export const miniPlugin: DevicePlugin = {
   deviceType: EDeviceType.Mini,
-  ignoreMethod: [],
+  overrides: [],
 };

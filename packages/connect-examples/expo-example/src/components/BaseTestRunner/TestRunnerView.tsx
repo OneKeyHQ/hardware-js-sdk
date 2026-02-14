@@ -21,20 +21,20 @@ function TestRunnerPrepareDataLogView() {
   return <AutoWrapperTextArea value={runnerLogs.join('\n')} />;
 }
 
-export type TestRunnerViewProps<T> = {
+export type TestRunnerViewProps<T, TExt = unknown> = {
   title?: string;
   renderExecuteView: () => React.ReactNode;
   isShowLogDetail?: boolean;
   stateManager?: CustomStateManager;
-} & TestRunnerResultViewProps;
+} & TestRunnerResultViewProps<T, TExt>;
 
-export function TestRunnerView<T>({
+export function TestRunnerView<T, TExt = unknown>({
   title,
   renderExecuteView,
   renderResultView,
   isShowLogDetail = true,
   stateManager,
-}: TestRunnerViewProps<T>) {
+}: TestRunnerViewProps<T, TExt>) {
   return (
     <TestRunnerProvider>
       <YStack gap="$1">

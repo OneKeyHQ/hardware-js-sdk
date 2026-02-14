@@ -136,21 +136,21 @@ function ExecuteView() {
         params: requestParams,
       });
     },
-    processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
+    processRequest: async (sdk, _method, connectId, deviceId, requestParams, item) => {
       // eslint-disable-next-line no-promise-executor-return
       await new Promise(resolve => setTimeout(resolve, intervalTime));
       const sdkPromise = async () => {
         try {
-          const res = await sdk[`${method}` as keyof typeof sdk](connectId, requestParams);
+          const res = await sdk.testInitializeDeviceDuration(connectId, requestParams);
           return { payload: res, skipVerify: true };
         } catch (error) {
           console.log('=====>>>>> processRequest error: ', error);
           return {
             payload: {
-              success: false,
+              success: false as const,
               payload: {
                 code: 800,
-                error,
+                error: error instanceof Error ? error.message : String(error),
               },
             },
             skipVerify: true,

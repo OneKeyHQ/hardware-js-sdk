@@ -35,16 +35,21 @@ export function replaceTemplate(key: string, template: string) {
 }
 
 /**
- * Get device-specific expected result
- * Considers device compatibility override configuration
+ * 获取设备级别的期望值覆盖
  */
 export function getDeviceExpected(
   features: any,
   method: string,
   coinType: string,
-  defaultExpected: boolean
+  defaultExpected: boolean,
+  testContext?: Record<string, any>
 ): boolean {
-  const override = compatibilityManager.getExpectedOverride(features, method, coinType);
+  const override = compatibilityManager.getExpectedOverride(
+    features,
+    method,
+    coinType,
+    testContext
+  );
   if (override !== undefined) {
     return override;
   }

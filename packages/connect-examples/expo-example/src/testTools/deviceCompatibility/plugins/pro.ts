@@ -4,5 +4,5 @@ import type { DevicePlugin } from '../DeviceCompatibility';
 
 export const proPlugin: DevicePlugin = {
   deviceType: EDeviceType.Pro,
-  ignoreMethod: [],
+  overrides: [],
 };
