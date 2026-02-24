@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@onekeyfe/hd-transport-electron": "1.1.23-alpha.0",
-    "@stoprocent/noble": "2.3.4",
+    "@stoprocent/noble": "2.3.16",
     "debug": "4.3.4",
     "electron-is-dev": "^3.0.1",
     "electron-log": "^5.1.5",
