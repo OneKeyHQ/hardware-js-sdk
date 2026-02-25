@@ -410,6 +410,12 @@ export class DeviceCommands {
         if (message?.includes('bytes overflow')) {
           error = ERRORS.TypedError(HardwareErrorCode.DataOverload);
         }
+        if (message?.includes('Too many inputs')) {
+          const detailMatch = message.match(/\((.+?)\)/);
+          error = ERRORS.TypedError(HardwareErrorCode.TooManyInputs, undefined, {
+            count: detailMatch?.[1],
+          });
+        }
       }
 
       if (code === 'Failure_ProcessError') {
