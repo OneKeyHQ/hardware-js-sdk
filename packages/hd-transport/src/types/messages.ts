@@ -1147,6 +1147,7 @@ export type CardanoSignMessage = {
   derivation_type: CardanoDerivationType;
   network_id: number;
   address_type?: CardanoAddressType;
+  protocol_magic?: number;
 };
 
 // CardanoMessageSignature

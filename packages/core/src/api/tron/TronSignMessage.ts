@@ -61,6 +61,9 @@ export default class TronSignMessage extends BaseMethod<HardwareTronSignMessage>
       classic1s: {
         min: '3.13.0',
       },
+      classic: {
+        min: '3.12.0',
+      },
     };
   }
 

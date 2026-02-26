@@ -22,6 +22,7 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
       { name: 'derivationType', type: 'number' },
       { name: 'networkId', type: 'number', required: true },
       { name: 'addressType', type: 'number' },
+      { name: 'protocolMagic', type: 'number' },
     ]);
 
     const addressN = validatePath(payload.path, 3);
@@ -35,6 +36,7 @@ export default class CardanoSignMessage extends BaseMethod<CardanoSignMessagePar
           : PROTO.CardanoDerivationType.ICARUS,
       network_id: payload.networkId,
       address_type: payload.addressType,
+      protocol_magic: payload.protocolMagic,
     };
   }
 
