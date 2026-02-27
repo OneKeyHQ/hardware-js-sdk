@@ -8,7 +8,7 @@ export const classic1sPlugin: DevicePlugin = {
     {
       id: 'classic1s-dnx-performance-limit',
       methods: ['dnxGetAddress'],
-      skip: 'Classic 1S 因性能限制暂不支持 dnxGetAddress',
+      expected: false,
     },
     {
       id: 'classic1s-stellar-coin60-with-safety-off',

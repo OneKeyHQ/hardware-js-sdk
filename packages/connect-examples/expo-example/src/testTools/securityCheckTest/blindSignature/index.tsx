@@ -64,37 +64,6 @@ function normalizeErrorMessage(error: unknown): string {
   }
 }
 
-function isExpectedInvalidPathError(
-  method: string,
-  responseErrorLowerCase: string,
-  allowInvalidParams: boolean
-): boolean {
-  if (
-    responseErrorLowerCase.indexOf('invalid path') !== -1 ||
-    responseErrorLowerCase.indexOf('forbidden key path') !== -1 ||
-    responseErrorLowerCase.indexOf('invalid address path') !== -1
-  ) {
-    return true;
-  }
-
-  if (allowInvalidParams && responseErrorLowerCase.indexOf('invalid params') !== -1) {
-    return true;
-  }
-
-  const allowUnsupportedMethodError =
-    method === 'tronSignMessage' || method === 'dnxSignTransaction';
-  if (
-    allowUnsupportedMethodError &&
-    (responseErrorLowerCase.indexOf('device not support this method') !== -1 ||
-      responseErrorLowerCase.indexOf('unknown message') !== -1 ||
-      responseErrorLowerCase.indexOf('failure_unexpectedmessage') !== -1)
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
 function ResultView({
   item,
   itemVerifyState,
@@ -124,7 +93,7 @@ function ResultView({
       </Stack>
 
       <Text fontSize={14}>
-        {intl.formatMessage({ id: 'label__expected' })} {expected ? 'success' : 'invalid path'}
+        {intl.formatMessage({ id: 'label__expected' })} {expected ? 'success' : 'failure'}
       </Text>
     </>
   );
@@ -315,7 +284,6 @@ function ExecuteView({
       const error = '';
 
       const responseError = normalizeErrorMessage(get(res, 'payload.error', ''));
-      const responseErrorLowerCase = responseError.toLowerCase();
 
       // Extract coinType from path for device-specific expected result
       // Path format: m/44'/60'/0' -> coinType = 60
@@ -339,12 +307,7 @@ function ExecuteView({
         });
       }
       if (expected === false) {
-        const allowInvalidParams = item.method === 'solSignTransaction' && coinType === '501';
-
-        if (
-          !res.success &&
-          isExpectedInvalidPathError(item.method, responseErrorLowerCase, allowInvalidParams)
-        ) {
+        if (!res.success) {
           return Promise.resolve({
             error: '',
             ext: resultExt,
@@ -352,12 +315,12 @@ function ExecuteView({
         }
         if (res.success) {
           return Promise.resolve({
-            error: `actual: success, expected: invalid path`,
+            error: `actual: success, expected: failure`,
             ext: resultExt,
           });
         }
         return Promise.resolve({
-          error: `actual: ${responseError}, expected: invalid path`,
+          error: `actual: ${responseError}, expected: failure`,
           ext: resultExt,
         });
       }

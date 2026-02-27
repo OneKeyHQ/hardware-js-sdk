@@ -29,23 +29,18 @@ export const classicPlugin: DevicePlugin = {
     {
       id: 'classic-unsupported-methods',
       methods: classicUnsupportedMethods,
-      skip: 'Classic 固件暂不支持该方法',
+      expected: false,
     },
     {
       id: 'classic-aptos-transfer-error',
       methods: 'aptosSignTransaction',
-      skip: 'Classic 上 aptosSignTransaction 存在 USB 传输错误（待固件修复）',
-    },
-    {
-      id: 'classic-tron-sign-message-v2',
-      methods: 'tronSignMessage',
-      skip: 'Classic 暂不支持 tronSignMessage',
+      expected: false,
     },
     {
       id: 'classic-eip7702',
       methods: 'evmSignTransaction',
       when: ({ params }) => Boolean(params?.transaction?.authorizationList),
-      skip: 'Classic 暂不支持 EIP-7702 (authorizationList)',
+      expected: false,
     },
     {
       id: 'classic-stellar-coin60-expected-success',
