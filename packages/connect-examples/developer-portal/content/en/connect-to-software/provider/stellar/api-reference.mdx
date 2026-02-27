@@ -1,0 +1,100 @@
+---
+title: API Reference
+description: OneKey Stellar provider API reference
+---
+
+# API Reference
+
+Complete reference for methods and basic types on `window.$onekey.stellar`.
+
+---
+
+## Methods
+
+| Method | Description |
+|------|------|
+| `getAddress(params?)` | Request permission (connect) and return the current Stellar address |
+| `getNetwork()` | Get current network information |
+| `signTransaction(xdr, opts?)` | Sign a Stellar transaction XDR |
+| `signAuthEntry(authEntry, opts?)` | Sign a Stellar auth entry (authorization entry XDR) |
+| `signMessage(message, opts?)` | Sign an arbitrary message |
+
+---
+
+## Properties
+
+| Property | Type | Description |
+|------|------|------|
+| `isOneKey` | `boolean` | OneKey identifier |
+
+---
+
+## Types
+
+```ts
+export type StellarGetAddressParams = { path?: string }
+export type StellarGetAddressResponse = { address: string }
+
+export type StellarNetworkInfo = {
+  network: string
+  networkPassphrase: string
+}
+
+export type StellarSignTransactionOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+  submit?: boolean
+  submitUrl?: string
+}
+export type StellarSignTransactionResponse = {
+  signedTxXdr: string
+  signerAddress?: string
+}
+
+export type StellarSignAuthEntryOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+}
+export type StellarSignAuthEntryResponse = {
+  signedAuthEntry: string
+  signerAddress: string
+}
+
+export type StellarSignMessageOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+}
+export type StellarSignMessageResponse = {
+  signedMessage: string
+  signerAddress: string
+}
+```
+
+---
+
+## Basic Type (for reference)
+
+```ts
+export type OneKeyStellarProvider = {
+  isOneKey: boolean
+
+  // Align with Stellar Wallets Kit (KitActions)
+  getAddress: (params?: StellarGetAddressParams) => Promise<StellarGetAddressResponse>
+  getNetwork: () => Promise<StellarNetworkInfo>
+  signTransaction: (
+    xdr: string,
+    opts?: StellarSignTransactionOpts
+  ) => Promise<StellarSignTransactionResponse>
+  signAuthEntry: (
+    authEntry: string,
+    opts?: StellarSignAuthEntryOpts
+  ) => Promise<StellarSignAuthEntryResponse>
+  signMessage: (
+    message: string,
+    opts?: StellarSignMessageOpts
+  ) => Promise<StellarSignMessageResponse>
+}
+```

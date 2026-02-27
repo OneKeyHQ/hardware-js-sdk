@@ -1,0 +1,100 @@
+---
+title: API 参考
+description: OneKey Stellar provider 完整 API 参考
+---
+
+# API 参考
+
+`window.$onekey.stellar` 的方法与基础类型参考。
+
+---
+
+## 方法
+
+| 方法 | 描述 |
+|------|------|
+| `getAddress(params?)` | 请求授权（连接）并返回当前 Stellar 地址 |
+| `getNetwork()` | 获取当前网络信息 |
+| `signTransaction(xdr, opts?)` | 签名 Stellar 交易 XDR |
+| `signAuthEntry(authEntry, opts?)` | 签名 Stellar Auth Entry（授权条目 XDR） |
+| `signMessage(message, opts?)` | 签名任意消息 |
+
+---
+
+## 属性
+
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `isOneKey` | `boolean` | OneKey 标识 |
+
+---
+
+## 类型
+
+```ts
+export type StellarGetAddressParams = { path?: string }
+export type StellarGetAddressResponse = { address: string }
+
+export type StellarNetworkInfo = {
+  network: string
+  networkPassphrase: string
+}
+
+export type StellarSignTransactionOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+  submit?: boolean
+  submitUrl?: string
+}
+export type StellarSignTransactionResponse = {
+  signedTxXdr: string
+  signerAddress?: string
+}
+
+export type StellarSignAuthEntryOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+}
+export type StellarSignAuthEntryResponse = {
+  signedAuthEntry: string
+  signerAddress: string
+}
+
+export type StellarSignMessageOpts = {
+  networkPassphrase?: string
+  address?: string
+  path?: string
+}
+export type StellarSignMessageResponse = {
+  signedMessage: string
+  signerAddress: string
+}
+```
+
+---
+
+## 基础类型（仅供参考）
+
+```ts
+export type OneKeyStellarProvider = {
+  isOneKey: boolean
+
+  // 与 Stellar Wallets Kit（KitActions）保持一致
+  getAddress: (params?: StellarGetAddressParams) => Promise<StellarGetAddressResponse>
+  getNetwork: () => Promise<StellarNetworkInfo>
+  signTransaction: (
+    xdr: string,
+    opts?: StellarSignTransactionOpts
+  ) => Promise<StellarSignTransactionResponse>
+  signAuthEntry: (
+    authEntry: string,
+    opts?: StellarSignAuthEntryOpts
+  ) => Promise<StellarSignAuthEntryResponse>
+  signMessage: (
+    message: string,
+    opts?: StellarSignMessageOpts
+  ) => Promise<StellarSignMessageResponse>
+}
+```
