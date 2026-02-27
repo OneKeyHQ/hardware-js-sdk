@@ -6279,10 +6279,10 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@stoprocent/bluetooth-hci-socket@^2.2.3":
-  version "2.2.3"
-  resolved "https://registry.yarnpkg.com/@stoprocent/bluetooth-hci-socket/-/bluetooth-hci-socket-2.2.3.tgz#a47074514b840d9309d97beebcb6a7c05c9228e9"
-  integrity sha512-aQmCkEaybqH7B1K6k2oJoZTf03g3PzmZFfi9+NHDiNVPi2Mbet4Mf86gVNEnctaG5aS9743zEMxSunWOzpt3MQ==
+"@stoprocent/bluetooth-hci-socket@^2.2.5":
+  version "2.2.5"
+  resolved "https://registry.yarnpkg.com/@stoprocent/bluetooth-hci-socket/-/bluetooth-hci-socket-2.2.5.tgz#0ba0665b8b7c112fd773cc5ad6eb31c29ab95c09"
+  integrity sha512-uP/Hflt7zRKt9W5WgMyRn4I5V3Z/PjTc28qCya6A3N99Sc1vqrQn4XRx1oYc5L/Qk7d4SRHNF0J2jWvOSVq6bw==
   dependencies:
     async "^3.2.6"
     debug "^4.3.7"
@@ -6293,16 +6293,17 @@
   optionalDependencies:
     usb "^2.14.0"
 
-"@stoprocent/noble@2.3.4":
-  version "2.3.4"
-  resolved "https://registry.yarnpkg.com/@stoprocent/noble/-/noble-2.3.4.tgz#6f6b7fc640e9ad697853846ab956ae47406f2ae6"
-  integrity sha512-Tq0DSSvkd3hRWROS/JqrvhgI9GcFaQlxWgn2SaZuvLXHM7OEtQ0jrOPuWtxf/vNF5CaS6JJeo5DzEy5vmGrJFQ==
+"@stoprocent/noble@2.3.16":
+  version "2.3.16"
+  resolved "https://registry.yarnpkg.com/@stoprocent/noble/-/noble-2.3.16.tgz#16afa634a894559e09890b1c0f448004fb24eb81"
+  integrity sha512-7+xGRHzyGN1gnnDDx1epQr7AqIp/mNK/CpBWBWWCxubWt5cl8Zsa9QbVrXYlnW1R6kdqYPaNfwLefOgxHDSb7w==
   dependencies:
     debug "^4.3.7"
     node-addon-api "^8.1.0"
     node-gyp-build "^4.8.1"
+    patch-package "^8.0.0"
   optionalDependencies:
-    "@stoprocent/bluetooth-hci-socket" "^2.2.3"
+    "@stoprocent/bluetooth-hci-socket" "^2.2.5"
 
 "@substrate/ss58-registry@^1.50.0":
   version "1.50.0"
