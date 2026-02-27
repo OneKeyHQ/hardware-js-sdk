@@ -1,0 +1,36 @@
+---
+title: Stellar
+description: 通过 OneKey Stellar Provider 进行 Stellar dApp 接入
+---
+
+import { Callout } from 'nextra/components'
+
+# Stellar
+
+在 Web 应用中使用 OneKey 的 Stellar Provider。通过 `window.$onekey.stellar` 访问。
+
+<Callout type="info">
+该 Provider 设计上与 Stellar Wallets Kit 的 <code>KitActions</code> 形状保持一致：<code>getAddress</code>、<code>signTransaction</code>、<code>signAuthEntry</code>、<code>signMessage</code>、<code>getNetwork</code>。
+</Callout>
+
+## 快速链接
+
+- [快速开始](getting-started)
+- [签名](signing)
+- [API 参考](api-reference)
+
+## 最小示例
+
+```ts
+const stellar = window.$onekey?.stellar
+if (!stellar?.isOneKey) throw new Error('未检测到 OneKey Stellar Provider')
+
+const { address } = await stellar.getAddress()
+const network = await stellar.getNetwork()
+
+console.log({ address, network })
+```
+
+## 常见错误
+
+- `4001`：用户拒绝了请求
