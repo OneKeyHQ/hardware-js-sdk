@@ -474,6 +474,12 @@ export const HardwareErrorCode = {
   DeviceSettingsLanguageNotSupport: 826,
 
   /**
+   * Too many inputs
+   * @params: { count?: string }
+   */
+  TooManyInputs: 827,
+
+  /**
    * Lowlevel transport connect error
    */
   LowlevelTrasnportConnectError: 900,
@@ -622,6 +628,7 @@ export const HardwareErrorCodeMessage: HardwareErrorCodeMessageMapping = {
     'Cosmos invalid JSON message, Only support Amino msgs.',
   [HardwareErrorCode.DeviceSettingsNotProvided]: 'No setting provided',
   [HardwareErrorCode.DeviceSettingsLanguageNotSupport]: 'Language not supported',
+  [HardwareErrorCode.TooManyInputs]: 'Too many inputs',
 
   /**
    * Lowlevel transport
