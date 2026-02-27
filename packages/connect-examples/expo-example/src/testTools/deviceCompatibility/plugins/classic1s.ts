@@ -28,5 +28,15 @@ export const classic1sPlugin: DevicePlugin = {
       when: ({ key }) => key === '501',
       expected: false,
     },
+    {
+      id: 'classic1s-tron-sign-message-expected-fail',
+      methods: 'tronSignMessage',
+      expected: false,
+    },
+    {
+      id: 'classic1s-dnx-sign-tx-expected-fail',
+      methods: 'dnxSignTransaction',
+      expected: false,
+    },
   ],
 };

@@ -64,6 +64,37 @@ function normalizeErrorMessage(error: unknown): string {
   }
 }
 
+function isExpectedInvalidPathError(
+  method: string,
+  responseErrorLowerCase: string,
+  allowInvalidParams: boolean
+): boolean {
+  if (
+    responseErrorLowerCase.indexOf('invalid path') !== -1 ||
+    responseErrorLowerCase.indexOf('forbidden key path') !== -1 ||
+    responseErrorLowerCase.indexOf('invalid address path') !== -1
+  ) {
+    return true;
+  }
+
+  if (allowInvalidParams && responseErrorLowerCase.indexOf('invalid params') !== -1) {
+    return true;
+  }
+
+  const allowUnsupportedMethodError =
+    method === 'tronSignMessage' || method === 'dnxSignTransaction';
+  if (
+    allowUnsupportedMethodError &&
+    (responseErrorLowerCase.indexOf('device not support this method') !== -1 ||
+      responseErrorLowerCase.indexOf('unknown message') !== -1 ||
+      responseErrorLowerCase.indexOf('failure_unexpectedmessage') !== -1)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function ResultView({
   item,
   itemVerifyState,
@@ -312,10 +343,7 @@ function ExecuteView({
 
         if (
           !res.success &&
-          (responseErrorLowerCase.indexOf('invalid path') !== -1 ||
-            responseErrorLowerCase.indexOf('forbidden key path') !== -1 ||
-            responseErrorLowerCase.indexOf('invalid address path') !== -1 ||
-            (allowInvalidParams && responseErrorLowerCase.indexOf('invalid params') !== -1))
+          isExpectedInvalidPathError(item.method, responseErrorLowerCase, allowInvalidParams)
         ) {
           return Promise.resolve({
             error: '',
