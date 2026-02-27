@@ -20,6 +20,7 @@ export default {
   cardano: { display: 'hidden' },
   algorand: { display: 'hidden' },
   conflux: { display: 'hidden' },
+  stellar: { display: 'hidden' },
   near: { display: 'hidden' },
   nostr: { display: 'hidden' },
   webln: { display: 'hidden' }

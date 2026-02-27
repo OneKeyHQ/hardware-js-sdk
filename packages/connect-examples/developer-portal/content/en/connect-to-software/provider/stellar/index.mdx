@@ -1,0 +1,36 @@
+---
+title: Stellar
+description: Stellar integration via OneKey's Stellar provider
+---
+
+import { Callout } from 'nextra/components'
+
+# Stellar
+
+Integrate Stellar using OneKey's Stellar provider. Access via `window.$onekey.stellar`.
+
+<Callout type="info">
+This provider is designed to match the Stellar Wallets Kit <code>KitActions</code> shape: <code>getAddress</code>, <code>signTransaction</code>, <code>signAuthEntry</code>, <code>signMessage</code>, <code>getNetwork</code>.
+</Callout>
+
+## Quick Links
+
+- [Getting Started](getting-started)
+- [Signing](signing)
+- [API Reference](api-reference)
+
+## Minimal Example
+
+```ts
+const stellar = window.$onekey?.stellar
+if (!stellar?.isOneKey) throw new Error('OneKey Stellar provider not detected')
+
+const { address } = await stellar.getAddress()
+const network = await stellar.getNetwork()
+
+console.log({ address, network })
+```
+
+## Common Errors
+
+- `4001`: User rejected the request
