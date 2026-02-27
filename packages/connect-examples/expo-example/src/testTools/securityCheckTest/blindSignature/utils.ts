@@ -1,5 +1,5 @@
 import { COINTYPE_MARK, baseParams } from './baseParams';
-import { compatibilityManager } from '../../deviceCompatibility/DeviceCompatibility';
+import { compatibilityManager } from '../../deviceCompatibility';
 
 import type { TestCaseDataType } from './data';
 import type { SecurityCheckTestCase } from './types';

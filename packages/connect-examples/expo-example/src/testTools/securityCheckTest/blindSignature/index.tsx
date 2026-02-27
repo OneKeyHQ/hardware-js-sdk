@@ -41,6 +41,29 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'ti
   });
 }
 
+function extractCoinTypeFromPath(path?: string): string {
+  const pathParts = path?.split('/') || [];
+  const coinTypePart = pathParts[2] || '';
+  return coinTypePart.replace(/'/g, '');
+}
+
+function normalizeErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error == null) {
+    return '';
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 function ResultView({
   item,
   itemVerifyState,
@@ -52,9 +75,7 @@ function ResultView({
   const verifyExt = itemVerifyState.ext;
   const securityChecksDisabled = verifyExt?.securityChecksDisabled ?? disableSecurityCheck;
 
-  const pathParts = item.path?.split('/') || [];
-  const coinTypePart = pathParts[2] || '';
-  const coinType = coinTypePart.replace("'", '');
+  const coinType = extractCoinTypeFromPath(item.path);
   const expected = getDeviceExpected(
     selectedDevice?.features || {},
     item.method,
@@ -213,7 +234,7 @@ function ExecuteView({
               success: false,
               payload: {
                 code: 800,
-                error,
+                error: normalizeErrorMessage(error),
               },
             },
             skipVerify: true,
@@ -262,13 +283,12 @@ function ExecuteView({
 
       const error = '';
 
-      const responseError = get(res, 'payload.error', '');
+      const responseError = normalizeErrorMessage(get(res, 'payload.error', ''));
+      const responseErrorLowerCase = responseError.toLowerCase();
 
       // Extract coinType from path for device-specific expected result
       // Path format: m/44'/60'/0' -> coinType = 60
-      const pathParts = item.path?.split('/') || [];
-      const coinTypePart = pathParts[2] || ''; // e.g., "60'"
-      const coinType = coinTypePart.replace("'", ''); // e.g., "60"
+      const coinType = extractCoinTypeFromPath(item.path);
 
       // Use device-specific expected value (if override configured)
       const expected = getDeviceExpected(
@@ -292,10 +312,10 @@ function ExecuteView({
 
         if (
           !res.success &&
-          (responseError.toLowerCase()?.indexOf('invalid path') !== -1 ||
-            responseError.toLowerCase()?.indexOf('forbidden key path') !== -1 ||
-            responseError.toLowerCase()?.indexOf('invalid address path') !== -1 ||
-            (allowInvalidParams && responseError.toLowerCase()?.indexOf('invalid params') !== -1))
+          (responseErrorLowerCase.indexOf('invalid path') !== -1 ||
+            responseErrorLowerCase.indexOf('forbidden key path') !== -1 ||
+            responseErrorLowerCase.indexOf('invalid address path') !== -1 ||
+            (allowInvalidParams && responseErrorLowerCase.indexOf('invalid params') !== -1))
         ) {
           return Promise.resolve({
             error: '',
