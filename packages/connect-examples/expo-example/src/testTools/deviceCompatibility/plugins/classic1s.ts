@@ -7,8 +7,8 @@ export const classic1sPlugin: DevicePlugin = {
   overrides: [
     {
       id: 'classic1s-dnx-performance-limit',
-      methods: ['dnxGetAddress', 'dnxSignTransaction'],
-      skip: 'Classic 1S 因性能限制暂不支持 DNX',
+      methods: ['dnxGetAddress'],
+      skip: 'Classic 1S 因性能限制暂不支持 dnxGetAddress',
     },
     {
       id: 'classic1s-stellar-coin60-with-safety-off',

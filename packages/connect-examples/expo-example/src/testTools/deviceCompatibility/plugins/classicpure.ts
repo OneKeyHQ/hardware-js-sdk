@@ -7,8 +7,8 @@ export const classicPurePlugin: DevicePlugin = {
   overrides: [
     {
       id: 'classicpure-dnx-performance-limit',
-      methods: ['dnxGetAddress', 'dnxSignTransaction'],
-      skip: 'Classic Pure 因性能限制暂不支持 DNX',
+      methods: ['dnxGetAddress'],
+      skip: 'Classic Pure 因性能限制暂不支持 dnxGetAddress',
     },
     {
       id: 'classicpure-stellar-coin60-with-safety-off',

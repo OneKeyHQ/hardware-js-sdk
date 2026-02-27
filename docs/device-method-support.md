@@ -62,7 +62,6 @@
 | 方法 | 说明 |
 |-----|------|
 | `dnxGetAddress` | 性能限制 |
-| `dnxSignTransaction` | 性能限制 |
 
 其他方法全部支持。
 
