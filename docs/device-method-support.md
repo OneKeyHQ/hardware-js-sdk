@@ -64,7 +64,6 @@
 |-----|-------------------------------|
 | `dnxGetAddress` | 性能限制 |
 | `dnxSignTransaction` | 固件当前返回失败（如 Unknown message） |
-| `tronSignMessage` | 固件当前返回失败（如 Device not support this method） |
 
 其他方法按默认预期执行。
 

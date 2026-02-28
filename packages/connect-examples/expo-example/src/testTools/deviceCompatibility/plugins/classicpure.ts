@@ -29,11 +29,6 @@ export const classicPurePlugin: DevicePlugin = {
       expected: false,
     },
     {
-      id: 'classicpure-tron-sign-message-expected-fail',
-      methods: 'tronSignMessage',
-      expected: false,
-    },
-    {
       id: 'classicpure-dnx-sign-tx-expected-fail',
       methods: 'dnxSignTransaction',
       expected: false,
