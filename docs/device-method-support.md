@@ -82,7 +82,25 @@
 
 ---
 
-# Touch / Mini
+# Touch
+
+## 当前测试下失败预期的方法（expected=false）
+
+| 方法 | 说明（实际错误文案可能随固件变化） |
+|-----|-------------------------------|
+| `alephiumSignTransaction` | 固件当前返回失败（如 Unexpected message） |
+| `alephiumSignMessage` | 固件当前返回失败（如 Unexpected message） |
+| `dnxSignTransaction` | 固件当前返回失败（如 Unexpected message） |
+| `neoSignTransaction` | 固件当前返回失败（如 Device not support this method） |
+| `solSignTransaction` (coin type 501) | 固件当前返回失败（如 Invalid signer used） |
+| `scdoSignTransaction` | 固件当前返回失败（如 Unexpected message） |
+| `scdoSignMessage` | 固件当前返回失败（如 Unexpected message） |
+
+其他方法按默认预期执行。
+
+---
+
+# Mini
 
 全部方法支持，无已知限制。
 
