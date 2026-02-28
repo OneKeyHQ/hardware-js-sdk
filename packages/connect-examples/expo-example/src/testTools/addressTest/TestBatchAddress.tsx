@@ -12,14 +12,6 @@ import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
-import {
-  checkBatchCompatibility,
-  getSkippedPaths,
-  handleSkipInRequest,
-  handleSkipInResponse,
-} from '../deviceCompatibility';
-import { useDevice } from '../../provider/DeviceProvider';
-import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
 
 import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -34,11 +26,6 @@ type ResultViewProps = {
 
 function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const title = item?.title || item?.method;
-
-  // 🎯 检查测试状态 - 如果是 skip 状态，显示跳过信息
-  if (itemVerifyState?.verify === 'skip') {
-    return <SkippedTestItem title={title} reason={itemVerifyState?.error} />;
-  }
 
   return (
     <>
@@ -92,15 +79,8 @@ function ExportReportView() {
 }
 
 let hardwareUiEventListener: any | undefined;
-function ExecuteView({
-  batchTestCases,
-  skippedPathsMapRef,
-}: {
-  batchTestCases: AddressBatchTestCase[];
-  skippedPathsMapRef: React.MutableRefObject<Map<string, string[]>>;
-}) {
+function ExecuteView({ batchTestCases }: { batchTestCases: AddressBatchTestCase[] }) {
   const { openDialog } = useHardwareInputPinDialog();
-  const { selectedDevice } = useDevice();
 
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<AddressBatchTestCase>();
@@ -201,51 +181,27 @@ function ExecuteView({
         originDataRef.current = passphraseTestCase;
       },
       generateRequestParams: item => {
-        const result = checkBatchCompatibility(selectedDevice?.features || {}, item, {
+        const requestParams = {
+          ...item.params,
           passphraseState: currentTestCase?.extra?.passphraseState,
           useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
+        };
+
+        return Promise.resolve({
+          method: item.method,
+          params: requestParams,
         });
-
-        // 保存跳过的路径到 ref，供 ResultView 和 processResponse 使用
-        const skippedPaths = getSkippedPaths(result.params);
-        skippedPathsMapRef.current.set(item.$key, skippedPaths);
-
-        return Promise.resolve(result);
       },
-      processRequest: async (SDK, method, connectId, deviceId, requestParams) =>
-        // 🎯 使用 helper 处理跳过逻辑
-        handleSkipInRequest(SDK, method, connectId, deviceId, requestParams),
       processResponse: (res, item, itemIndex) => {
-        // 🎯 使用 helper 检查跳过状态
-        const skipCheck = handleSkipInResponse(res, item);
-        if (skipCheck.shouldReturn && skipCheck.result) {
-          return Promise.resolve(skipCheck.result);
-        }
-
         const response = res as {
           path: string;
           address: string;
           serializedPath: string;
         }[];
 
-        // 🎯 从保存的 Map 中获取跳过的路径（避免重复计算）
-        const skippedPaths = skippedPathsMapRef.current.get(item.$key) || [];
-
-        // 🎯 如果有路径被跳过，验证时需要忽略这些路径
-        const pathsToValidate = Object.keys(item.result).filter(key => !skippedPaths.includes(key));
-
-        // 🎯 如果所有路径都被跳过，返回 skip 状态
-        if (pathsToValidate.length === 0 && Object.keys(item.result).length > 0) {
-          console.log(`✅ 所有路径都被跳过: ${item.method}`);
-          return Promise.resolve({
-            error: `所有 ${Object.keys(item.result).length} 个路径都不支持当前设备`,
-            verifyState: 'skip' as const,
-          });
-        }
-
         let error = '';
 
-        for (const key of pathsToValidate) {
+        for (const key of Object.keys(item.result)) {
           const address = response?.find(
             account => account.path === key || account.serializedPath === key
           );
@@ -391,16 +347,12 @@ export function TestBatchAddress({
   // 🎯 使用 testCases 数组的第一个元素的 name 作为 key
   // 当 testCases 改变时，强制 TestRunnerView 完全重新挂载，清除所有状态
   const testKey = testCases[0]?.name || title;
-  // 创建一个 ref 用于在 ExecuteView 和 processResponse 之间共享 skippedPaths
-  const skippedPathsMapRef = useRef<Map<string, string[]>>(new Map());
 
   return (
     <TestRunnerView<AddressBatchTestCase['data']>
       key={testKey}
       title={title}
-      renderExecuteView={() => (
-        <ExecuteView batchTestCases={testCases} skippedPathsMapRef={skippedPathsMapRef} />
-      )}
+      renderExecuteView={() => <ExecuteView batchTestCases={testCases} />}
       renderResultView={(item, itemVerifyState) => (
         <ResultView item={item} itemVerifyState={itemVerifyState} />
       )}

@@ -13,7 +13,6 @@ import { convertTestData, getDeviceExpected } from './utils';
 import data from './data';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { SwitchInput } from '../../../components/SwitchInput';
-import { checkCompatibilityInParams } from '../../deviceCompatibility/helpers';
 import { useDevice } from '../../../provider/DeviceProvider';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -203,10 +202,10 @@ function ExecuteView({
         ...params,
       };
 
-      // Check compatibility using helper
-      return Promise.resolve(
-        checkCompatibilityInParams(selectedDevice?.features || {}, item.method, requestParams)
-      );
+      return Promise.resolve({
+        method: item.method,
+        params: requestParams,
+      });
     },
     processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
       const sdkPromise = async () => {
