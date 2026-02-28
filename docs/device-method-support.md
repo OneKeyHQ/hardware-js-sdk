@@ -69,7 +69,20 @@
 
 ---
 
-# Touch / Pro / Mini
+# Pro
+
+## 当前测试下失败预期的方法（expected=false）
+
+| 方法 | 说明（实际错误文案可能随固件变化） |
+|-----|-------------------------------|
+| `dnxSignTransaction` | 固件当前返回失败（如 Unexpected message） |
+| `solSignTransaction` (coin type 501) | 固件当前返回失败（如 Invalid signer used） |
+
+其他方法按默认预期执行。
+
+---
+
+# Touch / Mini
 
 全部方法支持，无已知限制。
 
