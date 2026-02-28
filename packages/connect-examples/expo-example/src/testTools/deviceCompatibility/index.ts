@@ -6,6 +6,9 @@ export {
   DeviceCompatibilityManager,
   compatibilityManager,
   type DevicePlugin,
+  type DeviceCompatibilityOverride,
+  type DeviceCompatibilityCheckOptions,
+  type DeviceCompatibilityRuleContext,
   type CompatibilityResult,
   useDeviceCompatibility,
   useBatchDeviceCompatibility,
@@ -13,12 +16,3 @@ export {
 
 // 重新导出 EDeviceType 以便外部使用
 export { EDeviceType } from '@onekeyfe/hd-shared';
-
-export {
-  checkCompatibilityInParams,
-  handleSkipInRequest,
-  handleSkipInResponse,
-  filterUnsupportedPaths,
-  checkBatchCompatibility,
-  getSkippedPaths,
-} from './helpers';

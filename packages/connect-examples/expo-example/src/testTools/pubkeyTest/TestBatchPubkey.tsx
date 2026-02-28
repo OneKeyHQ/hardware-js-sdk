@@ -13,13 +13,6 @@ import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { stripHexPrefix } from '../../utils/hexstring';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
-import {
-  checkBatchCompatibility,
-  handleSkipInRequest,
-  handleSkipInResponse,
-} from '../deviceCompatibility';
-import { useDevice } from '../../provider/DeviceProvider';
-import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
 
 import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -88,11 +81,6 @@ const RenderNestedObject = ({ obj, parentKey = '' }: { obj: any; parentKey?: str
 
 function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const title = item?.title || item?.method;
-
-  // 🎯 检查测试状态 - 如果是 skip 状态，显示跳过信息
-  if (itemVerifyState?.verify === 'skip') {
-    return <SkippedTestItem title={title} reason={itemVerifyState?.error} />;
-  }
 
   return (
     <>
@@ -187,7 +175,6 @@ function validateFields(key: string, payload: any, result: any, prefix = '') {
 let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
   const { openDialog } = useHardwareInputPinDialog();
-  const { selectedDevice } = useDevice();
 
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
   const [currentTestCase, setCurrentTestCase] = useState<PubkeyBatchTestCase>();
@@ -285,22 +272,15 @@ function ExecuteView({ testCases }: { testCases: PubkeyBatchTestCase[] }) {
       originDataRef.current = passphraseTestCase;
     },
     generateRequestParams: item =>
-      // 🎯 使用批量兼容性检查 helper
-      Promise.resolve(
-        checkBatchCompatibility(selectedDevice?.features || {}, item, {
+      Promise.resolve({
+        method: item.method,
+        params: {
+          ...item.params,
           passphraseState: currentTestCase?.extra?.passphraseState,
           useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
-        })
-      ),
-    processRequest: async (SDK, method, connectId, deviceId, requestParams) =>
-      // 🎯 使用 helper 处理跳过逻辑
-      handleSkipInRequest(SDK, method, connectId, deviceId, requestParams),
+        },
+      }),
     processResponse: (res, item, itemIndex) => {
-      // 🎯 使用 helper 检查跳过状态
-      const skipCheck = handleSkipInResponse(res, item);
-      if (skipCheck.shouldReturn && skipCheck.result) {
-        return Promise.resolve(skipCheck.result);
-      }
       const response = res as {
         path: string;
         address: string;

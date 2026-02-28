@@ -1,6 +1,6 @@
 /**
- * 设备兼容性系统 - 集成版本
- * 功能：配置要跳过的方法，检测时跳过
+ * 设备兼容性系统
+ * 通过统一 overrides 规则处理「跳过执行」与「期望覆盖」两类行为
  */
 
 import { useMemo } from 'react';
@@ -10,11 +10,31 @@ import { useDevice } from '../../provider/DeviceProvider';
 
 import type { EDeviceType } from '@onekeyfe/hd-shared';
 
-// 设备插件配置
+export interface DeviceCompatibilityCheckOptions {
+  path?: string;
+  params?: any;
+  key?: string;
+  testContext?: Record<string, any>;
+}
+
+export interface DeviceCompatibilityRuleContext extends DeviceCompatibilityCheckOptions {
+  method: string;
+  features: any;
+  deviceType: EDeviceType;
+}
+
+export interface DeviceCompatibilityOverride {
+  id: string;
+  methods: string | string[];
+  when?: (context: DeviceCompatibilityRuleContext) => boolean;
+  skip?: string;
+  expected?: boolean;
+}
+
+// 设备插件配置（统一使用 overrides）
 export interface DevicePlugin {
   deviceType: EDeviceType;
-  ignoreMethod: string[]; // 要跳过的方法列表
-  ignoreMethodPath?: Record<string, string[]>; // 要跳过的方法+路径组合
+  overrides?: DeviceCompatibilityOverride[];
 }
 
 // 兼容性检查结果
@@ -36,39 +56,90 @@ export class DeviceCompatibilityManager {
   // 使用 SDK 提供的精确设备类型判断
   getDeviceType(features: any): EDeviceType {
     const deviceType = getDeviceTypeFromSDK(features);
-    // SDK 返回的类型已经是精确的，直接使用
     return deviceType as EDeviceType;
   }
 
-  // 检查方法是否应该跳过（支持路径级别检查）
-  checkMethod(features: any, method: string, path?: string): CompatibilityResult {
-    const deviceType = this.getDeviceType(features);
-    const plugin = this.plugins.get(deviceType);
-
-    if (!plugin) {
-      return { shouldSkip: false };
+  private parseCheckOptions(
+    pathOrParams?: string | DeviceCompatibilityCheckOptions
+  ): DeviceCompatibilityCheckOptions {
+    if (typeof pathOrParams === 'string') {
+      return { path: pathOrParams };
     }
 
-    // 1. 检查整个方法是否跳过
-    if (plugin.ignoreMethod.includes(method)) {
+    return pathOrParams || {};
+  }
+
+  private isMethodMatched(rule: DeviceCompatibilityOverride, method: string): boolean {
+    const methods = Array.isArray(rule.methods) ? rule.methods : [rule.methods];
+    return methods.includes(method);
+  }
+
+  private findMatchedOverride(
+    context: DeviceCompatibilityRuleContext,
+    predicate: (rule: DeviceCompatibilityOverride) => boolean
+  ): DeviceCompatibilityOverride | undefined {
+    const plugin = this.plugins.get(context.deviceType);
+    if (!plugin?.overrides?.length) {
+      return undefined;
+    }
+
+    return plugin.overrides.find(rule => {
+      if (!this.isMethodMatched(rule, context.method)) {
+        return false;
+      }
+      if (rule.when && !rule.when(context)) {
+        return false;
+      }
+      return predicate(rule);
+    });
+  }
+
+  // 检查方法是否需要跳过（支持路径级别与参数级别）
+  checkMethod(
+    features: any,
+    method: string,
+    pathOrParams?: string | DeviceCompatibilityCheckOptions
+  ): CompatibilityResult {
+    const deviceType = this.getDeviceType(features);
+    const options = this.parseCheckOptions(pathOrParams);
+    const context: DeviceCompatibilityRuleContext = {
+      ...options,
+      method,
+      features,
+      deviceType,
+    };
+
+    const matchedRule = this.findMatchedOverride(context, rule => typeof rule.skip === 'string');
+    if (matchedRule?.skip) {
       return {
         shouldSkip: true,
-        reason: `${method} is not supported on ${deviceType}`,
+        reason: matchedRule.skip,
       };
     }
 
-    // 2. 检查特定路径是否跳过
-    if (path && plugin.ignoreMethodPath?.[method]) {
-      const ignorePaths = plugin.ignoreMethodPath[method];
-      if (ignorePaths.includes(path)) {
-        return {
-          shouldSkip: true,
-          reason: `${method} path ${path} is not supported on ${deviceType}`,
-        };
-      }
-    }
-
     return { shouldSkip: false };
+  }
+
+  // 获取期望值覆盖（用于同一测试在不同设备上的差异）
+  getExpectedOverride(
+    features: any,
+    method: string,
+    key: string,
+    testContext?: Record<string, any>
+  ): boolean | undefined {
+    const deviceType = this.getDeviceType(features);
+    const context: DeviceCompatibilityRuleContext = {
+      method,
+      key,
+      testContext,
+      features,
+      deviceType,
+    };
+    const matchedRule = this.findMatchedOverride(
+      context,
+      rule => typeof rule.expected === 'boolean'
+    );
+    return matchedRule?.expected;
   }
 }
 

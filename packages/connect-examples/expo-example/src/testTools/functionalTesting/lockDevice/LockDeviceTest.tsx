@@ -51,7 +51,8 @@ function ExportReportView() {
       markdown.push(`| --- | --- | --- | --- |`);
       items.forEach(item => {
         const caseItem = item;
-        const { $key, method, path } = caseItem;
+        const { $key, method, params } = caseItem;
+        const path = params?.path ?? '-';
 
         const state = itemVerifyState?.[$key].verify;
 

@@ -11,13 +11,6 @@ import useExportReport from '../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../components/ui/Button';
 import TestRunnerOptionButtons from '../../components/BaseTestRunner/TestRunnerOptionButtons';
 import { useHardwareInputPinDialog } from '../../provider/HardwareInputPinProvider';
-import {
-  checkCompatibilityInParams,
-  handleSkipInRequest,
-  handleSkipInResponse,
-} from '../deviceCompatibility';
-import { useDevice } from '../../provider/DeviceProvider';
-import { SkippedTestItem } from '../../components/BaseTestRunner/SkippedTestItem';
 
 import type { TestCaseDataWithKey } from '../../components/BaseTestRunner/types';
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -32,11 +25,6 @@ type ResultViewProps = {
 function ResultView({ item, itemVerifyState }: ResultViewProps) {
   const intl = useIntl();
   const title = item?.title || item?.method;
-
-  // 🎯 检查测试状态 - 如果是 skip 状态，显示跳过信息
-  if (itemVerifyState?.verify === 'skip') {
-    return <SkippedTestItem title={title} reason={itemVerifyState?.error} />;
-  }
 
   return (
     <>
@@ -92,7 +80,6 @@ let hardwareUiEventListener: any | undefined;
 function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
-  const { selectedDevice } = useDevice();
 
   const [showOnOneKey, setShowOnOneKey] = useState<boolean>(false);
   const [testCaseList, setTestCaseList] = useState<string[]>([]);
@@ -195,22 +182,12 @@ function ExecuteView({ testCases }: { testCases: AddressTestCase[] }) {
           useEmptyPassphrase: !currentTestCase?.extra?.passphrase,
         };
 
-        // 🎯 使用 helper 检查兼容性
-        return Promise.resolve(
-          checkCompatibilityInParams(selectedDevice?.features || {}, item.method, requestParams)
-        );
+        return Promise.resolve({
+          method: item.method,
+          params: requestParams,
+        });
       },
-      processRequest: async (SDK, method, connectId, deviceId, requestParams) =>
-        // 🎯 使用 helper 处理跳过逻辑
-        handleSkipInRequest(SDK, method, connectId, deviceId, requestParams),
       processResponse: (res, item, _itemIndex) => {
-        // 🎯 使用 helper 检查跳过状态
-        const skipCheck = handleSkipInResponse(res, item);
-        if (skipCheck.shouldReturn && skipCheck.result) {
-          return Promise.resolve(skipCheck.result);
-        }
-
-        // 正常验证逻辑
         const response = res as {
           path: string;
           address: string;

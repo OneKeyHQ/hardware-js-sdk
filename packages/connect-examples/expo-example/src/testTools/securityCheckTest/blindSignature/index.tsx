@@ -9,14 +9,20 @@ import { useRunnerTest } from '../../../components/BaseTestRunner/useRunnerTest'
 import useExportReport from '../../../components/BaseTestRunner/useExportReport';
 import { Button } from '../../../components/ui/Button';
 import TestRunnerOptionButtons from '../../../components/BaseTestRunner/TestRunnerOptionButtons';
-import { convertTestData } from './utils';
+import { convertTestData, getDeviceExpected } from './utils';
 import data from './data';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { SwitchInput } from '../../../components/SwitchInput';
+import { useDevice } from '../../../provider/DeviceProvider';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
 import type { TestCaseDataWithKey } from '../../../components/BaseTestRunner/types';
-import type { ResultViewProps, SecurityCheckTestCase, TestCaseDataType } from './types';
+import type {
+  BlindSignatureVerifyExt,
+  ResultViewProps,
+  SecurityCheckTestCase,
+  TestCaseDataType,
+} from './types';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
   let timeoutHandle: NodeJS.Timeout;
@@ -25,14 +31,56 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'ti
   });
 
   return Promise.race([promise, timeoutPromise]).then(result => {
-    clearTimeout(timeoutHandle); // 清除超时计时器
+    clearTimeout(timeoutHandle);
     return result;
   });
 }
 
-function ResultView({ item, itemVerifyState }: ResultViewProps) {
+function extractCoinTypeFromPath(path?: string): string {
+  const pathParts = path?.split('/') || [];
+  const coinTypePart = pathParts[2] || '';
+  return coinTypePart.replace(/'/g, '');
+}
+
+function normalizeErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error == null) {
+    return '';
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function ResultView({
+  item,
+  itemVerifyState,
+  disableSecurityCheck,
+}: ResultViewProps & { disableSecurityCheck: boolean }) {
   const intl = useIntl();
+  const { selectedDevice } = useDevice();
   const title = `${item?.method} ${item.path}`;
+  const verifyExt = itemVerifyState.ext;
+  const securityChecksDisabled = verifyExt?.securityChecksDisabled ?? disableSecurityCheck;
+
+  const coinType = extractCoinTypeFromPath(item.path);
+  const expected = getDeviceExpected(
+    selectedDevice?.features || {},
+    item.method,
+    coinType,
+    item.expect,
+    {
+      securityChecksDisabled,
+    }
+  );
+  const actualError = verifyExt?.actualError;
 
   return (
     <>
@@ -41,8 +89,9 @@ function ResultView({ item, itemVerifyState }: ResultViewProps) {
       </Stack>
 
       <Text fontSize={14}>
-        {intl.formatMessage({ id: 'label__expected' })} {item?.expect ? 'success' : 'invalid path'}
+        {intl.formatMessage({ id: 'label__expected' })} {expected ? 'success' : 'failure'}
       </Text>
+      {!expected && actualError ? <Text fontSize={14}>actual error: {actualError}</Text> : null}
     </>
   );
 }
@@ -84,12 +133,18 @@ function ExportReportView() {
 }
 
 let hardwareUiEventListener: any | undefined;
-function ExecuteView() {
+function ExecuteView({
+  disableSecurityCheck,
+  setDisableSecurityCheck,
+}: {
+  disableSecurityCheck: boolean;
+  setDisableSecurityCheck: (value: boolean) => void;
+}) {
   const intl = useIntl();
   const { openDialog } = useHardwareInputPinDialog();
-  const [disableSecurityCheck, setDisableSecurityCheck] = useState(true);
+  const { selectedDevice } = useDevice();
 
-  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType>({
+  const { stopTest, beginTest } = useRunnerTest<TestCaseDataType, BlindSignatureVerifyExt>({
     initHardwareListener: sdk => {
       if (hardwareUiEventListener) {
         sdk.off(UI_EVENT, hardwareUiEventListener);
@@ -171,7 +226,7 @@ function ExecuteView() {
               success: false,
               payload: {
                 code: 800,
-                error,
+                error: normalizeErrorMessage(error),
               },
             },
             skipVerify: true,
@@ -205,39 +260,61 @@ function ExecuteView() {
       return Promise.resolve(result);
     },
     processResponse: (_, item, __, res) => {
+      const baseExt: BlindSignatureVerifyExt = {
+        securityChecksDisabled: disableSecurityCheck,
+      };
+
       const error = '';
 
-      const responseError = get(res, 'payload.error', '');
-      const expected = item.expect;
+      const responseError = normalizeErrorMessage(get(res, 'payload.error', ''));
+
+      // Extract coinType from path for device-specific expected result
+      // Path format: m/44'/60'/0' -> coinType = 60
+      const coinType = extractCoinTypeFromPath(item.path);
+
+      // Use device-specific expected value (if override configured)
+      const expected = getDeviceExpected(
+        selectedDevice?.features || {},
+        item.method,
+        coinType,
+        item.expect,
+        {
+          securityChecksDisabled: disableSecurityCheck,
+        }
+      );
 
       if (expected === true && !res.success) {
         return Promise.resolve({
           error: `actual: ${responseError}, expected: success`,
+          ext: baseExt,
         });
       }
       if (expected === false) {
-        if (
-          !res.success &&
-          (responseError.toLowerCase()?.indexOf('invalid path') !== -1 ||
-            responseError.toLowerCase()?.indexOf('forbidden key path') !== -1 ||
-            responseError.toLowerCase()?.indexOf('invalid address path') !== -1)
-        ) {
+        const failureExt: BlindSignatureVerifyExt = {
+          ...baseExt,
+          actualError: responseError,
+        };
+        if (!res.success) {
           return Promise.resolve({
             error: '',
+            ext: failureExt,
           });
         }
         if (res.success) {
           return Promise.resolve({
-            error: `actual: success, expected: invalid path`,
+            error: `actual: success, expected: failure`,
+            ext: failureExt,
           });
         }
         return Promise.resolve({
-          error: `actual: ${responseError}, expected: invalid path`,
+          error: `actual: ${responseError}, expected: failure`,
+          ext: failureExt,
         });
       }
 
       return Promise.resolve({
         error,
+        ext: baseExt,
       });
     },
     removeHardwareListener: sdk => {
@@ -268,19 +345,30 @@ function ExecuteView() {
         </XStack>
       </YStack>
     ),
-    [beginTest, disableSecurityCheck, intl, stopTest]
+    [beginTest, disableSecurityCheck, intl, setDisableSecurityCheck, stopTest]
   );
 
   return contentMemo;
 }
 
 export function BlindSignatureChainCheck() {
+  const [disableSecurityCheck, setDisableSecurityCheck] = useState(true);
+
   return (
-    <TestRunnerView<SecurityCheckTestCase['data']>
+    <TestRunnerView<TestCaseDataType, BlindSignatureVerifyExt>
       title="Blind Signature Security Test"
-      renderExecuteView={() => <ExecuteView />}
+      renderExecuteView={() => (
+        <ExecuteView
+          disableSecurityCheck={disableSecurityCheck}
+          setDisableSecurityCheck={setDisableSecurityCheck}
+        />
+      )}
       renderResultView={(item, itemVerifyState) => (
-        <ResultView item={item} itemVerifyState={itemVerifyState} />
+        <ResultView
+          item={item}
+          itemVerifyState={itemVerifyState}
+          disableSecurityCheck={disableSecurityCheck}
+        />
       )}
     />
   );

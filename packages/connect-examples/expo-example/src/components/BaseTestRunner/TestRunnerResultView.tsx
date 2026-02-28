@@ -12,16 +12,22 @@ import type { ItemVerifyState, createTestRunnerAtoms } from './Context/TestRunne
 // 自定义状态管理器类型
 type CustomStateManager = ReturnType<typeof createTestRunnerAtoms>;
 
-export type TestItemViewProps = {
-  item: TestCaseDataWithKey;
+type TestRunnerItem<TCaseData> = TCaseData extends Array<infer TItem> ? TItem : TCaseData;
+
+export type TestItemViewProps<TCaseData = any, TExt = unknown> = {
+  item: TestCaseDataWithKey<TestRunnerItem<TCaseData>>;
   renderResultView: (
-    item: TestCaseDataWithKey,
-    itemVerifyState: ItemVerifyState
+    item: TestCaseDataWithKey<TestRunnerItem<TCaseData>>,
+    itemVerifyState: ItemVerifyState<TExt>
   ) => React.ReactNode;
   stateManager?: CustomStateManager;
 };
 
-const TestItemView = ({ item, renderResultView, stateManager }: TestItemViewProps) => {
+const TestItemView = <TCaseData, TExt>({
+  item,
+  renderResultView,
+  stateManager,
+}: TestItemViewProps<TCaseData, TExt>) => {
   const selectedItemVerifyStateAtom = useMemo(
     () =>
       stateManager
@@ -30,9 +36,10 @@ const TestItemView = ({ item, renderResultView, stateManager }: TestItemViewProp
     [item.$key, stateManager]
   );
   const itemVerifyState = useAtomValue(selectedItemVerifyStateAtom);
+  const typedItemVerifyState = itemVerifyState as ItemVerifyState<TExt>;
 
-  const verifyState = useMemo(() => itemVerifyState?.verify ?? 'none', [itemVerifyState]);
-  const errorState = useMemo(() => itemVerifyState?.error ?? '', [itemVerifyState]);
+  const verifyState = useMemo(() => typedItemVerifyState?.verify ?? 'none', [typedItemVerifyState]);
+  const errorState = useMemo(() => typedItemVerifyState?.error ?? '', [typedItemVerifyState]);
 
   const errorStateViewMemo = useMemo(() => {
     // 🎯 如果是跳过状态，不显示错误信息
@@ -75,27 +82,31 @@ const TestItemView = ({ item, renderResultView, stateManager }: TestItemViewProp
     >
       {verifyStateViewMemo}
       <Stack flex={1}>
-        {renderResultView(item, itemVerifyState)}
+        {renderResultView(item, typedItemVerifyState)}
         {errorStateViewMemo}
       </Stack>
     </XStack>
   );
 };
 
-const TestItemViewMemo = memo(TestItemView);
+const TestItemViewMemo = memo(TestItemView) as typeof TestItemView;
 
-export type TestRunnerResultViewProps = Omit<TestItemViewProps, 'item'>;
+export type TestRunnerResultViewProps<TItemData = any, TExt = unknown> = Omit<
+  TestItemViewProps<TItemData, TExt>,
+  'item'
+>;
 
 // eslint-disable-next-line react/prop-types
-export function TestRunnerResultView({
+export function TestRunnerResultView<TCaseData = any, TExt = unknown>({
   renderResultView, // eslint-disable-line react/prop-types
   stateManager, // eslint-disable-line react/prop-types
-}: TestRunnerResultViewProps) {
+}: TestRunnerResultViewProps<TCaseData, TExt>) {
   const { itemValues } = useContext(TestRunnerContext);
+  const typedItemValues = itemValues as TestCaseDataWithKey<TestRunnerItem<TCaseData>>[];
 
   const renderItem = useCallback(
     // eslint-disable-next-line react/no-unused-prop-types
-    ({ item }: { item: TestCaseDataWithKey }) => (
+    ({ item }: { item: TestCaseDataWithKey<TestRunnerItem<TCaseData>> }) => (
       <TestItemViewMemo
         renderResultView={renderResultView}
         item={item}
@@ -107,8 +118,8 @@ export function TestRunnerResultView({
 
   return (
     <YStack>
-      <FlatList<TestCaseDataWithKey>
-        data={itemValues}
+      <FlatList<TestCaseDataWithKey<TestRunnerItem<TCaseData>>>
+        data={typedItemValues}
         renderItem={renderItem}
         keyExtractor={item => item.$key}
         contentContainerStyle={{ width: '100%' }}
