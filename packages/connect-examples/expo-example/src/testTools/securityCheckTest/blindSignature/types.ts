@@ -3,6 +3,7 @@ import type { TestCase, TestCaseDataWithKey } from '../../../components/BaseTest
 
 export type BlindSignatureVerifyExt = {
   securityChecksDisabled: boolean;
+  actualError?: string;
 };
 
 export type TestCaseDataType = {

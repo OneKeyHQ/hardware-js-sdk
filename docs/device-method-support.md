@@ -1,7 +1,8 @@
 # OneKey 硬件设备方法支持列表
 
-> 更新日期: 2026-02-27
+> 更新日期: 2026-02-28
 > 说明：测试用例层面不再通过 skip 隐藏结果，统一按真实返回做 expected 覆盖。
+> 说明：`expected = false` 的用例按“任意失败即通过”判定，同时在结果区展示设备实际错误信息。
 
 ## 设备型号
 
@@ -57,13 +58,15 @@
 
 # Classic 1S / Classic Pure
 
-## 不支持的方法
+## 当前测试下失败预期的方法（expected=false）
 
-| 方法 | 说明 |
-|-----|------|
+| 方法 | 说明（实际错误文案可能随固件变化） |
+|-----|-------------------------------|
 | `dnxGetAddress` | 性能限制 |
+| `dnxSignTransaction` | 固件当前返回失败（如 Unknown message） |
+| `tronSignMessage` | 固件当前返回失败（如 Device not support this method） |
 
-其他方法全部支持。
+其他方法按默认预期执行。
 
 ---
 

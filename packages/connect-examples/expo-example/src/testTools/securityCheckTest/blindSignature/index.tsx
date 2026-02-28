@@ -80,6 +80,7 @@ function ResultView({
       securityChecksDisabled,
     }
   );
+  const actualError = verifyExt?.actualError;
 
   return (
     <>
@@ -90,6 +91,7 @@ function ResultView({
       <Text fontSize={14}>
         {intl.formatMessage({ id: 'label__expected' })} {expected ? 'success' : 'failure'}
       </Text>
+      {!expected && actualError ? <Text fontSize={14}>actual error: {actualError}</Text> : null}
     </>
   );
 }
@@ -258,7 +260,7 @@ function ExecuteView({
       return Promise.resolve(result);
     },
     processResponse: (_, item, __, res) => {
-      const resultExt: BlindSignatureVerifyExt = {
+      const baseExt: BlindSignatureVerifyExt = {
         securityChecksDisabled: disableSecurityCheck,
       };
 
@@ -284,31 +286,35 @@ function ExecuteView({
       if (expected === true && !res.success) {
         return Promise.resolve({
           error: `actual: ${responseError}, expected: success`,
-          ext: resultExt,
+          ext: baseExt,
         });
       }
       if (expected === false) {
+        const failureExt: BlindSignatureVerifyExt = {
+          ...baseExt,
+          actualError: responseError,
+        };
         if (!res.success) {
           return Promise.resolve({
             error: '',
-            ext: resultExt,
+            ext: failureExt,
           });
         }
         if (res.success) {
           return Promise.resolve({
             error: `actual: success, expected: failure`,
-            ext: resultExt,
+            ext: failureExt,
           });
         }
         return Promise.resolve({
           error: `actual: ${responseError}, expected: failure`,
-          ext: resultExt,
+          ext: failureExt,
         });
       }
 
       return Promise.resolve({
         error,
-        ext: resultExt,
+        ext: baseExt,
       });
     },
     removeHardwareListener: sdk => {
