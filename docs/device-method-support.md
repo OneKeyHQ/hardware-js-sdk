@@ -102,7 +102,29 @@
 
 # Mini
 
-全部方法支持，无已知限制。
+## 当前测试下失败预期的方法（expected=false）
+
+| 方法 | 说明（实际错误文案可能随固件变化） |
+|-----|-------------------------------|
+| `alephiumSignTransaction` | 固件当前返回失败（如 Unknown message） |
+| `alephiumSignMessage` | 固件当前返回失败（如 Unknown message） |
+| `dnxSignTransaction` | 固件当前返回失败（如 Unknown message） |
+| `neoSignTransaction` | 固件当前返回失败（如 Device not support this method） |
+| `solSignTransaction` (coin type 501) | 固件当前返回失败（如 Invalid params） |
+| `scdoSignTransaction` | 固件当前返回失败（如 Unknown message） |
+| `scdoSignMessage` | 固件当前返回失败（如 Unknown message） |
+| `tonSignMessage` | 固件当前返回失败（如 Device not support this method） |
+| `tonSignProof` | 固件当前返回失败（如 Device not support this method） |
+| `tronSignMessage` | 固件当前返回失败（如 Device not support this method） |
+
+## 当前测试下成功预期的特殊覆盖（expected=true）
+
+| 方法 | 条件 | 说明 |
+|-----|------|------|
+| `nemSignTransaction` | coin type 60 | 当前设备实际可成功 |
+| `stellarSignTransaction` | coin type 60 | 当前设备实际可成功 |
+
+其他方法按默认预期执行。
 
 ---
 
