@@ -32,11 +32,6 @@ export const classicPlugin: DevicePlugin = {
       expected: false,
     },
     {
-      id: 'classic-aptos-transfer-error',
-      methods: 'aptosSignTransaction',
-      expected: false,
-    },
-    {
       id: 'classic-eip7702',
       methods: 'evmSignTransaction',
       when: ({ params }) => Boolean(params?.transaction?.authorizationList),

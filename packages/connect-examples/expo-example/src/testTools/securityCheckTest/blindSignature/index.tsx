@@ -13,11 +13,7 @@ import { convertTestData, getDeviceExpected } from './utils';
 import data from './data';
 import { useHardwareInputPinDialog } from '../../../provider/HardwareInputPinProvider';
 import { SwitchInput } from '../../../components/SwitchInput';
-import {
-  checkCompatibilityInParams,
-  handleSkipInRequest,
-  handleSkipInResponse,
-} from '../../deviceCompatibility/helpers';
+import { checkCompatibilityInParams } from '../../deviceCompatibility/helpers';
 import { useDevice } from '../../../provider/DeviceProvider';
 
 import type { CoreMessage } from '@onekeyfe/hd-core';
@@ -213,11 +209,6 @@ function ExecuteView({
       );
     },
     processRequest: async (sdk, method, connectId, deviceId, requestParams, item) => {
-      // Handle skipped requests
-      if (requestParams.__skipTest) {
-        return handleSkipInRequest(sdk, method, connectId, deviceId, requestParams);
-      }
-
       const sdkPromise = async () => {
         try {
           // @ts-expect-error
@@ -271,15 +262,6 @@ function ExecuteView({
       const resultExt: BlindSignatureVerifyExt = {
         securityChecksDisabled: disableSecurityCheck,
       };
-
-      // Handle skipped responses
-      const skipResult = handleSkipInResponse(res?.payload, item);
-      if (skipResult.shouldReturn && skipResult.result) {
-        return Promise.resolve({
-          ...skipResult.result,
-          ext: resultExt,
-        });
-      }
 
       const error = '';
 

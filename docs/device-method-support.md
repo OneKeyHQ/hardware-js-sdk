@@ -43,7 +43,6 @@
 
 | 方法 | 错误码 | 说明 |
 |-----|-------|------|
-| `aptosSignTransaction` | 19 | USB 传输错误，待固件调查 |
 | `evmSignTransaction` | - | EIP-7702 (authorizationList) 不支持 |
 | `solSignTransaction` | - | 正确 coin type 501 返回 Invalid params，待调查 |
 
