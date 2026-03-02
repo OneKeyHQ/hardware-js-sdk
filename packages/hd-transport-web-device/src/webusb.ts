@@ -23,10 +23,6 @@ export interface DeviceInfo extends OneKeyDeviceInfoBase {
   device: USBDevice;
 }
 
-type USBInTransferResultWithData = USBInTransferResult & {
-  data: DataView;
-};
-
 export default class WebUsbTransport {
   messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
@@ -259,15 +255,14 @@ export default class WebUsbTransport {
     await this.connect(path, false);
   }
 
-  private validateTransferInResult(
-    result: USBInTransferResult
-  ): asserts result is USBInTransferResultWithData {
+  private getTransferInData(result: USBInTransferResult): DataView {
     if (result.status !== 'ok') {
       throw new Error(`transferIn status: ${String(result.status)}`);
     }
     if (!result.data || result.data.byteLength === 0) {
       throw new Error('transferIn no data');
     }
+    return result.data;
   }
 
   private toArrayBuffer(buffer: ArrayBufferLike): ArrayBuffer {
@@ -310,10 +305,7 @@ export default class WebUsbTransport {
     throw lastError;
   }
 
-  private async transferInWithRetry(
-    path: string,
-    length: number
-  ): Promise<USBInTransferResultWithData> {
+  private async transferInWithRetry(path: string, length: number): Promise<DataView> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt += 1) {
       try {
@@ -322,8 +314,7 @@ export default class WebUsbTransport {
           await this.connect(path, false);
         }
         const result = await device.transferIn(this.endpointId, length);
-        this.validateTransferInResult(result);
-        return result;
+        return this.getTransferInData(result);
       } catch (error) {
         lastError = error;
         const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryablePacketIoError(error);
@@ -386,8 +377,8 @@ export default class WebUsbTransport {
    * Receive data from device
    */
   async receiveData(path: string) {
-    const firstPacket = await this.transferInWithRetry(path, PACKET_SIZE);
-    const firstData = this.toArrayBuffer(firstPacket.data.buffer.slice(1));
+    const firstPacketData = await this.transferInWithRetry(path, PACKET_SIZE);
+    const firstData = this.toArrayBuffer(firstPacketData.buffer.slice(1));
     const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData);
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
@@ -400,8 +391,8 @@ export default class WebUsbTransport {
     }
 
     while (decoded.offset < lengthWithHeader) {
-      const res = await this.transferInWithRetry(path, PACKET_SIZE);
-      const buffer = this.toArrayBuffer(res.data.buffer.slice(1));
+      const packetData = await this.transferInWithRetry(path, PACKET_SIZE);
+      const buffer = this.toArrayBuffer(packetData.buffer.slice(1));
       if (lengthWithHeader - decoded.offset >= PACKET_SIZE) {
         decoded.append(buffer);
       } else {
