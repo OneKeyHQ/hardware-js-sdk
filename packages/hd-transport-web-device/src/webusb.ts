@@ -282,7 +282,10 @@ export default class WebUsbTransport {
         if (!device.opened) {
           await this.connect(path, false);
         }
-        await device.transferOut(this.endpointId, packet);
+        const transferBuffer = this.toArrayBuffer(
+          packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength)
+        );
+        await device.transferOut(this.endpointId, transferBuffer);
         return;
       } catch (error) {
         lastError = error;
