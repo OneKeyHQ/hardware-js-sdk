@@ -12,6 +12,8 @@ const INTERFACE_ID = 0;
 const ENDPOINT_ID = 1;
 const PACKET_SIZE = 64;
 const HEADER_LENGTH = 6;
+const PACKET_IO_MAX_RETRIES = 3;
+const PACKET_IO_RETRY_DELAY = 300;
 
 /**
  * Device information with path and WebUSB device instance
@@ -199,6 +201,144 @@ export default class WebUsbTransport {
     await this.call(session, name, data);
   }
 
+  private getErrorMessage(error: unknown) {
+    if (!error) return '';
+    if (typeof error === 'string') return error;
+    if (typeof error === 'object' && 'message' in error) {
+      const { message } = error as { message?: unknown };
+      return typeof message === 'string' ? message : String(message ?? '');
+    }
+    return String(error);
+  }
+
+  private isRetryablePacketIoError(error: unknown) {
+    const message = this.getErrorMessage(error).toLowerCase();
+    return (
+      message.includes('transferout') ||
+      message.includes('transferin') ||
+      message.includes('usbdevice') ||
+      message.includes('disconnected') ||
+      message.includes('device not found') ||
+      message.includes('action was interrupted') ||
+      message.includes('networkerror')
+    );
+  }
+
+  private async reconnectForPacketIoRetry(
+    path: string,
+    direction: 'in' | 'out',
+    attempt: number,
+    error: unknown
+  ) {
+    this.Log.debug(
+      `[WebUsbTransport] transfer${direction} failed, retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+        error
+      )}`
+    );
+    await wait(attempt * PACKET_IO_RETRY_DELAY);
+
+    try {
+      const currentDevice = await this.findDevice(path);
+      if (currentDevice.opened) {
+        try {
+          await currentDevice.releaseInterface(this.interfaceId);
+        } catch (releaseError) {
+          this.Log.debug('[WebUsbTransport] releaseInterface before retry error:', releaseError);
+        }
+        await currentDevice.close();
+      }
+    } catch (closeError) {
+      this.Log.debug('[WebUsbTransport] close device before retry error:', closeError);
+    }
+
+    await this.getConnectedDevices();
+    await this.connect(path, false);
+  }
+
+  private getTransferInData(result: USBInTransferResult): DataView {
+    if (result.status !== 'ok') {
+      throw new Error(`transferIn status: ${String(result.status)}`);
+    }
+    if (!result.data || result.data.byteLength === 0) {
+      throw new Error('transferIn no data');
+    }
+    return result.data;
+  }
+
+  private toArrayBuffer(buffer: ArrayBufferLike): ArrayBuffer {
+    if (buffer instanceof ArrayBuffer) {
+      return buffer;
+    }
+    const copied = new Uint8Array(buffer.byteLength);
+    copied.set(new Uint8Array(buffer));
+    return copied.buffer;
+  }
+
+  private async transferOutWithRetry(path: string, packet: Uint8Array) {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt += 1) {
+      try {
+        const device = await this.findDevice(path);
+        if (!device.opened) {
+          await this.connect(path, false);
+        }
+        const transferBuffer = this.toArrayBuffer(
+          packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength)
+        );
+        await device.transferOut(this.endpointId, transferBuffer);
+        return;
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryablePacketIoError(error);
+        if (!shouldRetry) {
+          throw error;
+        }
+        try {
+          await this.reconnectForPacketIoRetry(path, 'out', attempt, error);
+        } catch (reconnectError) {
+          lastError = reconnectError;
+          this.Log.debug(
+            `[WebUsbTransport] transferout reconnect failed on retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+              reconnectError
+            )}`
+          );
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  private async transferInWithRetry(path: string, length: number): Promise<DataView> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt += 1) {
+      try {
+        const device = await this.findDevice(path);
+        if (!device.opened) {
+          await this.connect(path, false);
+        }
+        const result = await device.transferIn(this.endpointId, length);
+        return this.getTransferInData(result);
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryablePacketIoError(error);
+        if (!shouldRetry) {
+          throw error;
+        }
+        try {
+          await this.reconnectForPacketIoRetry(path, 'in', attempt, error);
+        } catch (reconnectError) {
+          lastError = reconnectError;
+          this.Log.debug(
+            `[WebUsbTransport] transferin reconnect failed on retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+              reconnectError
+            )}`
+          );
+        }
+      }
+    }
+    throw lastError;
+  }
+
   /**
    * Call device method
    */
@@ -225,11 +365,7 @@ export default class WebUsbTransport {
       newArray[0] = 63;
       newArray.set(new Uint8Array(buffer), 1);
       // console.log('send packet: ', newArray);
-
-      if (!device.opened) {
-        await this.connect(path, false);
-      }
-      await device.transferOut(this.endpointId, newArray);
+      await this.transferOutWithRetry(path, newArray);
     }
 
     const resData = await this.receiveData(path);
@@ -244,14 +380,9 @@ export default class WebUsbTransport {
    * Receive data from device
    */
   async receiveData(path: string) {
-    const device: USBDevice = await this.findDevice(path);
-    if (!device.opened) {
-      await this.connect(path, false);
-    }
-
-    const firstPacket = await device.transferIn(this.endpointId, PACKET_SIZE);
-    const firstData = firstPacket.data?.buffer.slice(1);
-    const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData as ArrayBuffer);
+    const firstPacketData = await this.transferInWithRetry(path, PACKET_SIZE);
+    const firstData = this.toArrayBuffer(firstPacketData.buffer.slice(1));
+    const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData);
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const lengthWithHeader = Number(length + HEADER_LENGTH);
@@ -263,22 +394,12 @@ export default class WebUsbTransport {
     }
 
     while (decoded.offset < lengthWithHeader) {
-      const res = await device.transferIn(this.endpointId, PACKET_SIZE);
-
-      if (!res.data) {
-        throw new Error('no data');
-      }
-      if (res.data.byteLength === 0) {
-        // empty data
-        console.warn('empty data');
-      }
-      const buffer = res.data.buffer.slice(1);
+      const packetData = await this.transferInWithRetry(path, PACKET_SIZE);
+      const buffer = this.toArrayBuffer(packetData.buffer.slice(1));
       if (lengthWithHeader - decoded.offset >= PACKET_SIZE) {
-        decoded.append(buffer as unknown as ArrayBuffer);
+        decoded.append(buffer);
       } else {
-        decoded.append(
-          buffer.slice(0, lengthWithHeader - decoded.offset) as unknown as ArrayBuffer
-        );
+        decoded.append(buffer.slice(0, lengthWithHeader - decoded.offset));
       }
     }
     decoded.reset();
