@@ -37,15 +37,55 @@
 - 多语言检索路由（按 `lang`）
 - 多项目共享网关分流（按 `libraryId`、`source`）
 
-## 4. 本地启动示例
+## 4. 本地联调（推荐）
+
+本仓库已提供一个本地 Context7 网关：
+
+- 脚本：`scripts/context7-chat-gateway.mjs`
+- 默认地址：`http://localhost:8787/api/chat`
+- 默认模式：`auto`（优先 `/api/v2/chat`，失败自动降级到 `/api/v2/context`）
+
+### 4.1 启动本地网关
+
+在仓库根目录执行：
+
+```bash
+yarn dev:docs:ai-gateway
+```
+
+可选环境变量：
+
+| 变量名                   | 必填 | 说明                                                                    |
+| ------------------------ | ---- | ----------------------------------------------------------------------- |
+| `PORT`                   | 否   | 网关端口，默认 `8787`                                                   |
+| `CONTEXT7_GATEWAY_MODE`  | 否   | `auto` / `chat` / `context`，默认 `auto`                                |
+| `CONTEXT7_LIBRARY_ID`    | 否   | 默认库 ID；未设置时优先读取仓库根目录 `context7.json`                  |
+| `CONTEXT7_API_KEY`       | 否   | Context7 Bearer Key（可提升稳定性/额度）                               |
+| `CONTEXT7_CHAT_ENDPOINT` | 否   | Chat 接口地址，默认 `https://context7.com/api/v2/chat`                 |
+| `CONTEXT7_CONTEXT_ENDPOINT` | 否 | Context 接口地址，默认 `https://context7.com/api/v2/context`           |
+
+> 说明：仓库里的 `context7.json` 包含 `public_key`（公开键），不是后端私密凭证。
+
+### 4.2 启动文档站并接入网关
+
+在另一个终端执行（当前环境建议用 webpack 模式）：
+
+```bash
+NEXT_PUBLIC_DOCS_AI_API_URL=http://localhost:8787/api/chat NEXT_PUBLIC_DOCS_AI_LIBRARY_ID=/onekeyhq/hardware-js-sdk yarn dev:docs:webpack
+```
+
+启动后访问：`http://localhost:3001/en/`
+
+## 5. 线上/自建网关示例
 
 ```bash
 NEXT_PUBLIC_DOCS_AI_API_URL=https://your-ai-gateway.example.com/api/chat NEXT_PUBLIC_DOCS_AI_LIBRARY_ID=/onekeyhq/hardware-js-sdk yarn dev
 ```
 
-## 5. 代码位置
+## 6. 代码位置
 
 - 组件：`components/DocAIChatWidget.client.jsx`
 - 注入位置：`app/[lang]/layout.jsx`
 - 样式：`styles/globals.css`
 - 样式依赖导入：`app/layout.jsx`
+- 本地网关：`scripts/context7-chat-gateway.mjs`

@@ -55,6 +55,8 @@
     "dev:shared": "cd ./packages/shared && yarn dev",
     "debug:watcher": "node ./scripts/monitor.js",
     "dev:docs": "cd ./packages/connect-examples/developer-portal && yarn dev",
+    "dev:docs:webpack": "cd ./packages/connect-examples/developer-portal && yarn dev:webpack",
+    "dev:docs:ai-gateway": "cd ./packages/connect-examples/developer-portal && yarn dev:ai-gateway",
     "build:docs": "cd ./packages/connect-examples/developer-portal && yarn build"
   },
   "resolutions": {
