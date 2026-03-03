@@ -42,8 +42,16 @@ const resolveLibraryId = () =>
 const getWidgetCopy = isZh => {
   if (isZh) {
     return {
-      title: 'OneKey 文档助手',
-      subtitle: '基于 Context7 的开发者问答',
+      title: '问 AI',
+      subtitle: 'OneKey 文档助手',
+      assistantLabel: 'AI 助手',
+      greeting: '你好！',
+      descriptionLines: [
+        '我是基于文档训练的 AI 助手，可回答 SDK 使用与排障问题。',
+        '我会结合 OneKey Hardware SDK 文档给出可执行建议。',
+      ],
+      askAnything: '你可以问我任何有关 OneKey Hardware SDK 的问题。',
+      exampleQuestionsTitle: '示例问题',
       fabText: '问 AI',
       openLabel: '打开 AI 助手',
       closeLabel: '关闭 AI 助手',
@@ -55,7 +63,6 @@ const getWidgetCopy = isZh => {
       copied: '已复制',
       retry: '重试',
       error: '请求失败，请重试。',
-      empty: '你好，我是 OneKey Hardware SDK 文档助手。',
       suggestions: [
         {
           text: '如何初始化 SDK？',
@@ -74,8 +81,16 @@ const getWidgetCopy = isZh => {
   }
 
   return {
-    title: 'OneKey Docs Assistant',
-    subtitle: 'Powered by Context7 retrieval',
+    title: 'Ask AI',
+    subtitle: 'OneKey Docs Assistant',
+    assistantLabel: 'AI assistant',
+    greeting: 'Hi!',
+    descriptionLines: [
+      "I'm an AI assistant trained on documentation, help articles, and examples.",
+      'I answer based on the OneKey Hardware SDK docs and best practices.',
+    ],
+    askAnything: 'Ask me anything about OneKey Hardware SDK.',
+    exampleQuestionsTitle: 'EXAMPLE QUESTIONS',
     fabText: 'Ask AI',
     openLabel: 'Open AI assistant',
     closeLabel: 'Close AI assistant',
@@ -87,7 +102,6 @@ const getWidgetCopy = isZh => {
     copied: 'Copied',
     retry: 'Retry',
     error: 'Request failed. Please retry.',
-    empty: 'Hi, I am the OneKey Hardware SDK docs assistant.',
     suggestions: [
       {
         text: 'SDK initialization',
@@ -290,24 +304,29 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
       {isOpen ? (
         <section className="docs-ai-panel" aria-label={copy.title}>
           <header className="docs-ai-header">
-            <div className="docs-ai-title-wrap">
-              <span className="docs-ai-logo">
-                <BotIcon size={14} />
-              </span>
-              <div>
-                <h3>{copy.title}</h3>
-                <p>{copy.subtitle}</p>
-              </div>
-            </div>
+            <h3>{copy.title}</h3>
             <button type="button" className="docs-ai-close" onClick={() => setIsOpen(false)}>
-              <XIcon size={16} />
+              <XIcon size={15} />
             </button>
           </header>
 
           <div className="docs-ai-body" ref={scrollRef}>
             {messages.length === 0 ? (
               <div className="docs-ai-empty">
-                <p>{copy.empty}</p>
+                <div className="docs-ai-assistant-head">
+                  <span className="docs-ai-assistant-icon">
+                    <BotIcon size={13} />
+                  </span>
+                  <span>{copy.assistantLabel}</span>
+                </div>
+                <p className="docs-ai-empty-greeting">{copy.greeting}</p>
+                <div className="docs-ai-empty-description">
+                  {copy.descriptionLines.map(line => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+                <p className="docs-ai-empty-ask">{copy.askAnything}</p>
+                <p className="docs-ai-empty-section">{copy.exampleQuestionsTitle}</p>
                 <div className="docs-ai-suggestion-list">
                   {copy.suggestions.map(item => (
                     <button
@@ -379,10 +398,6 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
           </div>
 
           <footer className="docs-ai-footer">
-            <div className="docs-ai-meta">
-              <span>{isZh ? 'Powered by OneKey' : 'Powered by OneKey'}</span>
-              <a href={docsHomeHref}>{isZh ? '开发文档' : 'Docs'}</a>
-            </div>
             <div className="docs-ai-input-wrap">
               <textarea
                 value={input}
@@ -414,9 +429,13 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                   aria-label={copy.send}
                   disabled={!input.trim()}
                 >
-                  <SendIcon size={15} />
+                  <SendIcon size={14} />
                 </button>
               )}
+            </div>
+            <div className="docs-ai-meta">
+              <span>{isZh ? 'Powered by OneKey' : 'Powered by OneKey'}</span>
+              <a href={docsHomeHref}>{isZh ? '开发文档' : 'Docs'}</a>
             </div>
           </footer>
         </section>
