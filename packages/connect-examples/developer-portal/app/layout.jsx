@@ -1,4 +1,7 @@
 import 'nextra-theme-docs/style.css'
+import '@assistant-ui/react-ui/styles/index.css'
+import '@assistant-ui/react-ui/styles/modal.css'
+import '@assistant-ui/react-ui/styles/markdown.css'
 import '../styles/globals.css'
 
 export const metadata = {

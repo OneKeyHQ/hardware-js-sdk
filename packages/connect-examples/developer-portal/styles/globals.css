@@ -2268,3 +2268,29 @@ html.dark header.nextra-navbar nav ul > li > a:hover,
 html.dark header.nextra-navbar nav ul > li > button:hover {
   color: #ffffff;
 }
+
+/* ============================================
+   AI Assistant Modal (assistant-ui)
+   ============================================ */
+
+[data-onekey-doc-ai='root'] .aui-modal-anchor {
+  z-index: 80;
+}
+
+[data-onekey-doc-ai='root'] .aui-modal-content {
+  width: min(440px, calc(100vw - 24px));
+  height: min(700px, calc(100vh - 120px));
+  border: 1px solid #3f3f46;
+  background: #101417;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+[data-onekey-doc-ai='root'] .aui-modal-button {
+  background: #00d395;
+  color: #05211a;
+  box-shadow: 0 8px 24px rgba(0, 211, 149, 0.35);
+}
+
+[data-onekey-doc-ai='root'] .aui-modal-button:hover {
+  background: #00bf87;
+}
