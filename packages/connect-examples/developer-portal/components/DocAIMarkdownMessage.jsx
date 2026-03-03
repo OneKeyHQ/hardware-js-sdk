@@ -9,7 +9,7 @@ import styles from './DocAIMarkdownMessage.module.css';
 function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
   const [copied, setCopied] = useState(false);
   const code = String(children).replace(/\n$/, '');
-  const language = className?.replace('language-', '') || 'text';
+  const language = className?.replace('language-', '') || 'code';
 
   const handleCopy = useCallback(async () => {
     try {
@@ -50,7 +50,11 @@ export default function DocAIMarkdownMessage({ text, copy }) {
         components={{
           a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
           code: ({ inline, className, children, ...props }) => {
-            if (inline) {
+            const code = String(children ?? '');
+            const isInline =
+              typeof inline === 'boolean' ? inline : !className && !code.includes('\n');
+
+            if (isInline) {
               return (
                 <code {...props} className={styles.inlineCode}>
                   {children}

@@ -16,7 +16,7 @@
 .markdown h2,
 .markdown h3 {
   margin: 0.9rem 0 0.48rem;
-  color: #162036;
+  color: #162036 !important;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -40,7 +40,7 @@
 
 .markdown p {
   margin: 0.56rem 0;
-  color: #334155;
+  color: #334155 !important;
   font-size: 0.95rem;
   line-height: 1.58;
 }
@@ -48,12 +48,13 @@
 .markdown ul,
 .markdown ol {
   margin: 0.5rem 0 0.72rem 1.08rem;
-  color: #334155;
+  color: #334155 !important;
   font-size: 0.95rem;
 }
 
 .markdown li {
   margin: 0.27rem 0;
+  color: #334155 !important;
 }
 
 .markdown a {
@@ -99,7 +100,7 @@
 }
 
 .markdown td {
-  color: #344256;
+  color: #344256 !important;
 }
 
 .inlineCode {
@@ -156,14 +157,15 @@
   margin: 0;
   padding: 10px 11px;
   overflow-x: auto;
-  background: #090f1f;
-  color: #eef2ff;
+  background: #090f1f !important;
+  color: #eef2ff !important;
 }
 
 .codeBlock code {
   white-space: pre;
   font-size: 0.82rem;
   line-height: 1.56;
+  color: #eef2ff !important;
   font-family:
     'Fira Code',
     'SFMono-Regular',
