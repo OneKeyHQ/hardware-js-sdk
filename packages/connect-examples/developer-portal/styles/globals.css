@@ -2273,16 +2273,61 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
    AI Assistant Modal (assistant-ui)
    ============================================ */
 
-[data-onekey-doc-ai='root'] .aui-modal-anchor {
+.aui-modal-anchor {
   z-index: 80;
 }
 
-[data-onekey-doc-ai='root'] .aui-modal-content {
-  width: min(440px, calc(100vw - 24px));
-  height: min(700px, calc(100vh - 120px));
+.aui-modal-content {
+  z-index: 90;
+  width: min(520px, calc(100vw - 24px));
+  height: min(760px, calc(100vh - 96px));
   border: 1px solid #3f3f46;
-  background: #101417;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  background: #0f141a;
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.55);
+}
+
+.aui-modal-content .aui-thread-viewport {
+  padding: 1rem 0.875rem 0;
+}
+
+.aui-modal-content .aui-thread-viewport-footer {
+  width: 100%;
+  max-width: none;
+  padding: 0.5rem 0.875rem 0.875rem;
+  background: linear-gradient(to top, #0f141a 78%, rgba(15, 20, 26, 0));
+}
+
+.aui-modal-content .aui-composer-root {
+  border-color: #3f3f46;
+  background: #171d25;
+}
+
+.aui-modal-content .aui-composer-input {
+  line-height: 1.5;
+}
+
+.aui-modal-content .aui-assistant-message-content,
+.aui-modal-content .aui-user-message-content {
+  max-width: 100%;
+}
+
+.aui-modal-content .aui-md-h1 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+.aui-modal-content .aui-md-h2 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.aui-modal-content .aui-md-pre {
+  margin-top: 0.875rem;
+  margin-bottom: 0.875rem;
+  max-width: 100%;
 }
 
 [data-onekey-doc-ai='root'] .aui-modal-button {

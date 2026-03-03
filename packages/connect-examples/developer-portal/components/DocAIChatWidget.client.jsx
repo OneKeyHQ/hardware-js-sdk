@@ -4,7 +4,9 @@ import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import { AssistantChatTransport, useChatRuntime } from '@assistant-ui/react-ai-sdk';
-import { AssistantModal } from '@assistant-ui/react-ui';
+import { AssistantModal, makeMarkdownText } from '@assistant-ui/react-ui';
+
+const MarkdownText = makeMarkdownText();
 
 const isFeatureEnabled = () => {
   const flag = process.env.NEXT_PUBLIC_DOCS_AI_ENABLED?.trim().toLowerCase();
@@ -41,6 +43,11 @@ const getModalConfig = isZh => {
           { text: '设备连接排查', prompt: '连接设备失败时，常见排查步骤有哪些？' },
           { text: '签名流程说明', prompt: '请解释一次完整的交易签名流程，并给代码示例。' },
         ],
+      },
+      assistantMessage: {
+        components: {
+          Text: MarkdownText,
+        },
       },
       strings: {
         assistantModal: {
@@ -91,6 +98,11 @@ const getModalConfig = isZh => {
           prompt: 'Explain a full transaction signing flow with code examples.',
         },
       ],
+    },
+    assistantMessage: {
+      components: {
+        Text: MarkdownText,
+      },
     },
     strings: {
       assistantModal: {
