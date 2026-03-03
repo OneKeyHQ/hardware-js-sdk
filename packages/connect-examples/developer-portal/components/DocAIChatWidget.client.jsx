@@ -5,8 +5,11 @@ import { usePathname } from 'next/navigation';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import { AssistantChatTransport, useChatRuntime } from '@assistant-ui/react-ai-sdk';
 import { AssistantModal, makeMarkdownText } from '@assistant-ui/react-ui';
+import remarkGfm from 'remark-gfm';
 
-const MarkdownText = makeMarkdownText();
+const MarkdownText = makeMarkdownText({
+  remarkPlugins: [remarkGfm],
+});
 
 const isFeatureEnabled = () => {
   const flag = process.env.NEXT_PUBLIC_DOCS_AI_ENABLED?.trim().toLowerCase();
