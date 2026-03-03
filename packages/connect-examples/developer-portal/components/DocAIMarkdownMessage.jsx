@@ -49,12 +49,15 @@ export default function DocAIMarkdownMessage({ text, copy }) {
         remarkPlugins={[remarkGfm]}
         components={{
           a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
-          code: ({ inline, className, children, ...props }) => {
+          code: ({ node, className, children, ...props }) => {
             const code = String(children ?? '');
-            const isInline =
-              typeof inline === 'boolean' ? inline : !className && !code.includes('\n');
+            const hasLanguage = typeof className === 'string' && className.includes('language-');
+            const isMultilinePosition = Boolean(
+              node?.position && node.position.start?.line !== node.position.end?.line
+            );
+            const isBlock = hasLanguage || isMultilinePosition || code.includes('\n');
 
-            if (isInline) {
+            if (!isBlock) {
               return (
                 <code {...props} className={styles.inlineCode}>
                   {children}
