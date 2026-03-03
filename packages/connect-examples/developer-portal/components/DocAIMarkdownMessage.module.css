@@ -193,6 +193,14 @@
   min-width: max-content;
 }
 
+.codePlainPre {
+  margin: 0;
+  min-width: max-content;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+}
+
 .codeText {
   color: #e8edf8 !important;
   font-family:
@@ -240,5 +248,9 @@
 
   .codeScroll > :global(div) {
     padding: 9px 10px !important;
+  }
+
+  .codePlainPre {
+    padding: 9px 10px;
   }
 }

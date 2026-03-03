@@ -316,7 +316,14 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                   ) : null}
                   <div className={styles.bubble}>
                     {textParts.map((part, index) => (
-                      <MarkdownMessage key={`${message.id}-${index}`} text={part} copy={copy} />
+                      <MarkdownMessage
+                        key={`${message.id}-${index}`}
+                        text={part}
+                        copy={copy}
+                        isStreaming={Boolean(
+                          isAssistant && isGenerating && latestAssistantMessage?.id === message.id
+                        )}
+                      />
                     ))}
 
                     {isAssistant ? (

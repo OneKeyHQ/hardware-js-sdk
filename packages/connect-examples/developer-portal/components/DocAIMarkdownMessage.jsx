@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CopyIcon } from 'lucide-react';
@@ -28,7 +28,9 @@ const normalizeLanguage = className => {
   return LANGUAGE_ALIASES[raw] || raw;
 };
 
-function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
+const MAX_HIGHLIGHT_CODE_LENGTH = 2200;
+
+function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel, disableHighlight = false }) {
   const [copied, setCopied] = useState(false);
   const code = String(children).replace(/\n$/, '');
   const language = normalizeLanguage(className);
@@ -36,6 +38,7 @@ function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
     if (language === 'text') return 'code';
     return language;
   }, [language]);
+  const shouldUsePlainCode = disableHighlight || code.length > MAX_HIGHLIGHT_CODE_LENGTH;
 
   const handleCopy = useCallback(async () => {
     try {
@@ -62,39 +65,45 @@ function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
         </button>
       </div>
       <div className={styles.codeScroll}>
-        <SyntaxHighlighter
-          language={language}
-          style={oneDark}
-          PreTag="div"
-          wrapLongLines={false}
-          customStyle={{
-            margin: 0,
-            padding: '10px 12px',
-            background: 'transparent',
-            border: '0',
-            borderRadius: 0,
-            overflow: 'visible',
-            fontFamily: 'var(--font-mono)',
-          }}
-          codeTagProps={{
-            className: styles.codeText,
-            style: {
+        {shouldUsePlainCode ? (
+          <pre className={styles.codePlainPre}>
+            <code className={styles.codeText}>{code}</code>
+          </pre>
+        ) : (
+          <SyntaxHighlighter
+            language={language}
+            style={oneDark}
+            PreTag="div"
+            wrapLongLines={false}
+            customStyle={{
+              margin: 0,
+              padding: '10px 12px',
+              background: 'transparent',
+              border: '0',
+              borderRadius: 0,
+              overflow: 'visible',
               fontFamily: 'var(--font-mono)',
-              fontSize: '12.5px',
-              lineHeight: 1.56,
-              fontWeight: 450,
-              whiteSpace: 'pre',
-            },
-          }}
-        >
-          {code}
-        </SyntaxHighlighter>
+            }}
+            codeTagProps={{
+              className: styles.codeText,
+              style: {
+                fontFamily: 'var(--font-mono)',
+                fontSize: '12.5px',
+                lineHeight: 1.56,
+                fontWeight: 450,
+                whiteSpace: 'pre',
+              },
+            }}
+          >
+            {code}
+          </SyntaxHighlighter>
+        )}
       </div>
     </div>
   );
 }
 
-export default function DocAIMarkdownMessage({ text, copy }) {
+function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
   return (
     <div className={styles.markdown} data-docs-ai="markdown">
       <ReactMarkdown
@@ -123,6 +132,7 @@ export default function DocAIMarkdownMessage({ text, copy }) {
                 className={className}
                 copyLabel={copy.copy}
                 copiedLabel={copy.copied}
+                disableHighlight={isStreaming}
               >
                 {children}
               </MarkdownCodeBlock>
@@ -135,3 +145,11 @@ export default function DocAIMarkdownMessage({ text, copy }) {
     </div>
   );
 }
+
+export default memo(
+  DocAIMarkdownMessage,
+  (prevProps, nextProps) =>
+    prevProps.text === nextProps.text &&
+    prevProps.copy === nextProps.copy &&
+    prevProps.isStreaming === nextProps.isStreaming
+);

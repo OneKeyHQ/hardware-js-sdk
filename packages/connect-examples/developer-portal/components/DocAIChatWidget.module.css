@@ -1,7 +1,7 @@
 .root {
   position: fixed;
-  right: 14px;
-  bottom: 14px;
+  right: 22px;
+  bottom: 22px;
   z-index: 96;
   color-scheme: light;
 }
@@ -33,8 +33,8 @@
 }
 
 .panel {
-  width: min(420px, calc(100vw - 16px));
-  height: min(650px, calc(100vh - 96px));
+  width: min(404px, calc(100vw - 40px));
+  height: min(620px, calc(100vh - 128px));
   border-radius: 8px;
   border: 1px solid #e5e9f0;
   background: #f8fafd;
@@ -469,13 +469,13 @@
 
 @media (max-width: 768px) {
   .root {
-    right: 8px;
-    bottom: 8px;
+    right: 12px;
+    bottom: 12px;
   }
 
   .panel {
-    width: calc(100vw - 12px);
-    height: min(82vh, 650px);
+    width: calc(100vw - 24px);
+    height: min(80vh, 620px);
     border-radius: 10px;
   }
 
