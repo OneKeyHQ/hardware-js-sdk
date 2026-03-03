@@ -142,6 +142,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   const [input, setInput] = useState('');
   const [copiedMessageId, setCopiedMessageId] = useState('');
   const scrollRef = useRef(null);
+  const inputRef = useRef(null);
 
   const authHeaderName = process.env.NEXT_PUBLIC_DOCS_AI_AUTH_HEADER_NAME?.trim();
   const authHeaderValue = process.env.NEXT_PUBLIC_DOCS_AI_AUTH_HEADER_VALUE?.trim();
@@ -180,10 +181,22 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
   const isGenerating = status === 'submitted' || status === 'streaming';
 
+  const resizeInput = useCallback(target => {
+    const element = target ?? inputRef.current;
+    if (!element) return;
+    element.style.height = '20px';
+    const nextHeight = Math.min(Math.max(element.scrollHeight, 20), 88);
+    element.style.height = `${nextHeight}px`;
+  }, []);
+
   useEffect(() => {
     if (!scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, status, isOpen]);
+
+  useEffect(() => {
+    resizeInput();
+  }, [input, isOpen, resizeInput]);
 
   const latestAssistantMessage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -336,8 +349,12 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
           <footer className={styles.footer} data-docs-ai="footer">
             <div className={styles.inputWrap} data-docs-ai="input-wrap">
               <textarea
+                ref={inputRef}
                 value={input}
-                onChange={event => setInput(event.target.value)}
+                onChange={event => {
+                  setInput(event.target.value);
+                  resizeInput(event.target);
+                }}
                 className={styles.input}
                 data-docs-ai="input"
                 placeholder={copy.placeholder}

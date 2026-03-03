@@ -49,6 +49,7 @@ export default function DocAIMarkdownMessage({ text, copy }) {
         remarkPlugins={[remarkGfm]}
         components={{
           a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
+          pre: ({ children }) => <>{children}</>,
           code: ({ node, className, children, ...props }) => {
             const code = String(children ?? '');
             const hasLanguage = typeof className === 'string' && className.includes('language-');
