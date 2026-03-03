@@ -1,15 +1,41 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CopyIcon } from 'lucide-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import styles from './DocAIMarkdownMessage.module.css';
+
+const LANGUAGE_ALIASES = {
+  ts: 'typescript',
+  js: 'javascript',
+  jsx: 'jsx',
+  tsx: 'tsx',
+  shell: 'bash',
+  sh: 'bash',
+  zsh: 'bash',
+  yml: 'yaml',
+  md: 'markdown',
+  txt: 'text',
+  plaintext: 'text',
+};
+
+const normalizeLanguage = className => {
+  const raw = className?.replace('language-', '').trim().toLowerCase();
+  if (!raw) return 'text';
+  return LANGUAGE_ALIASES[raw] || raw;
+};
 
 function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
   const [copied, setCopied] = useState(false);
   const code = String(children).replace(/\n$/, '');
-  const language = className?.replace('language-', '') || 'code';
+  const language = normalizeLanguage(className);
+  const displayLanguage = useMemo(() => {
+    if (language === 'text') return 'code';
+    return language;
+  }, [language]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -24,7 +50,7 @@ function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
   return (
     <div className={styles.codeBlock} data-docs-ai="code-block">
       <div className={styles.codeHead}>
-        <span>{language}</span>
+        <span>{displayLanguage}</span>
         <button
           type="button"
           className={styles.codeCopy}
@@ -35,9 +61,35 @@ function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
           <span>{copied ? copiedLabel : copyLabel}</span>
         </button>
       </div>
-      <pre>
-        <code className={className}>{code}</code>
-      </pre>
+      <div className={styles.codeScroll}>
+        <SyntaxHighlighter
+          language={language}
+          style={oneDark}
+          PreTag="div"
+          wrapLongLines={false}
+          customStyle={{
+            margin: 0,
+            padding: '10px 12px',
+            background: 'transparent',
+            border: '0',
+            borderRadius: 0,
+            overflow: 'visible',
+            fontFamily: 'var(--font-mono)',
+          }}
+          codeTagProps={{
+            className: styles.codeText,
+            style: {
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12.5px',
+              lineHeight: 1.56,
+              fontWeight: 450,
+              whiteSpace: 'pre',
+            },
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
     </div>
   );
 }
@@ -49,7 +101,7 @@ export default function DocAIMarkdownMessage({ text, copy }) {
         remarkPlugins={[remarkGfm]}
         components={{
           a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
-          pre: ({ children }) => <>{children}</>,
+          pre: ({ children }) => children,
           code: ({ node, className, children, ...props }) => {
             const code = String(children ?? '');
             const hasLanguage = typeof className === 'string' && className.includes('language-');

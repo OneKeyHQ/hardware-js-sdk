@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import {
-  BotIcon,
   CopyIcon,
   Loader2Icon,
   RotateCcwIcon,
@@ -15,6 +14,7 @@ import {
   XIcon,
 } from 'lucide-react';
 import MarkdownMessage from './DocAIMarkdownMessage';
+import { OneKeyIcon } from './ChainIcons';
 import styles from './DocAIChatWidget.module.css';
 
 const isFeatureEnabled = () => {
@@ -43,6 +43,7 @@ const getWidgetCopy = isZh => {
   if (isZh) {
     return {
       title: '问 AI',
+      askMeLabel: 'Ask Me',
       assistantLabel: 'AI 助手',
       greeting: '你好！',
       descriptionLines: [
@@ -82,6 +83,7 @@ const getWidgetCopy = isZh => {
 
   return {
     title: 'Ask AI',
+    askMeLabel: 'Ask Me',
     assistantLabel: 'AI assistant',
     greeting: 'Hi!',
     descriptionLines: [
@@ -247,7 +249,10 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
       {isOpen ? (
         <section className={styles.panel} aria-label={copy.title} data-docs-ai="panel">
           <header className={styles.header} data-docs-ai="header">
-            <h3 className={styles.headerTitle}>{copy.title}</h3>
+            <div className={styles.headerLeft}>
+              <span className={styles.askMeLabel}>{copy.askMeLabel}</span>
+              <h3 className={styles.headerTitle}>{copy.title}</h3>
+            </div>
             <button
               type="button"
               className={styles.closeButton}
@@ -263,7 +268,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               <div className={styles.empty} data-docs-ai="empty">
                 <div className={styles.assistantHead}>
                   <span className={styles.assistantIcon}>
-                    <BotIcon size={13} />
+                    <OneKeyIcon size={13} />
                   </span>
                   <span>{copy.assistantLabel}</span>
                 </div>
@@ -304,7 +309,11 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                     isAssistant ? styles.assistantMessage : styles.userMessage
                   }`}
                 >
-                  {isAssistant ? <span className={styles.avatar}>A</span> : null}
+                  {isAssistant ? (
+                    <span className={styles.avatar}>
+                      <OneKeyIcon size={14} className={styles.avatarLogo} />
+                    </span>
+                  ) : null}
                   <div className={styles.bubble}>
                     {textParts.map((part, index) => (
                       <MarkdownMessage key={`${message.id}-${index}`} text={part} copy={copy} />

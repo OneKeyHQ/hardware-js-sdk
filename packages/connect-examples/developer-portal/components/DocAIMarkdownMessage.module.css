@@ -46,6 +46,22 @@
   line-height: 1.56;
 }
 
+.markdown strong {
+  color: #1f2a44 !important;
+  font-weight: 600;
+}
+
+.markdown em {
+  color: #3b485f !important;
+}
+
+.markdown mark {
+  background: #fff2b8;
+  color: #1f2a44;
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
 .markdown ul,
 .markdown ol {
   margin: 0.4rem 0 0.62rem 1rem;
@@ -62,6 +78,15 @@
   color: #2563eb;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.markdown blockquote {
+  margin: 0.54rem 0;
+  padding: 0.3rem 0.7rem;
+  border-left: 2px solid #d4deed;
+  color: #475569;
+  background: #f4f7fc;
+  border-radius: 6px;
 }
 
 .markdown table {
@@ -105,12 +130,13 @@
 }
 
 .inlineCode {
-  border: 1px solid #d7e0ec;
-  border-radius: 6px;
-  background: #f3f7fc;
-  color: #1f2a3d;
-  padding: 0.06rem 0.3rem;
-  font-size: 0.8em;
+  border: 1px solid #434f66 !important;
+  border-radius: 6px !important;
+  background: #2f3747 !important;
+  color: #ecf2ff !important;
+  padding: 0.06rem 0.32rem !important;
+  font-size: 0.8em !important;
+  font-weight: 500 !important;
   font-family:
     'Fira Code',
     'SFMono-Regular',
@@ -119,22 +145,22 @@
     Consolas,
     'Liberation Mono',
     'Courier New',
-    monospace;
+    monospace !important;
 }
 
 .codeBlock {
   margin: 0.56rem 0;
   border-radius: 10px;
-  border: 1px solid #d2dae8;
+  border: 1px solid #c8d5ea;
   overflow: hidden;
-  background: #0b1220;
+  background: #090f1f;
 }
 
 .codeHead {
   height: 30px;
-  padding: 0 9px 0 10px;
-  background: #0f213d;
-  border-bottom: 1px solid rgba(176, 192, 223, 0.2);
+  padding: 0 10px 0 11px;
+  background: #10203a;
+  border-bottom: 1px solid rgba(159, 180, 214, 0.24);
   color: #dbe7fb;
   font-size: 0.72rem;
   font-weight: 600;
@@ -155,16 +181,20 @@
   gap: 4px;
 }
 
-.markdown .codeBlock pre {
-  margin: 0;
-  padding: 10px 12px !important;
+.codeScroll {
   overflow-x: auto;
   overflow-y: hidden;
-  background: #090f1f !important;
-  color: #eef2ff !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+  background: #090f1f;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.codeScroll > :global(div) {
+  min-width: max-content;
+}
+
+.codeText {
+  color: #e8edf8 !important;
   font-family:
     'Fira Code',
     'SFMono-Regular',
@@ -175,34 +205,18 @@
     'Courier New',
     monospace !important;
   font-size: 12.5px !important;
-  line-height: 1.55 !important;
+  line-height: 1.56 !important;
 }
 
-.markdown .codeBlock code {
-  white-space: pre;
-  font-size: 0.79rem;
-  line-height: 1.55;
-  color: #eef2ff !important;
-  font-family:
-    'Fira Code',
-    'SFMono-Regular',
-    Menlo,
-    Monaco,
-    Consolas,
-    'Liberation Mono',
-    'Courier New',
-    monospace;
-}
-
-.codeBlock pre::-webkit-scrollbar {
+.codeScroll::-webkit-scrollbar {
   height: 6px;
 }
 
-.codeBlock pre::-webkit-scrollbar-track {
+.codeScroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.codeBlock pre::-webkit-scrollbar-thumb {
+.codeScroll::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.38);
   border-radius: 999px;
 }
@@ -224,7 +238,7 @@
     font-size: 0.92rem;
   }
 
-  .codeBlock pre {
-    padding: 9px 10px;
+  .codeScroll > :global(div) {
+    padding: 9px 10px !important;
   }
 }

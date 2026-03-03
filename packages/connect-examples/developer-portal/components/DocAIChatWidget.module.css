@@ -51,7 +51,7 @@
 
 .header {
   height: 40px;
-  padding: 8px 16px 8px 20px;
+  padding: 8px 14px 8px 16px;
   background: #f8fafd;
   display: flex;
   align-items: center;
@@ -59,12 +59,35 @@
   flex-shrink: 0;
 }
 
+.headerLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.askMeLabel {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid #d7deea;
+  background: #f4f7fc;
+  color: #7b8ba3;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
 .headerTitle {
   margin: 0;
-  color: #667085;
-  font-size: 0.875rem;
+  color: #7f8ca2;
+  font-size: 0.8rem;
   font-weight: 400;
   line-height: 1.43;
+  white-space: nowrap;
 }
 
 .closeButton {
@@ -91,7 +114,7 @@
   min-height: 0;
   overflow-y: auto;
   background: #f8fafd;
-  padding: 12px 18px 10px 20px;
+  padding: 10px 16px 8px;
   scrollbar-width: thin;
   scrollbar-color: #c4cedd transparent;
 }
@@ -111,14 +134,14 @@
 
 .empty {
   color: #374151;
-  padding-top: 78px;
+  padding-top: 56px;
 }
 
 .assistantHead {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 7px;
+  margin-bottom: 7px;
   color: #667085;
   font-size: 0.84rem;
   font-weight: 500;
@@ -126,9 +149,8 @@
 }
 
 .assistantIcon {
-  width: 18px;
-  height: 18px;
-  color: #667085;
+  width: 14px;
+  height: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -151,7 +173,7 @@
 }
 
 .emptyAsk {
-  margin: 12px 0 16px;
+  margin: 10px 0 14px;
   color: #475569;
   font-size: 0.875rem;
   font-weight: 400;
@@ -159,7 +181,7 @@
 }
 
 .emptySection {
-  margin: 0 0 10px;
+  margin: 0 0 9px;
   color: #667085;
   font-size: 0.68rem;
   font-weight: 600;
@@ -171,7 +193,7 @@
 .suggestionList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .suggestion {
@@ -200,7 +222,8 @@
 .message {
   display: flex;
   width: 100%;
-  margin: 9px 0;
+  align-items: flex-start;
+  margin: 8px 0;
 }
 
 .userMessage {
@@ -209,30 +232,34 @@
 
 .assistantMessage {
   justify-content: flex-start;
-  gap: 8px;
+  gap: 6px;
 }
 
 .avatar {
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  border: 1px solid #dce3ef;
+  border: 1px solid #d5deea;
   background: #ffffff;
-  color: #667085;
-  font-size: 0.72rem;
-  font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: 3px;
+}
+
+.avatarLogo {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
 }
 
 .bubble {
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 24px);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: #0f172a;
+  min-width: 0;
 }
 
 .userMessage .bubble {
@@ -245,10 +272,11 @@
   background: transparent;
   padding-left: 0;
   padding-right: 0;
+  flex: 1;
 }
 
 .actions {
-  margin-top: 8px;
+  margin-top: 7px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -303,7 +331,7 @@
 }
 
 .footer {
-  padding: 10px 20px 12px;
+  padding: 8px 16px 10px;
   background: #f8fafd;
   flex-shrink: 0;
 }
@@ -408,7 +436,7 @@
 
 .meta {
   min-height: 20px;
-  margin: 9px 0 0;
+  margin: 7px 0 0;
   color: #98a2b3;
   font-size: 0.75rem;
   line-height: 1.4;
@@ -452,14 +480,14 @@
   }
 
   .body {
-    padding: 12px 13px 10px 14px;
+    padding: 10px 12px 8px;
   }
 
   .empty {
-    padding-top: 48px;
+    padding-top: 40px;
   }
 
   .footer {
-    padding: 8px 12px 10px 14px;
+    padding: 8px 12px 10px;
   }
 }
