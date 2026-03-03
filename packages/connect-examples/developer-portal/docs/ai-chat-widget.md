@@ -1,10 +1,10 @@
 # Developer Portal AI 对话弹窗接入说明
 
-本文档说明 `developer-portal` 中 AI 对话弹窗（assistant-ui）的启用方式。
+本文档说明 `developer-portal` 中 AI 对话弹窗（Vercel AI SDK + 自定义 UI）的启用方式。
 
 ## 1. 设计与约束
 
-- 前端 UI：`assistant-ui`（浮动按钮 + 弹窗），接近 Inkeep 的交互方式。
+- 前端 UI：`@ai-sdk/react` + 自定义弹窗组件（浮动按钮 + 右下角面板），可按品牌样式持续定制。
 - 文档站构建方式：`next export` 静态导出，因此不依赖 Next API Route。
 - 请求方式：前端直接请求你们自己的对话服务端点（可在后端转发到 Context7、模型网关或自建 RAG）。
 
@@ -87,5 +87,5 @@ NEXT_PUBLIC_DOCS_AI_API_URL=https://your-ai-gateway.example.com/api/chat NEXT_PU
 - 组件：`components/DocAIChatWidget.client.jsx`
 - 注入位置：`app/[lang]/layout.jsx`
 - 样式：`styles/globals.css`
-- 样式依赖导入：`app/layout.jsx`
+- 全局样式导入：`app/layout.jsx`
 - 本地网关：`scripts/context7-chat-gateway.mjs`
