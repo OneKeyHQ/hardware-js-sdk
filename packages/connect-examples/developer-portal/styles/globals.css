@@ -2311,9 +2311,9 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
   width: min(398px, calc(100vw - 14px));
   height: min(690px, calc(100vh - 20px));
   border-radius: 16px;
-  border: 1px solid #d9e1ee;
-  background: #f8fafd;
-  box-shadow: 0 28px 68px rgba(15, 23, 42, 0.35);
+  border: 1px solid #e2e8f1;
+  background: #ffffff;
+  box-shadow: 0 28px 68px rgba(15, 23, 42, 0.28);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -2322,9 +2322,8 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 }
 
 .docs-ai-header {
-  height: 56px;
+  height: 54px;
   padding: 0 11px 0 13px;
-  border-bottom: 1px solid #e7edf6;
   background: #fff;
   display: flex;
   align-items: center;
@@ -2365,28 +2364,29 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 }
 
 .docs-ai-close {
-  width: 28px;
-  height: 28px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
-  color: #64748b;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #b0b9c7;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .docs-ai-close:hover {
-  background: #f8fafc;
-  color: #334155;
+  background: #f3f6fb;
+  color: #7c8aa0;
 }
 
 .docs-ai-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  background: #fbfcfe;
-  padding: 11px 11px 13px;
+  background: #fff;
+  padding: 9px 11px 12px;
 }
 
 .docs-ai-empty p {
@@ -2697,8 +2697,7 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 }
 
 .docs-ai-footer {
-  padding: 8px 10px 10px;
-  border-top: 1px solid #e7edf6;
+  padding: 6px 10px 10px;
   background: #fff;
 }
 
