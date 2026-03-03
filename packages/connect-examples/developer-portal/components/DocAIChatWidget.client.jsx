@@ -4,8 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import {
   BotIcon,
   CopyIcon,
@@ -16,6 +14,8 @@ import {
   SquareIcon,
   XIcon,
 } from 'lucide-react';
+import MarkdownMessage from './DocAIMarkdownMessage';
+import styles from './DocAIChatWidget.module.css';
 
 const isFeatureEnabled = () => {
   const flag = process.env.NEXT_PUBLIC_DOCS_AI_ENABLED?.trim().toLowerCase();
@@ -43,7 +43,6 @@ const getWidgetCopy = isZh => {
   if (isZh) {
     return {
       title: '问 AI',
-      subtitle: 'OneKey 文档助手',
       assistantLabel: 'AI 助手',
       greeting: '你好！',
       descriptionLines: [
@@ -63,6 +62,7 @@ const getWidgetCopy = isZh => {
       copied: '已复制',
       retry: '重试',
       error: '请求失败，请重试。',
+      poweredBy: 'Powered by OneKey',
       suggestions: [
         {
           text: '如何初始化 SDK？',
@@ -82,7 +82,6 @@ const getWidgetCopy = isZh => {
 
   return {
     title: 'Ask AI',
-    subtitle: 'OneKey Docs Assistant',
     assistantLabel: 'AI assistant',
     greeting: 'Hi!',
     descriptionLines: [
@@ -102,6 +101,7 @@ const getWidgetCopy = isZh => {
     copied: 'Copied',
     retry: 'Retry',
     error: 'Request failed. Please retry.',
+    poweredBy: 'Powered by OneKey',
     suggestions: [
       {
         text: 'SDK initialization',
@@ -134,80 +134,9 @@ const getMessageTextParts = message => {
   return [];
 };
 
-function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
-  const [copied, setCopied] = useState(false);
-  const code = String(children).replace(/\n$/, '');
-  const language = className?.replace('language-', '') || 'text';
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      setCopied(false);
-    }
-  }, [code]);
-
-  return (
-    <div className="docs-ai-code-block">
-      <div className="docs-ai-code-head">
-        <span>{language}</span>
-        <button
-          type="button"
-          className="docs-ai-code-copy"
-          onClick={handleCopy}
-          aria-label={copied ? copiedLabel : copyLabel}
-        >
-          <CopyIcon size={14} />
-          <span>{copied ? copiedLabel : copyLabel}</span>
-        </button>
-      </div>
-      <pre>
-        <code className={className}>{code}</code>
-      </pre>
-    </div>
-  );
-}
-
-function MarkdownMessage({ text, copy }) {
-  return (
-    <div className="docs-ai-markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
-          code: ({ inline, className, children, ...props }) => {
-            if (inline) {
-              return (
-                <code {...props} className="docs-ai-inline-code">
-                  {children}
-                </code>
-              );
-            }
-
-            return (
-              <MarkdownCodeBlock
-                className={className}
-                copyLabel={copy.copy}
-                copiedLabel={copy.copied}
-              >
-                {children}
-              </MarkdownCodeBlock>
-            );
-          },
-        }}
-      >
-        {text}
-      </ReactMarkdown>
-    </div>
-  );
-}
-
 function ChatWidgetRuntime({ apiUrl, lang }) {
   const pathname = usePathname();
   const isZh = lang === 'zh';
-  const docsHomeHref = isZh ? '/zh/' : '/en/';
   const copy = useMemo(() => getWidgetCopy(isZh), [isZh]);
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -288,51 +217,58 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   }, []);
 
   return (
-    <div className="docs-ai-root" data-onekey-doc-ai="root">
+    <div className={styles.root} data-onekey-doc-ai="root" data-docs-ai="root">
       {!isOpen ? (
         <button
           type="button"
-          className="docs-ai-fab"
+          className={styles.fab}
+          data-docs-ai="fab"
           onClick={() => setIsOpen(v => !v)}
           aria-label={isOpen ? copy.closeLabel : copy.openLabel}
         >
           <SparklesIcon size={16} />
-          <span className="docs-ai-fab-text">{copy.fabText}</span>
+          <span className={styles.fabText}>{copy.fabText}</span>
         </button>
       ) : null}
 
       {isOpen ? (
-        <section className="docs-ai-panel" aria-label={copy.title}>
-          <header className="docs-ai-header">
-            <h3>{copy.title}</h3>
-            <button type="button" className="docs-ai-close" onClick={() => setIsOpen(false)}>
+        <section className={styles.panel} aria-label={copy.title} data-docs-ai="panel">
+          <header className={styles.header} data-docs-ai="header">
+            <h3 className={styles.headerTitle}>{copy.title}</h3>
+            <button
+              type="button"
+              className={styles.closeButton}
+              data-docs-ai="close"
+              onClick={() => setIsOpen(false)}
+            >
               <XIcon size={15} />
             </button>
           </header>
 
-          <div className="docs-ai-body" ref={scrollRef}>
+          <div className={styles.body} ref={scrollRef} data-docs-ai="body">
             {messages.length === 0 ? (
-              <div className="docs-ai-empty">
-                <div className="docs-ai-assistant-head">
-                  <span className="docs-ai-assistant-icon">
+              <div className={styles.empty} data-docs-ai="empty">
+                <div className={styles.assistantHead}>
+                  <span className={styles.assistantIcon}>
                     <BotIcon size={13} />
                   </span>
                   <span>{copy.assistantLabel}</span>
                 </div>
-                <p className="docs-ai-empty-greeting">{copy.greeting}</p>
-                <div className="docs-ai-empty-description">
+                <p className={styles.emptyGreeting}>{copy.greeting}</p>
+                <div className={styles.emptyDescription}>
                   {copy.descriptionLines.map(line => (
                     <p key={line}>{line}</p>
                   ))}
                 </div>
-                <p className="docs-ai-empty-ask">{copy.askAnything}</p>
-                <p className="docs-ai-empty-section">{copy.exampleQuestionsTitle}</p>
-                <div className="docs-ai-suggestion-list">
+                <p className={styles.emptyAsk}>{copy.askAnything}</p>
+                <p className={styles.emptySection}>{copy.exampleQuestionsTitle}</p>
+                <div className={styles.suggestionList}>
                   {copy.suggestions.map(item => (
                     <button
                       key={item.text}
                       type="button"
-                      className="docs-ai-suggestion"
+                      className={styles.suggestion}
+                      data-docs-ai="suggestion"
                       onClick={() => handleSend(item.prompt)}
                     >
                       {item.text}
@@ -351,21 +287,21 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               return (
                 <article
                   key={message.id}
-                  className={`docs-ai-message ${isAssistant ? 'is-assistant' : 'is-user'}`}
+                  className={`${styles.message} ${
+                    isAssistant ? styles.assistantMessage : styles.userMessage
+                  }`}
                 >
-                  {isAssistant ? <span className="docs-ai-avatar">A</span> : null}
-                  <div className="docs-ai-bubble">
+                  {isAssistant ? <span className={styles.avatar}>A</span> : null}
+                  <div className={styles.bubble}>
                     {textParts.map((part, index) => (
                       <MarkdownMessage key={`${message.id}-${index}`} text={part} copy={copy} />
                     ))}
 
                     {isAssistant ? (
-                      <div className="docs-ai-actions">
+                      <div className={styles.actions} data-docs-ai="actions">
                         <button type="button" onClick={() => handleCopyMessage(message)}>
                           <CopyIcon size={14} />
-                          <span>
-                            {copiedMessageId === message.id ? copy.copied : copy.copy}
-                          </span>
+                          <span>{copiedMessageId === message.id ? copy.copied : copy.copy}</span>
                         </button>
                         {latestAssistantMessage?.id === message.id ? (
                           <button type="button" onClick={() => regenerate({ messageId: message.id })}>
@@ -381,14 +317,14 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
             })}
 
             {isGenerating ? (
-              <div className="docs-ai-status">
-                <Loader2Icon size={14} className="spin" />
+              <div className={styles.status} data-docs-ai="status">
+                <Loader2Icon size={14} className={styles.spin} />
                 <span>{copy.sending}</span>
               </div>
             ) : null}
 
             {error ? (
-              <div className="docs-ai-error">
+              <div className={styles.error} data-docs-ai="error">
                 <span>{copy.error}</span>
                 <button type="button" onClick={clearError}>
                   OK
@@ -397,12 +333,13 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
             ) : null}
           </div>
 
-          <footer className="docs-ai-footer">
-            <div className="docs-ai-input-wrap">
+          <footer className={styles.footer} data-docs-ai="footer">
+            <div className={styles.inputWrap} data-docs-ai="input-wrap">
               <textarea
                 value={input}
                 onChange={event => setInput(event.target.value)}
-                className="docs-ai-input"
+                className={styles.input}
+                data-docs-ai="input"
                 placeholder={copy.placeholder}
                 rows={1}
                 onKeyDown={event => {
@@ -415,7 +352,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               {isGenerating ? (
                 <button
                   type="button"
-                  className="docs-ai-send is-stop"
+                  className={`${styles.sendButton} ${styles.stopButton}`}
+                  data-docs-ai="send"
                   onClick={stop}
                   aria-label={copy.stop}
                 >
@@ -424,7 +362,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               ) : (
                 <button
                   type="button"
-                  className="docs-ai-send"
+                  className={styles.sendButton}
+                  data-docs-ai="send"
                   onClick={() => handleSend()}
                   aria-label={copy.send}
                   disabled={!input.trim()}
@@ -433,9 +372,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 </button>
               )}
             </div>
-            <div className="docs-ai-meta">
-              <span>{isZh ? 'Powered by OneKey' : 'Powered by OneKey'}</span>
-              <a href={docsHomeHref}>{isZh ? '开发文档' : 'Docs'}</a>
+            <div className={styles.meta} data-docs-ai="meta">
+              <span>{copy.poweredBy}</span>
             </div>
           </footer>
         </section>

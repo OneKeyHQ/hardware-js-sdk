@@ -1,0 +1,198 @@
+.markdown {
+  font-size: 0.93rem;
+  line-height: 1.6;
+  color: #344256;
+}
+
+.markdown > *:first-child {
+  margin-top: 0;
+}
+
+.markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  margin: 0.9rem 0 0.48rem;
+  color: #162036;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.markdown h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.34;
+}
+
+.markdown h2 {
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.38;
+}
+
+.markdown h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.42;
+}
+
+.markdown p {
+  margin: 0.56rem 0;
+  color: #334155;
+  font-size: 0.95rem;
+  line-height: 1.58;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0.5rem 0 0.72rem 1.08rem;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.markdown li {
+  margin: 0.27rem 0;
+}
+
+.markdown a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0.74rem 0;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.markdown th,
+.markdown td {
+  border-right: 1px solid #ebf0f6;
+  border-bottom: 1px solid #e5ebf3;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.82rem;
+}
+
+.markdown th:last-child,
+.markdown td:last-child {
+  border-right: 0;
+}
+
+.markdown tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown th {
+  font-weight: 700;
+  color: #1f2a3d;
+  background: #f8fafc;
+}
+
+.markdown td {
+  color: #344256;
+}
+
+.inlineCode {
+  border: 1px solid #d7e0ec;
+  border-radius: 6px;
+  background: #f3f7fc;
+  color: #1f2a3d;
+  padding: 0.08rem 0.34rem;
+  font-size: 0.82em;
+  font-family:
+    'Fira Code',
+    'SFMono-Regular',
+    Menlo,
+    Monaco,
+    Consolas,
+    'Liberation Mono',
+    'Courier New',
+    monospace;
+}
+
+.codeBlock {
+  margin: 0.68rem 0;
+  border-radius: 10px;
+  border: 1px solid #d2dae8;
+  overflow: hidden;
+  background: #0b1220;
+}
+
+.codeHead {
+  height: 34px;
+  padding: 0 10px 0 11px;
+  background: #0f213d;
+  border-bottom: 1px solid rgba(176, 192, 223, 0.2);
+  color: #dbe7fb;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.codeCopy {
+  border: 0;
+  background: transparent;
+  color: #dbe7fb;
+  font-size: 0.74rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.codeBlock pre {
+  margin: 0;
+  padding: 10px 11px;
+  overflow-x: auto;
+  background: #090f1f;
+  color: #eef2ff;
+}
+
+.codeBlock code {
+  white-space: pre;
+  font-size: 0.82rem;
+  line-height: 1.56;
+  font-family:
+    'Fira Code',
+    'SFMono-Regular',
+    Menlo,
+    Monaco,
+    Consolas,
+    'Liberation Mono',
+    'Courier New',
+    monospace;
+}
+
+@media (max-width: 768px) {
+  .markdown {
+    font-size: 0.9rem;
+  }
+
+  .markdown h1 {
+    font-size: 1.36rem;
+  }
+
+  .markdown h2 {
+    font-size: 1.16rem;
+  }
+
+  .markdown h3 {
+    font-size: 1.04rem;
+  }
+
+  .codeBlock pre {
+    padding: 9px 10px;
+  }
+}
