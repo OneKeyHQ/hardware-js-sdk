@@ -2275,8 +2275,8 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 
 .docs-ai-root {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: 14px;
+  bottom: 14px;
   z-index: 96;
 }
 
@@ -2307,8 +2307,8 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 }
 
 .docs-ai-panel {
-  width: min(410px, calc(100vw - 16px));
-  height: min(720px, calc(100vh - 26px));
+  width: min(398px, calc(100vw - 14px));
+  height: min(690px, calc(100vh - 20px));
   border-radius: 16px;
   border: 1px solid #d9e1ee;
   background: #f8fafd;
@@ -2316,6 +2316,8 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  animation: docs-ai-pop-in 0.16s ease;
+  transform-origin: right bottom;
 }
 
 .docs-ai-header {
@@ -2383,7 +2385,7 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
   min-height: 0;
   overflow-y: auto;
   background: #fbfcfe;
-  padding: 12px 12px 14px;
+  padding: 11px 11px 13px;
 }
 
 .docs-ai-empty p {
@@ -2401,7 +2403,7 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 
 .docs-ai-suggestion {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #fff;
   color: #334155;
   font-size: 0.83rem;
@@ -2694,32 +2696,51 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 }
 
 .docs-ai-footer {
-  padding: 10px 12px 12px;
+  padding: 8px 10px 10px;
   border-top: 1px solid #e7edf6;
   background: #fff;
 }
 
+.docs-ai-meta {
+  height: 18px;
+  margin: 0 2px 8px;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.docs-ai-meta a {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.docs-ai-meta a:hover {
+  color: #334155;
+}
+
 .docs-ai-input-wrap {
   border: 1px solid #d6deea;
-  border-radius: 12px;
+  border-radius: 999px;
   background: #fff;
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 7px 7px 7px 10px;
+  padding: 5px 5px 5px 11px;
 }
 
 .docs-ai-input {
   flex: 1;
-  min-height: 22px;
-  max-height: 130px;
+  min-height: 24px;
+  max-height: 96px;
   border: 0;
   resize: none;
   outline: 0;
   background: transparent;
   color: #0f172a;
   line-height: 1.45;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
 }
 
 .docs-ai-input::placeholder {
@@ -2727,11 +2748,11 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 }
 
 .docs-ai-send {
-  width: 33px;
-  height: 33px;
-  border-radius: 10px;
-  border: 1px solid #334155;
-  background: #1f2937;
+  width: 31px;
+  height: 31px;
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  background: #111827;
   color: #f8fafc;
   display: inline-flex;
   align-items: center;
@@ -2755,6 +2776,17 @@ html.dark header.nextra-navbar nav ul > li > button:hover {
 @keyframes docs-ai-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes docs-ai-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

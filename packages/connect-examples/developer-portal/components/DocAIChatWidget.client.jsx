@@ -193,6 +193,7 @@ function MarkdownMessage({ text, copy }) {
 function ChatWidgetRuntime({ apiUrl, lang }) {
   const pathname = usePathname();
   const isZh = lang === 'zh';
+  const docsHomeHref = isZh ? '/zh/' : '/en/';
   const copy = useMemo(() => getWidgetCopy(isZh), [isZh]);
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -378,6 +379,10 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
           </div>
 
           <footer className="docs-ai-footer">
+            <div className="docs-ai-meta">
+              <span>{isZh ? 'Powered by OneKey' : 'Powered by OneKey'}</span>
+              <a href={docsHomeHref}>{isZh ? '开发文档' : 'Docs'}</a>
+            </div>
             <div className="docs-ai-input-wrap">
               <textarea
                 value={input}
