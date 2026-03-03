@@ -44,6 +44,7 @@ const getWidgetCopy = isZh => {
     return {
       title: 'OneKey 文档助手',
       subtitle: '基于 Context7 的开发者问答',
+      fabText: '问 AI',
       openLabel: '打开 AI 助手',
       closeLabel: '关闭 AI 助手',
       placeholder: '输入问题，例如：如何初始化 SDK？',
@@ -75,6 +76,7 @@ const getWidgetCopy = isZh => {
   return {
     title: 'OneKey Docs Assistant',
     subtitle: 'Powered by Context7 retrieval',
+    fabText: 'Ask AI',
     openLabel: 'Open AI assistant',
     closeLabel: 'Close AI assistant',
     placeholder: 'Ask your question, e.g. How do I connect a device?',
@@ -272,14 +274,17 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
   return (
     <div className="docs-ai-root" data-onekey-doc-ai="root">
-      <button
-        type="button"
-        className="docs-ai-fab"
-        onClick={() => setIsOpen(v => !v)}
-        aria-label={isOpen ? copy.closeLabel : copy.openLabel}
-      >
-        {isOpen ? <XIcon size={18} /> : <SparklesIcon size={18} />}
-      </button>
+      {!isOpen ? (
+        <button
+          type="button"
+          className="docs-ai-fab"
+          onClick={() => setIsOpen(v => !v)}
+          aria-label={isOpen ? copy.closeLabel : copy.openLabel}
+        >
+          <SparklesIcon size={16} />
+          <span className="docs-ai-fab-text">{copy.fabText}</span>
+        </button>
+      ) : null}
 
       {isOpen ? (
         <section className="docs-ai-panel" aria-label={copy.title}>
