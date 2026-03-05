@@ -1,11 +1,14 @@
 'use client'
 
+import { useCallback } from 'react'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react'
 import cn from 'clsx'
+import { SearchIcon, SparklesIcon } from 'lucide-react'
 import { Anchor, Button } from 'nextra/components'
 import { useFSRoute } from 'nextra/hooks'
 import { ArrowRightIcon, MenuIcon } from 'nextra/icons'
-import { setMenu, useConfig, useMenu, useThemeConfig } from 'nextra-theme-docs'
+import { setMenu, useConfig, useMenu } from 'nextra-theme-docs'
+import { DOCS_AI_TAB, emitDocsAIOpen } from './docAIAssistEvents'
 
 const classes = {
   link: cn(
@@ -104,9 +107,19 @@ const NavbarMenu = ({ menu, children }) => {
 
 export function OneKeyClientNavbar({ children, className }) {
   const items = useConfig().normalizePagesResult.topLevelNavbarItems
-  const themeConfig = useThemeConfig()
   const pathname = useFSRoute()
   const menu = useMenu()
+  const isZh = pathname?.startsWith('/zh')
+  const searchText = isZh ? '搜索' : 'Search'
+  const askAIText = isZh ? '问 AI' : 'Ask AI'
+
+  const handleOpenSearch = useCallback(() => {
+    emitDocsAIOpen(DOCS_AI_TAB.SEARCH)
+  }, [])
+
+  const handleOpenAskAI = useCallback(() => {
+    emitDocsAIOpen(DOCS_AI_TAB.ASK)
+  }, [])
 
   const navClass = cn(
     'x:flex x:gap-4 x:overflow-x-auto nextra-scrollbar x:py-1.5 x:max-md:hidden',
@@ -148,8 +161,30 @@ export function OneKeyClientNavbar({ children, className }) {
     )
   })
 
-  const search = themeConfig.search && (
-    <div className="x:max-md:hidden">{themeConfig.search}</div>
+  const assistActions = (
+    <div className="x:flex x:items-center x:gap-2 x:mr-2">
+      <button
+        type="button"
+        className="x:inline-flex x:items-center x:gap-2 x:h-9 x:px-3 x:max-md:px-2.5 x:rounded-xl x:border x:border-zinc-700 x:bg-zinc-900/80 x:text-zinc-100 x:text-sm x:transition-colors x:hover:bg-zinc-800"
+        onClick={handleOpenSearch}
+        aria-label="Open search"
+      >
+        <SearchIcon size={15} />
+        <span className="x:max-md:hidden">{searchText}</span>
+        <kbd className="x:ml-1 x:max-md:hidden x:px-1.5 x:py-0.5 x:rounded-md x:border x:border-zinc-700 x:text-[11px] x:leading-none x:text-zinc-400">
+          ⌘K
+        </kbd>
+      </button>
+      <button
+        type="button"
+        className="x:inline-flex x:items-center x:gap-2 x:h-9 x:px-3 x:max-md:px-2.5 x:rounded-xl x:border x:border-zinc-700 x:bg-zinc-950 x:text-zinc-200 x:text-sm x:transition-colors x:hover:bg-zinc-900"
+        onClick={handleOpenAskAI}
+        aria-label="Open Ask AI"
+      >
+        <SparklesIcon size={15} />
+        <span className="x:max-md:hidden">{askAIText}</span>
+      </button>
+    </div>
   )
 
   const toggleClass = cn({ open: menu })
@@ -157,7 +192,7 @@ export function OneKeyClientNavbar({ children, className }) {
   return (
     <>
       <div className={navClass}>{navItems}</div>
-      {search}
+      {assistActions}
       {children}
       <Button
         aria-label="Menu"
