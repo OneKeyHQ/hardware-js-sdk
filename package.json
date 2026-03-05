@@ -91,7 +91,7 @@
     "babel-loader": "^8.2.5",
     "cross-env": "^7.0.3",
     "electron-builder": "^24.9.1",
-    "eslint": "^8.4.1",
+    "eslint": "^9.26.0",
     "eslint-config-wesbos": "3.2.3",
     "eslint-plugin-jest": "^26.6.0",
     "husky": "9.1.6",
