@@ -1,0 +1,65 @@
+.assistActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.assistButton {
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: #e4e4e7;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.searchButton {
+  border-color: #3f3f46;
+  background: rgba(24, 24, 27, 0.76);
+}
+
+.searchButton:hover {
+  background: rgba(39, 39, 42, 0.9);
+  border-color: #52525b;
+}
+
+.searchHotkey {
+  margin-left: 2px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(113, 113, 122, 0.7);
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  background: transparent;
+}
+
+/* 弹窗打开时隐藏导航触发器，避免与弹窗顶部按钮产生重复感。 */
+:global(html[data-docs-ai-open='true']) .assistActions {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+}
+
+@media (max-width: 768px) {
+  .assistActions {
+    margin-right: 4px;
+  }
+
+  .assistButton {
+    padding: 0 10px;
+  }
+
+  .buttonLabel,
+  .searchHotkey {
+    display: none;
+  }
+}

@@ -1,8 +1,16 @@
 .markdown {
-  font-size: 0.875rem;
-  line-height: 1.56;
-  color: #344256;
+  font-size: 13px;
+  line-height: 20px;
+  color: #d3dff0;
   font-family: inherit;
+  overflow-wrap: anywhere;
+  background: transparent;
+}
+
+.markdown::selection,
+.markdown *::selection {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: inherit !important;
 }
 
 .markdown > *:first-child {
@@ -16,76 +24,82 @@
 .markdown h1,
 .markdown h2,
 .markdown h3 {
-  margin: 0.72rem 0 0.4rem;
-  color: #162036 !important;
+  margin: 10px 0 6px;
+  color: #f3f7ff;
   font-family: inherit;
+  font-weight: 600;
 }
 
 .markdown h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.35;
+  font-size: 18px;
+  line-height: 25px;
 }
 
 .markdown h2 {
-  font-size: 1.08rem;
-  font-weight: 600;
-  line-height: 1.4;
+  font-size: 16px;
+  line-height: 23px;
 }
 
 .markdown h3 {
-  font-size: 0.98rem;
-  font-weight: 600;
-  line-height: 1.42;
+  font-size: 15px;
+  line-height: 22px;
 }
 
 .markdown p {
-  margin: 0.44rem 0;
-  color: #334155 !important;
-  font-size: 0.875rem;
-  line-height: 1.56;
+  margin: 0 0 7px;
+  color: #d3dff0;
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
 }
 
 .markdown strong {
-  color: #1f2a44 !important;
+  color: #f8fbff;
   font-weight: 600;
 }
 
 .markdown em {
-  color: #3b485f !important;
+  color: #c2d2ea;
 }
 
 .markdown mark {
-  background: #fff2b8;
-  color: #1f2a44;
+  background: rgba(250, 204, 21, 0.25);
+  color: #fff6d1;
   border-radius: 4px;
   padding: 0 3px;
 }
 
 .markdown ul,
 .markdown ol {
-  margin: 0.4rem 0 0.62rem 1rem;
-  color: #334155 !important;
-  font-size: 0.875rem;
+  margin: 0 0 8px 18px;
+  color: #d3dff0;
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .markdown li {
-  margin: 0.22rem 0;
-  color: #334155 !important;
+  margin: 2px 0;
+  overflow-wrap: anywhere;
 }
 
 .markdown a {
-  color: #2563eb;
+  color: #8bc5ff;
   text-decoration: underline;
   text-underline-offset: 2px;
+  text-decoration-color: rgba(139, 197, 255, 0.58);
+}
+
+.markdown a:hover {
+  color: #b8ddff;
+  text-decoration-color: rgba(184, 221, 255, 0.86);
 }
 
 .markdown blockquote {
-  margin: 0.54rem 0;
-  padding: 0.3rem 0.7rem;
-  border-left: 2px solid #d4deed;
-  color: #475569;
-  background: #f4f7fc;
+  margin: 7px 0;
+  padding: 6px 10px;
+  border-left: 2px solid rgba(148, 163, 184, 0.62);
+  color: #c4d1e7;
+  background: rgba(15, 23, 42, 0.56);
   border-radius: 6px;
 }
 
@@ -93,21 +107,25 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  margin: 0.62rem 0;
-  border: 1px solid #dbe3ef;
+  margin: 8px 0;
+  border: 1px solid rgba(148, 163, 184, 0.34);
   border-radius: 8px;
   overflow: hidden;
-  background: #ffffff;
+  background: rgba(6, 11, 22, 0.7);
+  display: block;
+  overflow-x: auto;
 }
 
 .markdown th,
 .markdown td {
-  border-right: 1px solid #ebf0f6;
-  border-bottom: 1px solid #e5ebf3;
-  padding: 7px 9px;
+  border-right: 1px solid rgba(148, 163, 184, 0.3);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 6px 8px;
   text-align: left;
   vertical-align: top;
-  font-size: 0.79rem;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
 }
 
 .markdown th:last-child,
@@ -120,22 +138,23 @@
 }
 
 .markdown th {
-  font-weight: 700;
-  color: #1f2a3d;
-  background: #f8fafc;
+  font-weight: 600;
+  color: #f3f7ff;
+  background: rgba(15, 23, 42, 0.76);
 }
 
 .markdown td {
-  color: #344256 !important;
+  color: #d3dff0;
+  overflow-wrap: anywhere;
 }
 
 .inlineCode {
-  border: 1px solid #434f66 !important;
+  border: 1px solid rgba(148, 163, 184, 0.38) !important;
   border-radius: 6px !important;
-  background: #2f3747 !important;
-  color: #ecf2ff !important;
-  padding: 0.06rem 0.32rem !important;
-  font-size: 0.8em !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: #e9f3ff !important;
+  padding: 1px 5px !important;
+  font-size: 0.84em !important;
   font-weight: 500 !important;
   font-family:
     'Fira Code',
@@ -149,20 +168,21 @@
 }
 
 .codeBlock {
-  margin: 0.56rem 0;
-  border-radius: 10px;
-  border: 1px solid #c8d5ea;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
   overflow: hidden;
-  background: #090f1f;
+  background: rgba(2, 6, 23, 0.9);
 }
 
 .codeHead {
   height: 30px;
   padding: 0 10px 0 11px;
-  background: #10203a;
-  border-bottom: 1px solid rgba(159, 180, 214, 0.24);
+  background: #111827;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
   color: #dbe7fb;
-  font-size: 0.72rem;
+  font-size: 11px;
+  line-height: 16px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -174,23 +194,47 @@
   border: 0;
   background: transparent;
   color: #dbe7fb;
-  font-size: 0.7rem;
+  font-size: 11px;
+  line-height: 16px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  cursor: pointer;
+}
+
+.codeCopy:hover {
+  color: #f8fafc;
 }
 
 .codeScroll {
   overflow-x: auto;
   overflow-y: hidden;
-  background: #090f1f;
+  background: #0f172a;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
 
 .codeScroll > :global(div) {
   min-width: max-content;
+}
+
+.codeScroll :global(code[class*='language-']),
+.codeScroll :global(pre[class*='language-']) {
+  background: transparent !important;
+  text-shadow: none !important;
+}
+
+.codeScroll :global(code span) {
+  background: transparent !important;
+  background-color: transparent !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+.codeScroll :global(.token) {
+  background: transparent !important;
+  text-shadow: none !important;
 }
 
 .codePlainPre {
@@ -202,7 +246,7 @@
 }
 
 .codeText {
-  color: #e8edf8 !important;
+  color: #e5e7eb !important;
   font-family:
     'Fira Code',
     'SFMono-Regular',
@@ -229,28 +273,34 @@
   border-radius: 999px;
 }
 
+.streamingText {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: #d3dff0;
+  font-size: 13px;
+  line-height: 20px;
+  font-family: inherit;
+}
+
 @media (max-width: 768px) {
   .markdown {
-    font-size: 0.84rem;
+    font-size: 13px;
   }
 
   .markdown h1 {
-    font-size: 1.16rem;
+    font-size: 17px;
+    line-height: 24px;
   }
 
   .markdown h2 {
-    font-size: 1rem;
+    font-size: 15px;
+    line-height: 22px;
   }
 
   .markdown h3 {
-    font-size: 0.92rem;
-  }
-
-  .codeScroll > :global(div) {
-    padding: 9px 10px !important;
-  }
-
-  .codePlainPre {
-    padding: 9px 10px;
+    font-size: 14px;
+    line-height: 21px;
   }
 }

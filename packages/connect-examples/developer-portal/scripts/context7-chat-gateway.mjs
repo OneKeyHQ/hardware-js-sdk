@@ -147,6 +147,66 @@ function truncate(text, max = 320) {
   return `${text.slice(0, max)}...`;
 }
 
+function normalizeText(value) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function normalizeSourceUrl(value) {
+  if (typeof value !== 'string') return '';
+  const next = value.trim();
+  if (!next) return '';
+  if (!/^https?:\/\//i.test(next)) return '';
+  return next;
+}
+
+function normalizeContextSources(contextData) {
+  const infoSnippets = Array.isArray(contextData?.infoSnippets) ? contextData.infoSnippets : [];
+  const codeSnippets = Array.isArray(contextData?.codeSnippets) ? contextData.codeSnippets : [];
+
+  const merged = [];
+
+  for (const item of infoSnippets) {
+    const url = normalizeSourceUrl(item?.pageId || item?.url || '');
+    if (!url) continue;
+
+    const title =
+      normalizeText(item?.breadcrumb || item?.title || item?.pageTitle || '') || 'Documentation';
+    const excerpt = truncate(normalizeText(item?.content || ''), 180);
+    merged.push({
+      title,
+      url,
+      excerpt,
+      type: 'doc',
+    });
+  }
+
+  for (const item of codeSnippets) {
+    const url = normalizeSourceUrl(item?.codeId || item?.pageId || item?.url || '');
+    if (!url) continue;
+
+    const title =
+      normalizeText(item?.codeTitle || item?.pageTitle || item?.breadcrumb || '') || 'Code Example';
+    const codePreview = item?.codeList?.[0]?.code || item?.content || '';
+    const excerpt = truncate(normalizeText(codePreview), 180);
+    merged.push({
+      title,
+      url,
+      excerpt,
+      type: 'code',
+    });
+  }
+
+  const unique = new Map();
+  for (const source of merged) {
+    const key = `${source.title}::${source.url}`;
+    if (unique.has(key)) continue;
+    unique.set(key, source);
+  }
+
+  return Array.from(unique.values()).slice(0, 8);
+}
+
 function latestUserQuery(messages) {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i];
@@ -337,10 +397,33 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (method === 'POST' && url.pathname === '/api/sources') {
+      const body = await readBody(req);
+      const libraryId =
+        (typeof body.libraryId === 'string' && body.libraryId.trim()) || libraryConfig.libraryId;
+      const pathname = typeof body.pathname === 'string' ? body.pathname : '';
+      const lang = typeof body.lang === 'string' ? body.lang : '';
+      const query =
+        (typeof body.query === 'string' && body.query.trim()) || latestUserQuery(body.messages) || '';
+
+      const contextData = await fetchContext7Context({ libraryId, query });
+      const sources = normalizeContextSources(contextData);
+
+      sendJson(res, 200, {
+        ok: true,
+        libraryId,
+        pathname,
+        lang,
+        query,
+        sources,
+      });
+      return;
+    }
+
     if (method !== 'POST' || url.pathname !== '/api/chat') {
       sendJson(res, 404, {
         error: 'Not Found',
-        message: '仅支持 POST /api/chat 与 GET /health',
+        message: '仅支持 POST /api/chat、POST /api/sources 与 GET /health',
       });
       return;
     }

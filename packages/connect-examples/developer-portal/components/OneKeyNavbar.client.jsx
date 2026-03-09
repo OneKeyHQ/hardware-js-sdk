@@ -3,12 +3,13 @@
 import { useCallback } from 'react'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react'
 import cn from 'clsx'
-import { SearchIcon, SparklesIcon } from 'lucide-react'
+import { SearchIcon } from 'lucide-react'
 import { Anchor, Button } from 'nextra/components'
 import { useFSRoute } from 'nextra/hooks'
 import { ArrowRightIcon, MenuIcon } from 'nextra/icons'
 import { setMenu, useConfig, useMenu } from 'nextra-theme-docs'
 import { DOCS_AI_TAB, emitDocsAIOpen } from './docAIAssistEvents'
+import styles from './OneKeyNavbar.client.module.css'
 
 const classes = {
   link: cn(
@@ -20,9 +21,9 @@ const classes = {
 
 const isMenu = (page) => page.type === 'menu'
 
-const sanitizeMenuId = (menu) => {
+const sanitizeMenuKey = (menu) => {
   const base = menu.name || menu.route || menu.title || 'menu'
-  return `onekey-navbar-${base.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()}`
+  return base.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()
 }
 
 const menuItemsClass = cn(
@@ -43,6 +44,7 @@ const menuAnchor = {
 
 const NavbarMenu = ({ menu, children }) => {
   // Site is always dark mode (forcedTheme: 'dark' in layout)
+  const menuKey = sanitizeMenuKey(menu)
   const routes =
     menu.children?.reduce((acc, child) => {
       if (child?.name) acc[child.name] = child
@@ -74,7 +76,8 @@ const NavbarMenu = ({ menu, children }) => {
       {({ open }) => (
         <>
           <MenuButton
-            id={sanitizeMenuId(menu)}
+            id={`onekey-navbar-${menuKey}`}
+            data-onekey-menu={menuKey}
             className={cn(
               classes.link,
               'x:items-center x:flex x:gap-1.5 x:cursor-pointer x:outline-none'
@@ -111,14 +114,9 @@ export function OneKeyClientNavbar({ children, className }) {
   const menu = useMenu()
   const isZh = pathname?.startsWith('/zh')
   const searchText = isZh ? '搜索' : 'Search'
-  const askAIText = isZh ? '问 AI' : 'Ask AI'
 
   const handleOpenSearch = useCallback(() => {
     emitDocsAIOpen(DOCS_AI_TAB.SEARCH)
-  }, [])
-
-  const handleOpenAskAI = useCallback(() => {
-    emitDocsAIOpen(DOCS_AI_TAB.ASK)
   }, [])
 
   const navClass = cn(
@@ -162,27 +160,18 @@ export function OneKeyClientNavbar({ children, className }) {
   })
 
   const assistActions = (
-    <div className="x:flex x:items-center x:gap-2 x:mr-2">
+    <div className={styles.assistActions}>
       <button
         type="button"
-        className="x:inline-flex x:items-center x:gap-2 x:h-9 x:px-3 x:max-md:px-2.5 x:rounded-xl x:border x:border-zinc-700 x:bg-zinc-900/80 x:text-zinc-100 x:text-sm x:transition-colors x:hover:bg-zinc-800"
+        className={`${styles.assistButton} ${styles.searchButton}`}
         onClick={handleOpenSearch}
         aria-label="Open search"
       >
         <SearchIcon size={15} />
-        <span className="x:max-md:hidden">{searchText}</span>
-        <kbd className="x:ml-1 x:max-md:hidden x:px-1.5 x:py-0.5 x:rounded-md x:border x:border-zinc-700 x:text-[11px] x:leading-none x:text-zinc-400">
+        <span className={styles.buttonLabel}>{searchText}</span>
+        <kbd className={styles.searchHotkey}>
           ⌘K
         </kbd>
-      </button>
-      <button
-        type="button"
-        className="x:inline-flex x:items-center x:gap-2 x:h-9 x:px-3 x:max-md:px-2.5 x:rounded-xl x:border x:border-zinc-700 x:bg-zinc-950 x:text-zinc-200 x:text-sm x:transition-colors x:hover:bg-zinc-900"
-        onClick={handleOpenAskAI}
-        aria-label="Open Ask AI"
-      >
-        <SparklesIcon size={15} />
-        <span className="x:max-md:hidden">{askAIText}</span>
       </button>
     </div>
   )

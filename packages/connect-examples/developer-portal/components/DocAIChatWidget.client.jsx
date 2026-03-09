@@ -172,6 +172,7 @@ const getWidgetCopy = isZh => {
       searchCount: count => `${count} 条结果`,
       askHint: '找不到答案？切换 Ask AI 继续提问',
       askFromSearch: '转到 Ask AI',
+      askUnavailable: 'Ask AI 暂未配置服务端地址，请先设置 NEXT_PUBLIC_DOCS_AI_API_URL。',
       assistantLabel: 'AI 助手',
       askDescription: '我会基于 OneKey Hardware SDK 文档回答并给出来源。',
       exampleQuestionsTitle: '示例问题',
@@ -213,6 +214,7 @@ const getWidgetCopy = isZh => {
     searchCount: count => `${count} results`,
     askHint: 'Still blocked? continue in Ask AI.',
     askFromSearch: 'Ask AI with this query',
+    askUnavailable: 'Ask AI is not configured. Set NEXT_PUBLIC_DOCS_AI_API_URL first.',
     assistantLabel: 'AI assistant',
     askDescription: 'I answer with OneKey Hardware SDK docs and source citations.',
     exampleQuestionsTitle: 'EXAMPLE QUESTIONS',
@@ -263,6 +265,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   const pathname = usePathname();
   const isZh = lang === 'zh';
   const copy = useMemo(() => getWidgetCopy(isZh), [isZh]);
+  const hasChatApi = Boolean(apiUrl);
+  const chatApiUrl = apiUrl || '/api/__docs_ai_disabled';
 
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(DOCS_AI_TAB.SEARCH);
@@ -305,7 +309,10 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
     [pathname, lang]
   );
 
-  const sourcesApiUrl = useMemo(() => resolveSourcesApiUrl(apiUrl), [apiUrl]);
+  const sourcesApiUrl = useMemo(
+    () => (hasChatApi ? resolveSourcesApiUrl(apiUrl) : ''),
+    [apiUrl, hasChatApi]
+  );
 
   const sourceHeaders = useMemo(
     () => ({
@@ -318,12 +325,12 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        api: apiUrl,
+        api: chatApiUrl,
         credentials: 'omit',
         headers,
         body,
       }),
-    [apiUrl, body, headers]
+    [body, chatApiUrl, headers]
   );
 
   const { messages, sendMessage, regenerate, stop, status, error, clearError } = useChat({
@@ -442,6 +449,19 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previous;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const html = document.documentElement;
+    if (isOpen) {
+      html.setAttribute('data-docs-ai-open', 'true');
+    } else {
+      html.removeAttribute('data-docs-ai-open');
+    }
+    return () => {
+      html.removeAttribute('data-docs-ai-open');
     };
   }, [isOpen]);
 
@@ -568,7 +588,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   const handleSend = useCallback(
     async customInput => {
       const text = normalizeText(customInput ?? input);
-      if (!text || isGenerating) return;
+      if (!hasChatApi || !text || isGenerating) return;
 
       const requestId = createRequestId();
       setPendingSourceRequest({
@@ -584,7 +604,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
       scheduleScrollToBottom(true);
       await sendMessage({ text });
     },
-    [fetchSourcesForQuery, input, isGenerating, scheduleScrollToBottom, sendMessage]
+    [fetchSourcesForQuery, hasChatApi, input, isGenerating, scheduleScrollToBottom, sendMessage]
   );
 
   const handleCopyMessage = useCallback(async message => {
@@ -720,9 +740,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 onKeyDown={handleSearchInputKeyDown}
               />
             </div>
-          ) : (
-            <p className={styles.askDescription}>{copy.askDescription}</p>
-          )}
+          ) : null}
         </header>
 
         {activeTab === DOCS_AI_TAB.SEARCH ? (
@@ -747,7 +765,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               ) : (
                 <div className={styles.searchEmpty}>
                   <p>{copy.searchEmpty}</p>
-                  <p className={styles.askHint}>{copy.askHint}</p>
+                  <p className={styles.askHint}>{hasChatApi ? copy.askHint : copy.askUnavailable}</p>
                   <button type="button" className={styles.askFromSearch} onClick={handleOpenAskFromSearch}>
                     {copy.askFromSearch}
                   </button>
@@ -780,11 +798,18 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                         className={styles.suggestion}
                         data-docs-ai="suggestion"
                         onClick={() => handleSend(item.prompt)}
+                        disabled={!hasChatApi}
                       >
                         {item.text}
                       </button>
                     ))}
                   </div>
+                </div>
+              ) : null}
+
+              {!hasChatApi ? (
+                <div className={styles.askUnavailable} data-docs-ai="ask-unavailable">
+                  {copy.askUnavailable}
                 </div>
               ) : null}
 
@@ -919,6 +944,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                   data-docs-ai="input"
                   placeholder={copy.placeholder}
                   rows={1}
+                  disabled={!hasChatApi}
                   onKeyDown={event => {
                     const nativeComposing = Boolean(event.nativeEvent?.isComposing);
                     const isImeEnter =
@@ -962,7 +988,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                     data-docs-ai="send"
                     onClick={() => handleSend()}
                     aria-label={copy.send}
-                    disabled={!input.trim()}
+                    disabled={!hasChatApi || !input.trim()}
                   >
                     <SendIcon size={14} />
                   </button>
@@ -983,7 +1009,7 @@ export default function DocAIChatWidget({ lang = 'en' }) {
   const enabled = isFeatureEnabled();
   const apiUrl = resolveApiUrl();
 
-  if (!enabled || !apiUrl) {
+  if (!enabled) {
     return null;
   }
 

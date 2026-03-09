@@ -863,19 +863,6 @@ main ~ footer {
   display: block !important;
 }
 
-/* NavbarExtras button styles - ensure correct colors */
-.nextra-nav-container .flex.items-center button {
-  background: transparent !important;
-}
-
-.nextra-nav-container .flex.items-center button:hover {
-  background: #f4f4f5 !important;
-}
-
-.dark .nextra-nav-container .flex.items-center button:hover {
-  background: #27272a !important;
-}
-
 /* ============================================
    Sidebar Styling
    ============================================ */
