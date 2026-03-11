@@ -13,28 +13,38 @@ import {
   SquareIcon,
   XIcon,
 } from 'lucide-react';
-import MarkdownMessage from './DocAIMarkdownMessage';
+import MarkdownMessage, { sanitizeDocAIMessageText } from './DocAIMarkdownMessage';
 import { OneKeyIcon } from './ChainIcons';
 import { DOCS_AI_OPEN_EVENT, DOCS_AI_TAB } from './docAIAssistEvents';
 import styles from './DocAIChatWidget.module.css';
 
-const isFeatureEnabled = () => {
-  const flag = process.env.NEXT_PUBLIC_DOCS_AI_ENABLED?.trim().toLowerCase();
-  return flag !== 'false' && flag !== '0';
-};
-
+/**
+ * Derive the RAG chat API URL.
+ *
+ * Priority:
+ *   1. NEXT_PUBLIC_DOCS_AI_API_URL env var — explicit override (local dev, staging)
+ *   2. Hostname-based mapping:
+ *        *.onekey.so       →  https://rag.onekey.so/api/chat
+ *        anything else     →  https://rag.onekeytest.com/api/chat
+ *
+ * Local dev example — add to developer-portal/.env.local:
+ *   NEXT_PUBLIC_DOCS_AI_API_URL=http://localhost:8787/api/chat
+ */
 const resolveApiUrl = () => {
-  const rawApiUrl = process.env.NEXT_PUBLIC_DOCS_AI_API_URL?.trim();
-  if (!rawApiUrl) return '';
+  // Explicit env var override (works in both SSR and browser after Next.js inlines it)
+  const envUrl = process.env.NEXT_PUBLIC_DOCS_AI_API_URL?.trim();
+  if (envUrl) return envUrl;
 
-  if (/^https?:\/\//i.test(rawApiUrl)) return rawApiUrl;
+  if (typeof window === 'undefined') return '';
+  const { hostname } = window.location;
 
-  if (rawApiUrl.startsWith('/')) {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') || '';
-    return `${basePath}${rawApiUrl}` || rawApiUrl;
+  // Production: use the matching RAG service for the deployment domain
+  if (hostname === 'onekey.so' || hostname.endsWith('.onekey.so')) {
+    return 'https://rag.onekey.so/api/chat';
   }
 
-  return rawApiUrl;
+  // Test env, localhost, and all other origins → test RAG service
+  return 'https://rag.onekeytest.com/api/chat';
 };
 
 const resolveLibraryId = () =>
@@ -175,7 +185,9 @@ const getWidgetCopy = isZh => {
       askUnavailable: 'Ask AI 暂未配置服务端地址，请先设置 NEXT_PUBLIC_DOCS_AI_API_URL。',
       assistantLabel: 'AI 助手',
       askDescription: '我会基于 OneKey Hardware SDK 文档回答并给出来源。',
-      exampleQuestionsTitle: '示例问题',
+      exampleQuestionsTitle: 'EXAMPLE QUESTIONS',
+      askAiBridgeLabel: '向 AI 提问',
+      contextOnly: '我先找到了这些相关文档来源，你可以继续追问更具体的问题。',
       closeLabel: '关闭',
       placeholder: '输入问题，例如：如何初始化 SDK？',
       sending: '生成中',
@@ -218,6 +230,8 @@ const getWidgetCopy = isZh => {
     assistantLabel: 'AI assistant',
     askDescription: 'I answer with OneKey Hardware SDK docs and source citations.',
     exampleQuestionsTitle: 'EXAMPLE QUESTIONS',
+    askAiBridgeLabel: 'Ask AI',
+    contextOnly: 'I found the most relevant documentation sources below. Ask a more specific follow-up for a grounded answer.',
     closeLabel: 'Close',
     placeholder: 'Ask your question, e.g. How do I connect a device?',
     sending: 'Generating',
@@ -259,6 +273,80 @@ const getMessageTextParts = message => {
   }
 
   return [];
+};
+
+const getRenderableMessageTextParts = message => {
+  const parts = getMessageTextParts(message);
+  if (message?.role !== 'assistant') return parts;
+  return parts.map(part => sanitizeDocAIMessageText(part)).filter(Boolean);
+};
+
+const getDisplayMessageTextParts = (message, sources, copy) => {
+  const textParts = getRenderableMessageTextParts(message);
+  if (textParts.length > 0) return textParts;
+  if (message?.role === 'assistant' && Array.isArray(sources) && sources.length > 0) {
+    return [copy.contextOnly];
+  }
+  return [];
+};
+
+const buildCopyText = (message, sources, copy) => {
+  const sections = [...getDisplayMessageTextParts(message, sources, copy)];
+
+  if (Array.isArray(sources) && sources.length > 0) {
+    const sourceLines = sources
+      .map((source, index) => `${index + 1}. ${source.title}\n${source.url}`)
+      .join('\n\n');
+
+    if (sourceLines) {
+      sections.push(`${copy.sourcesTitle}\n${sourceLines}`);
+    }
+  }
+
+  return sections.join('\n\n').trim();
+};
+
+const getLatestUserMessageTextBefore = (messages, assistantMessageId) => {
+  if (!Array.isArray(messages) || messages.length === 0) return '';
+
+  const assistantIndex = messages.findIndex(message => message?.id === assistantMessageId);
+  const startIndex = assistantIndex >= 0 ? assistantIndex - 1 : messages.length - 1;
+
+  for (let index = startIndex; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== 'user') continue;
+    return getMessageTextParts(message).join('\n\n').trim();
+  }
+
+  return '';
+};
+
+const sanitizeOutgoingMessages = messages => {
+  if (!Array.isArray(messages)) return [];
+
+  return messages
+    .map(message => {
+      if (!message || typeof message !== 'object' || !Array.isArray(message.parts)) return null;
+
+      const parts = message.parts.flatMap(part => {
+        if (!part || part.type !== 'text' || typeof part.text !== 'string') return [];
+
+        const nextText =
+          message.role === 'assistant'
+            ? sanitizeDocAIMessageText(part.text)
+            : part.text.trim();
+
+        if (!nextText) return [];
+        return [{ ...part, text: nextText }];
+      });
+
+      if (parts.length === 0) return null;
+      return {
+        ...message,
+        parts,
+      };
+    })
+    .filter(Boolean);
 };
 
 function ChatWidgetRuntime({ apiUrl, lang }) {
@@ -329,6 +417,12 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
         credentials: 'omit',
         headers,
         body,
+        prepareSendMessagesRequest: request => ({
+          body: {
+            ...request.body,
+            messages: sanitizeOutgoingMessages(request.messages),
+          },
+        }),
       }),
     [body, chatApiUrl, headers]
   );
@@ -607,8 +701,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
     [fetchSourcesForQuery, hasChatApi, input, isGenerating, scheduleScrollToBottom, sendMessage]
   );
 
-  const handleCopyMessage = useCallback(async message => {
-    const text = getMessageTextParts(message).join('\n\n').trim();
+  const handleCopyMessage = useCallback(async (message, sources) => {
+    const text = buildCopyText(message, sources, copy);
     if (!text) return;
 
     try {
@@ -618,7 +712,26 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
     } catch {
       setCopiedMessageId('');
     }
-  }, []);
+  }, [copy]);
+
+  const handleRetryMessage = useCallback(
+    async message => {
+      const query = getLatestUserMessageTextBefore(messages, message?.id);
+      if (query) {
+        const requestId = createRequestId();
+        setPendingSourceRequest({
+          requestId,
+          status: 'loading',
+          query,
+          sources: [],
+        });
+        void fetchSourcesForQuery(query, requestId);
+      }
+
+      await regenerate({ messageId: message.id });
+    },
+    [fetchSourcesForQuery, messages, regenerate]
+  );
 
   const handleOpenAskFromSearch = useCallback(() => {
     const text = normalizeText(searchInput);
@@ -640,22 +753,34 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        setActiveSearchIndex(prev => Math.min(prev + 1, Math.max(filteredSearchResults.length - 1, 0)));
+        setActiveSearchIndex(prev => {
+          // -1 = bridge row; move into first result (if any)
+          if (prev === -1) return filteredSearchResults.length > 0 ? 0 : -1;
+          return Math.min(prev + 1, filteredSearchResults.length - 1);
+        });
       }
 
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-        setActiveSearchIndex(prev => Math.max(prev - 1, 0));
+        setActiveSearchIndex(prev => {
+          // at or above first result → move to bridge row
+          if (prev <= 0) return -1;
+          return prev - 1;
+        });
       }
 
       if (event.key === 'Enter') {
         event.preventDefault();
+        // bridge row is selected → switch to Ask AI
+        if (activeSearchIndex === -1) {
+          handleOpenAskFromSearch();
+          return;
+        }
         const current = filteredSearchResults[activeSearchIndex];
         if (current) {
           handleOpenResult(current);
           return;
         }
-
         if (normalizeText(searchInput)) {
           handleOpenAskFromSearch();
         }
@@ -695,37 +820,47 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
       >
         <header className={styles.header} data-docs-ai="header">
           <div className={styles.headerTop}>
-            <div className={styles.segment}>
+            <div className={styles.modeTitle}>
+              {activeTab === DOCS_AI_TAB.SEARCH ? (
+                <SearchIcon size={14} className={styles.modeTitleIcon} />
+              ) : (
+                <SparklesIcon size={14} className={styles.modeTitleIcon} />
+              )}
+              <span>{activeTab === DOCS_AI_TAB.SEARCH ? copy.searchTab : copy.askTab}</span>
+            </div>
+            <div className={styles.headerActions}>
+              <div className={styles.segment}>
+                <button
+                  type="button"
+                  className={`${styles.segmentItem} ${
+                    activeTab === DOCS_AI_TAB.SEARCH ? styles.segmentItemActive : ''
+                  }`}
+                  onClick={() => setActiveTab(DOCS_AI_TAB.SEARCH)}
+                >
+                  <SearchIcon size={14} />
+                  <span>{copy.searchTab}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.segmentItem} ${
+                    activeTab === DOCS_AI_TAB.ASK ? styles.segmentItemActive : ''
+                  }`}
+                  onClick={() => setActiveTab(DOCS_AI_TAB.ASK)}
+                >
+                  <SparklesIcon size={14} />
+                  <span>{copy.askTab}</span>
+                </button>
+              </div>
               <button
                 type="button"
-                className={`${styles.segmentItem} ${
-                  activeTab === DOCS_AI_TAB.SEARCH ? styles.segmentItemActive : ''
-                }`}
-                onClick={() => setActiveTab(DOCS_AI_TAB.SEARCH)}
+                className={styles.closeButton}
+                data-docs-ai="close"
+                onClick={() => setIsOpen(false)}
+                aria-label={copy.closeLabel}
               >
-                <SearchIcon size={14} />
-                <span>{copy.searchTab}</span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.segmentItem} ${
-                  activeTab === DOCS_AI_TAB.ASK ? styles.segmentItemActive : ''
-                }`}
-                onClick={() => setActiveTab(DOCS_AI_TAB.ASK)}
-              >
-                <SparklesIcon size={14} />
-                <span>{copy.askTab}</span>
+                <XIcon size={16} />
               </button>
             </div>
-            <button
-              type="button"
-              className={styles.closeButton}
-              data-docs-ai="close"
-              onClick={() => setIsOpen(false)}
-              aria-label={copy.closeLabel}
-            >
-              <XIcon size={16} />
-            </button>
           </div>
 
           {activeTab === DOCS_AI_TAB.SEARCH ? (
@@ -745,6 +880,17 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
         {activeTab === DOCS_AI_TAB.SEARCH ? (
           <div className={styles.searchBody} data-docs-ai="search-body">
+            <button
+              type="button"
+              className={`${styles.askAiBridge}${activeSearchIndex === -1 ? ` ${styles.askAiBridgeActive}` : ''}`}
+              onClick={handleOpenAskFromSearch}
+            >
+              <span className={styles.askAiBridgeIconWrap}>
+                <OneKeyIcon size={16} className={styles.askAiBridgeIconSvg} />
+              </span>
+              <span className={styles.askAiBridgeText}>{copy.askAiBridgeLabel}</span>
+              <kbd className={styles.askAiBridgeKbd}>↵</kbd>
+            </button>
             <p className={styles.searchSectionTitle}>{copy.searchListTitle}</p>
             <p className={styles.searchCount}>{copy.searchCount(filteredSearchResults.length)}</p>
             <div className={styles.searchResultList}>
@@ -787,15 +933,21 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                     <span className={styles.assistantIcon}>
                       <OneKeyIcon size={16} className={styles.avatarLogo} />
                     </span>
-                    <span>{copy.assistantLabel}</span>
+                    <span className={styles.assistantLabelText}>{copy.assistantLabel}</span>
                   </div>
+                  <p className={styles.greeting}>
+                    {isZh ? '向我询问任何关于\u00a0' : 'Ask me anything about\u00a0'}
+                    <span className={styles.brandChip}>OneKey</span>
+                    {isZh ? '\u00a0的问题。' : '.'}
+                  </p>
+                  <p className={styles.askDesc}>{copy.askDescription}</p>
                   <p className={styles.emptySection}>{copy.exampleQuestionsTitle}</p>
                   <div className={styles.suggestionList}>
-                    {copy.suggestions.map(item => (
+                    {copy.suggestions.map((item, index) => (
                       <button
                         key={item.text}
                         type="button"
-                        className={styles.suggestion}
+                        className={`${styles.suggestion}${index === 0 ? ` ${styles.suggestionFirst}` : ''}`}
                         data-docs-ai="suggestion"
                         onClick={() => handleSend(item.prompt)}
                         disabled={!hasChatApi}
@@ -814,9 +966,6 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               ) : null}
 
               {messages.map(message => {
-                const textParts = getMessageTextParts(message);
-                if (textParts.length === 0) return null;
-
                 const isAssistant = message.role === 'assistant';
                 const isLatestAssistantMessage = Boolean(
                   isAssistant && latestAssistantMessage?.id === message.id
@@ -832,6 +981,13 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 const shouldShowSources = Boolean(
                   isAssistant && !isStreamingMessage && messageSources.length > 0
                 );
+                const displayTextParts = getDisplayMessageTextParts(
+                  message,
+                  shouldShowSources ? messageSources : [],
+                  copy
+                );
+
+                if (displayTextParts.length === 0 && !shouldShowSources) return null;
 
                 return (
                   <div
@@ -849,7 +1005,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                       </div>
                     ) : null}
                     <div className={styles.bubble}>
-                      {textParts.map((part, index) => (
+                      {displayTextParts.map((part, index) => (
                         <MarkdownMessage
                           key={`${message.id}-${index}`}
                           text={part}
@@ -892,12 +1048,17 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                             </div>
                           ) : null}
                           <div className={styles.actions} data-docs-ai="actions">
-                            <button type="button" onClick={() => handleCopyMessage(message)}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCopyMessage(message, shouldShowSources ? messageSources : [])
+                              }
+                            >
                               <CopyIcon size={14} />
                               <span>{copiedMessageId === message.id ? copy.copied : copy.copy}</span>
                             </button>
                             {latestAssistantMessage?.id === message.id ? (
-                              <button type="button" onClick={() => regenerate({ messageId: message.id })}>
+                              <button type="button" onClick={() => handleRetryMessage(message)}>
                                 <RotateCcwIcon size={14} />
                                 <span>{copy.retry}</span>
                               </button>
@@ -1006,12 +1167,6 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 }
 
 export default function DocAIChatWidget({ lang = 'en' }) {
-  const enabled = isFeatureEnabled();
   const apiUrl = resolveApiUrl();
-
-  if (!enabled) {
-    return null;
-  }
-
   return <ChatWidgetRuntime apiUrl={apiUrl} lang={lang} />;
 }
