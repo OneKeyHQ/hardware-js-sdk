@@ -113,7 +113,12 @@ export const ALL_PASSPHRASE_VARIANT_IDS: PassphraseVariantId[] = [
   'passphrase_2',
 ];
 
-export type TestSuiteType = 'deviceFlow' | 'sdkAddressBatch' | 'sdkPubkeyBatch';
+export type TestSuiteType =
+  | 'deviceFlow'
+  | 'sdkAddressBatch'
+  | 'sdkPubkeyBatch'
+  | 'passphraseWalletSwitch'
+  | 'specialPassphrase';
 
 export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description: string }> = {
   deviceFlow: { label: 'Device Flow', description: 'PhonePilot 设备端创建/导入流程执行是否成功' },
@@ -124,6 +129,14 @@ export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description
   sdkPubkeyBatch: {
     label: 'SDK Pubkey Batch',
     description: '仅导入助记词场景执行公钥结果核对',
+  },
+  passphraseWalletSwitch: {
+    label: 'Passphrase Wallet Switch',
+    description: '创建 N 个密码短语钱包并循环切换，验证地址一致性',
+  },
+  specialPassphrase: {
+    label: 'Special Passphrase',
+    description: '9 种特殊密码短语 × 3 方法（btc/evm/dnx），mockDevice 期望 vs SDK 实际',
   },
 };
 

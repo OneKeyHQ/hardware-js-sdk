@@ -44,10 +44,13 @@ export const automationProgressAtom = atom<TestProgress>(defaultProgress);
 export const automationReportAtom = atom<TestReport | null>(null);
 export const automationLogsAtom = atom<string[]>([]);
 
+const MAX_LOG_ENTRIES = 2000;
+
 export const addLogAtom = atom(null, (get, set, log: string) => {
   const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
   const logs = get(automationLogsAtom);
-  set(automationLogsAtom, [...logs, `[${timestamp}] ${log}`]);
+  const next = [...logs, `[${timestamp}] ${log}`];
+  set(automationLogsAtom, next.length > MAX_LOG_ENTRIES ? next.slice(-MAX_LOG_ENTRIES) : next);
 });
 
 export const clearLogsAtom = atom(null, (_get, set) => {
@@ -77,3 +80,6 @@ export const progressPercentageAtom = atom(get => {
   }
   return Math.round((progress.completedSuites / progress.totalSuites) * 100);
 });
+
+export const reportFilterAtom = atom<'all' | 'failed'>('all');
+export const reportExpandAllAtom = atom(false);

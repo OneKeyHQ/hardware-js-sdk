@@ -25,7 +25,7 @@ const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTesting
 const AttachToPinTestingScreen = lazy(() => import('./src/views/AttachToPinTestingScreen'));
 const SLIP39TestScreen = lazy(() => import('./src/views/SLIP39TestScreen'));
 const ChainMethodTestScreen = lazy(() => import('./src/views/ChainMethodTestScreen'));
-const AutomationTestScreen = lazy(() => import('./src/views/AutomationTestScreen'));
+const AutomationTestScreen = lazy(() => import('./src/views/AutomationTest'));
 
 // React Navigation v6 linking 配置
 const linking: LinkingOptions<ParamListBase> = {

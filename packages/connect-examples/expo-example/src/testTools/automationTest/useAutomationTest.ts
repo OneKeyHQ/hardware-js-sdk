@@ -52,7 +52,13 @@ import type {
 import type { CoreApi } from '@onekeyfe/hd-core';
 import type { SLIP39MethodData, SLIP39TestCaseData } from '../slip39Test/types';
 
-const SUITE_EXECUTION_ORDER: TestSuiteType[] = ['deviceFlow', 'sdkAddressBatch', 'sdkPubkeyBatch'];
+const SUITE_EXECUTION_ORDER: TestSuiteType[] = [
+  'deviceFlow',
+  'sdkAddressBatch',
+  'sdkPubkeyBatch',
+  'passphraseWalletSwitch',
+  'specialPassphrase',
+];
 const EVM_ADDRESS_PATH = "m/44'/60'/0'/0/0";
 const BIP39_CREATE_PUBKEY_PROBES: Array<{
   method: string;
@@ -408,11 +414,14 @@ function buildSdkParamsForPath(methodCase: AutomationSdkMethodCase, expectedPath
 }
 
 function getSuiteName(suiteType: TestSuiteType): string {
-  return suiteType === 'deviceFlow'
-    ? 'Device Flow'
-    : suiteType === 'sdkAddressBatch'
-      ? 'SDK Address Batch'
-      : 'SDK Pubkey Batch';
+  const names: Record<TestSuiteType, string> = {
+    deviceFlow: 'Device Flow',
+    sdkAddressBatch: 'SDK Address Batch',
+    sdkPubkeyBatch: 'SDK Pubkey Batch',
+    passphraseWalletSwitch: 'Passphrase Wallet Switch',
+    specialPassphrase: 'Special Passphrase',
+  };
+  return names[suiteType] || suiteType;
 }
 
 function getBip39ImportProbeAddress(scenario: AutomationScenario): string {
@@ -640,10 +649,15 @@ export function useAutomationTest() {
     }
   }, [addLog, updateHealthState]);
 
+  const uiListenerRef = useRef<((message: { type: string }) => void) | null>(null);
+
   const setupUIListener = useCallback(
     (sdk: CoreApi) => {
-      sdk.removeAllListeners(UI_EVENT);
-      sdk.on(UI_EVENT, async (message: { type: string }) => {
+      if (uiListenerRef.current) {
+        sdk.off(UI_EVENT, uiListenerRef.current);
+      }
+
+      const listener = async (message: { type: string }) => {
         addLog(`UI Event: ${message.type}`);
 
         switch (message.type) {
@@ -685,7 +699,10 @@ export function useAutomationTest() {
           default:
             break;
         }
-      });
+      };
+
+      uiListenerRef.current = listener;
+      sdk.on(UI_EVENT, listener);
     },
     [addLog]
   );
@@ -1538,6 +1555,292 @@ export function useAutomationTest() {
     [runWithRetry, setProgress, updateSuiteProgress]
   );
 
+  const runPassphraseWalletSwitchSuite = useCallback(
+    async (
+      scenario: AutomationScenario,
+      sdk: CoreApi,
+      connectId: string,
+      deviceId: string
+    ): Promise<TestSuiteResult> => {
+      updateSuiteProgress('passphraseWalletSwitch', scenario);
+      const startedAt = Date.now();
+      const results: TestCaseResult[] = [];
+      const walletCount = 5;
+      const switchCount = 20;
+
+      const cacheAddress = new Map<string, { address: string; passphraseState: string }>();
+
+      try {
+        for (let i = 0; i < walletCount; i += 1) {
+          const passphrase = i === 0 ? '' : String(i);
+          const useEmpty = i === 0;
+          currentPassphraseRef.current = passphrase;
+          addLog(`Creating wallet ${i}, passphrase: 「${passphrase}」`);
+
+          const psResult = (await runWithRetry(`getPassphraseState:wallet-${i}`, () =>
+            sdk.getPassphraseState(connectId, {
+              initSession: true,
+              useEmptyPassphrase: useEmpty,
+            })
+          )) as { success: boolean; payload?: string };
+
+          if (!psResult.success) {
+            results.push({
+              title: `Create wallet-${i}`,
+              passed: false,
+              error: 'getPassphraseState failed',
+              duration: Date.now() - startedAt,
+            });
+            break;
+          }
+
+          const passphraseState = psResult.payload || '';
+          const addrResult = (await runWithRetry(`evmGetAddress:wallet-${i}`, () =>
+            sdk.evmGetAddress(connectId, deviceId, {
+              path: EVM_ADDRESS_PATH,
+              showOnOneKey: false,
+              passphraseState,
+              useEmptyPassphrase: useEmpty,
+            })
+          )) as { success: boolean; payload?: { address?: string } };
+
+          if (!addrResult.success) {
+            results.push({
+              title: `Create wallet-${i}`,
+              passed: false,
+              error: 'evmGetAddress failed during wallet creation',
+              duration: Date.now() - startedAt,
+            });
+            break;
+          }
+
+          const address = addrResult.payload?.address || '';
+          cacheAddress.set(`wallet-${i}`, { address, passphraseState });
+          addLog(`  wallet-${i} address: ${address}`);
+        }
+
+        if (cacheAddress.size < walletCount) {
+          addLog(
+            `Wallet creation incomplete (${cacheAddress.size}/${walletCount}), aborting switch phase`
+          );
+        }
+
+        for (let switchIdx = 0; switchIdx < switchCount && cacheAddress.size === walletCount; switchIdx += 1) {
+          if (!runningRef.current) {
+            break;
+          }
+          const walletIdx = switchIdx % walletCount;
+          const walletKey = `wallet-${walletIdx}`;
+          const cached = cacheAddress.get(walletKey);
+          if (!cached) {
+            continue;
+          }
+
+          const passphrase = walletIdx === 0 ? '' : String(walletIdx);
+          currentPassphraseRef.current = passphrase;
+
+          const caseStart = Date.now();
+          const addrResult = (await runWithRetry(`evmGetAddress:switch-${switchIdx}`, () =>
+            sdk.evmGetAddress(connectId, deviceId, {
+              path: EVM_ADDRESS_PATH,
+              showOnOneKey: false,
+              passphraseState: cached.passphraseState,
+              useEmptyPassphrase: walletIdx === 0,
+            })
+          )) as { success: boolean; payload?: { address?: string } };
+
+          const actual = addrResult.payload?.address || '';
+          results.push({
+            title: `Switch ${switchIdx} → ${walletKey}`,
+            method: 'evmGetAddress',
+            expected: cached.address,
+            actual,
+            passed: actual === cached.address,
+            duration: Date.now() - caseStart,
+            metadata: { passphrase },
+          });
+
+          await delay(80);
+        }
+      } catch (error) {
+        results.push({
+          title: 'passphraseWalletSwitch unexpected error',
+          passed: false,
+          error: error instanceof Error ? error.message : String(error),
+          duration: Date.now() - startedAt,
+        });
+      }
+
+      currentPassphraseRef.current = '';
+      return createSuiteResult(
+        'passphraseWalletSwitch',
+        'Passphrase Wallet Switch',
+        results,
+        Date.now() - startedAt
+      );
+    },
+    [addLog, runWithRetry, updateSuiteProgress]
+  );
+
+  const runSpecialPassphraseSuite = useCallback(
+    async (
+      scenario: AutomationScenario,
+      sdk: CoreApi,
+      connectId: string,
+      deviceId: string
+    ): Promise<TestSuiteResult> => {
+      updateSuiteProgress('specialPassphrase', scenario);
+      const startedAt = Date.now();
+      const results: TestCaseResult[] = [];
+
+      const specialPassphrases = [
+        'Aa0!)_+맪Ӎ¬}¨¥ϸΔѭЧゞく6鼵',
+        '¥Øÿ',
+        'P@sswôrd€',
+        ' My Passphrase ',
+        '私のパスワード',
+        'myسياسةpassphrase',
+        '你好passphrase',
+        'mi política de frase de contraseña',
+        String.fromCharCode(...Array.from({ length: 25 }, (_, i) => i + 96)),
+      ];
+
+      const SPECIAL_PP_METHOD_PATHS: Record<string, string> = {
+        btcGetAddress: "m/44'/0'/0'/0/0",
+        evmGetAddress: "m/44'/60'/0'/0/0",
+        dnxGetAddress: "m/44'/29538'/0'/0/0",
+      };
+      const methods = Object.keys(SPECIAL_PP_METHOD_PATHS);
+      const mnemonic = scenario.bip39ImportMnemonicWords?.join(' ');
+
+      if (!mnemonic) {
+        return createSkippedSuiteResult(
+          'specialPassphrase',
+          'Special Passphrase',
+          'No mnemonic words available for special passphrase test (import scenario required)'
+        );
+      }
+
+      try {
+        const { default: mockDevice } = await import('../../utils/mockDevice');
+
+        for (const passphrase of specialPassphrases) {
+          currentPassphraseRef.current = passphrase;
+          addLog(`Testing special passphrase: 「${passphrase}」`);
+
+          const psResult = (await runWithRetry(`getPassphraseState:special`, () =>
+            sdk.getPassphraseState(connectId, {
+              initSession: true,
+              useEmptyPassphrase: false,
+            })
+          )) as { success: boolean; payload?: string };
+
+          if (!psResult.success) {
+            results.push({
+              title: `getPassphraseState for 「${passphrase}」`,
+              passed: false,
+              error: 'getPassphraseState failed',
+              duration: Date.now() - startedAt,
+            });
+            continue;
+          }
+
+          const passphraseState = psResult.payload || '';
+
+          for (const method of methods) {
+            if (!runningRef.current) {
+              break;
+            }
+
+            const caseStart = Date.now();
+            try {
+              const mockFn = (mockDevice as Record<string, unknown>)[method];
+              if (typeof mockFn !== 'function') {
+                results.push({
+                  title: `${method} / 「${passphrase}」`,
+                  method,
+                  passed: false,
+                  error: `mockDevice.${method} not found`,
+                  duration: Date.now() - caseStart,
+                });
+                continue;
+              }
+
+              const mockRes = (await mockFn('', '', {
+                path: SPECIAL_PP_METHOD_PATHS[method],
+                mnemonic: mnemonic.trim(),
+                passphrase,
+              })) as { payload?: { address?: string } };
+
+              const expected = mockRes?.payload?.address || '';
+
+              const sdkMethod = (sdk as Record<string, unknown>)[method];
+              if (typeof sdkMethod !== 'function') {
+                results.push({
+                  title: `${method} / 「${passphrase}」`,
+                  method,
+                  expected,
+                  passed: false,
+                  error: `SDK method ${method} not found`,
+                  duration: Date.now() - caseStart,
+                });
+                continue;
+              }
+
+              const sdkResult = (await runWithRetry(`${method}:special`, () =>
+                (sdkMethod as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, {
+                  path: SPECIAL_PP_METHOD_PATHS[method],
+                  showOnOneKey: false,
+                  passphraseState,
+                  useEmptyPassphrase: false,
+                })
+              )) as { success: boolean; payload?: { address?: string } };
+
+              const actual = sdkResult.payload?.address || '';
+              const passed = actual.toLowerCase() === expected.toLowerCase();
+
+              results.push({
+                title: `${method} / 「${passphrase}」`,
+                method,
+                expected,
+                actual,
+                passed,
+                duration: Date.now() - caseStart,
+                metadata: { passphrase },
+              });
+            } catch (error) {
+              results.push({
+                title: `${method} / 「${passphrase}」`,
+                method,
+                passed: false,
+                error: error instanceof Error ? error.message : String(error),
+                duration: Date.now() - caseStart,
+              });
+            }
+
+            await delay(80);
+          }
+        }
+      } catch (error) {
+        results.push({
+          title: 'specialPassphrase unexpected error',
+          passed: false,
+          error: error instanceof Error ? error.message : String(error),
+          duration: Date.now() - startedAt,
+        });
+      }
+
+      currentPassphraseRef.current = '';
+      return createSuiteResult(
+        'specialPassphrase',
+        'Special Passphrase',
+        results,
+        Date.now() - startedAt
+      );
+    },
+    [addLog, runWithRetry, updateSuiteProgress]
+  );
+
   const runSelectedSdkSuites = useCallback(
     async (
       scenario: AutomationScenario,
@@ -1642,6 +1945,36 @@ export function useAutomationTest() {
         markSuiteCompleted();
       }
 
+      if (
+        selectedSuites.includes('passphraseWalletSwitch') &&
+        scenario.supportedSuites.includes('passphraseWalletSwitch') &&
+        !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
+      ) {
+        const ppSwitchResult = await runPassphraseWalletSwitchSuite(
+          scenario,
+          sdk,
+          connectId,
+          deviceId
+        );
+        nextSuiteResults.push(ppSwitchResult);
+        markSuiteCompleted();
+      }
+
+      if (
+        selectedSuites.includes('specialPassphrase') &&
+        scenario.supportedSuites.includes('specialPassphrase') &&
+        !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
+      ) {
+        const specialPPResult = await runSpecialPassphraseSuite(
+          scenario,
+          sdk,
+          connectId,
+          deviceId
+        );
+        nextSuiteResults.push(specialPPResult);
+        markSuiteCompleted();
+      }
+
       return nextSuiteResults;
     },
     [
@@ -1650,8 +1983,10 @@ export function useAutomationTest() {
       markSuiteCompleted,
       runBip39CreateDynamicSuite,
       runBip39ImportSdkSuite,
+      runPassphraseWalletSwitchSuite,
       runSlip39CreateDynamicSuite,
       runSlip39SdkSuite,
+      runSpecialPassphraseSuite,
     ]
   );
 
@@ -1900,6 +2235,11 @@ export function useAutomationTest() {
 
   const runAutomation = useCallback(
     async (mode: AutomationRunMode): Promise<void> => {
+      if (runningRef.current) {
+        addLog('Automation is already running');
+        return;
+      }
+
       if (!SDK || !selectedDevice?.connectId) {
         addLog('SDK or selected device is not available');
         return;
@@ -2202,7 +2542,10 @@ export function useAutomationTest() {
         fatalErrorMessage = error instanceof Error ? error.message : String(error);
         addLog(`Automation aborted by unexpected error: ${fatalErrorMessage}`);
       } finally {
-        SDK.removeAllListeners(UI_EVENT);
+        if (uiListenerRef.current) {
+          SDK.off(UI_EVENT, uiListenerRef.current);
+          uiListenerRef.current = null;
+        }
         runningRef.current = false;
       }
 
@@ -2271,7 +2614,6 @@ export function useAutomationTest() {
   const stopAutomation = useCallback(async () => {
     runningRef.current = false;
     currentPassphraseRef.current = '';
-    setProgress(prev => ({ ...prev, status: 'idle', currentPassphrase: null }));
     addLog('Stopping automation test...');
 
     if (clientRef.current) {

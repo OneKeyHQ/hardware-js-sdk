@@ -20,8 +20,27 @@ import type {
 /** PhonePilot 默认服务地址 */
 const DEFAULT_SERVER_URL = 'http://localhost:3847';
 
-/** MCP JSON-RPC 请求 ID 计数器 */
-let requestId = 0;
+/** 默认请求超时（30 秒） */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** 长时间操作超时（5 分钟，用于 executeSequence 等） */
+const LONG_TIMEOUT_MS = 300_000;
+
+/**
+ * 带超时的 fetch 封装
+ */
+function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+}
 
 /**
  * PhonePilot MCP 客户端
@@ -36,6 +55,8 @@ export class PhonePilotClient {
   private connectionState: ConnectionState = 'disconnected';
 
   private onStateChange?: (state: ConnectionState) => void;
+
+  private requestId = 0;
 
   constructor(serverUrl: string = DEFAULT_SERVER_URL) {
     this.serverUrl = serverUrl;
@@ -52,19 +73,20 @@ export class PhonePilotClient {
 
   private parseSSEResponse(sseText: string): { result?: unknown; error?: { message: string } } {
     const lines = sseText.trim().split('\n');
-    let jsonData = '';
+    const dataLines: string[] = [];
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
       if (line.startsWith('data: ')) {
-        jsonData = line.substring(6);
-        break;
+        dataLines.push(line.substring(6));
       }
     }
 
-    if (!jsonData) {
+    if (dataLines.length === 0) {
       return { error: { message: 'No data field in SSE response' } };
     }
+
+    const jsonData = dataLines.join('\n');
 
     try {
       return JSON.parse(jsonData);
@@ -75,7 +97,11 @@ export class PhonePilotClient {
 
   async healthCheck(): Promise<HealthCheckResponse | null> {
     try {
-      const response = await fetch(`${this.serverUrl}/health`);
+      const response = await fetchWithTimeout(
+        `${this.serverUrl}/health`,
+        {},
+        DEFAULT_TIMEOUT_MS
+      );
       if (response.ok) {
         return await response.json();
       }
@@ -90,9 +116,10 @@ export class PhonePilotClient {
     this.updateState('connecting');
 
     try {
+      this.requestId += 1;
       const initRequest = {
         jsonrpc: '2.0',
-        id: ++requestId,
+        id: this.requestId,
         method: 'initialize',
         params: {
           protocolVersion: '2025-03-26',
@@ -104,14 +131,18 @@ export class PhonePilotClient {
         },
       };
 
-      const response = await fetch(`${this.serverUrl}/mcp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json, text/event-stream',
+      const response = await fetchWithTimeout(
+        `${this.serverUrl}/mcp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+          },
+          body: JSON.stringify(initRequest),
         },
-        body: JSON.stringify(initRequest),
-      });
+        DEFAULT_TIMEOUT_MS
+      );
 
       if (!response.ok) {
         throw new Error(`MCP connection failed: ${response.status}`);
@@ -136,12 +167,16 @@ export class PhonePilotClient {
   async disconnect(): Promise<void> {
     if (this.sessionId) {
       try {
-        await fetch(`${this.serverUrl}/mcp`, {
-          method: 'DELETE',
-          headers: {
-            'mcp-session-id': this.sessionId,
+        await fetchWithTimeout(
+          `${this.serverUrl}/mcp`,
+          {
+            method: 'DELETE',
+            headers: {
+              'mcp-session-id': this.sessionId,
+            },
           },
-        });
+          DEFAULT_TIMEOUT_MS
+        );
       } catch (error) {
         console.error('PhonePilot MCP disconnect error:', error);
       }
@@ -150,27 +185,36 @@ export class PhonePilotClient {
     this.updateState('disconnected');
   }
 
-  private async sendRequest<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+  private async sendRequest<T>(
+    method: string,
+    params: Record<string, unknown> = {},
+    timeoutMs: number = DEFAULT_TIMEOUT_MS
+  ): Promise<T> {
     if (!this.sessionId) {
       throw new Error('Not connected to PhonePilot MCP');
     }
 
+    this.requestId += 1;
     const request = {
       jsonrpc: '2.0',
-      id: ++requestId,
+      id: this.requestId,
       method,
       params,
     };
 
-    const response = await fetch(`${this.serverUrl}/mcp`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json, text/event-stream',
-        'mcp-session-id': this.sessionId,
+    const response = await fetchWithTimeout(
+      `${this.serverUrl}/mcp`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'mcp-session-id': this.sessionId,
+        },
+        body: JSON.stringify(request),
       },
-      body: JSON.stringify(request),
-    });
+      timeoutMs
+    );
 
     if (!response.ok) {
       throw new Error(`MCP request failed: ${response.status}`);
@@ -208,18 +252,34 @@ export class PhonePilotClient {
       params,
     };
 
-    await fetch(`${this.serverUrl}/mcp`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json, text/event-stream',
-        'mcp-session-id': this.sessionId,
-      },
-      body: JSON.stringify(notification),
-    });
+    try {
+      const response = await fetchWithTimeout(
+        `${this.serverUrl}/mcp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            'mcp-session-id': this.sessionId,
+          },
+          body: JSON.stringify(notification),
+        },
+        DEFAULT_TIMEOUT_MS
+      );
+
+      if (!response.ok) {
+        console.warn(`PhonePilot notification ${method} failed: ${response.status}`);
+      }
+    } catch (error) {
+      console.warn(`PhonePilot notification ${method} error:`, error);
+    }
   }
 
-  private async callTool<T>(toolName: string, args: Record<string, unknown> = {}): Promise<T> {
+  private async callTool<T>(
+    toolName: string,
+    args: Record<string, unknown> = {},
+    timeoutMs: number = DEFAULT_TIMEOUT_MS
+  ): Promise<T> {
     const result = await this.sendRequest<{
       content: Array<{
         type: string;
@@ -227,14 +287,17 @@ export class PhonePilotClient {
         data?: string;
         mimeType?: string;
       }>;
-    }>('tools/call', {
-      name: toolName,
-      arguments: args,
-    });
+    }>('tools/call', { name: toolName, arguments: args }, timeoutMs);
 
     const textContent = result.content.find(c => c.type === 'text');
     if (textContent?.text) {
-      return JSON.parse(textContent.text) as T;
+      try {
+        return JSON.parse(textContent.text) as T;
+      } catch (error) {
+        throw new Error(
+          `Failed to parse tool ${toolName} response: ${error instanceof Error ? error.message : error}`
+        );
+      }
     }
 
     throw new Error(`Tool ${toolName} returned no text content`);
@@ -242,7 +305,8 @@ export class PhonePilotClient {
 
   private async callToolWithImage<T>(
     toolName: string,
-    args: Record<string, unknown> = {}
+    args: Record<string, unknown> = {},
+    timeoutMs: number = DEFAULT_TIMEOUT_MS
   ): Promise<{ result: T; frame?: string }> {
     const response = await this.sendRequest<{
       content: Array<{
@@ -251,10 +315,7 @@ export class PhonePilotClient {
         data?: string;
         mimeType?: string;
       }>;
-    }>('tools/call', {
-      name: toolName,
-      arguments: args,
-    });
+    }>('tools/call', { name: toolName, arguments: args }, timeoutMs);
 
     const textContent = response.content.find(c => c.type === 'text');
     const imageContent = response.content.find(c => c.type === 'image');
@@ -263,10 +324,16 @@ export class PhonePilotClient {
       throw new Error(`Tool ${toolName} returned no text content`);
     }
 
-    return {
-      result: JSON.parse(textContent.text) as T,
-      frame: imageContent?.data,
-    };
+    try {
+      return {
+        result: JSON.parse(textContent.text) as T,
+        frame: imageContent?.data,
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to parse tool ${toolName} response: ${error instanceof Error ? error.message : error}`
+      );
+    }
   }
 
   async armConnect(): Promise<ArmConnectResult> {
@@ -319,7 +386,8 @@ export class PhonePilotClient {
   async executeSequence(sequenceId: string): Promise<ExecuteSequenceResult> {
     const { result, frame } = await this.callToolWithImage<ExecuteSequenceResult>(
       'execute-sequence',
-      { sequenceId }
+      { sequenceId },
+      LONG_TIMEOUT_MS
     );
     return {
       ...result,
