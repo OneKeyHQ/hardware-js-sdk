@@ -22,6 +22,7 @@ import { generateScdoAddressFromSeed } from '../../utils/mockDevice/method/scdoG
 import { generateXrpAddressFromSeed } from '../../utils/mockDevice/method/xrpGetAddress';
 import { generateBenfenAddressFromSeed } from '../../utils/mockDevice/method/benfenGetAddress';
 import { generateTonAddressFromSeed } from '../../utils/mockDevice/method/tonGetAddress';
+import { generatePolkadotAddressFromSeed } from '../../utils/mockDevice/method/polkadotGetAddress';
 
 // Import public key generators
 import { generateAptosPublicKeyFromSeed } from '../../utils/mockDevice/method/aptosGetPublicKey';
@@ -110,9 +111,10 @@ const GENERATORS: Record<string, MethodGenerator> = {
       try {
         const keyPair = deriveKeyPairWithPath(seed, params.path, 'secp256k1');
         const publicKey = keyPair.publicKey ? Buffer.from(keyPair.publicKey).toString('hex') : '';
+        const xpub = (keyPair as { publicExtendedKey?: string }).publicExtendedKey || '';
         return Promise.resolve({
           success: true,
-          payload: { publicKey, node: { public_key: publicKey } },
+          payload: { publicKey, xpub, node: { public_key: publicKey } },
         });
       } catch (error) {
         return Promise.resolve({
@@ -142,9 +144,10 @@ const GENERATORS: Record<string, MethodGenerator> = {
         const publicKey = keyPair.publicKey
           ? `0x${Buffer.from(keyPair.publicKey).toString('hex')}`
           : '';
+        const xpub = (keyPair as { publicExtendedKey?: string }).publicExtendedKey || '';
         return Promise.resolve({
           success: true,
-          payload: { publicKey },
+          payload: { publicKey, xpub },
         });
       } catch (error) {
         return Promise.resolve({
@@ -350,7 +353,7 @@ const GENERATORS: Record<string, MethodGenerator> = {
   polkadotGetAddress: {
     address: (seed: Buffer, params: any) => {
       try {
-        const result = generatePolkadotPublicKeyFromSeed(seed, params.path);
+        const result = generatePolkadotAddressFromSeed(seed, params.path, params.prefix);
         return Promise.resolve({ success: true, payload: { address: result } });
       } catch (error) {
         return Promise.resolve({

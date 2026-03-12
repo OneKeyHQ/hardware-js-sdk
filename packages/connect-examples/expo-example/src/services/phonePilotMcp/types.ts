@@ -2,204 +2,218 @@
  * PhonePilot MCP Client Type Definitions
  */
 
-/** MCP Tool call result */
-export interface McpToolResult<T = unknown> {
-  content: Array<{
-    type: 'text' | 'image';
-    text?: string;
-    data?: string;
-    mimeType?: string;
-  }>;
-  result?: T;
-}
-
-/** Arm connect result */
 export interface ArmConnectResult {
   success: boolean;
   handle: number;
   message: string;
 }
 
-/** Arm disconnect result */
 export interface ArmDisconnectResult {
   success: boolean;
   message: string;
 }
 
-/** Arm move result */
 export interface ArmMoveResult {
   success: boolean;
   position: { x: number; y: number };
   message: string;
-  frame?: string; // base64 JPEG if captureFrame was true
+  frame?: string;
 }
 
-/** Arm click result */
 export interface ArmClickResult {
   success: boolean;
   message: string;
-  frame?: string; // base64 JPEG if captureFrame was true
+  frame?: string;
 }
 
-/** Capture frame result */
 export interface CaptureFrameResult {
   success: boolean;
   message: string;
-  frame?: string; // base64 JPEG
+  frame?: string;
 }
 
-/** Device preparation parameters */
-export interface PrepareDeviceParams {
-  /** Type of test setup */
-  testType: 'standard' | 'passphrase' | 'slip39' | 'pin';
-  /** Standard mnemonic words */
-  mnemonic?: string[];
-  /** SLIP39 shares (array of word arrays) */
-  slip39Shares?: string[][];
-  /** Optional passphrase */
-  passphrase?: string;
-  /** Optional PIN */
-  pin?: string;
-}
-
-/** Device preparation result */
-export interface PrepareDeviceResult {
-  success: boolean;
-  message: string;
-}
-
-/** Confirm/Cancel action params */
-export interface ConfirmActionParams {
-  action: 'confirm' | 'cancel';
-}
-
-/** Action result */
 export interface ActionResult {
   success: boolean;
   message: string;
 }
 
-/** PhonePilot connection state */
+export interface ExecuteSequenceResult extends ActionResult {
+  sequenceId?: string;
+  sequenceName?: string;
+  stepsCompleted?: number;
+  totalSteps?: number;
+  frame?: string;
+}
+
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
-/** PhonePilot health check response */
 export interface HealthCheckResponse {
   status: 'ok' | 'error';
   server: string;
   version: string;
+  mcpReady: boolean;
+  ocrReady: boolean;
+  message?: string;
+  ocr: PhonePilotOcrHealth;
+  sequenceIds: string[];
   activeSessions: {
     streamable: number;
     sse: number;
   };
 }
 
-/** Mnemonic group identifier */
-export type MnemonicGroupId =
-  | 'count12_one'
-  | 'count12_two'
-  | 'count12_three'
-  | 'count18_one'
-  | 'count18_two'
-  | 'count18_three'
-  | 'count24_one'
-  | 'count24_two'
-  | 'count24_three'
-  | 'slip39_20_one'
-  | 'slip39_20_two'
-  | 'slip39_20_three'
-  | 'slip39_33_one'
-  | 'slip39_33_two';
-
-/** Mnemonic group configuration */
-export interface MnemonicGroup {
-  id: MnemonicGroupId;
-  name: string;
-  type: 'standard' | 'slip39';
-  wordCount: number;
-  /** For standard mnemonic */
-  mnemonic?: string[];
-  /** For SLIP39 */
-  slip39Shares?: string[][];
-  /** PhonePilot sequence ID for this mnemonic */
-  phonePilotSequenceId: string;
+export interface PhonePilotOcrHealth {
+  ready: boolean;
+  pythonBin: string;
+  pythonVersion?: string;
+  scriptPath?: string;
+  missingDependencies: string[];
+  missingModels: string[];
+  message: string;
+  checkedAt: string;
 }
 
-/** Passphrase variant */
-export interface PassphraseVariant {
-  name: string;
-  passphrase: string;
-  passphraseState: string;
+export interface MnemonicStoreMetadata {
+  capturedAt?: string;
+  wordCount?: number;
+  source?: string;
 }
 
-/** Passphrase variant identifier */
+export interface MnemonicStoreResult {
+  success: boolean;
+  message: string;
+  words?: string[];
+  wordCount?: number;
+  metadata?: MnemonicStoreMetadata;
+  shares?: string[][];
+  shareCount?: number;
+  threshold?: number;
+  sequenceId?: string;
+  walletType?: 'bip39' | 'slip39';
+  flowType?: 'create' | 'import' | 'manual';
+}
+
+export type JiraIssueKey = 'OK-26053' | 'OK-26054' | 'OK-5504' | 'OK-40090';
 export type PassphraseVariantId = 'normal' | 'passphrase_empty' | 'passphrase_1' | 'passphrase_2';
 
-/** Passphrase variant display info */
-export const PASSPHRASE_VARIANT_INFO: Record<PassphraseVariantId, { label: string; description: string }> = {
-  normal: { label: 'Normal', description: '无 Passphrase' },
-  passphrase_empty: { label: 'Empty', description: '空字符串 Passphrase' },
-  passphrase_1: { label: 'Passphrase 1', description: 'asdfg7890' },
-  passphrase_2: { label: 'Passphrase 2', description: '1234567890qwerty...' },
+export const PASSPHRASE_VARIANT_INFO: Record<
+  PassphraseVariantId,
+  { label: string; description: string }
+> = {
+  normal: { label: 'Normal', description: '标准钱包，不输入密码短语' },
+  passphrase_empty: { label: 'Empty', description: '隐藏钱包，输入空字符串' },
+  passphrase_1: { label: 'Passphrase 1', description: '场景绑定的第一组密码短语' },
+  passphrase_2: { label: 'Passphrase 2', description: '场景绑定的第二组密码短语' },
 };
 
-/** Test suite type */
-export type TestSuiteType =
-  | 'address'
-  | 'pubkey'
-  | 'passphrase'
-  | 'slip39'
-  | 'security'
-  | 'functional'
-  | 'attachToPin'
-  | 'chainMethod';
+export const ALL_PASSPHRASE_VARIANT_IDS: PassphraseVariantId[] = [
+  'normal',
+  'passphrase_empty',
+  'passphrase_1',
+  'passphrase_2',
+];
 
-/** Automation test configuration */
+export type TestSuiteType = 'deviceFlow' | 'sdkAddressBatch' | 'sdkPubkeyBatch';
+
+export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description: string }> = {
+  deviceFlow: { label: 'Device Flow', description: 'PhonePilot 设备端创建/导入流程执行是否成功' },
+  sdkAddressBatch: {
+    label: 'SDK Address Batch',
+    description: '仅导入助记词场景执行地址结果核对',
+  },
+  sdkPubkeyBatch: {
+    label: 'SDK Pubkey Batch',
+    description: '仅导入助记词场景执行公钥结果核对',
+  },
+};
+
+export type AutomationScenarioId =
+  | 'ok26053_bip39_create_12'
+  | 'ok26053_bip39_create_18'
+  | 'ok26053_bip39_create_24'
+  | 'ok26054_bip39_import_12'
+  | 'ok26054_bip39_import_12_two'
+  | 'ok26054_bip39_import_12_three'
+  | 'ok26054_bip39_import_18'
+  | 'ok26054_bip39_import_18_two'
+  | 'ok26054_bip39_import_18_three'
+  | 'ok26054_bip39_import_24'
+  | 'ok26054_bip39_import_24_two'
+  | 'ok26054_bip39_import_24_three'
+  | 'ok5504_slip39_create_20_1of1'
+  | 'ok5504_slip39_create_20_2of2'
+  | 'ok5504_slip39_create_20_8of8'
+  | 'ok5504_slip39_create_20_16of2'
+  | 'ok40090_slip39_import_20_1of1'
+  | 'ok40090_slip39_import_20_3of2'
+  | 'ok40090_slip39_import_20_16of16'
+  | 'ok40090_slip39_import_33_1of1'
+  | 'ok40090_slip39_import_33_2of3';
+
+export type Slip39DatasetId =
+  | 'count20_one'
+  | 'count20_two'
+  | 'count20_three'
+  | 'count33_one'
+  | 'count33_two';
+
+export interface AutomationScenario {
+  id: AutomationScenarioId;
+  jiraKey: JiraIssueKey;
+  title: string;
+  flowType: 'create' | 'import';
+  walletType: 'bip39' | 'slip39';
+  caseLabel: string;
+  wordCount: number;
+  shareCount?: number;
+  threshold?: number;
+  phonePilotSequenceId: string;
+  supportedSuites: TestSuiteType[];
+  slip39DatasetId?: Slip39DatasetId;
+  bip39ImportMnemonicWords?: string[];
+}
+
 export interface AutomationTestConfig {
-  /** Test suites to run */
+  scenarioIds: AutomationScenarioId[];
   testSuites: TestSuiteType[];
-  /** Mnemonic groups to test */
-  mnemonicGroups: MnemonicGroupId[];
-  /** Passphrase variants to test */
   passphraseVariants: PassphraseVariantId[];
-  /** PhonePilot server URL */
   phonePilotUrl: string;
-  /** Stop on first error */
   stopOnFirstError: boolean;
-  /** Retry count for failed tests */
   retryCount: number;
-  /** Delay between tests in ms */
   delayBetweenTests: number;
 }
 
-/** Test progress state */
 export interface TestProgress {
-  currentMnemonicGroup: MnemonicGroupId | null;
+  currentScenarioId: AutomationScenarioId | null;
+  currentScenarioTitle: string | null;
   currentPassphrase: string | null;
   currentTestSuite: TestSuiteType | null;
   currentTestIndex: number;
   totalTests: number;
-  completedMnemonicGroups: number;
-  totalMnemonicGroups: number;
+  completedScenarios: number;
+  totalScenarios: number;
+  completedSuites: number;
+  totalSuites: number;
   status: 'idle' | 'preparing-device' | 'running' | 'paused' | 'done' | 'error';
   errorMessage?: string;
 }
 
-/** Test case result */
 export interface TestCaseResult {
-  testName: string;
-  method: string;
-  expected: string;
-  actual: string;
+  title: string;
+  method?: string;
+  expected?: string;
+  actual?: string;
   passed: boolean;
+  skipped?: boolean;
   error?: string;
   duration: number;
+  metadata?: Record<string, string>;
 }
 
-/** Test suite result */
 export interface TestSuiteResult {
+  suiteType: TestSuiteType;
   suiteName: string;
-  mnemonicGroup: MnemonicGroupId;
-  passphrase: string;
+  status: 'passed' | 'failed' | 'skipped';
   totalTests: number;
   passedTests: number;
   failedTests: number;
@@ -208,15 +222,25 @@ export interface TestSuiteResult {
   results: TestCaseResult[];
 }
 
-/** Complete test report */
+export interface ScenarioReportResult {
+  scenarioId: AutomationScenarioId;
+  scenarioTitle: string;
+  jiraKey: JiraIssueKey;
+  flowType: 'create' | 'import';
+  walletType: 'bip39' | 'slip39';
+  caseLabel: string;
+  status: 'passed' | 'failed' | 'skipped';
+  duration: number;
+  suiteResults: TestSuiteResult[];
+}
+
 export interface TestReport {
   startTime: number;
   endTime: number;
   duration: number;
-  totalSuites: number;
-  totalTests: number;
-  passedTests: number;
-  failedTests: number;
-  skippedTests: number;
-  suiteResults: TestSuiteResult[];
+  totalScenarios: number;
+  passedScenarios: number;
+  failedScenarios: number;
+  skippedScenarios: number;
+  scenarioResults: ScenarioReportResult[];
 }

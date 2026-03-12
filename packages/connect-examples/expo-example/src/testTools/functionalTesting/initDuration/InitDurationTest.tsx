@@ -141,7 +141,10 @@ function ExecuteView() {
       await new Promise(resolve => setTimeout(resolve, intervalTime));
       const sdkPromise = async () => {
         try {
-          const res = await sdk[`${method}` as keyof typeof sdk](connectId, requestParams);
+          const sdkMethod = (sdk as unknown as Record<string, (...args: any[]) => Promise<any>>)[
+            method
+          ];
+          const res = await sdkMethod(connectId, requestParams);
           return { payload: res, skipVerify: true };
         } catch (error) {
           console.log('=====>>>>> processRequest error: ', error);

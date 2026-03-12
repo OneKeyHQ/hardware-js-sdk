@@ -66,7 +66,12 @@ export function ExportDeviceInfo() {
   const intl = useIntl();
   const { features, onekeyFeatures } = useDeviceFieldContext();
 
-  const getFieldValue = (field: string) => onekeyFeatures?.[field] ?? features?.[field] ?? '';
+  const getFieldValue = (field: string) => {
+    const onekeyFeatureRecord = onekeyFeatures as Record<string, unknown> | undefined;
+    const featureRecord = features as Record<string, unknown> | undefined;
+
+    return onekeyFeatureRecord?.[field] ?? featureRecord?.[field] ?? '';
+  };
 
   const exportInfo = () => {
     const markdown = [];

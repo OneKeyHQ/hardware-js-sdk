@@ -83,30 +83,7 @@ const SLIP39_CONFIGS: SLIP39TestConfig[] = [
   },
 ];
 
-// 候选密码短语池 - 从 addressTest 中提取的各种 passphrase
-const CANDIDATE_PASSPHRASES = [
-  '12345',
-  'onekey',
-  '#$%^&*()',
-  'jFhC5z@Dk%ya2edpvkECr~qr',
-  "qwertyuiopasdfghjklzxcvbnm1234567890-=[];',./12345",
-  'Passw0rd!@#',
-  '$`%@@`&^~$',
-];
-
-// 随机选择两个不同的密码短语
-function getRandomPassphrases(): { passphrase1: string; passphrase2: string } {
-  const shuffled = [...CANDIDATE_PASSPHRASES].sort(() => Math.random() - 0.5);
-  return {
-    passphrase1: shuffled[0],
-    passphrase2: shuffled[1],
-  };
-}
-
-// 生成密码短语配置（每次生成时随机选择）
 function generatePassphraseConfigs(): SLIP39PassphraseConfig[] {
-  const { passphrase1, passphrase2 } = getRandomPassphrases();
-
   return [
     {
       name: 'normal',
@@ -118,11 +95,11 @@ function generatePassphraseConfigs(): SLIP39PassphraseConfig[] {
     },
     {
       name: 'passphrase_1',
-      passphrase: passphrase1,
+      passphrase: '12345',
     },
     {
       name: 'passphrase_2',
-      passphrase: passphrase2,
+      passphrase: 'onekey',
     },
   ];
 }

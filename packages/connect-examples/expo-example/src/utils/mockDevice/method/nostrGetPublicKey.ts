@@ -1,6 +1,9 @@
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
-import type { NostrGetPublicKeyParams } from '@onekeyfe/hd-core';
+type NostrGetPublicKeyParams = {
+  path: string | number[];
+  showOnOneKey?: boolean;
+};
 
 /**
  * 抽离的核心逻辑：从 seed 生成 Nostr 公钥

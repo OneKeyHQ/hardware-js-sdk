@@ -1,25 +1,25 @@
 import { convertTestBatchData, convertTestSingleData } from '../utils';
-import normal12 from './normal12';
-import passphrase12Empty from './passphrase12_empty';
-import passphrase121 from './passphrase12_1';
-import passphrase122 from './passphrase12_2';
+import normal from './normal';
+import passphraseEmpty from './passphrase_empty';
+import passphrase1 from './passphrase_1';
+import passphrase2 from './passphrase_2';
 
 export const singlePubkeyTestCount12Three = [
   {
-    ...convertTestSingleData(normal12, {
+    ...convertTestSingleData(normal, {
       getOnlyOne: true,
     }),
     name: 'three-normal-12-only-one',
   },
-  convertTestSingleData(normal12),
-  convertTestSingleData(passphrase12Empty),
-  convertTestSingleData(passphrase121),
-  convertTestSingleData(passphrase122),
+  convertTestSingleData(normal),
+  convertTestSingleData(passphraseEmpty),
+  convertTestSingleData(passphrase1),
+  convertTestSingleData(passphrase2),
 ];
 
 export const batchPubkeyTestCount12Three = [
-  convertTestBatchData(normal12),
-  convertTestBatchData(passphrase12Empty),
-  convertTestBatchData(passphrase121),
-  convertTestBatchData(passphrase122),
+  convertTestBatchData(normal),
+  convertTestBatchData(passphraseEmpty),
+  convertTestBatchData(passphrase1),
+  convertTestBatchData(passphrase2),
 ];

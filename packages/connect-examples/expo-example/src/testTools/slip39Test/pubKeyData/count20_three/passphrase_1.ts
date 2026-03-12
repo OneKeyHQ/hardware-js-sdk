@@ -1,189 +1,162 @@
 import type { SLIP39TestCaseData } from '../../types';
 
 export const count20ThreePassphrase1: SLIP39TestCaseData = {
-  id: 'count20_three_passphrase_1',
-  name: 'count20_three_passphrase_1',
-  description: '16-of-16 (20 words each) + passphrase_1',
-  passphrase: 'onekey',
-  shares: [
-    'platform helpful academic afraid custody blind shaft burning visual prune knit clay mason genuine march crisis smug wits woman taught',
-    'platform helpful academic alto armed theory alpha paces welcome quick quiet device craft strike chemical ocean briefing space phantom legal',
-    'platform helpful academic anxiety cage sympathy dramatic western acrobat transfer oral spew package style scroll pajamas curious grant center alto',
-    'platform helpful academic award cards category salt guest pharmacy devote pistol focus identify infant evoke recall shaft empty hazard romantic',
-    'platform helpful academic bike clogs estate duke thank bolt floral race phrase preach seafood strategy industry crowd length grant yield',
-    'platform helpful academic bracelet clock daughter memory visitor result blanket garbage starting speak clay junction pitch ladybug jacket fluff ultimate',
-    'platform helpful academic burning credit install sidewalk level museum evening permit duke cards findings aunt document improve woman general august',
-    'platform helpful academic carve ajar edge similar glance darkness random envelope glen ancestor gums view venture wealthy learn ivory exotic',
-    'platform helpful academic class depend gather story empty harvest overall craft leaves nuclear reject kernel that temple width presence speak',
-    'platform helpful academic company adequate western resident dismiss mortgage emperor coastal sack example ancestor mason length mama timber rhythm buyer',
-    'platform helpful academic crucial domain bedroom violence mental multiple language sympathy grin beaver salt excuse pants worthy vegan prepare unfold',
-    'platform helpful academic deadline crush depart thank pregnant treat salon ambition miracle sidewalk speak practice taxi soldier scholar vitamins junk',
-    'platform helpful academic deploy chemical afraid justice undergo deny excuse famous entrance scene early photo glance salon platform wildlife ladle',
-    'platform helpful academic diploma cricket trend loud replace rapids payment paces theory easel spine cultural dictate hormone necklace blimp exact',
-    'platform helpful academic dragon company true volume carve dough endorse force plot cinema remember skin transfer criminal hunting axle mayor',
-    'platform helpful academic easel deadline evil museum spill funding muscle retreat smart timely oven transfer grownup deal armed merchant flash',
+  "id": "count20_three_passphrase_1",
+  "name": "count20_three_passphrase_1",
+  "description": "16-of-16 (20 words each) + passphrase_1",
+  "passphrase": "12345",
+  "shares": [
+    "platform helpful academic afraid custody blind shaft burning visual prune knit clay mason genuine march crisis smug wits woman taught",
+    "platform helpful academic alto armed theory alpha paces welcome quick quiet device craft strike chemical ocean briefing space phantom legal",
+    "platform helpful academic anxiety cage sympathy dramatic western acrobat transfer oral spew package style scroll pajamas curious grant center alto",
+    "platform helpful academic award cards category salt guest pharmacy devote pistol focus identify infant evoke recall shaft empty hazard romantic",
+    "platform helpful academic bike clogs estate duke thank bolt floral race phrase preach seafood strategy industry crowd length grant yield",
+    "platform helpful academic bracelet clock daughter memory visitor result blanket garbage starting speak clay junction pitch ladybug jacket fluff ultimate",
+    "platform helpful academic burning credit install sidewalk level museum evening permit duke cards findings aunt document improve woman general august",
+    "platform helpful academic carve ajar edge similar glance darkness random envelope glen ancestor gums view venture wealthy learn ivory exotic",
+    "platform helpful academic class depend gather story empty harvest overall craft leaves nuclear reject kernel that temple width presence speak",
+    "platform helpful academic company adequate western resident dismiss mortgage emperor coastal sack example ancestor mason length mama timber rhythm buyer",
+    "platform helpful academic crucial domain bedroom violence mental multiple language sympathy grin beaver salt excuse pants worthy vegan prepare unfold",
+    "platform helpful academic deadline crush depart thank pregnant treat salon ambition miracle sidewalk speak practice taxi soldier scholar vitamins junk",
+    "platform helpful academic deploy chemical afraid justice undergo deny excuse famous entrance scene early photo glance salon platform wildlife ladle",
+    "platform helpful academic diploma cricket trend loud replace rapids payment paces theory easel spine cultural dictate hormone necklace blimp exact",
+    "platform helpful academic dragon company true volume carve dough endorse force plot cinema remember skin transfer criminal hunting axle mayor",
+    "platform helpful academic easel deadline evil museum spill funding muscle retreat smart timely oven transfer grownup deal armed merchant flash"
   ],
-  data: [
+  "data": [
     {
-      method: 'btcGetPublicKey',
-      name: 'btcGetPublicKey-Legacy',
-      params: {
-        path: "m/44'/0'/$$INDEX$$'/0/0",
-        coin: 'btc',
+      "method": "btcGetPublicKey",
+      "name": "btcGetPublicKey-Legacy",
+      "params": {
+        "path": "m/44'/0'/$$INDEX$$'/0/0",
+        "coin": "btc"
       },
-      expectedPublicKey: {
-        "m/44'/0'/0'/0/0": '0356688a8c67084ffa53be9f2653711f103b996ddd35fef6d52bf131ef45130066',
-        "m/44'/0'/1'/0/0": '021d147e05d5bce7ef3b97290e2d94f5f5cbe7a6d1958663032c57d9f444f3eb3d',
-        "m/44'/0'/21234567'/0/0":
-          '028957384c110d555cbc943c6934c1e9f0f129db65265b1b42620a0ca05945dd11',
-        "m/44'/0'/2147483646'/0/0":
-          '03e31bb50650875e3e4659aa8d7ea0f3520fe6d2bea1ed48998288562b15658a72',
-        "m/44'/0'/2147483647'/0/0":
-          '02d79c1a6f72155356a8fc926d7a06ce14c54eb13ce27facea76d62960121ee167',
-      },
+      "expectedPublicKey": {
+        "m/44'/0'/0'/0/0": "038a5f5a8cab1f0d972c3dcb61f9972a244f8568bc730361293c288bb9b2d9c5c9",
+        "m/44'/0'/1'/0/0": "036981a04faa3374c5701b52c79bcbd89082b2d8f5ec63c500c2d5a4508ce7b95e",
+        "m/44'/0'/21234567'/0/0": "027d250eb33485e67c118ecc51aa2c435f7606a60677f55b06f3a44d8186b1df98",
+        "m/44'/0'/2147483646'/0/0": "030e3a99dc65addc2322a6550834a8b8d49ce7de1ee12a91cdbeac5c1b74aef693",
+        "m/44'/0'/2147483647'/0/0": "0321e6f86bd76b8ad93280658a70f3d6a68ca68b010e45a087f0efe01d3ecd5dd5"
+      }
     },
     {
-      method: 'btcGetPublicKey',
-      name: 'btcGetPublicKey-Nested SegWit',
-      params: {
-        path: "m/49'/0'/$$INDEX$$'/0/0",
-        coin: 'btc',
-        scriptType: 'SPENDP2SHWITNESS',
+      "method": "btcGetPublicKey",
+      "name": "btcGetPublicKey-Nested SegWit",
+      "params": {
+        "path": "m/49'/0'/$$INDEX$$'/0/0",
+        "coin": "btc",
+        "scriptType": "SPENDP2SHWITNESS"
       },
-      expectedPublicKey: {
-        "m/49'/0'/0'/0/0": '03eccc59d5f5fa7698fbf7591e2279478b092154d60983c4e0261520945843dfff',
-        "m/49'/0'/1'/0/0": '038c7bcedc2c9bb90c9eb5f0c7ae8492db1dadee901695bad959f4ce3ea089e248',
-        "m/49'/0'/21234567'/0/0":
-          '0344f3131842f6ed4f18d1f0adb57530ceb200f4d91924135419ff8047d75f8d78',
-        "m/49'/0'/2147483646'/0/0":
-          '02b3e0e35cb34c0346c30ab5e2801e66a79bdf9790a3ef470224d47bd56848f8c8',
-        "m/49'/0'/2147483647'/0/0":
-          '02b652e6d915aef0f22fa15d1e5bf56322e1509928bb597d29619db94eeff51f56',
-      },
+      "expectedPublicKey": {
+        "m/49'/0'/0'/0/0": "02c9653bcb33dce181579f625734c94eb97e6a10df0fa4958df9a3e686e9c456e5",
+        "m/49'/0'/1'/0/0": "03c22ebda44dca847a6bb181c5f1cd079a85512ff42128f9586dadf24dce7d059a",
+        "m/49'/0'/21234567'/0/0": "022d214fc9bc74868e5d42113b550f5cd1e5c1c93b170e19aa1d6c7cf68217a7dc",
+        "m/49'/0'/2147483646'/0/0": "028369dbc217758e378f2efa8f5506cd71fb9774d8779cdc8e66398c542d69e8f1",
+        "m/49'/0'/2147483647'/0/0": "02c7286a49e361aa63a2b861c9fb919fc579fec0c43fbca1c9ef8a955c7ab8c9b6"
+      }
     },
     {
-      method: 'btcGetPublicKey',
-      name: 'btcGetPublicKey-Native SegWit',
-      params: {
-        path: "m/84'/0'/$$INDEX$$'/0/0",
-        coin: 'btc',
-        scriptType: 'SPENDWITNESS',
+      "method": "btcGetPublicKey",
+      "name": "btcGetPublicKey-Native SegWit",
+      "params": {
+        "path": "m/84'/0'/$$INDEX$$'/0/0",
+        "coin": "btc",
+        "scriptType": "SPENDWITNESS"
       },
-      expectedPublicKey: {
-        "m/84'/0'/0'/0/0": '03df4862ebefd7284c318b61c02194d2ab4636a42e10d90d642516684e1d71286c',
-        "m/84'/0'/1'/0/0": '03e3d395f9661004d7149641793affe914afee92b4825dbc72da1b8960f9559215',
-        "m/84'/0'/21234567'/0/0":
-          '024ce2f9f67af4d17f0c8c681e787379706668dabc60faa3a1bc7938ba4a16a6ca',
-        "m/84'/0'/2147483646'/0/0":
-          '031359812abd98a50524efd6776d5aa6f55c2b45fdc7c0253992ac0ec04e85f6e8',
-        "m/84'/0'/2147483647'/0/0":
-          '02e33eb999f99ddfd8ec8c5badb9787d7a667816f455e09ff3abd53194e40c437d',
-      },
+      "expectedPublicKey": {
+        "m/84'/0'/0'/0/0": "030d898772dcf65f597831d05ef8139c4656bdbf43fb61bbdd5408c9a562d5759a",
+        "m/84'/0'/1'/0/0": "035737728fd41a2e4293a04b7255ea22f571796c1056bd39650e3c49728f4d0298",
+        "m/84'/0'/21234567'/0/0": "028fe47d7fdfbb30146b0d8bda2e0c44e41a98784bea0619f2ee1651ae5d1e71f5",
+        "m/84'/0'/2147483646'/0/0": "03cbbd5324ce9ea2bf29009b115d50e520a7a1a8fa5e3da3b6860f24f3c45a25ec",
+        "m/84'/0'/2147483647'/0/0": "036467aa286c7f1ef2bab75696111be63d86febbfd25dddc940504051470039f1f"
+      }
     },
     {
-      method: 'btcGetPublicKey',
-      name: 'btcGetPublicKey-Taproot',
-      params: {
-        path: "m/86'/0'/$$INDEX$$'/0/0",
-        coin: 'btc',
-        scriptType: 'SPENDTAPROOT',
+      "method": "btcGetPublicKey",
+      "name": "btcGetPublicKey-Taproot",
+      "params": {
+        "path": "m/86'/0'/$$INDEX$$'/0/0",
+        "coin": "btc",
+        "scriptType": "SPENDTAPROOT"
       },
-      expectedPublicKey: {
-        "m/86'/0'/0'/0/0": '02727fe10fc10670b4bdcda80a6cc25bd8984f241f1765159a67e10702b7629b25',
-        "m/86'/0'/1'/0/0": '02c8f11c62bd99783e3328a0fae0c1be56bdbeb6c18f60c4d24ef9b161eaf0e7e0',
-        "m/86'/0'/21234567'/0/0":
-          '0329db8072ed6c21c651c51f967428751b5d957ef4e9d6eca42711f0d2bed52304',
-        "m/86'/0'/2147483646'/0/0":
-          '02bd10d34744503818812ceb7f43b8ebbd73f3d73e41a858fde79c2f1898411e5b',
-        "m/86'/0'/2147483647'/0/0":
-          '020f01959e7273e31b2f92325ac52c2cd5f04c35114cfa720fdeed2d8bf64dee3c',
-      },
+      "expectedPublicKey": {
+        "m/86'/0'/0'/0/0": "02b7cd15a7099c70f1217fbf0adafedae46e30abb2dcd222340701dc4e63bc7519",
+        "m/86'/0'/1'/0/0": "03e38d3a9a3d482a354236426673718c3e8d4edce2058e348622384daae0f5f22c",
+        "m/86'/0'/21234567'/0/0": "022e3555e43febc25f80991167ca9dabbf96a9b302d13ab805c26198e834000ba9",
+        "m/86'/0'/2147483646'/0/0": "036039d0f2e61c641237a0690c8415ee84bd7df6bab716f25a64146d98e69b440f",
+        "m/86'/0'/2147483647'/0/0": "02aac7a8100b41ee495c94fceb6a9c552d96ceb9270af0e6392ab80dd816435653"
+      }
     },
     {
-      method: 'evmGetPublicKey',
-      name: 'evmGetPublicKey-Ethereum',
-      params: {
-        path: "m/44'/60'/$$INDEX$$'/0/0",
+      "method": "evmGetPublicKey",
+      "name": "evmGetPublicKey-Ethereum",
+      "params": {
+        "path": "m/44'/60'/$$INDEX$$'/0/0"
       },
-      expectedPublicKey: {
-        "m/44'/60'/0'/0/0": '0x038f20805ab8990d709a10c82198a64cf1664c63384c9a5ee5bb2b0796fd3e3e28',
-        "m/44'/60'/1'/0/0": '0x03ad4e51562da8084dee4e636ec6adfc6b646fd41c88a1ba738e5147c285641b92',
-        "m/44'/60'/21234567'/0/0":
-          '0x031db49ca6a3e3fa61a53ec64cfac8519a7c7609e8ec3f812ab7341b8faa45f470',
-        "m/44'/60'/2147483646'/0/0":
-          '0x03fe778c08f8d3c6c76a47d9a7a5a4999b1f13ecadd030efcc1ba6676fa8ea60e7',
-        "m/44'/60'/2147483647'/0/0":
-          '0x02d7b03289c1c0095c1e4117ac4e25f18328e0413adbd577c599ba8798a5b2abee',
-      },
+      "expectedPublicKey": {
+        "m/44'/60'/0'/0/0": "0x0343dbb11709dc0fca56fe0f901f15af4333728563e89dd077dba3df76920a5843",
+        "m/44'/60'/1'/0/0": "0x02960c087e1e2d1b78b21453897bd0eadef4ecbe9b6069dc1838620b009cb809a0",
+        "m/44'/60'/21234567'/0/0": "0x030ad67e36315f1b7a610e52d0f044072d27bd9a36fd40bf5925b54da430072e01",
+        "m/44'/60'/2147483646'/0/0": "0x038dd4e27dbf8216b46acf43ea7559bda9aeb6b4f80b9d783931583568da5ba40b",
+        "m/44'/60'/2147483647'/0/0": "0x03bd5d253750a122591b6662ac49c19d437018945a7e50e4bf096703fa267b3be9"
+      }
     },
     {
-      method: 'cosmosGetPublicKey',
-      name: 'cosmosGetPublicKey-cosmos',
-      params: {
-        hrp: 'cosmos',
-        path: "m/44'/118'/$$INDEX$$'/0/0",
+      "method": "cosmosGetPublicKey",
+      "name": "cosmosGetPublicKey-cosmos",
+      "params": {
+        "hrp": "cosmos",
+        "path": "m/44'/118'/$$INDEX$$'/0/0"
       },
-      expectedPublicKey: {
-        "m/44'/118'/0'/0/0": '0288d7d13214d85ba36cd9655ce7e4ca371c6bdc877d9a9eea36ada268fca34465',
-        "m/44'/118'/1'/0/0": '0394ef29e6af2a0ab8d7060ff1952c57e7f71a236d72472aeaa2ee18124d06ace2',
-        "m/44'/118'/21234567'/0/0":
-          '0287f43073ed8a1756a20fab826bde36442a0c94335bb2d2d894ea58adfa5c3fe7',
-        "m/44'/118'/2147483646'/0/0":
-          '029fa60102da0e2d9191c285af7e506e18a6c1d1895f456ff6370e43a9416671cb',
-        "m/44'/118'/2147483647'/0/0":
-          '02baf478eebe8df992baaaf09f68a85ba04d74954ac511f23b12f1d61b7f0115c7',
-      },
+      "expectedPublicKey": {
+        "m/44'/118'/0'/0/0": "02222e1fd25ff9e5572bd2ee395ba30c824f97ef5ed72d100427cb344f0de3e9ef",
+        "m/44'/118'/1'/0/0": "033548e7a331ef1738706474ff80b4b2d323b7933e94b076fcf5558a66647715be",
+        "m/44'/118'/21234567'/0/0": "02dda997d53ca03e964814429e7fbbba8980d336044b607667fa796b0a4ccb9853",
+        "m/44'/118'/2147483646'/0/0": "037eaaf2ce5a90f48562cc4463800fefb4e367f6d5cd9364702084d7f797ea3743",
+        "m/44'/118'/2147483647'/0/0": "03718fdb4ff97e6b86c847ea5dc2c9f0fd6140477493e122637878ba5e3cc1f839"
+      }
     },
     {
-      method: 'suiGetPublicKey',
-      name: 'suiGetPublicKey',
-      params: {
-        path: "m/44'/784'/$$INDEX$$'/0'/0'",
+      "method": "suiGetPublicKey",
+      "name": "suiGetPublicKey",
+      "params": {
+        "path": "m/44'/784'/$$INDEX$$'/0'/0'"
       },
-      expectedPublicKey: {
-        "m/44'/784'/0'/0'/0'": '00a4aaeaaf7121348e571e6f5456904ab125d4c06af0b55329de54173ee7b8f3c6',
-        "m/44'/784'/1'/0'/0'": '007089dd807c52488b4841c3add304ed2152462c9952212f4e4d743c4470502337',
-        "m/44'/784'/21234567'/0'/0'":
-          '000273b21eb768d8c1e27a3e078786c5602474aef6190c428693d608ab29106741',
-        "m/44'/784'/2147483646'/0'/0'":
-          '000d82b61e5c8b46d78bf7fe23e0e967e73c7adc6244c2875ed2276c60735f4b7e',
-        "m/44'/784'/2147483647'/0'/0'":
-          '0012b1259ffea08ae7653b62d7dac7b1c396d8421b07e4c8698b72ed80dd1ac41d',
-      },
+      "expectedPublicKey": {
+        "m/44'/784'/0'/0'/0'": "00aebf8272fdac41d5822b13274c05a31761eb8da454aa9d3df8114cd3a59b0bce",
+        "m/44'/784'/1'/0'/0'": "00c41809bee42d6cb8f5fe664909c38e152956dd5fc748053902901d418473521c",
+        "m/44'/784'/21234567'/0'/0'": "00c42e6ed1ff52e91c55ab383f398ae548cf66783b03f31ef421f2de6d40e6ea43",
+        "m/44'/784'/2147483646'/0'/0'": "006a3b6f3445be3dde993ab1986fcb6b84c058284b23041f26d590a24d4ffd81f0",
+        "m/44'/784'/2147483647'/0'/0'": "00d58506810d93619b5f0a252d5d0fddc3e7787bfaa465112d1bf358aa6f0d5ff9"
+      }
     },
     {
-      method: 'aptosGetPublicKey',
-      name: 'aptosGetPublicKey',
-      params: {
-        path: "m/44'/637'/$$INDEX$$'/0'/0'",
+      "method": "aptosGetPublicKey",
+      "name": "aptosGetPublicKey",
+      "params": {
+        "path": "m/44'/637'/$$INDEX$$'/0'/0'"
       },
-      expectedPublicKey: {
-        "m/44'/637'/0'/0'/0'": '022c3d08691444d49808e507894c568024a7e7f3a1bea88213cfca93b5663919',
-        "m/44'/637'/1'/0'/0'": 'e668c52e3983985bdffc3a1f44db083b54f7140f4620dbef7c981003a637f923',
-        "m/44'/637'/21234567'/0'/0'":
-          '67c2bfa1a9e8008ce2f1468db336826f3cfa16d27e4c9377a86b3ca127f4d059',
-        "m/44'/637'/2147483646'/0'/0'":
-          '8f6f9835e142c4a2ed28980757f35498994fb4fe611736248bd49789258fd81a',
-        "m/44'/637'/2147483647'/0'/0'":
-          'afda99b5c655bfb55e0da4d44b6c3c2da4cd6a8d28dc37cfe3bef6f92dfbfb19',
-      },
+      "expectedPublicKey": {
+        "m/44'/637'/0'/0'/0'": "c032d0586bfef49345e293fde436813637c7b97adbe92c9aa4f5ce3e6f319043",
+        "m/44'/637'/1'/0'/0'": "50c3f9d400374a300ef820cff7c49a6e4ea16cd9e1b995610e04317068699397",
+        "m/44'/637'/21234567'/0'/0'": "103086a0bd0c163195eb333d29b2749d494818ff0ebf69f3d06fdf80f32b2c42",
+        "m/44'/637'/2147483646'/0'/0'": "19a3ce975d1fd0a1d74462b72f89091a1ec1b54d9cf15e2bc47aecb1e08a1de0",
+        "m/44'/637'/2147483647'/0'/0'": "a538629b8f74e680fc578756a9622cd67bd5c53407cc31589c58ca0339e923ba"
+      }
     },
     {
-      method: 'nostrGetPublicKey',
-      name: 'nostrGetPublicKey',
-      params: {
-        path: "m/44'/1237'/$$INDEX$$'/0/0",
+      "method": "nostrGetPublicKey",
+      "name": "nostrGetPublicKey",
+      "params": {
+        "path": "m/44'/1237'/$$INDEX$$'/0/0"
       },
-      expectedPublicKey: {
-        "m/44'/1237'/0'/0/0": '1edb159f21d7939454c8ccf8f74af3662e14e7e451f18a20431072d951e06499',
-        "m/44'/1237'/1'/0/0": '3c7aa65f16034d79b90b4ca404d7e6d394be807a4bc3e763a323b0addb64c7ff',
-        "m/44'/1237'/21234567'/0/0":
-          '846a3db69b2e29d3b0498bdd5341aefe5052cfe8b175ac9a65d30e2e0b6bd14d',
-        "m/44'/1237'/2147483646'/0/0":
-          'f24daaed21e9694e1af9ba613d8cb61f834eb31cae89e4fe47c7d94f3be82979',
-        "m/44'/1237'/2147483647'/0/0":
-          '8c8530a839eed5ce0bd0de29fef0a44071617a51bce007cf7b5a241cdcd325de',
-      },
-    },
-  ],
+      "expectedPublicKey": {
+        "m/44'/1237'/0'/0/0": "9a0313b8513df65cb869a35083fec37c3a80761f6d91ed8b2e24f90674d354b4",
+        "m/44'/1237'/1'/0/0": "9e84f801800c56bdb9edc112f24d9282a8fa09ac44aa40ad2514a2670792be62",
+        "m/44'/1237'/21234567'/0/0": "b8a58d1d4e68999936074f5a7d7563e79512fee0fda99ccdf94a74c7508ff3d1",
+        "m/44'/1237'/2147483646'/0/0": "2bb24de2ab08b2e074b4089dc6a8ba23138551dcddc30547a69410b9bf988a3d",
+        "m/44'/1237'/2147483647'/0/0": "d095df76249786a9bef2d78548c0628a270e90301095ba46745d4e07ca49d630"
+      }
+    }
+  ]
 };
