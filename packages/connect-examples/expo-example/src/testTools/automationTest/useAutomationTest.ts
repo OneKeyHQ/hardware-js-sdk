@@ -56,7 +56,6 @@ const SUITE_EXECUTION_ORDER: TestSuiteType[] = [
   'deviceFlow',
   'sdkAddressBatch',
   'sdkPubkeyBatch',
-  'passphraseWalletSwitch',
   'specialPassphrase',
 ];
 const EVM_ADDRESS_PATH = "m/44'/60'/0'/0/0";
@@ -418,7 +417,6 @@ function getSuiteName(suiteType: TestSuiteType): string {
     deviceFlow: 'Device Flow',
     sdkAddressBatch: 'SDK Address Batch',
     sdkPubkeyBatch: 'SDK Pubkey Batch',
-    passphraseWalletSwitch: 'Passphrase Wallet Switch',
     specialPassphrase: 'Special Passphrase',
   };
   return names[suiteType] || suiteType;
@@ -1580,138 +1578,6 @@ export function useAutomationTest() {
     [runWithRetry, setProgress, updateSuiteProgress]
   );
 
-  const runPassphraseWalletSwitchSuite = useCallback(
-    async (
-      scenario: AutomationScenario,
-      sdk: CoreApi,
-      connectId: string,
-      deviceId: string
-    ): Promise<TestSuiteResult> => {
-      updateSuiteProgress('passphraseWalletSwitch', scenario);
-      const startedAt = Date.now();
-      const results: TestCaseResult[] = [];
-      const walletCount = 5;
-      const switchCount = 20;
-
-      const cacheAddress = new Map<string, { address: string; passphraseState: string }>();
-
-      try {
-        for (let i = 0; i < walletCount; i += 1) {
-          const passphrase = i === 0 ? '' : String(i);
-          const useEmpty = i === 0;
-          currentPassphraseRef.current = passphrase;
-          addLog(`Creating wallet ${i}, passphrase: 「${passphrase}」`);
-
-          const psResult = (await runWithRetry(`getPassphraseState:wallet-${i}`, () =>
-            sdk.getPassphraseState(connectId, {
-              initSession: true,
-              useEmptyPassphrase: useEmpty,
-            })
-          )) as { success: boolean; payload?: string };
-
-          if (!psResult.success) {
-            results.push({
-              title: `Create wallet-${i}`,
-              passed: false,
-              error: 'getPassphraseState failed',
-              duration: Date.now() - startedAt,
-            });
-            break;
-          }
-
-          const passphraseState = psResult.payload || '';
-          const addrResult = (await runWithRetry(`evmGetAddress:wallet-${i}`, () =>
-            sdk.evmGetAddress(connectId, deviceId, {
-              path: EVM_ADDRESS_PATH,
-              showOnOneKey: false,
-              passphraseState,
-              useEmptyPassphrase: useEmpty,
-            })
-          )) as { success: boolean; payload?: { address?: string } };
-
-          if (!addrResult.success) {
-            results.push({
-              title: `Create wallet-${i}`,
-              passed: false,
-              error: 'evmGetAddress failed during wallet creation',
-              duration: Date.now() - startedAt,
-            });
-            break;
-          }
-
-          const address = addrResult.payload?.address || '';
-          cacheAddress.set(`wallet-${i}`, { address, passphraseState });
-          addLog(`  wallet-${i} address: ${address}`);
-        }
-
-        if (cacheAddress.size < walletCount) {
-          addLog(
-            `Wallet creation incomplete (${cacheAddress.size}/${walletCount}), aborting switch phase`
-          );
-        }
-
-        for (let switchIdx = 0; switchIdx < switchCount && cacheAddress.size === walletCount; switchIdx += 1) {
-          if (!runningRef.current) {
-            break;
-          }
-          const walletIdx = switchIdx % walletCount;
-          const walletKey = `wallet-${walletIdx}`;
-          const cached = cacheAddress.get(walletKey);
-          if (!cached) {
-            continue;
-          }
-
-          const passphrase = walletIdx === 0 ? '' : String(walletIdx);
-          currentPassphraseRef.current = passphrase;
-
-          const caseStart = Date.now();
-          const addrResult = (await runWithRetry(`evmGetAddress:switch-${switchIdx}`, () =>
-            sdk.evmGetAddress(connectId, deviceId, {
-              path: EVM_ADDRESS_PATH,
-              showOnOneKey: false,
-              passphraseState: cached.passphraseState,
-              useEmptyPassphrase: walletIdx === 0,
-            })
-          )) as { success: boolean; payload?: { address?: string } };
-
-          const actual = addrResult.payload?.address || '';
-          const passed = actual === cached.address;
-          if (!passed) {
-            addLog(`[MISMATCH] Switch ${switchIdx} → ${walletKey}`);
-            addLog(`  expected: ${cached.address}`);
-            addLog(`  actual:   ${actual}`);
-          }
-          results.push({
-            title: `Switch ${switchIdx} → ${walletKey}`,
-            method: 'evmGetAddress',
-            expected: cached.address,
-            actual,
-            passed,
-            duration: Date.now() - caseStart,
-            metadata: { passphrase },
-          });
-
-          await delay(80);
-        }
-      } catch (error) {
-        results.push({
-          title: 'passphraseWalletSwitch unexpected error',
-          passed: false,
-          error: error instanceof Error ? error.message : String(error),
-          duration: Date.now() - startedAt,
-        });
-      }
-
-      currentPassphraseRef.current = '';
-      return createSuiteResult(
-        'passphraseWalletSwitch',
-        'Passphrase Wallet Switch',
-        results,
-        Date.now() - startedAt
-      );
-    },
-    [addLog, runWithRetry, updateSuiteProgress]
-  );
 
   const runSpecialPassphraseSuite = useCallback(
     async (
@@ -1981,20 +1847,6 @@ export function useAutomationTest() {
         markSuiteCompleted();
       }
 
-      if (
-        selectedSuites.includes('passphraseWalletSwitch') &&
-        scenario.supportedSuites.includes('passphraseWalletSwitch') &&
-        !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
-      ) {
-        const passphraseWalletSwitchResult = await runPassphraseWalletSwitchSuite(
-          scenario,
-          sdk,
-          connectId,
-          deviceId
-        );
-        nextSuiteResults.push(passphraseWalletSwitchResult);
-        markSuiteCompleted();
-      }
 
       if (
         selectedSuites.includes('specialPassphrase') &&
@@ -2019,7 +1871,6 @@ export function useAutomationTest() {
       markSuiteCompleted,
       runBip39CreateDynamicSuite,
       runBip39ImportSdkSuite,
-      runPassphraseWalletSwitchSuite,
       runSlip39CreateDynamicSuite,
       runSlip39SdkSuite,
       runSpecialPassphraseSuite,

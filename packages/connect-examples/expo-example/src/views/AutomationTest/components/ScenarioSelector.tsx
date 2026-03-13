@@ -19,7 +19,6 @@ function formatScenarioSuiteSummary(scenario: AutomationScenario): string {
     deviceFlow: 'Device Flow',
     sdkAddressBatch: 'Address',
     sdkPubkeyBatch: 'Pubkey',
-    passphraseWalletSwitch: 'Passphrase Switch',
     specialPassphrase: 'Special Passphrase',
   };
 

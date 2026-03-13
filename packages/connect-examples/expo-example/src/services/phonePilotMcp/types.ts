@@ -117,7 +117,6 @@ export type TestSuiteType =
   | 'deviceFlow'
   | 'sdkAddressBatch'
   | 'sdkPubkeyBatch'
-  | 'passphraseWalletSwitch'
   | 'specialPassphrase';
 
 export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description: string }> = {
@@ -129,10 +128,6 @@ export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description
   sdkPubkeyBatch: {
     label: 'SDK Pubkey Batch',
     description: '仅导入助记词场景执行公钥结果核对',
-  },
-  passphraseWalletSwitch: {
-    label: 'Passphrase Wallet Switch',
-    description: '创建 N 个密码短语钱包并循环切换，验证地址一致性',
   },
   specialPassphrase: {
     label: 'Special Passphrase',

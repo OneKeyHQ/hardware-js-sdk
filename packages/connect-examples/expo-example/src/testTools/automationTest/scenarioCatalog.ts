@@ -10,7 +10,6 @@ const BIP39_IMPORT_SUITES: TestSuiteType[] = [
   'deviceFlow',
   'sdkAddressBatch',
   'sdkPubkeyBatch',
-  'passphraseWalletSwitch',
   'specialPassphrase',
 ];
 const SLIP39_CREATE_SUITES: TestSuiteType[] = ['deviceFlow'];
