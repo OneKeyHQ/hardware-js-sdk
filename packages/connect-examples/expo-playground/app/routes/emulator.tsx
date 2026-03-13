@@ -367,7 +367,7 @@ const EmulatorPage: React.FC = () => {
               {/* 当前步骤信息和资源链接 */}
               <div className="text-center">
                 <p className="text-slate-500 dark:text-slate-400 text-sm mb-3">
-                  第 {currentStep + 1} 步，共 {steps.length} 步
+                  {t('emulator.stepProgress', { current: currentStep + 1, total: steps.length })}
                 </p>
 
                 {/* 开发资源快捷链接 */}
@@ -379,7 +379,7 @@ const EmulatorPage: React.FC = () => {
                     className="inline-flex items-center space-x-1.5 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors font-medium"
                   >
                     <GitBranch className="h-4 w-4" />
-                    <span>Git仓库</span>
+                    <span>{t('emulator.gitRepo')}</span>
                   </button>
                   <div className="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
                   <button
@@ -392,7 +392,7 @@ const EmulatorPage: React.FC = () => {
                     className="inline-flex items-center space-x-1.5 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors font-medium"
                   >
                     <Code className="h-4 w-4" />
-                    <span>文档</span>
+                    <span>{t('emulator.documentation')}</span>
                   </button>
                 </div>
               </div>
@@ -762,18 +762,17 @@ const EmulatorPage: React.FC = () => {
                           {t('emulator.nextSteps')}
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                          {/* 第一步 */}
                           <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
                             <div className="flex items-center space-x-2 mb-2">
                               <span className="flex items-center justify-center w-5 h-5 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 rounded-full text-xs font-medium">
                                 1
                               </span>
                               <h5 className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                访问模拟器界面
+                                {t('emulator.connectStep1Title')}
                               </h5>
                             </div>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
-                              VNC模式，在浏览器中查看
+                              {t('emulator.connectStep1Desc')}
                             </p>
                             <button
                               onClick={() =>
@@ -782,44 +781,42 @@ const EmulatorPage: React.FC = () => {
                               className="w-full inline-flex items-center justify-center space-x-1 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-md py-2 px-3 transition-colors"
                             >
                               <ExternalLink className="h-3 w-3" />
-                              <span>打开 localhost:6088</span>
+                              <span>{t('emulator.connectStep1Action')}</span>
                             </button>
                           </div>
 
-                          {/* 第二步 */}
                           <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
                             <div className="flex items-center space-x-2 mb-2">
                               <span className="flex items-center justify-center w-5 h-5 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 rounded-full text-xs font-medium">
                                 2
                               </span>
                               <h5 className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                切换连接方式
+                                {t('emulator.connectStep2Title')}
                               </h5>
                             </div>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
-                              在首页选择模拟器传输方式
+                              {t('emulator.connectStep2Desc')}
                             </p>
                             <button
                               onClick={() => navigate('/')}
                               className="w-full inline-flex items-center justify-center space-x-1 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-md py-2 px-3 transition-colors"
                             >
                               <ArrowRight className="h-3 w-3" />
-                              <span>返回首页</span>
+                              <span>{t('emulator.connectStep2Action')}</span>
                             </button>
                           </div>
 
-                          {/* 第三步 */}
                           <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
                             <div className="flex items-center space-x-2 mb-2">
                               <span className="flex items-center justify-center w-5 h-5 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 rounded-full text-xs font-medium">
                                 3
                               </span>
                               <h5 className="text-xs font-medium text-slate-900 dark:text-slate-100">
-                                开始开发测试
+                                {t('emulator.connectStep3Title')}
                               </h5>
                             </div>
                             <p className="text-xs text-slate-600 dark:text-slate-400">
-                              使用完整的硬件钱包功能进行开发和测试
+                              {t('emulator.connectStep3Desc')}
                             </p>
                             <div className="mt-2 flex items-center justify-center">
                               <CheckCircle className="h-4 w-4 text-slate-500 dark:text-slate-400" />

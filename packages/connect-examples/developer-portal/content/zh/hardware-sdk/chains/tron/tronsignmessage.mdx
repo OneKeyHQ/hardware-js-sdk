@@ -16,7 +16,7 @@ const result = await HardwareSDK.tronSignMessage(connectId, deviceId, params);
 
 [**可选通用参数**](../../../core-api-guide#common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
 * `messageHex` - _必需_ `string` 十六进制格式的待签名消息
 * `messageType` - _可选_ `string` TRON 消息签名算法类型。推荐使用 `'v2'` 以获得更好的兼容性和安全性。允许值：`'v1' | 'v2'`。除非有遗留系统约束，否则请使用 `'v2'`。
 

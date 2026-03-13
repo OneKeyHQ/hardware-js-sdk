@@ -6,11 +6,31 @@ export const metadata = {
     default: 'OneKey Developers',
     template: '%s - OneKey Developers'
   },
-  description: 'Official developer documentation for OneKey hardware and software integration.',
+  description: 'Official developer documentation for OneKey hardware and software integration. Build secure Web3 experiences with OneKey hardware wallets.',
   icons: {
     icon: '/icons/onekey.png',
     apple: '/icons/onekey.png',
   },
+  openGraph: {
+    title: 'OneKey Developers',
+    description: 'Official developer documentation for OneKey hardware and software integration. Build secure Web3 experiences with OneKey hardware wallets.',
+    siteName: 'OneKey Developers',
+    type: 'website',
+    images: [{ url: '/og.jpg', width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'OneKey Developers',
+    description: 'Official developer documentation for OneKey hardware and software integration.',
+    creator: '@OneKeyHQ',
+    site: '@OneKeyHQ',
+    images: ['/og.jpg'],
+  },
+  metadataBase: new URL('https://developer.onekey.so'),
+}
+
+export const viewport = {
+  themeColor: '#000000',
 }
 
 export default function RootLayout({ children }) {

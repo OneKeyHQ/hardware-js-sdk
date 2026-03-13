@@ -130,7 +130,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
               className="h-14 rounded-none rounded-bl-lg bg-gray-500 hover:bg-gray-600 text-white transition-all duration-150"
               onClick={handleBackspace}
               disabled={pin.length === 0}
-              title="删除最后一位数字"
+              title={t('pin.cancel', 'Delete last digit')}
             >
               <span className="text-xl">⌫</span>
             </Button>
@@ -150,7 +150,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
               className="h-14 rounded-none rounded-br-lg bg-gray-800 hover:bg-gray-700 text-white transition-all duration-150"
               onClick={handleSubmit}
               disabled={pin.length === 0}
-              title="确认并提交PIN码"
+              title={t('pin.submit', 'Confirm and submit PIN')}
             >
               <span className="text-xl text-white">✓</span>
             </Button>
@@ -161,7 +161,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
             variant="ghost"
             onClick={handleUseDevice}
             className="w-full text-gray-500 hover:text-gray-700 text-base font-medium h-12 px-4 hover:bg-gray-50 rounded-lg transition-all duration-150"
-            title="在硬件设备上直接输入PIN码"
+            title={t('pin.deviceInput', 'Enter PIN on device')}
           >
             {t('pin.deviceInput', 'Enter on device')}
           </Button>

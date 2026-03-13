@@ -789,6 +789,18 @@ export const en = {
       vncModeNote:
         'Cross-platform universal, access emulator interface through browser, no additional configuration required',
       x11ModeNote: 'Linux exclusive, native window display, better performance',
+      stepProgress: 'Step {{current}} of {{total}}',
+      launchVncMode: 'Launch VNC Mode',
+      launchX11Mode: 'Launch X11 Mode',
+      copyAndRunHint: 'Copy and run one of the commands above to start your emulator',
+      connectStep1Title: 'Access Emulator UI',
+      connectStep1Desc: 'VNC mode, view in browser',
+      connectStep1Action: 'Open localhost:6088',
+      connectStep2Title: 'Switch Connection',
+      connectStep2Desc: 'Select emulator transport on homepage',
+      connectStep2Action: 'Go to Homepage',
+      connectStep3Title: 'Start Development',
+      connectStep3Desc: 'Use full hardware wallet features for development and testing',
     },
     components: {
       deviceConnectionAlert: {
