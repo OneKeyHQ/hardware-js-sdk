@@ -166,6 +166,17 @@ const PROVIDER_CHAINS = [
     ]
   },
   {
+    id: 'stellar',
+    name: 'Stellar',
+    icon: 'stellar',
+    pages: [
+      { id: 'index', name: 'Overview', path: '' },
+      { id: 'getting-started', name: 'Getting Started' },
+      { id: 'signing', name: 'Signing' },
+      { id: 'api-reference', name: 'API Reference' },
+    ]
+  },
+  {
     id: 'near',
     name: 'NEAR',
     icon: 'near',

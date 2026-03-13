@@ -1,8 +1,7 @@
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
 type NostrGetPublicKeyParams = {
-  path: string | number[];
-  showOnOneKey?: boolean;
+  path: string | string[];
 };
 
 /**

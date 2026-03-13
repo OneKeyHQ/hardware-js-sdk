@@ -6,7 +6,7 @@ import { miniPlugin } from './mini';
 import { touchPlugin } from './touch';
 import { proPlugin } from './pro';
 
-// 注册所有设备插件
+// Register all device plugins
 compatibilityManager.registerPlugin(classic1sPlugin);
 compatibilityManager.registerPlugin(classicPlugin);
 compatibilityManager.registerPlugin(classicPurePlugin);

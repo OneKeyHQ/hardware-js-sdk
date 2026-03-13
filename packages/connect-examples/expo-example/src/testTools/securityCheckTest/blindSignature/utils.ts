@@ -1,4 +1,5 @@
 import { COINTYPE_MARK, baseParams } from './baseParams';
+import { compatibilityManager } from '../../deviceCompatibility';
 
 import type { TestCaseDataType } from './data';
 import type { SecurityCheckTestCase } from './types';
@@ -31,6 +32,28 @@ export function replaceTemplate(key: string, template: string) {
   }
 
   return path;
+}
+
+/**
+ * 获取设备级别的期望值覆盖
+ */
+export function getDeviceExpected(
+  features: any,
+  method: string,
+  coinType: string,
+  defaultExpected: boolean,
+  testContext?: Record<string, any>
+): boolean {
+  const override = compatibilityManager.getExpectedOverride(
+    features,
+    method,
+    coinType,
+    testContext
+  );
+  if (override !== undefined) {
+    return override;
+  }
+  return defaultExpected;
 }
 
 export function convertTestData(

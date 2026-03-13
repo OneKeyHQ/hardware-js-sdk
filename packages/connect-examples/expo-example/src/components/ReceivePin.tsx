@@ -257,7 +257,7 @@ type IReceivePinProps = {
   onConfirm: (value: string) => void;
   onSwitchDevice: () => void;
   onCancel: () => void;
-  onTestUnexpectedMessage: () => void;
+  onTestUnexpectedMessage?: () => void;
 };
 
 export const ReceivePin = memo<IReceivePinProps>(
@@ -322,7 +322,9 @@ export const ReceivePin = memo<IReceivePinProps>(
               {payload && <Text>payload: {JSON.stringify(payload)}</Text>}
               <PinInputArea />
               <PinActions onConfirm={onConfirm} onSwitchDevice={onSwitchDevice} />
-              <Button onPress={onTestUnexpectedMessage}>Test UnexpectedMessage</Button>
+              {onTestUnexpectedMessage ? (
+                <Button onPress={onTestUnexpectedMessage}>Test UnexpectedMessage</Button>
+              ) : null}
             </YStack>
 
             <CloseButton onCancel={handleCancel} />

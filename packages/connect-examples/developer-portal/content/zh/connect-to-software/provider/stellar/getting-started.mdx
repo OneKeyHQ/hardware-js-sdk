@@ -1,0 +1,45 @@
+---
+title: 快速开始
+description: 检测并使用 OneKey Stellar Provider
+---
+
+import { Callout } from 'nextra/components'
+
+# 快速开始
+
+了解如何检测 OneKey Stellar Provider，并请求 Stellar 地址。
+
+<Callout type="warning">
+Stellar 的签名通常依赖正确的 network passphrase（例如 Public / Testnet）。签名时请确保传入与目标网络一致的参数。
+</Callout>
+
+---
+
+## 检测 Provider
+
+```ts
+const stellar = window.$onekey?.stellar
+
+if (!stellar?.isOneKey) {
+  throw new Error('未检测到 OneKey Stellar Provider')
+}
+```
+
+---
+
+## 获取地址（连接）
+
+```ts
+// 触发授权/连接流程，并返回地址（G...）
+const { address } = await stellar.getAddress()
+console.log('Address:', address)
+```
+
+---
+
+## 获取网络
+
+```ts
+const { network, networkPassphrase } = await stellar.getNetwork()
+console.log({ network, networkPassphrase })
+```

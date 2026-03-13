@@ -65,13 +65,10 @@ export function getDeviceMode(features: Features | undefined) {
 export function ExportDeviceInfo() {
   const intl = useIntl();
   const { features, onekeyFeatures } = useDeviceFieldContext();
+  const onekeyFeatureMap = onekeyFeatures as Record<string, unknown> | undefined;
+  const featureMap = features as Record<string, unknown> | undefined;
 
-  const getFieldValue = (field: string) => {
-    const onekeyFeatureRecord = onekeyFeatures as Record<string, unknown> | undefined;
-    const featureRecord = features as Record<string, unknown> | undefined;
-
-    return onekeyFeatureRecord?.[field] ?? featureRecord?.[field] ?? '';
-  };
+  const getFieldValue = (field: string) => onekeyFeatureMap?.[field] ?? featureMap?.[field] ?? '';
 
   const exportInfo = () => {
     const markdown = [];

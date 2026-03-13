@@ -1,8 +1,7 @@
 import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
 type PolkadotGetPublicKeyParams = {
-  path: string | number[];
-  showOnOneKey?: boolean;
+  path: string | string[];
 };
 
 /**

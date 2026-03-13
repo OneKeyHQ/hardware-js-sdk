@@ -23,6 +23,12 @@ import type { CoreApi, Features, Success, Unsuccessful } from '@onekeyfe/hd-core
 // 自定义状态管理器类型
 type CustomStateManager = ReturnType<typeof createTestRunnerAtoms>;
 
+type RunnerProcessResult<TExt = unknown> = {
+  error: string | undefined;
+  verifyState?: VerifyState;
+  ext?: TExt;
+};
+
 type RunnerContext = {
   deviceFeatures: Features;
   deviceId: string | undefined;
@@ -30,7 +36,7 @@ type RunnerContext = {
   printLog: (log: string) => void;
 };
 
-type RunnerConfig<T> = {
+type RunnerConfig<T, TExt = unknown> = {
   // 可选的自定义状态管理器
   stateManager?: CustomStateManager;
 
@@ -78,26 +84,18 @@ type RunnerConfig<T> = {
     item: TestCaseDataWithKey<T>,
     itemIndex: number,
     res: Unsuccessful | Success<any>
-  ) => Promise<{
-    error: string | undefined;
-    verifyState?: VerifyState;
-    ext?: any;
-  }>;
+  ) => Promise<RunnerProcessResult<TExt>>;
   processResponse: (
     response: any,
     item: TestCaseDataWithKey<T>,
     itemIndex: number,
     res: Unsuccessful | Success<any>
-  ) => Promise<{
-    error: string | undefined;
-    verifyState?: VerifyState;
-    ext?: any;
-  }>;
+  ) => Promise<RunnerProcessResult<TExt>>;
   processRunnerDone?: () => void;
   removeHardwareListener?: (sdk: CoreApi) => Promise<void>;
 };
 
-export function useRunnerTest<T>(config: RunnerConfig<T>) {
+export function useRunnerTest<T, TExt = unknown>(config: RunnerConfig<T, TExt>) {
   const {
     stateManager,
     initTestCase,
@@ -336,7 +334,7 @@ export function useRunnerTest<T>(config: RunnerConfig<T>) {
 
               let verifyState: VerifyState = 'none';
               let error: string | undefined = '';
-              let ext: any;
+              let ext: TExt | undefined;
 
               if (preCheckResponse) {
                 const result = await preCheckResponse(method, requestParams, item, itemIndex, res);

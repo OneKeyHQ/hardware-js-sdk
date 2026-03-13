@@ -69,7 +69,8 @@
     "tmp": "0.2.4",
     "micromatch": "4.0.8",
     "sha.js": "2.4.12",
-    "cipher-base": "1.0.5"
+    "cipher-base": "1.0.5",
+    "fast-xml-parser": "4.5.4"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",
