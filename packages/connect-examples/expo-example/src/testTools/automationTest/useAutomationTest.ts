@@ -988,12 +988,19 @@ export function useAutomationTest() {
           methodData.name
         );
 
+        const passed = actual === expected;
+        if (!passed) {
+          addLog(`[MISMATCH] ${slip39Case.id} / ${methodData.name || methodData.method}`);
+          addLog(`  expected: ${expected}`);
+          addLog(`  actual:   ${actual}`);
+        }
+
         return {
           title: `${slip39Case.id} / ${methodData.name || methodData.method} / ${expectedPath}`,
           method: methodData.method,
           expected,
           actual,
-          passed: actual === expected,
+          passed,
           duration: Date.now() - startedAt,
           metadata: {
             scenario: scenario.title,
@@ -1136,12 +1143,18 @@ export function useAutomationTest() {
           methodCase.name
         );
 
+        const passed = actual === expected;
+        if (!passed) {
+          addLog(`[MISMATCH] ${sdkCase.id} / ${methodCase.name || methodCase.method} / ${expectedPath}`);
+          addLog(`  expected: ${expected}`);
+          addLog(`  actual:   ${actual}`);
+        }
         return {
           title: `${sdkCase.id} / ${methodCase.name || methodCase.method} / ${expectedPath}`,
           method: methodCase.method,
           expected,
           actual,
-          passed: actual === expected,
+          passed,
           duration: Date.now() - startedAt,
           metadata: {
             scenario: scenario.title,
@@ -1313,12 +1326,18 @@ export function useAutomationTest() {
                 probe.method,
                 probe.caseName
               );
+              const passed = actual === expected;
+              if (!passed) {
+                addLog(`[MISMATCH] ${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`);
+                addLog(`  expected: ${expected}`);
+                addLog(`  actual:   ${actual}`);
+              }
               results.push({
                 title: `${scenario.id} / ${probe.caseName} / ${probe.path} / ${variantId}`,
                 method: probe.method,
                 expected,
                 actual,
-                passed: actual === expected,
+                passed,
                 duration: Date.now() - startedAtCase,
                 metadata: {
                   path: probe.path,
@@ -1500,6 +1519,12 @@ export function useAutomationTest() {
                   methodData.method,
                   methodData.name
                 );
+                const passed = actual === expected;
+                if (!passed) {
+                  addLog(`[MISMATCH] ${scenario.id} / ${methodData.name || methodData.method} / ${variantId} / ${expectedPath}`);
+                  addLog(`  expected: ${expected}`);
+                  addLog(`  actual:   ${actual}`);
+                }
                 results.push({
                   title: `${scenario.id} / ${
                     methodData.name || methodData.method
@@ -1507,7 +1532,7 @@ export function useAutomationTest() {
                   method: methodData.method,
                   expected,
                   actual,
-                  passed: actual === expected,
+                  passed,
                   duration: Date.now() - startedAtCase,
                   metadata: {
                     passphrase: passphraseDisplay,
@@ -1650,12 +1675,18 @@ export function useAutomationTest() {
           )) as { success: boolean; payload?: { address?: string } };
 
           const actual = addrResult.payload?.address || '';
+          const passed = actual === cached.address;
+          if (!passed) {
+            addLog(`[MISMATCH] Switch ${switchIdx} → ${walletKey}`);
+            addLog(`  expected: ${cached.address}`);
+            addLog(`  actual:   ${actual}`);
+          }
           results.push({
             title: `Switch ${switchIdx} → ${walletKey}`,
             method: 'evmGetAddress',
             expected: cached.address,
             actual,
-            passed: actual === cached.address,
+            passed,
             duration: Date.now() - caseStart,
             metadata: { passphrase },
           });
@@ -1705,12 +1736,12 @@ export function useAutomationTest() {
         String.fromCharCode(...Array.from({ length: 25 }, (_, i) => i + 96)),
       ];
 
-      const SPECIAL_PP_METHOD_PATHS: Record<string, string> = {
+      const SPECIAL_PASSPHRASE_METHOD_PATHS: Record<string, string> = {
         btcGetAddress: "m/44'/0'/0'/0/0",
         evmGetAddress: "m/44'/60'/0'/0/0",
         dnxGetAddress: "m/44'/29538'/0'/0/0",
       };
-      const methods = Object.keys(SPECIAL_PP_METHOD_PATHS);
+      const methods = Object.keys(SPECIAL_PASSPHRASE_METHOD_PATHS);
       const mnemonic = scenario.bip39ImportMnemonicWords?.join(' ');
 
       if (!mnemonic) {
@@ -1767,7 +1798,7 @@ export function useAutomationTest() {
               }
 
               const mockRes = (await mockFn('', '', {
-                path: SPECIAL_PP_METHOD_PATHS[method],
+                path: SPECIAL_PASSPHRASE_METHOD_PATHS[method],
                 mnemonic: mnemonic.trim(),
                 passphrase,
               })) as { payload?: { address?: string } };
@@ -1789,7 +1820,7 @@ export function useAutomationTest() {
 
               const sdkResult = (await runWithRetry(`${method}:special`, () =>
                 (sdkMethod as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, {
-                  path: SPECIAL_PP_METHOD_PATHS[method],
+                  path: SPECIAL_PASSPHRASE_METHOD_PATHS[method],
                   showOnOneKey: false,
                   passphraseState,
                   useEmptyPassphrase: false,
@@ -1798,6 +1829,11 @@ export function useAutomationTest() {
 
               const actual = sdkResult.payload?.address || '';
               const passed = actual.toLowerCase() === expected.toLowerCase();
+              if (!passed) {
+                addLog(`[MISMATCH] ${method} / 「${passphrase}」`);
+                addLog(`  expected: ${expected}`);
+                addLog(`  actual:   ${actual}`);
+              }
 
               results.push({
                 title: `${method} / 「${passphrase}」`,
@@ -1950,13 +1986,13 @@ export function useAutomationTest() {
         scenario.supportedSuites.includes('passphraseWalletSwitch') &&
         !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
       ) {
-        const ppSwitchResult = await runPassphraseWalletSwitchSuite(
+        const passphraseWalletSwitchResult = await runPassphraseWalletSwitchSuite(
           scenario,
           sdk,
           connectId,
           deviceId
         );
-        nextSuiteResults.push(ppSwitchResult);
+        nextSuiteResults.push(passphraseWalletSwitchResult);
         markSuiteCompleted();
       }
 
@@ -1965,13 +2001,13 @@ export function useAutomationTest() {
         scenario.supportedSuites.includes('specialPassphrase') &&
         !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
       ) {
-        const specialPPResult = await runSpecialPassphraseSuite(
+        const specialPassphraseResult = await runSpecialPassphraseSuite(
           scenario,
           sdk,
           connectId,
           deviceId
         );
-        nextSuiteResults.push(specialPPResult);
+        nextSuiteResults.push(specialPassphraseResult);
         markSuiteCompleted();
       }
 

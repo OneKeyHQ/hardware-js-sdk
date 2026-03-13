@@ -19,8 +19,8 @@ function formatScenarioSuiteSummary(scenario: AutomationScenario): string {
     deviceFlow: 'Device Flow',
     sdkAddressBatch: 'Address',
     sdkPubkeyBatch: 'Pubkey',
-    passphraseWalletSwitch: 'PP Switch',
-    specialPassphrase: 'Special PP',
+    passphraseWalletSwitch: 'Passphrase Switch',
+    specialPassphrase: 'Special Passphrase',
   };
 
   return scenario.supportedSuites.map(suiteType => labelMap[suiteType] ?? suiteType).join(' + ');
