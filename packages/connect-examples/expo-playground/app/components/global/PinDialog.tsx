@@ -36,7 +36,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
       setPin('');
       onClose();
     } catch (error) {
-      console.error('PIN提交失败:', error);
+      console.error('PIN submit failed:', error);
     }
   };
 
@@ -46,7 +46,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
       setPin('');
       onClose();
     } catch (error) {
-      console.error('设备PIN输入失败:', error);
+      console.error('Device PIN input failed:', error);
     }
   };
 
@@ -56,7 +56,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
       setPin('');
       onClose();
     } catch (error) {
-      console.error('PIN取消失败:', error);
+      console.error('PIN cancel failed:', error);
     }
   };
 
@@ -88,10 +88,10 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <DialogTitle className="text-xl font-semibold text-gray-900 mb-2">
-                {t('pin.enterPin', '输入PIN码')}
+                {t('pin.enterPin', 'Enter PIN')}
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-600 leading-relaxed">
-                {t('pin.checkDeviceLayout', '请查看设备屏幕上的键盘布局。')}
+                {t('pin.checkDeviceLayout', 'Please check the keyboard layout on your device screen.')}
               </DialogDescription>
             </div>
           </div>
@@ -163,7 +163,7 @@ const PinDialog: React.FC<PinDialogProps> = ({ isOpen, onClose }) => {
             className="w-full text-gray-500 hover:text-gray-700 text-base font-medium h-12 px-4 hover:bg-gray-50 rounded-lg transition-all duration-150"
             title="在硬件设备上直接输入PIN码"
           >
-            {t('pin.deviceInput', '在设备上输入')}
+            {t('pin.deviceInput', 'Enter on device')}
           </Button>
         </div>
       </DialogContent>
