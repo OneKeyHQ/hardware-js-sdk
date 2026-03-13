@@ -263,14 +263,14 @@ bridge.register(handlerName: "closeUIWindow") { _, callback in
 }
 ```
 
-在 JS 中，您将从适配器调用这些处理程序以镜像演示的行为。否则，您可以完全在 JS 中使用 `UI_EVENT` 处理 UI — 参见 [事件配置](../../api-reference#events-ui) 了解事件连接和响应（WebUSB 指南包含最小对话框）。
+在 JS 中，您将从适配器调用这些处理程序以镜像演示的行为。否则，您可以完全在 JS 中使用 `UI_EVENT` 处理 UI — 参见 [事件配置](/zh/hardware-sdk/core-api-guide#events-ui) 了解事件连接和响应（WebUSB 指南包含最小对话框）。
 
 ## 步骤 8. 检查清单
 
 - 在加载 HTML 之前注册处理程序以避免竞态条件。
 - 使用服务 UUID 过滤器扫描并在合理的时间窗口内停止。
 - 持久化 `connectId`（外设 UUID）并在首次连接后使用 `getFeatures(connectId)` 获取 `device_id`。
-- 始终在 JS 中订阅 `UI_EVENT` 以避免请求停滞（参见 [事件配置](../../api-reference#events-ui)）。
+- 始终在 JS 中订阅 `UI_EVENT` 以避免请求停滞（参见 [事件配置](/zh/hardware-sdk/core-api-guide#events-ui)）。
 - 将 `web/web_dist/` 保留在您的应用包中并相应调整 `load` 路径。
 
 ## 参考

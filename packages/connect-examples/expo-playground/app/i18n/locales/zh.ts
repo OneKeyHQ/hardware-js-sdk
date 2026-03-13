@@ -750,6 +750,18 @@ export const zh = {
       docInProgressDesc: '详细文档即将发布，敬请期待',
       vncModeNote: '跨平台通用，通过浏览器访问模拟器界面，无需额外配置',
       x11ModeNote: 'Linux 专用，原生窗口显示，性能更佳',
+      stepProgress: '第 {{current}} 步，共 {{total}} 步',
+      launchVncMode: '启动 VNC 模式',
+      launchX11Mode: '启动 X11 模式',
+      copyAndRunHint: '复制并运行上方的命令来启动模拟器',
+      connectStep1Title: '访问模拟器界面',
+      connectStep1Desc: 'VNC模式，在浏览器中查看',
+      connectStep1Action: '打开 localhost:6088',
+      connectStep2Title: '切换连接方式',
+      connectStep2Desc: '在首页选择模拟器传输方式',
+      connectStep2Action: '返回首页',
+      connectStep3Title: '开始开发测试',
+      connectStep3Desc: '使用完整的硬件钱包功能进行开发和测试',
     },
     components: {
       deviceConnectionAlert: {

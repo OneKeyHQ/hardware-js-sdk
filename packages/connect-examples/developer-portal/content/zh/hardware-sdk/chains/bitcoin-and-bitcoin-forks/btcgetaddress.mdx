@@ -18,7 +18,7 @@ const result = await HardwareSDK.btcGetAddress(connectId, deviceId, params);
 
 #### 导出单个地址
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 3。[更多信息](../../../api-reference#hd-path)
+* `path` - _必需_ `string | Array<number>` 最小长度为 3。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
 * `showOnOneKey` - _可选_ `boolean` 决定是否在设备上显示地址。默认设置为 `true`
 * `coin` - _可选_ `string` 决定 [coins.json](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/data/coins/bitcoin.json) 文件中指定的网络定义。可以使用币种的 `shortcut`、`name` 或 `label`。如果未设置 `coin`，API 将尝试从 `path` 获取网络定义。
 * `multisig` - _可选_ MultisigRedeemScriptType，赎回脚本信息（仅用于多签地址）
