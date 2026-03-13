@@ -19,12 +19,12 @@ const GlobalDialogManager: React.FC = () => {
   const [passphraseDialogOpen, setPassphraseDialogOpen] = useState(false);
 
   const handlePinClose = () => {
-    console.log('[GlobalDialogManager] 🚪 关闭PIN弹窗');
+    console.log('[GlobalDialogManager] Close PIN dialog');
     setPinDialogOpen(false);
   };
 
   const handlePassphraseClose = () => {
-    console.log('[GlobalDialogManager] 🚪 关闭Passphrase弹窗');
+    console.log('[GlobalDialogManager] Close Passphrase dialog');
     setPassphraseDialogOpen(false);
   };
 
@@ -33,15 +33,15 @@ const GlobalDialogManager: React.FC = () => {
     // 将弹窗控制方法挂载到window对象，供SDKProvider调用
     window.globalDialogManager = {
       showPinDialog: () => {
-        console.log('[GlobalDialogManager] 📱 显示PIN输入弹窗');
+        console.log('[GlobalDialogManager] Show PIN dialog');
         setPinDialogOpen(true);
       },
       showPassphraseDialog: () => {
-        console.log('[GlobalDialogManager] 📱 显示passPhrase弹窗');
+        console.log('[GlobalDialogManager] Show Passphrase dialog');
         setPassphraseDialogOpen(true);
       },
       closeAllDialogs: () => {
-        console.log('[GlobalDialogManager] 🚪 关闭所有弹窗');
+        console.log('[GlobalDialogManager] Close all dialogs');
         setPinDialogOpen(false);
         setPassphraseDialogOpen(false);
       },

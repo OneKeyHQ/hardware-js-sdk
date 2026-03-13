@@ -554,6 +554,15 @@ export const en = {
       warningMessage: 'Lost passphrase cannot be recovered',
       maxLength: 'Maximum 50 characters',
     },
+    deviceAction: {
+      success: 'Execution successful!',
+      failed: 'Execution failed',
+      confirmOnDevice: 'Please confirm on your device',
+      enterPassphrase: 'Please enter passphrase on your device',
+      enterPin: 'Please enter PIN on your device',
+      firmwareUpdating: 'Firmware updating...',
+      processing: 'Processing...',
+    },
     transport: {
       webusb: {
         description: 'Recommended',
