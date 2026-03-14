@@ -78,6 +78,28 @@ const normalizeSourceUrl = value => {
   return '';
 };
 
+/**
+ * Convert a GitHub URL pointing to developer-portal content into the
+ * corresponding live docs page URL.
+ *
+ * Example:
+ *   https://github.com/onekeyhq/hardware-js-sdk/blob/onekey/packages/
+ *     connect-examples/developer-portal/content/en/hardware-sdk/foo.mdx
+ *   → {docsOrigin}/en/hardware-sdk/foo
+ */
+const GITHUB_CONTENT_RE =
+  /^https?:\/\/github\.com\/[^/]+\/hardware-js-sdk\/blob\/[^/]+\/packages\/connect-examples\/developer-portal\/content\/(.+)$/i;
+
+const transformSourceUrl = url => {
+  const match = url.match(GITHUB_CONTENT_RE);
+  if (!match) return url;
+  const docPath = match[1]
+    .replace(/\.mdx?$/i, '')
+    .replace(/\/index$/, '');
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${origin}/${docPath}`;
+};
+
 const normalizeSources = rawSources => {
   if (!Array.isArray(rawSources)) return [];
 
@@ -85,7 +107,7 @@ const normalizeSources = rawSources => {
   for (const item of rawSources) {
     if (!item || typeof item !== 'object') continue;
 
-    const url = normalizeSourceUrl(item.url);
+    const url = transformSourceUrl(normalizeSourceUrl(item.url));
     const title = normalizeText(item.title) || url || 'Untitled Source';
     if (!url) continue;
 
@@ -598,6 +620,11 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
     return null;
   }, [messages]);
 
+  // True while generating but no visible text has streamed yet.
+  // Keeps the status dots visible until the first token actually renders,
+  // avoiding a blank gap between dot-disappear and text-appear.
+  const isWaitingForContent = isGenerating && !getRenderableMessageTextParts(latestAssistantMessage).some(p => p.trim());
+
   const fetchSourcesForQuery = useCallback(
     async (query, requestId) => {
       if (!sourcesApiUrl) {
@@ -1070,7 +1097,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 );
               })}
 
-              {status === 'submitted' ? (
+              {isWaitingForContent ? (
                 <div className={styles.status} data-docs-ai="status">
                   <span className={styles.statusText}>{copy.sending}</span>
                   <span className={styles.statusDots} aria-hidden="true">
