@@ -103,16 +103,6 @@ export const sanitizeDocAIMessageText = input => {
   );
 };
 
-const normalizeMarkdownArtifacts = input => {
-  if (typeof input !== 'string' || !input) return '';
-
-  return sanitizeDocAIMessageText(
-    input
-      .replace(/＠/g, '@')
-      .replace(/@0nekeyfe\//gi, '@onekeyfe/')
-  );
-};
-
 function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel, disableHighlight = false }) {
   const [copied, setCopied] = useState(false);
   const code = String(children).replace(/\n$/, '');
@@ -189,16 +179,6 @@ function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel, disabl
 }
 
 function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
-  const markdownText = useMemo(() => normalizeMarkdownArtifacts(text), [text]);
-
-  if (isStreaming) {
-    return (
-      <div className={styles.markdown} data-docs-ai="markdown">
-        <pre className={styles.streamingText}>{text}</pre>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.markdown} data-docs-ai="markdown">
       <ReactMarkdown
@@ -227,7 +207,7 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
                 className={className}
                 copyLabel={copy.copy}
                 copiedLabel={copy.copied}
-                disableHighlight={false}
+                disableHighlight={isStreaming}
               >
                 {children}
               </MarkdownCodeBlock>
@@ -235,7 +215,7 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
           },
         }}
       >
-        {markdownText}
+        {text}
       </ReactMarkdown>
     </div>
   );

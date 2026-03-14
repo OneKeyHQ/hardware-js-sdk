@@ -892,7 +892,6 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               <kbd className={styles.askAiBridgeKbd}>↵</kbd>
             </button>
             <p className={styles.searchSectionTitle}>{copy.searchListTitle}</p>
-            <p className={styles.searchCount}>{copy.searchCount(filteredSearchResults.length)}</p>
             <div className={styles.searchResultList}>
               {filteredSearchResults.length > 0 ? (
                 filteredSearchResults.map((item, index) => (
@@ -930,8 +929,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               {messages.length === 0 ? (
                 <div className={styles.empty} data-docs-ai="empty">
                   <div className={styles.assistantHead}>
-                    <span className={styles.assistantIcon}>
-                      <OneKeyIcon size={16} className={styles.avatarLogo} />
+                    <span className={styles.emptyStateIcon}>
+                      <OneKeyIcon size={22} className={styles.avatarLogo} />
                     </span>
                     <span className={styles.assistantLabelText}>{copy.assistantLabel}</span>
                   </div>
@@ -1071,7 +1070,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                 );
               })}
 
-              {isGenerating ? (
+              {status === 'submitted' ? (
                 <div className={styles.status} data-docs-ai="status">
                   <span className={styles.statusText}>{copy.sending}</span>
                   <span className={styles.statusDots} aria-hidden="true">

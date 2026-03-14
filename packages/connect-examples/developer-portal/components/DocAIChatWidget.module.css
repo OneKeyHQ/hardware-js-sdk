@@ -47,7 +47,6 @@
   transform: translate(-50%, -50%);
   width: min(720px, calc(100vw - 32px));
   height: min(78vh, 680px);
-  max-height: min(80vh, 760px);
 
   background: linear-gradient(160deg, rgba(13, 19, 33, 0.97) 0%, rgba(8, 11, 20, 0.99) 100%);
   border: 1px solid var(--clr-border);
@@ -254,10 +253,6 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 600;
-}
-
-.searchCount {
-  display: none;
 }
 
 .searchResultList {
@@ -517,7 +512,7 @@
 }
 
 /* Icon used in empty state */
-.assistantIcon {
+.emptyStateIcon {
   width: 48px;
   height: 48px;
   border-radius: 14px;
@@ -530,7 +525,7 @@
   box-shadow: 0 0 24px rgba(56, 189, 248, 0.1);
 }
 
-.assistantIcon .avatarLogo {
+.emptyStateIcon .avatarLogo {
   width: 22px;
   height: 22px;
   color: var(--clr-accent);
