@@ -8,6 +8,7 @@ import type {
   AutomationTestConfig,
   ConnectionState,
   HealthCheckResponse,
+  ScenarioReportResult,
   TestProgress,
   TestReport,
 } from '../services/phonePilotMcp/types';
@@ -42,7 +43,73 @@ export const cameraFrameAtom = atom<string | null>(null);
 export const automationConfigAtom = atom<AutomationTestConfig>(defaultConfig);
 export const automationProgressAtom = atom<TestProgress>(defaultProgress);
 export const automationReportAtom = atom<TestReport | null>(null);
+export const liveReportAtom = atom<TestReport | null>(null);
 export const automationLogsAtom = atom<string[]>([]);
+
+export const initLiveReportAtom = atom(
+  null,
+  (_get, set, params: { totalScenarios: number; startTime: number }) => {
+    set(liveReportAtom, {
+      startTime: params.startTime,
+      endTime: params.startTime,
+      duration: 0,
+      totalScenarios: params.totalScenarios,
+      passedScenarios: 0,
+      failedScenarios: 0,
+      skippedScenarios: 0,
+      scenarioResults: [],
+    });
+  }
+);
+
+export const updateLiveScenarioAtom = atom(
+  null,
+  (get, set, scenarioResult: ScenarioReportResult) => {
+    const current = get(liveReportAtom);
+    const now = Date.now();
+
+    if (!current) {
+      set(liveReportAtom, {
+        startTime: now,
+        endTime: now,
+        duration: 0,
+        totalScenarios: 1,
+        passedScenarios: scenarioResult.status === 'passed' ? 1 : 0,
+        failedScenarios: scenarioResult.status === 'failed' ? 1 : 0,
+        skippedScenarios: scenarioResult.status === 'skipped' ? 1 : 0,
+        scenarioResults: [scenarioResult],
+      });
+      return;
+    }
+
+    const existing = current.scenarioResults.findIndex(
+      s => s.scenarioId === scenarioResult.scenarioId
+    );
+    const scenarioResults =
+      existing >= 0
+        ? current.scenarioResults.map((s, i) => (i === existing ? scenarioResult : s))
+        : [...current.scenarioResults, scenarioResult];
+
+    set(liveReportAtom, {
+      startTime: current.startTime,
+      endTime: now,
+      duration: now - current.startTime,
+      totalScenarios: current.totalScenarios,
+      passedScenarios: scenarioResults.filter(s => s.status === 'passed').length,
+      failedScenarios: scenarioResults.filter(s => s.status === 'failed').length,
+      skippedScenarios: scenarioResults.filter(s => s.status === 'skipped').length,
+      scenarioResults,
+    });
+  }
+);
+
+export const effectiveReportAtom = atom<TestReport | null>(get => {
+  const live = get(liveReportAtom);
+  if (live && live.scenarioResults.length > 0) {
+    return live;
+  }
+  return get(automationReportAtom);
+});
 
 const MAX_LOG_ENTRIES = 2000;
 

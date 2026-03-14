@@ -95,7 +95,7 @@ function createBip39CreateScenario(
   return {
     id,
     jiraKey: 'OK-26053',
-    title: `OK-26053 / create / ${caseLabel}`,
+    title: `BIP39 创建 / ${caseLabel}`,
     flowType: 'create',
     walletType: 'bip39',
     caseLabel,
@@ -116,7 +116,7 @@ function createBip39ImportScenario(
   return {
     id,
     jiraKey: 'OK-26054',
-    title: `OK-26054 / import / ${caseLabel}`,
+    title: `BIP39 导入 / ${caseLabel}`,
     flowType: 'import',
     walletType: 'bip39',
     caseLabel,
@@ -138,7 +138,7 @@ function createSlip39CreateScenario(
   return {
     id,
     jiraKey: 'OK-5504',
-    title: `OK-5504 / create / ${caseLabel}`,
+    title: `SLIP39 创建 / ${caseLabel}`,
     flowType: 'create',
     walletType: 'slip39',
     caseLabel,
@@ -162,7 +162,7 @@ function createSlip39ImportScenario(
   return {
     id,
     jiraKey: 'OK-40090',
-    title: `OK-40090 / import / ${caseLabel}`,
+    title: `SLIP39 导入 / ${caseLabel}`,
     flowType: 'import',
     walletType: 'slip39',
     caseLabel,

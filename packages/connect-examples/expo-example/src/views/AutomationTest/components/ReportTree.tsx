@@ -3,7 +3,7 @@ import { useAtomValue } from 'jotai';
 import { Text, YStack } from 'tamagui';
 
 import {
-  automationReportAtom,
+  effectiveReportAtom,
   reportExpandAllAtom,
   reportFilterAtom,
 } from '../../../atoms/automationAtoms';
@@ -12,7 +12,7 @@ import { ReportSummaryBar } from './ReportSummaryBar';
 import { ReportScenarioNode } from './ReportScenarioNode';
 
 export function ReportTree() {
-  const report = useAtomValue(automationReportAtom);
+  const report = useAtomValue(effectiveReportAtom);
   const filter = useAtomValue(reportFilterAtom);
   const expandAll = useAtomValue(reportExpandAllAtom);
 

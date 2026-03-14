@@ -1,4 +1,5 @@
-import { Card, Text, XStack, YStack } from 'tamagui';
+import { Check as CheckIcon } from '@tamagui/lucide-icons';
+import { Checkbox, Text, XStack, YStack } from 'tamagui';
 
 import {
   ALL_PASSPHRASE_VARIANT_IDS,
@@ -6,7 +7,6 @@ import {
 } from '../../../services/phonePilotMcp/types';
 import { toggleValue } from '../utils';
 import { PanelActions } from './PanelActions';
-import { SelectableRow } from './SelectableRow';
 
 import type {
   AutomationTestConfig,
@@ -32,10 +32,10 @@ export function PassphraseSelector({
   };
 
   return (
-    <YStack gap="$3">
+    <YStack gap="$2">
       <XStack justifyContent="space-between" alignItems="center" gap="$3" flexWrap="wrap">
         <Text fontSize={14} fontWeight="700">
-          隐藏钱包密码短语变体
+          Passphrase 变体
         </Text>
         <PanelActions
           disabled={isRunning}
@@ -48,24 +48,34 @@ export function PassphraseSelector({
           onClear={() => setConfig(prev => ({ ...prev, passphraseVariants: [] }))}
         />
       </XStack>
-      <Card bordered padding="$3" backgroundColor="$gray1">
-        <Text fontSize={12} color="$gray10">
-          当前自动化报告会展示 literal。SLIP39 约定：`passphrase_1 = 12345`，`passphrase_2 =
-          onekey`。
-        </Text>
-      </Card>
-      <YStack gap="$2">
-        {ALL_PASSPHRASE_VARIANT_IDS.map(variantId => (
-          <SelectableRow
-            key={variantId}
-            checked={config.passphraseVariants.includes(variantId)}
-            disabled={isRunning}
-            title={PASSPHRASE_VARIANT_INFO[variantId].label}
-            description={PASSPHRASE_VARIANT_INFO[variantId].description}
-            onToggle={() => togglePassphraseVariant(variantId)}
-          />
-        ))}
-      </YStack>
+      <XStack flexWrap="wrap" gap="$2">
+        {ALL_PASSPHRASE_VARIANT_IDS.map(variantId => {
+          const checked = config.passphraseVariants.includes(variantId);
+          return (
+            <XStack
+              key={variantId}
+              alignItems="center"
+              gap="$2"
+              paddingVertical="$2"
+              paddingHorizontal="$2.5"
+              borderRadius="$3"
+              borderWidth={1}
+              borderColor={checked ? '$blue8' : '$gray5'}
+              backgroundColor={checked ? '$blue2' : 'transparent'}
+              opacity={isRunning ? 0.5 : 1}
+              cursor={isRunning ? 'not-allowed' : 'pointer'}
+              onPress={isRunning ? undefined : () => togglePassphraseVariant(variantId)}
+            >
+              <Checkbox size="$3" checked={checked} disabled={isRunning} pointerEvents="none">
+                <Checkbox.Indicator>
+                  <CheckIcon size={14} />
+                </Checkbox.Indicator>
+              </Checkbox>
+              <Text fontSize={12} fontWeight="500">{PASSPHRASE_VARIANT_INFO[variantId].label}</Text>
+            </XStack>
+          );
+        })}
+      </XStack>
     </YStack>
   );
 }

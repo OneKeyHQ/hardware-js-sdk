@@ -24,7 +24,7 @@ export function RunnerBehaviorConfig({
         checked={config.stopOnFirstError}
         disabled={isRunning}
         title="首错即停"
-        description="默认按 suite 粒度继续执行；启用后任一场景失败即停止后续场景。"
+        description="启用后，任一 suite 失败将跳过当前场景剩余 suite 并停止后续场景。关闭则继续执行所有场景。"
         onToggle={() =>
           setConfig(prev => ({
             ...prev,

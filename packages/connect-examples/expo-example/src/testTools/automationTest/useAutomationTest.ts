@@ -24,9 +24,12 @@ import {
   automationReportAtom,
   cameraFrameAtom,
   clearLogsAtom,
+  initLiveReportAtom,
+  liveReportAtom,
   phonePilotConnectionStateAtom,
   phonePilotHealthAtom,
   resetProgressAtom,
+  updateLiveScenarioAtom,
 } from '../../atoms/automationAtoms';
 import HardwareSDKContext from '../../provider/HardwareSDKContext';
 import { useDevice } from '../../provider/DeviceProvider';
@@ -511,6 +514,9 @@ export function useAutomationTest() {
   const config = useAtomValue(automationConfigAtom);
   const [progress, setProgress] = useAtom(automationProgressAtom);
   const setReport = useSetAtom(automationReportAtom);
+  const setLiveReport = useSetAtom(liveReportAtom);
+  const initLiveReport = useSetAtom(initLiveReportAtom);
+  const updateLiveScenario = useSetAtom(updateLiveScenarioAtom);
   const logs = useAtomValue(automationLogsAtom);
   const addLog = useSetAtom(addLogAtom);
   const clearLogs = useSetAtom(clearLogsAtom);
@@ -526,6 +532,24 @@ export function useAutomationTest() {
   const currentPassphraseRef = useRef('');
   const lastUrlRef = useRef(config.phonePilotUrl);
   const phonePilotHealthRef = useRef<HealthCheckResponse | null>(null);
+
+  const liveScenarioCtxRef = useRef<{
+    scenario: AutomationScenario;
+    startedAt: number;
+    completedSuiteResults: TestSuiteResult[];
+  } | null>(null);
+
+  const notifyLiveCaseUpdate = useCallback(
+    (suiteType: TestSuiteType, suiteName: string, partialResults: TestCaseResult[]) => {
+      const ctx = liveScenarioCtxRef.current;
+      if (!ctx) return;
+      const partialSuite = createSuiteResult(suiteType, suiteName, partialResults, Date.now() - ctx.startedAt);
+      const allSuites = [...ctx.completedSuiteResults, partialSuite];
+      const report = buildScenarioReport(ctx.scenario, allSuites, Date.now() - ctx.startedAt);
+      updateLiveScenario(report);
+    },
+    [updateLiveScenario]
+  );
 
   const updateSuiteProgress = useCallback(
     (suiteType: TestSuiteType, scenario: AutomationScenario) => {
@@ -898,6 +922,60 @@ export function useAutomationTest() {
     return featuresResult.payload?.device_id ?? '';
   }, []);
 
+  /**
+   * Ensure device passphrase_protection matches the need, then obtain passphraseState.
+   * - When passphrase is non-empty: enable passphrase_protection if off, call getPassphraseState
+   * - When passphrase is empty/undefined: disable passphrase_protection if on, return undefined
+   *
+   * Pattern from SLIP39AddressValidation.tsx lines 616-639.
+   */
+  const ensurePassphraseState = useCallback(
+    async (
+      sdk: CoreApi,
+      connectId: string,
+      passphrase: string | undefined,
+      label: string
+    ): Promise<string | undefined> => {
+      const featuresResult = await sdk.getFeatures(connectId);
+      if (!featuresResult.success) {
+        throw new Error('Failed to get device features for passphrase check');
+      }
+      const features = featuresResult.payload;
+
+      if (!passphrase) {
+        // Normal wallet: disable passphrase_protection if it's on
+        if (features?.passphrase_protection) {
+          addLog(`[${label}] Disabling passphrase_protection for normal wallet`);
+          await sdk.deviceSettings(connectId, { usePassphrase: false });
+        }
+        return undefined;
+      }
+
+      // Passphrase wallet: enable passphrase_protection if it's off
+      if (!features?.passphrase_protection) {
+        addLog(`[${label}] Enabling passphrase_protection for passphrase wallet`);
+        await sdk.deviceSettings(connectId, { usePassphrase: true });
+      }
+
+      addLog(`[${label}] Getting passphraseState for 「${passphrase}」 (currentRef="${currentPassphraseRef.current}")`);
+      const psResult = (await runWithRetry(`getPassphraseState:${label}`, () =>
+        sdk.getPassphraseState(connectId, {
+          initSession: true,
+          useEmptyPassphrase: false,
+        })
+      )) as { success: boolean; payload?: string };
+
+      if (!psResult.success) {
+        throw new Error(`getPassphraseState failed for passphrase 「${passphrase}」`);
+      }
+
+      const state = psResult.payload;
+      addLog(`[${label}] Got passphraseState: "${state}" (type=${typeof state})`);
+      return state;
+    },
+    [addLog, runWithRetry]
+  );
+
   const readMnemonicStoreContext = useCallback(async (): Promise<MnemonicStoreResult | null> => {
     if (!clientRef.current) {
       return null;
@@ -941,7 +1019,8 @@ export function useAutomationTest() {
       slip39Case: SLIP39TestCaseData,
       methodData: SLIP39MethodData,
       expectedPath: string,
-      caseType: 'address' | 'pubkey'
+      caseType: 'address' | 'pubkey',
+      passphraseState?: string
     ): Promise<TestCaseResult> => {
       const startedAt = Date.now();
       const expected = extractComparisonValue(
@@ -954,11 +1033,16 @@ export function useAutomationTest() {
       );
 
       try {
-        const params = {
+        const params: Record<string, unknown> = {
           ...(methodData.params || {}),
           path: expectedPath,
           showOnOneKey: false,
         };
+        if (passphraseState != null && passphraseState !== '') {
+          params.passphraseState = passphraseState;
+          params.useEmptyPassphrase = false;
+        }
+        addLog(`[SDK_CALL] ${methodData.method} path=${expectedPath} passphraseState=${passphraseState != null ? `"${passphraseState}"` : 'undefined'} hasPS=${!!params.passphraseState}`);
         const result = (await runWithRetry(`${methodData.method}:${expectedPath}`, () => {
           const method = (sdk as Record<string, unknown>)[methodData.method];
           if (typeof method !== 'function') {
@@ -1051,6 +1135,22 @@ export function useAutomationTest() {
           currentPassphrase: passphraseDisplay,
         }));
 
+        // Ensure device passphrase_protection matches, then get passphraseState
+        let passphraseState: string | undefined;
+        try {
+          passphraseState = await ensurePassphraseState(sdk, connectId, slip39Case.passphrase, 'SLIP39');
+        } catch (error) {
+          addLog(`[ERROR] ensurePassphraseState failed: ${error}`);
+          results.push({
+            title: `passphraseState for 「${passphraseDisplay}」`,
+            passed: false,
+            error: error instanceof Error ? error.message : String(error),
+            duration: 0,
+          });
+          notifyLiveCaseUpdate(suiteType, suiteType === 'sdkAddressBatch' ? 'SDK Address Batch' : 'SDK Pubkey Batch', results);
+          continue;
+        }
+
         for (const methodData of slip39Case.data) {
           const expectedMap =
             caseType === 'address' ? methodData.expectedAddress : methodData.expectedPublicKey;
@@ -1068,9 +1168,11 @@ export function useAutomationTest() {
               slip39Case,
               methodData,
               expectedPath,
-              caseType
+              caseType,
+              passphraseState
             );
             results.push(caseResult);
+            notifyLiveCaseUpdate(suiteType, suiteType === 'sdkAddressBatch' ? 'SDK Address Batch' : 'SDK Pubkey Batch', results);
             await delay(80);
           }
         }
@@ -1089,7 +1191,7 @@ export function useAutomationTest() {
         Date.now() - startedAt
       );
     },
-    [runSdkMethodCase, setProgress, updateSuiteProgress]
+    [runSdkMethodCase, ensurePassphraseState, addLog, setProgress, updateSuiteProgress]
   );
 
   const runAutomationSdkBatchCase = useCallback(
@@ -1101,7 +1203,8 @@ export function useAutomationTest() {
       sdkCase: AutomationSdkCase,
       methodCase: AutomationSdkMethodCase,
       expectedPath: string,
-      caseType: 'address' | 'pubkey'
+      caseType: 'address' | 'pubkey',
+      passphraseState?: string
     ): Promise<TestCaseResult> => {
       const startedAt = Date.now();
       const expected = extractExpectedByPath(
@@ -1114,6 +1217,10 @@ export function useAutomationTest() {
 
       try {
         const params = buildSdkParamsForPath(methodCase, expectedPath);
+        if (passphraseState != null && passphraseState !== '') {
+          params.passphraseState = passphraseState;
+          params.useEmptyPassphrase = false;
+        }
         const result = (await runWithRetry(`${methodCase.method}:${expectedPath}`, () => {
           const method = (sdk as Record<string, unknown>)[methodCase.method];
           if (typeof method !== 'function') {
@@ -1206,6 +1313,22 @@ export function useAutomationTest() {
           currentPassphrase: passphraseDisplay,
         }));
 
+        // Ensure device passphrase_protection matches, then get passphraseState
+        let passphraseState: string | undefined;
+        try {
+          passphraseState = await ensurePassphraseState(sdk, connectId, bip39Case.passphrase, 'BIP39_IMPORT');
+        } catch (error) {
+          addLog(`[ERROR] ensurePassphraseState failed: ${error}`);
+          results.push({
+            title: `passphraseState for 「${passphraseDisplay}」`,
+            passed: false,
+            error: error instanceof Error ? error.message : String(error),
+            duration: 0,
+          });
+          notifyLiveCaseUpdate(suiteType, getSuiteName(suiteType), results);
+          continue;
+        }
+
         for (const methodCase of bip39Case.data) {
           const expectedPaths = Object.keys(methodCase.expectedByPath || {});
           for (const expectedPath of expectedPaths) {
@@ -1220,9 +1343,11 @@ export function useAutomationTest() {
               bip39Case,
               methodCase,
               expectedPath,
-              caseType
+              caseType,
+              passphraseState
             );
             results.push(caseResult);
+            notifyLiveCaseUpdate(suiteType, getSuiteName(suiteType), results);
             await delay(80);
           }
         }
@@ -1236,7 +1361,7 @@ export function useAutomationTest() {
 
       return createSuiteResult(suiteType, getSuiteName(suiteType), results, Date.now() - startedAt);
     },
-    [runAutomationSdkBatchCase, setProgress, updateSuiteProgress]
+    [runAutomationSdkBatchCase, ensurePassphraseState, addLog, setProgress, updateSuiteProgress]
   );
 
   const runBip39CreateDynamicSuite = useCallback(
@@ -1281,6 +1406,22 @@ export function useAutomationTest() {
           currentPassphrase: passphraseDisplay,
         }));
 
+        // Ensure device passphrase_protection matches, then get passphraseState
+        let passphraseState: string | undefined;
+        try {
+          passphraseState = await ensurePassphraseState(sdk, connectId, passphraseLiteral, 'BIP39_CREATE');
+        } catch (error) {
+          addLog(`[ERROR] ensurePassphraseState failed: ${error}`);
+          results.push({
+            title: `passphraseState for 「${passphraseDisplay}」`,
+            passed: false,
+            error: error instanceof Error ? error.message : String(error),
+            duration: 0,
+          });
+          notifyLiveCaseUpdate(suiteType, getSuiteName(suiteType), results);
+          continue;
+        }
+
         const seed = mnemonicToSeed(mnemonicWords.join(' '), passphraseLiteral);
         for (const probe of probes) {
           const startedAtCase = Date.now();
@@ -1292,15 +1433,21 @@ export function useAutomationTest() {
               throw new Error(`Missing expected ${caseType} value for ${probe.caseName}`);
             }
 
+            const sdkParams: Record<string, unknown> = {
+              path: probe.path,
+              showOnOneKey: false,
+            };
+            if (passphraseState != null && passphraseState !== '') {
+              sdkParams.passphraseState = passphraseState;
+              sdkParams.useEmptyPassphrase = false;
+            }
+
             const result = (await runWithRetry(`${probe.method}:${probe.path}`, () => {
               const method = (sdk as Record<string, unknown>)[probe.method];
               if (typeof method !== 'function') {
                 throw new Error(`SDK method not found: ${probe.method}`);
               }
-              return (method as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, {
-                path: probe.path,
-                showOnOneKey: false,
-              });
+              return (method as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, sdkParams);
             })) as { success: boolean; payload?: unknown };
 
             if (!result.success) {
@@ -1360,6 +1507,7 @@ export function useAutomationTest() {
             });
           }
 
+          notifyLiveCaseUpdate(suiteType, getSuiteName(suiteType), results);
           await delay(80);
         }
       }
@@ -1372,7 +1520,7 @@ export function useAutomationTest() {
 
       return createSuiteResult(suiteType, getSuiteName(suiteType), results, Date.now() - startedAt);
     },
-    [runWithRetry, setProgress, updateSuiteProgress]
+    [runWithRetry, ensurePassphraseState, addLog, setProgress, updateSuiteProgress]
   );
 
   const runSlip39CreateDynamicSuite = useCallback(
@@ -1432,6 +1580,22 @@ export function useAutomationTest() {
           currentPassphrase: passphraseDisplay,
         }));
 
+        // Ensure device passphrase_protection matches, then get passphraseState
+        let passphraseState: string | undefined;
+        try {
+          passphraseState = await ensurePassphraseState(sdk, connectId, passphraseLiteral, 'SLIP39_CREATE');
+        } catch (error) {
+          addLog(`[ERROR] ensurePassphraseState failed: ${error}`);
+          results.push({
+            title: `passphraseState for 「${passphraseDisplay}」`,
+            passed: false,
+            error: error instanceof Error ? error.message : String(error),
+            duration: 0,
+          });
+          notifyLiveCaseUpdate(suiteType, suiteType === 'sdkAddressBatch' ? 'SDK Address Batch' : 'SDK Pubkey Batch', results);
+          continue;
+        }
+
         for (const methodData of templateCase.data) {
           const expectedMap =
             caseType === 'address' ? methodData.expectedAddress : methodData.expectedPublicKey;
@@ -1481,16 +1645,22 @@ export function useAutomationTest() {
                 throw new Error('Generated expected value is empty');
               }
 
+              const sdkMethodParams: Record<string, unknown> = {
+                ...(methodData.params || {}),
+                path: expectedPath,
+                showOnOneKey: false,
+              };
+              if (passphraseState != null && passphraseState !== '') {
+                sdkMethodParams.passphraseState = passphraseState;
+                sdkMethodParams.useEmptyPassphrase = false;
+              }
+
               const sdkResult = (await runWithRetry(`${methodData.method}:${expectedPath}`, () => {
                 const method = (sdk as Record<string, unknown>)[methodData.method];
                 if (typeof method !== 'function') {
                   throw new Error(`SDK method not found: ${methodData.method}`);
                 }
-                return (method as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, {
-                  ...(methodData.params || {}),
-                  path: expectedPath,
-                  showOnOneKey: false,
-                });
+                return (method as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, sdkMethodParams);
               })) as { success: boolean; payload?: unknown };
 
               if (!sdkResult.success) {
@@ -1557,6 +1727,7 @@ export function useAutomationTest() {
               });
             }
 
+            notifyLiveCaseUpdate(suiteType, suiteType === 'sdkAddressBatch' ? 'SDK Address Batch' : 'SDK Pubkey Batch', results);
             await delay(80);
           }
         }
@@ -1575,7 +1746,7 @@ export function useAutomationTest() {
         Date.now() - startedAt
       );
     },
-    [runWithRetry, setProgress, updateSuiteProgress]
+    [runWithRetry, ensurePassphraseState, addLog, setProgress, updateSuiteProgress]
   );
 
 
@@ -1639,6 +1810,7 @@ export function useAutomationTest() {
               error: 'getPassphraseState failed',
               duration: Date.now() - startedAt,
             });
+            notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
             continue;
           }
 
@@ -1660,6 +1832,7 @@ export function useAutomationTest() {
                   error: `mockDevice.${method} not found`,
                   duration: Date.now() - caseStart,
                 });
+                notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
                 continue;
               }
 
@@ -1681,6 +1854,7 @@ export function useAutomationTest() {
                   error: `SDK method ${method} not found`,
                   duration: Date.now() - caseStart,
                 });
+                notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
                 continue;
               }
 
@@ -1720,6 +1894,7 @@ export function useAutomationTest() {
               });
             }
 
+            notifyLiveCaseUpdate('specialPassphrase', 'Special Passphrase', results);
             await delay(80);
           }
         }
@@ -1798,6 +1973,9 @@ export function useAutomationTest() {
                   config.passphraseVariants
                 );
         nextSuiteResults.push(sdkAddressResult);
+        if (liveScenarioCtxRef.current) {
+          liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
+        }
         markSuiteCompleted();
       }
 
@@ -1844,6 +2022,9 @@ export function useAutomationTest() {
                   config.passphraseVariants
                 );
         nextSuiteResults.push(sdkPubkeyResult);
+        if (liveScenarioCtxRef.current) {
+          liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
+        }
         markSuiteCompleted();
       }
 
@@ -1860,6 +2041,9 @@ export function useAutomationTest() {
           deviceId
         );
         nextSuiteResults.push(specialPassphraseResult);
+        if (liveScenarioCtxRef.current) {
+          liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
+        }
         markSuiteCompleted();
       }
 
@@ -2005,6 +2189,10 @@ export function useAutomationTest() {
               ? getBip39ImportProbeAddress(scenario)
               : getSlip39ImportProbeAddress(scenario);
 
+          addLog(
+            `Debug import probe [${scenario.id}]: expected=${expectedAddress || '(none)'}, actual=${currentEvmAddress || '(none)'}`
+          );
+
           if (!currentEvmAddress) {
             scenarioDecisions.set(scenario.id, {
               matched: false,
@@ -2099,6 +2287,17 @@ export function useAutomationTest() {
 
       const matchedCount = Array.from(scenarioDecisions.values()).filter(item => item.matched).length;
       addLog(`Debug matched scenarios: ${matchedCount}/${selectedScenarios.length}`);
+
+      addLog('--- Debug scenario match summary ---');
+      for (const scenario of selectedScenarios) {
+        const decision = scenarioDecisions.get(scenario.id);
+        if (decision) {
+          const symbol = decision.matched ? '✓' : '✗';
+          const detail = decision.reason || 'matched';
+          addLog(`  ${symbol} ${scenario.id}: ${detail}`);
+        }
+      }
+
       if (matchedCount === 0) {
         addLog('Debug mode found no matching scenarios; only skipped reports will be generated');
       }
@@ -2156,6 +2355,7 @@ export function useAutomationTest() {
       );
       const { connectId } = selectedDevice;
       const startTime = Date.now();
+      initLiveReport({ totalScenarios: selectedScenarios.length, startTime });
       const scenarioResults: ScenarioReportResult[] = [];
       let fatalErrorMessage = '';
 
@@ -2223,6 +2423,11 @@ export function useAutomationTest() {
           );
           const selectedSuites = buildSelectedSuites(scenario, config.testSuites);
           const scenarioStartedAt = Date.now();
+          liveScenarioCtxRef.current = {
+            scenario,
+            startedAt: scenarioStartedAt,
+            completedSuiteResults: [],
+          };
           let suiteResults: TestSuiteResult[] = [];
           let scenarioReport: ScenarioReportResult;
 
@@ -2414,6 +2619,7 @@ export function useAutomationTest() {
           }
 
           scenarioResults.push(scenarioReport);
+          updateLiveScenario(scenarioReport);
           markScenarioCompleted();
 
           if (shouldStopBySuiteFailure(config.stopOnFirstError, scenarioReport.suiteResults)) {
@@ -2449,6 +2655,7 @@ export function useAutomationTest() {
       };
 
       setReport(report);
+      setLiveReport(report);
       setProgress(prev => ({
         ...prev,
         status: fatalErrorMessage ? 'error' : 'done',
@@ -2484,9 +2691,12 @@ export function useAutomationTest() {
       resolveDebugRunContext,
       runSelectedSdkSuites,
       selectedDevice,
+      initLiveReport,
+      setLiveReport,
       setProgress,
       setReport,
       setupUIListener,
+      updateLiveScenario,
     ]
   );
 

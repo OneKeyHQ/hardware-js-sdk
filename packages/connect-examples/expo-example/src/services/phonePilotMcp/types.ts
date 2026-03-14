@@ -120,18 +120,21 @@ export type TestSuiteType =
   | 'specialPassphrase';
 
 export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description: string }> = {
-  deviceFlow: { label: 'Device Flow', description: 'PhonePilot 设备端创建/导入流程执行是否成功' },
+  deviceFlow: {
+    label: '设备流程',
+    description: '通过 PhonePilot 执行设备端创建/导入钱包操作',
+  },
   sdkAddressBatch: {
-    label: 'SDK Address Batch',
-    description: '仅导入助记词场景执行地址结果核对',
+    label: '地址批量校验',
+    description: '多链地址 SDK 查询 vs 预期值比对（含 passphrase 变体）',
   },
   sdkPubkeyBatch: {
-    label: 'SDK Pubkey Batch',
-    description: '仅导入助记词场景执行公钥结果核对',
+    label: '公钥批量校验',
+    description: '多链公钥 SDK 查询 vs 预期值比对（含 passphrase 变体）',
   },
   specialPassphrase: {
-    label: 'Special Passphrase',
-    description: '9 种特殊密码短语 × 3 方法（btc/evm/dnx），mockDevice 期望 vs SDK 实际',
+    label: '特殊密码短语',
+    description: '9 组特殊字符 × 3 方法（BTC/EVM/DNX），mockDevice vs SDK',
   },
 };
 

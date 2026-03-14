@@ -1,29 +1,23 @@
-import { useMemo } from 'react';
-import { Card, Text, XStack, YStack } from 'tamagui';
+import { useMemo, useState } from 'react';
+import { Check as CheckIcon } from '@tamagui/lucide-icons';
+import { Checkbox, Text, XStack, YStack } from 'tamagui';
 
-import { TEST_SUITE_INFO } from '../../../services/phonePilotMcp/types';
 import { PanelActions } from './PanelActions';
-import { SelectableRow } from './SelectableRow';
 
 import type {
   AutomationScenario,
   AutomationScenarioId,
   AutomationTestConfig,
-  TestSuiteType,
 } from '../../../services/phonePilotMcp/types';
 
 const JIRA_ORDER = ['OK-26053', 'OK-26054', 'OK-5504', 'OK-40090'] as const;
 
-function formatScenarioSuiteSummary(scenario: AutomationScenario): string {
-  const labelMap: Record<TestSuiteType, string> = {
-    deviceFlow: 'Device Flow',
-    sdkAddressBatch: 'Address',
-    sdkPubkeyBatch: 'Pubkey',
-    specialPassphrase: 'Special Passphrase',
-  };
-
-  return scenario.supportedSuites.map(suiteType => labelMap[suiteType] ?? suiteType).join(' + ');
-}
+const JIRA_LABELS: Record<string, string> = {
+  'OK-26053': '创建 BIP39 钱包',
+  'OK-26054': '导入 BIP39 钱包',
+  'OK-5504': '创建 SLIP39 钱包',
+  'OK-40090': '导入 SLIP39 钱包',
+};
 
 export function ScenarioSelector({
   config,
@@ -38,6 +32,8 @@ export function ScenarioSelector({
     updater: AutomationTestConfig | ((prev: AutomationTestConfig) => AutomationTestConfig)
   ) => void;
 }) {
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
   const scenariosByJira = useMemo(() => {
     const groupMap = new Map<string, AutomationScenario[]>();
     scenarios.forEach(scenario => {
@@ -61,8 +57,20 @@ export function ScenarioSelector({
     }));
   };
 
+  const toggleGroup = (jiraKey: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(jiraKey)) {
+        next.delete(jiraKey);
+      } else {
+        next.add(jiraKey);
+      }
+      return next;
+    });
+  };
+
   return (
-    <YStack gap="$3">
+    <YStack gap="$2">
       <XStack justifyContent="space-between" alignItems="center" gap="$3" flexWrap="wrap">
         <Text fontSize={14} fontWeight="700">
           Jira 场景矩阵
@@ -78,55 +86,110 @@ export function ScenarioSelector({
           onClear={() => setConfig(prev => ({ ...prev, scenarioIds: [] }))}
         />
       </XStack>
-      {scenariosByJira.map(group => (
-        <Card key={group.jiraKey} bordered padding="$3">
-          <YStack gap="$2.5">
-            <XStack justifyContent="space-between" alignItems="center" gap="$3">
-              <YStack>
-                <Text fontSize={13} fontWeight="700">
-                  {group.jiraKey}
+      {scenariosByJira.map(group => {
+        const isExpanded = expandedGroups.has(group.jiraKey);
+        const selectedCount = group.scenarios.filter(s =>
+          config.scenarioIds.includes(s.id)
+        ).length;
+
+        return (
+          <YStack key={group.jiraKey} gap="$1">
+            <XStack
+              alignItems="center"
+              gap="$2"
+              paddingVertical="$1.5"
+              paddingHorizontal="$2"
+              cursor="pointer"
+              hoverStyle={{ backgroundColor: '$gray3' }}
+              borderRadius="$2"
+              onPress={() => toggleGroup(group.jiraKey)}
+            >
+              <Text fontSize={12} color="$gray10" width={14}>
+                {isExpanded ? '▾' : '▸'}
+              </Text>
+              <Text fontSize={13} fontWeight="700">
+                {JIRA_LABELS[group.jiraKey] || group.jiraKey}
+              </Text>
+              <Text fontSize={11} color="$gray10">
+                ({selectedCount}/{group.scenarios.length})
+              </Text>
+              <XStack flex={1} />
+              <XStack
+                gap="$1"
+                onPress={e => {
+                  e.stopPropagation();
+                }}
+              >
+                <Text
+                  fontSize={11}
+                  color={isRunning ? '$gray8' : '$blue10'}
+                  cursor={isRunning ? 'not-allowed' : 'pointer'}
+                  onPress={() => {
+                    if (isRunning) return;
+                    setConfig(prev => ({
+                      ...prev,
+                      scenarioIds: Array.from(
+                        new Set([...prev.scenarioIds, ...group.scenarios.map(item => item.id)])
+                      ),
+                    }));
+                  }}
+                >
+                  全选
                 </Text>
-                <Text fontSize={11} color="$gray10">
-                  {group.scenarios.length} 个 concrete case
+                <Text fontSize={11} color="$gray8">
+                  |
                 </Text>
-              </YStack>
-              <PanelActions
-                disabled={isRunning}
-                onSelectAll={() =>
-                  setConfig(prev => ({
-                    ...prev,
-                    scenarioIds: Array.from(
-                      new Set([...prev.scenarioIds, ...group.scenarios.map(item => item.id)])
-                    ),
-                  }))
-                }
-                onClear={() =>
-                  setConfig(prev => ({
-                    ...prev,
-                    scenarioIds: prev.scenarioIds.filter(
-                      id => !group.scenarios.some(item => item.id === id)
-                    ),
-                  }))
-                }
-              />
+                <Text
+                  fontSize={11}
+                  color={isRunning ? '$gray8' : '$blue10'}
+                  cursor={isRunning ? 'not-allowed' : 'pointer'}
+                  onPress={() => {
+                    if (isRunning) return;
+                    setConfig(prev => ({
+                      ...prev,
+                      scenarioIds: prev.scenarioIds.filter(
+                        id => !group.scenarios.some(item => item.id === id)
+                      ),
+                    }));
+                  }}
+                >
+                  清空
+                </Text>
+              </XStack>
             </XStack>
-            <YStack gap="$2">
-              {group.scenarios.map(scenario => (
-                <SelectableRow
-                  key={scenario.id}
-                  checked={config.scenarioIds.includes(scenario.id)}
-                  disabled={isRunning}
-                  title={scenario.title}
-                  description={`PhonePilot: ${
-                    scenario.phonePilotSequenceId
-                  } · 校验: ${formatScenarioSuiteSummary(scenario)}`}
-                  onToggle={() => toggleScenario(scenario.id)}
-                />
-              ))}
-            </YStack>
+            {isExpanded && (
+              <YStack gap="$1" paddingLeft="$4">
+                {group.scenarios.map(scenario => {
+                  const checked = config.scenarioIds.includes(scenario.id);
+                  return (
+                    <XStack
+                      key={scenario.id}
+                      alignItems="center"
+                      gap="$2"
+                      paddingVertical="$1"
+                      opacity={isRunning ? 0.5 : 1}
+                      cursor={isRunning ? 'not-allowed' : 'pointer'}
+                      onPress={isRunning ? undefined : () => toggleScenario(scenario.id)}
+                    >
+                      <Checkbox
+                        size="$2"
+                        checked={checked}
+                        disabled={isRunning}
+                        pointerEvents="none"
+                      >
+                        <Checkbox.Indicator>
+                          <CheckIcon size={12} />
+                        </Checkbox.Indicator>
+                      </Checkbox>
+                      <Text fontSize={12}>{scenario.title}</Text>
+                    </XStack>
+                  );
+                })}
+              </YStack>
+            )}
           </YStack>
-        </Card>
-      ))}
+        );
+      })}
     </YStack>
   );
 }
