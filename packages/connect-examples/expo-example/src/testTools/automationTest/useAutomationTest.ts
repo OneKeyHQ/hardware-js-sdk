@@ -2581,9 +2581,7 @@ export function useAutomationTest() {
                   'failed'
                 );
               } else {
-                const preparation = config.devicePreparationMode === 'skipReset'
-                  ? { success: true, suiteResult: createSkippedSuiteResult('deviceFlow', 'Device Preparation', 'Skipped by user config (skipReset)') }
-                  : await executeScenarioPreparation(scenario, {
+                const preparation = await executeScenarioPreparation(scenario, {
                       health: scenarioHealth,
                       clearMnemonicStore: true,
                     });
