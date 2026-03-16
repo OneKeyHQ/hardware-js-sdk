@@ -93,6 +93,28 @@ export interface MnemonicStoreResult {
   flowType?: 'create' | 'import' | 'manual';
 }
 
+export type DevicePreparationMode = 'full' | 'skipReset' | 'sdkOnly';
+
+export const DEVICE_PREPARATION_MODE_INFO: Record<
+  DevicePreparationMode,
+  { label: string; description: string }
+> = {
+  full: {
+    label: '完整流程',
+    description: '重置钱包 → 创建/导入钱包 → SDK 测试',
+  },
+  skipReset: {
+    label: '跳过重置',
+    description: '设备已恢复出厂，跳过重置，执行创建/导入 → SDK 测试',
+  },
+  sdkOnly: {
+    label: '仅 SDK 测试',
+    description: '设备已有正确钱包，跳过所有 PhonePilot，直接 SDK 测试',
+  },
+};
+
+export const ALL_DEVICE_PREPARATION_MODES: DevicePreparationMode[] = ['full', 'skipReset', 'sdkOnly'];
+
 export type JiraIssueKey = 'OK-26053' | 'OK-26054' | 'OK-5504' | 'OK-40090';
 export type PassphraseVariantId = 'normal' | 'passphrase_empty' | 'passphrase_1' | 'passphrase_2';
 
@@ -192,6 +214,7 @@ export interface AutomationTestConfig {
   stopOnFirstError: boolean;
   retryCount: number;
   delayBetweenTests: number;
+  devicePreparationMode: DevicePreparationMode;
 }
 
 export interface TestProgress {

@@ -21,6 +21,7 @@ const defaultConfig: AutomationTestConfig = {
   stopOnFirstError: false,
   retryCount: 1,
   delayBetweenTests: 500,
+  devicePreparationMode: 'full',
 };
 
 const defaultProgress: TestProgress = {
@@ -137,7 +138,11 @@ export const canStartAutomationAtom = atom(get => {
   const isConnected = get(phonePilotConnectionStateAtom) === 'connected';
   const isRunning = get(isAutomationRunningAtom);
   const config = get(automationConfigAtom);
-  return isConnected && !isRunning && config.scenarioIds.length > 0 && config.testSuites.length > 0;
+  const hasScenarios = config.scenarioIds.length > 0 && config.testSuites.length > 0;
+  if (config.devicePreparationMode === 'sdkOnly') {
+    return !isRunning && hasScenarios;
+  }
+  return isConnected && !isRunning && hasScenarios;
 });
 
 export const progressPercentageAtom = atom(get => {

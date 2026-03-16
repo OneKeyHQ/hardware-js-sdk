@@ -647,9 +647,19 @@ export function useAutomationTest() {
     }
     addLog(`Sequence count: ${health.sequenceIds.length}`);
 
-    const success = await client.connect();
-    addLog(success ? 'PhonePilot connected' : 'PhonePilot connection failed');
-    return success;
+    const mcpConnected = await client.connect();
+    if (!mcpConnected) {
+      addLog('PhonePilot MCP connection failed');
+      return false;
+    }
+
+    try {
+      await client.armConnect();
+      addLog('PhonePilot connected (MCP + arm)');
+    } catch (error) {
+      addLog(`Warning: arm-connect failed (${error}), sequences requiring arm may fail`);
+    }
+    return true;
   }, [
     addLog,
     config.phonePilotUrl,
@@ -713,10 +723,21 @@ export function useAutomationTest() {
                 currentPassphraseRef.current || '(empty)'
               }"`
             );
-            sdk.uiResponse({
-              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-              payload: { value: currentPassphraseRef.current || '' },
-            });
+            setTimeout(async () => {
+              sdk.uiResponse({
+                type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+                payload: { value: currentPassphraseRef.current ?? '' },
+              });
+              // Pro device needs physical confirmation after passphrase entry
+              if (clientRef.current) {
+                try {
+                  await clientRef.current.confirmAction();
+                  addLog('Passphrase confirmed via PhonePilot');
+                } catch (error) {
+                  addLog(`Passphrase confirm failed: ${error}`);
+                }
+              }
+            }, 200);
             break;
           default:
             break;
@@ -919,7 +940,11 @@ export function useAutomationTest() {
     if (!featuresResult.success) {
       throw new Error('Failed to get device features');
     }
-    return featuresResult.payload?.device_id ?? '';
+    const features = featuresResult.payload;
+    if (features?.initialized === false) {
+      throw new Error('Device is not initialized (factory reset state). Please create or import a wallet first, or switch to "完整流程" / "跳过重置" mode.');
+    }
+    return features?.device_id ?? '';
   }, []);
 
   /**
@@ -929,51 +954,48 @@ export function useAutomationTest() {
    *
    * Pattern from SLIP39AddressValidation.tsx lines 616-639.
    */
+  /**
+   * Passphrase state management — follows the exact same pattern as SLIP39BatchAddressTest.
+   *
+   * @param features - device features obtained BEFORE the passphrase loop (not from a fresh getFeatures call)
+   */
   const ensurePassphraseState = useCallback(
     async (
       sdk: CoreApi,
       connectId: string,
+      features: Record<string, unknown> | undefined,
       passphrase: string | undefined,
       label: string
     ): Promise<string | undefined> => {
-      const featuresResult = await sdk.getFeatures(connectId);
-      if (!featuresResult.success) {
-        throw new Error('Failed to get device features for passphrase check');
+      // Step 1: Toggle passphrase_protection — exact same logic as SLIP39BatchAddressTest
+      if (features?.passphrase_protection === true && passphrase == null) {
+        addLog(`[${label}] Disabling passphrase_protection for normal wallet`);
+        await sdk.deviceSettings(connectId, { usePassphrase: false });
       }
-      const features = featuresResult.payload;
-
-      if (!passphrase) {
-        // Normal wallet: disable passphrase_protection if it's on
-        if (features?.passphrase_protection) {
-          addLog(`[${label}] Disabling passphrase_protection for normal wallet`);
-          await sdk.deviceSettings(connectId, { usePassphrase: false });
-        }
-        return undefined;
-      }
-
-      // Passphrase wallet: enable passphrase_protection if it's off
-      if (!features?.passphrase_protection) {
+      if (!features?.passphrase_protection && passphrase != null) {
         addLog(`[${label}] Enabling passphrase_protection for passphrase wallet`);
         await sdk.deviceSettings(connectId, { usePassphrase: true });
       }
 
-      addLog(`[${label}] Getting passphraseState for 「${passphrase}」 (currentRef="${currentPassphraseRef.current}")`);
-      const psResult = (await runWithRetry(`getPassphraseState:${label}`, () =>
-        sdk.getPassphraseState(connectId, {
+      // Step 2: Get passphraseState — only when passphrase != null
+      if (passphrase != null) {
+        addLog(`[${label}] Getting passphraseState for 「${passphrase}」`);
+        const passphraseStateRes = await sdk.getPassphraseState(connectId, {
           initSession: true,
           useEmptyPassphrase: false,
-        })
-      )) as { success: boolean; payload?: string };
+        });
 
-      if (!psResult.success) {
-        throw new Error(`getPassphraseState failed for passphrase 「${passphrase}」`);
+        if (!passphraseStateRes.success) {
+          throw new Error(`getPassphraseState failed for passphrase 「${passphrase}」`);
+        }
+
+        addLog(`[${label}] Got passphraseState: "${passphraseStateRes.payload}"`);
+        return passphraseStateRes.payload;
       }
 
-      const state = psResult.payload;
-      addLog(`[${label}] Got passphraseState: "${state}" (type=${typeof state})`);
-      return state;
+      return undefined;
     },
-    [addLog, runWithRetry]
+    [addLog]
   );
 
   const readMnemonicStoreContext = useCallback(async (): Promise<MnemonicStoreResult | null> => {
@@ -995,6 +1017,7 @@ export function useAutomationTest() {
         sdk.evmGetAddress(connectId, deviceId, {
           path: EVM_ADDRESS_PATH,
           showOnOneKey: false,
+          useEmptyPassphrase: true,
         })
       )) as { success: boolean; payload?: unknown };
 
@@ -1037,11 +1060,9 @@ export function useAutomationTest() {
           ...(methodData.params || {}),
           path: expectedPath,
           showOnOneKey: false,
+          passphraseState,
+          useEmptyPassphrase: !slip39Case.passphrase,
         };
-        if (passphraseState != null && passphraseState !== '') {
-          params.passphraseState = passphraseState;
-          params.useEmptyPassphrase = false;
-        }
         addLog(`[SDK_CALL] ${methodData.method} path=${expectedPath} passphraseState=${passphraseState != null ? `"${passphraseState}"` : 'undefined'} hasPS=${!!params.passphraseState}`);
         const result = (await runWithRetry(`${methodData.method}:${expectedPath}`, () => {
           const method = (sdk as Record<string, unknown>)[methodData.method];
@@ -1126,9 +1147,13 @@ export function useAutomationTest() {
         );
       }
 
+      // Get features ONCE before passphrase loop (same as SLIP39BatchAddressTest)
+      const featuresResult = await sdk.getFeatures(connectId);
+      const deviceFeatures = featuresResult.success ? featuresResult.payload : undefined;
+
       const results: TestCaseResult[] = [];
       for (const slip39Case of slip39Cases) {
-        currentPassphraseRef.current = slip39Case.passphrase || '';
+        currentPassphraseRef.current = slip39Case.passphrase ?? '';
         const passphraseDisplay = formatPassphraseDisplay(slip39Case.passphrase);
         setProgress(prev => ({
           ...prev,
@@ -1138,7 +1163,7 @@ export function useAutomationTest() {
         // Ensure device passphrase_protection matches, then get passphraseState
         let passphraseState: string | undefined;
         try {
-          passphraseState = await ensurePassphraseState(sdk, connectId, slip39Case.passphrase, 'SLIP39');
+          passphraseState = await ensurePassphraseState(sdk, connectId, deviceFeatures, slip39Case.passphrase, 'SLIP39');
         } catch (error) {
           addLog(`[ERROR] ensurePassphraseState failed: ${error}`);
           results.push({
@@ -1217,10 +1242,8 @@ export function useAutomationTest() {
 
       try {
         const params = buildSdkParamsForPath(methodCase, expectedPath);
-        if (passphraseState != null && passphraseState !== '') {
-          params.passphraseState = passphraseState;
-          params.useEmptyPassphrase = false;
-        }
+        params.passphraseState = passphraseState;
+        params.useEmptyPassphrase = !sdkCase.passphrase;
         const result = (await runWithRetry(`${methodCase.method}:${expectedPath}`, () => {
           const method = (sdk as Record<string, unknown>)[methodCase.method];
           if (typeof method !== 'function') {
@@ -1304,9 +1327,12 @@ export function useAutomationTest() {
         );
       }
 
+      const featuresResult2 = await sdk.getFeatures(connectId);
+      const deviceFeatures2 = featuresResult2.success ? featuresResult2.payload : undefined;
+
       const results: TestCaseResult[] = [];
       for (const bip39Case of bip39Cases) {
-        currentPassphraseRef.current = bip39Case.passphrase || '';
+        currentPassphraseRef.current = bip39Case.passphrase ?? '';
         const passphraseDisplay = formatPassphraseDisplay(bip39Case.passphrase);
         setProgress(prev => ({
           ...prev,
@@ -1316,7 +1342,7 @@ export function useAutomationTest() {
         // Ensure device passphrase_protection matches, then get passphraseState
         let passphraseState: string | undefined;
         try {
-          passphraseState = await ensurePassphraseState(sdk, connectId, bip39Case.passphrase, 'BIP39_IMPORT');
+          passphraseState = await ensurePassphraseState(sdk, connectId, deviceFeatures2, bip39Case.passphrase, 'BIP39_IMPORT');
         } catch (error) {
           addLog(`[ERROR] ensurePassphraseState failed: ${error}`);
           results.push({
@@ -1392,6 +1418,9 @@ export function useAutomationTest() {
           ? [{ method: 'evmGetAddress', caseName: 'evmGetAddress', path: EVM_ADDRESS_PATH }]
           : BIP39_CREATE_PUBKEY_PROBES;
 
+      const featuresResult3 = await sdk.getFeatures(connectId);
+      const deviceFeatures3 = featuresResult3.success ? featuresResult3.payload : undefined;
+
       const results: TestCaseResult[] = [];
       for (const variantId of selectedPassphraseVariants) {
         if (!runningRef.current) {
@@ -1400,7 +1429,7 @@ export function useAutomationTest() {
 
         const passphraseLiteral = getScenarioPassphraseLiteral(scenario, variantId);
         const passphraseDisplay = formatPassphraseDisplay(passphraseLiteral);
-        currentPassphraseRef.current = passphraseLiteral || '';
+        currentPassphraseRef.current = passphraseLiteral ?? '';
         setProgress(prev => ({
           ...prev,
           currentPassphrase: passphraseDisplay,
@@ -1409,7 +1438,7 @@ export function useAutomationTest() {
         // Ensure device passphrase_protection matches, then get passphraseState
         let passphraseState: string | undefined;
         try {
-          passphraseState = await ensurePassphraseState(sdk, connectId, passphraseLiteral, 'BIP39_CREATE');
+          passphraseState = await ensurePassphraseState(sdk, connectId, deviceFeatures3, passphraseLiteral, 'BIP39_CREATE');
         } catch (error) {
           addLog(`[ERROR] ensurePassphraseState failed: ${error}`);
           results.push({
@@ -1436,11 +1465,9 @@ export function useAutomationTest() {
             const sdkParams: Record<string, unknown> = {
               path: probe.path,
               showOnOneKey: false,
+              passphraseState,
+              useEmptyPassphrase: !passphraseLiteral,
             };
-            if (passphraseState != null && passphraseState !== '') {
-              sdkParams.passphraseState = passphraseState;
-              sdkParams.useEmptyPassphrase = false;
-            }
 
             const result = (await runWithRetry(`${probe.method}:${probe.path}`, () => {
               const method = (sdk as Record<string, unknown>)[probe.method];
@@ -1566,6 +1593,9 @@ export function useAutomationTest() {
         );
       }
 
+      const featuresResult4 = await sdk.getFeatures(connectId);
+      const deviceFeatures4 = featuresResult4.success ? featuresResult4.payload : undefined;
+
       const results: TestCaseResult[] = [];
       for (const variantId of variantIds) {
         if (!runningRef.current) {
@@ -1574,7 +1604,7 @@ export function useAutomationTest() {
 
         const passphraseLiteral = getScenarioPassphraseLiteral(scenario, variantId);
         const passphraseDisplay = formatPassphraseDisplay(passphraseLiteral);
-        currentPassphraseRef.current = passphraseLiteral || '';
+        currentPassphraseRef.current = passphraseLiteral ?? '';
         setProgress(prev => ({
           ...prev,
           currentPassphrase: passphraseDisplay,
@@ -1583,7 +1613,7 @@ export function useAutomationTest() {
         // Ensure device passphrase_protection matches, then get passphraseState
         let passphraseState: string | undefined;
         try {
-          passphraseState = await ensurePassphraseState(sdk, connectId, passphraseLiteral, 'SLIP39_CREATE');
+          passphraseState = await ensurePassphraseState(sdk, connectId, deviceFeatures4, passphraseLiteral, 'SLIP39_CREATE');
         } catch (error) {
           addLog(`[ERROR] ensurePassphraseState failed: ${error}`);
           results.push({
@@ -1649,11 +1679,9 @@ export function useAutomationTest() {
                 ...(methodData.params || {}),
                 path: expectedPath,
                 showOnOneKey: false,
+                passphraseState,
+                useEmptyPassphrase: !passphraseLiteral,
               };
-              if (passphraseState != null && passphraseState !== '') {
-                sdkMethodParams.passphraseState = passphraseState;
-                sdkMethodParams.useEmptyPassphrase = false;
-              }
 
               const sdkResult = (await runWithRetry(`${methodData.method}:${expectedPath}`, () => {
                 const method = (sdk as Record<string, unknown>)[methodData.method];
@@ -2331,7 +2359,9 @@ export function useAutomationTest() {
         return;
       }
 
-      if (connectionState !== 'connected') {
+      const needsPhonePilot = config.devicePreparationMode !== 'sdkOnly';
+
+      if (needsPhonePilot && connectionState !== 'connected') {
         addLog('PhonePilot not connected, connecting...');
         const connected = await connectPhonePilot();
         if (!connected) {
@@ -2359,26 +2389,32 @@ export function useAutomationTest() {
       const scenarioResults: ScenarioReportResult[] = [];
       let fatalErrorMessage = '';
 
-      const health = await refreshPhonePilotHealth();
-      if (!health) {
-        runningRef.current = false;
-        setProgress(prev => ({
-          ...prev,
-          status: 'error',
-          errorMessage: 'PhonePilot health check failed before automation start',
-        }));
-        addLog('PhonePilot health check failed before automation start');
-        return;
+      let health: HealthCheckResponse | null = null;
+      if (needsPhonePilot) {
+        health = await refreshPhonePilotHealth();
+        if (!health) {
+          runningRef.current = false;
+          setProgress(prev => ({
+            ...prev,
+            status: 'error',
+            errorMessage: 'PhonePilot health check failed before automation start',
+          }));
+          addLog('PhonePilot health check failed before automation start');
+          return;
+        }
       }
 
       addLog(
         mode === 'debug' ? '=== Automation Debug Test Started ===' : '=== Automation Test Started ==='
       );
       addLog(`Scenario count: ${selectedScenarios.length}`);
-      addLog(`PhonePilot MCP ready: ${health.mcpReady ? 'yes' : 'no'}`);
-      addLog(`PhonePilot OCR ready: ${health.ocrReady ? 'yes' : 'no'}`);
-      if (health.message) {
-        addLog(`PhonePilot health message: ${health.message}`);
+      addLog(`Device preparation mode: ${config.devicePreparationMode}`);
+      if (health) {
+        addLog(`PhonePilot MCP ready: ${health.mcpReady ? 'yes' : 'no'}`);
+        addLog(`PhonePilot OCR ready: ${health.ocrReady ? 'yes' : 'no'}`);
+        if (health.message) {
+          addLog(`PhonePilot health message: ${health.message}`);
+        }
       }
       if (mode === 'debug') {
         addLog('Debug mode enabled: skip reset-wallet and execute-sequence, run SDK validation only');
@@ -2518,7 +2554,9 @@ export function useAutomationTest() {
                 'failed'
               );
             } else {
-              const resetPreparation = await executeResetPreparation(scenarioIndex, scenarioHealth);
+              const resetPreparation = config.devicePreparationMode === 'skipReset'
+                ? { success: true, suiteResult: createSkippedSuiteResult('deviceFlow', 'Device Reset', 'Skipped by user config (skipReset)') }
+                : await executeResetPreparation(scenarioIndex, scenarioHealth);
               if (!resetPreparation.success) {
                 if (selectedSuites.includes('deviceFlow')) {
                   suiteResults.push(resetPreparation.suiteResult);
@@ -2543,10 +2581,12 @@ export function useAutomationTest() {
                   'failed'
                 );
               } else {
-                const preparation = await executeScenarioPreparation(scenario, {
-                  health: scenarioHealth,
-                  clearMnemonicStore: true,
-                });
+                const preparation = config.devicePreparationMode === 'skipReset'
+                  ? { success: true, suiteResult: createSkippedSuiteResult('deviceFlow', 'Device Preparation', 'Skipped by user config (skipReset)') }
+                  : await executeScenarioPreparation(scenario, {
+                      health: scenarioHealth,
+                      clearMnemonicStore: true,
+                    });
 
                 if (selectedSuites.includes('deviceFlow')) {
                   suiteResults.push(preparation.suiteResult);
@@ -2701,8 +2741,12 @@ export function useAutomationTest() {
   );
 
   const startAutomation = useCallback(async (): Promise<void> => {
-    await runAutomation('full');
-  }, [runAutomation]);
+    if (config.devicePreparationMode === 'sdkOnly') {
+      await runAutomation('debug');
+    } else {
+      await runAutomation('full');
+    }
+  }, [config.devicePreparationMode, runAutomation]);
 
   const startDebugAutomation = useCallback(async (): Promise<void> => {
     await runAutomation('debug');

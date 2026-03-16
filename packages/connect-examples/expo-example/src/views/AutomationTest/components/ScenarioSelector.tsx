@@ -158,7 +158,7 @@ export function ScenarioSelector({
               </XStack>
             </XStack>
             {isExpanded && (
-              <YStack gap="$1" paddingLeft="$4">
+              <YStack gap="$1.5" paddingLeft="$2">
                 {group.scenarios.map(scenario => {
                   const checked = config.scenarioIds.includes(scenario.id);
                   return (
@@ -166,7 +166,12 @@ export function ScenarioSelector({
                       key={scenario.id}
                       alignItems="center"
                       gap="$2"
-                      paddingVertical="$1"
+                      paddingVertical="$1.5"
+                      paddingHorizontal="$2"
+                      borderRadius="$3"
+                      borderWidth={1}
+                      borderColor={checked ? '$blue8' : '$gray5'}
+                      backgroundColor={checked ? '$blue2' : 'transparent'}
                       opacity={isRunning ? 0.5 : 1}
                       cursor={isRunning ? 'not-allowed' : 'pointer'}
                       onPress={isRunning ? undefined : () => toggleScenario(scenario.id)}
@@ -176,12 +181,13 @@ export function ScenarioSelector({
                         checked={checked}
                         disabled={isRunning}
                         pointerEvents="none"
+                        borderRadius="$1"
                       >
                         <Checkbox.Indicator>
                           <CheckIcon size={12} />
                         </Checkbox.Indicator>
                       </Checkbox>
-                      <Text fontSize={12}>{scenario.title}</Text>
+                      <Text fontSize={12} flex={1}>{scenario.title}</Text>
                     </XStack>
                   );
                 })}

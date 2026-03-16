@@ -2,7 +2,12 @@ import { Input, Label, Text, YStack } from 'tamagui';
 
 import { SelectableRow } from './SelectableRow';
 
-import type { AutomationTestConfig } from '../../../services/phonePilotMcp/types';
+import {
+  ALL_DEVICE_PREPARATION_MODES,
+  DEVICE_PREPARATION_MODE_INFO,
+} from '../../../services/phonePilotMcp/types';
+
+import type { AutomationTestConfig, DevicePreparationMode } from '../../../services/phonePilotMcp/types';
 
 export function RunnerBehaviorConfig({
   config,
@@ -20,6 +25,27 @@ export function RunnerBehaviorConfig({
       <Text fontSize={14} fontWeight="700">
         Runner 行为
       </Text>
+      <YStack gap="$2">
+        <Label>设备准备模式</Label>
+        {ALL_DEVICE_PREPARATION_MODES.map((mode: DevicePreparationMode) => {
+          const info = DEVICE_PREPARATION_MODE_INFO[mode];
+          return (
+            <SelectableRow
+              key={mode}
+              checked={config.devicePreparationMode === mode}
+              disabled={isRunning}
+              title={info.label}
+              description={info.description}
+              onToggle={() =>
+                setConfig(prev => ({
+                  ...prev,
+                  devicePreparationMode: mode,
+                }))
+              }
+            />
+          );
+        })}
+      </YStack>
       <SelectableRow
         checked={config.stopOnFirstError}
         disabled={isRunning}
