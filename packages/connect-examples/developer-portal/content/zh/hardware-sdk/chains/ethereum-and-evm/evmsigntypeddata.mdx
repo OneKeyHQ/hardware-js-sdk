@@ -38,9 +38,11 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
 #### 什么情况下使用盲签
 
 * 使用 Mini 或 Classic 设备。
+* Classic1s / ClassicPure 的自定义类型数量超过 8 个（不含 `primaryType`）。
+* Classic1s / ClassicPure 存在任意 `bytes` 字段，且数据大小大于 1.5KB。
 * 数据中存在嵌套数组。
-* 固件版本低于 4.4.0，且数据大小大于 1KB。
-* 固件版本大于或等于 4.4.0，且数据大小大于 1.5KB。
+* 固件版本低于 4.4.0，且 `message.data` 大小大于 1KB。
+* 固件版本大于或等于 4.4.0，且 `message.data` 大小大于 1.5KB。
 
 ### 示例
 

@@ -40,6 +40,14 @@ export type EVMSignTypedDataParams = {
   chainId?: number;
 };
 
+const MINI_MAX_STRUCT_FIELDS = 16;
+const MINI_MAX_ACCESS_PATH_DEPTH = 6;
+const MINI_MAX_CUSTOM_DEP_STRUCTS = 8;
+const MINI_MAX_NAME_LENGTH = 63;
+const MINI_MAX_DYNAMIC_VALUE_BYTES = 1536;
+const MINI_MAX_ARRAY_TYPE_FIELDS = 24;
+const MINI_MAX_ARRAY_ELEMENTS = 24;
+
 export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams> {
   init() {
     this.checkDeviceId = true;
@@ -385,6 +393,140 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     return false;
   }
 
+  hasClassicFamilyTypedDataFormatViolations(item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>) {
+    if (!item?.types || !item.primaryType) return false;
+
+    const isArrayType = (typeName: string) => /\[[0-9]*\]$/.test(typeName);
+    const isBytesType = (typeName: string) => /^bytes(\d*)$/.test(typeName);
+    const isStructType = (typeName: string) => typeName in item.types;
+
+    if (Object.values(item.types).some(fields => fields.length > MINI_MAX_STRUCT_FIELDS)) {
+      return true;
+    }
+
+    if (
+      Object.entries(item.types).some(
+        ([typeName, fields]) =>
+          typeName.length > MINI_MAX_NAME_LENGTH ||
+          fields.some(field => field.name.length > MINI_MAX_NAME_LENGTH)
+      )
+    ) {
+      return true;
+    }
+
+    const totalArrayTypeFields = Object.values(item.types).reduce(
+      (count, fields) => count + fields.filter(field => isArrayType(field.type)).length,
+      0
+    );
+    if (totalArrayTypeFields > MINI_MAX_ARRAY_TYPE_FIELDS) {
+      return true;
+    }
+
+    const getDepth = (typeName: string, visiting: Set<string>): number => {
+      if (isArrayType(typeName)) {
+        const { entryTypeName } = parseArrayType(typeName);
+        return 1 + getDepth(entryTypeName, visiting);
+      }
+
+      if (!isStructType(typeName)) return 1;
+
+      // Cyclic reference detected — return a value that guarantees violation
+      if (visiting.has(typeName)) return MINI_MAX_ACCESS_PATH_DEPTH + 1;
+
+      visiting.add(typeName);
+      const depth = item.types[typeName].reduce((maxDepth, { type }) => {
+        const nextDepth = 1 + getDepth(type, visiting);
+        return Math.max(maxDepth, nextDepth);
+      }, 1);
+      visiting.delete(typeName);
+      return depth;
+    };
+
+    const maxPathDepth =
+      1 +
+      Math.max(
+        getDepth('EIP712Domain', new Set()),
+        getDepth(item.primaryType as string, new Set())
+      );
+    if (maxPathDepth > MINI_MAX_ACCESS_PATH_DEPTH) {
+      return true;
+    }
+
+    const depStructs = new Set<string>();
+    const collectDeps = (typeName: string, visiting: Set<string>) => {
+      if (isArrayType(typeName)) {
+        const { entryTypeName } = parseArrayType(typeName);
+        collectDeps(entryTypeName, visiting);
+        return;
+      }
+
+      if (!isStructType(typeName) || visiting.has(typeName)) return;
+
+      visiting.add(typeName);
+      if (typeName !== 'EIP712Domain' && typeName !== item.primaryType) {
+        depStructs.add(typeName);
+      }
+      item.types[typeName].forEach(({ type }) => collectDeps(type, visiting));
+      visiting.delete(typeName);
+    };
+
+    collectDeps('EIP712Domain', new Set());
+    collectDeps(item.primaryType as string, new Set());
+    if (depStructs.size > MINI_MAX_CUSTOM_DEP_STRUCTS) {
+      return true;
+    }
+
+    const dynamicSize = (typeName: string, value: unknown) => {
+      if (typeName === 'string') {
+        return typeof value === 'string' ? Buffer.byteLength(value, 'utf8') : 0;
+      }
+      if (isBytesType(typeName) && typeof value === 'string') {
+        const startIndex = value.startsWith('0x') ? 2 : 0;
+        return (value.length - startIndex) / 2;
+      }
+      return 0;
+    };
+
+    const walkValue = (typeName: string, value: unknown): boolean => {
+      if (value == null) return false;
+
+      if (isArrayType(typeName)) {
+        if (!Array.isArray(value)) return false;
+        const { entryTypeName } = parseArrayType(typeName);
+        const entryIsStruct = isStructType(entryTypeName);
+        const entryIsPrimitive = !entryIsStruct && !isArrayType(entryTypeName);
+
+        // In MetaMask V4, struct arrays are encoded individually and each element
+        // occupies a slot, so large struct arrays hit firmware limits just like primitives.
+        // In non-V4 mode struct arrays are hashed as a single blob, bypassing the limit.
+        if (
+          value.length > MINI_MAX_ARRAY_ELEMENTS &&
+          (entryIsPrimitive || (this.params.metamaskV4Compat && entryIsStruct))
+        ) {
+          return true;
+        }
+
+        return value.some(entry => walkValue(entryTypeName, entry));
+      }
+
+      if (dynamicSize(typeName, value) > MINI_MAX_DYNAMIC_VALUE_BYTES) {
+        return true;
+      }
+
+      if (typeof value === 'object' && isStructType(typeName)) {
+        return item.types[typeName].some(({ name, type }) =>
+          walkValue(type, (value as Record<string, unknown>)[name])
+        );
+      }
+
+      return false;
+    };
+
+    return (
+      walkValue('EIP712Domain', item.domain) || walkValue(item.primaryType as string, item.message)
+    );
+  }
+
   supportSignTyped() {
     const deviceType = getDeviceType(this.device.features);
     if (DeviceModelToTypes.model_mini.includes(deviceType)) {
@@ -415,9 +557,14 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
       Enum_Capability.Capability_EthereumTypedData
     );
 
-    // For Classic、Mini device we use EthereumSignTypedData
+    // For Classic / Mini:
+    // - If parsed typed-data capability is missing, keep using blind-sign.
+    // - For Mini with parsed capability, add extra format checks before parsed signing.
     const deviceType = getDeviceType(this.device.features);
-    if (DeviceModelToTypes.model_mini.includes(deviceType) && !supportEip712OnClassic) {
+    if (
+      DeviceModelToTypes.model_mini.includes(deviceType) &&
+      (!supportEip712OnClassic || this.hasClassicFamilyTypedDataFormatViolations(this.params.data))
+    ) {
       validateParams(this.params, [
         { name: 'domainHash', type: 'hexString', required: true },
         { name: 'messageHash', type: 'hexString', required: true },
