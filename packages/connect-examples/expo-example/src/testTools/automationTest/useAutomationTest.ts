@@ -2322,9 +2322,12 @@ export function useAutomationTest() {
   );
 
   const executeResetPreparation = useCallback(
-    async (scenarioIndex: number, health: HealthCheckResponse): Promise<PreparationResult> => {
-      const resetSequenceId =
-        scenarioIndex === 0 ? RESET_SEQUENCE_LOCKED : RESET_SEQUENCE_UNLOCKED;
+    async (
+      features: Record<string, unknown>,
+      health: HealthCheckResponse
+    ): Promise<PreparationResult> => {
+      const isUnlocked = features.unlocked === true;
+      const resetSequenceId = isUnlocked ? RESET_SEQUENCE_UNLOCKED : RESET_SEQUENCE_LOCKED;
 
       if (!health.sequenceIds.includes(resetSequenceId)) {
         const reason = `sequence drift: ${resetSequenceId} is not present in PhonePilot /health sequenceIds`;
@@ -2391,7 +2394,7 @@ export function useAutomationTest() {
         };
       }
     },
-    [addLog, executePhonePilotSequence, SDK, selectedDevice]
+    [addLog, executePhonePilotSequence]
   );
 
   const resolveDebugRunContext = useCallback(
@@ -2810,9 +2813,31 @@ export function useAutomationTest() {
                 'failed'
               );
             } else {
-              const resetPreparation = config.devicePreparationMode === 'skipReset'
-                ? { success: true, suiteResult: createSkippedSuiteResult('deviceFlow', 'Device Reset', 'Skipped by user config (skipReset)') }
-                : await executeResetPreparation(scenarioIndex, scenarioHealth);
+              // Fetch device features to determine reset strategy
+              addLog('Fetching device features to determine reset strategy...');
+              const deviceFeatures = await fetchDeviceFeatures(SDK!, connectId);
+              addLog(`Device features: initialized=${deviceFeatures?.initialized}, unlocked=${deviceFeatures?.unlocked}`);
+              const isInitialized = deviceFeatures?.initialized !== false;
+              const shouldSkipReset =
+                config.devicePreparationMode === 'skipReset' || !isInitialized;
+
+              if (!isInitialized) {
+                addLog('Device is not initialized (factory state) — skipping reset step');
+              }
+
+              const resetPreparation = shouldSkipReset
+                ? {
+                    success: true,
+                    suiteResult: createSkippedSuiteResult(
+                      'deviceFlow',
+                      'Device Reset',
+                      !isInitialized
+                        ? 'Skipped: device already in factory reset state (initialized=false)'
+                        : 'Skipped by user config (skipReset)'
+                    ),
+                    mnemonicStoreResult: null,
+                  }
+                : await executeResetPreparation(deviceFeatures!, scenarioHealth);
               if (!resetPreparation.success) {
                 if (selectedSuites.includes('deviceFlow')) {
                   suiteResults.push(resetPreparation.suiteResult);
