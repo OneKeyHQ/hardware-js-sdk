@@ -140,7 +140,8 @@ export type TestSuiteType =
   | 'sdkAddressBatch'
   | 'sdkPubkeyBatch'
   | 'specialPassphrase'
-  | 'securityCheck';
+  | 'securityCheck'
+  | 'chainMethodBatch';
 
 export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description: string }> = {
   deviceFlow: {
@@ -163,9 +164,14 @@ export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description
     label: '安全检查',
     description: '盲签名安全检查：28 个链签名方法 × 合法/非法 coinType，验证 safetyChecks 行为',
   },
+  chainMethodBatch: {
+    label: '链方法批量测试',
+    description: '5 条链（BTC/ETH/ADA/SOL/DOT）× 多方法 × presupposes，仅验证调用成功/失败',
+  },
 };
 
 export type AutomationScenarioId =
+  | 'bip39_import_12_api'
   | 'ok26053_bip39_create_12'
   | 'ok26053_bip39_create_18'
   | 'ok26053_bip39_create_24'

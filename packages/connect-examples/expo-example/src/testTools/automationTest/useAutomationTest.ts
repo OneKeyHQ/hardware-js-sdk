@@ -9,6 +9,7 @@ import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { getAllAutomationScenarios, getAutomationScenario } from './scenarioCatalog';
 import { convertTestData, getDeviceExpected } from '../securityCheckTest/blindSignature/utils';
 import securityCheckData from '../securityCheckTest/blindSignature/data';
+import { chainTestData } from '../chainMethodTest/data';
 import {
   resolveBip39ImportSdkCases,
   type AutomationSdkCase,
@@ -64,6 +65,8 @@ const SUITE_EXECUTION_ORDER: TestSuiteType[] = [
   'sdkAddressBatch',
   'sdkPubkeyBatch',
   'specialPassphrase',
+  'securityCheck',
+  'chainMethodBatch',
 ];
 const EVM_ADDRESS_PATH = "m/44'/60'/0'/0/0";
 const BIP39_CREATE_PUBKEY_PROBES: Array<{
@@ -436,6 +439,8 @@ function getSuiteName(suiteType: TestSuiteType): string {
     sdkAddressBatch: 'SDK Address Batch',
     sdkPubkeyBatch: 'SDK Pubkey Batch',
     specialPassphrase: 'Special Passphrase',
+    securityCheck: 'Security Check',
+    chainMethodBatch: 'Chain Method Batch',
   };
   return names[suiteType] || suiteType;
 }
@@ -572,6 +577,18 @@ function countSdkCasePaths(
   return count;
 }
 
+function countChainMethodBatchTests(): number {
+  return chainTestData.reduce(
+    (sum, chain) =>
+      sum +
+      chain.data.reduce(
+        (s2: number, entry: { presupposes?: unknown[] }) => s2 + (entry.presupposes?.length ?? 0),
+        0
+      ),
+    0
+  );
+}
+
 function countScenarioTotalTests(
   scenario: AutomationScenario,
   selectedSuites: TestSuiteType[],
@@ -585,6 +602,10 @@ function countScenarioTotalTests(
       if (scenario.supportedSuites.includes('specialPassphrase') && scenario.bip39ImportMnemonicWords) {
         total += 9 * 3; // 9 passphrases × 3 methods
       }
+    } else if (suiteType === 'securityCheck') {
+      total += convertTestData(securityCheckData).data.length;
+    } else if (suiteType === 'chainMethodBatch') {
+      total += countChainMethodBatchTests();
     } else {
       total += countSdkCasePaths(scenario, suiteType, passphraseVariants);
     }
@@ -2291,6 +2312,89 @@ export function useAutomationTest() {
     [addLog, incrementCompletedTests, notifyLiveCaseUpdate]
   );
 
+  const runChainMethodBatchSuite = useCallback(
+    async (
+      sdk: CoreApi,
+      connectId: string,
+      deviceId: string,
+    ): Promise<TestSuiteResult> => {
+      const startedAt = Date.now();
+      const results: TestCaseResult[] = [];
+      addLog('[ChainMethodBatch] Starting chain method batch suite');
+
+      try {
+        for (const chain of chainTestData) {
+          for (const entry of chain.data) {
+            for (const presuppose of entry.presupposes ?? []) {
+              const caseStart = Date.now();
+              const caseTitle = `${chain.symbol} / ${entry.method} / ${presuppose.title}`;
+              try {
+                const sdkMethod = (sdk as Record<string, unknown>)[entry.method];
+                if (typeof sdkMethod !== 'function') {
+                  results.push({
+                    title: caseTitle,
+                    method: entry.method,
+                    passed: false,
+                    error: `SDK method ${entry.method} not found`,
+                    duration: Date.now() - caseStart,
+                  });
+                  incrementCompletedTests();
+                  notifyLiveCaseUpdate('chainMethodBatch', 'Chain Method Batch', results);
+                  continue;
+                }
+
+                const sdkResult = await (sdkMethod as (...args: unknown[]) => Promise<{ success: boolean; payload?: { error?: string } }>)(
+                  connectId,
+                  deviceId,
+                  presuppose.value
+                );
+
+                if (sdkResult.success) {
+                  results.push({
+                    title: caseTitle,
+                    method: entry.method,
+                    passed: true,
+                    duration: Date.now() - caseStart,
+                  });
+                } else {
+                  results.push({
+                    title: caseTitle,
+                    method: entry.method,
+                    passed: false,
+                    error: sdkResult.payload?.error ?? 'unknown error',
+                    duration: Date.now() - caseStart,
+                  });
+                }
+              } catch (err) {
+                results.push({
+                  title: caseTitle,
+                  method: entry.method,
+                  passed: false,
+                  error: err instanceof Error ? err.message : String(err),
+                  duration: Date.now() - caseStart,
+                });
+              }
+
+              incrementCompletedTests();
+              notifyLiveCaseUpdate('chainMethodBatch', 'Chain Method Batch', results);
+              await delay(SDK_CASE_DELAY_MS);
+            }
+          }
+        }
+      } catch (error) {
+        results.push({
+          title: 'chainMethodBatch unexpected error',
+          passed: false,
+          error: error instanceof Error ? error.message : String(error),
+          duration: Date.now() - startedAt,
+        });
+      }
+
+      return createSuiteResult('chainMethodBatch', 'Chain Method Batch', results, Date.now() - startedAt);
+    },
+    [addLog, incrementCompletedTests, notifyLiveCaseUpdate]
+  );
+
   const runSelectedSdkSuites = useCallback(
     async (
       scenario: AutomationScenario,
@@ -2433,6 +2537,19 @@ export function useAutomationTest() {
         markSuiteCompleted();
       }
 
+      if (
+        selectedSuites.includes('chainMethodBatch') &&
+        scenario.supportedSuites.includes('chainMethodBatch') &&
+        !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
+      ) {
+        const chainMethodBatchResult = await runChainMethodBatchSuite(sdk, connectId, deviceId);
+        nextSuiteResults.push(chainMethodBatchResult);
+        if (liveScenarioCtxRef.current) {
+          liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
+        }
+        markSuiteCompleted();
+      }
+
       return nextSuiteResults;
     },
     [
@@ -2445,6 +2562,7 @@ export function useAutomationTest() {
       runSlip39SdkSuite,
       runSpecialPassphraseSuite,
       runSecurityCheckSuite,
+      runChainMethodBatchSuite,
     ]
   );
 

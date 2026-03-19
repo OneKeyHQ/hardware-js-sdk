@@ -176,7 +176,21 @@ function createSlip39ImportScenario(
   };
 }
 
+const MNEMONIC_12_API = 'journey timber such lumber buzz room march brave cotton chat ensure control'.split(' ');
+
 export const AUTOMATION_SCENARIOS: Record<AutomationScenarioId, AutomationScenario> = {
+  bip39_import_12_api: {
+    id: 'bip39_import_12_api',
+    jiraKey: 'OK-26054',
+    title: 'BIP39 导入 / API 专用助记词',
+    flowType: 'import',
+    walletType: 'bip39',
+    caseLabel: 'api-12',
+    wordCount: 12,
+    phonePilotSequenceId: 'api-normal-12',
+    supportedSuites: ['deviceFlow', 'securityCheck', 'chainMethodBatch'],
+    bip39ImportMnemonicWords: MNEMONIC_12_API,
+  },
   ok26053_bip39_create_12: createBip39CreateScenario(
     'ok26053_bip39_create_12',
     '12-word',
