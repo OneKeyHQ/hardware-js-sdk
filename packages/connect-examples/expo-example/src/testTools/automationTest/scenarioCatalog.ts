@@ -5,7 +5,12 @@ import type {
   TestSuiteType,
 } from '../../services/phonePilotMcp/types';
 
-const BIP39_CREATE_SUITES: TestSuiteType[] = ['deviceFlow', 'sdkAddressBatch', 'sdkPubkeyBatch', 'securityCheck'];
+const BIP39_CREATE_SUITES: TestSuiteType[] = [
+  'deviceFlow',
+  'sdkAddressBatch',
+  'sdkPubkeyBatch',
+  'securityCheck',
+];
 const BIP39_IMPORT_SUITES: TestSuiteType[] = [
   'deviceFlow',
   'sdkAddressBatch',
@@ -13,8 +18,18 @@ const BIP39_IMPORT_SUITES: TestSuiteType[] = [
   'specialPassphrase',
   'securityCheck',
 ];
-const SLIP39_CREATE_SUITES: TestSuiteType[] = ['deviceFlow', 'sdkAddressBatch', 'sdkPubkeyBatch', 'securityCheck'];
-const SLIP39_IMPORT_SUITES: TestSuiteType[] = ['deviceFlow', 'sdkAddressBatch', 'sdkPubkeyBatch', 'securityCheck'];
+const SLIP39_CREATE_SUITES: TestSuiteType[] = [
+  'deviceFlow',
+  'sdkAddressBatch',
+  'sdkPubkeyBatch',
+  'securityCheck',
+];
+const SLIP39_IMPORT_SUITES: TestSuiteType[] = [
+  'deviceFlow',
+  'sdkAddressBatch',
+  'sdkPubkeyBatch',
+  'securityCheck',
+];
 
 const BIP39_IMPORT_VECTORS = {
   12: {
@@ -176,7 +191,8 @@ function createSlip39ImportScenario(
   };
 }
 
-const MNEMONIC_12_API = 'journey timber such lumber buzz room march brave cotton chat ensure control'.split(' ');
+const MNEMONIC_12_API =
+  'journey timber such lumber buzz room march brave cotton chat ensure control'.split(' ');
 
 export const AUTOMATION_SCENARIOS: Record<AutomationScenarioId, AutomationScenario> = {
   bip39_import_12_api: {

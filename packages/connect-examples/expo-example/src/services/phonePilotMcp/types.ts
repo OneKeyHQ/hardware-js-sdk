@@ -113,7 +113,11 @@ export const DEVICE_PREPARATION_MODE_INFO: Record<
   },
 };
 
-export const ALL_DEVICE_PREPARATION_MODES: DevicePreparationMode[] = ['full', 'sdkOnly', 'deviceFlowOnly'];
+export const ALL_DEVICE_PREPARATION_MODES: DevicePreparationMode[] = [
+  'full',
+  'sdkOnly',
+  'deviceFlowOnly',
+];
 
 export type JiraIssueKey = 'OK-26053' | 'OK-26054' | 'OK-5504' | 'OK-40090';
 export type PassphraseVariantId = 'normal' | 'passphrase_empty' | 'passphrase_1' | 'passphrase_2';
