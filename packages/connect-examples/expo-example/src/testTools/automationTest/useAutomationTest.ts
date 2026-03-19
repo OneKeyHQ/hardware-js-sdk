@@ -2819,12 +2819,17 @@ export function useAutomationTest() {
               addLog(`Device features: initialized=${deviceFeatures?.initialized}, unlocked=${deviceFeatures?.unlocked}`);
               const isInitialized = deviceFeatures?.initialized !== false;
               const shouldSkipReset =
-                config.devicePreparationMode === 'skipReset' || !isInitialized;
+                !isInitialized;
 
               if (!isInitialized) {
                 addLog('Device is not initialized (factory state) — skipping reset step');
               }
 
+              if (!shouldSkipReset && !deviceFeatures) {
+                throw new Error(
+                  'Failed to fetch device features — cannot determine reset strategy. Check device connection.'
+                );
+              }
               const resetPreparation = shouldSkipReset
                 ? {
                     success: true,
@@ -2833,11 +2838,11 @@ export function useAutomationTest() {
                       'Device Reset',
                       !isInitialized
                         ? 'Skipped: device already in factory reset state (initialized=false)'
-                        : 'Skipped by user config (skipReset)'
+                        : 'Skipped by config (auto-detected)'
                     ),
                     mnemonicStoreResult: null,
                   }
-                : await executeResetPreparation(deviceFeatures!, scenarioHealth);
+                : await executeResetPreparation(deviceFeatures as Record<string, unknown>, scenarioHealth);
               if (!resetPreparation.success) {
                 if (selectedSuites.includes('deviceFlow')) {
                   suiteResults.push(resetPreparation.suiteResult);
