@@ -3,6 +3,7 @@
  */
 
 import { atom } from 'jotai';
+import { atomWithStorage } from 'jotai/utils';
 
 import type {
   AutomationTestConfig,
@@ -42,7 +43,10 @@ const defaultProgress: TestProgress = {
 export const phonePilotConnectionStateAtom = atom<ConnectionState>('disconnected');
 export const phonePilotHealthAtom = atom<HealthCheckResponse | null>(null);
 export const cameraFrameAtom = atom<string | null>(null);
-export const automationConfigAtom = atom<AutomationTestConfig>(defaultConfig);
+export const automationConfigAtom = atomWithStorage<AutomationTestConfig>(
+  'automation-test-config',
+  defaultConfig
+);
 export const automationProgressAtom = atom<TestProgress>(defaultProgress);
 export const automationReportAtom = atom<TestReport | null>(null);
 export const liveReportAtom = atom<TestReport | null>(null);
