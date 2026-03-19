@@ -21,8 +21,7 @@ export function LogsSection() {
           ref={textAreaRef}
           value={logs.join('\n')}
           editable={false}
-          minHeight={120}
-          maxHeight={400}
+          height={650}
           fontSize={12}
           lineHeight={16}
           fontFamily="$mono"

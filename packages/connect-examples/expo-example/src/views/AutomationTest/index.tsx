@@ -175,11 +175,11 @@ function AutomationTestContent() {
       </PanelView>
 
       {/* Two-column layout: config left, report+logs right */}
-      <XStack gap="$3" alignItems="flex-start">
+      <XStack gap="$3" alignItems="stretch">
         {/* Left: Config (35%) */}
         <YStack width="35%" minWidth={280}>
           <PanelView title="测试配置">
-            <ScrollView maxHeight="80vh" showsVerticalScrollIndicator>
+            <ScrollView height={680} showsVerticalScrollIndicator>
               <YStack gap="$0">
                 <ScenarioSelector
                   config={config}
@@ -214,7 +214,7 @@ function AutomationTestContent() {
                 </XStack>
               )}
             </XStack>
-            <ScrollView maxHeight="80vh" marginTop="$3" showsVerticalScrollIndicator>
+            <ScrollView height={680} marginTop="$3" showsVerticalScrollIndicator>
               {activeTab === 'report' ? <ReportTree /> : <LogsSection />}
             </ScrollView>
           </PanelView>
