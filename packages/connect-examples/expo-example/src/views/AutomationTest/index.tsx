@@ -122,7 +122,12 @@ function AutomationTestContent() {
                 paddingHorizontal="$3"
                 backgroundColor={(!canStart || isRunning) ? '$gray5' : '$green9'}
                 color={(!canStart || isRunning) ? '$gray10' : 'white'}
-                hoverStyle={(!canStart || isRunning) ? {} : { opacity: 0.8 }}
+                hoverStyle={(!canStart || isRunning)
+                  ? { backgroundColor: '$gray5' }
+                  : { opacity: 0.8, backgroundColor: '$green9' }}
+                pressStyle={(!canStart || isRunning)
+                  ? { backgroundColor: '$gray5' }
+                  : { opacity: 0.7, backgroundColor: '$green9' }}
                 cursor={(!canStart || isRunning) ? 'not-allowed' : 'pointer'}
                 onPress={automation.startAutomation}
                 disabled={!canStart || isRunning}
@@ -137,7 +142,12 @@ function AutomationTestContent() {
                 paddingHorizontal="$3"
                 backgroundColor={!isRunning ? '$gray5' : '$red9'}
                 color={!isRunning ? '$gray10' : 'white'}
-                hoverStyle={!isRunning ? {} : { opacity: 0.8 }}
+                hoverStyle={!isRunning
+                  ? { backgroundColor: '$gray5' }
+                  : { opacity: 0.8, backgroundColor: '$red9' }}
+                pressStyle={!isRunning
+                  ? { backgroundColor: '$gray5' }
+                  : { opacity: 0.7, backgroundColor: '$red9' }}
                 cursor={!isRunning ? 'not-allowed' : 'pointer'}
                 onPress={automation.stopAutomation}
                 disabled={!isRunning}

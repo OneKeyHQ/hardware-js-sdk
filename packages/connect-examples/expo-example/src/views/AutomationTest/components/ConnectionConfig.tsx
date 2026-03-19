@@ -53,7 +53,8 @@ export function ConnectionConfig({
           paddingHorizontal="$3"
           backgroundColor={isConnected ? '$red9' : '$blue9'}
           color="white"
-          hoverStyle={{ opacity: 0.8 }}
+          hoverStyle={{ opacity: 0.8, backgroundColor: isConnected ? '$red9' : '$blue9' }}
+          pressStyle={{ opacity: 0.7, backgroundColor: isConnected ? '$red9' : '$blue9' }}
           cursor="pointer"
           onPress={isConnected ? onDisconnect : onConnect}
         >
