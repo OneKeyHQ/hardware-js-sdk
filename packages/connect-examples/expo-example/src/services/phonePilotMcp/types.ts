@@ -139,7 +139,8 @@ export type TestSuiteType =
   | 'deviceFlow'
   | 'sdkAddressBatch'
   | 'sdkPubkeyBatch'
-  | 'specialPassphrase';
+  | 'specialPassphrase'
+  | 'securityCheck';
 
 export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description: string }> = {
   deviceFlow: {
@@ -157,6 +158,10 @@ export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description
   specialPassphrase: {
     label: '特殊密码短语',
     description: '9 组特殊字符 × 3 方法（BTC/EVM/DNX），mockDevice vs SDK',
+  },
+  securityCheck: {
+    label: '安全检查',
+    description: '盲签名安全检查：28 个链签名方法 × 合法/非法 coinType，验证 safetyChecks 行为',
   },
 };
 

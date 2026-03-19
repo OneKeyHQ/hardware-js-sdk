@@ -7,6 +7,8 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
 import { getAllAutomationScenarios, getAutomationScenario } from './scenarioCatalog';
+import { convertTestData, getDeviceExpected } from '../securityCheckTest/blindSignature/utils';
+import securityCheckData from '../securityCheckTest/blindSignature/data';
 import {
   resolveBip39ImportSdkCases,
   type AutomationSdkCase,
@@ -2178,6 +2180,117 @@ export function useAutomationTest() {
     [addLog, runWithRetry, updateSuiteProgress, incrementCompletedTests]
   );
 
+  const runSecurityCheckSuite = useCallback(
+    async (
+      sdk: CoreApi,
+      connectId: string,
+      deviceId: string,
+    ): Promise<TestSuiteResult> => {
+      const startedAt = Date.now();
+      const results: TestCaseResult[] = [];
+      addLog('[SecurityCheck] Starting blind signature security check suite');
+
+      try {
+        // Disable passphrase_protection and set safetyChecks: 0 (strict)
+        const featuresBeforeCheck = await fetchDeviceFeatures(sdk, connectId);
+        if (featuresBeforeCheck?.passphrase_protection) {
+          addLog('[SecurityCheck] Disabling passphrase_protection');
+          await sdk.deviceSettings(connectId, { usePassphrase: false });
+        }
+        // @ts-expect-error safetyChecks not in type definitions yet
+        await sdk.deviceSettings(connectId, { safetyChecks: 0 });
+        addLog('[SecurityCheck] safetyChecks set to strict (0)');
+
+        const testCases = convertTestData(securityCheckData).data;
+        addLog(`[SecurityCheck] Running ${testCases.length} test cases`);
+
+        for (const testCase of testCases) {
+          const caseStart = Date.now();
+          const { method, params, expect: expectedResult, title } = testCase;
+
+          try {
+            const sdkMethod = (sdk as Record<string, unknown>)[method];
+            if (typeof sdkMethod !== 'function') {
+              results.push({
+                title,
+                method,
+                passed: false,
+                error: `SDK method ${method} not found`,
+                duration: Date.now() - caseStart,
+              });
+              incrementCompletedTests();
+              notifyLiveCaseUpdate('securityCheck', 'Security Check', results);
+              continue;
+            }
+
+            let sdkResult: { success: boolean; payload?: { error?: string } };
+            try {
+              const resultOrTimeout = await Promise.race([
+                (sdkMethod as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, params),
+                new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), 45_000)),
+              ]);
+              if (resultOrTimeout === 'timeout') {
+                sdk.cancel(connectId);
+                await sdk.getFeatures(connectId, { retryCount: 1 });
+                sdkResult = { success: false, payload: { error: 'timeout after 45s' } };
+              } else {
+                sdkResult = resultOrTimeout as typeof sdkResult;
+              }
+            } catch (callError) {
+              sdkResult = { success: false, payload: { error: callError instanceof Error ? callError.message : String(callError) } };
+            }
+
+            // Allow device-specific overrides (e.g. Pro doesn't support DNX)
+            const coinType = (() => {
+              const path: string = (params as Record<string, unknown>)?.path as string
+                ?? ((params as Record<string, unknown>)?.inputs as Array<Record<string, unknown>>)?.[0]?.path as string
+                ?? '';
+              return path.split('/')[2]?.replace(/'/g, '') ?? '';
+            })();
+            const deviceFeats = deviceFeaturesRef.current ?? {};
+            const expected = getDeviceExpected(deviceFeats, method, coinType, expectedResult, { securityChecksDisabled: false });
+
+            const actualSuccess = sdkResult.success;
+            const passed = expected ? actualSuccess : !actualSuccess;
+            const expectedLabel = expected ? 'success' : 'failure';
+            const actualLabel = actualSuccess ? 'success' : `failure(${sdkResult.payload?.error ?? ''})`;
+
+            results.push({
+              title,
+              method,
+              expected: expectedLabel,
+              actual: actualLabel,
+              passed,
+              duration: Date.now() - caseStart,
+            });
+          } catch (error) {
+            results.push({
+              title,
+              method,
+              passed: false,
+              error: error instanceof Error ? error.message : String(error),
+              duration: Date.now() - caseStart,
+            });
+          }
+
+          incrementCompletedTests();
+          notifyLiveCaseUpdate('securityCheck', 'Security Check', results);
+          await delay(SDK_CASE_DELAY_MS);
+        }
+      } catch (error) {
+        results.push({
+          title: 'securityCheck unexpected error',
+          passed: false,
+          error: error instanceof Error ? error.message : String(error),
+          duration: Date.now() - startedAt,
+        });
+      }
+
+      return createSuiteResult('securityCheck', 'Security Check', results, Date.now() - startedAt);
+    },
+    [addLog, incrementCompletedTests, notifyLiveCaseUpdate]
+  );
+
   const runSelectedSdkSuites = useCallback(
     async (
       scenario: AutomationScenario,
@@ -2307,6 +2420,19 @@ export function useAutomationTest() {
         markSuiteCompleted();
       }
 
+      if (
+        selectedSuites.includes('securityCheck') &&
+        scenario.supportedSuites.includes('securityCheck') &&
+        !shouldStopBySuiteFailure(config.stopOnFirstError, nextSuiteResults)
+      ) {
+        const securityCheckResult = await runSecurityCheckSuite(sdk, connectId, deviceId);
+        nextSuiteResults.push(securityCheckResult);
+        if (liveScenarioCtxRef.current) {
+          liveScenarioCtxRef.current.completedSuiteResults = [...nextSuiteResults];
+        }
+        markSuiteCompleted();
+      }
+
       return nextSuiteResults;
     },
     [
@@ -2318,6 +2444,7 @@ export function useAutomationTest() {
       runSlip39CreateDynamicSuite,
       runSlip39SdkSuite,
       runSpecialPassphraseSuite,
+      runSecurityCheckSuite,
     ]
   );
 
