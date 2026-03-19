@@ -31,6 +31,7 @@ const defaultProgress: TestProgress = {
   currentTestSuite: null,
   currentTestIndex: 0,
   totalTests: 0,
+  completedTests: 0,
   completedScenarios: 0,
   totalScenarios: 0,
   completedSuites: 0,
@@ -138,7 +139,9 @@ export const canStartAutomationAtom = atom(get => {
   const isConnected = get(phonePilotConnectionStateAtom) === 'connected';
   const isRunning = get(isAutomationRunningAtom);
   const config = get(automationConfigAtom);
-  const hasScenarios = config.scenarioIds.length > 0 && config.testSuites.length > 0;
+  // deviceFlowOnly always runs only deviceFlow suite, testSuites selection is irrelevant
+  const hasScenarios = config.scenarioIds.length > 0 &&
+    (config.devicePreparationMode === 'deviceFlowOnly' || config.testSuites.length > 0);
   if (config.devicePreparationMode === 'sdkOnly') {
     return !isRunning && hasScenarios;
   }
@@ -147,6 +150,9 @@ export const canStartAutomationAtom = atom(get => {
 
 export const progressPercentageAtom = atom(get => {
   const progress = get(automationProgressAtom);
+  if (progress.totalTests > 0) {
+    return Math.round((progress.completedTests / progress.totalTests) * 100);
+  }
   if (progress.totalSuites === 0) {
     return 0;
   }

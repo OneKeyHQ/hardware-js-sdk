@@ -9,9 +9,11 @@ import type { ScenarioReportResult } from '../../../services/phonePilotMcp/types
 function ReportScenarioNodeInner({
   scenario,
   expandAll,
+  filter,
 }: {
   scenario: ScenarioReportResult;
   expandAll: boolean;
+  filter?: 'all' | 'failed';
 }) {
   const autoExpand = scenario.status === 'failed';
   const [localExpanded, setLocalExpanded] = useState(autoExpand);
@@ -51,13 +53,20 @@ function ReportScenarioNodeInner({
         </XStack>
         {expanded ? (
           <YStack gap="$2">
-            {scenario.suiteResults.map(suite => (
-              <ReportSuiteNode
-                key={`${scenario.scenarioId}-${suite.suiteType}`}
-                suite={suite}
-                expandAll={expandAll}
-              />
-            ))}
+            {scenario.suiteResults
+              .filter(suite =>
+                filter === 'failed'
+                  ? suite.results.some(r => !r.passed && !r.skipped)
+                  : true
+              )
+              .map(suite => (
+                <ReportSuiteNode
+                  key={`${scenario.scenarioId}-${suite.suiteType}`}
+                  suite={suite}
+                  expandAll={expandAll}
+                  filter={filter}
+                />
+              ))}
           </YStack>
         ) : null}
       </YStack>

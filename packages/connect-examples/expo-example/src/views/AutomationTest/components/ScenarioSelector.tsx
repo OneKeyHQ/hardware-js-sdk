@@ -181,10 +181,16 @@ export function ScenarioSelector({
                         checked={checked}
                         disabled={isRunning}
                         pointerEvents="none"
+                        borderWidth={1.5}
                         borderRadius="$1"
+                        borderColor={checked ? '$blue8' : '$gray7'}
+                        backgroundColor={checked ? '$blue3' : 'transparent'}
+                        width={16}
+                        height={16}
+                        minWidth={16}
                       >
                         <Checkbox.Indicator>
-                          <CheckIcon size={12} />
+                          <CheckIcon size={11} />
                         </Checkbox.Indicator>
                       </Checkbox>
                       <Text fontSize={12} flex={1}>{scenario.title}</Text>

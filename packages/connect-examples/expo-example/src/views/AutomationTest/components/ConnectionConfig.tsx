@@ -1,5 +1,5 @@
 import { useAtomValue } from 'jotai';
-import { Button, Card, Input, Stack, Text, XStack, YStack } from 'tamagui';
+import { Button, Input, Stack, Text, XStack, YStack } from 'tamagui';
 
 import {
   phonePilotConnectionStateAtom,
@@ -28,54 +28,59 @@ export function ConnectionConfig({
 
   const statusLabelMap = {
     connected: '已连接',
-    connecting: '连接中',
+    connecting: '连接中...',
     disconnected: '未连接',
     error: '连接失败',
   } as const;
 
   return (
-    <YStack gap="$3">
-      <Text fontSize={14} fontWeight="700">
-        PhonePilot 连接
-      </Text>
-      <YStack gap="$2">
-        <Text fontSize={12} color="$gray10">
-          MCP 地址
-        </Text>
+    <YStack gap="$2">
+      {/* URL + connect button on one row */}
+      <XStack alignItems="center" gap="$2">
+        <Text fontSize={12} color="$gray10" minWidth={60}>MCP 地址</Text>
         <Input
+          flex={1}
+          size="$3"
+          height={34}
           value={config.phonePilotUrl}
           onChangeText={value => setConfig(prev => ({ ...prev, phonePilotUrl: value }))}
           placeholder="http://localhost:3847"
         />
-      </YStack>
-
-      <XStack alignItems="center" justifyContent="space-between" gap="$3" flexWrap="wrap">
-        <Text fontSize={13} color={getConnectionColor(connectionState)}>
-          当前状态: {statusLabelMap[connectionState]}
-        </Text>
-        <Button onPress={isConnected ? onDisconnect : onConnect}>
-          {isConnected ? '断开连接' : '连接 PhonePilot'}
+        <Button
+          size="$3"
+          height={34}
+          borderRadius="$2"
+          paddingHorizontal="$3"
+          backgroundColor={isConnected ? '$red9' : '$blue9'}
+          color="white"
+          hoverStyle={{ opacity: 0.8 }}
+          cursor="pointer"
+          onPress={isConnected ? onDisconnect : onConnect}
+        >
+          {isConnected ? '断开' : '连接'}
         </Button>
       </XStack>
 
-      <XStack gap="$3" flexWrap="wrap">
+      {/* Status + health on one row */}
+      <XStack alignItems="center" gap="$3" flexWrap="wrap">
         <XStack alignItems="center" gap="$1.5">
           <Stack
-            width={8}
-            height={8}
+            width={7}
+            height={7}
             borderRadius={4}
-            backgroundColor={getReadyColor(health?.mcpReady)}
+            backgroundColor={getConnectionColor(connectionState)}
           />
-          <Text fontSize={12}>MCP: {formatReadyLabel(health?.mcpReady)}</Text>
+          <Text fontSize={12} color={getConnectionColor(connectionState)}>
+            {statusLabelMap[connectionState]}
+          </Text>
         </XStack>
         <XStack alignItems="center" gap="$1.5">
-          <Stack
-            width={8}
-            height={8}
-            borderRadius={4}
-            backgroundColor={getReadyColor(health?.ocrReady)}
-          />
-          <Text fontSize={12}>OCR: {formatReadyLabel(health?.ocrReady)}</Text>
+          <Stack width={7} height={7} borderRadius={4} backgroundColor={getReadyColor(health?.mcpReady)} />
+          <Text fontSize={11} color="$gray10">MCP: {formatReadyLabel(health?.mcpReady)}</Text>
+        </XStack>
+        <XStack alignItems="center" gap="$1.5">
+          <Stack width={7} height={7} borderRadius={4} backgroundColor={getReadyColor(health?.ocrReady)} />
+          <Text fontSize={11} color="$gray10">OCR: {formatReadyLabel(health?.ocrReady)}</Text>
         </XStack>
       </XStack>
     </YStack>

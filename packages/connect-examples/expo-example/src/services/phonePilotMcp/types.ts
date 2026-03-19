@@ -93,7 +93,7 @@ export interface MnemonicStoreResult {
   flowType?: 'create' | 'import' | 'manual';
 }
 
-export type DevicePreparationMode = 'full' | 'skipReset' | 'sdkOnly';
+export type DevicePreparationMode = 'full' | 'skipReset' | 'sdkOnly' | 'deviceFlowOnly';
 
 export const DEVICE_PREPARATION_MODE_INFO: Record<
   DevicePreparationMode,
@@ -111,9 +111,13 @@ export const DEVICE_PREPARATION_MODE_INFO: Record<
     label: '仅 SDK 测试',
     description: '设备已有正确钱包，跳过所有 PhonePilot，直接 SDK 测试',
   },
+  deviceFlowOnly: {
+    label: '仅设备流程',
+    description: '仅执行重置 → 创建/导入序列，跳过所有 SDK 测试',
+  },
 };
 
-export const ALL_DEVICE_PREPARATION_MODES: DevicePreparationMode[] = ['full', 'skipReset', 'sdkOnly'];
+export const ALL_DEVICE_PREPARATION_MODES: DevicePreparationMode[] = ['full', 'skipReset', 'sdkOnly', 'deviceFlowOnly'];
 
 export type JiraIssueKey = 'OK-26053' | 'OK-26054' | 'OK-5504' | 'OK-40090';
 export type PassphraseVariantId = 'normal' | 'passphrase_empty' | 'passphrase_1' | 'passphrase_2';
@@ -224,6 +228,7 @@ export interface TestProgress {
   currentTestSuite: TestSuiteType | null;
   currentTestIndex: number;
   totalTests: number;
+  completedTests: number;
   completedScenarios: number;
   totalScenarios: number;
   completedSuites: number;
@@ -249,6 +254,8 @@ export interface TestSuiteResult {
   suiteName: string;
   status: 'passed' | 'failed' | 'skipped';
   totalTests: number;
+  /** Pre-calculated expected total — set at suite start, stays fixed during live updates. */
+  expectedTotalTests?: number;
   passedTests: number;
   failedTests: number;
   skippedTests: number;

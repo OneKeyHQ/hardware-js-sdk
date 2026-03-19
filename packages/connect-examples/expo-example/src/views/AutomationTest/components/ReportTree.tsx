@@ -21,7 +21,11 @@ export function ReportTree() {
       return [];
     }
     if (filter === 'failed') {
-      return report.scenarioResults.filter(s => s.status === 'failed');
+      return report.scenarioResults.filter(s =>
+        s.suiteResults.some(suite =>
+          suite.results.some(r => !r.passed && !r.skipped)
+        )
+      );
     }
     return report.scenarioResults;
   }, [report, filter]);
@@ -46,6 +50,7 @@ export function ReportTree() {
             key={scenario.scenarioId}
             scenario={scenario}
             expandAll={expandAll}
+            filter={filter}
           />
         ))}
       </YStack>

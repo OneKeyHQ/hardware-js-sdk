@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
 
-import { formatDuration, getStatusColor } from '../utils';
+import { formatDuration } from '../utils';
 import { ReportCaseRow } from './ReportCaseRow';
 
 import type { TestSuiteResult } from '../../../services/phonePilotMcp/types';
@@ -9,9 +9,11 @@ import type { TestSuiteResult } from '../../../services/phonePilotMcp/types';
 function ReportSuiteNodeInner({
   suite,
   expandAll,
+  filter,
 }: {
   suite: TestSuiteResult;
   expandAll: boolean;
+  filter?: 'all' | 'failed';
 }) {
   const autoExpand = suite.status === 'failed';
   const [localExpanded, setLocalExpanded] = useState(autoExpand);
@@ -25,6 +27,13 @@ function ReportSuiteNodeInner({
   }, [expandAll]);
 
   const expanded = localExpanded;
+
+  const filteredResults = useMemo(() => {
+    if (filter === 'failed') {
+      return suite.results.filter(r => !r.passed && !r.skipped);
+    }
+    return suite.results;
+  }, [suite.results, filter]);
 
   return (
     <Card bordered padding="$3" backgroundColor="$bgApp">
@@ -40,15 +49,17 @@ function ReportSuiteNodeInner({
             <Text fontSize={13} fontWeight="700">
               {expanded ? '▾' : '▸'} {suite.suiteName}
             </Text>
-            <Text fontSize={11} color="$gray10">
-              状态: <Text color={getStatusColor(suite.status)}>{suite.status}</Text> · 用例{' '}
-              {suite.passedTests}/{suite.totalTests} · 耗时 {formatDuration(suite.duration)}
-            </Text>
+            <XStack gap="$2" flexWrap="wrap">
+              <Text fontSize={11} color="$green10">通过 {suite.passedTests}</Text>
+              <Text fontSize={11} color="$gray10">·</Text>
+              <Text fontSize={11} color={suite.failedTests > 0 ? '$red10' : '$gray10'}>失败 {suite.failedTests}</Text>
+              <Text fontSize={11} color="$gray10">· 总 {suite.expectedTotalTests ?? suite.totalTests} · 耗时 {formatDuration(suite.duration)}</Text>
+            </XStack>
           </YStack>
         </XStack>
         {expanded ? (
           <YStack gap="$2">
-            {suite.results.map(testCase => (
+            {filteredResults.map(testCase => (
               <ReportCaseRow
                 key={`${suite.suiteType}-${testCase.title}`}
                 testCase={testCase}

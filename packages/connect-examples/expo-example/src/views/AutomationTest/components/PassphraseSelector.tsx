@@ -66,9 +66,21 @@ export function PassphraseSelector({
               cursor={isRunning ? 'not-allowed' : 'pointer'}
               onPress={isRunning ? undefined : () => togglePassphraseVariant(variantId)}
             >
-              <Checkbox size="$3" checked={checked} disabled={isRunning} pointerEvents="none">
+              <Checkbox
+                size="$3"
+                checked={checked}
+                disabled={isRunning}
+                pointerEvents="none"
+                borderWidth={1.5}
+                borderRadius="$2"
+                borderColor={checked ? '$blue8' : '$gray7'}
+                backgroundColor={checked ? '$blue3' : 'transparent'}
+                width={18}
+                height={18}
+                minWidth={18}
+              >
                 <Checkbox.Indicator>
-                  <CheckIcon size={14} />
+                  <CheckIcon size={12} />
                 </Checkbox.Indicator>
               </Checkbox>
               <Text fontSize={12} fontWeight="500">{PASSPHRASE_VARIANT_INFO[variantId].label}</Text>
