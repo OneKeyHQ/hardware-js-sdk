@@ -25,6 +25,9 @@ logs
 .eslintcache
 *.tsbuildinfo
 
+# automation test reports
+automation-report-*.json
+
 # build outputs
 lib
 libDev
