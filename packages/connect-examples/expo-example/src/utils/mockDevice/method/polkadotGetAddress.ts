@@ -1,7 +1,9 @@
 /* eslint-disable no-bitwise */
-import { encodeAddress, hdLedger } from '@polkadot/util-crypto';
+import { ed25519PairFromSeed, encodeAddress } from '@polkadot/util-crypto';
+import { ledgerDerivePrivate } from '@polkadot/util-crypto/hd/ledger/derivePrivate';
+import { ledgerMaster } from '@polkadot/util-crypto/hd/ledger/master';
 
-import { deriveKeyPairWithPath } from '../helper';
+import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
 import type { PolkadotGetAddressParams } from '@onekeyfe/hd-core';
 
@@ -36,8 +38,18 @@ export function generatePolkadotAddressFromMnemonic(
   prefix = 0,
   passphrase = ''
 ): string {
-  const secret = hdLedger(mnemonic, path, passphrase);
-  return encodeAddress(secret.publicKey, prefix);
+  let extendedPrivateKey = ledgerMaster(mnemonic, passphrase);
+
+  for (const segment of path.split('/').slice(1)) {
+    const index = Number.parseInt(segment.replace(/'$/, ''), 10);
+    if (Number.isNaN(index)) {
+      throw new Error(`Invalid derivation index: ${segment}`);
+    }
+    extendedPrivateKey = ledgerDerivePrivate(extendedPrivateKey, index + 0x80000000);
+  }
+
+  const keyPair = ed25519PairFromSeed(extendedPrivateKey.slice(0, 32));
+  return encodeAddress(keyPair.publicKey, prefix);
 }
 
 export default function polkadotGetAddress(

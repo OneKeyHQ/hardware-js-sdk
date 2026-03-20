@@ -13,6 +13,8 @@ export type TestCaseDataType = {
   path?: string;
   params?: any;
   expect: boolean;
+  confirmCount?: number;
+  noSlide?: boolean;
 };
 
 export type SecurityCheckTestCase = TestCase<TestCaseDataType[]>;

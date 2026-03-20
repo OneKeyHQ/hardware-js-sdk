@@ -84,7 +84,10 @@ export default class WebUsbTransport {
       const device = await this.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
       return device;
     } catch (e) {
-      this.Log.debug('requestDevice error: ', e);
+      this.Log.debug(
+        'requestDevice error: ',
+        e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+      );
       return null;
     }
   }
@@ -132,7 +135,7 @@ export default class WebUsbTransport {
       await this.connect(input.path ?? '', true);
       return await Promise.resolve(input.path);
     } catch (e) {
-      this.Log.debug('acquire error: ', e);
+      this.Log.debug('acquire error: ', e instanceof Error ? `${e.name}: ${e.message}` : String(e));
       throw e;
     }
   }

@@ -1,6 +1,6 @@
-import { type PlaygroundProps } from '../../../components/Playground';
+import type { ChainMethodEntry } from './index';
 
-const btcData: PlaygroundProps[] = [
+const btcData: ChainMethodEntry[] = [
   {
     method: 'btcGetAddress',
     description: 'Get a Bitcoin address for your account.',
@@ -91,6 +91,8 @@ const btcData: PlaygroundProps[] = [
   },
   {
     method: 'btcSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     description: 'Sign a message with your Bitcoin private key.',
     presupposes: [
       {
@@ -124,6 +126,7 @@ const btcData: PlaygroundProps[] = [
   },
   {
     method: 'btcSignTransaction',
+    confirmCount: 2,
     description: 'Sign a Bitcoin transaction with your Bitcoin private key.',
     presupposes: [
       {

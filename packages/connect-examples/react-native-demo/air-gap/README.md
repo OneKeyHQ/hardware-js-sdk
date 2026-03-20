@@ -38,4 +38,38 @@ The module under `packages/connect-examples/react-native-demo/air-gap` demonstra
 - `getAirGapSdk()`: lazily instantiates the Keystone SDK with chain-specific extensions (`AirGapEthSDK`, `AirGapBtcSDK`, `AirGapSolSDK`).
 - `OneKeyRequestDeviceQR`: wraps outbound requests so they conform to the `onekey-app-call-device` message structure understood by the hardware.
 
+## Third-party wallet integration notes
+
+When integrating OneKey Air-Gap with an existing wallet app, watch out for these issues discovered during real-world integrations:
+
+### UR type routing (critical)
+
+Most wallets use a whitelist to route UR data to the correct decoder. The BC-UR v2 decoder (`@ngraveio/bc-ur` `URDecoder`) uses fountain codes, while legacy v1 uses a completely different `bc-bech32` encoding.
+
+**Problem**: If a UR type is not in the whitelist, it falls through to the legacy v1 decoder and gets stuck (e.g., "please continue scanning 1/1").
+
+**Solution**: Ensure all standard UR types are in the v2 whitelist. The types your scanner must accept:
+- `crypto-psbt` — BTC PSBT (request and response)
+- `crypto-hdkey` — HD key export from device
+- `crypto-multi-accounts` — Multi-account export from device
+- `eth-signature` — Ethereum signature response
+- `sol-signature` — Solana signature response
+- `btc-signature` — Bitcoin signature response
+
+### `onekey-app-call-device` is private
+
+The `onekey-app-call-device` UR type is an internal protocol for OneKey device management (batch account export, address verification). **Third-party wallets should NOT implement this** — it may change at any time. Use standard Keystone SDK methods (`parseMultiAccounts`, `parseHDKey`) to handle device responses instead.
+
+### Fragment size differences
+
+- OneKey demo uses `maxFragmentLength: 100` (balanced density)
+- OneKey firmware uses `max_fragment_len: 200`
+- Other wallets may use different values (e.g., 150–200)
+
+The BC-UR decoder handles any fragment size, so these differences don't cause failures. However, larger fragments produce denser QR codes that may be harder for some cameras to scan. Consider the target device's camera quality when choosing fragment sizes.
+
+### Decoder lifecycle
+
+Always create a fresh `URDecoder` for each scanning session. A stale decoder from a previous incomplete scan will reject parts from a new UR payload (different type or sequence). The demo uses a ref-based per-session decoder that is created when the scanner opens and destroyed when it closes.
+
 Consult the source files in `air-gap/sdk` and `air-gap/src` for concrete usage patterns that can be copied into your own application.

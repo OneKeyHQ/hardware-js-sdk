@@ -4,7 +4,7 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
   id: 'count20_two_passphrase_2',
   name: 'count20_two_passphrase_2',
   description: '2-of-3 (20 words each) + passphrase_2',
-  passphrase: "qwertyuiopasdfghjklzxcvbnm1234567890-=[];',./12345",
+  passphrase: 'onekey',
   shares: [
     'network vexed academic acid alive forbid database equation average advocate golden careful exhaust dance texture satisfy lair negative earth flash',
     'network vexed academic agency calcium memory elegant merchant welcome oral evidence bulb union company suitable spend loud miracle story withdraw',
@@ -18,14 +18,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         coin: 'btc',
       },
       expectedPublicKey: {
-        "m/44'/0'/0'/0/0": '0359f52a39fce3ba44e8a84866bc4fe9233cd9a1cd4c699b54d26192dcba579adf',
-        "m/44'/0'/1'/0/0": '02e380ec44f1639dc7bdf48451d7a02f5fd7d80250c1cb23da527f4a03be3285bd',
+        "m/44'/0'/0'/0/0": '022926ec93a6350c651cd4a24c9dd04eefe986deecd9bbb34d78c543df3bb3b171',
+        "m/44'/0'/1'/0/0": '02535c0b824ec1f0de4c8e93adf5fb3802953ea465e25a1a358f6322ed868620d5',
         "m/44'/0'/21234567'/0/0":
-          '039c374a836a9e0da87ddc56391fbf3043bcb82c76af1bf856051f8423c9e107ba',
+          '03e69f5b062d4913ae3c69419f8ce719d805c3eae9e615f8164362708469040f11',
         "m/44'/0'/2147483646'/0/0":
-          '03f728d24540ca8db8216573743428bc05f1b579d4781b44ece1f97dc58e71e0a8',
+          '0327128a7e64d376bbc0b97641fd0bacccd89c286fd6fcc54eff0e6e685a1c943e',
         "m/44'/0'/2147483647'/0/0":
-          '02bf2cda28556b749630738eeb02ae7f161b6485553f1cf4fea44c7a35f3846188',
+          '02de2c58c1f93b034d1e1bcaef1829cb817635d0ff1b650ae7addcf18e281a0981',
       },
     },
     {
@@ -37,14 +37,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         scriptType: 'SPENDP2SHWITNESS',
       },
       expectedPublicKey: {
-        "m/49'/0'/0'/0/0": '039829bbac25babf180604495c3b1eae84aba6e0b22b568f8b3c5943598544b7d5',
-        "m/49'/0'/1'/0/0": '03ebaaa1885cc5111aff630b90e301c09e61542e54901478aa2346f69b94a658b7',
+        "m/49'/0'/0'/0/0": '03afb324054ba060b1582638439d86cf4cff778a9008dbedfbe8efd01e91b52c3a',
+        "m/49'/0'/1'/0/0": '03e91535a2608a3dd40642caf3d6361b76c82f4e2bd87ed04c3de8fc46af5cdc60',
         "m/49'/0'/21234567'/0/0":
-          '03942a7c122ff8fc9b8afdd0b9c791c52da9da7028d5c95fb01797f18ecc803872',
+          '0271a4cfe6c373be9a16dcd13c47500ff4431703d23ad193fa241de6e75cfcd62c',
         "m/49'/0'/2147483646'/0/0":
-          '03166d16e853de6d7ad0fddb41f32e3029bd28d7a95f0939f27d93748cebd56fc9',
+          '032c346d5a190f926a947e71884aa060e756a3b29b40e1e9009ea269dd9ca62e86',
         "m/49'/0'/2147483647'/0/0":
-          '0302a78205ba2b6fbe7ee789e3aea620d6f0a72c729a8a5d74afcf82a972ad3723',
+          '0248f42c9af61752c09a7d8eabf17a18cd6eab0b41e76e8ec8c4725f70d863b94e',
       },
     },
     {
@@ -56,14 +56,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         scriptType: 'SPENDWITNESS',
       },
       expectedPublicKey: {
-        "m/84'/0'/0'/0/0": '027492aa01fbd13561c63b3c351a634e09b28b17e69d539f6e525059d42d41c172',
-        "m/84'/0'/1'/0/0": '024ef8c1502bdb403ddf72ea83e9e3b6d6e92e9e123f63eb7b277ffaf5cb7fa9b8',
+        "m/84'/0'/0'/0/0": '0216f18dc0411cf267e8fd1667b99b33e830dafb8a045f94a1bc920dc6407bd7b0',
+        "m/84'/0'/1'/0/0": '03cfa69227f4abb0428a46806f9546fa2d17ad60ed296735f4448aff14cd1c8659',
         "m/84'/0'/21234567'/0/0":
-          '038696121b4445582e0b8898b0c826f1bc36de9d01056e8fab4129902962332f63',
+          '02c5b495e53e4899e08ac2351789c772f95b1790733a77b4321d6db62dcc2b81ff',
         "m/84'/0'/2147483646'/0/0":
-          '034ac50abaa5b98ff1c5707a2a2bdec03dd2c0582971ad1cd8f1be66ba1a8abf22',
+          '0360e49a6805ca56fffed7d145dc42dc0210e73393677c4b2438d74962ea19c8a3',
         "m/84'/0'/2147483647'/0/0":
-          '02034404bb8cb3ff8844721d48c2cd51aac08b35fd560f367c733c238efe1e4fe6',
+          '039d5aef74c9661f095ade6dda392d4faac0cd719a035a1f289a30c0438a7577ae',
       },
     },
     {
@@ -75,14 +75,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         scriptType: 'SPENDTAPROOT',
       },
       expectedPublicKey: {
-        "m/86'/0'/0'/0/0": '03c88ab32769682fa86a2386da20aea66f63f0c40dbdbd2d6b74d83a1f972c3521',
-        "m/86'/0'/1'/0/0": '021e29f6cf975dce0f8c91a752a0a685b2e8e98d3e6f53afe513f69d01e850a3e1',
+        "m/86'/0'/0'/0/0": '02f9e2ead6cc285d7732f1aa8f02be8d8a12ee543c87bd77d9dda7e615026f328f',
+        "m/86'/0'/1'/0/0": '02dc7e79b6e4d2a2d43bffa35f71dce35c167426868087d361675e4f1d75f6faac',
         "m/86'/0'/21234567'/0/0":
-          '03b4a4081f2b7182490c107e2184d8cbb83b3a552f4a96781272e89b67d49e6a8f',
+          '03284246761976af1d896fc6eb49bf77d941fd7d20a647d0327fac0745721ed5c5',
         "m/86'/0'/2147483646'/0/0":
-          '02db41c22f92dd861b632517eb911cc7edcdf03549b7d564bdb8ac3aef078e5c3f',
+          '026d75a3ebd8bb3acd837c8c665b81a7110ae7dbe76b134db6e05da01d59b659de',
         "m/86'/0'/2147483647'/0/0":
-          '02af09290d655b4eeb906b1608cfe4a74f2e479879fd3442933bf22fca92781737',
+          '021a784a480b67dce072083a81f0aa5f4b6a38abc6ec608bbf676c49875fd0a62c',
       },
     },
     {
@@ -92,14 +92,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         path: "m/44'/60'/$$INDEX$$'/0/0",
       },
       expectedPublicKey: {
-        "m/44'/60'/0'/0/0": '0x03a01c8a6fbde0cbde94c9228383fad1bd54f09aa85bfe9e087c6b783ec286a33e',
-        "m/44'/60'/1'/0/0": '0x0396aedb44990b4892172d3c22b57889394889b75784ab8ad8b1179303ed38e70c',
+        "m/44'/60'/0'/0/0": '0x03149223c6988ea893a618731124e2c69dde282426c08d241f656d5abd6819388c',
+        "m/44'/60'/1'/0/0": '0x032c18d87969e418468b079c8ad402a46a69e4417940b68be4fba81f4200f8acb7',
         "m/44'/60'/21234567'/0/0":
-          '0x02c854e2c7cf0ffef1e4577837212c966ff1ebfdf8aa4afe6c18dd75fe0ca4ed5e',
+          '0x02bb38ab8d52b2c28329de9db7aae498159b342c23e7064df0411cac2c74d0761c',
         "m/44'/60'/2147483646'/0/0":
-          '0x0334a60fc32dbbb18ca666229e6d14dfc2f3d0568f6da20aa0dd86bb2d994f924d',
+          '0x02fe1d1a98d30c288c1a661e7fafb90f9064b954c2936e54452e01e3fa17282309',
         "m/44'/60'/2147483647'/0/0":
-          '0x03e20b557daf9b8f32a3650468b1975abc850a4173269990f8f3f8a51e9e5f149f',
+          '0x027f6f6fd7320fd4d0d8165a1abf030f90e02fdff90aa258096ca47950ef30740a',
       },
     },
     {
@@ -110,14 +110,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         path: "m/44'/118'/$$INDEX$$'/0/0",
       },
       expectedPublicKey: {
-        "m/44'/118'/0'/0/0": '03d5e2fb2f18a61c45c64ee625c1543e09bf2eacec1fb1a050660bed36732fe0ca',
-        "m/44'/118'/1'/0/0": '0231a68788fb436ca64bb2530249bfc819efc9963c9d568c949ffbffb78840c334',
+        "m/44'/118'/0'/0/0": '03559f0977dcc7c84f169f87bb59fcd0706e4ecf627286e59f0a0437ef2461dca2',
+        "m/44'/118'/1'/0/0": '02fc84cae49cdf01b4aa284d88ce730c90e5883af6f1272c03d222d5e634203564',
         "m/44'/118'/21234567'/0/0":
-          '035c2118f818cd15dd4c51e7d5f6dcd27c08a08d96c0d5f4ec44c4249bd5c84c03',
+          '03d7ea3a7ba9a7760da0560ee01488f89e0d87137abb768d9cf4c3d2dc2fe32369',
         "m/44'/118'/2147483646'/0/0":
-          '03d265c66abbfd28fc2a0b960356975db62685209e854c60b1fca5c9957c5b208f',
+          '031b41967752e30a9b1996b0b62a120bced35a1befea90912f8a999fc131e85bff',
         "m/44'/118'/2147483647'/0/0":
-          '028a34d1965af0a2bd2130aa57b89c98f0b5f0a2d0ec0d61b0fffb03e20ace294d',
+          '0201eb3c3cfc44aabc53197c14c46b220a6d2068e6ee00707cd7ac00eb7a20424d',
       },
     },
     {
@@ -127,14 +127,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         path: "m/44'/784'/$$INDEX$$'/0'/0'",
       },
       expectedPublicKey: {
-        "m/44'/784'/0'/0'/0'": '002b9b3794c6bf3e1c92181d9c84fd78db9bc735961e5453d679e17b48d9381870',
-        "m/44'/784'/1'/0'/0'": '008c52a765b2ded6108807e67354330784fe45b008098bfde103164fabb00bf19d',
+        "m/44'/784'/0'/0'/0'": '0075bc84ebc9c06d0e77d00dbc8658dd5bc3960b00610171d923745902c468c0c8',
+        "m/44'/784'/1'/0'/0'": '00b00162e180c6e685d518efdc96ac281de98dd1b7c9a93d313128dba8123c1087',
         "m/44'/784'/21234567'/0'/0'":
-          '0095473c62c8c34326c7939b0f9b547bc39452c7fd20753f261ff5b8ea58b4ded0',
+          '00dbfef1aecff88f9864458627ebcf796ab40be91077464d0898ea87b8a5b604a0',
         "m/44'/784'/2147483646'/0'/0'":
-          '0075270d4ea439f84ce2f6e8fe25cd9b9d5152ab216bc01d1eba0ed82e69d25173',
+          '00574b23a59df14a6efa033abca36536a388128e72251dd932df00222e90778a49',
         "m/44'/784'/2147483647'/0'/0'":
-          '0088b06025ac61537e9fe3a0e58075b6b73a47b0a52597663dcf850338a53d0227',
+          '004631644c19ce3fae6f01c31cdffa644d308f86df51e63de50bf925028c05e856',
       },
     },
     {
@@ -144,14 +144,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         path: "m/44'/637'/$$INDEX$$'/0'/0'",
       },
       expectedPublicKey: {
-        "m/44'/637'/0'/0'/0'": '8dd24ec86d1f3ca54101701d94e2aa30988f60b03b8363aca92fa5c3a5d724fc',
-        "m/44'/637'/1'/0'/0'": '23c39fe161231cf2dce239978622d03e09da8c48164ea367d3368c507480c40f',
+        "m/44'/637'/0'/0'/0'": 'c33a4f26bec9419f6cb269d5b008af6b7f21f80aea8428bbc6a218d9e6247990',
+        "m/44'/637'/1'/0'/0'": '4d2e71fcbb91134835372459b1076e8462639686c9fd137547d3d320e673706b',
         "m/44'/637'/21234567'/0'/0'":
-          '7a6e982e5380d85dafdadd2f346d28a7c02c071f4d40358a10856ec09ae03529',
+          'dde177c6eb7a1a924c48c4287bb5e439ec9cb7d6a53c1257d2c3ca0234a4053e',
         "m/44'/637'/2147483646'/0'/0'":
-          'dc9612bcc11c427474ee90b192b8536b17dd61a3842d0efb83e3bacef36a37cc',
+          '9d7b87ea04966ca8c02a2278d05434191b64edd3aa6c6615fd08dab00255aecc',
         "m/44'/637'/2147483647'/0'/0'":
-          '664876a664436d37804c89b24e874064bedeeee71fdcc291101f1ca03fe8f7df',
+          '3af02d9a371b4ee44a983f76a410293e265b391b704b77301bbd7bf89d6be6c5',
       },
     },
     {
@@ -161,14 +161,14 @@ export const count20TwoPassphrase2: SLIP39TestCaseData = {
         path: "m/44'/1237'/$$INDEX$$'/0/0",
       },
       expectedPublicKey: {
-        "m/44'/1237'/0'/0/0": '9405b4fca5cd4b9219b292753af19caec2961b7f74cb0186f46d08b944526b7c',
-        "m/44'/1237'/1'/0/0": '7f10509b1db61923fffecfb697b7f9712d97849a80b9d8fe1dc77e11bc6867cc',
+        "m/44'/1237'/0'/0/0": 'a367ad9b8eea3cfe2fb0ffdca9326fa93ae7de07c5a4942b8d701e87e82193cf',
+        "m/44'/1237'/1'/0/0": '03897631ef7c5f4605e92f0290d724516ab6535b3fdf97a5398015843dafa055',
         "m/44'/1237'/21234567'/0/0":
-          '17c7febab452684168c22d0a3bf64377e46ab8b0e1886a57334ccf6435e1ab30',
+          'be19297de9dd07dbd1375300215b6a40d51320033dfa3193844a260b76ef58d6',
         "m/44'/1237'/2147483646'/0/0":
-          'c081651d3e2d2e3b7dc2fa9713602bf1b19649ad641fc555610ab7b92b06421a',
+          'bfa481a61ea7ce3209c70c3594c603ccfd05902b80a254e8b88881b7283fc2e3',
         "m/44'/1237'/2147483647'/0/0":
-          '702e79ba82ef47d1c92ff2846bf7162d4ee25b1e87bf6a696ca5fee77db34158',
+          '1e48ae95ef9a0671d8b7a83ee11ad980f731b647fc25e034c28fb12f8d0c5d88',
       },
     },
   ],

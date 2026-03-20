@@ -2,11 +2,24 @@ export type TestCaseDataType = {
   method: string;
   expected: Record<string, boolean>;
   params?: any;
+  /**
+   * Number of button presses needed before the final confirm gesture
+   * when the expected result is `true` (native coinType signing).
+   * Defaults to 1 if not specified.
+   */
+  confirmCount?: number;
+  /**
+   * If true, no slide-confirm gesture is needed after button presses.
+   * Most signMessage methods fall into this category.
+   */
+  noSlide?: boolean;
 };
 
 export default [
+  // ==== sign transaction ====
   {
     method: 'alephiumSignTransaction',
+    confirmCount: 3,
     expected: {
       '1234': true,
       '60': false,
@@ -14,6 +27,7 @@ export default [
   },
   {
     method: 'algoSignTransaction',
+    confirmCount: 1,
     expected: {
       '283': true,
       '60': false,
@@ -21,6 +35,7 @@ export default [
   },
   {
     method: 'aptosSignTransaction',
+    confirmCount: 2,
     expected: {
       '637': true,
       '60': false,
@@ -28,6 +43,7 @@ export default [
   },
   {
     method: 'confluxSignTransaction',
+    confirmCount: 1,
     expected: {
       '503': true,
       '60': false,
@@ -35,6 +51,7 @@ export default [
   },
   {
     method: 'cosmosSignTransaction',
+    confirmCount: 1,
     expected: {
       '118': true,
       '60': false,
@@ -42,6 +59,7 @@ export default [
   },
   {
     method: 'dnxSignTransaction',
+    confirmCount: 1,
     expected: {
       '29538': true,
       '60': false,
@@ -49,6 +67,7 @@ export default [
   },
   {
     method: 'filecoinSignTransaction',
+    confirmCount: 2,
     expected: {
       '461': true,
       '60': false,
@@ -56,6 +75,7 @@ export default [
   },
   {
     method: 'kaspaSignTransaction',
+    confirmCount: 1,
     expected: {
       '111111': true,
       '60': false,
@@ -63,6 +83,7 @@ export default [
   },
   {
     method: 'nearSignTransaction',
+    confirmCount: 1,
     expected: {
       '397': true,
       '60': false,
@@ -70,6 +91,7 @@ export default [
   },
   {
     method: 'neoSignTransaction',
+    confirmCount: 2,
     expected: {
       '888': true,
       '60': false,
@@ -78,6 +100,7 @@ export default [
   },
   {
     method: 'nexaSignTransaction',
+    confirmCount: 2,
     expected: {
       '29223': true,
       '999': false,
@@ -85,6 +108,7 @@ export default [
   },
   {
     method: 'nemSignTransaction',
+    confirmCount: 2,
     expected: {
       '1': true,
       '43': true,
@@ -93,6 +117,7 @@ export default [
   },
   {
     method: 'nostrSignSchnorr',
+    confirmCount: 1,
     expected: {
       '1237': true,
       '999': false,
@@ -101,6 +126,8 @@ export default [
   },
   {
     method: 'nervosSignTransaction',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '309': true,
       '60': false,
@@ -108,6 +135,7 @@ export default [
   },
   {
     method: 'polkadotSignTransaction',
+    confirmCount: 2,
     expected: {
       '354': true,
       '999': false,
@@ -116,6 +144,7 @@ export default [
   },
   {
     method: 'solSignTransaction',
+    confirmCount: 1,
     expected: {
       '501': true,
       '999': false,
@@ -124,6 +153,7 @@ export default [
   },
   {
     method: 'scdoSignTransaction',
+    confirmCount: 1,
     expected: {
       '541': true,
       '999': false,
@@ -132,6 +162,7 @@ export default [
   },
   {
     method: 'starcoinSignTransaction',
+    confirmCount: 7,
     expected: {
       '101010': true,
       '60': false,
@@ -139,6 +170,7 @@ export default [
   },
   {
     method: 'stellarSignTransaction',
+    confirmCount: 2,
     expected: {
       '148': true,
       '60': false,
@@ -146,6 +178,7 @@ export default [
   },
   {
     method: 'suiSignTransaction',
+    confirmCount: 1,
     expected: {
       '784': true,
       '60': false,
@@ -153,6 +186,7 @@ export default [
   },
   {
     method: 'xrpSignTransaction',
+    confirmCount: 1,
     expected: {
       '144': true,
       '60': false,
@@ -160,6 +194,7 @@ export default [
   },
   {
     method: 'tonSignMessage',
+    confirmCount: 2,
     expected: {
       '607': true,
       '60': false,
@@ -167,6 +202,7 @@ export default [
   },
   {
     method: 'tronSignTransaction',
+    confirmCount: 1,
     expected: {
       '195': true,
       '60': false,
@@ -176,6 +212,8 @@ export default [
   // ==== sign message ====
   {
     method: 'alephiumSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '1234': true,
       '60': false,
@@ -183,6 +221,8 @@ export default [
   },
   {
     method: 'aptosSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '637': true,
       '60': false,
@@ -190,13 +230,17 @@ export default [
   },
   {
     method: 'confluxSignMessage',
+    confirmCount: 1,
     expected: {
-      '503': true,
+      // 503 is blocked by firmware (path m/44'/503'/0 is forbidden)
+      '503': false,
       '60': false,
     },
   },
   {
     method: 'confluxSignMessageCIP23',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '503': true,
       '60': false,
@@ -204,6 +248,7 @@ export default [
   },
   {
     method: 'scdoSignMessage',
+    confirmCount: 1,
     expected: {
       '541': true,
       '999': false,
@@ -212,6 +257,8 @@ export default [
   },
   {
     method: 'starcoinSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '101010': true,
       '60': false,
@@ -219,6 +266,8 @@ export default [
   },
   {
     method: 'suiSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '784': true,
       '60': false,
@@ -226,6 +275,8 @@ export default [
   },
   {
     method: 'solSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '501': true,
       '60': false,
@@ -233,6 +284,8 @@ export default [
   },
   {
     method: 'solSignOffchainMessage',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '501': true,
       '60': false,
@@ -240,6 +293,8 @@ export default [
   },
   {
     method: 'tronSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '195': true,
       '60': false,
@@ -247,6 +302,8 @@ export default [
   },
   {
     method: 'tonSignProof',
+    confirmCount: 1,
+    noSlide: true,
     expected: {
       '607': true,
       '60': false,

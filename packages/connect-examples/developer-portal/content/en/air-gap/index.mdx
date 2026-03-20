@@ -15,12 +15,21 @@ Build a "device stays offline" signing loop using UR-encoded QR codes.
 
 ## Quick Start by Chain
 
-| Chain | Request Type | Response Type |
+| Chain | Request Type (App → Device) | Response Type (Device → App) |
 |-------|-------------|---------------|
 | [Ethereum & EVM](./ethereum-and-evm) | `eth-sign-request` | `eth-signature` |
 | [Bitcoin (PSBT)](./bitcoin) | `crypto-psbt` | `crypto-psbt` |
 | [Solana](./solana) | `sol-sign-request` | `sol-signature` |
 | [Tron](./tron) | `tron-sign-request` | `tron-signature` |
+
+### Account Export Types (Device → App)
+
+These UR types are used when the device exports account information to the app during initial setup:
+
+| UR Type | Description |
+|---------|-------------|
+| `crypto-hdkey` | Single HD key export ([BCR-2020-007](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-007-hdkey.md)) |
+| `crypto-multi-accounts` | Multi-chain account bundle export |
 
 ## API Reference
 
@@ -35,6 +44,34 @@ npm install @keystonehq/keystone-sdk @keystonehq/bc-ur-registry-eth
 # UR primitives
 npm install @ngraveio/bc-ur
 ```
+
+## Third-Party Wallet Integration
+
+If you are integrating OneKey Air-Gap into an existing wallet, you need to ensure your QR scanner routes these UR types to a **BC-UR v2 decoder** (fountain-coded), not a legacy v1 decoder.
+
+### UR types your scanner must accept
+
+| Direction | UR Type | When |
+|-----------|---------|------|
+| Device → App | `crypto-psbt` | BTC signed PSBT |
+| Device → App | `crypto-hdkey` | HD key export on connect |
+| Device → App | `crypto-multi-accounts` | Multi-account export on connect |
+| Device → App | `eth-signature` | ETH signed transaction |
+| Device → App | `sol-signature` | SOL signed transaction |
+| Device → App | `btc-signature` | BTC signature (non-PSBT) |
+| App → Device | `eth-sign-request` | ETH sign request |
+| App → Device | `sol-sign-request` | SOL sign request |
+| App → Device | `crypto-psbt` | BTC unsigned PSBT |
+
+### Common pitfall: UR type routing
+
+Some wallets use a **whitelist** to decide which UR types are decoded with the modern BC-UR v2 decoder (fountain codes via `@ngraveio/bc-ur`). Types not in the whitelist may fall through to a legacy v1 decoder that uses a completely different encoding scheme, causing the scanner to get stuck.
+
+**If your scanner shows "please continue scanning" but never completes**, check that the UR type is in your v2 whitelist.
+
+### `onekey-app-call-device` (private protocol)
+
+The `onekey-app-call-device` UR type is a **OneKey-internal protocol** used for device management operations (e.g., `getMultiAccounts`, `verifyAddress`). Third-party wallets **should NOT implement this type** — it may change without notice. Use the standard Keystone SDK methods instead.
 
 ## Demo & Examples
 
