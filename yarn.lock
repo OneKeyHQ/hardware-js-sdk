@@ -8206,6 +8206,13 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-17.0.35.tgz#635b7586086d51fb40de0a2ec9d1014a5283ba4a"
   integrity sha512-vu1SrqBjbbZ3J6vwY17jBs8Sr/BKA+/a/WtjRG+whKg1iuLFOosq872EXS0eXWILdO36DHQQeku/ZcL6hz2fpg==
 
+"@types/node@^24.9.0":
+  version "24.12.0"
+  resolved "https://registry.npmjs.org/@types/node/-/node-24.12.0.tgz#6222e028210e5322e4f4f6767f8d88e5ea3b33d2"
+  integrity sha512-GYDxsZi3ChgmckRT9HPU0WEhKLP08ev/Yfcq2AstjrDASOYCSXeyjDsHg4v5t4jOj7cyDX3vmprafKlWIG9MXQ==
+  dependencies:
+    undici-types "~7.16.0"
+
 "@types/normalize-package-data@^2.4.0":
   version "2.4.1"
   resolved "https://registry.yarnpkg.com/@types/normalize-package-data/-/normalize-package-data-2.4.1.tgz#d3357479a0fdfdd5907fe67e17e0a85c906e1301"
@@ -12778,15 +12785,6 @@ electron@^25.0.0:
   version "25.9.8"
   resolved "https://registry.yarnpkg.com/electron/-/electron-25.9.8.tgz#7c125ccbddad02861736275b0d4a387c59a91469"
   integrity sha512-PGgp6PH46QVENHuAHc2NT1Su8Q1qov7qIl2jI5tsDpTibwV2zD8539AeWBQySeBU4dhbj9onIl7+1bXQ0wefBg==
-  dependencies:
-    "@electron/get" "^2.0.0"
-    "@types/node" "^18.11.18"
-    extract-zip "^2.0.1"
-
-electron@^28.0.0:
-  version "28.2.3"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-28.2.3.tgz#d26821bcfda7ee445b4b75231da4b057a7ce6e7b"
-  integrity sha512-he9nGphZo03ejDjYBXpmFVw0KBKogXvR2tYxE4dyYvnfw42uaFIBFrwGeenvqoEOfheJfcI0u4rFG6h3QxDwnA==
   dependencies:
     "@electron/get" "^2.0.0"
     "@types/node" "^18.11.18"
@@ -24883,6 +24881,11 @@ undici-types@~5.26.4:
   version "5.26.5"
   resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-5.26.5.tgz#bcd539893d00b56e964fd2657a4866b221a65617"
   integrity sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==
+
+undici-types@~7.16.0:
+  version "7.16.0"
+  resolved "https://registry.npmjs.org/undici-types/-/undici-types-7.16.0.tgz#ffccdff36aea4884cbfce9a750a0580224f58a46"
+  integrity sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==
 
 unicode-canonical-property-names-ecmascript@^2.0.0:
   version "2.0.0"
