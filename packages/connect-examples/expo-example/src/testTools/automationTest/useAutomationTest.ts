@@ -3527,6 +3527,7 @@ export function useAutomationTest() {
   const stopAutomation = useCallback(async () => {
     runningRef.current = false;
     currentPassphraseRef.current = '';
+    setProgress(prev => ({ ...prev, status: 'paused' }));
     addLog('Stopping automation test...');
 
     if (clientRef.current) {

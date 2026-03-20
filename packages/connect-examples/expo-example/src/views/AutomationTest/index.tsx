@@ -117,49 +117,17 @@ function AutomationTestContent() {
             <XStack alignItems="center" gap="$2" flexWrap="wrap">
               <Button
                 size="$3"
-                height={34}
-                borderRadius="$2"
-                paddingHorizontal="$3"
-                backgroundColor={!canStart || isRunning ? '$gray5' : '$green9'}
-                color={!canStart || isRunning ? '$gray10' : 'white'}
-                hoverStyle={
-                  !canStart || isRunning
-                    ? { backgroundColor: '$gray5' }
-                    : { opacity: 0.8, backgroundColor: '$green9' }
-                }
-                pressStyle={
-                  !canStart || isRunning
-                    ? { backgroundColor: '$gray5' }
-                    : { opacity: 0.7, backgroundColor: '$green9' }
-                }
-                cursor={!canStart || isRunning ? 'not-allowed' : 'pointer'}
+                theme="green"
                 onPress={automation.startAutomation}
                 disabled={!canStart || isRunning}
-                opacity={!canStart || isRunning ? 0.6 : 1}
               >
                 开始
               </Button>
               <Button
                 size="$3"
-                height={34}
-                borderRadius="$2"
-                paddingHorizontal="$3"
-                backgroundColor={!isRunning ? '$gray5' : '$red9'}
-                color={!isRunning ? '$gray10' : 'white'}
-                hoverStyle={
-                  !isRunning
-                    ? { backgroundColor: '$gray5' }
-                    : { opacity: 0.8, backgroundColor: '$red9' }
-                }
-                pressStyle={
-                  !isRunning
-                    ? { backgroundColor: '$gray5' }
-                    : { opacity: 0.7, backgroundColor: '$red9' }
-                }
-                cursor={!isRunning ? 'not-allowed' : 'pointer'}
+                theme="red"
                 onPress={automation.stopAutomation}
                 disabled={!isRunning}
-                opacity={!isRunning ? 0.6 : 1}
               >
                 停止
               </Button>

@@ -1,3 +1,10 @@
-import data from './normal12';
+import passphraseEmpty from './passphrase_empty';
 
-export default data;
+import type { PubkeyTestCaseData } from '../types';
+
+export default {
+  ...passphraseEmpty,
+  name: 'three-normal-12',
+  passphrase: undefined,
+  passphraseState: '',
+} as PubkeyTestCaseData;
