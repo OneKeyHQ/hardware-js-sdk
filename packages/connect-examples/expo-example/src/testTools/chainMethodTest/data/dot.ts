@@ -1,6 +1,6 @@
-import { type PlaygroundProps } from '../../../components/Playground';
+import type { ChainMethodEntry } from './index';
 
-const dotData: PlaygroundProps[] = [
+const dotData: ChainMethodEntry[] = [
   {
     method: 'polkadotGetAddress',
     description: 'Get a Polkadot address for your account.',
@@ -18,24 +18,9 @@ const dotData: PlaygroundProps[] = [
         title: 'Batch Get Address',
         value: {
           bundle: [
-            {
-              path: "m/44'/354'/0'/0'/0'",
-              prefix: '0',
-              network: 'polkadot',
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/354'/1'/0'/0'",
-              prefix: '0',
-              network: 'polkadot',
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/354'/2'/0'/0'",
-              prefix: '0',
-              network: 'polkadot',
-              showOnOneKey: false,
-            },
+            { path: "m/44'/354'/0'/0'/0'", prefix: '0', network: 'polkadot', showOnOneKey: false },
+            { path: "m/44'/354'/1'/0'/0'", prefix: '0', network: 'polkadot', showOnOneKey: false },
+            { path: "m/44'/354'/2'/0'/0'", prefix: '0', network: 'polkadot', showOnOneKey: false },
           ],
         },
       },
@@ -61,6 +46,7 @@ const dotData: PlaygroundProps[] = [
   },
   {
     method: 'polkadotSignTransaction',
+    confirmCount: 2,
     description: 'Sign a Polkadot transaction.',
     presupposes: [
       {

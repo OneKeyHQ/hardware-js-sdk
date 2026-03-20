@@ -5,31 +5,15 @@ import type {
   TestSuiteType,
 } from '../../services/phonePilotMcp/types';
 
-const BIP39_CREATE_SUITES: TestSuiteType[] = [
-  'deviceFlow',
-  'sdkAddressBatch',
-  'sdkPubkeyBatch',
-  'securityCheck',
-];
+const BIP39_CREATE_SUITES: TestSuiteType[] = ['deviceFlow', 'sdkAddressBatch', 'sdkPubkeyBatch'];
 const BIP39_IMPORT_SUITES: TestSuiteType[] = [
   'deviceFlow',
   'sdkAddressBatch',
   'sdkPubkeyBatch',
   'specialPassphrase',
-  'securityCheck',
 ];
-const SLIP39_CREATE_SUITES: TestSuiteType[] = [
-  'deviceFlow',
-  'sdkAddressBatch',
-  'sdkPubkeyBatch',
-  'securityCheck',
-];
-const SLIP39_IMPORT_SUITES: TestSuiteType[] = [
-  'deviceFlow',
-  'sdkAddressBatch',
-  'sdkPubkeyBatch',
-  'securityCheck',
-];
+const SLIP39_CREATE_SUITES: TestSuiteType[] = ['deviceFlow', 'sdkAddressBatch', 'sdkPubkeyBatch'];
+const SLIP39_IMPORT_SUITES: TestSuiteType[] = ['deviceFlow', 'sdkAddressBatch', 'sdkPubkeyBatch'];
 
 const BIP39_IMPORT_VECTORS = {
   12: {

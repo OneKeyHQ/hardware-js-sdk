@@ -373,6 +373,10 @@ export class PhonePilotClient {
     return this.callTool<ActionResult>('confirm-action', { action: 'cancel' });
   }
 
+  async slideConfirm(): Promise<ActionResult> {
+    return this.callTool<ActionResult>('confirm-action', { action: 'slide' });
+  }
+
   async inputPin(pin: string): Promise<ActionResult> {
     return this.callTool<ActionResult>('input-pin', { pin });
   }

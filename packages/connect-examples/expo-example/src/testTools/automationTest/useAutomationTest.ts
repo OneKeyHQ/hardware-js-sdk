@@ -881,7 +881,7 @@ export function useAutomationTest() {
   const uiListenerRef = useRef<((message: { type: string }) => void) | null>(null);
 
   const setupUIListener = useCallback(
-    (sdk: CoreApi) => {
+    (sdk: CoreApi, buttonOverride?: () => Promise<void>) => {
       if (uiListenerRef.current) {
         sdk.off(UI_EVENT, uiListenerRef.current);
       }
@@ -891,7 +891,13 @@ export function useAutomationTest() {
 
         switch (message.type) {
           case UI_REQUEST.REQUEST_BUTTON:
-            if (clientRef.current) {
+            if (buttonOverride) {
+              try {
+                await buttonOverride();
+              } catch (error) {
+                addLog(`Button override failed: ${error}`);
+              }
+            } else if (clientRef.current) {
               try {
                 await delay(CONFIRM_ACTION_DELAY_MS);
                 await clientRef.current.confirmAction();
@@ -2336,13 +2342,39 @@ export function useAutomationTest() {
       const results: TestCaseResult[] = [];
       addLog('[SecurityCheck] Starting blind signature security check suite');
 
+      // Sequence of actions to perform on the next REQUEST_BUTTON event.
+      // 'confirm' = single button press, 'slide' = left-to-right swipe confirm.
+      const secBtnSeqRef = { current: [] as Array<'confirm' | 'slide'> };
+
+      const securityCheckButtonOverride = async () => {
+        const client = clientRef.current;
+        if (!client) return;
+        const seq = secBtnSeqRef.current;
+        if (seq.length === 0) return;
+        await delay(CONFIRM_ACTION_DELAY_MS);
+        for (const step of seq) {
+          if (step === 'confirm') {
+            await client.confirmAction();
+            await delay(300);
+          } else if (step === 'slide') {
+            await client.slideConfirm();
+          }
+        }
+        addLog(`[SecurityCheck] Button sequence done: [${seq.join(', ')}]`);
+      };
+
+      // Install security-check-specific button handler
+      setupUIListener(sdk, securityCheckButtonOverride);
+
       try {
-        // Disable passphrase_protection and set safetyChecks: 0 (strict)
+        // Disable passphrase_protection and set safetyChecks: 0 (strict).
+        // The device will show a "Disable safety checks" confirmation → swipe to confirm.
         const featuresBeforeCheck = await fetchDeviceFeatures(sdk, connectId);
         if (featuresBeforeCheck?.passphrase_protection) {
           addLog('[SecurityCheck] Disabling passphrase_protection');
           await sdk.deviceSettings(connectId, { usePassphrase: false });
         }
+        secBtnSeqRef.current = ['slide'];
         // @ts-expect-error safetyChecks not in type definitions yet
         await sdk.deviceSettings(connectId, { safetyChecks: 0 });
         addLog('[SecurityCheck] safetyChecks set to strict (0)');
@@ -2367,6 +2399,20 @@ export function useAutomationTest() {
               incrementCompletedTests();
               notifyLiveCaseUpdate('securityCheck', 'Security Check', results);
             } else {
+              // Prepare button sequence for this case.
+              // For expected=true (native coinType): N button presses + optional slide-confirm.
+              // For expected=false (blocked): device rejects immediately, no button needed.
+              if (expectedResult) {
+                const confirmCount = testCase.confirmCount ?? 1;
+                const seq: Array<'confirm' | 'slide'> = Array(confirmCount).fill('confirm');
+                if (!testCase.noSlide) {
+                  seq.push('slide');
+                }
+                secBtnSeqRef.current = seq;
+              } else {
+                secBtnSeqRef.current = [];
+              }
+
               let sdkResult: { success: boolean; payload?: { error?: string } };
               try {
                 const resultOrTimeout = await Promise.race([
@@ -2449,11 +2495,14 @@ export function useAutomationTest() {
           error: error instanceof Error ? error.message : String(error),
           duration: Date.now() - startedAt,
         });
+      } finally {
+        // Restore default UI listener (without security-check button override)
+        setupUIListener(sdk);
       }
 
       return createSuiteResult('securityCheck', 'Security Check', results, Date.now() - startedAt);
     },
-    [addLog, incrementCompletedTests, notifyLiveCaseUpdate]
+    [addLog, incrementCompletedTests, notifyLiveCaseUpdate, setupUIListener]
   );
 
   const runChainMethodBatchSuite = useCallback(
@@ -2462,9 +2511,43 @@ export function useAutomationTest() {
       const results: TestCaseResult[] = [];
       addLog('[ChainMethodBatch] Starting chain method batch suite');
 
+      // Sequence of actions to perform on the next REQUEST_BUTTON event.
+      const chainBtnSeqRef = { current: [] as Array<'confirm' | 'slide'> };
+
+      const chainMethodButtonOverride = async () => {
+        const client = clientRef.current;
+        if (!client) return;
+        const seq = chainBtnSeqRef.current;
+        if (seq.length === 0) return;
+        await delay(CONFIRM_ACTION_DELAY_MS);
+        for (const step of seq) {
+          if (step === 'confirm') {
+            await client.confirmAction();
+            await delay(300);
+          } else if (step === 'slide') {
+            await client.slideConfirm();
+          }
+        }
+        addLog(`[ChainMethodBatch] Button sequence done: [${seq.join(', ')}]`);
+      };
+
+      setupUIListener(sdk, chainMethodButtonOverride);
+
       try {
         for (const chain of chainTestData) {
           for (const entry of chain.data) {
+            // Prepare button sequence based on entry metadata.
+            // Methods without confirmCount are read-only (getAddress, getPublicKey, verify).
+            if (entry.confirmCount) {
+              const seq: Array<'confirm' | 'slide'> = Array(entry.confirmCount).fill('confirm');
+              if (!entry.noSlide) {
+                seq.push('slide');
+              }
+              chainBtnSeqRef.current = seq;
+            } else {
+              chainBtnSeqRef.current = [];
+            }
+
             for (const presuppose of entry.presupposes ?? []) {
               const caseStart = Date.now();
               const caseTitle = `${chain.symbol} / ${entry.method} / ${presuppose.title}`;
@@ -2527,6 +2610,8 @@ export function useAutomationTest() {
           error: error instanceof Error ? error.message : String(error),
           duration: Date.now() - startedAt,
         });
+      } finally {
+        setupUIListener(sdk);
       }
 
       return createSuiteResult(
@@ -2536,7 +2621,7 @@ export function useAutomationTest() {
         Date.now() - startedAt
       );
     },
-    [addLog, incrementCompletedTests, notifyLiveCaseUpdate]
+    [addLog, incrementCompletedTests, notifyLiveCaseUpdate, setupUIListener]
   );
 
   const runSelectedSdkSuites = useCallback(
