@@ -88,9 +88,7 @@ export function ScenarioSelector({
       </XStack>
       {scenariosByJira.map(group => {
         const isExpanded = expandedGroups.has(group.jiraKey);
-        const selectedCount = group.scenarios.filter(s =>
-          config.scenarioIds.includes(s.id)
-        ).length;
+        const selectedCount = group.scenarios.filter(s => config.scenarioIds.includes(s.id)).length;
 
         return (
           <YStack key={group.jiraKey} gap="$1">
@@ -193,7 +191,9 @@ export function ScenarioSelector({
                           <CheckIcon size={11} />
                         </Checkbox.Indicator>
                       </Checkbox>
-                      <Text fontSize={12} flex={1}>{scenario.title}</Text>
+                      <Text fontSize={12} flex={1}>
+                        {scenario.title}
+                      </Text>
                     </XStack>
                   );
                 })}

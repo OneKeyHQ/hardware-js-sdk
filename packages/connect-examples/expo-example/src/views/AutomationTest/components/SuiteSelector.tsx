@@ -44,9 +44,7 @@ export function SuiteSelector({
               testSuites: Object.keys(TEST_SUITE_INFO) as TestSuiteType[],
             }))
           }
-          onClear={() =>
-            setConfig(prev => ({ ...prev, testSuites: ['deviceFlow'] }))
-          }
+          onClear={() => setConfig(prev => ({ ...prev, testSuites: ['deviceFlow'] }))}
         />
       </XStack>
       <YStack gap="$1.5">
@@ -81,8 +79,12 @@ export function SuiteSelector({
                 </Checkbox.Indicator>
               </Checkbox>
               <YStack flex={1} gap="$0.5">
-                <Text fontSize={13} fontWeight="600">{info.label}</Text>
-                <Text fontSize={11} color="$gray10">{info.description}</Text>
+                <Text fontSize={13} fontWeight="600">
+                  {info.label}
+                </Text>
+                <Text fontSize={11} color="$gray10">
+                  {info.description}
+                </Text>
               </YStack>
             </XStack>
           );

@@ -3,8 +3,7 @@ import { ed25519PairFromSeed, encodeAddress } from '@polkadot/util-crypto';
 import { ledgerDerivePrivate } from '@polkadot/util-crypto/hd/ledger/derivePrivate';
 import { ledgerMaster } from '@polkadot/util-crypto/hd/ledger/master';
 
-import { deriveKeyPairWithPath } from '../helper';
-import { mnemonicToSeed } from '../helper';
+import { deriveKeyPairWithPath, mnemonicToSeed } from '../helper';
 
 import type { PolkadotGetAddressParams } from '@onekeyfe/hd-core';
 

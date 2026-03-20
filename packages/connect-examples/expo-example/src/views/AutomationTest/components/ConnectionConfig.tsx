@@ -5,7 +5,7 @@ import {
   phonePilotConnectionStateAtom,
   phonePilotHealthAtom,
 } from '../../../atoms/automationAtoms';
-import { getConnectionColor, getReadyColor, formatReadyLabel } from '../utils';
+import { formatReadyLabel, getConnectionColor, getReadyColor } from '../utils';
 
 import type { AutomationTestConfig } from '../../../services/phonePilotMcp/types';
 
@@ -37,7 +37,9 @@ export function ConnectionConfig({
     <YStack gap="$2">
       {/* URL + connect button on one row */}
       <XStack alignItems="center" gap="$2">
-        <Text fontSize={12} color="$gray10" minWidth={60}>MCP 地址</Text>
+        <Text fontSize={12} color="$gray10" minWidth={60}>
+          MCP 地址
+        </Text>
         <Input
           flex={1}
           size="$3"
@@ -76,12 +78,26 @@ export function ConnectionConfig({
           </Text>
         </XStack>
         <XStack alignItems="center" gap="$1.5">
-          <Stack width={7} height={7} borderRadius={4} backgroundColor={getReadyColor(health?.mcpReady)} />
-          <Text fontSize={11} color="$gray10">MCP: {formatReadyLabel(health?.mcpReady)}</Text>
+          <Stack
+            width={7}
+            height={7}
+            borderRadius={4}
+            backgroundColor={getReadyColor(health?.mcpReady)}
+          />
+          <Text fontSize={11} color="$gray10">
+            MCP: {formatReadyLabel(health?.mcpReady)}
+          </Text>
         </XStack>
         <XStack alignItems="center" gap="$1.5">
-          <Stack width={7} height={7} borderRadius={4} backgroundColor={getReadyColor(health?.ocrReady)} />
-          <Text fontSize={11} color="$gray10">OCR: {formatReadyLabel(health?.ocrReady)}</Text>
+          <Stack
+            width={7}
+            height={7}
+            borderRadius={4}
+            backgroundColor={getReadyColor(health?.ocrReady)}
+          />
+          <Text fontSize={11} color="$gray10">
+            OCR: {formatReadyLabel(health?.ocrReady)}
+          </Text>
         </XStack>
       </XStack>
     </YStack>

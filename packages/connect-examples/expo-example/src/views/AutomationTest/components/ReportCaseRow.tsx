@@ -32,15 +32,16 @@ function ReportCaseRowInner({ testCase }: { testCase: TestCaseResult }) {
             实际: {testCase.actual}
           </Text>
         ) : null}
-        {testCase.error && !testCase.skipped ? (
+        {testCase.error && !testCase.skipped && (
           <Text fontSize={11} color="$red10">
             错误: {testCase.error}
           </Text>
-        ) : testCase.error && testCase.skipped ? (
+        )}
+        {testCase.error && testCase.skipped && (
           <Text fontSize={11} color="$gray10">
             跳过原因: {testCase.error}
           </Text>
-        ) : null}
+        )}
         {testCase.metadata ? (
           <Text fontSize={11} color="$gray10">
             元数据:{' '}

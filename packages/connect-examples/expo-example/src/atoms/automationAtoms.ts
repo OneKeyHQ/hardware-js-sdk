@@ -144,7 +144,8 @@ export const canStartAutomationAtom = atom(get => {
   const isRunning = get(isAutomationRunningAtom);
   const config = get(automationConfigAtom);
   // deviceFlowOnly always runs only deviceFlow suite, testSuites selection is irrelevant
-  const hasScenarios = config.scenarioIds.length > 0 &&
+  const hasScenarios =
+    config.scenarioIds.length > 0 &&
     (config.devicePreparationMode === 'deviceFlowOnly' || config.testSuites.length > 0);
   if (config.devicePreparationMode === 'sdkOnly') {
     return !isRunning && hasScenarios;

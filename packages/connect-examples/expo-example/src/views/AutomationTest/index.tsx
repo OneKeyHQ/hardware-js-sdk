@@ -120,18 +120,22 @@ function AutomationTestContent() {
                 height={34}
                 borderRadius="$2"
                 paddingHorizontal="$3"
-                backgroundColor={(!canStart || isRunning) ? '$gray5' : '$green9'}
-                color={(!canStart || isRunning) ? '$gray10' : 'white'}
-                hoverStyle={(!canStart || isRunning)
-                  ? { backgroundColor: '$gray5' }
-                  : { opacity: 0.8, backgroundColor: '$green9' }}
-                pressStyle={(!canStart || isRunning)
-                  ? { backgroundColor: '$gray5' }
-                  : { opacity: 0.7, backgroundColor: '$green9' }}
-                cursor={(!canStart || isRunning) ? 'not-allowed' : 'pointer'}
+                backgroundColor={!canStart || isRunning ? '$gray5' : '$green9'}
+                color={!canStart || isRunning ? '$gray10' : 'white'}
+                hoverStyle={
+                  !canStart || isRunning
+                    ? { backgroundColor: '$gray5' }
+                    : { opacity: 0.8, backgroundColor: '$green9' }
+                }
+                pressStyle={
+                  !canStart || isRunning
+                    ? { backgroundColor: '$gray5' }
+                    : { opacity: 0.7, backgroundColor: '$green9' }
+                }
+                cursor={!canStart || isRunning ? 'not-allowed' : 'pointer'}
                 onPress={automation.startAutomation}
                 disabled={!canStart || isRunning}
-                opacity={(!canStart || isRunning) ? 0.6 : 1}
+                opacity={!canStart || isRunning ? 0.6 : 1}
               >
                 开始
               </Button>
@@ -142,12 +146,16 @@ function AutomationTestContent() {
                 paddingHorizontal="$3"
                 backgroundColor={!isRunning ? '$gray5' : '$red9'}
                 color={!isRunning ? '$gray10' : 'white'}
-                hoverStyle={!isRunning
-                  ? { backgroundColor: '$gray5' }
-                  : { opacity: 0.8, backgroundColor: '$red9' }}
-                pressStyle={!isRunning
-                  ? { backgroundColor: '$gray5' }
-                  : { opacity: 0.7, backgroundColor: '$red9' }}
+                hoverStyle={
+                  !isRunning
+                    ? { backgroundColor: '$gray5' }
+                    : { opacity: 0.8, backgroundColor: '$red9' }
+                }
+                pressStyle={
+                  !isRunning
+                    ? { backgroundColor: '$gray5' }
+                    : { opacity: 0.7, backgroundColor: '$red9' }
+                }
                 cursor={!isRunning ? 'not-allowed' : 'pointer'}
                 onPress={automation.stopAutomation}
                 disabled={!isRunning}
@@ -170,13 +178,21 @@ function AutomationTestContent() {
             </XStack>
             {progress.status !== 'idle' && (
               <XStack gap="$3" flexWrap="wrap">
-                <Text fontSize={12} color="$gray10">状态: {progress.status}</Text>
-                <Text fontSize={12} color="$gray10">{progress.currentScenarioTitle || '—'}</Text>
+                <Text fontSize={12} color="$gray10">
+                  状态: {progress.status}
+                </Text>
+                <Text fontSize={12} color="$gray10">
+                  {progress.currentScenarioTitle || '—'}
+                </Text>
                 {progress.currentPassphrase ? (
-                  <Text fontSize={12} color="$gray10">PP: {progress.currentPassphrase}</Text>
+                  <Text fontSize={12} color="$gray10">
+                    PP: {progress.currentPassphrase}
+                  </Text>
                 ) : null}
                 {progress.errorMessage ? (
-                  <Text fontSize={12} color="$red10">错误: {progress.errorMessage}</Text>
+                  <Text fontSize={12} color="$red10">
+                    错误: {progress.errorMessage}
+                  </Text>
                 ) : null}
               </XStack>
             )}

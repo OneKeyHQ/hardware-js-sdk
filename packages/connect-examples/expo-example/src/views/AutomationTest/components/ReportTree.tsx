@@ -22,9 +22,7 @@ export function ReportTree() {
     }
     if (filter === 'failed') {
       return report.scenarioResults.filter(s =>
-        s.suiteResults.some(suite =>
-          suite.results.some(r => !r.passed && !r.skipped)
-        )
+        s.suiteResults.some(suite => suite.results.some(r => !r.passed && !r.skipped))
       );
     }
     return report.scenarioResults;

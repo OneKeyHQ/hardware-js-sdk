@@ -29,17 +29,11 @@ const LONG_TIMEOUT_MS = 300_000;
 /**
  * 带超时的 fetch 封装
  */
-function fetchWithTimeout(
-  url: string,
-  options: RequestInit,
-  timeoutMs: number
-): Promise<Response> {
+function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
-    clearTimeout(timer)
-  );
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -97,11 +91,7 @@ export class PhonePilotClient {
 
   async healthCheck(): Promise<HealthCheckResponse | null> {
     try {
-      const response = await fetchWithTimeout(
-        `${this.serverUrl}/health`,
-        {},
-        DEFAULT_TIMEOUT_MS
-      );
+      const response = await fetchWithTimeout(`${this.serverUrl}/health`, {}, DEFAULT_TIMEOUT_MS);
       if (response.ok) {
         return await response.json();
       }
@@ -295,7 +285,9 @@ export class PhonePilotClient {
         return JSON.parse(textContent.text) as T;
       } catch (error) {
         throw new Error(
-          `Failed to parse tool ${toolName} response: ${error instanceof Error ? error.message : error}`
+          `Failed to parse tool ${toolName} response: ${
+            error instanceof Error ? error.message : error
+          }`
         );
       }
     }
@@ -331,7 +323,9 @@ export class PhonePilotClient {
       };
     } catch (error) {
       throw new Error(
-        `Failed to parse tool ${toolName} response: ${error instanceof Error ? error.message : error}`
+        `Failed to parse tool ${toolName} response: ${
+          error instanceof Error ? error.message : error
+        }`
       );
     }
   }

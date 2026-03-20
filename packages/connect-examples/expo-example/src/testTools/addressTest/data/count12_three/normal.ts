@@ -1,1 +1,3 @@
-export { default } from './normal12';
+import data from './normal12';
+
+export default data;

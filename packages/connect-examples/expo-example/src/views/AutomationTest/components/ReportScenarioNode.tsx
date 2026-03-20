@@ -55,9 +55,7 @@ function ReportScenarioNodeInner({
           <YStack gap="$2">
             {scenario.suiteResults
               .filter(suite =>
-                filter === 'failed'
-                  ? suite.results.some(r => !r.passed && !r.skipped)
-                  : true
+                filter === 'failed' ? suite.results.some(r => !r.passed && !r.skipped) : true
               )
               .map(suite => (
                 <ReportSuiteNode

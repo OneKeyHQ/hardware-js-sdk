@@ -50,20 +50,26 @@ function ReportSuiteNodeInner({
               {expanded ? '▾' : '▸'} {suite.suiteName}
             </Text>
             <XStack gap="$2" flexWrap="wrap">
-              <Text fontSize={11} color="$green10">通过 {suite.passedTests}</Text>
-              <Text fontSize={11} color="$gray10">·</Text>
-              <Text fontSize={11} color={suite.failedTests > 0 ? '$red10' : '$gray10'}>失败 {suite.failedTests}</Text>
-              <Text fontSize={11} color="$gray10">· 总 {suite.expectedTotalTests ?? suite.totalTests} · 耗时 {formatDuration(suite.duration)}</Text>
+              <Text fontSize={11} color="$green10">
+                通过 {suite.passedTests}
+              </Text>
+              <Text fontSize={11} color="$gray10">
+                ·
+              </Text>
+              <Text fontSize={11} color={suite.failedTests > 0 ? '$red10' : '$gray10'}>
+                失败 {suite.failedTests}
+              </Text>
+              <Text fontSize={11} color="$gray10">
+                · 总 {suite.expectedTotalTests ?? suite.totalTests} · 耗时{' '}
+                {formatDuration(suite.duration)}
+              </Text>
             </XStack>
           </YStack>
         </XStack>
         {expanded ? (
           <YStack gap="$2">
             {filteredResults.map(testCase => (
-              <ReportCaseRow
-                key={`${suite.suiteType}-${testCase.title}`}
-                testCase={testCase}
-              />
+              <ReportCaseRow key={`${suite.suiteType}-${testCase.title}`} testCase={testCase} />
             ))}
           </YStack>
         ) : null}

@@ -1,1 +1,3 @@
-export { default } from './passphrase12_2';
+import data from './passphrase12_2';
+
+export default data;

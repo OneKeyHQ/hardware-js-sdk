@@ -5,7 +5,10 @@ import {
   DEVICE_PREPARATION_MODE_INFO,
 } from '../../../services/phonePilotMcp/types';
 
-import type { AutomationTestConfig, DevicePreparationMode } from '../../../services/phonePilotMcp/types';
+import type {
+  AutomationTestConfig,
+  DevicePreparationMode,
+} from '../../../services/phonePilotMcp/types';
 
 export function RunnerBehaviorConfig({
   config,
@@ -26,7 +29,9 @@ export function RunnerBehaviorConfig({
 
       {/* Device preparation mode — compact pill selector */}
       <YStack gap="$1.5">
-        <Text fontSize={12} color="$gray10">设备准备模式</Text>
+        <Text fontSize={12} color="$gray10">
+          设备准备模式
+        </Text>
         <XStack flexWrap="wrap" gap="$2">
           {ALL_DEVICE_PREPARATION_MODES.map((mode: DevicePreparationMode) => {
             const info = DEVICE_PREPARATION_MODE_INFO[mode];
@@ -48,7 +53,11 @@ export function RunnerBehaviorConfig({
                     : () => setConfig(prev => ({ ...prev, devicePreparationMode: mode }))
                 }
               >
-                <Text fontSize={12} fontWeight={checked ? '700' : '400'} color={checked ? '$blue11' : '$gray11'}>
+                <Text
+                  fontSize={12}
+                  fontWeight={checked ? '700' : '400'}
+                  color={checked ? '$blue11' : '$gray11'}
+                >
                   {info.label}
                 </Text>
               </XStack>
@@ -79,8 +88,12 @@ export function RunnerBehaviorConfig({
         }
       >
         <YStack flex={1} gap="$0.5">
-          <Text fontSize={12} fontWeight="600">首错即停</Text>
-          <Text fontSize={11} color="$gray10">任一 suite 失败后停止后续场景</Text>
+          <Text fontSize={12} fontWeight="600">
+            首错即停
+          </Text>
+          <Text fontSize={11} color="$gray10">
+            任一 suite 失败后停止后续场景
+          </Text>
         </YStack>
         <Text fontSize={12} color={config.stopOnFirstError ? '$orange11' : '$gray9'}>
           {config.stopOnFirstError ? '开' : '关'}
@@ -90,7 +103,9 @@ export function RunnerBehaviorConfig({
       {/* Numeric inputs — two columns */}
       <XStack gap="$3">
         <YStack flex={1} gap="$1">
-          <Text fontSize={12} color="$gray10">重试次数</Text>
+          <Text fontSize={12} color="$gray10">
+            重试次数
+          </Text>
           <Input
             size="$3"
             height={34}
@@ -98,7 +113,10 @@ export function RunnerBehaviorConfig({
             keyboardType="numeric"
             onChangeText={value => {
               const cleaned = value.replace(/[^0-9]/g, '');
-              setConfig(prev => ({ ...prev, retryCount: cleaned === '' ? 0 : parseInt(cleaned, 10) }));
+              setConfig(prev => ({
+                ...prev,
+                retryCount: cleaned === '' ? 0 : parseInt(cleaned, 10),
+              }));
             }}
             onBlur={() =>
               setConfig(prev => ({ ...prev, retryCount: Math.max(1, prev.retryCount) }))
@@ -107,7 +125,9 @@ export function RunnerBehaviorConfig({
           />
         </YStack>
         <YStack flex={1} gap="$1">
-          <Text fontSize={12} color="$gray10">场景间隔 (ms)</Text>
+          <Text fontSize={12} color="$gray10">
+            场景间隔 (ms)
+          </Text>
           <Input
             size="$3"
             height={34}

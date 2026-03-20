@@ -83,7 +83,9 @@ export function PassphraseSelector({
                   <CheckIcon size={12} />
                 </Checkbox.Indicator>
               </Checkbox>
-              <Text fontSize={12} fontWeight="500">{PASSPHRASE_VARIANT_INFO[variantId].label}</Text>
+              <Text fontSize={12} fontWeight="500">
+                {PASSPHRASE_VARIANT_INFO[variantId].label}
+              </Text>
             </XStack>
           );
         })}
