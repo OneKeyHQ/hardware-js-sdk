@@ -8,7 +8,6 @@ import { pbkdf2 } from '@noble/hashes/pbkdf2';
 import { sha256 } from '@noble/hashes/sha256';
 
 import { Slip39, WORD_LIST, combineMnemonics, validateMnemonic } from './core/index';
-
 // Import address generators
 import { generateBtcAddressFromSeed } from '../../utils/mockDevice/method/btcGetAddress';
 import { generateEvmAddressFromSeed } from '../../utils/mockDevice/method/evmGetAddress';
@@ -23,7 +22,6 @@ import { generateXrpAddressFromSeed } from '../../utils/mockDevice/method/xrpGet
 import { generateBenfenAddressFromSeed } from '../../utils/mockDevice/method/benfenGetAddress';
 import { generateTonAddressFromSeed } from '../../utils/mockDevice/method/tonGetAddress';
 import { generatePolkadotAddressFromSeed } from '../../utils/mockDevice/method/polkadotGetAddress';
-
 // Import public key generators
 import { generateAptosPublicKeyFromSeed } from '../../utils/mockDevice/method/aptosGetPublicKey';
 import { generateNostrPublicKeyFromSeed } from '../../utils/mockDevice/method/nostrGetPublicKey';

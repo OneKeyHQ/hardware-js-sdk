@@ -87,7 +87,7 @@ export default class DeviceConnector {
       }
       return res;
     } catch (error) {
-      Log.error('acquire error: ', error?.name ? `${error.name}: ${error.message}` : error.message);
+      Log.error('acquire error: ', error.message);
       safeThrowError(error);
     }
   }

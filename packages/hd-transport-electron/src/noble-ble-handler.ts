@@ -714,28 +714,6 @@ function ensureDiscoverListener(): void {
   }
 }
 
-// Check whether a deviceId looks like a valid Noble platform peripheral ID.
-// macOS: 32 lowercase hex chars (e.g. 1f6dad0b8782aab31d2f7ae2b11e5b6c)
-// Standard UUID with dashes (e.g. 1f6dad0b-8782-aab3-1d2f-7ae2b11e5b6c)
-// Linux: MAC address (e.g. AA:BB:CC:DD:EE:FF)
-function isNoblePlatformId(deviceId: string): boolean {
-  if (/^[0-9a-f]{32}$/i.test(deviceId)) return true;
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deviceId)) return true;
-  if (/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/i.test(deviceId)) return true;
-  return false;
-}
-
-// Check whether a discovered peripheral matches the requested deviceId.
-// Primary: exact peripheral.id match.
-// Fallback: BLE advertisement localName match, to handle cases where an older
-// version of the app (or a different platform) stored the device name as connectId.
-function isPeripheralMatch(peripheral: Peripheral, targetDeviceId: string): boolean {
-  if (peripheral.id === targetDeviceId) return true;
-  const localName = peripheral.advertisement?.localName;
-  if (localName && localName === targetDeviceId) return true;
-  return false;
-}
-
 // Perform targeted scan for a specific device ID
 // Uses self-contained local listener pattern - no global state needed
 async function performTargetedScan(targetDeviceId: string): Promise<Peripheral | null> {
@@ -749,13 +727,12 @@ async function performTargetedScan(targetDeviceId: string): Promise<Peripheral |
   logger?.info('[NobleBLE] Starting targeted scan for device:', targetDeviceId);
 
   return new Promise((resolve, reject) => {
-    // Local discover listener - matches by UUID or advertisement name
+    // Local discover listener - only matches target device
     const onDiscover = (peripheral: Peripheral) => {
-      if (isPeripheralMatch(peripheral, targetDeviceId)) {
+      if (peripheral.id === targetDeviceId) {
         logger?.info('[NobleBLE] Target device found during targeted scan:', {
           id: peripheral.id,
           name: peripheral.advertisement?.localName,
-          matchedBy: peripheral.id === targetDeviceId ? 'id' : 'name',
         });
         clearTimeout(timeoutId);
         nobleInstance.removeListener('discover', onDiscover);
@@ -1256,18 +1233,6 @@ async function connectDevice(deviceId: string, webContents: WebContents): Promis
     totalDiscovered: discoveredDevices.size,
     totalConnected: connectedDevices.size,
   });
-
-  // Warn early if the deviceId format is not a valid Noble platform identifier.
-  // A non-UUID format (e.g. a device name or serial number stored by an older app
-  // version or a different platform) will never match peripheral.id and will always
-  // time out. Logging here makes the root cause immediately visible in the log.
-  if (!isNoblePlatformId(deviceId)) {
-    logger?.error(
-      '[NobleBLE] deviceId does not match any known Noble platform ID format (UUID / MAC).',
-      'connectId may be stale or originate from a different platform:',
-      deviceId
-    );
-  }
 
   let peripheral = discoveredDevices.get(deviceId);
 
