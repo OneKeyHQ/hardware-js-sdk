@@ -4,26 +4,118 @@ title: 取消请求
 
 # 取消请求
 
-## 取消命令
+## 概述
 
-取消当前正在执行的方法，并触发 `ui-close_window` 事件。
+取消当前正在执行的 SDK 方法调用，并触发 `ui-close_window` 事件。用于中止长时间等待的操作（例如等待用户在设备上确认）或关闭待处理的 UI 提示（PIN / Passphrase 对话框）。
+
+> **重要：** `cancel()` 仅中止正在进行的 SDK 调用 — 它**不会**断开传输连接（USB 或 BLE）。设备连接保持活跃，取消后可立即发起新的调用。
+
+## 方法
 
 ```typescript
-HardwareSDK.cancel(connectId);
+HardwareSDK.cancel(connectId?: string): void;
 ```
 
 ### 参数
 
-[**可选通用参数**](../common-params)
+| 参数 | 类型 | 是否必填 | 描述 |
+|------|------|----------|------|
+| `connectId` | `string` | 否 | 目标设备的 `connectId`。不传时，SDK 会取消当前正在使用的设备上的活动调用。 |
 
-### 示例
+### 返回值
+
+`undefined` — 方法立即返回。挂起的 SDK 调用将以错误拒绝（错误码 `801`，"User cancelled the action"）。
+
+## 使用场景
+
+| 场景 | 示例 |
+|------|------|
+| 用户在 PIN / Passphrase 对话框中点击"取消" | 中止挂起的 `uiResponse` 等待 |
+| 超时 — 设备确认等待过久 | 在自定义计时器触发后取消 |
+| 页面导航 — 用户离开页面或关闭弹窗 | 在组件卸载前清理 |
+| 重试 — 需要从头重新发起调用 | 先取消，再重新发起调用 |
+
+## 示例
+
+### 基本取消
 
 ```typescript
+// 发起一个长时间运行的调用
+const signPromise = HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: { /* ... */ },
+});
+
+// 用户点击"取消"
 HardwareSDK.cancel(connectId);
+
+// Promise 会被拒绝
+const result = await signPromise;
+// result.success === false
+// result.payload.code === 801
 ```
 
-### 返回结果
+### 组件卸载时取消（React）
+
+```tsx
+import { useEffect, useRef } from 'react';
+
+function SignTransaction({ connectId, deviceId }) {
+  const connectIdRef = useRef(connectId);
+
+  useEffect(() => {
+    connectIdRef.current = connectId;
+    return () => {
+      // 组件卸载时中止挂起的设备调用
+      HardwareSDK.cancel(connectIdRef.current);
+    };
+  }, [connectId]);
+
+  // ...
+}
+```
+
+### 超时取消
 
 ```typescript
-undefined
+async function signWithTimeout(connectId: string, deviceId: string, params: any, timeoutMs = 60_000) {
+  const timer = setTimeout(() => {
+    HardwareSDK.cancel(connectId);
+  }, timeoutMs);
+
+  try {
+    const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params);
+    clearTimeout(timer);
+    return result;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
 ```
+
+## Cancel 与 Disconnect 的区别
+
+| | `cancel(connectId)` | 物理断开（拔线 / BLE 超出范围） |
+|---|---|---|
+| **行为** | 中止挂起的 SDK 调用；设备保持连接 | 传输层触发 `DEVICE.DISCONNECT` 事件；所有挂起的调用被拒绝 |
+| **连接状态** | 活跃 — 可立即调用 SDK 方法 | 已断开 — 需要重新发现并连接 |
+| **使用场景** | 用户主动取消、超时、页面导航清理 | 硬件事件（拔线、BLE 信号丢失） |
+
+> SDK 不提供编程式的 "disconnect" 方法。传输层的清理在设备物理断开或页面/应用关闭时自动发生。如需释放会话而不断开连接，只需停止发起 SDK 调用 — 会话将在内部超时后自动释放。
+
+## 错误码参考
+
+调用被取消时，拒绝的结果结构如下：
+
+```typescript
+{
+  success: false,
+  payload: {
+    error: "User cancelled the action",
+    code: 801  // ACTION_CANCELLED
+  }
+}
+```
+
+完整错误码列表请参见 [错误码](/zh/hardware-sdk/core-api-guide#error-codes)。

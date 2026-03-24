@@ -38,7 +38,7 @@ HardwareSDK.searchDevices().then(result => {
             "connectId": string, // 设备连接 ID（同一设备稳定不变，设备重置不影响）
             "uuid": string, // 设备唯一 ID
             "deviceType": string, // 设备类型：'classic' | 'mini' | 'touch' | 'pro'
-            "deviceId": string, // 设备 ID，设备重置/擦除/恢复后会变，仅在使用 @onekeyfe/hd-common-connect-sdk 的 webusb 传输时返回
+            "deviceId": string, // 设备 ID，设备重置/擦除/恢复后会变，仅在使用 hd-common-connect-sdk 的 webusb 传输时返回
             "path": string, // 通过 WebUSB 连接 USB 时的设备序列号
             "name": string, // 设备的蓝牙名称
         },
