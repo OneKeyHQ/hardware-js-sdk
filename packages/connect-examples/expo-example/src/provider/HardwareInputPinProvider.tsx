@@ -82,6 +82,7 @@ export const HardwareInputPinDialogProvider: React.FC<{ children: ReactNode }> =
         onConfirm={val => onConfirmPin(val)}
         onSwitchDevice={onInputPinOnDeviceCallback}
         onCancel={onPinCancelCallback}
+        onTestUnexpectedMessage={() => {}}
       />
     </HardwareInputPinDialogContext.Provider>
   );

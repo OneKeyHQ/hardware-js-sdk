@@ -1,6 +1,6 @@
-import { type PlaygroundProps } from '../../../components/Playground';
+import type { ChainMethodEntry } from './index';
 
-const solData: PlaygroundProps[] = [
+const solData: ChainMethodEntry[] = [
   {
     method: 'solGetAddress',
     description: 'Get a Solana address for your account.',
@@ -16,18 +16,9 @@ const solData: PlaygroundProps[] = [
         title: 'Batch Get Address',
         value: {
           bundle: [
-            {
-              path: "m/44'/501'/0'/0'",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/501'/1'/0'",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/501'/2'/0'",
-              showOnOneKey: false,
-            },
+            { path: "m/44'/501'/0'/0'", showOnOneKey: false },
+            { path: "m/44'/501'/1'/0'", showOnOneKey: false },
+            { path: "m/44'/501'/2'/0'", showOnOneKey: false },
           ],
         },
       },
@@ -35,6 +26,7 @@ const solData: PlaygroundProps[] = [
   },
   {
     method: 'solSignTransaction',
+    confirmCount: 1,
     description: 'Sign a Solana transaction.',
     presupposes: [
       {
@@ -57,6 +49,8 @@ const solData: PlaygroundProps[] = [
   },
   {
     method: 'solSignOffchainMessage',
+    confirmCount: 1,
+    noSlide: true,
     description: 'Sign Offchain Message',
     presupposes: [
       {
@@ -70,6 +64,8 @@ const solData: PlaygroundProps[] = [
   },
   {
     method: 'solSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     description: 'Sign a Solana message.',
     presupposes: [
       {
