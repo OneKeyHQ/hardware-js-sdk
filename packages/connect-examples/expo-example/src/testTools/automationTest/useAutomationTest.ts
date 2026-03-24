@@ -1498,6 +1498,7 @@ export function useAutomationTest() {
       cleanupPassphraseLoop,
       updateSuiteProgress,
       incrementCompletedTests,
+      notifyLiveCaseUpdate,
     ]
   );
 
@@ -1693,6 +1694,7 @@ export function useAutomationTest() {
       cleanupPassphraseLoop,
       updateSuiteProgress,
       incrementCompletedTests,
+      notifyLiveCaseUpdate,
     ]
   );
 
@@ -1865,6 +1867,7 @@ export function useAutomationTest() {
       addLog,
       updateSuiteProgress,
       incrementCompletedTests,
+      notifyLiveCaseUpdate,
     ]
   );
 
@@ -2120,6 +2123,7 @@ export function useAutomationTest() {
       addLog,
       updateSuiteProgress,
       incrementCompletedTests,
+      notifyLiveCaseUpdate,
     ]
   );
 
@@ -2333,7 +2337,7 @@ export function useAutomationTest() {
         Date.now() - startedAt
       );
     },
-    [addLog, runWithRetry, updateSuiteProgress, incrementCompletedTests]
+    [addLog, runWithRetry, updateSuiteProgress, incrementCompletedTests, notifyLiveCaseUpdate]
   );
 
   const runSecurityCheckSuite = useCallback(
