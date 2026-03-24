@@ -91,14 +91,39 @@ const stripRetrievalScaffold = text => {
   return next.trim();
 };
 
+/**
+ * Wrap bare `@onekeyfe/...` package names in backticks so the markdown
+ * renderer (remark-gfm) doesn't mangle the `@` as an autolink or email.
+ * Skips instances already inside backticks or fenced code blocks.
+ */
+const wrapBarePackageNames = text => {
+  if (typeof text !== 'string') return text;
+
+  // Split on fenced code blocks to avoid touching code content
+  const parts = text.split(/(```[\s\S]*?```)/g);
+  return parts
+    .map((part, i) => {
+      // Odd indices are fenced code blocks — leave untouched
+      if (i % 2 === 1) return part;
+      // Wrap @onekeyfe/package-name that is NOT already inside backticks
+      return part.replace(
+        /(?<!`)\B@onekeyfe\/[\w-]+(?!`)/g,
+        match => `\`${match}\``
+      );
+    })
+    .join('');
+};
+
 export const sanitizeDocAIMessageText = input => {
   if (typeof input !== 'string' || !input) return '';
 
   return stripRetrievalScaffold(
     stripInlineSources(
-      input
-        .replace(/＠/g, '@')
-        .replace(/@0nekeyfe\//gi, '@onekeyfe/')
+      wrapBarePackageNames(
+        input
+          .replace(/＠/g, '@')
+          .replace(/@0nekeyfe\//gi, '@onekeyfe/')
+      )
     )
   );
 };

@@ -223,16 +223,16 @@ const getWidgetCopy = isZh => {
       poweredBy: 'Powered by OneKey',
       suggestions: [
         {
-          text: '初始化 SDK',
-          prompt: '如何初始化 OneKey Hardware SDK？请给我最小可运行示例。',
+          text: 'WebUSB 连接',
+          prompt: '如何在浏览器中通过 WebUSB 连接 OneKey 硬件设备？请给出从安装 SDK、初始化、设备授权到首次调用的完整代码示例。',
         },
         {
-          text: '连接排查',
-          prompt: '连接设备失败时，常见排查步骤有哪些？',
+          text: 'React Native 蓝牙连接',
+          prompt: '如何在 React Native 项目中使用 @onekeyfe/hd-ble-sdk 通过蓝牙 BLE 连接 OneKey 硬件设备？请包含安装、权限配置和完整初始化示例。',
         },
         {
-          text: '签名流程',
-          prompt: '请解释一次完整的交易签名流程，并给代码示例。',
+          text: 'EVM 交易签名',
+          prompt: '请给出使用 OneKey Hardware SDK 签名一笔 EVM 交易的完整流程和代码示例，包括 PIN/Passphrase 处理。',
         },
       ],
     };
@@ -267,16 +267,16 @@ const getWidgetCopy = isZh => {
     poweredBy: 'Powered by OneKey',
     suggestions: [
       {
-        text: 'SDK initialization',
-        prompt: 'How do I initialize OneKey Hardware SDK with a minimal runnable example?',
+        text: 'WebUSB connection',
+        prompt: 'How do I connect to a OneKey hardware device via WebUSB in the browser? Give me a complete code example from SDK install, initialization, device authorization to the first API call.',
       },
       {
-        text: 'Connection troubleshooting',
-        prompt: 'What are the common troubleshooting steps when device connection fails?',
+        text: 'React Native BLE',
+        prompt: 'How do I establish a BLE connection to a OneKey hardware device in a React Native app using @onekeyfe/hd-ble-sdk? Include installation, permission setup, and a full initialization example.',
       },
       {
-        text: 'Signing workflow',
-        prompt: 'Explain a full transaction signing flow with code examples.',
+        text: 'EVM transaction signing',
+        prompt: 'Show me the complete flow and code example for signing an EVM transaction using the OneKey Hardware SDK, including PIN/Passphrase handling.',
       },
     ],
   };
