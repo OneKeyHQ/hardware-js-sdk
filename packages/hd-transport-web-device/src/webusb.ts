@@ -366,12 +366,16 @@ export default class WebUsbTransport {
     const encodeBuffers = buildEncodeBuffers(messages, name, data);
 
     const totalPackets = encodeBuffers.length;
+    const isLargeTransfer = totalPackets > 100;
     const sendStartTime = Date.now();
-    this.Log.debug(
-      `[WebUsbTransport] call ${name}: sending ${totalPackets} packets (${
-        totalPackets * PACKET_SIZE
-      } bytes)`
-    );
+
+    if (isLargeTransfer) {
+      this.Log.debug(
+        `[WebUsbTransport] call ${name}: sending ${totalPackets} packets (${
+          totalPackets * PACKET_SIZE
+        } bytes)`
+      );
+    }
 
     for (let i = 0; i < encodeBuffers.length; i++) {
       const newArray: Uint8Array = new Uint8Array(PACKET_SIZE);
@@ -379,7 +383,7 @@ export default class WebUsbTransport {
       newArray.set(new Uint8Array(encodeBuffers[i]), 1);
       await this.transferOutWithRetry(path, newArray);
 
-      if (totalPackets > 100 && (i + 1) % Math.ceil(totalPackets / 10) === 0) {
+      if (isLargeTransfer && (i + 1) % Math.ceil(totalPackets / 10) === 0) {
         this.Log.debug(
           `[WebUsbTransport] call ${name}: sent ${i + 1}/${totalPackets} packets (${Math.round(
             ((i + 1) / totalPackets) * 100
@@ -389,14 +393,19 @@ export default class WebUsbTransport {
     }
 
     const sendDuration = Date.now() - sendStartTime;
-    this.Log.debug(
-      `[WebUsbTransport] call ${name}: all ${totalPackets} packets sent in ${sendDuration}ms, waiting for response...`
-    );
+    if (isLargeTransfer) {
+      this.Log.debug(
+        `[WebUsbTransport] call ${name}: all ${totalPackets} packets sent in ${sendDuration}ms, waiting for response...`
+      );
+    }
 
     const receiveStartTime = Date.now();
     const resData = await this.receiveData(path);
     const receiveDuration = Date.now() - receiveStartTime;
-    this.Log.debug(`[WebUsbTransport] call ${name}: response received in ${receiveDuration}ms`);
+
+    if (isLargeTransfer || receiveDuration > 1000) {
+      this.Log.debug(`[WebUsbTransport] call ${name}: response received in ${receiveDuration}ms`);
+    }
 
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
@@ -409,16 +418,12 @@ export default class WebUsbTransport {
    * Receive data from device
    */
   async receiveData(path: string) {
-    this.Log.debug('[WebUsbTransport] receiveData: waiting for first packet...');
     const firstPacketData = await this.transferInWithRetry(path, PACKET_SIZE);
     const firstData = this.toArrayBuffer(firstPacketData.buffer.slice(1));
     const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData);
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const lengthWithHeader = Number(length + HEADER_LENGTH);
-    this.Log.debug(
-      `[WebUsbTransport] receiveData: first packet received, typeId=${typeId}, totalLength=${lengthWithHeader}`
-    );
 
     const decoded = new ByteBuffer(lengthWithHeader);
     decoded.writeUint16(typeId);
@@ -438,7 +443,12 @@ export default class WebUsbTransport {
       }
       receivedPackets += 1;
     }
-    this.Log.debug(`[WebUsbTransport] receiveData: complete, ${receivedPackets} packets received`);
+
+    if (receivedPackets > 1) {
+      this.Log.debug(
+        `[WebUsbTransport] receiveData: ${receivedPackets} packets, totalLength=${lengthWithHeader}`
+      );
+    }
 
     decoded.reset();
     const result = decoded.toBuffer();
