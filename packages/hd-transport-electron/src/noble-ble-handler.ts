@@ -55,6 +55,10 @@ const subscribedDevices = new Map<string, boolean>(); // Track subscription stat
 // 🔒 Subscription operation state tracking to prevent race conditions
 const subscriptionOperations = new Map<string, 'subscribing' | 'unsubscribing' | 'idle'>();
 
+// 🔒 Connection operation deduplication: prevent concurrent connectDevice calls for the same deviceId
+// When two callers request connect simultaneously, the second one awaits the first's Promise
+const pendingConnections = new Map<string, Promise<void>>();
+
 // Packet reassembly state for each device
 interface PacketAssemblyState {
   bufferLength: number;
@@ -1223,8 +1227,24 @@ async function setupConnectionAndDiscoverServices(
   }
 }
 
-// Connect to device - supports both discovered and direct connection modes
+// Connect to device - with deduplication to prevent concurrent connection races
 async function connectDevice(deviceId: string, webContents: WebContents): Promise<void> {
+  // 🔒 Deduplicate: if a connection for this deviceId is already in progress, await it
+  const pending = pendingConnections.get(deviceId);
+  if (pending) {
+    logger?.info('[NobleBLE] Connection already in progress for device, awaiting:', deviceId);
+    return pending;
+  }
+
+  const connectionPromise = connectDeviceInternal(deviceId, webContents).finally(() => {
+    pendingConnections.delete(deviceId);
+  });
+  pendingConnections.set(deviceId, connectionPromise);
+  return connectionPromise;
+}
+
+// Internal connect implementation - supports both discovered and direct connection modes
+async function connectDeviceInternal(deviceId: string, webContents: WebContents): Promise<void> {
   logger?.info('[NobleBLE] Connect device request:', {
     deviceId,
     hasDiscovered: discoveredDevices.has(deviceId),

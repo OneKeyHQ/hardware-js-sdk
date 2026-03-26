@@ -367,7 +367,11 @@ export default class WebUsbTransport {
 
     const totalPackets = encodeBuffers.length;
     const sendStartTime = Date.now();
-    this.Log.debug(`[WebUsbTransport] call ${name}: sending ${totalPackets} packets (${totalPackets * PACKET_SIZE} bytes)`);
+    this.Log.debug(
+      `[WebUsbTransport] call ${name}: sending ${totalPackets} packets (${
+        totalPackets * PACKET_SIZE
+      } bytes)`
+    );
 
     for (let i = 0; i < encodeBuffers.length; i++) {
       const newArray: Uint8Array = new Uint8Array(PACKET_SIZE);
@@ -376,12 +380,18 @@ export default class WebUsbTransport {
       await this.transferOutWithRetry(path, newArray);
 
       if (totalPackets > 100 && (i + 1) % Math.ceil(totalPackets / 10) === 0) {
-        this.Log.debug(`[WebUsbTransport] call ${name}: sent ${i + 1}/${totalPackets} packets (${Math.round(((i + 1) / totalPackets) * 100)}%)`);
+        this.Log.debug(
+          `[WebUsbTransport] call ${name}: sent ${i + 1}/${totalPackets} packets (${Math.round(
+            ((i + 1) / totalPackets) * 100
+          )}%)`
+        );
       }
     }
 
     const sendDuration = Date.now() - sendStartTime;
-    this.Log.debug(`[WebUsbTransport] call ${name}: all ${totalPackets} packets sent in ${sendDuration}ms, waiting for response...`);
+    this.Log.debug(
+      `[WebUsbTransport] call ${name}: all ${totalPackets} packets sent in ${sendDuration}ms, waiting for response...`
+    );
 
     const receiveStartTime = Date.now();
     const resData = await this.receiveData(path);
@@ -406,7 +416,9 @@ export default class WebUsbTransport {
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const lengthWithHeader = Number(length + HEADER_LENGTH);
-    this.Log.debug(`[WebUsbTransport] receiveData: first packet received, typeId=${typeId}, totalLength=${lengthWithHeader}`);
+    this.Log.debug(
+      `[WebUsbTransport] receiveData: first packet received, typeId=${typeId}, totalLength=${lengthWithHeader}`
+    );
 
     const decoded = new ByteBuffer(lengthWithHeader);
     decoded.writeUint16(typeId);
