@@ -7,11 +7,11 @@
 import type {
   ActionResult,
   ActionSequenceResult,
-  AutomationPresetExecutionResult,
   ArmClickResult,
   ArmConnectResult,
   ArmDisconnectResult,
   ArmMoveResult,
+  AutomationPresetExecutionResult,
   CaptureFrameResult,
   ConnectionState,
   ExecuteSequenceResult,
@@ -393,16 +393,14 @@ export class PhonePilotClient {
     return { ...result, frame };
   }
 
-  async executeAutomationPreset(
-    input: {
-      suite: 'deviceSettings' | 'securityCheck' | 'chainMethodBatch';
-      presetId: string;
-      expectedResult?: boolean;
-      startDelayMs?: number;
-      betweenStepsDelayMs?: number;
-      returnFrame?: boolean;
-    }
-  ): Promise<AutomationPresetExecutionResult> {
+  async executeAutomationPreset(input: {
+    suite: 'deviceSettings' | 'securityCheck' | 'chainMethodBatch';
+    presetId: string;
+    expectedResult?: boolean;
+    startDelayMs?: number;
+    betweenStepsDelayMs?: number;
+    returnFrame?: boolean;
+  }): Promise<AutomationPresetExecutionResult> {
     const { result, frame } = await this.callToolWithImage<AutomationPresetExecutionResult>(
       'execute-automation-preset',
       input

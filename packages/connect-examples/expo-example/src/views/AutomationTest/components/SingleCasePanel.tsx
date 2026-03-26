@@ -24,13 +24,7 @@ interface SingleChainMethodCaseInput {
   slideCount: number;
 }
 
-function ActionBadge({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function ActionBadge({ label, value }: { label: string; value: string }) {
   return (
     <XStack
       paddingHorizontal="$2"
@@ -147,7 +141,8 @@ export function SingleCasePanel({
         临时入口。这里会走 AutomationTest 当前这套 SDK + PhonePilot 链路，单独触发一个用例。
       </Text>
       <Text fontSize={11} color="$gray10">
-        Security Check 首次执行会先做一次设备预处理: confirm x1, slide x0。后续同一连接复用，不重复触发。
+        Security Check 首次执行会先做一次设备预处理: confirm x1, slide x0。后续同一连接复用，不重复
+        触发。
       </Text>
 
       <YStack gap="$2" padding="$2.5" borderWidth={1} borderColor="$gray5" borderRadius="$4">
@@ -169,9 +164,7 @@ export function SingleCasePanel({
                 subtitle={testCase.expectedResult ? 'expect success' : 'expect failure'}
                 confirmCount={testCase.confirmCount}
                 slideCount={testCase.slideCount}
-                onPress={() => {
-                  void onRunSecurityCheckCase(testCase);
-                }}
+                onPress={() => onRunSecurityCheckCase(testCase)}
               />
             ))}
           </YStack>
@@ -197,9 +190,7 @@ export function SingleCasePanel({
                 subtitle={testCase.method}
                 confirmCount={testCase.confirmCount}
                 slideCount={testCase.slideCount}
-                onPress={() => {
-                  void onRunChainMethodCase(testCase);
-                }}
+                onPress={() => onRunChainMethodCase(testCase)}
               />
             ))}
           </YStack>

@@ -5,6 +5,8 @@
 import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 
+import { STANDALONE_TEST_SUITES } from '../services/phonePilotMcp/types';
+
 import type {
   AutomationTestConfig,
   ConnectionState,
@@ -13,7 +15,6 @@ import type {
   TestProgress,
   TestReport,
 } from '../services/phonePilotMcp/types';
-import { STANDALONE_TEST_SUITES } from '../services/phonePilotMcp/types';
 
 const defaultConfig: AutomationTestConfig = {
   scenarioIds: ['ok26054_bip39_import_12', 'ok40090_slip39_import_20_1of1'],

@@ -45,19 +45,19 @@ import {
   generateMultiChainAddressFromSLIP39,
   generateMultiChainPublicKeyFromSLIP39,
 } from '../slip39Test/slip39Utils';
-
 import {
-  STANDALONE_TEST_SUITES,
   type AutomationScenario,
   type HealthCheckResponse,
   type MnemonicStoreResult,
   type PassphraseVariantId,
+  STANDALONE_TEST_SUITES,
   type ScenarioReportResult,
   type TestCaseResult,
   type TestReport,
   type TestSuiteResult,
   type TestSuiteType,
 } from '../../services/phonePilotMcp/types';
+
 import type { CoreApi } from '@onekeyfe/hd-core';
 import type { SLIP39MethodData, SLIP39TestCaseData } from '../slip39Test/types';
 
@@ -2529,7 +2529,7 @@ export function useAutomationTest() {
       });
 
       try {
-        const connectId = selectedDevice.connectId;
+        const { connectId } = selectedDevice;
         const deviceId = await refreshDeviceId(SDK, connectId);
         addLog(`Device ID updated: ${deviceId}`);
         return { connectId, deviceId };
@@ -2767,14 +2767,10 @@ export function useAutomationTest() {
             for (const presuppose of entry.presupposes ?? []) {
               const caseStart = Date.now();
               const caseTitle = `${chain.symbol} / ${entry.method} / ${presuppose.title}`;
-              setPendingUiActions(
-                'chainMethodBatch',
-                caseTitle,
-                [
-                  ...Array<DeviceUiAction>(entry.confirmCount ?? 0).fill('confirm'),
-                  ...(entry.noSlide || !entry.confirmCount ? [] : (['slide'] as DeviceUiAction[])),
-                ]
-              );
+              setPendingUiActions('chainMethodBatch', caseTitle, [
+                ...Array<DeviceUiAction>(entry.confirmCount ?? 0).fill('confirm'),
+                ...(entry.noSlide || !entry.confirmCount ? [] : (['slide'] as DeviceUiAction[])),
+              ]);
               try {
                 const sdkMethod = (sdk as Record<string, unknown>)[entry.method];
                 if (typeof sdkMethod !== 'function') {
@@ -2954,18 +2950,22 @@ export function useAutomationTest() {
               : '');
           const coinType = path.split('/')[2]?.replace(/'/g, '') ?? '';
           const deviceFeats = deviceFeaturesRef.current ?? {};
-          const expected = getDeviceExpected(deviceFeats, testCase.method, coinType, testCase.expectedResult, {
-            securityChecksDisabled: false,
-          });
+          const expected = getDeviceExpected(
+            deviceFeats,
+            testCase.method,
+            coinType,
+            testCase.expectedResult,
+            {
+              securityChecksDisabled: false,
+            }
+          );
 
           const actualSuccess = sdkResult.success;
           results.push({
             title: testCase.title,
             method: testCase.method,
             expected: expected ? 'success' : 'failure',
-            actual: actualSuccess
-              ? 'success'
-              : `failure(${sdkResult.payload?.error ?? ''})`,
+            actual: actualSuccess ? 'success' : `failure(${sdkResult.payload?.error ?? ''})`,
             passed: expected ? actualSuccess : !actualSuccess,
             duration: Date.now() - startTime,
           });
@@ -3010,14 +3010,10 @@ export function useAutomationTest() {
       addLog(`[Single][ChainMethodBatch] ${testCase.title}`);
 
       try {
-        setPendingUiActions(
-          'chainMethodBatch',
-          testCase.title,
-          [
-            ...Array<DeviceUiAction>(testCase.confirmCount).fill('confirm'),
-            ...Array<DeviceUiAction>(testCase.slideCount).fill('slide'),
-          ]
-        );
+        setPendingUiActions('chainMethodBatch', testCase.title, [
+          ...Array<DeviceUiAction>(testCase.confirmCount).fill('confirm'),
+          ...Array<DeviceUiAction>(testCase.slideCount).fill('slide'),
+        ]);
         const sdkMethod = (SDK as Record<string, unknown>)[testCase.method];
         if (typeof sdkMethod !== 'function') {
           results.push({

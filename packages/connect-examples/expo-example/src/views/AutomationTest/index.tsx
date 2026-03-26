@@ -183,7 +183,13 @@ function AutomationTestContent() {
           <PanelView title="测试配置">
             <ScrollView height={680} showsVerticalScrollIndicator>
               <YStack gap="$3">
-                <YStack gap="$2.5" padding="$2.5" borderWidth={1} borderColor="$gray4" borderRadius="$4">
+                <YStack
+                  gap="$2.5"
+                  padding="$2.5"
+                  borderWidth={1}
+                  borderColor="$gray4"
+                  borderRadius="$4"
+                >
                   <Text fontSize={15} fontWeight="700">
                     地址 / 公钥校验模块
                   </Text>

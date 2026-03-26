@@ -167,10 +167,7 @@ export const SCENARIO_DRIVEN_TEST_SUITES: TestSuiteType[] = [
   'specialPassphrase',
 ];
 
-export const STANDALONE_TEST_SUITES: TestSuiteType[] = [
-  'securityCheck',
-  'chainMethodBatch',
-];
+export const STANDALONE_TEST_SUITES: TestSuiteType[] = ['securityCheck', 'chainMethodBatch'];
 
 export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description: string }> = {
   deviceFlow: {
