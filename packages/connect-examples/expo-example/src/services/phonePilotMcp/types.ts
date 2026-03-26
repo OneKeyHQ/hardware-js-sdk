@@ -37,6 +37,20 @@ export interface ActionResult {
   message: string;
 }
 
+export interface ActionSequenceResult extends ActionResult {
+  steps: Array<'confirm' | 'cancel' | 'slide'>;
+  stepsCompleted: number;
+  frame?: string;
+}
+
+export interface AutomationPresetExecutionResult extends ActionResult {
+  suite: 'deviceSettings' | 'securityCheck' | 'chainMethodBatch';
+  presetId: string;
+  steps: Array<'confirm' | 'cancel' | 'slide'>;
+  stepsCompleted: number;
+  frame?: string;
+}
+
 export interface ExecuteSequenceResult extends ActionResult {
   sequenceId?: string;
   sequenceName?: string;
@@ -146,6 +160,17 @@ export type TestSuiteType =
   | 'specialPassphrase'
   | 'securityCheck'
   | 'chainMethodBatch';
+
+export const SCENARIO_DRIVEN_TEST_SUITES: TestSuiteType[] = [
+  'sdkAddressBatch',
+  'sdkPubkeyBatch',
+  'specialPassphrase',
+];
+
+export const STANDALONE_TEST_SUITES: TestSuiteType[] = [
+  'securityCheck',
+  'chainMethodBatch',
+];
 
 export const TEST_SUITE_INFO: Record<TestSuiteType, { label: string; description: string }> = {
   deviceFlow: {

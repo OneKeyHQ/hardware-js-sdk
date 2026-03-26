@@ -21,8 +21,10 @@ import { ProgressBar } from './components/ProgressBar';
 import { ConnectionConfig } from './components/ConnectionConfig';
 import { ScenarioSelector } from './components/ScenarioSelector';
 import { SuiteSelector } from './components/SuiteSelector';
+import { StandaloneSuiteSelector } from './components/StandaloneSuiteSelector';
 import { PassphraseSelector } from './components/PassphraseSelector';
 import { RunnerBehaviorConfig } from './components/RunnerBehaviorConfig';
+import { SingleCasePanel } from './components/SingleCasePanel';
 import { ReportTree } from './components/ReportTree';
 import { LogsSection } from './components/LogsSection';
 import { TabSelector } from './components/TabSelector';
@@ -114,10 +116,13 @@ function AutomationTestContent() {
           </YStack>
           {/* Right: run controls + progress */}
           <YStack flex={1} minWidth={260} gap="$2">
-            <XStack alignItems="center" gap="$2" flexWrap="wrap">
+            <XStack alignItems="center" gap="$2" flexWrap="wrap" minHeight={34}>
               <Button
                 size="$3"
                 theme="green"
+                height={34}
+                borderRadius="$2"
+                paddingHorizontal="$3"
                 onPress={automation.startAutomation}
                 disabled={!canStart || isRunning}
               >
@@ -126,6 +131,9 @@ function AutomationTestContent() {
               <Button
                 size="$3"
                 theme="red"
+                height={34}
+                borderRadius="$2"
+                paddingHorizontal="$3"
                 onPress={automation.stopAutomation}
                 disabled={!isRunning}
               >
@@ -174,19 +182,42 @@ function AutomationTestContent() {
         <YStack width="35%" minWidth={280}>
           <PanelView title="测试配置">
             <ScrollView height={680} showsVerticalScrollIndicator>
-              <YStack gap="$0">
-                <ScenarioSelector
+              <YStack gap="$3">
+                <YStack gap="$2.5" padding="$2.5" borderWidth={1} borderColor="$gray4" borderRadius="$4">
+                  <Text fontSize={15} fontWeight="700">
+                    地址 / 公钥校验模块
+                  </Text>
+                  <ScenarioSelector
+                    config={config}
+                    isRunning={isRunning}
+                    scenarios={automation.scenarios}
+                    setConfig={setConfig}
+                  />
+                  <Separator marginVertical="$1" />
+                  <SuiteSelector config={config} isRunning={isRunning} setConfig={setConfig} />
+                  <Separator marginVertical="$1" />
+                  <PassphraseSelector config={config} isRunning={isRunning} setConfig={setConfig} />
+                </YStack>
+                <StandaloneSuiteSelector
                   config={config}
                   isRunning={isRunning}
-                  scenarios={automation.scenarios}
                   setConfig={setConfig}
+                  suiteType="securityCheck"
                 />
-                <Separator marginVertical="$2" />
-                <SuiteSelector config={config} isRunning={isRunning} setConfig={setConfig} />
-                <Separator marginVertical="$2" />
-                <PassphraseSelector config={config} isRunning={isRunning} setConfig={setConfig} />
-                <Separator marginVertical="$2" />
+                <StandaloneSuiteSelector
+                  config={config}
+                  isRunning={isRunning}
+                  setConfig={setConfig}
+                  suiteType="chainMethodBatch"
+                />
+                <Separator marginVertical="$1" />
                 <RunnerBehaviorConfig config={config} isRunning={isRunning} setConfig={setConfig} />
+                <Separator marginVertical="$1" />
+                <SingleCasePanel
+                  isRunning={isRunning}
+                  onRunSecurityCheckCase={automation.runSingleSecurityCheckCase}
+                  onRunChainMethodCase={automation.runSingleChainMethodCase}
+                />
               </YStack>
             </ScrollView>
           </PanelView>
@@ -199,10 +230,24 @@ function AutomationTestContent() {
               <TabSelector tabs={REPORT_TABS} activeTab={activeTab} onTabChange={setActiveTab} />
               {report && (
                 <XStack gap="$2">
-                  <Button size="$2" theme="gray" onPress={handleExportReport}>
+                  <Button
+                    size="$3"
+                    theme="gray"
+                    height={34}
+                    borderRadius="$2"
+                    paddingHorizontal="$3"
+                    onPress={handleExportReport}
+                  >
                     导出 JSON
                   </Button>
-                  <Button size="$2" theme="red" onPress={handleExportFailures}>
+                  <Button
+                    size="$3"
+                    theme="red"
+                    height={34}
+                    borderRadius="$2"
+                    paddingHorizontal="$3"
+                    onPress={handleExportFailures}
+                  >
                     导出失败用例
                   </Button>
                 </XStack>

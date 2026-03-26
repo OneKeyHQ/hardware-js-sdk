@@ -46,16 +46,17 @@ import {
   generateMultiChainPublicKeyFromSLIP39,
 } from '../slip39Test/slip39Utils';
 
-import type {
-  AutomationScenario,
-  HealthCheckResponse,
-  MnemonicStoreResult,
-  PassphraseVariantId,
-  ScenarioReportResult,
-  TestCaseResult,
-  TestReport,
-  TestSuiteResult,
-  TestSuiteType,
+import {
+  STANDALONE_TEST_SUITES,
+  type AutomationScenario,
+  type HealthCheckResponse,
+  type MnemonicStoreResult,
+  type PassphraseVariantId,
+  type ScenarioReportResult,
+  type TestCaseResult,
+  type TestReport,
+  type TestSuiteResult,
+  type TestSuiteType,
 } from '../../services/phonePilotMcp/types';
 import type { CoreApi } from '@onekeyfe/hd-core';
 import type { SLIP39MethodData, SLIP39TestCaseData } from '../slip39Test/types';
@@ -104,17 +105,21 @@ const SLIP39_CREATE_ALLOWED_VARIANTS: PassphraseVariantId[] = ['normal', 'passph
 const RESET_SEQUENCE_LOCKED = 'reset-wallet-locked';
 const RESET_SEQUENCE_UNLOCKED = 'reset-wallet-unlocked';
 const DEBUG_SKIP_DEVICE_FLOW_REASON = 'debug mode skipped device flow';
+const STANDALONE_MODULE_SCENARIO_ID = 'bip39_import_12_api';
 
 /**
  * Timing constants — aligned with SLIP39 standalone test timings.
  * After a wallet import/create sequence the device needs time to persist
  * state before it can respond to Initialize commands.
  */
-const CONFIRM_ACTION_DELAY_MS = 500;
+const CONFIRM_ACTION_DELAY_MS = 900;
+const CONFIRM_ACTION_STEP_DELAY_MS = 1000;
 const POST_SEQUENCE_SETTLE_MS = 3000;
 /** Extra settle time between device preparation (import/create) and the first SDK call. */
 const PRE_SDK_SETTLE_MS = 3000;
 const SDK_CASE_DELAY_MS = 80;
+const DEVICE_FLOW_ONLY_SUITES: TestSuiteType[] = ['deviceFlow'];
+type DeviceUiAction = 'confirm' | 'slide';
 
 type AutomationRunMode = 'full' | 'debug';
 
@@ -134,6 +139,25 @@ interface DebugRunContext {
   currentEvmAddress: string;
   mnemonicStoreResult: MnemonicStoreResult | null;
   scenarioDecisions: Map<string, DebugScenarioDecision>;
+}
+
+interface SingleSecurityCheckCaseInput {
+  id: string;
+  title: string;
+  method: string;
+  params: Record<string, unknown>;
+  expectedResult: boolean;
+  confirmCount: number;
+  slideCount: number;
+}
+
+interface SingleChainMethodCaseInput {
+  id: string;
+  title: string;
+  method: string;
+  params: Record<string, unknown>;
+  confirmCount: number;
+  slideCount: number;
 }
 
 function delay(ms: number): Promise<void> {
@@ -461,23 +485,27 @@ async function fetchDeviceFeatures(
 
 function getBip39ImportProbeAddress(scenario: AutomationScenario): string {
   const sdkCase = resolveBip39ImportSdkCases(scenario, ['normal'], 'address')[0];
-  if (!sdkCase) {
-    return '';
-  }
 
-  for (const methodData of sdkCase.data) {
-    if (methodData.method === 'evmGetAddress') {
-      return extractExpectedByPath(
-        methodData.expectedByPath,
-        EVM_ADDRESS_PATH,
-        'address',
-        methodData.method,
-        methodData.name
-      );
+  if (sdkCase) {
+    for (const methodData of sdkCase.data) {
+      if (methodData.method === 'evmGetAddress') {
+        return extractExpectedByPath(
+          methodData.expectedByPath,
+          EVM_ADDRESS_PATH,
+          'address',
+          methodData.method,
+          methodData.name
+        );
+      }
     }
   }
 
-  return '';
+  if (!scenario.bip39ImportMnemonicWords?.length) {
+    return '';
+  }
+
+  const seed = mnemonicToSeed(scenario.bip39ImportMnemonicWords.join(' '));
+  return generateEvmAddressFromSeed(seed, EVM_ADDRESS_PATH);
 }
 
 function getSlip39ImportProbeAddress(scenario: AutomationScenario): string {
@@ -529,9 +557,39 @@ function buildSelectedSuites(
   scenario: AutomationScenario,
   selectedSuites: TestSuiteType[]
 ): TestSuiteType[] {
-  return SUITE_EXECUTION_ORDER.filter(
+  const resolved = SUITE_EXECUTION_ORDER.filter(
     suiteType => selectedSuites.includes(suiteType) && scenario.supportedSuites.includes(suiteType)
   );
+
+  if (scenario.id === STANDALONE_MODULE_SCENARIO_ID) {
+    return resolved;
+  }
+
+  return resolved.filter(suiteType => !STANDALONE_TEST_SUITES.includes(suiteType));
+}
+
+function hasStandaloneSuiteSelection(selectedSuites: TestSuiteType[]): boolean {
+  return selectedSuites.some(suiteType => STANDALONE_TEST_SUITES.includes(suiteType));
+}
+
+function buildEffectiveSelectedScenarios(
+  scenarioIds: AutomationScenario['id'][],
+  selectedSuites: TestSuiteType[]
+): AutomationScenario[] {
+  const scenarioMap = new Map<AutomationScenario['id'], AutomationScenario>();
+
+  scenarioIds.forEach(id => {
+    scenarioMap.set(id, getAutomationScenario(id));
+  });
+
+  if (hasStandaloneSuiteSelection(selectedSuites)) {
+    scenarioMap.set(
+      STANDALONE_MODULE_SCENARIO_ID,
+      getAutomationScenario(STANDALONE_MODULE_SCENARIO_ID)
+    );
+  }
+
+  return Array.from(scenarioMap.values());
 }
 
 function countSdkCasePaths(
@@ -648,6 +706,15 @@ export function useAutomationTest() {
   const currentPassphraseRef = useRef('');
   const lastUrlRef = useRef(config.phonePilotUrl);
   const phonePilotHealthRef = useRef<HealthCheckResponse | null>(null);
+  const singleSecurityCheckPreparedRef = useRef<{ connectId: string; deviceId: string } | null>(
+    null
+  );
+  const pendingUiActionRef = useRef<{
+    suite: 'deviceSettings' | 'securityCheck' | 'chainMethodBatch';
+    label: string;
+    actions: DeviceUiAction[];
+    total: number;
+  } | null>(null);
 
   const deviceFeaturesRef = useRef<Record<string, unknown> | undefined>(undefined);
 
@@ -786,11 +853,73 @@ export function useAutomationTest() {
     [setPhonePilotHealth]
   );
 
+  const setPendingUiActions = useCallback(
+    (
+      suite: 'deviceSettings' | 'securityCheck' | 'chainMethodBatch',
+      label: string,
+      actions: DeviceUiAction[]
+    ) => {
+      pendingUiActionRef.current = {
+        suite,
+        label,
+        actions: [...actions],
+        total: actions.length,
+      };
+      addLog(
+        `[${suite}] Pending UI actions for ${label}: ${
+          actions.length > 0 ? actions.join(' -> ') : 'no action'
+        }`
+      );
+    },
+    [addLog]
+  );
+
+  const clearPendingUiActions = useCallback(() => {
+    pendingUiActionRef.current = null;
+  }, []);
+
+  const executeNextPendingUiAction = useCallback(async (): Promise<void> => {
+    const pending = pendingUiActionRef.current;
+    if (!pending) {
+      addLog('UI Event REQUEST_BUTTON received with no pending action');
+      return;
+    }
+
+    if (pending.actions.length === 0) {
+      addLog(`[${pending.suite}] No remaining UI actions for ${pending.label}`);
+      return;
+    }
+
+    const client = clientRef.current;
+    if (!client) {
+      throw new Error('PhonePilot client unavailable');
+    }
+
+    const steps = [...pending.actions];
+    pendingUiActionRef.current = null;
+    const result = await client.executeActionSequence(steps, {
+      startDelayMs: CONFIRM_ACTION_DELAY_MS,
+      betweenStepsDelayMs: CONFIRM_ACTION_STEP_DELAY_MS,
+      returnFrame: false,
+    });
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+
+    addLog(
+      `[${pending.suite}] Executed sequence for ${pending.label}: ${
+        steps.join(' -> ') || 'no action'
+      } (${result.stepsCompleted}/${pending.total})`
+    );
+  }, [addLog]);
+
   useEffect(() => {
     if (!clientRef.current || lastUrlRef.current !== config.phonePilotUrl) {
       if (clientRef.current && lastUrlRef.current !== config.phonePilotUrl) {
         clientRef.current.disconnect();
       }
+      singleSecurityCheckPreparedRef.current = null;
+      pendingUiActionRef.current = null;
       clientRef.current = new PhonePilotClient(config.phonePilotUrl);
       clientRef.current.setOnStateChange(setConnectionState);
       lastUrlRef.current = config.phonePilotUrl;
@@ -803,6 +932,8 @@ export function useAutomationTest() {
       if (clientRef.current) {
         clientRef.current.disconnect();
       }
+      singleSecurityCheckPreparedRef.current = null;
+      pendingUiActionRef.current = null;
       updateHealthState(null);
     },
     [updateHealthState]
@@ -866,6 +997,8 @@ export function useAutomationTest() {
   ]);
 
   const disconnectPhonePilot = useCallback(async (): Promise<void> => {
+    singleSecurityCheckPreparedRef.current = null;
+    pendingUiActionRef.current = null;
     if (clientRef.current) {
       try {
         await clientRef.current.armDisconnect();
@@ -2340,45 +2473,150 @@ export function useAutomationTest() {
     [addLog, runWithRetry, updateSuiteProgress, incrementCompletedTests, notifyLiveCaseUpdate]
   );
 
+  const prepareSingleSdkRun = useCallback(
+    async (
+      suiteType: 'securityCheck' | 'chainMethodBatch',
+      caseTitle: string
+    ): Promise<{ connectId: string; deviceId: string } | null> => {
+      if (runningRef.current) {
+        addLog('Automation is already running');
+        return null;
+      }
+
+      if (!SDK || !selectedDevice?.connectId) {
+        addLog('SDK or selected device is not available');
+        return null;
+      }
+
+      if (connectionState !== 'connected') {
+        addLog('PhonePilot not connected, connecting...');
+        const connected = await connectPhonePilot();
+        if (!connected) {
+          addLog('Failed to connect to PhonePilot');
+          return null;
+        }
+      }
+
+      const health = await refreshPhonePilotHealth();
+      if (!health) {
+        addLog('PhonePilot health check failed before single SDK test');
+        return null;
+      }
+
+      runningRef.current = true;
+      pendingUiActionRef.current = null;
+      clearLogs();
+      resetProgress();
+      setReport(null);
+      setLiveReport(null);
+      currentPassphraseRef.current = '';
+
+      const startTime = Date.now();
+      initLiveReport({ totalScenarios: 1, startTime });
+      setProgress({
+        currentScenarioId: STANDALONE_MODULE_SCENARIO_ID,
+        currentScenarioTitle: caseTitle,
+        currentPassphrase: null,
+        currentTestSuite: suiteType,
+        currentTestIndex: 0,
+        totalTests: 1,
+        completedTests: 0,
+        completedScenarios: 0,
+        totalScenarios: 1,
+        completedSuites: 0,
+        totalSuites: 1,
+        status: 'running',
+      });
+
+      try {
+        const connectId = selectedDevice.connectId;
+        const deviceId = await refreshDeviceId(SDK, connectId);
+        addLog(`Device ID updated: ${deviceId}`);
+        return { connectId, deviceId };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        addLog(`Single SDK test setup failed: ${message}`);
+        setProgress(prev => ({
+          ...prev,
+          status: 'error',
+          errorMessage: message,
+        }));
+        runningRef.current = false;
+        return null;
+      }
+    },
+    [
+      SDK,
+      addLog,
+      clearLogs,
+      connectPhonePilot,
+      connectionState,
+      initLiveReport,
+      refreshDeviceId,
+      refreshPhonePilotHealth,
+      resetProgress,
+      selectedDevice,
+      setLiveReport,
+      setProgress,
+      setReport,
+    ]
+  );
+
+  const finalizeSingleSdkRun = useCallback(
+    (
+      suiteType: 'securityCheck' | 'chainMethodBatch',
+      suiteName: string,
+      caseTitle: string,
+      results: TestCaseResult[],
+      startTime: number
+    ) => {
+      const suiteResult = createSuiteResult(suiteType, suiteName, results, Date.now() - startTime);
+      const scenario = getAutomationScenario(STANDALONE_MODULE_SCENARIO_ID);
+      const scenarioReport = buildScenarioReport(scenario, [suiteResult], Date.now() - startTime);
+      const endTime = Date.now();
+      const report: TestReport = {
+        startTime,
+        endTime,
+        duration: endTime - startTime,
+        totalScenarios: 1,
+        passedScenarios: scenarioReport.status === 'passed' ? 1 : 0,
+        failedScenarios: scenarioReport.status === 'failed' ? 1 : 0,
+        skippedScenarios: scenarioReport.status === 'skipped' ? 1 : 0,
+        scenarioResults: [scenarioReport],
+      };
+
+      setReport(report);
+      setLiveReport(report);
+      setProgress(prev => ({
+        ...prev,
+        currentScenarioTitle: caseTitle,
+        completedTests: results.length,
+        completedSuites: 1,
+        completedScenarios: 1,
+        status: 'done',
+        errorMessage: undefined,
+      }));
+      runningRef.current = false;
+    },
+    [setLiveReport, setProgress, setReport]
+  );
+
   const runSecurityCheckSuite = useCallback(
     async (sdk: CoreApi, connectId: string, deviceId: string): Promise<TestSuiteResult> => {
       const startedAt = Date.now();
       const results: TestCaseResult[] = [];
       addLog('[SecurityCheck] Starting blind signature security check suite');
-
-      // Sequence of actions to perform on the next REQUEST_BUTTON event.
-      // 'confirm' = single button press, 'slide' = left-to-right swipe confirm.
-      const secBtnSeqRef = { current: [] as Array<'confirm' | 'slide'> };
-
-      const securityCheckButtonOverride = async () => {
-        const client = clientRef.current;
-        if (!client) return;
-        const seq = secBtnSeqRef.current;
-        if (seq.length === 0) return;
-        await delay(CONFIRM_ACTION_DELAY_MS);
-        for (const step of seq) {
-          if (step === 'confirm') {
-            await client.confirmAction();
-            await delay(300);
-          } else if (step === 'slide') {
-            await client.slideConfirm();
-          }
-        }
-        addLog(`[SecurityCheck] Button sequence done: [${seq.join(', ')}]`);
-      };
-
-      // Install security-check-specific button handler
-      setupUIListener(sdk, securityCheckButtonOverride);
+      setupUIListener(sdk, executeNextPendingUiAction);
 
       try {
         // Disable passphrase_protection and set safetyChecks: 0 (strict).
-        // The device will show a "Disable safety checks" confirmation → swipe to confirm.
+        // The device first requires a button confirm, then a final slide confirm.
         const featuresBeforeCheck = await fetchDeviceFeatures(sdk, connectId);
         if (featuresBeforeCheck?.passphrase_protection) {
           addLog('[SecurityCheck] Disabling passphrase_protection');
           await sdk.deviceSettings(connectId, { usePassphrase: false });
         }
-        secBtnSeqRef.current = ['slide'];
+        setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
         // @ts-expect-error safetyChecks not in type definitions yet
         await sdk.deviceSettings(connectId, { safetyChecks: 0 });
         addLog('[SecurityCheck] safetyChecks set to strict (0)');
@@ -2403,19 +2641,16 @@ export function useAutomationTest() {
               incrementCompletedTests();
               notifyLiveCaseUpdate('securityCheck', 'Security Check', results);
             } else {
-              // Prepare button sequence for this case.
-              // For expected=true (native coinType): N button presses + optional slide-confirm.
-              // For expected=false (blocked): device rejects immediately, no button needed.
-              if (expectedResult) {
-                const confirmCount = testCase.confirmCount ?? 1;
-                const seq: Array<'confirm' | 'slide'> = Array(confirmCount).fill('confirm');
-                if (!testCase.noSlide) {
-                  seq.push('slide');
-                }
-                secBtnSeqRef.current = seq;
-              } else {
-                secBtnSeqRef.current = [];
-              }
+              setPendingUiActions(
+                'securityCheck',
+                title,
+                expectedResult
+                  ? [
+                      ...Array<DeviceUiAction>(testCase.confirmCount ?? 1).fill('confirm'),
+                      ...(testCase.noSlide ? [] : (['slide'] as DeviceUiAction[])),
+                    ]
+                  : []
+              );
 
               let sdkResult: { success: boolean; payload?: { error?: string } };
               try {
@@ -2486,6 +2721,8 @@ export function useAutomationTest() {
               error: error instanceof Error ? error.message : String(error),
               duration: Date.now() - caseStart,
             });
+          } finally {
+            clearPendingUiActions();
           }
 
           incrementCompletedTests();
@@ -2500,13 +2737,21 @@ export function useAutomationTest() {
           duration: Date.now() - startedAt,
         });
       } finally {
-        // Restore default UI listener (without security-check button override)
+        clearPendingUiActions();
         setupUIListener(sdk);
       }
 
       return createSuiteResult('securityCheck', 'Security Check', results, Date.now() - startedAt);
     },
-    [addLog, incrementCompletedTests, notifyLiveCaseUpdate, setupUIListener]
+    [
+      addLog,
+      clearPendingUiActions,
+      executeNextPendingUiAction,
+      incrementCompletedTests,
+      notifyLiveCaseUpdate,
+      setPendingUiActions,
+      setupUIListener,
+    ]
   );
 
   const runChainMethodBatchSuite = useCallback(
@@ -2514,47 +2759,22 @@ export function useAutomationTest() {
       const startedAt = Date.now();
       const results: TestCaseResult[] = [];
       addLog('[ChainMethodBatch] Starting chain method batch suite');
-
-      // Sequence of actions to perform on the next REQUEST_BUTTON event.
-      const chainBtnSeqRef = { current: [] as Array<'confirm' | 'slide'> };
-
-      const chainMethodButtonOverride = async () => {
-        const client = clientRef.current;
-        if (!client) return;
-        const seq = chainBtnSeqRef.current;
-        if (seq.length === 0) return;
-        await delay(CONFIRM_ACTION_DELAY_MS);
-        for (const step of seq) {
-          if (step === 'confirm') {
-            await client.confirmAction();
-            await delay(300);
-          } else if (step === 'slide') {
-            await client.slideConfirm();
-          }
-        }
-        addLog(`[ChainMethodBatch] Button sequence done: [${seq.join(', ')}]`);
-      };
-
-      setupUIListener(sdk, chainMethodButtonOverride);
+      setupUIListener(sdk, executeNextPendingUiAction);
 
       try {
         for (const chain of chainTestData) {
           for (const entry of chain.data) {
-            // Prepare button sequence based on entry metadata.
-            // Methods without confirmCount are read-only (getAddress, getPublicKey, verify).
-            if (entry.confirmCount) {
-              const seq: Array<'confirm' | 'slide'> = Array(entry.confirmCount).fill('confirm');
-              if (!entry.noSlide) {
-                seq.push('slide');
-              }
-              chainBtnSeqRef.current = seq;
-            } else {
-              chainBtnSeqRef.current = [];
-            }
-
             for (const presuppose of entry.presupposes ?? []) {
               const caseStart = Date.now();
               const caseTitle = `${chain.symbol} / ${entry.method} / ${presuppose.title}`;
+              setPendingUiActions(
+                'chainMethodBatch',
+                caseTitle,
+                [
+                  ...Array<DeviceUiAction>(entry.confirmCount ?? 0).fill('confirm'),
+                  ...(entry.noSlide || !entry.confirmCount ? [] : (['slide'] as DeviceUiAction[])),
+                ]
+              );
               try {
                 const sdkMethod = (sdk as Record<string, unknown>)[entry.method];
                 if (typeof sdkMethod !== 'function') {
@@ -2599,6 +2819,8 @@ export function useAutomationTest() {
                   error: err instanceof Error ? err.message : String(err),
                   duration: Date.now() - caseStart,
                 });
+              } finally {
+                clearPendingUiActions();
               }
 
               incrementCompletedTests();
@@ -2615,6 +2837,7 @@ export function useAutomationTest() {
           duration: Date.now() - startedAt,
         });
       } finally {
+        clearPendingUiActions();
         setupUIListener(sdk);
       }
 
@@ -2625,7 +2848,231 @@ export function useAutomationTest() {
         Date.now() - startedAt
       );
     },
-    [addLog, incrementCompletedTests, notifyLiveCaseUpdate, setupUIListener]
+    [
+      addLog,
+      clearPendingUiActions,
+      executeNextPendingUiAction,
+      incrementCompletedTests,
+      notifyLiveCaseUpdate,
+      setPendingUiActions,
+      setupUIListener,
+    ]
+  );
+
+  const runSingleSecurityCheckCase = useCallback(
+    async (testCase: SingleSecurityCheckCaseInput): Promise<void> => {
+      const ctx = await prepareSingleSdkRun('securityCheck', testCase.title);
+      if (!ctx || !SDK) {
+        return;
+      }
+
+      const startTime = Date.now();
+      const results: TestCaseResult[] = [];
+      setupUIListener(SDK, executeNextPendingUiAction);
+      addLog(`[Single][SecurityCheck] ${testCase.title}`);
+
+      try {
+        const preparedContext = singleSecurityCheckPreparedRef.current;
+        const canReusePreparation =
+          preparedContext?.connectId === ctx.connectId && preparedContext.deviceId === ctx.deviceId;
+
+        if (canReusePreparation) {
+          addLog('[SecurityCheck] Reusing existing single-case device preparation');
+        } else {
+          const featuresBeforeCheck = await fetchDeviceFeatures(SDK, ctx.connectId);
+          if (featuresBeforeCheck?.passphrase_protection) {
+            addLog('[SecurityCheck] Disabling passphrase_protection');
+            await SDK.deviceSettings(ctx.connectId, { usePassphrase: false });
+          }
+
+          setPendingUiActions('deviceSettings', 'disable safety checks', ['confirm']);
+          // @ts-expect-error safetyChecks not in type definitions yet
+          await SDK.deviceSettings(ctx.connectId, { safetyChecks: 0 });
+          addLog('[SecurityCheck] safetyChecks set to strict (0)');
+          singleSecurityCheckPreparedRef.current = {
+            connectId: ctx.connectId,
+            deviceId: ctx.deviceId,
+          };
+        }
+
+        setPendingUiActions(
+          'securityCheck',
+          testCase.title,
+          testCase.expectedResult
+            ? [
+                ...Array<DeviceUiAction>(testCase.confirmCount).fill('confirm'),
+                ...Array<DeviceUiAction>(testCase.slideCount).fill('slide'),
+              ]
+            : []
+        );
+
+        const sdkMethod = (SDK as Record<string, unknown>)[testCase.method];
+        if (typeof sdkMethod !== 'function') {
+          results.push({
+            title: testCase.title,
+            method: testCase.method,
+            passed: false,
+            error: `SDK method ${testCase.method} not found`,
+            duration: Date.now() - startTime,
+          });
+        } else {
+          let sdkResult: { success: boolean; payload?: { error?: string } };
+          try {
+            const resultOrTimeout = await Promise.race([
+              (sdkMethod as (...args: unknown[]) => Promise<unknown>)(
+                ctx.connectId,
+                ctx.deviceId,
+                testCase.params
+              ),
+              new Promise<'timeout'>(resolve => {
+                setTimeout(() => {
+                  resolve('timeout');
+                }, 45_000);
+              }),
+            ]);
+            if (resultOrTimeout === 'timeout') {
+              SDK.cancel(ctx.connectId);
+              await SDK.getFeatures(ctx.connectId, { retryCount: 1 });
+              sdkResult = { success: false, payload: { error: 'timeout after 45s' } };
+            } else {
+              sdkResult = resultOrTimeout as { success: boolean; payload?: { error?: string } };
+            }
+          } catch (callError) {
+            sdkResult = {
+              success: false,
+              payload: {
+                error: callError instanceof Error ? callError.message : String(callError),
+              },
+            };
+          }
+
+          const path =
+            (typeof testCase.params.path === 'string' && testCase.params.path) ||
+            (Array.isArray(testCase.params.inputs) &&
+            typeof testCase.params.inputs[0]?.path === 'string'
+              ? testCase.params.inputs[0].path
+              : '');
+          const coinType = path.split('/')[2]?.replace(/'/g, '') ?? '';
+          const deviceFeats = deviceFeaturesRef.current ?? {};
+          const expected = getDeviceExpected(deviceFeats, testCase.method, coinType, testCase.expectedResult, {
+            securityChecksDisabled: false,
+          });
+
+          const actualSuccess = sdkResult.success;
+          results.push({
+            title: testCase.title,
+            method: testCase.method,
+            expected: expected ? 'success' : 'failure',
+            actual: actualSuccess
+              ? 'success'
+              : `failure(${sdkResult.payload?.error ?? ''})`,
+            passed: expected ? actualSuccess : !actualSuccess,
+            duration: Date.now() - startTime,
+          });
+        }
+      } catch (error) {
+        results.push({
+          title: testCase.title,
+          method: testCase.method,
+          passed: false,
+          error: error instanceof Error ? error.message : String(error),
+          duration: Date.now() - startTime,
+        });
+      } finally {
+        clearPendingUiActions();
+        setupUIListener(SDK);
+      }
+
+      finalizeSingleSdkRun('securityCheck', 'Security Check', testCase.title, results, startTime);
+    },
+    [
+      SDK,
+      addLog,
+      clearPendingUiActions,
+      executeNextPendingUiAction,
+      finalizeSingleSdkRun,
+      prepareSingleSdkRun,
+      setPendingUiActions,
+      setupUIListener,
+    ]
+  );
+
+  const runSingleChainMethodCase = useCallback(
+    async (testCase: SingleChainMethodCaseInput): Promise<void> => {
+      const ctx = await prepareSingleSdkRun('chainMethodBatch', testCase.title);
+      if (!ctx || !SDK) {
+        return;
+      }
+
+      const startTime = Date.now();
+      const results: TestCaseResult[] = [];
+      setupUIListener(SDK, executeNextPendingUiAction);
+      addLog(`[Single][ChainMethodBatch] ${testCase.title}`);
+
+      try {
+        setPendingUiActions(
+          'chainMethodBatch',
+          testCase.title,
+          [
+            ...Array<DeviceUiAction>(testCase.confirmCount).fill('confirm'),
+            ...Array<DeviceUiAction>(testCase.slideCount).fill('slide'),
+          ]
+        );
+        const sdkMethod = (SDK as Record<string, unknown>)[testCase.method];
+        if (typeof sdkMethod !== 'function') {
+          results.push({
+            title: testCase.title,
+            method: testCase.method,
+            passed: false,
+            error: `SDK method ${testCase.method} not found`,
+            duration: Date.now() - startTime,
+          });
+        } else {
+          const sdkResult = await (
+            sdkMethod as (
+              ...args: unknown[]
+            ) => Promise<{ success: boolean; payload?: { error?: string } }>
+          )(ctx.connectId, ctx.deviceId, testCase.params);
+
+          results.push({
+            title: testCase.title,
+            method: testCase.method,
+            passed: sdkResult.success,
+            error: sdkResult.success ? undefined : sdkResult.payload?.error ?? 'unknown error',
+            duration: Date.now() - startTime,
+          });
+        }
+      } catch (error) {
+        results.push({
+          title: testCase.title,
+          method: testCase.method,
+          passed: false,
+          error: error instanceof Error ? error.message : String(error),
+          duration: Date.now() - startTime,
+        });
+      } finally {
+        clearPendingUiActions();
+        setupUIListener(SDK);
+      }
+
+      finalizeSingleSdkRun(
+        'chainMethodBatch',
+        'Chain Method Batch',
+        testCase.title,
+        results,
+        startTime
+      );
+    },
+    [
+      SDK,
+      addLog,
+      clearPendingUiActions,
+      executeNextPendingUiAction,
+      finalizeSingleSdkRun,
+      prepareSingleSdkRun,
+      setPendingUiActions,
+      setupUIListener,
+    ]
   );
 
   const runSelectedSdkSuites = useCallback(
@@ -3083,6 +3530,8 @@ export function useAutomationTest() {
       }
 
       runningRef.current = true;
+      singleSecurityCheckPreparedRef.current = null;
+      pendingUiActionRef.current = null;
       clearLogs();
       resetProgress();
       setReport(null);
@@ -3090,13 +3539,16 @@ export function useAutomationTest() {
 
       setupUIListener(SDK);
 
-      const selectedScenarios = config.scenarioIds.map(id => getAutomationScenario(id));
-      const effectiveSuitesForCount =
+      const effectiveRequestedSuites =
         config.devicePreparationMode === 'deviceFlowOnly'
-          ? (['deviceFlow'] as TestSuiteType[])
+          ? DEVICE_FLOW_ONLY_SUITES
           : config.testSuites;
+      const selectedScenarios = buildEffectiveSelectedScenarios(
+        config.scenarioIds,
+        effectiveRequestedSuites
+      );
       const totalSuites = selectedScenarios.reduce(
-        (sum, scenario) => sum + buildSelectedSuites(scenario, effectiveSuitesForCount).length,
+        (sum, scenario) => sum + buildSelectedSuites(scenario, effectiveRequestedSuites).length,
         0
       );
       const totalTests = selectedScenarios.reduce(
@@ -3104,7 +3556,7 @@ export function useAutomationTest() {
           sum +
           countScenarioTotalTests(
             scenario,
-            buildSelectedSuites(scenario, effectiveSuitesForCount),
+            buildSelectedSuites(scenario, effectiveRequestedSuites),
             config.passphraseVariants
           ),
         0
@@ -3190,11 +3642,7 @@ export function useAutomationTest() {
             `\n--- Scenario ${scenarioIndex + 1}/${selectedScenarios.length}: ${scenario.title} ---`
           );
           // deviceFlowOnly: only run deviceFlow suite regardless of testSuites config
-          const effectiveSuites =
-            config.devicePreparationMode === 'deviceFlowOnly'
-              ? (['deviceFlow'] as TestSuiteType[])
-              : config.testSuites;
-          const selectedSuites = buildSelectedSuites(scenario, effectiveSuites);
+          const selectedSuites = buildSelectedSuites(scenario, effectiveRequestedSuites);
           const scenarioStartedAt = Date.now();
           liveScenarioCtxRef.current = {
             scenario,
@@ -3531,6 +3979,7 @@ export function useAutomationTest() {
   const stopAutomation = useCallback(async () => {
     runningRef.current = false;
     currentPassphraseRef.current = '';
+    pendingUiActionRef.current = null;
     setProgress(prev => ({ ...prev, status: 'paused' }));
     addLog('Stopping automation test...');
 
@@ -3573,5 +4022,7 @@ export function useAutomationTest() {
     startAutomation,
     stopAutomation,
     captureFrame,
+    runSingleSecurityCheckCase,
+    runSingleChainMethodCase,
   };
 }

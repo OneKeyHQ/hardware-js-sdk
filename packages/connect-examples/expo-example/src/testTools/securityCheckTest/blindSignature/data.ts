@@ -59,7 +59,7 @@ export default [
   },
   {
     method: 'dnxSignTransaction',
-    confirmCount: 1,
+    confirmCount: 0,
     expected: {
       '29538': true,
       '60': false,
@@ -67,7 +67,7 @@ export default [
   },
   {
     method: 'filecoinSignTransaction',
-    confirmCount: 2,
+    confirmCount: 1,
     expected: {
       '461': true,
       '60': false,
@@ -75,7 +75,7 @@ export default [
   },
   {
     method: 'kaspaSignTransaction',
-    confirmCount: 1,
+    confirmCount: 2,
     expected: {
       '111111': true,
       '60': false,
@@ -91,7 +91,7 @@ export default [
   },
   {
     method: 'neoSignTransaction',
-    confirmCount: 2,
+    confirmCount: 1,
     expected: {
       '888': true,
       '60': false,
@@ -118,6 +118,7 @@ export default [
   {
     method: 'nostrSignSchnorr',
     confirmCount: 1,
+    noSlide: true,
     expected: {
       '1237': true,
       '999': false,
@@ -126,8 +127,7 @@ export default [
   },
   {
     method: 'nervosSignTransaction',
-    confirmCount: 1,
-    noSlide: true,
+    confirmCount: 2,
     expected: {
       '309': true,
       '60': false,
@@ -135,7 +135,7 @@ export default [
   },
   {
     method: 'polkadotSignTransaction',
-    confirmCount: 2,
+    confirmCount: 1,
     expected: {
       '354': true,
       '999': false,
@@ -162,7 +162,7 @@ export default [
   },
   {
     method: 'starcoinSignTransaction',
-    confirmCount: 7,
+    confirmCount: 2,
     expected: {
       '101010': true,
       '60': false,
@@ -170,7 +170,7 @@ export default [
   },
   {
     method: 'stellarSignTransaction',
-    confirmCount: 2,
+    confirmCount: 7,
     expected: {
       '148': true,
       '60': false,
@@ -178,7 +178,7 @@ export default [
   },
   {
     method: 'suiSignTransaction',
-    confirmCount: 1,
+    confirmCount: 2,
     expected: {
       '784': true,
       '60': false,
@@ -194,7 +194,7 @@ export default [
   },
   {
     method: 'tonSignMessage',
-    confirmCount: 2,
+    confirmCount: 1,
     expected: {
       '607': true,
       '60': false,
@@ -202,7 +202,7 @@ export default [
   },
   {
     method: 'tronSignTransaction',
-    confirmCount: 1,
+    confirmCount: 2,
     expected: {
       '195': true,
       '60': false,
@@ -231,16 +231,15 @@ export default [
   {
     method: 'confluxSignMessage',
     confirmCount: 1,
+    noSlide: true,
     expected: {
-      // 503 is blocked by firmware (path m/44'/503'/0 is forbidden)
-      '503': false,
+      '503': true,
       '60': false,
     },
   },
   {
     method: 'confluxSignMessageCIP23',
     confirmCount: 1,
-    noSlide: true,
     expected: {
       '503': true,
       '60': false,
@@ -249,6 +248,7 @@ export default [
   {
     method: 'scdoSignMessage',
     confirmCount: 1,
+    noSlide: true,
     expected: {
       '541': true,
       '999': false,

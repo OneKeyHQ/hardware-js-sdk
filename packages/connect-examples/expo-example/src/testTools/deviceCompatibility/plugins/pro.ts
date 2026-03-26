@@ -15,11 +15,5 @@ export const proPlugin: DevicePlugin = {
       methods: 'dnxSignTransaction',
       expected: false,
     },
-    {
-      id: 'pro-sol-coin501-expected-fail',
-      methods: 'solSignTransaction',
-      when: ({ key }) => key === '501',
-      expected: false,
-    },
   ],
 };

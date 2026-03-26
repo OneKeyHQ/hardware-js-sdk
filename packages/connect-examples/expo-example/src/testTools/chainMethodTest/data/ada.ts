@@ -154,7 +154,7 @@ const adaData: ChainMethodEntry[] = [
   },
   {
     method: 'cardanoSignTransaction',
-    confirmCount: 2,
+    confirmCount: 5,
     description: 'Sign a Cardano transaction.',
     presupposes: [
       {

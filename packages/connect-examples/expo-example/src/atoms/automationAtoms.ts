@@ -13,6 +13,7 @@ import type {
   TestProgress,
   TestReport,
 } from '../services/phonePilotMcp/types';
+import { STANDALONE_TEST_SUITES } from '../services/phonePilotMcp/types';
 
 const defaultConfig: AutomationTestConfig = {
   scenarioIds: ['ok26054_bip39_import_12', 'ok40090_slip39_import_20_1of1'],
@@ -143,14 +144,19 @@ export const canStartAutomationAtom = atom(get => {
   const isConnected = get(phonePilotConnectionStateAtom) === 'connected';
   const isRunning = get(isAutomationRunningAtom);
   const config = get(automationConfigAtom);
-  // deviceFlowOnly always runs only deviceFlow suite, testSuites selection is irrelevant
-  const hasScenarios =
+  const hasStandaloneSuites = config.testSuites.some(suiteType =>
+    STANDALONE_TEST_SUITES.includes(suiteType)
+  );
+  const hasRunnableScenarioModule =
     config.scenarioIds.length > 0 &&
     (config.devicePreparationMode === 'deviceFlowOnly' || config.testSuites.length > 0);
+  const hasRunnableStandaloneModule =
+    config.devicePreparationMode !== 'deviceFlowOnly' && hasStandaloneSuites;
+  const hasRunnableSelection = hasRunnableScenarioModule || hasRunnableStandaloneModule;
   if (config.devicePreparationMode === 'sdkOnly') {
-    return !isRunning && hasScenarios;
+    return !isRunning && hasRunnableSelection;
   }
-  return isConnected && !isRunning && hasScenarios;
+  return isConnected && !isRunning && hasRunnableSelection;
 });
 
 export const progressPercentageAtom = atom(get => {

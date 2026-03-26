@@ -6,6 +6,8 @@
 
 import type {
   ActionResult,
+  ActionSequenceResult,
+  AutomationPresetExecutionResult,
   ArmClickResult,
   ArmConnectResult,
   ArmDisconnectResult,
@@ -375,6 +377,37 @@ export class PhonePilotClient {
 
   async slideConfirm(): Promise<ActionResult> {
     return this.callTool<ActionResult>('confirm-action', { action: 'slide' });
+  }
+
+  async executeActionSequence(
+    steps: Array<'confirm' | 'cancel' | 'slide'>,
+    options?: { startDelayMs?: number; betweenStepsDelayMs?: number; returnFrame?: boolean }
+  ): Promise<ActionSequenceResult> {
+    const { result, frame } = await this.callToolWithImage<ActionSequenceResult>(
+      'confirm-action-sequence',
+      {
+        steps,
+        ...options,
+      }
+    );
+    return { ...result, frame };
+  }
+
+  async executeAutomationPreset(
+    input: {
+      suite: 'deviceSettings' | 'securityCheck' | 'chainMethodBatch';
+      presetId: string;
+      expectedResult?: boolean;
+      startDelayMs?: number;
+      betweenStepsDelayMs?: number;
+      returnFrame?: boolean;
+    }
+  ): Promise<AutomationPresetExecutionResult> {
+    const { result, frame } = await this.callToolWithImage<AutomationPresetExecutionResult>(
+      'execute-automation-preset',
+      input
+    );
+    return { ...result, frame };
   }
 
   async inputPin(pin: string): Promise<ActionResult> {

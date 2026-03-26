@@ -21,12 +21,6 @@ export const touchPlugin: DevicePlugin = {
       expected: false,
     },
     {
-      id: 'touch-sol-coin501-expected-fail',
-      methods: 'solSignTransaction',
-      when: ({ key }) => key === '501',
-      expected: false,
-    },
-    {
       id: 'touch-scdo-sign-expected-fail',
       methods: ['scdoSignTransaction', 'scdoSignMessage'],
       expected: false,
