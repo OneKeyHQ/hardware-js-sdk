@@ -185,6 +185,7 @@ export default class WebUsbTransport {
    * Connect to specific device
    */
   async connectToDevice(path: string, first: boolean) {
+    this.Log.debug(`[WebUsbTransport] connectToDevice: path=${path}, first=${first}`);
     const device: USBDevice = await this.findDevice(path);
     await device.open();
 
@@ -193,11 +194,12 @@ export default class WebUsbTransport {
       try {
         await device.reset();
       } catch (error) {
-        // Ignore reset errors
+        this.Log.debug('[WebUsbTransport] connectToDevice: reset error (ignored):', error);
       }
     }
 
     await device.claimInterface(this.interfaceId);
+    this.Log.debug(`[WebUsbTransport] connectToDevice: connected successfully`);
   }
 
   async post(session: string, name: string, data: Record<string, unknown>) {
@@ -363,15 +365,29 @@ export default class WebUsbTransport {
     }
     const encodeBuffers = buildEncodeBuffers(messages, name, data);
 
-    for (const buffer of encodeBuffers) {
+    const totalPackets = encodeBuffers.length;
+    const sendStartTime = Date.now();
+    this.Log.debug(`[WebUsbTransport] call ${name}: sending ${totalPackets} packets (${totalPackets * PACKET_SIZE} bytes)`);
+
+    for (let i = 0; i < encodeBuffers.length; i++) {
       const newArray: Uint8Array = new Uint8Array(PACKET_SIZE);
       newArray[0] = 63;
-      newArray.set(new Uint8Array(buffer), 1);
-      // console.log('send packet: ', newArray);
+      newArray.set(new Uint8Array(encodeBuffers[i]), 1);
       await this.transferOutWithRetry(path, newArray);
+
+      if (totalPackets > 100 && (i + 1) % Math.ceil(totalPackets / 10) === 0) {
+        this.Log.debug(`[WebUsbTransport] call ${name}: sent ${i + 1}/${totalPackets} packets (${Math.round(((i + 1) / totalPackets) * 100)}%)`);
+      }
     }
 
+    const sendDuration = Date.now() - sendStartTime;
+    this.Log.debug(`[WebUsbTransport] call ${name}: all ${totalPackets} packets sent in ${sendDuration}ms, waiting for response...`);
+
+    const receiveStartTime = Date.now();
     const resData = await this.receiveData(path);
+    const receiveDuration = Date.now() - receiveStartTime;
+    this.Log.debug(`[WebUsbTransport] call ${name}: response received in ${receiveDuration}ms`);
+
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
@@ -383,12 +399,15 @@ export default class WebUsbTransport {
    * Receive data from device
    */
   async receiveData(path: string) {
+    this.Log.debug('[WebUsbTransport] receiveData: waiting for first packet...');
     const firstPacketData = await this.transferInWithRetry(path, PACKET_SIZE);
     const firstData = this.toArrayBuffer(firstPacketData.buffer.slice(1));
     const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(firstData);
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const lengthWithHeader = Number(length + HEADER_LENGTH);
+    this.Log.debug(`[WebUsbTransport] receiveData: first packet received, typeId=${typeId}, totalLength=${lengthWithHeader}`);
+
     const decoded = new ByteBuffer(lengthWithHeader);
     decoded.writeUint16(typeId);
     decoded.writeUint32(length);
@@ -396,6 +415,7 @@ export default class WebUsbTransport {
       decoded.append(restBuffer);
     }
 
+    let receivedPackets = 1;
     while (decoded.offset < lengthWithHeader) {
       const packetData = await this.transferInWithRetry(path, PACKET_SIZE);
       const buffer = this.toArrayBuffer(packetData.buffer.slice(1));
@@ -404,7 +424,10 @@ export default class WebUsbTransport {
       } else {
         decoded.append(buffer.slice(0, lengthWithHeader - decoded.offset));
       }
+      receivedPackets += 1;
     }
+    this.Log.debug(`[WebUsbTransport] receiveData: complete, ${receivedPackets} packets received`);
+
     decoded.reset();
     const result = decoded.toBuffer();
     return Buffer.from(result as unknown as ArrayBuffer).toString('hex');
@@ -414,8 +437,10 @@ export default class WebUsbTransport {
    * Release device
    */
   async release(path: string) {
+    this.Log.debug(`[WebUsbTransport] release: path=${path}`);
     const device: USBDevice = await this.findDevice(path);
     await device.releaseInterface(this.interfaceId);
     await device.close();
+    this.Log.debug(`[WebUsbTransport] release: done`);
   }
 }
