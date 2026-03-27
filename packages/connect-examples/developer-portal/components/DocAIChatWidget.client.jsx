@@ -1056,18 +1056,6 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                         />
                       ))}
 
-                      {!isAssistant ? (
-                        <div className={styles.userActions}>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyMessage(message, [])}
-                          >
-                            <CopyIcon size={12} />
-                            <span>{copiedMessageId === message.id ? copy.copied : copy.copy}</span>
-                          </button>
-                        </div>
-                      ) : null}
-
                       {isAssistant ? (
                         <div className={styles.assistantTail}>
                           {shouldShowSources ? (
@@ -1121,6 +1109,17 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                         </div>
                       ) : null}
                     </div>
+                    {!isAssistant ? (
+                      <div className={styles.userActions}>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(message, [])}
+                        >
+                          <CopyIcon size={12} />
+                          <span>{copiedMessageId === message.id ? copy.copied : copy.copy}</span>
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
@@ -1221,15 +1220,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 }
 
 export default function DocAIChatWidget({ lang = 'en' }) {
-  // Resolve the API URL once after mount. Before mount (SSR + first hydration
-  // render) apiUrl is '' so hasChatApi=false — but the widget is closed (returns
-  // null) so no request is made.  After mount the real URL is set and the
-  // transport/useMemo hooks pick it up on the next render.
-  const [apiUrl, setApiUrl] = useState('');
-
-  useEffect(() => {
-    setApiUrl(resolveApiUrl());
-  }, []);
-
-  return <ChatWidgetRuntime apiUrl={apiUrl} lang={lang} />;
+  // resolveApiUrl() derives the URL from the env var or window.location hostname.
+  // On SSR (no window) it returns '' — but the widget starts closed (returns null)
+  // so no hydration mismatch occurs.
+  return <ChatWidgetRuntime apiUrl={resolveApiUrl()} lang={lang} />;
 }
