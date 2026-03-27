@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { Highlight, themes } from 'prism-react-renderer'
 
 function useIsDarkMode() {
   const [isDark, setIsDark] = useState(false)
@@ -46,6 +45,7 @@ export function EditorCodeBlock({
   const bp = useMemo(() => normalizeLineSet(breakpoints), [breakpoints])
   const active = Number.isFinite(Number(activeLine)) ? Number(activeLine) : null
   const scrollStyle = maxHeight !== undefined && maxHeight !== null ? { maxHeight } : undefined
+  const theme = isDark ? themes.oneDark : themes.oneLight
 
   return (
     <div
@@ -70,72 +70,83 @@ export function EditorCodeBlock({
         className={['min-h-0 flex-1 overflow-auto', scrollClassName].filter(Boolean).join(' ')}
         style={scrollStyle}
       >
-        <SyntaxHighlighter
-          language={language}
-          style={isDark ? oneDark : oneLight}
-          showLineNumbers
-          wrapLines
-          customStyle={{
-            height: '100%',
-            margin: 0,
-            padding: '12px 0',
-            background: isDark ? '#282c34' : '#f8fafc',
-            fontFamily: 'var(--font-mono)',
-            cursor
-          }}
-          codeTagProps={{
-            style: {
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12.5,
-              lineHeight: 1.6,
-              fontWeight: 450
-            }
-          }}
-          lineNumberStyle={(lineNumber) => {
-            const isBp = bp.has(lineNumber)
-            return {
-              position: 'relative',
-              minWidth: 54,
-              paddingRight: 12,
-              paddingLeft: 22,
-              textAlign: 'right',
-              userSelect: 'none',
-              opacity: 0.85,
-              color: isDark ? '#7f848e' : '#475569',
-              fontSize: 12.5,
-              ...(showBreakpoints && isBp
-                ? {
-                    backgroundImage: `radial-gradient(circle, ${isDark ? '#ff5f56' : '#dc2626'} 48%, transparent 49%)`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: '10px center',
-                    backgroundSize: '14px 14px'
+        <Highlight theme={theme} code={String(code ?? '')} language={language}>
+          {({ tokens, getLineProps, getTokenProps }) => (
+            <pre
+              style={{
+                height: '100%',
+                margin: 0,
+                padding: '12px 0',
+                background: isDark ? '#282c34' : '#f8fafc',
+                fontFamily: 'var(--font-mono)',
+                cursor,
+                overflow: 'visible',
+              }}
+            >
+              <code
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12.5,
+                  lineHeight: 1.6,
+                  fontWeight: 450,
+                }}
+              >
+                {tokens.map((line, i) => {
+                  const lineNumber = i + 1
+                  const isActive = active !== null && lineNumber === active
+                  const isBp = bp.has(lineNumber)
+                  const lineProps = getLineProps({ line, key: i })
+
+                  const lineStyle = {
+                    display: 'block',
+                    paddingRight: 12,
+                    borderLeft: isActive
+                      ? '2px solid rgba(255, 255, 255, 0.5)'
+                      : '2px solid transparent',
+                    background: isActive
+                      ? isDark
+                        ? 'rgba(255, 255, 255, 0.08)'
+                        : 'rgba(0, 0, 0, 0.05)'
+                      : showBreakpoints && isBp
+                        ? 'rgba(239, 68, 68, 0.06)'
+                        : 'transparent',
                   }
-                : null)
-            }
-          }}
-          lineProps={(lineNumber) => {
-            const isActive = active !== null && lineNumber === active
-            const isBp = bp.has(lineNumber)
-            return {
-              style: {
-                display: 'block',
-                paddingRight: 12,
-                borderLeft: isActive ? '2px solid rgba(255, 255, 255, 0.5)' : '2px solid transparent',
-                background: isActive
-                  ? isDark
-                    ? 'rgba(255, 255, 255, 0.08)'
-                    : 'rgba(0, 0, 0, 0.05)'
-                  : showBreakpoints && isBp
-                    ? isDark
-                      ? 'rgba(239, 68, 68, 0.06)'
-                      : 'rgba(239, 68, 68, 0.06)'
-                    : 'transparent'
-              }
-            }
-          }}
-        >
-          {String(code ?? '')}
-        </SyntaxHighlighter>
+
+                  const lineNumStyle = {
+                    display: 'inline-block',
+                    position: 'relative',
+                    minWidth: 54,
+                    paddingRight: 12,
+                    paddingLeft: 22,
+                    textAlign: 'right',
+                    userSelect: 'none',
+                    opacity: 0.85,
+                    color: isDark ? '#7f848e' : '#475569',
+                    fontSize: 12.5,
+                    ...(showBreakpoints && isBp
+                      ? {
+                          backgroundImage: `radial-gradient(circle, ${isDark ? '#ff5f56' : '#dc2626'} 48%, transparent 49%)`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: '10px center',
+                          backgroundSize: '14px 14px',
+                        }
+                      : null),
+                  }
+
+                  return (
+                    <div key={i} {...lineProps} style={{ ...lineProps.style, ...lineStyle }}>
+                      <span style={lineNumStyle}>{lineNumber}</span>
+                      {line.map((token, j) => {
+                        const tokenProps = getTokenProps({ token, key: j })
+                        return <span key={j} {...tokenProps} />
+                      })}
+                    </div>
+                  )
+                })}
+              </code>
+            </pre>
+          )}
+        </Highlight>
       </div>
     </div>
   )
