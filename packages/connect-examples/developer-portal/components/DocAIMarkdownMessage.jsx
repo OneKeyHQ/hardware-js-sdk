@@ -203,12 +203,15 @@ function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel, disabl
   );
 }
 
+// Stable reference for remarkPlugins — avoids ReactMarkdown re-init on every render
+const REMARK_PLUGINS = [remarkGfm];
+
 /**
  * Throttle interval for streaming renders. Uses a leading + trailing edge
  * pattern so the UI always shows the latest text within this interval,
  * even when token delivery pauses momentarily.
  */
-const STREAM_THROTTLE_MS = 150;
+const STREAM_THROTTLE_MS = 140;
 
 function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
   const [displayText, setDisplayText] = useState(text);
@@ -249,41 +252,48 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
   // Cleanup on unmount
   useEffect(() => () => clearTimeout(trailingTimerRef.current), []);
 
+  // Memoize components so ReactMarkdown doesn't re-process when displayText
+  // hasn't changed.  During streaming, code blocks use plain <pre> (no Prism)
+  // to avoid expensive highlighting on every token — highlighting activates
+  // once streaming ends.
+  const components = useMemo(
+    () => ({
+      a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
+      pre: ({ children }) => children,
+      code: ({ node, className, children, ...props }) => {
+        const code = String(children ?? '');
+        const hasLanguage = typeof className === 'string' && className.includes('language-');
+        const isMultilinePosition = Boolean(
+          node?.position && node.position.start?.line !== node.position.end?.line
+        );
+        const isBlock = hasLanguage || isMultilinePosition || code.includes('\n');
+
+        if (!isBlock) {
+          return (
+            <code {...props} className={styles.inlineCode}>
+              {children}
+            </code>
+          );
+        }
+
+        return (
+          <MarkdownCodeBlock
+            className={className}
+            copyLabel={copy.copy}
+            copiedLabel={copy.copied}
+            disableHighlight={isStreaming}
+          >
+            {children}
+          </MarkdownCodeBlock>
+        );
+      },
+    }),
+    [copy.copy, copy.copied, isStreaming]
+  );
+
   return (
     <div className={styles.markdown} data-docs-ai="markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
-          pre: ({ children }) => children,
-          code: ({ node, className, children, ...props }) => {
-            const code = String(children ?? '');
-            const hasLanguage = typeof className === 'string' && className.includes('language-');
-            const isMultilinePosition = Boolean(
-              node?.position && node.position.start?.line !== node.position.end?.line
-            );
-            const isBlock = hasLanguage || isMultilinePosition || code.includes('\n');
-
-            if (!isBlock) {
-              return (
-                <code {...props} className={styles.inlineCode}>
-                  {children}
-                </code>
-              );
-            }
-
-            return (
-              <MarkdownCodeBlock
-                className={className}
-                copyLabel={copy.copy}
-                copiedLabel={copy.copied}
-              >
-                {children}
-              </MarkdownCodeBlock>
-            );
-          },
-        }}
-      >
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
         {displayText}
       </ReactMarkdown>
     </div>
