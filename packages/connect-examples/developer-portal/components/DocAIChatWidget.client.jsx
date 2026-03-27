@@ -1207,12 +1207,11 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 }
 
 export default function DocAIChatWidget({ lang = 'en' }) {
-  // Resolve URL after mount to avoid SSR/client hydration mismatch
-  // (resolveApiUrl reads window.location which doesn't exist on the server).
-  const [apiUrl, setApiUrl] = useState(() => {
-    const envUrl = process.env.NEXT_PUBLIC_DOCS_AI_API_URL?.trim();
-    return envUrl || '';
-  });
+  // Resolve the API URL once after mount. Before mount (SSR + first hydration
+  // render) apiUrl is '' so hasChatApi=false — but the widget is closed (returns
+  // null) so no request is made.  After mount the real URL is set and the
+  // transport/useMemo hooks pick it up on the next render.
+  const [apiUrl, setApiUrl] = useState('');
 
   useEffect(() => {
     setApiUrl(resolveApiUrl());
