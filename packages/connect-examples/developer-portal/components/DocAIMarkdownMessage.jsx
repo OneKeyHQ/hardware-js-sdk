@@ -1,10 +1,10 @@
 'use client';
 
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CopyIcon } from 'lucide-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import styles from './DocAIMarkdownMessage.module.css';
 
@@ -28,7 +28,7 @@ const normalizeLanguage = className => {
   return LANGUAGE_ALIASES[raw] || raw;
 };
 
-const MAX_HIGHLIGHT_CODE_LENGTH = 2200;
+const MAX_HIGHLIGHT_CODE_LENGTH = 8000;
 
 /**
  * Strip any "Sources" / "参考资料" section appended by the model or context mode.
@@ -92,22 +92,22 @@ const stripRetrievalScaffold = text => {
 };
 
 /**
- * Wrap bare `@onekeyfe/...` package names in backticks so the markdown
- * renderer (remark-gfm) doesn't mangle the `@` as an autolink or email.
- * Skips instances already inside backticks or fenced code blocks.
+ * Wrap bare scoped npm package names (`@scope/package`) in backticks so
+ * remark-gfm doesn't mangle the `@` as an autolink or email fragment.
+ * Skips instances already inside backticks, inline code, or fenced code blocks.
  */
 const wrapBarePackageNames = text => {
   if (typeof text !== 'string') return text;
 
-  // Split on fenced code blocks to avoid touching code content
-  const parts = text.split(/(```[\s\S]*?```)/g);
+  // Split on fenced code blocks AND inline code spans to avoid touching code
+  const parts = text.split(/(```[\s\S]*?```|`[^`]+`)/g);
   return parts
     .map((part, i) => {
-      // Odd indices are fenced code blocks — leave untouched
+      // Odd indices are code — leave untouched
       if (i % 2 === 1) return part;
-      // Wrap @onekeyfe/package-name that is NOT already inside backticks
+      // Wrap @scope/package-name that is NOT already inside backticks
       return part.replace(
-        /(?<!`)\B@onekeyfe\/[\w-]+(?!`)/g,
+        /(?<!`)@[\w-]+\/[\w.-]+(?!`)/g,
         match => `\`${match}\``
       );
     })
@@ -203,7 +203,52 @@ function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel, disabl
   );
 }
 
+/**
+ * Throttle interval for streaming renders. Uses a leading + trailing edge
+ * pattern so the UI always shows the latest text within this interval,
+ * even when token delivery pauses momentarily.
+ */
+const STREAM_THROTTLE_MS = 150;
+
 function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
+  const [displayText, setDisplayText] = useState(text);
+  const latestTextRef = useRef(text);
+  const lastRenderTsRef = useRef(0);
+  const trailingTimerRef = useRef(null);
+
+  latestTextRef.current = text;
+
+  useEffect(() => {
+    if (!isStreaming) {
+      // Not streaming — render immediately, cancel any pending flush
+      clearTimeout(trailingTimerRef.current);
+      trailingTimerRef.current = null;
+      setDisplayText(text);
+      return;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastRenderTsRef.current;
+
+    if (elapsed >= STREAM_THROTTLE_MS) {
+      // Leading edge: enough time passed, render now
+      lastRenderTsRef.current = now;
+      clearTimeout(trailingTimerRef.current);
+      trailingTimerRef.current = null;
+      setDisplayText(text);
+    } else if (!trailingTimerRef.current) {
+      // Trailing edge: schedule a flush so the latest text always appears
+      trailingTimerRef.current = setTimeout(() => {
+        lastRenderTsRef.current = Date.now();
+        trailingTimerRef.current = null;
+        setDisplayText(latestTextRef.current);
+      }, STREAM_THROTTLE_MS - elapsed);
+    }
+  }, [text, isStreaming]);
+
+  // Cleanup on unmount
+  useEffect(() => () => clearTimeout(trailingTimerRef.current), []);
+
   return (
     <div className={styles.markdown} data-docs-ai="markdown">
       <ReactMarkdown
@@ -232,7 +277,6 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
                 className={className}
                 copyLabel={copy.copy}
                 copiedLabel={copy.copied}
-                disableHighlight={isStreaming}
               >
                 {children}
               </MarkdownCodeBlock>
@@ -240,16 +284,10 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
           },
         }}
       >
-        {text}
+        {displayText}
       </ReactMarkdown>
     </div>
   );
 }
 
-export default memo(
-  DocAIMarkdownMessage,
-  (prevProps, nextProps) =>
-    prevProps.text === nextProps.text &&
-    prevProps.copy === nextProps.copy &&
-    prevProps.isStreaming === nextProps.isStreaming
-);
+export default memo(DocAIMarkdownMessage);

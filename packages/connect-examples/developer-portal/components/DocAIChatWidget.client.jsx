@@ -398,6 +398,8 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   const sourceAbortRef = useRef(null);
   const composingRef = useRef(false);
   const justEndedComposingRef = useRef(false);
+  const activeResultRef = useRef(null);
+  const bridgeRef = useRef(null);
 
   const authHeaderName = process.env.NEXT_PUBLIC_DOCS_AI_AUTH_HEADER_NAME?.trim();
   const authHeaderValue = process.env.NEXT_PUBLIC_DOCS_AI_AUTH_HEADER_VALUE?.trim();
@@ -545,6 +547,14 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   useEffect(() => {
     setActiveSearchIndex(0);
   }, [searchInput, activeTab]);
+
+  useEffect(() => {
+    if (activeSearchIndex === -1 && bridgeRef.current) {
+      bridgeRef.current.scrollIntoView({ block: 'nearest' });
+    } else if (activeSearchIndex >= 0 && activeResultRef.current) {
+      activeResultRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeSearchIndex]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -844,17 +854,27 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
         data-docs-ai="panel"
         role="dialog"
         aria-modal="true"
+        onKeyDown={handleSearchInputKeyDown}
       >
         <header className={styles.header} data-docs-ai="header">
           <div className={styles.headerTop}>
-            <div className={styles.modeTitle}>
-              {activeTab === DOCS_AI_TAB.SEARCH ? (
-                <SearchIcon size={14} className={styles.modeTitleIcon} />
-              ) : (
+            {activeTab === DOCS_AI_TAB.SEARCH ? (
+              <div className={styles.searchInputWrap}>
+                <SearchIcon size={18} className={styles.searchInputIcon} />
+                <input
+                  ref={searchInputRef}
+                  className={styles.searchInput}
+                  value={searchInput}
+                  onChange={event => setSearchInput(event.target.value)}
+                  placeholder={copy.searchPlaceholder}
+                />
+              </div>
+            ) : (
+              <div className={styles.modeTitle}>
                 <SparklesIcon size={14} className={styles.modeTitleIcon} />
-              )}
-              <span>{activeTab === DOCS_AI_TAB.SEARCH ? copy.searchTab : copy.askTab}</span>
-            </div>
+                <span>{copy.askTab}</span>
+              </div>
+            )}
             <div className={styles.headerActions}>
               <div className={styles.segment}>
                 <button
@@ -889,60 +909,54 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
               </button>
             </div>
           </div>
-
-          {activeTab === DOCS_AI_TAB.SEARCH ? (
-            <div className={styles.searchInputWrap}>
-              <SearchIcon size={18} className={styles.searchInputIcon} />
-              <input
-                ref={searchInputRef}
-                className={styles.searchInput}
-                value={searchInput}
-                onChange={event => setSearchInput(event.target.value)}
-                placeholder={copy.searchPlaceholder}
-                onKeyDown={handleSearchInputKeyDown}
-              />
-            </div>
-          ) : null}
         </header>
 
         {activeTab === DOCS_AI_TAB.SEARCH ? (
           <div className={styles.searchBody} data-docs-ai="search-body">
-            <button
-              type="button"
-              className={`${styles.askAiBridge}${activeSearchIndex === -1 ? ` ${styles.askAiBridgeActive}` : ''}`}
-              onClick={handleOpenAskFromSearch}
-            >
-              <span className={styles.askAiBridgeIconWrap}>
-                <OneKeyIcon size={16} className={styles.askAiBridgeIconSvg} />
-              </span>
-              <span className={styles.askAiBridgeText}>{copy.askAiBridgeLabel}</span>
-              <kbd className={styles.askAiBridgeKbd}>↵</kbd>
-            </button>
-            <p className={styles.searchSectionTitle}>{copy.searchListTitle}</p>
-            <div className={styles.searchResultList}>
-              {filteredSearchResults.length > 0 ? (
-                filteredSearchResults.map((item, index) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`${styles.searchResultItem} ${
-                      index === activeSearchIndex ? styles.searchResultItemActive : ''
-                    }`}
-                    onClick={() => handleOpenResult(item)}
-                  >
-                    <span className={styles.searchResultTitle}>{item.title}</span>
-                    <span className={styles.searchResultPath}>{item.path}</span>
-                  </button>
-                ))
-              ) : (
-                <div className={styles.searchEmpty}>
-                  <p>{copy.searchEmpty}</p>
-                  <p className={styles.askHint}>{hasChatApi ? copy.askHint : copy.askUnavailable}</p>
-                  <button type="button" className={styles.askFromSearch} onClick={handleOpenAskFromSearch}>
-                    {copy.askFromSearch}
-                  </button>
-                </div>
-              )}
+            <div className={styles.searchBodyInner}>
+              <button
+                ref={bridgeRef}
+                type="button"
+                className={`${styles.askAiBridge}${activeSearchIndex === -1 ? ` ${styles.askAiBridgeActive}` : ''}`}
+                onClick={handleOpenAskFromSearch}
+              >
+                <span className={styles.askAiBridgeIconWrap}>
+                  <OneKeyIcon size={16} className={styles.askAiBridgeIconSvg} />
+                </span>
+                <span className={styles.askAiBridgeText}>{copy.askAiBridgeLabel}</span>
+                {activeSearchIndex === -1 ? <kbd className={styles.askAiBridgeKbd}>↵</kbd> : null}
+              </button>
+              <p className={styles.searchSectionTitle}>{copy.searchListTitle}</p>
+              <div className={styles.searchResultList}>
+                {filteredSearchResults.length > 0 ? (
+                  filteredSearchResults.map((item, index) => {
+                    const isActive = index === activeSearchIndex;
+                    return (
+                      <button
+                        key={item.id}
+                        ref={isActive ? activeResultRef : undefined}
+                        type="button"
+                        className={`${styles.searchResultItem} ${
+                          isActive ? styles.searchResultItemActive : ''
+                        }`}
+                        onClick={() => handleOpenResult(item)}
+                      >
+                        <span className={styles.searchResultTitle}>{item.title}</span>
+                        <span className={styles.searchResultPath}>{item.path}</span>
+                        {isActive ? <kbd className={styles.searchResultKbd}>↵</kbd> : null}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className={styles.searchEmpty}>
+                    <p>{copy.searchEmpty}</p>
+                    <p className={styles.askHint}>{hasChatApi ? copy.askHint : copy.askUnavailable}</p>
+                    <button type="button" className={styles.askFromSearch} onClick={handleOpenAskFromSearch}>
+                      {copy.askFromSearch}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ) : (
@@ -1193,6 +1207,16 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 }
 
 export default function DocAIChatWidget({ lang = 'en' }) {
-  const apiUrl = resolveApiUrl();
+  // Resolve URL after mount to avoid SSR/client hydration mismatch
+  // (resolveApiUrl reads window.location which doesn't exist on the server).
+  const [apiUrl, setApiUrl] = useState(() => {
+    const envUrl = process.env.NEXT_PUBLIC_DOCS_AI_API_URL?.trim();
+    return envUrl || '';
+  });
+
+  useEffect(() => {
+    setApiUrl(resolveApiUrl());
+  }, []);
+
   return <ChatWidgetRuntime apiUrl={apiUrl} lang={lang} />;
 }

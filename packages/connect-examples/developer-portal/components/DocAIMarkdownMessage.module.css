@@ -1,6 +1,6 @@
 .markdown {
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 14px;
+  line-height: 22px;
   color: #d3dff0;
   font-family: inherit;
   overflow-wrap: anywhere;
@@ -46,10 +46,10 @@
 }
 
 .markdown p {
-  margin: 0 0 7px;
+  margin: 0 0 8px;
   color: #d3dff0;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 14px;
+  line-height: 22px;
   overflow-wrap: anywhere;
 }
 
@@ -73,8 +73,8 @@
 .markdown ol {
   margin: 0 0 8px 18px;
   color: #d3dff0;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 14px;
+  line-height: 22px;
 }
 
 .markdown li {
@@ -120,11 +120,11 @@
 .markdown td {
   border-right: 1px solid rgba(148, 163, 184, 0.3);
   border-bottom: 1px solid rgba(148, 163, 184, 0.3);
-  padding: 6px 8px;
+  padding: 7px 10px;
   text-align: left;
   vertical-align: top;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 19px;
   white-space: pre-wrap;
 }
 
@@ -246,7 +246,7 @@
 }
 
 .codeText {
-  color: #e5e7eb !important;
+  color: #e5e7eb;
   font-family:
     'Fira Code',
     'SFMono-Regular',
@@ -275,7 +275,7 @@
 
 @media (max-width: 768px) {
   .markdown {
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .markdown h1 {

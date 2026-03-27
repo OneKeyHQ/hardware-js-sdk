@@ -65,28 +65,18 @@
 
 /* ─── Header ───────────────────────────────────────────────────── */
 .header {
-  padding: 16px 20px 0;
+  padding: 12px 14px;
   background: transparent;
   flex-shrink: 0;
   position: relative;
-}
-
-.header::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--clr-border);
+  border-bottom: 1px solid var(--clr-border);
 }
 
 .headerTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 10px;
 }
 
 /* ─── Mode Title (left side of header) ────────────────────────── */
@@ -176,21 +166,17 @@
   color: var(--clr-sub);
 }
 
-/* ─── Search Input ─────────────────────────────────────────────── */
+/* ─── Search Input (inline in header row) ─────────────────────── */
 .searchInputWrap {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  height: 56px;
-  margin: 0 -20px;
+  gap: 10px;
+  height: 40px;
+  padding: 0 6px;
   background: transparent;
-  border-bottom: 1px solid var(--clr-border);
   transition: background var(--transition);
-}
-
-.searchInputWrap:focus-within {
-  background: rgba(56, 189, 248, 0.025);
 }
 
 .searchInputWrap:focus-within .searchInputIcon {
@@ -232,11 +218,16 @@
 /* ─── Search Body ──────────────────────────────────────────────── */
 .searchBody {
   flex: 1;
-  padding: 20px 20px 24px;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+
+/* Inner wrapper carries the padding — padding-bottom on a scroll container
+   is unreliable across browsers, but padding on an inner block always works. */
+.searchBodyInner {
+  padding: 20px 20px 24px;
 }
 
 .searchBody::-webkit-scrollbar { width: 4px; }
@@ -296,6 +287,10 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.searchResultItemActive {
+  padding-right: 42px;
+}
+
 .searchResultItem:hover::before,
 .searchResultItemActive::before {
   height: 58%;
@@ -314,6 +309,30 @@
   color: var(--clr-muted);
   font-size: 12px;
   line-height: 1.4;
+}
+
+/* Enter key badge on selected search result */
+.searchResultKbd {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 22px;
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--clr-muted);
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0;
+  pointer-events: none;
 }
 
 /* ─── Search Empty State ───────────────────────────────────────── */
@@ -959,7 +978,9 @@
 
 .input::placeholder {
   color: var(--clr-muted) !important;
-  opacity: 1;
+  opacity: 0.42;
+  font-weight: 300;
+  letter-spacing: 0.02em;
 }
 
 .input::-webkit-scrollbar { width: 4px; }
@@ -1069,24 +1090,10 @@
   }
 
   .header {
-    padding: 14px 16px 0;
+    padding: 10px 12px;
   }
 
-  .header::after {
-    left: 0;
-    right: 0;
-  }
-
-  .headerTop {
-    margin-bottom: 12px;
-  }
-
-  .searchInputWrap {
-    margin: 0 -16px;
-    padding: 0 14px;
-  }
-
-  .searchBody {
+  .searchBodyInner {
     padding: 16px 16px 20px;
   }
 

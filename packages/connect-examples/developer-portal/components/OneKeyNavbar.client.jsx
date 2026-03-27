@@ -169,9 +169,10 @@ export function OneKeyClientNavbar({ children, className }) {
       >
         <SearchIcon size={15} />
         <span className={styles.buttonLabel}>{searchText}</span>
-        <kbd className={styles.searchHotkey}>
-          ⌘K
-        </kbd>
+        <span className={styles.searchHotkeyWrap}>
+          <kbd className={styles.searchHotkey}>⌘</kbd>
+          <kbd className={styles.searchHotkey}>K</kbd>
+        </span>
       </button>
     </div>
   )
