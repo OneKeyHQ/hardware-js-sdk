@@ -1073,16 +1073,11 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                                       rel="noreferrer noopener"
                                       className={styles.sourceCard}
                                     >
-                                      <span className={styles.sourceCardHead}>
-                                        <span className={styles.sourceIndex}>{sourceIndex + 1}</span>
-                                        <span className={styles.sourceMeta}>
-                                          <span className={styles.sourceLink}>{source.title}</span>
-                                          <span className={styles.sourceType}>{source.type}</span>
-                                        </span>
-                                      </span>
-                                      {source.excerpt ? (
-                                        <span className={styles.sourceExcerpt}>{source.excerpt}</span>
-                                      ) : null}
+                                      <span className={styles.sourceIndex}>{sourceIndex + 1}</span>
+                                      <span className={styles.sourceLink}>{source.title}</span>
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={styles.sourceArrow}>
+                                        <path d="M7 17L17 7" /><path d="M7 7h10v10" />
+                                      </svg>
                                     </a>
                                   </li>
                                 ))}
