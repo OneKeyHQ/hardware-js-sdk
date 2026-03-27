@@ -4,9 +4,44 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CopyIcon } from 'lucide-react';
-import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Highlight, Prism, themes } from 'prism-react-renderer';
 import styles from './DocAIMarkdownMessage.module.css';
+
+/* ── Register extra languages that prism-react-renderer doesn't ship ── */
+if (typeof globalThis !== 'undefined' && !Prism.languages.bash) {
+  Prism.languages.bash = Prism.languages.extend('clike', {
+    comment: { pattern: /(^|[^"{\\$])#.*/, lookbehind: true },
+    string: [
+      { pattern: /\$'(?:[^'\\]|\\.)*'/, greedy: true },
+      { pattern: /"(?:[^"\\$]|\\[\s\S]|\$(?:[^({]|\([^)]*\)|\{[^}]*\}))*"/, greedy: true },
+      { pattern: /'[^']*'/, greedy: true },
+    ],
+    variable: /\$(?:\w+|[!#?*@$]|\{[^}]+\})/,
+    keyword:
+      /\b(?:if|then|else|elif|fi|for|while|until|do|done|in|case|esac|function|select|return|exit|break|continue|declare|local|export|readonly|unset|shift|trap|source|set)\b/,
+    builtin:
+      /\b(?:echo|printf|read|cd|pwd|pushd|popd|dirs|let|eval|exec|command|type|hash|true|false|test|cat|head|tail|grep|sed|awk|sort|uniq|wc|find|xargs|chmod|chown|mkdir|rmdir|rm|cp|mv|ln|touch|install|npm|npx|yarn|pnpm|pip|git|curl|wget|docker|node|deno|bun)\b/,
+    operator: /&&|\|\||[!=<>]=?|[|&;]/,
+  });
+  Prism.languages.sh = Prism.languages.bash;
+  Prism.languages.shell = Prism.languages.bash;
+  Prism.languages.zsh = Prism.languages.bash;
+}
+
+/* ── Java language (extends clike) ── */
+if (typeof globalThis !== 'undefined' && !Prism.languages.java) {
+  Prism.languages.java = Prism.languages.extend('clike', {
+    keyword:
+      /\b(?:abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|var|void|volatile|while|yield)\b/,
+    number:
+      /\b0b[01][01_]*L?\b|\b0x[\da-f_]*\.?[\da-f_p+-]+\b|(?:\b\d[\d_]*\.?[\d_]*|\B\.\d[\d_]*)(?:e[+-]?\d[\d_]*)?[dfl]?\b/i,
+    operator: /->|[!=<>]=?|&&|\|\||[+\-*/%&|^~<>]=?|>>>?=?|\?|::|\.{3}/,
+    'class-name': /\b[A-Z]\w*\b/,
+    annotation: { pattern: /@\w+/, alias: 'punctuation' },
+  });
+}
+
+const HIGHLIGHT_THEME = themes.oneDark;
 
 const LANGUAGE_ALIASES = {
   ts: 'typescript',
@@ -28,18 +63,10 @@ const normalizeLanguage = className => {
   return LANGUAGE_ALIASES[raw] || raw;
 };
 
-const MAX_HIGHLIGHT_CODE_LENGTH = 8000;
+const MAX_HIGHLIGHT_CODE_LENGTH = 12000;
 
 /**
  * Strip any "Sources" / "参考资料" section appended by the model or context mode.
- * The frontend renders source cards separately from /api/sources, so inline
- * source lists from the model response are redundant and removed here.
- *
- * Handled patterns:
- *   ## Sources / ### Sources / **Sources** headings
- *   Horizontal-rule  "---" followed by a Sources heading
- *   Bare "Sources:" label
- * Everything from the first match to the end of the string is stripped.
  */
 const INLINE_SOURCES_RE =
   /\n{1,2}(?:---+[ \t]*\n[ \t]*)?(?:#{1,3}[ \t]+|\*{1,2})?(?:Sources?|参考资料|References?)(?:\*{1,2})?[ \t]*:?[ \t]*\n[\s\S]*/i;
@@ -94,18 +121,14 @@ const stripRetrievalScaffold = text => {
 /**
  * Wrap bare scoped npm package names (`@scope/package`) in backticks so
  * remark-gfm doesn't mangle the `@` as an autolink or email fragment.
- * Skips instances already inside backticks, inline code, or fenced code blocks.
  */
 const wrapBarePackageNames = text => {
   if (typeof text !== 'string') return text;
 
-  // Split on fenced code blocks AND inline code spans to avoid touching code
   const parts = text.split(/(```[\s\S]*?```|`[^`]+`)/g);
   return parts
     .map((part, i) => {
-      // Odd indices are code — leave untouched
       if (i % 2 === 1) return part;
-      // Wrap @scope/package-name that is NOT already inside backticks
       return part.replace(
         /(?<!`)@[\w-]+\/[\w.-]+(?!`)/g,
         match => `\`${match}\``
@@ -128,15 +151,16 @@ export const sanitizeDocAIMessageText = input => {
   );
 };
 
-function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel, disableHighlight = false }) {
+/**
+ * Lightweight code block using prism-react-renderer (~3 KB) instead of
+ * react-syntax-highlighter (~200 KB).  Fast enough to highlight during streaming.
+ */
+function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel }) {
   const [copied, setCopied] = useState(false);
   const code = String(children).replace(/\n$/, '');
   const language = normalizeLanguage(className);
-  const displayLanguage = useMemo(() => {
-    if (language === 'text') return 'code';
-    return language;
-  }, [language]);
-  const shouldUsePlainCode = disableHighlight || code.length > MAX_HIGHLIGHT_CODE_LENGTH;
+  const displayLanguage = useMemo(() => (language === 'text' ? 'code' : language), [language]);
+  const usePlain = code.length > MAX_HIGHLIGHT_CODE_LENGTH;
 
   const handleCopy = useCallback(async () => {
     try {
@@ -163,55 +187,46 @@ function MarkdownCodeBlock({ className, children, copyLabel, copiedLabel, disabl
         </button>
       </div>
       <div className={styles.codeScroll}>
-        {shouldUsePlainCode ? (
+        {usePlain ? (
           <pre className={styles.codePlainPre}>
             <code className={styles.codeText}>{code}</code>
           </pre>
         ) : (
-          <SyntaxHighlighter
-            language={language}
-            style={oneDark}
-            PreTag="div"
-            wrapLongLines={false}
-            customStyle={{
-              margin: 0,
-              padding: '10px 12px',
-              background: 'transparent',
-              border: '0',
-              borderRadius: 0,
-              overflow: 'visible',
-              fontFamily: 'var(--font-mono)',
-            }}
-            codeTagProps={{
-              className: styles.codeText,
-              style: {
-                fontFamily: 'var(--font-mono)',
-                fontSize: '12.5px',
-                lineHeight: 1.56,
-                fontWeight: 450,
-                whiteSpace: 'pre',
-                background: 'transparent',
-                textShadow: 'none',
-              },
-            }}
-          >
-            {code}
-          </SyntaxHighlighter>
+          <Highlight theme={HIGHLIGHT_THEME} code={code} language={language}>
+            {({ style, tokens, getLineProps, getTokenProps }) => (
+              <pre
+                className={styles.codePlainPre}
+                style={{ ...style, background: 'transparent', margin: 0 }}
+              >
+                <code className={styles.codeText}>
+                  {tokens.map((line, i) => {
+                    const lineProps = getLineProps({ line, key: i });
+                    return (
+                      <div key={i} {...lineProps} style={undefined}>
+                        {line.map((token, j) => {
+                          const tokenProps = getTokenProps({ token, key: j });
+                          return <span key={j} {...tokenProps} />;
+                        })}
+                      </div>
+                    );
+                  })}
+                </code>
+              </pre>
+            )}
+          </Highlight>
         )}
       </div>
     </div>
   );
 }
 
-// Stable reference for remarkPlugins — avoids ReactMarkdown re-init on every render
+// Stable reference for remarkPlugins
 const REMARK_PLUGINS = [remarkGfm];
 
 /**
- * Throttle interval for streaming renders. Uses a leading + trailing edge
- * pattern so the UI always shows the latest text within this interval,
- * even when token delivery pauses momentarily.
+ * Throttle interval for streaming renders.
  */
-const STREAM_THROTTLE_MS = 140;
+const STREAM_THROTTLE_MS = 120;
 
 function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
   const [displayText, setDisplayText] = useState(text);
@@ -223,7 +238,6 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
 
   useEffect(() => {
     if (!isStreaming) {
-      // Not streaming — render immediately, cancel any pending flush
       clearTimeout(trailingTimerRef.current);
       trailingTimerRef.current = null;
       setDisplayText(text);
@@ -234,13 +248,11 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
     const elapsed = now - lastRenderTsRef.current;
 
     if (elapsed >= STREAM_THROTTLE_MS) {
-      // Leading edge: enough time passed, render now
       lastRenderTsRef.current = now;
       clearTimeout(trailingTimerRef.current);
       trailingTimerRef.current = null;
       setDisplayText(text);
     } else if (!trailingTimerRef.current) {
-      // Trailing edge: schedule a flush so the latest text always appears
       trailingTimerRef.current = setTimeout(() => {
         lastRenderTsRef.current = Date.now();
         trailingTimerRef.current = null;
@@ -249,13 +261,8 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
     }
   }, [text, isStreaming]);
 
-  // Cleanup on unmount
   useEffect(() => () => clearTimeout(trailingTimerRef.current), []);
 
-  // Memoize components so ReactMarkdown doesn't re-process when displayText
-  // hasn't changed.  During streaming, code blocks use plain <pre> (no Prism)
-  // to avoid expensive highlighting on every token — highlighting activates
-  // once streaming ends.
   const components = useMemo(
     () => ({
       a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
@@ -281,14 +288,13 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
             className={className}
             copyLabel={copy.copy}
             copiedLabel={copy.copied}
-            disableHighlight={isStreaming}
           >
             {children}
           </MarkdownCodeBlock>
         );
       },
     }),
-    [copy.copy, copy.copied, isStreaming]
+    [copy.copy, copy.copied]
   );
 
   return (
