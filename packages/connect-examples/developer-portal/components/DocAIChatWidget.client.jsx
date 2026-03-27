@@ -376,7 +376,7 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
   const isZh = lang === 'zh';
   const copy = useMemo(() => getWidgetCopy(isZh), [isZh]);
   const hasChatApi = Boolean(apiUrl);
-  const chatApiUrl = apiUrl || '/api/__docs_ai_disabled';
+  const chatApiUrl = apiUrl;
 
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(DOCS_AI_TAB.SEARCH);
@@ -436,18 +436,20 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
 
   const transport = useMemo(
     () =>
-      new DefaultChatTransport({
-        api: chatApiUrl,
-        credentials: 'omit',
-        headers,
-        body,
-        prepareSendMessagesRequest: request => ({
-          body: {
-            ...request.body,
-            messages: sanitizeOutgoingMessages(request.messages),
-          },
-        }),
-      }),
+      chatApiUrl
+        ? new DefaultChatTransport({
+            api: chatApiUrl,
+            credentials: 'omit',
+            headers,
+            body,
+            prepareSendMessagesRequest: request => ({
+              body: {
+                ...request.body,
+                messages: sanitizeOutgoingMessages(request.messages),
+              },
+            }),
+          })
+        : undefined,
     [body, chatApiUrl, headers]
   );
 
@@ -1053,6 +1055,18 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                           isStreaming={isStreamingMessage}
                         />
                       ))}
+
+                      {!isAssistant ? (
+                        <div className={styles.userActions}>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyMessage(message, [])}
+                          >
+                            <CopyIcon size={12} />
+                            <span>{copiedMessageId === message.id ? copy.copied : copy.copy}</span>
+                          </button>
+                        </div>
+                      ) : null}
 
                       {isAssistant ? (
                         <div className={styles.assistantTail}>

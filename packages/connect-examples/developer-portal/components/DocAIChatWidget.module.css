@@ -751,6 +751,31 @@
 
 .actions button:hover { color: var(--clr-sub); }
 
+/* Copy action for user messages */
+.userActions {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.userActions button {
+  border: 0;
+  background: transparent;
+  color: var(--clr-dim);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: color var(--transition);
+}
+
+.userActions button:hover { color: var(--clr-sub); }
+
 /* ─── Sources ──────────────────────────────────────────────────── */
 .sources { margin-top: 12px; }
 
