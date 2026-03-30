@@ -31,9 +31,17 @@ All OneKey devices support passphrase and session caching (`passphraseState`).
 
 The simplest approach — explicitly choose the standard wallet to avoid accidental hidden wallet prompts.
 
-1. App calls SDK method with `useEmptyPassphrase: true`
-2. SDK initializes session with empty passphrase on device
-3. Device returns result directly — no user prompt
+```mermaid
+sequenceDiagram
+    participant App
+    participant SDK
+    participant Device
+
+    App->>SDK: evmGetAddress(..., useEmptyPassphrase: true)
+    SDK->>Device: Initialize session (empty passphrase)
+    Device-->>SDK: Session ready
+    SDK-->>App: { address, path }
+```
 
 ```ts
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -46,11 +54,22 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 Listen for the passphrase request event and let the user choose input method.
 
-1. App calls SDK method (without `useEmptyPassphrase`)
-2. SDK fires `UI_REQUEST.REQUEST_PASSPHRASE` event
-3. App shows passphrase dialog with two options: on-device or software input
-4. App calls `uiResponse` with the user's choice
-5. SDK sends passphrase to device and returns result
+```mermaid
+sequenceDiagram
+    participant App
+    participant SDK
+    participant Device
+
+    App->>SDK: evmGetAddress(...)
+    SDK->>Device: Initialize session
+    Device-->>SDK: REQUEST_PASSPHRASE
+    SDK-->>App: UI_REQUEST.REQUEST_PASSPHRASE
+    Note over App: Show passphrase dialog<br/>(on-device or software input)
+    App->>SDK: uiResponse(passphrase)
+    SDK->>Device: Send passphrase
+    Device-->>SDK: Session ready
+    SDK-->>App: { address, path }
+```
 
 ```ts
 // Option A: On-device input
@@ -70,8 +89,29 @@ HardwareSDK.uiResponse({
 
 Reduce repeated passphrase prompts across multiple calls.
 
-1. Call `getPassphraseState` — prompts user for passphrase once, returns `passphraseState`
-2. Pass `passphraseState` + `initSession: true` in subsequent calls — no more prompts
+```mermaid
+sequenceDiagram
+    participant App
+    participant SDK
+    participant Device
+
+    App->>SDK: getPassphraseState(connectId)
+    SDK->>Device: Prompt passphrase (once)
+    Device-->>SDK: passphraseState
+    SDK-->>App: passphraseState = "abc"
+
+    Note over App: Subsequent calls use cached state
+
+    App->>SDK: evmGetAddress(..., passphraseState, initSession)
+    SDK->>Device: Reuse session (no prompt)
+    Device-->>SDK: Result
+    SDK-->>App: { address }
+
+    App->>SDK: btcGetAddress(..., passphraseState)
+    SDK->>Device: Reuse session (no prompt)
+    Device-->>SDK: Result
+    SDK-->>App: { address }
+```
 
 ```ts
 // Step 1: Get passphrase state (prompts user once)

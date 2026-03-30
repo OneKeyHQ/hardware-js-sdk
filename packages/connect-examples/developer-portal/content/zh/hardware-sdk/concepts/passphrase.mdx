@@ -31,9 +31,17 @@ title: Passphrase（核心指南）
 
 最简单的方式——显式选择标准钱包，避免意外的隐藏钱包提示。
 
-1. 应用调用 SDK 方法并设置 `useEmptyPassphrase: true`
-2. SDK 使用空 passphrase 在设备上初始化会话
-3. 设备直接返回结果——无需用户操作
+```mermaid
+sequenceDiagram
+    participant App as 应用
+    participant SDK
+    participant Device as 设备
+
+    App->>SDK: evmGetAddress(..., useEmptyPassphrase: true)
+    SDK->>Device: 初始化会话（空 passphrase）
+    Device-->>SDK: 会话就绪
+    SDK-->>App: { address, path }
+```
 
 ```ts
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -46,11 +54,22 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 监听 Passphrase 请求事件，让用户选择输入方式。
 
-1. 应用调用 SDK 方法（不设置 `useEmptyPassphrase`）
-2. SDK 触发 `UI_REQUEST.REQUEST_PASSPHRASE` 事件
-3. 应用显示 Passphrase 对话框，提供两个选项：设备端输入或软件端输入
-4. 应用调用 `uiResponse` 传入用户的选择
-5. SDK 将 passphrase 发送到设备并返回结果
+```mermaid
+sequenceDiagram
+    participant App as 应用
+    participant SDK
+    participant Device as 设备
+
+    App->>SDK: evmGetAddress(...)
+    SDK->>Device: 初始化会话
+    Device-->>SDK: REQUEST_PASSPHRASE
+    SDK-->>App: UI_REQUEST.REQUEST_PASSPHRASE
+    Note over App: 显示 Passphrase 对话框<br/>（设备端或软件端输入）
+    App->>SDK: uiResponse(passphrase)
+    SDK->>Device: 发送 passphrase
+    Device-->>SDK: 会话就绪
+    SDK-->>App: { address, path }
+```
 
 ```ts
 // 选项 A：在设备上输入
@@ -70,8 +89,29 @@ HardwareSDK.uiResponse({
 
 通过会话缓存减少重复的 Passphrase 输入提示。
 
-1. 调用 `getPassphraseState` — 仅提示用户一次，返回 `passphraseState`
-2. 后续调用传入 `passphraseState` + `initSession: true` — 不再提示
+```mermaid
+sequenceDiagram
+    participant App as 应用
+    participant SDK
+    participant Device as 设备
+
+    App->>SDK: getPassphraseState(connectId)
+    SDK->>Device: 提示输入 passphrase（仅一次）
+    Device-->>SDK: passphraseState
+    SDK-->>App: passphraseState = "abc"
+
+    Note over App: 后续调用使用缓存状态
+
+    App->>SDK: evmGetAddress(..., passphraseState, initSession)
+    SDK->>Device: 复用会话（无提示）
+    Device-->>SDK: 结果
+    SDK-->>App: { address }
+
+    App->>SDK: btcGetAddress(..., passphraseState)
+    SDK->>Device: 复用会话（无提示）
+    Device-->>SDK: 结果
+    SDK-->>App: { address }
+```
 
 ```ts
 // 步骤 1：获取 passphrase 状态（仅提示用户一次）
