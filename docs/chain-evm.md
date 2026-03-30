@@ -66,6 +66,9 @@ OneKey SDK 支持多种 EVM 交易类型，能够自动检测并处理，确保�
   - **简化用户授权:** 允许 EOA 像智能合约钱包一样执行复杂操作，而无需预先部署合约或预存资金。
   - **Gas 效率:** 潜在地降低了多步操作的 Gas 成本。
 - **SDK 实现:** 通过 `hasEIP7702Features` 函数检测 `authorizationList` 字段来识别。此类型是 EIP-1559 的扩展，因此也包含其费用参数。
+- **兼容性边界:** SDK 检测到 `authorizationList` 后会走 EIP-7702 签名流程，但实际是否可签名仍取决于设备协议和固件能力。`legacyV1` 协议不支持 EIP-7702，部分设备型号也会将带 `authorizationList` 的 `evmSignTransaction` 视为不支持。
+
+> 这里的“SDK 支持”表示接口、类型和签名流程支持构造 EIP-7702 请求，不等同于所有设备 / 固件组合都能成功签名。遇到兼容性问题时，请优先查阅 [设备方法支持列表](./device-method-support.md) 中对应机型的 `evmSignTransaction` 说明。
 
 ### 交易类型对比
 
@@ -143,8 +146,9 @@ EIP-712 结构化数据签名在 SDK 中通过两条路径实现：
     - `maxFeePerGas` 和 `maxPriorityFeePerGas` 存在 `=>` **EIP-1559**
     - 否则 `=>` **Legacy**
   - **动态参数验证:** 根据检测到的交易类型，应用不同的验证规则，确保所有必需的字段（如 `gasPrice` 或 `maxFeePerGas`）都存在。
-  - **协议切换:** 同样使用 `TransportManager.getMessageVersion()` 来选择 `legacyV1` 或 `latest` 实现。注意：EIP-7702 在 `legacyV1` 模式下不被支持。
+  - **协议切换:** 同样使用 `TransportManager.getMessageVersion()` 来选择 `legacyV1` 或 `latest` 实现。注意：EIP-7702 在 `legacyV1` 模式下不被支持，SDK 在 Trezor-compatible 路径会直接返回错误。
   - **设备交互:** 根据交易类型，调用 `latest` 模块中对应的 `evmSignTx`, `evmSignTxEip1559`, 或 `evmSignTxEip7702` 函数，将交易数据分块发送给设备进行签名。
+  - **排查建议:** 如果仅在传入 `authorizationList` 时签名失败，请先确认当前设备是否支持 `latest` 协议，再检查 [设备方法支持列表](./device-method-support.md) 中对应机型的 `evmSignTransaction` 兼容性说明；例如 Classic 当前对 EIP-7702 交易的预期结果为失败。
 
 ### 5.4 `EVMSignTypedData`
 
