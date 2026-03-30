@@ -156,15 +156,7 @@
   padding: 1px 5px !important;
   font-size: 0.84em !important;
   font-weight: 500 !important;
-  font-family:
-    'Fira Code',
-    'SFMono-Regular',
-    Menlo,
-    Monaco,
-    Consolas,
-    'Liberation Mono',
-    'Courier New',
-    monospace !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
 }
 
 .codeBlock {
@@ -215,6 +207,14 @@
   scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
 
+/* Neutralize Prism's global CSS (loaded by Nextra for MDX pages) which
+   leaks .token backgrounds like `background: #ffffff80` into our chat
+   code blocks.  prism-react-renderer only uses inline color styles. */
+.codeScroll :global(.token) {
+  background: none !important;
+  text-shadow: none !important;
+}
+
 .codePlainPre {
   margin: 0;
   min-width: max-content;
@@ -225,15 +225,7 @@
 
 .codeText {
   color: #e5e7eb;
-  font-family:
-    'Fira Code',
-    'SFMono-Regular',
-    Menlo,
-    Monaco,
-    Consolas,
-    'Liberation Mono',
-    'Courier New',
-    monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12.5px;
   line-height: 1.56;
 }

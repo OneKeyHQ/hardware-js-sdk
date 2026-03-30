@@ -343,22 +343,43 @@ const getLatestUserMessageTextBefore = (messages, assistantMessageId) => {
   return '';
 };
 
+/**
+ * Max characters per assistant message in conversation history.
+ * Long code-heavy responses can cause 403 from the RAG API when sent
+ * back as context.  Truncate older assistant messages to stay within limits.
+ */
+const MAX_ASSISTANT_HISTORY_CHARS = 2000;
+
 const sanitizeOutgoingMessages = messages => {
   if (!Array.isArray(messages)) return [];
 
+  const total = messages.length;
+
   return messages
-    .map(message => {
+    .map((message, index) => {
       if (!message || typeof message !== 'object' || !Array.isArray(message.parts)) return null;
+
+      const isLastMessage = index === total - 1;
 
       const parts = message.parts.flatMap(part => {
         if (!part || part.type !== 'text' || typeof part.text !== 'string') return [];
 
-        const nextText =
+        let nextText =
           message.role === 'assistant'
             ? sanitizeDocAIMessageText(part.text)
             : part.text.trim();
 
         if (!nextText) return [];
+
+        // Truncate older assistant messages to prevent 403 from large payloads
+        if (
+          message.role === 'assistant' &&
+          !isLastMessage &&
+          nextText.length > MAX_ASSISTANT_HISTORY_CHARS
+        ) {
+          nextText = `${nextText.slice(0, MAX_ASSISTANT_HISTORY_CHARS)}…`;
+        }
+
         return [{ ...part, text: nextText }];
       });
 
