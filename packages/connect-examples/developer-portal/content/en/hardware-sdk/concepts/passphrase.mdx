@@ -13,40 +13,27 @@ Rules and best practices for handling passphrases (hidden wallets).
 - Passphrases cannot be recovered; back them up securely.
 - Force the standard wallet by setting `useEmptyPassphrase: true`.
 
-## Device support matrix
+## Device support
 
-| Feature | Classic | Classic 1S | Mini | Touch | Pro |
-|---------|---------|-----------|------|-------|-----|
-| Passphrase supported | Yes | Yes | Yes | Yes | Yes |
-| On-device input | Yes | Yes | Yes | Yes (touch keyboard) | Yes (touch keyboard) |
-| Software input (host) | Yes | Yes | Yes | Yes | Yes |
-| Session caching (`passphraseState`) | Yes | Yes | Yes | Yes | Yes |
-| USB connection | Yes | Yes | Yes | Yes | Yes |
-| BLE connection | No | Yes | No | Yes | Yes |
-| Air-Gap (QR) | No | No | No | No | Yes |
+| Device | On-device input | Software input (host) |
+|--------|----------------|----------------------|
+| Classic | Yes | Yes |
+| Classic 1S | Yes | Yes |
+| Mini | Yes | Yes |
+| Touch | Yes (touch keyboard) | Yes |
+| Pro | Yes (touch keyboard) | Yes |
 
-> **Recommendation:** On-device passphrase input is always preferred for maximum security, regardless of device model.
+All OneKey devices support passphrase and session caching (`passphraseState`).
 
 ## Interaction flow
 
 ### Proactive strategy (recommended)
 
-The simplest approach — explicitly choose the standard wallet to avoid accidental hidden wallet prompts:
+The simplest approach — explicitly choose the standard wallet to avoid accidental hidden wallet prompts.
 
-```
-App                           SDK                        Device
- │                             │                           │
- │  evmGetAddress(...)         │                           │
- │  useEmptyPassphrase: true   │                           │
- │ ────────────────────────►   │                           │
- │                             │   Initialize session      │
- │                             │ ─────────────────────►    │
- │                             │   (empty passphrase)      │
- │                             │ ◄─────────────────────    │
- │                             │                           │
- │   { address, path }        │                           │
- │ ◄────────────────────────   │                           │
-```
+1. App calls SDK method with `useEmptyPassphrase: true`
+2. SDK initializes session with empty passphrase on device
+3. Device returns result directly — no user prompt
 
 ```ts
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -57,37 +44,16 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 ### Reactive strategy (event-driven)
 
-Listen for the passphrase request event and let the user choose input method:
+Listen for the passphrase request event and let the user choose input method.
 
-```
-App                           SDK                        Device
- │                             │                           │
- │  evmGetAddress(...)         │                           │
- │ ────────────────────────►   │                           │
- │                             │   Initialize session      │
- │                             │ ─────────────────────►    │
- │                             │   REQUEST_PASSPHRASE      │
- │   UI_REQUEST.               │ ◄─────────────────────    │
- │   REQUEST_PASSPHRASE        │                           │
- │ ◄────────────────────────   │                           │
- │                             │                           │
- │   Show passphrase dialog    │                           │
- │   ┌──────────────────┐      │                           │
- │   │ Option A: Device │      │                           │
- │   │ Option B: Software│     │                           │
- │   └──────────────────┘      │                           │
- │                             │                           │
- │   uiResponse(...)           │                           │
- │ ────────────────────────►   │                           │
- │                             │   Send passphrase         │
- │                             │ ─────────────────────►    │
- │                             │                           │
- │   { address, path }        │                           │
- │ ◄────────────────────────   │                           │
-```
+1. App calls SDK method (without `useEmptyPassphrase`)
+2. SDK fires `UI_REQUEST.REQUEST_PASSPHRASE` event
+3. App shows passphrase dialog with two options: on-device or software input
+4. App calls `uiResponse` with the user's choice
+5. SDK sends passphrase to device and returns result
 
 ```ts
-// Option A: On-device input (preferred — most secure)
+// Option A: On-device input
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PASSPHRASE,
   payload: { passphraseOnDevice: true, value: '' },
@@ -102,34 +68,10 @@ HardwareSDK.uiResponse({
 
 ### Hidden wallet with session caching
 
-To reduce repeated passphrase prompts across multiple calls:
+Reduce repeated passphrase prompts across multiple calls.
 
-```
-App                           SDK                        Device
- │                             │                           │
- │  getPassphraseState(...)    │                           │
- │ ────────────────────────►   │                           │
- │                             │   (passphrase prompt)     │
- │                             │ ◄────────────────────►    │
- │                             │                           │
- │   passphraseState = "abc"   │                           │
- │ ◄────────────────────────   │                           │
- │                             │                           │
- │  evmGetAddress(...)         │                           │
- │  passphraseState: "abc"     │                           │
- │  initSession: true          │                           │
- │ ────────────────────────►   │   (no prompt, cached)     │
- │                             │ ─────────────────────►    │
- │   { address }              │                           │
- │ ◄────────────────────────   │                           │
- │                             │                           │
- │  btcGetAddress(...)         │                           │
- │  passphraseState: "abc"     │                           │
- │ ────────────────────────►   │   (no prompt, cached)     │
- │                             │ ─────────────────────►    │
- │   { address }              │                           │
- │ ◄────────────────────────   │                           │
-```
+1. Call `getPassphraseState` — prompts user for passphrase once, returns `passphraseState`
+2. Pass `passphraseState` + `initSession: true` in subsequent calls — no more prompts
 
 ```ts
 // Step 1: Get passphrase state (prompts user once)
@@ -157,9 +99,8 @@ await HardwareSDK.btcGetAddress(connectId, deviceId, {
 ## Security tips
 
 - **Never log or persist** passphrases in plain text.
-- Prefer **on-device input** whenever possible for maximum security.
 - Use `useEmptyPassphrase: true` to prevent accidental hidden wallet creation.
-- Pro/Touch devices: PIN must be entered on-device; passphrase can be entered on-device or via software (on-device recommended).
+- Pro/Touch devices: PIN must be entered on-device; passphrase can be entered on-device or via software.
 
 ## FAQ
 

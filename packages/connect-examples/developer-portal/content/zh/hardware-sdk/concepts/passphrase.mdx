@@ -13,40 +13,27 @@ title: Passphrase（核心指南）
 - Passphrase 遗忘后无法恢复，请妥善备份。
 - 设置 `useEmptyPassphrase: true` 可强制使用标准钱包。
 
-## 设备支持矩阵
+## 设备支持
 
-| 特性 | Classic | Classic 1S | Mini | Touch | Pro |
-|------|---------|-----------|------|-------|-----|
-| 支持 Passphrase | 是 | 是 | 是 | 是 | 是 |
-| 设备端输入 | 是 | 是 | 是 | 是（触屏键盘） | 是（触屏键盘） |
-| 软件端输入（主机） | 是 | 是 | 是 | 是 | 是 |
-| 会话缓存（`passphraseState`） | 是 | 是 | 是 | 是 | 是 |
-| USB 连接 | 是 | 是 | 是 | 是 | 是 |
-| BLE 蓝牙连接 | 否 | 是 | 否 | 是 | 是 |
-| Air-Gap（QR 码） | 否 | 否 | 否 | 否 | 是 |
+| 设备 | 设备端输入 | 软件端输入（主机） |
+|------|----------|-----------------|
+| Classic | 是 | 是 |
+| Classic 1S | 是 | 是 |
+| Mini | 是 | 是 |
+| Touch | 是（触屏键盘） | 是 |
+| Pro | 是（触屏键盘） | 是 |
 
-> **建议：** 无论使用哪款设备，始终优先选择在设备端输入 Passphrase 以获得最高安全性。
+所有 OneKey 设备均支持 Passphrase 和会话缓存（`passphraseState`）。
 
 ## 交互流程
 
 ### 主动策略（推荐）
 
-最简单的方式——显式选择标准钱包，避免意外的隐藏钱包提示：
+最简单的方式——显式选择标准钱包，避免意外的隐藏钱包提示。
 
-```
-应用                           SDK                        设备
- │                             │                           │
- │  evmGetAddress(...)         │                           │
- │  useEmptyPassphrase: true   │                           │
- │ ────────────────────────►   │                           │
- │                             │   初始化会话               │
- │                             │ ─────────────────────►    │
- │                             │   （空 passphrase）        │
- │                             │ ◄─────────────────────    │
- │                             │                           │
- │   { address, path }        │                           │
- │ ◄────────────────────────   │                           │
-```
+1. 应用调用 SDK 方法并设置 `useEmptyPassphrase: true`
+2. SDK 使用空 passphrase 在设备上初始化会话
+3. 设备直接返回结果——无需用户操作
 
 ```ts
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -57,37 +44,16 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 
 ### 响应式策略（事件驱动）
 
-监听 Passphrase 请求事件，让用户选择输入方式：
+监听 Passphrase 请求事件，让用户选择输入方式。
 
-```
-应用                           SDK                        设备
- │                             │                           │
- │  evmGetAddress(...)         │                           │
- │ ────────────────────────►   │                           │
- │                             │   初始化会话               │
- │                             │ ─────────────────────►    │
- │                             │   REQUEST_PASSPHRASE      │
- │   UI_REQUEST.               │ ◄─────────────────────    │
- │   REQUEST_PASSPHRASE        │                           │
- │ ◄────────────────────────   │                           │
- │                             │                           │
- │   显示 Passphrase 对话框     │                           │
- │   ┌──────────────────┐      │                           │
- │   │ 选项 A：设备输入   │      │                           │
- │   │ 选项 B：软件输入   │      │                           │
- │   └──────────────────┘      │                           │
- │                             │                           │
- │   uiResponse(...)           │                           │
- │ ────────────────────────►   │                           │
- │                             │   发送 passphrase         │
- │                             │ ─────────────────────►    │
- │                             │                           │
- │   { address, path }        │                           │
- │ ◄────────────────────────   │                           │
-```
+1. 应用调用 SDK 方法（不设置 `useEmptyPassphrase`）
+2. SDK 触发 `UI_REQUEST.REQUEST_PASSPHRASE` 事件
+3. 应用显示 Passphrase 对话框，提供两个选项：设备端输入或软件端输入
+4. 应用调用 `uiResponse` 传入用户的选择
+5. SDK 将 passphrase 发送到设备并返回结果
 
 ```ts
-// 选项 A：在设备上输入（首选——最安全）
+// 选项 A：在设备上输入
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PASSPHRASE,
   payload: { passphraseOnDevice: true, value: '' },
@@ -102,34 +68,10 @@ HardwareSDK.uiResponse({
 
 ### 隐藏钱包的会话缓存
 
-通过会话缓存减少重复的 Passphrase 输入提示：
+通过会话缓存减少重复的 Passphrase 输入提示。
 
-```
-应用                           SDK                        设备
- │                             │                           │
- │  getPassphraseState(...)    │                           │
- │ ────────────────────────►   │                           │
- │                             │   （提示输入 passphrase）   │
- │                             │ ◄────────────────────►    │
- │                             │                           │
- │   passphraseState = "abc"   │                           │
- │ ◄────────────────────────   │                           │
- │                             │                           │
- │  evmGetAddress(...)         │                           │
- │  passphraseState: "abc"     │                           │
- │  initSession: true          │                           │
- │ ────────────────────────►   │   （无提示，已缓存）        │
- │                             │ ─────────────────────►    │
- │   { address }              │                           │
- │ ◄────────────────────────   │                           │
- │                             │                           │
- │  btcGetAddress(...)         │                           │
- │  passphraseState: "abc"     │                           │
- │ ────────────────────────►   │   （无提示，已缓存）        │
- │                             │ ─────────────────────►    │
- │   { address }              │                           │
- │ ◄────────────────────────   │                           │
-```
+1. 调用 `getPassphraseState` — 仅提示用户一次，返回 `passphraseState`
+2. 后续调用传入 `passphraseState` + `initSession: true` — 不再提示
 
 ```ts
 // 步骤 1：获取 passphrase 状态（仅提示用户一次）
@@ -157,9 +99,8 @@ await HardwareSDK.btcGetAddress(connectId, deviceId, {
 ## 注意事项
 
 - **不要记录或持久化** Passphrase 明文。
-- 尽可能使用**设备端输入**以获得最高安全性。
 - 使用 `useEmptyPassphrase: true` 防止意外创建隐藏钱包。
-- Pro/Touch 设备：PIN 必须在设备上输入；Passphrase 可在设备或软件端输入（建议使用设备）。
+- Pro/Touch 设备：PIN 必须在设备上输入；Passphrase 可在设备或软件端输入。
 
 ## 常见问题
 
