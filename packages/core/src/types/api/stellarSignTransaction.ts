@@ -110,6 +110,37 @@ type StellarInflationOperation = {
   source?: string;
 };
 
+export type StellarPathPaymentStrictReceiveOperation = {
+  type: 'pathPaymentStrictReceive';
+  source?: string;
+  sendAsset: StellarAsset;
+  sendMax: string;
+  destination: string;
+  destAsset: StellarAsset;
+  destAmount: string;
+  path?: StellarAsset[];
+};
+
+export type StellarPathPaymentStrictSendOperation = {
+  type: 'pathPaymentStrictSend';
+  source?: string;
+  sendAsset: StellarAsset;
+  sendAmount: string;
+  destination: string;
+  destAsset: StellarAsset;
+  destMin: string;
+  path?: StellarAsset[];
+};
+
+export type StellarInvokeHostFunctionOperation = {
+  type: 'invokeHostFunctionOneKey';
+  source?: string;
+  contract: string;
+  functionName: string;
+  callArgsXDRHex: string;
+  sorobanAuthXDRHex: string;
+};
+
 export type StellarOperation =
   | StellarCreateAccountOperation
   | StellarPaymentOperation
@@ -122,7 +153,10 @@ export type StellarOperation =
   | StellarAccountMergeOperation
   | StellarInflationOperation
   | StellarManageDataOperation
-  | StellarBumpSequenceOperation;
+  | StellarBumpSequenceOperation
+  | StellarPathPaymentStrictReceiveOperation
+  | StellarPathPaymentStrictSendOperation
+  | StellarInvokeHostFunctionOperation;
 
 export type StellarTransaction = {
   source: string;
@@ -139,6 +173,7 @@ export type StellarTransaction = {
     hash?: string | Buffer;
   };
   operations: StellarOperation[];
+  sorobanDataXDR?: string;
 };
 
 export type StellarSignTransactionParams = {

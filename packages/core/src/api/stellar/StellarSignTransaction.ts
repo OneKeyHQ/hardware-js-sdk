@@ -15,6 +15,8 @@ import type { StellarOperation, StellarSignTransactionParams } from '../../types
 export default class StellarSignTransaction extends BaseMethod<HardwareStellarSignTx> {
   operations: any[] = [];
 
+  sorobanDataXDR?: string;
+
   parseOperation = (op: StellarOperation) => {
     switch (op.type) {
       case 'createAccount':
@@ -144,6 +146,45 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
           source_account: op.source,
           bump_to: op.bumpTo,
         };
+
+      case 'invokeHostFunctionOneKey':
+        return {
+          type: 'StellarInvokeHostFunctionOp',
+          source_account: op.source,
+          contract_address: op.contract,
+          function_name: op.functionName,
+          call_args_xdr: op.callArgsXDRHex,
+          soroban_auth_xdr: op.sorobanAuthXDRHex,
+        };
+
+      case 'pathPaymentStrictReceive':
+        validateParams(op, [{ name: 'sendMax', type: 'bigNumber', required: true }]);
+        validateParams(op, [{ name: 'destAmount', type: 'bigNumber', required: true }]);
+        return {
+          type: 'StellarPathPaymentStrictReceiveOp',
+          source_account: op.source,
+          send_asset: op.sendAsset,
+          send_max: op.sendMax,
+          destination_account: op.destination,
+          destination_asset: op.destAsset,
+          destination_amount: op.destAmount,
+          paths: op.path,
+        };
+
+      case 'pathPaymentStrictSend':
+        validateParams(op, [{ name: 'sendAmount', type: 'bigNumber', required: true }]);
+        validateParams(op, [{ name: 'destMin', type: 'bigNumber', required: true }]);
+        return {
+          type: 'StellarPathPaymentStrictSendOp',
+          source_account: op.source,
+          send_asset: op.sendAsset,
+          send_amount: op.sendAmount,
+          destination_account: op.destination,
+          destination_asset: op.destAsset,
+          destination_min: op.destMin,
+          paths: op.path,
+        };
+
       default:
         return {};
     }
@@ -171,6 +212,8 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
     // init params
     const addressN = validatePath(this.payload.path, 3);
 
+    const isSoroban = transaction.operations.some(op => op.type === 'invokeHostFunctionOneKey');
+
     this.params = {
       address_n: addressN,
       network_passphrase: networkPassphrase,
@@ -181,7 +224,24 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
       memo_type: StellarMemoType.NONE,
       timebounds_start: transaction.timebounds.minTime,
       timebounds_end: transaction.timebounds.maxTime,
+      ...(isSoroban ? { is_soroban_transaction: true } : {}),
     };
+
+    if (isSoroban) {
+      if (transaction.operations.length !== 1) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.CallMethodInvalidParameter,
+          'Soroban transactions must contain exactly one operation'
+        );
+      }
+      if (!transaction.sorobanDataXDR) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.CallMethodInvalidParameter,
+          'sorobanDataXDR is required for Soroban transactions'
+        );
+      }
+      this.sorobanDataXDR = transaction.sorobanDataXDR;
+    }
 
     if (transaction.memo) {
       this.params.memo_type = transaction.memo.type;
@@ -198,23 +258,47 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
     });
   }
 
-  processTxRequest = async (operations: any, index: number): Promise<StellarSignedTx> => {
-    const isLastOp = index + 1 >= operations.length;
-    const { type, ...op } = operations[index];
+  processTxRequest = async (
+    response: { type: string; message: any },
+    operations: any[],
+    index: number
+  ): Promise<StellarSignedTx> => {
+    switch (response.type) {
+      case 'StellarSignedTx':
+        return response.message;
 
-    if (isLastOp) {
-      const response = await this.device.commands.typedCall(type, 'StellarSignedTx', op);
-      return response.message;
+      case 'StellarSorobanDataRequest': {
+        const sorobanRes = await this.device.commands.typedCall(
+          'StellarSorobanDataAck',
+          'StellarSignedTx',
+          { data_xdr: this.sorobanDataXDR }
+        );
+        return sorobanRes.message;
+      }
+
+      case 'StellarTxOpRequest': {
+        const { type, ...op } = operations[index];
+        const nextRes = await this.device.commands.typedCall(
+          type,
+          ['StellarTxOpRequest', 'StellarSorobanDataRequest', 'StellarSignedTx'],
+          op
+        );
+        return this.processTxRequest(nextRes, operations, index + 1);
+      }
+
+      default:
+        throw ERRORS.TypedError(
+          HardwareErrorCode.RuntimeError,
+          `unexpected response type: ${response.type}`
+        );
     }
-
-    await this.device.commands.typedCall(type, 'StellarTxOpRequest', op);
-
-    return this.processTxRequest(operations, index + 1);
   };
 
   async run() {
-    await this.device.commands.typedCall('StellarSignTx', 'StellarTxOpRequest', { ...this.params });
+    const response = await this.device.commands.typedCall('StellarSignTx', 'StellarTxOpRequest', {
+      ...this.params,
+    });
 
-    return this.processTxRequest(this.operations, 0);
+    return this.processTxRequest(response, this.operations, 0);
   }
 }

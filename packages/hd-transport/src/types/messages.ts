@@ -3795,6 +3795,7 @@ export type StellarSignTx = {
   memo_id?: string;
   memo_hash?: Buffer | string;
   num_operations: number;
+  is_soroban_transaction?: boolean;
 };
 
 // StellarTxOpRequest
@@ -3924,6 +3925,23 @@ export type StellarManageDataOp = {
 export type StellarBumpSequenceOp = {
   source_account?: string;
   bump_to: UintType;
+};
+
+// StellarInvokeHostFunctionOp
+export type StellarInvokeHostFunctionOp = {
+  source_account?: string;
+  contract_address: string;
+  function_name: string;
+  call_args_xdr: string;
+  soroban_auth_xdr: string;
+};
+
+// StellarSorobanDataRequest
+export type StellarSorobanDataRequest = {};
+
+// StellarSorobanDataAck
+export type StellarSorobanDataAck = {
+  data_xdr: string;
 };
 
 // StellarSignedTx
@@ -4835,6 +4853,9 @@ export type MessageType = {
   StellarAccountMergeOp: StellarAccountMergeOp;
   StellarManageDataOp: StellarManageDataOp;
   StellarBumpSequenceOp: StellarBumpSequenceOp;
+  StellarInvokeHostFunctionOp: StellarInvokeHostFunctionOp;
+  StellarSorobanDataRequest: StellarSorobanDataRequest;
+  StellarSorobanDataAck: StellarSorobanDataAck;
   StellarSignedTx: StellarSignedTx;
   SuiGetAddress: SuiGetAddress;
   SuiAddress: SuiAddress;
