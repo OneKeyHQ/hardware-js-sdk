@@ -266,6 +266,11 @@ function DocAIMarkdownMessage({ text, copy, isStreaming = false }) {
   const components = useMemo(
     () => ({
       a: props => <a {...props} target="_blank" rel="noreferrer noopener" />,
+      table: ({ children }) => (
+        <div className={styles.tableWrap}>
+          <table>{children}</table>
+        </div>
+      ),
       pre: ({ children }) => children,
       code: ({ node, className, children, ...props }) => {
         const code = String(children ?? '');

@@ -8,13 +8,45 @@ Rules and best practices for handling passphrases (hidden wallets).
 
 ## Core concepts
 
-- Standard wallet = seed + empty passphrase; hidden wallet = seed + non-empty passphrase (case sensitive).
+- **Standard wallet** = seed + empty passphrase; **hidden wallet** = seed + non-empty passphrase (case-sensitive).
+- Every different passphrase generates a completely different wallet — even a single character change.
 - Passphrases cannot be recovered; back them up securely.
 - Force the standard wallet by setting `useEmptyPassphrase: true`.
 
-## App behaviors
+## Device support matrix
+
+| Feature | Classic | Classic 1S | Mini | Touch | Pro |
+|---------|---------|-----------|------|-------|-----|
+| Passphrase supported | Yes | Yes | Yes | Yes | Yes |
+| On-device input | Yes | Yes | Yes | Yes (touch keyboard) | Yes (touch keyboard) |
+| Software input (host) | Yes | Yes | Yes | Yes | Yes |
+| Session caching (`passphraseState`) | Yes | Yes | Yes | Yes | Yes |
+| USB connection | Yes | Yes | Yes | Yes | Yes |
+| BLE connection | No | Yes | No | Yes | Yes |
+| Air-Gap (QR) | No | No | No | No | Yes |
+
+> **Recommendation:** On-device passphrase input is always preferred for maximum security, regardless of device model.
+
+## Interaction flow
 
 ### Proactive strategy (recommended)
+
+The simplest approach — explicitly choose the standard wallet to avoid accidental hidden wallet prompts:
+
+```
+App                           SDK                        Device
+ │                             │                           │
+ │  evmGetAddress(...)         │                           │
+ │  useEmptyPassphrase: true   │                           │
+ │ ────────────────────────►   │                           │
+ │                             │   Initialize session      │
+ │                             │ ─────────────────────►    │
+ │                             │   (empty passphrase)      │
+ │                             │ ◄─────────────────────    │
+ │                             │                           │
+ │   { address, path }        │                           │
+ │ ◄────────────────────────   │                           │
+```
 
 ```ts
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
@@ -23,26 +55,140 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 });
 ```
 
-### Reactive strategy (event driven)
+### Reactive strategy (event-driven)
+
+Listen for the passphrase request event and let the user choose input method:
+
+```
+App                           SDK                        Device
+ │                             │                           │
+ │  evmGetAddress(...)         │                           │
+ │ ────────────────────────►   │                           │
+ │                             │   Initialize session      │
+ │                             │ ─────────────────────►    │
+ │                             │   REQUEST_PASSPHRASE      │
+ │   UI_REQUEST.               │ ◄─────────────────────    │
+ │   REQUEST_PASSPHRASE        │                           │
+ │ ◄────────────────────────   │                           │
+ │                             │                           │
+ │   Show passphrase dialog    │                           │
+ │   ┌──────────────────┐      │                           │
+ │   │ Option A: Device │      │                           │
+ │   │ Option B: Software│     │                           │
+ │   └──────────────────┘      │                           │
+ │                             │                           │
+ │   uiResponse(...)           │                           │
+ │ ────────────────────────►   │                           │
+ │                             │   Send passphrase         │
+ │                             │ ─────────────────────►    │
+ │                             │                           │
+ │   { address, path }        │                           │
+ │ ◄────────────────────────   │                           │
+```
 
 ```ts
-// On-device input (preferred)
+// Option A: On-device input (preferred — most secure)
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PASSPHRASE,
   payload: { passphraseOnDevice: true, value: '' },
 });
 
-// Software input (optionally cache for this session)
+// Option B: Software input (optionally cache for this session)
 HardwareSDK.uiResponse({
   type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { value, passphraseOnDevice: false, save: true },
+  payload: { value: userInput, passphraseOnDevice: false, save: true },
 });
 ```
 
-## Session & caching
+### Hidden wallet with session caching
 
-- `passphraseState`: fetch once via Get Passphrase State; combine with `keepSession`/`initSession` to reduce repeated prompts.
+To reduce repeated passphrase prompts across multiple calls:
+
+```
+App                           SDK                        Device
+ │                             │                           │
+ │  getPassphraseState(...)    │                           │
+ │ ────────────────────────►   │                           │
+ │                             │   (passphrase prompt)     │
+ │                             │ ◄────────────────────►    │
+ │                             │                           │
+ │   passphraseState = "abc"   │                           │
+ │ ◄────────────────────────   │                           │
+ │                             │                           │
+ │  evmGetAddress(...)         │                           │
+ │  passphraseState: "abc"     │                           │
+ │  initSession: true          │                           │
+ │ ────────────────────────►   │   (no prompt, cached)     │
+ │                             │ ─────────────────────►    │
+ │   { address }              │                           │
+ │ ◄────────────────────────   │                           │
+ │                             │                           │
+ │  btcGetAddress(...)         │                           │
+ │  passphraseState: "abc"     │                           │
+ │ ────────────────────────►   │   (no prompt, cached)     │
+ │                             │ ─────────────────────►    │
+ │   { address }              │                           │
+ │ ◄────────────────────────   │                           │
+```
+
+```ts
+// Step 1: Get passphrase state (prompts user once)
+const state = await HardwareSDK.getPassphraseState(connectId);
+const passphraseState = state.payload;
+
+// Step 2: Use passphraseState in subsequent calls (no more prompts)
+const commonParams = {
+  initSession: true,
+  passphraseState,
+};
+
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...commonParams,
+});
+
+await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  ...commonParams,
+});
+```
 
 ## Security tips
 
-- Do not log or persist passphrases; prefer on-device input whenever possible.
+- **Never log or persist** passphrases in plain text.
+- Prefer **on-device input** whenever possible for maximum security.
+- Use `useEmptyPassphrase: true` to prevent accidental hidden wallet creation.
+- Pro/Touch devices: PIN must be entered on-device; passphrase can be entered on-device or via software (on-device recommended).
+
+## FAQ
+
+### What happens if I forget my passphrase?
+
+Funds in the hidden wallet become permanently inaccessible. There is no way to recover a forgotten passphrase. Always keep a secure backup.
+
+### Is the passphrase the same as the PIN?
+
+No. The PIN protects physical access to the device. The passphrase creates an entirely different wallet from the same seed. They serve different security purposes:
+
+| | PIN | Passphrase |
+|---|-----|-----------|
+| Purpose | Device access protection | Hidden wallet creation |
+| Recovery | Can be reset via device wipe + seed recovery | Cannot be recovered |
+| Storage | Stored on device | Never stored anywhere |
+| Case-sensitive | N/A (numeric) | Yes |
+
+### Can I have multiple hidden wallets?
+
+Yes. Each unique passphrase creates a distinct hidden wallet. You can have as many hidden wallets as you want — one per unique passphrase.
+
+### Does the device validate my passphrase?
+
+No. The device accepts any passphrase and derives a wallet from it. If you mistype your passphrase, you'll get a valid but different (empty) wallet. There is no "wrong passphrase" error.
+
+### What's the difference between `passphraseOnDevice` and software input?
+
+- **On-device**: The passphrase is entered directly on the hardware device's screen/keyboard. It never leaves the device.
+- **Software input**: The passphrase is typed in your app and sent to the device via SDK.
+
+See also: [Common Params](../common-params), [Events & UI Wiring](/en/hardware-sdk/core-api-guide#events-ui).

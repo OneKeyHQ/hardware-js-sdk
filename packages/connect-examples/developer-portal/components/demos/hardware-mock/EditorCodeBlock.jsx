@@ -138,6 +138,13 @@ export function EditorCodeBlock({
                       <span style={lineNumStyle}>{lineNumber}</span>
                       {line.map((token, j) => {
                         const tokenProps = getTokenProps({ token, key: j })
+                        // Neutralize Nextra's global Prism CSS that leaks
+                        // `.token { background: #ffffff80 }` into our blocks
+                        tokenProps.style = {
+                          ...tokenProps.style,
+                          background: 'none',
+                          textShadow: 'none',
+                        }
                         return <span key={j} {...tokenProps} />
                       })}
                     </div>
