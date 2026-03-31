@@ -12,10 +12,21 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type { StellarOperation, StellarSignTransactionParams } from '../../types';
 
+// Firmware accepts up to 512 bytes per chunk; 1 byte = 2 hex chars
+const SOROBAN_CHUNK_BYTES = 512;
+const SOROBAN_CHUNK_HEX_CHARS = SOROBAN_CHUNK_BYTES * 2;
+
 export default class StellarSignTransaction extends BaseMethod<HardwareStellarSignTx> {
   operations: any[] = [];
 
-  sorobanDataXDR?: string;
+  private sorobanState?: {
+    callArgs: string;
+    callArgsSent: number;
+    auth: string;
+    authSent: number;
+    ext: string;
+    extSent: number;
+  };
 
   parseOperation = (op: StellarOperation) => {
     switch (op.type) {
@@ -147,15 +158,29 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
           bump_to: op.bumpTo,
         };
 
-      case 'invokeHostFunctionOneKey':
+      case 'invokeHostFunctionOneKey': {
+        const callArgs = op.callArgsXDRHex ?? '';
+        const auth = op.sorobanAuthXDRHex ?? '';
+
+        if (!this.sorobanState) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'sorobanState not initialized');
+        }
+        this.sorobanState.callArgs = callArgs;
+        this.sorobanState.callArgsSent = Math.min(callArgs.length, SOROBAN_CHUNK_HEX_CHARS);
+        this.sorobanState.auth = auth;
+        this.sorobanState.authSent = Math.min(auth.length, SOROBAN_CHUNK_HEX_CHARS);
+
         return {
           type: 'StellarInvokeHostFunctionOp',
           source_account: op.source,
           contract_address: op.contract,
           function_name: op.functionName,
-          call_args_xdr: op.callArgsXDRHex,
-          soroban_auth_xdr: op.sorobanAuthXDRHex,
+          call_args_xdr_size: callArgs.length / 2,
+          call_args_xdr_initial_chunk: callArgs.slice(0, SOROBAN_CHUNK_HEX_CHARS),
+          soroban_auth_xdr_size: auth.length / 2,
+          soroban_auth_xdr_initial_chunk: auth.slice(0, SOROBAN_CHUNK_HEX_CHARS),
         };
+      }
 
       case 'pathPaymentStrictReceive':
         validateParams(op, [{ name: 'sendMax', type: 'bigNumber', required: true }]);
@@ -214,19 +239,6 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
 
     const isSoroban = transaction.operations.some(op => op.type === 'invokeHostFunctionOneKey');
 
-    this.params = {
-      address_n: addressN,
-      network_passphrase: networkPassphrase,
-      source_account: transaction.source,
-      fee: transaction.fee,
-      sequence_number: transaction.sequence,
-      num_operations: transaction.operations.length,
-      memo_type: StellarMemoType.NONE,
-      timebounds_start: transaction.timebounds.minTime,
-      timebounds_end: transaction.timebounds.maxTime,
-      ...(isSoroban ? { is_soroban_transaction: true } : {}),
-    };
-
     if (isSoroban) {
       if (transaction.operations.length !== 1) {
         throw ERRORS.TypedError(
@@ -240,8 +252,28 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
           'sorobanDataXDR is required for Soroban transactions'
         );
       }
-      this.sorobanDataXDR = transaction.sorobanDataXDR;
+      this.sorobanState = {
+        callArgs: '',
+        callArgsSent: 0,
+        auth: '',
+        authSent: 0,
+        ext: transaction.sorobanDataXDR,
+        extSent: 0,
+      };
     }
+
+    this.params = {
+      address_n: addressN,
+      network_passphrase: networkPassphrase,
+      source_account: transaction.source,
+      fee: transaction.fee,
+      sequence_number: transaction.sequence,
+      num_operations: transaction.operations.length,
+      memo_type: StellarMemoType.NONE,
+      timebounds_start: transaction.timebounds.minTime,
+      timebounds_end: transaction.timebounds.maxTime,
+      ...(this.sorobanState ? { soroban_data_size: this.sorobanState.ext.length / 2 } : {}),
+    };
 
     if (transaction.memo) {
       this.params.memo_type = transaction.memo.type;
@@ -268,12 +300,50 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
         return response.message;
 
       case 'StellarSorobanDataRequest': {
+        if (!this.sorobanState) {
+          throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'sorobanState not initialized');
+        }
+
+        const reqType = response.message.type as number;
+        // data_length 是字节数，转为 hex 字符数
+        const hexLen = (response.message.data_length as number) * 2;
+        let chunk: string;
+
+        switch (reqType) {
+          // CALL: invoke contract call_args
+          case 0: {
+            const { callArgs, callArgsSent } = this.sorobanState;
+            chunk = callArgs.slice(callArgsSent, callArgsSent + hexLen);
+            this.sorobanState.callArgsSent += chunk.length;
+            break;
+          }
+          // AUTH: soroban authorization entries
+          case 1: {
+            const { auth, authSent } = this.sorobanState;
+            chunk = auth.slice(authSent, authSent + hexLen);
+            this.sorobanState.authSent += chunk.length;
+            break;
+          }
+          // EXT: soroban transaction extension data
+          case 2: {
+            const { ext, extSent } = this.sorobanState;
+            chunk = ext.slice(extSent, extSent + hexLen);
+            this.sorobanState.extSent += chunk.length;
+            break;
+          }
+          default:
+            throw ERRORS.TypedError(
+              HardwareErrorCode.RuntimeError,
+              `unknown soroban request type: ${reqType}`
+            );
+        }
+
         const sorobanRes = await this.device.commands.typedCall(
           'StellarSorobanDataAck',
-          'StellarSignedTx',
-          { data_xdr: this.sorobanDataXDR }
+          ['StellarSorobanDataRequest', 'StellarSignedTx'],
+          { data_xdr: chunk }
         );
-        return sorobanRes.message;
+        return this.processTxRequest(sorobanRes, operations, index);
       }
 
       case 'StellarTxOpRequest': {

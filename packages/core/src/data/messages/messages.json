@@ -10275,11 +10275,11 @@
           "type": "uint32",
           "id": 14
         },
-        "is_soroban_transaction": {
-          "type": "bool",
+        "soroban_data_size": {
+          "type": "uint32",
           "id": 60,
           "options": {
-            "default": false
+            "default": 0
           }
         }
       },
@@ -10689,20 +10689,50 @@
           "type": "string",
           "id": 3
         },
-        "call_args_xdr": {
+        "call_args_xdr_size": {
           "rule": "required",
-          "type": "bytes",
+          "type": "uint32",
           "id": 4
         },
-        "soroban_auth_xdr": {
+        "call_args_xdr_initial_chunk": {
           "rule": "required",
           "type": "bytes",
           "id": 5
+        },
+        "soroban_auth_xdr_size": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 6
+        },
+        "soroban_auth_xdr_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
         }
       }
     },
     "StellarSorobanDataRequest": {
-      "fields": {}
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "StellarRequestType",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      },
+      "nested": {
+        "StellarRequestType": {
+          "values": {
+            "CALL": 0,
+            "AUTH": 1,
+            "EXT": 2
+          }
+        }
+      }
     },
     "StellarSorobanDataAck": {
       "fields": {

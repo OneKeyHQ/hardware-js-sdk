@@ -3795,7 +3795,7 @@ export type StellarSignTx = {
   memo_id?: string;
   memo_hash?: Buffer | string;
   num_operations: number;
-  is_soroban_transaction?: boolean;
+  soroban_data_size?: number;
 };
 
 // StellarTxOpRequest
@@ -3932,12 +3932,23 @@ export type StellarInvokeHostFunctionOp = {
   source_account?: string;
   contract_address: string;
   function_name: string;
-  call_args_xdr: string;
-  soroban_auth_xdr: string;
+  call_args_xdr_size: number;
+  call_args_xdr_initial_chunk: string;
+  soroban_auth_xdr_size: number;
+  soroban_auth_xdr_initial_chunk: string;
 };
 
+export enum StellarRequestType {
+  CALL = 0,
+  AUTH = 1,
+  EXT = 2,
+}
+
 // StellarSorobanDataRequest
-export type StellarSorobanDataRequest = {};
+export type StellarSorobanDataRequest = {
+  type: StellarRequestType;
+  data_length: number;
+};
 
 // StellarSorobanDataAck
 export type StellarSorobanDataAck = {
