@@ -12,8 +12,8 @@ import type {
 } from '@onekeyfe/hd-transport';
 import type { StellarOperation, StellarSignTransactionParams } from '../../types';
 
-// Firmware accepts up to 512 bytes per chunk; 1 byte = 2 hex chars
-const SOROBAN_CHUNK_BYTES = 512;
+// Firmware accepts up to 1024 bytes per chunk; 1 byte = 2 hex chars
+const SOROBAN_CHUNK_BYTES = 1024;
 const SOROBAN_CHUNK_HEX_CHARS = SOROBAN_CHUNK_BYTES * 2;
 
 export default class StellarSignTransaction extends BaseMethod<HardwareStellarSignTx> {
@@ -304,28 +304,28 @@ export default class StellarSignTransaction extends BaseMethod<HardwareStellarSi
           throw ERRORS.TypedError(HardwareErrorCode.RuntimeError, 'sorobanState not initialized');
         }
 
-        const reqType = response.message.type as number;
+        const reqType = response.message.type as string;
         // data_length 是字节数，转为 hex 字符数
         const hexLen = (response.message.data_length as number) * 2;
         let chunk: string;
 
         switch (reqType) {
           // CALL: invoke contract call_args
-          case 0: {
+          case 'CALL': {
             const { callArgs, callArgsSent } = this.sorobanState;
             chunk = callArgs.slice(callArgsSent, callArgsSent + hexLen);
             this.sorobanState.callArgsSent += chunk.length;
             break;
           }
           // AUTH: soroban authorization entries
-          case 1: {
+          case 'AUTH': {
             const { auth, authSent } = this.sorobanState;
             chunk = auth.slice(authSent, authSent + hexLen);
             this.sorobanState.authSent += chunk.length;
             break;
           }
           // EXT: soroban transaction extension data
-          case 2: {
+          case 'EXT': {
             const { ext, extSent } = this.sorobanState;
             chunk = ext.slice(extSent, extSent + hexLen);
             this.sorobanState.extSent += chunk.length;
