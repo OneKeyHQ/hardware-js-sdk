@@ -183,6 +183,8 @@ const btcData: ChainMethodEntry[] = [
   },
   {
     method: 'btcVerifyMessage',
+    confirmCount: 2,
+    noSlide: true,
     description: 'Verify a message signed with a Bitcoin private key.',
     presupposes: [
       {

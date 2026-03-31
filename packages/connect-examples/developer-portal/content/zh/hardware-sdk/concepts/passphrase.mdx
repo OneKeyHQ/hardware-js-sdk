@@ -4,23 +4,45 @@ title: Passphrase（核心指南）
 
 # Passphrase（核心指南）
 
-处理 OneKey 设备 Passphrase（隐藏钱包）的基本规则。
+处理 OneKey 设备 Passphrase（隐藏钱包）的基本规则与最佳实践。
 
 ## 关键要点
 
-- 标准钱包 vs 隐藏钱包：
-  - 标准钱包 = 助记词 + 空 Passphrase
-  - 隐藏钱包 = 助记词 + 非空 Passphrase（区分大小写；任何改动都会生成不同的钱包）
-- 重要提示：Passphrase 遗忘后无法恢复，请妥善备份。输入时必须完全一致（区分大小写）。
-- 相关：要在调用中强制使用标准钱包，请设置 `useEmptyPassphrase: true`
+- **标准钱包** = 助记词 + 空 Passphrase；**隐藏钱包** = 助记词 + 非空 Passphrase（区分大小写）。
+- 每个不同的 Passphrase 都会生成完全不同的钱包——即使只差一个字符。
+- Passphrase 遗忘后无法恢复，请妥善备份。
+- 设置 `useEmptyPassphrase: true` 可强制使用标准钱包。
 
+## 设备支持
 
-## 应用行为
+| 设备 | 设备端输入 | 软件端输入（主机） |
+|------|----------|-----------------|
+| Classic | 是 | 是 |
+| Classic 1S | 是 | 是 |
+| Mini | 是 | 是 |
+| Touch | 是（触屏键盘） | 是 |
+| Pro | 是（触屏键盘） | 是 |
 
-使用 Passphrase 的两种方式：
+所有 OneKey 设备均支持 Passphrase 和会话缓存（`passphraseState`）。
 
-1) 主动意图（推荐）
-- 为单次调用强制使用标准钱包：
+## 交互流程
+
+### 主动策略（推荐）
+
+最简单的方式——显式选择标准钱包，避免意外的隐藏钱包提示。
+
+```mermaid
+sequenceDiagram
+    participant App as 应用
+    participant SDK
+    participant Device as 设备
+
+    App->>SDK: evmGetAddress(..., useEmptyPassphrase: true)
+    SDK->>Device: 初始化会话（空 passphrase）
+    Device-->>SDK: 会话就绪
+    SDK-->>App: { address, path }
+```
+
 ```ts
 await HardwareSDK.evmGetAddress(connectId, deviceId, {
   path: "m/44'/60'/0'",
@@ -28,32 +50,126 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 });
 ```
 
-2) 响应式事件处理
-- 在 `UI_REQUEST.REQUEST_PASSPHRASE` 时，显示单个提示，包含两个操作：
-  - 在设备上输入（首选）：
-    ```ts
-    HardwareSDK.uiResponse({
-      type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-      payload: { passphraseOnDevice: true, value: '' },
-    });
-    ```
-  - 在此屏幕上输入（软件输入；可选择为会话缓存）：
-    ```ts
-    HardwareSDK.uiResponse({
-      type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-      payload: { value, passphraseOnDevice: false, save: true },
-    });
-    ```
+### 响应式策略（事件驱动）
 
-## 缓存与会话
+监听 Passphrase 请求事件，让用户选择输入方式。
 
-- `passphraseState`：通过 [获取 Passphrase 状态](../basic-api/get-passphrase-state) 获取一次，并在 [通用参数](../common-params) 中传入，以减少重复提示。
-- 结合 `keepSession` / `initSession` 使用，可减少流程中的交互次数。
+```mermaid
+sequenceDiagram
+    participant App as 应用
+    participant SDK
+    participant Device as 设备
+
+    App->>SDK: evmGetAddress(...)
+    SDK->>Device: 初始化会话
+    Device-->>SDK: REQUEST_PASSPHRASE
+    SDK-->>App: UI_REQUEST.REQUEST_PASSPHRASE
+    Note over App: 显示 Passphrase 对话框<br/>（设备端或软件端输入）
+    App->>SDK: uiResponse(passphrase)
+    SDK->>Device: 发送 passphrase
+    Device-->>SDK: 会话就绪
+    SDK-->>App: { address, path }
+```
+
+```ts
+// 选项 A：在设备上输入
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: { passphraseOnDevice: true, value: '' },
+});
+
+// 选项 B：软件输入（可选择为会话缓存）
+HardwareSDK.uiResponse({
+  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+  payload: { value: userInput, passphraseOnDevice: false, save: true },
+});
+```
+
+### 隐藏钱包的会话缓存
+
+通过会话缓存减少重复的 Passphrase 输入提示。
+
+```mermaid
+sequenceDiagram
+    participant App as 应用
+    participant SDK
+    participant Device as 设备
+
+    App->>SDK: getPassphraseState(connectId)
+    SDK->>Device: 提示输入 passphrase（仅一次）
+    Device-->>SDK: passphraseState
+    SDK-->>App: passphraseState = "abc"
+
+    Note over App: 后续调用使用缓存状态
+
+    App->>SDK: evmGetAddress(..., passphraseState, initSession)
+    SDK->>Device: 复用会话（无提示）
+    Device-->>SDK: 结果
+    SDK-->>App: { address }
+
+    App->>SDK: btcGetAddress(..., passphraseState)
+    SDK->>Device: 复用会话（无提示）
+    Device-->>SDK: 结果
+    SDK-->>App: { address }
+```
+
+```ts
+// 步骤 1：获取 passphrase 状态（仅提示用户一次）
+const state = await HardwareSDK.getPassphraseState(connectId);
+const passphraseState = state.payload;
+
+// 步骤 2：后续调用使用 passphraseState（不再提示）
+const commonParams = {
+  initSession: true,
+  passphraseState,
+};
+
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...commonParams,
+});
+
+await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  ...commonParams,
+});
+```
 
 ## 注意事项
 
-- 不要记录或持久化 Passphrase；掩码输入。
-- 建议在设备上输入以获得更好的安全性。
-- Pro/Touch：PIN 必须在设备上输入；Passphrase 仍可在设备或软件中输入（建议使用设备）。
+- **不要记录或持久化** Passphrase 明文。
+- 使用 `useEmptyPassphrase: true` 防止意外创建隐藏钱包。
+- Pro/Touch 设备：PIN 必须在设备上输入；Passphrase 可在设备或软件端输入。
+
+## 常见问题
+
+### 忘记 Passphrase 会怎样？
+
+隐藏钱包中的资金将永久无法访问。没有任何方式可以恢复遗忘的 Passphrase。请务必保留安全备份。
+
+### Passphrase 和 PIN 是同一个东西吗？
+
+不是。PIN 保护设备的物理访问。Passphrase 从同一个助记词创建完全不同的钱包。它们有不同的安全用途：
+
+| | PIN | Passphrase |
+|---|-----|-----------|
+| 用途 | 设备访问保护 | 隐藏钱包创建 |
+| 恢复 | 可通过擦除设备 + 恢复助记词重置 | 无法恢复 |
+| 存储 | 存储在设备上 | 不存储在任何地方 |
+| 区分大小写 | 不适用（纯数字） | 是 |
+
+### 可以有多个隐藏钱包吗？
+
+可以。每个不同的 Passphrase 创建一个独立的隐藏钱包。你可以拥有任意数量的隐藏钱包——每个 Passphrase 对应一个。
+
+### 设备会验证我的 Passphrase 吗？
+
+不会。设备接受任何 Passphrase 并从中派生钱包。如果你输入了错误的 Passphrase，你会得到一个有效但不同的（空的）钱包。不会出现"Passphrase 错误"的提示。
+
+### `passphraseOnDevice` 和软件输入有什么区别？
+
+- **设备端输入**：Passphrase 直接在硬件设备的屏幕/键盘上输入，永远不会离开设备。
+- **软件输入**：Passphrase 在你的应用中输入后通过 SDK 发送到设备。
 
 另请参阅：[通用参数](../common-params)，[事件配置](/zh/hardware-sdk/core-api-guide#events-ui)。

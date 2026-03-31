@@ -30,44 +30,13 @@ export function SiteHeader() {
 
   const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
 
-  // 获取版本信息
-  const commitSha =
-    (globalThis as typeof globalThis & { __COMMIT_SHA__?: string }).__COMMIT_SHA__ || 'dev';
-  const isProduction = commitSha !== 'dev';
-
-  // 调试信息 - 只在开发环境显示
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('Debug - Environment info:', {
-      commitSha,
-      isProduction,
-      globalCommitSha: (globalThis as typeof globalThis & { __COMMIT_SHA__?: string })
-        .__COMMIT_SHA__,
-      nodeEnv: process.env.NODE_ENV,
-    });
-  }
-
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-6 max-w-[100%]">
-          {/* 左侧：侧边栏切换按钮和版本信息 */}
+          {/* 左侧：侧边栏切换按钮 */}
           <div className="flex items-center gap-3">
-            {/* 侧边栏切换按钮 */}
             <SidebarTrigger />
-
-            {/* 版本信息 */}
-            <div className="flex items-center gap-2">
-              {isProduction && (
-                <Badge variant="secondary" className="text-xs">
-                  v{commitSha}
-                </Badge>
-              )}
-              {!isProduction && (
-                <Badge variant="outline" className="text-xs">
-                  dev
-                </Badge>
-              )}
-            </div>
           </div>
 
           {/* 右侧：工具栏 */}

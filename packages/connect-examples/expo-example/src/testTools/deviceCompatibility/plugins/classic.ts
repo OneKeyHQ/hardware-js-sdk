@@ -49,11 +49,5 @@ export const classicPlugin: DevicePlugin = {
       when: ({ key }) => key === '60',
       expected: true,
     },
-    {
-      id: 'classic-sol-coin501-expected-fail',
-      methods: 'solSignTransaction',
-      when: ({ key }) => key === '501',
-      expected: false,
-    },
   ],
 };

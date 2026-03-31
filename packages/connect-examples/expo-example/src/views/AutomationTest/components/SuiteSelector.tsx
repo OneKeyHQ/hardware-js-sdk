@@ -1,7 +1,10 @@
 import { Check as CheckIcon } from '@tamagui/lucide-icons';
 import { Checkbox, Text, XStack, YStack } from 'tamagui';
 
-import { TEST_SUITE_INFO } from '../../../services/phonePilotMcp/types';
+import {
+  SCENARIO_DRIVEN_TEST_SUITES,
+  TEST_SUITE_INFO,
+} from '../../../services/phonePilotMcp/types';
 import { toggleValue } from '../utils';
 import { PanelActions } from './PanelActions';
 
@@ -25,11 +28,6 @@ export function SuiteSelector({
     }));
   };
 
-  // deviceFlow is always included automatically — controlled by devicePreparationMode, not user-toggled
-  const suiteTypes = (Object.keys(TEST_SUITE_INFO) as TestSuiteType[]).filter(
-    s => s !== 'deviceFlow'
-  );
-
   return (
     <YStack gap="$2">
       <XStack justifyContent="space-between" alignItems="center" gap="$3" flexWrap="wrap">
@@ -41,14 +39,21 @@ export function SuiteSelector({
           onSelectAll={() =>
             setConfig(prev => ({
               ...prev,
-              testSuites: Object.keys(TEST_SUITE_INFO) as TestSuiteType[],
+              testSuites: Array.from(new Set([...prev.testSuites, ...SCENARIO_DRIVEN_TEST_SUITES])),
             }))
           }
-          onClear={() => setConfig(prev => ({ ...prev, testSuites: ['deviceFlow'] }))}
+          onClear={() =>
+            setConfig(prev => ({
+              ...prev,
+              testSuites: prev.testSuites.filter(
+                suiteType => !SCENARIO_DRIVEN_TEST_SUITES.includes(suiteType)
+              ),
+            }))
+          }
         />
       </XStack>
       <YStack gap="$1.5">
-        {suiteTypes.map(suiteType => {
+        {SCENARIO_DRIVEN_TEST_SUITES.map(suiteType => {
           const checked = config.testSuites.includes(suiteType);
           const info = TEST_SUITE_INFO[suiteType];
           return (

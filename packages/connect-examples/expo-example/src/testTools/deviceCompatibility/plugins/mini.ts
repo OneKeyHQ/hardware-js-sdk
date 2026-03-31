@@ -21,12 +21,6 @@ export const miniPlugin: DevicePlugin = {
       expected: false,
     },
     {
-      id: 'mini-sol-coin501-expected-fail',
-      methods: 'solSignTransaction',
-      when: ({ key }) => key === '501',
-      expected: false,
-    },
-    {
       id: 'mini-nem-coin60-expected-success',
       methods: 'nemSignTransaction',
       when: ({ key }) => key === '60',

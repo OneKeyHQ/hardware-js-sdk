@@ -1,11 +1,15 @@
 'use client'
 
+import { useCallback } from 'react'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react'
 import cn from 'clsx'
+import { SearchIcon } from 'lucide-react'
 import { Anchor, Button } from 'nextra/components'
 import { useFSRoute } from 'nextra/hooks'
 import { ArrowRightIcon, MenuIcon } from 'nextra/icons'
-import { setMenu, useConfig, useMenu, useThemeConfig } from 'nextra-theme-docs'
+import { setMenu, useConfig, useMenu } from 'nextra-theme-docs'
+import { DOCS_AI_TAB, emitDocsAIOpen } from './docAIAssistEvents'
+import styles from './OneKeyNavbar.client.module.css'
 
 const classes = {
   link: cn(
@@ -17,9 +21,9 @@ const classes = {
 
 const isMenu = (page) => page.type === 'menu'
 
-const sanitizeMenuId = (menu) => {
+const sanitizeMenuKey = (menu) => {
   const base = menu.name || menu.route || menu.title || 'menu'
-  return `onekey-navbar-${base.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()}`
+  return base.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()
 }
 
 const menuItemsClass = cn(
@@ -40,6 +44,7 @@ const menuAnchor = {
 
 const NavbarMenu = ({ menu, children }) => {
   // Site is always dark mode (forcedTheme: 'dark' in layout)
+  const menuKey = sanitizeMenuKey(menu)
   const routes =
     menu.children?.reduce((acc, child) => {
       if (child?.name) acc[child.name] = child
@@ -71,7 +76,8 @@ const NavbarMenu = ({ menu, children }) => {
       {({ open }) => (
         <>
           <MenuButton
-            id={sanitizeMenuId(menu)}
+            id={`onekey-navbar-${menuKey}`}
+            data-onekey-menu={menuKey}
             className={cn(
               classes.link,
               'x:items-center x:flex x:gap-1.5 x:cursor-pointer x:outline-none'
@@ -104,9 +110,14 @@ const NavbarMenu = ({ menu, children }) => {
 
 export function OneKeyClientNavbar({ children, className }) {
   const items = useConfig().normalizePagesResult.topLevelNavbarItems
-  const themeConfig = useThemeConfig()
   const pathname = useFSRoute()
   const menu = useMenu()
+  const isZh = pathname?.startsWith('/zh')
+  const searchText = isZh ? '搜索' : 'Search'
+
+  const handleOpenSearch = useCallback(() => {
+    emitDocsAIOpen(DOCS_AI_TAB.SEARCH)
+  }, [])
 
   const navClass = cn(
     'x:flex x:gap-4 x:overflow-x-auto nextra-scrollbar x:py-1.5 x:max-md:hidden',
@@ -148,8 +159,22 @@ export function OneKeyClientNavbar({ children, className }) {
     )
   })
 
-  const search = themeConfig.search && (
-    <div className="x:max-md:hidden">{themeConfig.search}</div>
+  const assistActions = (
+    <div className={styles.assistActions}>
+      <button
+        type="button"
+        className={`${styles.assistButton} ${styles.searchButton}`}
+        onClick={handleOpenSearch}
+        aria-label="Open search"
+      >
+        <SearchIcon size={15} />
+        <span className={styles.buttonLabel}>{searchText}</span>
+        <span className={styles.searchHotkeyWrap}>
+          <kbd className={styles.searchHotkey}>⌘</kbd>
+          <kbd className={styles.searchHotkey}>K</kbd>
+        </span>
+      </button>
+    </div>
   )
 
   const toggleClass = cn({ open: menu })
@@ -157,7 +182,7 @@ export function OneKeyClientNavbar({ children, className }) {
   return (
     <>
       <div className={navClass}>{navItems}</div>
-      {search}
+      {assistActions}
       {children}
       <Button
         aria-label="Menu"

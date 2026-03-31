@@ -1,0 +1,81 @@
+.assistActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.assistButton {
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: #e4e4e7;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.searchButton {
+  border-color: #3f3f46;
+  background: rgba(24, 24, 27, 0.76);
+}
+
+.searchButton:hover {
+  background: rgba(39, 39, 42, 0.9);
+  border-color: #52525b;
+}
+
+.searchHotkeyWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(113, 113, 122, 0.5);
+}
+
+.searchHotkey {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid rgba(113, 113, 122, 0.55);
+  background: rgba(39, 39, 42, 0.7);
+  color: #a1a1aa;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* 弹窗打开时隐藏导航触发器，避免与弹窗顶部按钮产生重复感。 */
+:global(html[data-docs-ai-open='true']) .assistActions {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+}
+
+@media (max-width: 768px) {
+  .assistActions {
+    margin-right: 4px;
+  }
+
+  .assistButton {
+    padding: 0 10px;
+  }
+
+  .buttonLabel,
+  .searchHotkeyWrap {
+    display: none;
+  }
+}

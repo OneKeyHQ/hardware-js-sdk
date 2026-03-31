@@ -23,12 +23,6 @@ export const classic1sPlugin: DevicePlugin = {
       expected: true,
     },
     {
-      id: 'classic1s-sol-coin501-expected-fail',
-      methods: 'solSignTransaction',
-      when: ({ key }) => key === '501',
-      expected: false,
-    },
-    {
       id: 'classic1s-dnx-sign-tx-expected-fail',
       methods: 'dnxSignTransaction',
       expected: false,
