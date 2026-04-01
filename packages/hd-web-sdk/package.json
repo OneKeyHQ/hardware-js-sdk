@@ -20,7 +20,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@onekeyfe/cross-inpage-provider-core": "^0.0.17",
+    "@onekeyfe/cross-inpage-provider-core": "^1.1.58",
     "@onekeyfe/hd-core": "1.1.25-alpha.0",
     "@onekeyfe/hd-shared": "1.1.25-alpha.0",
     "@onekeyfe/hd-transport-http": "1.1.25-alpha.0",
