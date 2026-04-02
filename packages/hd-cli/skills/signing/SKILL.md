@@ -284,6 +284,66 @@ onekey-hw sign-typed-data \
 }
 ```
 
+### `onekey-hw sign-typed-data`
+
+Sign EIP-712 typed data (EVM only).
+
+```bash
+onekey-hw sign-typed-data \
+  --data <eip712-json> \
+  [--path <bip44-path>] \
+  [--connect-id <id>]
+```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `--data` | Yes | EIP-712 typed data as JSON |
+| `--path` | No | BIP44 derivation path (default: m/44'/60'/0'/0/0) |
+| `--metamask-v4-compat` | No | MetaMask V4 compatibility mode (default: true) |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "payload": {
+    "signature": "0xabc...",
+    "address": "0x1234..."
+  }
+}
+```
+
+### `onekey-hw sign-psbt`
+
+Sign a Bitcoin PSBT (Partially Signed Bitcoin Transaction).
+Only supported on Pro (>= 4.9.3) and Classic1s (>= 3.10.1).
+
+```bash
+onekey-hw sign-psbt \
+  --psbt <hex-encoded-psbt> \
+  [--coin <coin>] \
+  [--connect-id <id>]
+```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `--psbt` | Yes | Hex-encoded PSBT data |
+| `--coin` | No | Bitcoin network: btc, ltc, etc. (default: btc) |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "payload": {
+    "psbt": "hex-encoded-signed-psbt"
+  }
+}
+```
+
+**Agent notes:**
+- Simpler than `sign-transaction --chain btc` (no need to construct inputs/outputs/refTxs).
+- Classic1s has a limit of 5 UTXOs per PSBT.
+- Preferred method when the application provides PSBT format.
+
 ### `onekey-hw verify-message`
 
 Verify a signed message on-device (BTC, EVM, Starcoin).
@@ -291,18 +351,26 @@ Verify a signed message on-device (BTC, EVM, Starcoin).
 ```bash
 onekey-hw verify-message \
   --chain <chain> \
+  --address <address> \
   --message <message> \
   --signature <signature> \
-  --address <address> \
   [--connect-id <id>]
 ```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `--chain` | Yes | btc, evm, or starcoin |
+| `--address` | Yes | Signer address (or publicKey for starcoin) |
+| `--message` | Yes | Original message |
+| `--signature` | Yes | Signature to verify |
 
 **Returns:**
 ```json
 {
   "success": true,
-  "verified": true,
-  "message": "Verified on device"
+  "payload": {
+    "message": "Message verified"
+  }
 }
 ```
 

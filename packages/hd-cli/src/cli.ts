@@ -169,6 +169,114 @@ program
   });
 
 program
+  .command('sign-typed-data')
+  .description('Sign EIP-712 typed data (EVM only, requires device confirmation)')
+  .requiredOption('--data <json>', 'EIP-712 typed data JSON')
+  .option('--path <path>', 'BIP44 derivation path')
+  .option('--metamask-v4-compat', 'Use MetaMask V4 compatibility mode', true)
+  .action(async (opts) => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const data = JSON.parse(opts.data);
+      const params = getCommonParams(globalOpts);
+      const path = opts.path || "m/44'/60'/0'/0/0";
+      const result = await sdk.evmSignTypedData(
+        params.connectId || '',
+        params.deviceId || '',
+        {
+          path,
+          metamaskV4Compat: opts.metamaskV4Compat,
+          data,
+          ...params,
+        } as any
+      );
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('sign-psbt')
+  .description('Sign a Bitcoin PSBT (Pro/Classic1s only, requires device confirmation)')
+  .requiredOption('--psbt <hex>', 'Hex-encoded PSBT data')
+  .option('--coin <coin>', 'Bitcoin network: btc, ltc, etc.', 'btc')
+  .action(async (opts) => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.btcSignPsbt(
+        params.connectId || '',
+        params.deviceId || '',
+        {
+          psbt: opts.psbt,
+          coin: opts.coin,
+          ...params,
+        } as any
+      );
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('verify-message')
+  .description('Verify a signed message on-device (BTC, EVM, Starcoin)')
+  .requiredOption('--chain <chain>', 'Target blockchain (btc, evm, starcoin)')
+  .requiredOption('--address <addr>', 'Signer address')
+  .requiredOption('--message <msg>', 'Original message')
+  .requiredOption('--signature <sig>', 'Signature to verify')
+  .action(async (opts) => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const params = getCommonParams(globalOpts);
+      const cid = params.connectId || '';
+      const did = params.deviceId || '';
+      let result: unknown;
+      switch (opts.chain.toLowerCase()) {
+        case 'evm':
+        case 'eth':
+        case 'ethereum':
+          result = await sdk.evmVerifyMessage(cid, did, {
+            address: opts.address,
+            messageHex: opts.message,
+            signature: opts.signature,
+          });
+          break;
+        case 'btc':
+        case 'bitcoin':
+          result = await sdk.btcVerifyMessage(cid, did, {
+            address: opts.address,
+            message: opts.message,
+            signature: opts.signature,
+            coin: 'btc',
+          });
+          break;
+        case 'starcoin':
+        case 'stc':
+          result = await sdk.starcoinVerifyMessage(cid, did, {
+            publicKey: opts.address,
+            message: opts.message,
+            signature: opts.signature,
+          });
+          break;
+        default:
+          throw new Error(`verifyMessage not supported for chain: ${opts.chain}. Supported: evm, btc, starcoin`);
+      }
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
   .command('batch-get-address')
   .description('Get addresses for multiple chains/paths in a single session')
   .requiredOption('--bundle <json>', 'JSON array of {chain, path, showOnDevice}')
@@ -303,12 +411,32 @@ program
 program
   .command('change-pin')
   .description('Change or set the device PIN code')
+  .option('--remove', 'Remove PIN protection instead of changing')
+  .action(async (opts) => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const result = await sdk.deviceChangePin(globalOpts.connectId, {
+        remove: opts.remove ?? false,
+      } as any);
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('passphrase-state')
+  .description('Get current passphrase state (for hidden wallet session management)')
   .action(async () => {
     const globalOpts = program.opts();
     const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.deviceChangePin(globalOpts.connectId);
+      const result = await sdk.getPassphraseState(globalOpts.connectId, {
+        useEmptyPassphrase: globalOpts.useEmptyPassphrase,
+      } as any);
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -415,15 +543,31 @@ program
   .command('device-settings')
   .description('Update device label and settings')
   .option('--label <name>', 'Device display name')
-  .option('--auto-lock-delay <seconds>', 'Auto-lock timeout in seconds')
+  .option('--auto-lock-delay <seconds>', 'Auto-lock timeout in seconds (0 = disabled)')
+  .option('--language <lang>', 'Device language')
+  .option('--passphrase-always-on-device <bool>', 'Always enter passphrase on device')
+  .option('--haptic-feedback <bool>', 'Enable/disable haptic feedback')
+  .option('--auto-shutdown-delay <seconds>', 'Auto shutdown timeout in seconds')
   .action(async (opts) => {
     const globalOpts = program.opts();
     const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
+      // Map CLI options to SDK param names (camelCase → snake_case handled by SDK)
+      // Reference: packages/core/src/api/device/DeviceSettings.ts
       const settings: Record<string, unknown> = {};
-      if (opts.label) settings.label = opts.label;
-      if (opts.autoLockDelay) settings.autoLockDelayMs = parseInt(opts.autoLockDelay, 10) * 1000;
+      if (opts.label !== undefined) settings.label = opts.label;
+      if (opts.autoLockDelay !== undefined) settings.autoLockDelayMs = parseInt(opts.autoLockDelay, 10) * 1000;
+      if (opts.language !== undefined) settings.language = opts.language;
+      if (opts.passphraseAlwaysOnDevice !== undefined) settings.passphraseAlwaysOnDevice = opts.passphraseAlwaysOnDevice === 'true';
+      if (opts.hapticFeedback !== undefined) settings.hapticFeedback = opts.hapticFeedback === 'true';
+      if (opts.autoShutdownDelay !== undefined) settings.autoShutdownDelayMs = parseInt(opts.autoShutdownDelay, 10) * 1000;
+
+      if (Object.keys(settings).length === 0) {
+        outputResult(globalOpts, { success: false, error: 'No settings provided. Use --label, --auto-lock-delay, --language, etc.' });
+        return;
+      }
+
       const result = await sdk.deviceSettings(globalOpts.connectId, settings);
       outputResult(globalOpts, result);
     } finally {

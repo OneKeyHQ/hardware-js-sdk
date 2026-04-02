@@ -51,11 +51,15 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 
 ### `onekey-hw change-pin`
 
-Change or set the device PIN code.
+Change, set, or remove the device PIN code.
 
 ```bash
-onekey-hw change-pin [--connect-id <id>]
+onekey-hw change-pin [--remove] [--connect-id <id>]
 ```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `--remove` | No | Remove PIN protection instead of changing |
 
 **Returns:**
 ```json
@@ -69,7 +73,30 @@ onekey-hw change-pin [--connect-id <id>]
 - PIN entry happens entirely on the device screen — the CLI does not see the PIN.
 - If no PIN was set, this creates a new PIN.
 - If PIN was already set, device will ask for current PIN first, then new PIN twice.
+- Use `--remove` to disable PIN protection (NOT recommended).
 - Instruct user: "Follow the prompts on your device screen to set your new PIN."
+
+### `onekey-hw passphrase-state`
+
+Get current passphrase state for hidden wallet session management.
+
+```bash
+onekey-hw passphrase-state [--use-empty-passphrase] [--connect-id <id>]
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "payload": "passphrase_state_hash"
+}
+```
+
+**Agent notes:**
+- Returns a hash identifying the current passphrase wallet session.
+- Use `--use-empty-passphrase` to get state for the standard (non-hidden) wallet.
+- Pass the returned state as `--passphrase-state` to subsequent commands to avoid
+  re-prompting the passphrase on every operation.
 
 ### `onekey-hw toggle-passphrase`
 
@@ -216,12 +243,16 @@ onekey-hw device-wipe [--connect-id <id>]
 
 ### `onekey-hw device-settings`
 
-Update device label and other non-critical settings.
+Update device label and other settings.
 
 ```bash
 onekey-hw device-settings \
   [--label <name>] \
   [--auto-lock-delay <seconds>] \
+  [--language <lang>] \
+  [--passphrase-always-on-device <bool>] \
+  [--haptic-feedback <bool>] \
+  [--auto-shutdown-delay <seconds>] \
   [--connect-id <id>]
 ```
 
@@ -229,15 +260,17 @@ onekey-hw device-settings \
 |---|---|---|
 | `--label` | No | Device display name |
 | `--auto-lock-delay` | No | Auto-lock timeout in seconds (0 = disabled) |
-| `--connect-id` | No | Device connection ID |
+| `--language` | No | Device UI language |
+| `--passphrase-always-on-device` | No | Always enter passphrase on device screen |
+| `--haptic-feedback` | No | Enable/disable haptic feedback (true/false) |
+| `--auto-shutdown-delay` | No | Auto power-off timeout in seconds |
 
 **Returns:**
 ```json
 {
   "success": true,
-  "settings": {
-    "label": "My OneKey Pro",
-    "autoLockDelay": 600
+  "payload": {
+    "message": "Settings applied"
   }
 }
 ```

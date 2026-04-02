@@ -184,7 +184,55 @@
       "id": "sign-btc-psbt",
       "prompt": "Sign this Bitcoin PSBT transaction",
       "expected_commands": [
+        "onekey-hw sign-psbt"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "sign-btc-inputs-outputs",
+      "prompt": "Sign a Bitcoin transaction with these inputs and outputs",
+      "expected_commands": [
         "onekey-hw sign-transaction --chain btc"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "sign-eip712",
+      "prompt": "Sign this EIP-712 typed data with my hardware wallet",
+      "expected_commands": [
+        "onekey-hw sign-typed-data"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "verify-eth-message",
+      "prompt": "Verify this Ethereum signed message on my device",
+      "expected_commands": [
+        "onekey-hw verify-message --chain evm"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "remove-pin",
+      "prompt": "Remove PIN from my device",
+      "expected_commands": [
+        "onekey-hw change-pin --remove"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "passphrase-session",
+      "prompt": "Get my hidden wallet passphrase state",
+      "expected_commands": [
+        "onekey-hw passphrase-state"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "haptic-feedback",
+      "prompt": "Disable haptic feedback on my device",
+      "expected_commands": [
+        "onekey-hw device-settings --haptic-feedback false"
       ],
       "match_mode": "contains"
     },
