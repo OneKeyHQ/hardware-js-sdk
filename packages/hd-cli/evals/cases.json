@@ -1,0 +1,235 @@
+{
+  "version": "1.0.0",
+  "description": "Evaluation cases for OneKey hardware wallet CLI agent skills",
+  "cases": [
+    {
+      "id": "device-search-basic",
+      "prompt": "Find my OneKey hardware wallet",
+      "expected_commands": ["onekey-hw search"],
+      "match_mode": "exact"
+    },
+    {
+      "id": "device-search-cn",
+      "prompt": "搜索我的 OneKey 硬件钱包",
+      "expected_commands": ["onekey-hw search"],
+      "match_mode": "exact"
+    },
+    {
+      "id": "device-status",
+      "prompt": "What's the status of my hardware wallet?",
+      "expected_commands": ["onekey-hw status"],
+      "match_mode": "exact"
+    },
+    {
+      "id": "bridge-check",
+      "prompt": "Is OneKey Bridge running?",
+      "expected_commands": ["onekey-hw bridge-status"],
+      "match_mode": "exact"
+    },
+    {
+      "id": "get-eth-address",
+      "prompt": "Get my Ethereum address from hardware wallet",
+      "expected_commands": [
+        "onekey-hw status",
+        "onekey-hw get-address --chain evm --show-on-device true"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "get-btc-address",
+      "prompt": "Show me my Bitcoin receive address",
+      "expected_commands": [
+        "onekey-hw status",
+        "onekey-hw get-address --chain btc --show-on-device true"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "get-sol-address",
+      "prompt": "I need my Solana address",
+      "expected_commands": [
+        "onekey-hw get-address --chain sol"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "get-multi-address",
+      "prompt": "Set up addresses for ETH, BTC, and SOL",
+      "expected_commands": [
+        "onekey-hw batch-get-address"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "sign-evm-tx",
+      "prompt": "Sign this Ethereum transaction: send 0.1 ETH to 0xAbCdEf1234567890AbCdEf1234567890AbCdEf12",
+      "expected_commands": [
+        "onekey-hw status",
+        "onekey-hw sign-transaction --chain evm"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "sign-message",
+      "prompt": "Sign this message with my ETH wallet: 'Hello World'",
+      "expected_commands": [
+        "onekey-hw sign-message --chain evm --message"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "firmware-check",
+      "prompt": "Is my firmware up to date?",
+      "expected_commands": [
+        "onekey-hw firmware-check-all"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "firmware-check-cn",
+      "prompt": "检查固件是否有更新",
+      "expected_commands": [
+        "onekey-hw firmware-check"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "firmware-update",
+      "prompt": "Update my device firmware to the latest version",
+      "expected_commands": [
+        "onekey-hw firmware-check",
+        "onekey-hw firmware-update"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "change-pin",
+      "prompt": "I want to change my device PIN",
+      "expected_commands": [
+        "onekey-hw status",
+        "onekey-hw change-pin"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "enable-passphrase",
+      "prompt": "Enable passphrase protection on my device",
+      "expected_commands": [
+        "onekey-hw toggle-passphrase --enable true"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "device-backup",
+      "prompt": "Back up my recovery phrase",
+      "expected_commands": [
+        "onekey-hw device-backup"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "factory-reset",
+      "prompt": "Factory reset my OneKey device",
+      "expected_commands": [
+        "onekey-hw device-wipe"
+      ],
+      "match_mode": "contains",
+      "expect_confirmation": true
+    },
+    {
+      "id": "setup-new-device",
+      "prompt": "Set up my new OneKey hardware wallet from scratch",
+      "expected_commands": [
+        "onekey-hw search",
+        "onekey-hw device-verify",
+        "onekey-hw device-reset",
+        "onekey-hw device-backup"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "setup-new-device-cn",
+      "prompt": "帮我初始化新的 OneKey 硬件钱包",
+      "expected_commands": [
+        "onekey-hw search",
+        "onekey-hw device-reset"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "recover-wallet",
+      "prompt": "Recover my wallet from seed phrase on the hardware device",
+      "expected_commands": [
+        "onekey-hw device-recovery"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "verify-genuine",
+      "prompt": "How do I know if my OneKey device is genuine?",
+      "expected_commands": [
+        "onekey-hw device-verify"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "get-cosmos-address",
+      "prompt": "获取我的 Cosmos 地址",
+      "expected_commands": [
+        "onekey-hw get-address --chain cosmos"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "sign-btc-psbt",
+      "prompt": "Sign this Bitcoin PSBT transaction",
+      "expected_commands": [
+        "onekey-hw sign-transaction --chain btc"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "bootloader-stuck",
+      "prompt": "My device is stuck in bootloader mode, help me fix it",
+      "expected_commands": [
+        "onekey-hw status",
+        "onekey-hw firmware-check",
+        "onekey-hw firmware-update"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "connection-troubleshoot",
+      "prompt": "My hardware wallet won't connect",
+      "expected_commands": [
+        "onekey-hw bridge-status",
+        "onekey-hw search"
+      ],
+      "match_mode": "ordered"
+    },
+    {
+      "id": "nostr-pubkey",
+      "prompt": "Get my Nostr public key from hardware wallet",
+      "expected_commands": [
+        "onekey-hw get-public-key --chain nostr"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "lock-device",
+      "prompt": "Lock my device",
+      "expected_commands": [
+        "onekey-hw lock"
+      ],
+      "match_mode": "exact"
+    },
+    {
+      "id": "device-label",
+      "prompt": "Rename my device to 'My OneKey Pro'",
+      "expected_commands": [
+        "onekey-hw device-settings --label"
+      ],
+      "match_mode": "contains"
+    }
+  ]
+}

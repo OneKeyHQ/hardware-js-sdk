@@ -1,0 +1,21 @@
+{
+  "name": "onekey-hardware-plugins",
+  "owner": {
+    "name": "OneKey",
+    "email": "dev@onekey.so"
+  },
+  "metadata": {
+    "description": "Official OneKey hardware wallet plugins for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "onekey-hardware",
+      "source": {
+        "source": "git-subdir",
+        "url": "OneKeyHQ/hardware-js-sdk",
+        "path": "packages/hd-cli"
+      },
+      "description": "OneKey hardware wallet skills — device management, secure signing, firmware updates, security settings"
+    }
+  ]
+}
