@@ -15,7 +15,10 @@ program
 
 program.option('--json', 'Output in JSON format (for agent consumption)');
 program.option('--transport <type>', 'Transport type: http | webusb | ble', 'http');
-program.option('--connect-id <id>', 'Device connection ID');
+program.option('--connect-id <id>', 'Device connection ID (USB: serial, iOS: uuid, Android: MAC)');
+program.option('--device-id <id>', 'Persistent device ID from getFeatures (changes when seed changes)');
+program.option('--passphrase-state <state>', 'Passphrase state for hidden wallet access');
+program.option('--use-empty-passphrase', 'Use standard wallet (skip passphrase prompt)');
 
 // ============================================================
 // Device Commands
@@ -86,7 +89,7 @@ program
         chain: opts.chain,
         path: opts.path,
         showOnDevice: opts.showOnDevice === 'true',
-        connectId: globalOpts.connectId,
+        ...getCommonParams(globalOpts),
       });
       outputResult(globalOpts, result);
     } finally {
@@ -108,7 +111,7 @@ program
       const result = await resolveGetPublicKey(sdk, {
         chain: opts.chain,
         path: opts.path,
-        connectId: globalOpts.connectId,
+        ...getCommonParams(globalOpts),
       });
       outputResult(globalOpts, result);
     } finally {
@@ -133,7 +136,7 @@ program
         chain: opts.chain,
         path: opts.path,
         transaction: tx,
-        connectId: globalOpts.connectId,
+        ...getCommonParams(globalOpts),
       });
       outputResult(globalOpts, result);
     } finally {
@@ -157,7 +160,7 @@ program
         chain: opts.chain,
         path: opts.path,
         message: opts.message,
-        connectId: globalOpts.connectId,
+        ...getCommonParams(globalOpts),
       });
       outputResult(globalOpts, result);
     } finally {
@@ -178,7 +181,7 @@ program
       const bundle = JSON.parse(opts.bundle);
       const result = await resolveBatchGetAddress(sdk, {
         bundle,
-        connectId: globalOpts.connectId,
+        ...getCommonParams(globalOpts),
       });
       outputResult(globalOpts, result);
     } finally {
@@ -223,13 +226,26 @@ program
 program
   .command('firmware-update')
   .description('Update device firmware')
-  .option('--version <ver>', 'Target firmware version')
+  .option('--version <ver>', 'Target firmware version (e.g., "4.8.0")')
+  .option('--platform <platform>', 'Platform: native | desktop | ext | web', 'desktop')
   .action(async (opts) => {
     const globalOpts = program.opts();
     const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.firmwareUpdateV2(globalOpts.connectId, opts.version);
+      // firmwareUpdateV2 requires: connectId, deviceId, { updateType, platform, version? }
+      const params: Record<string, unknown> = {
+        updateType: 'firmware',
+        platform: opts.platform,
+      };
+      if (opts.version) {
+        params.version = opts.version.split('.').map(Number);
+      }
+      const result = await sdk.firmwareUpdateV2(
+        globalOpts.connectId,
+        globalOpts.deviceId,
+        params as any
+      );
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -240,12 +256,25 @@ program
   .command('firmware-update-ble')
   .description('Update BLE (Bluetooth) firmware')
   .option('--version <ver>', 'Target BLE firmware version')
-  .action(async () => {
+  .option('--platform <platform>', 'Platform: native | desktop | ext | web', 'desktop')
+  .action(async (opts) => {
     const globalOpts = program.opts();
     const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.checkBLEFirmwareRelease(globalOpts.connectId);
+      // BLE firmware update also uses firmwareUpdateV2 with updateType: 'ble'
+      const params: Record<string, unknown> = {
+        updateType: 'ble',
+        platform: opts.platform,
+      };
+      if (opts.version) {
+        params.version = opts.version.split('.').map(Number);
+      }
+      const result = await sdk.firmwareUpdateV2(
+        globalOpts.connectId,
+        globalOpts.deviceId,
+        params as any
+      );
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -435,6 +464,19 @@ program
 // ============================================================
 // Helpers
 // ============================================================
+
+/**
+ * Extract common device params from global CLI options.
+ * These are passed to every SDK method call.
+ */
+function getCommonParams(globalOpts: Record<string, any>) {
+  return {
+    connectId: globalOpts.connectId,
+    deviceId: globalOpts.deviceId,
+    passphraseState: globalOpts.passphraseState,
+    useEmptyPassphrase: globalOpts.useEmptyPassphrase,
+  };
+}
 
 function outputResult(globalOpts: { json?: boolean }, result: unknown): void {
   if (globalOpts.json || !process.stdout.isTTY) {

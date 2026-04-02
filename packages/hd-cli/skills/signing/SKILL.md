@@ -417,9 +417,21 @@ Step 3 — Present results
 - User wants to broadcast a signed transaction → this skill only SIGNS,
   broadcasting is handled by the application layer.
 
+## Air-Gap (QR Code) Signing
+
+For air-gapped (offline) devices, the SDK supports UR (Uniform Resource) encoded
+QR code signing via `@ngraveio/bc-ur` and `@keystonehq/keystone-sdk`:
+
+- **Supported chains**: EVM, BTC, SOL
+- **Flow**: Generate request QR → Device scans → Signs offline → Generates response QR → Scan response
+- **CLI**: Air-gap signing is NOT available via CLI commands (requires camera/QR UI).
+  Use the SDK's AirGap API directly for QR-based workflows.
+- **Reference**: `packages/connect-examples/react-native-demo/air-gap/sdk/`
+
 ## Cross-References
 
 - Device connection required → `hardware-device` skill handles connection.
 - Firmware check recommended → `hardware-firmware` skill can verify compatibility.
 - Transaction building → use `onekey` plugin (app-monorepo) to build transactions,
   then use this skill to sign them with hardware security.
+- Air-gap signing → requires native app with QR code UI, not available via CLI.

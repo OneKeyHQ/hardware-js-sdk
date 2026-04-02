@@ -76,11 +76,26 @@ function getDefaultPath(chain: string): string {
   return path;
 }
 
-export interface GetAddressParams {
+/**
+ * Common params passed to all SDK methods.
+ * Reference: packages/core/src/types/api/export.ts (CommonParams)
+ *
+ * - connectId: USB serial / iOS uuid / Android MAC
+ * - deviceId: persistent device ID (changes when seed changes)
+ * - passphraseState: for hidden wallet access
+ * - useEmptyPassphrase: skip passphrase (standard wallet)
+ */
+export interface CommonCLIParams {
+  connectId?: string;
+  deviceId?: string;
+  passphraseState?: string;
+  useEmptyPassphrase?: boolean;
+}
+
+export interface GetAddressParams extends CommonCLIParams {
   chain: string;
   path?: string;
   showOnDevice?: boolean;
-  connectId?: string;
 }
 
 export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) {
@@ -88,34 +103,40 @@ export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) 
   const path = params.path || getDefaultPath(chain);
   const showOnOneKey = params.showOnDevice ?? true;
   const connectId = params.connectId || '';
+  const deviceId = params.deviceId || '';
+  // Common params for passphrase handling
+  const commonParams = {
+    ...(params.passphraseState ? { passphraseState: params.passphraseState } : {}),
+    ...(params.useEmptyPassphrase ? { useEmptyPassphrase: true } : {}),
+  };
 
   const chainMethodMap: Record<string, () => Promise<unknown>> = {
-    evm: () => sdk.evmGetAddress(connectId, '', { path, showOnOneKey }),
-    btc: () => sdk.btcGetAddress(connectId, '', { path, showOnOneKey, coin: 'btc' }),
-    sol: () => sdk.solGetAddress(connectId, '', { path, showOnOneKey }),
-    tron: () => sdk.tronGetAddress(connectId, '', { path, showOnOneKey }),
-    cosmos: () => sdk.cosmosGetAddress(connectId, '', { path, showOnOneKey }),
-    cardano: () => sdk.cardanoGetAddress(connectId, '', { addressParameters: { path, addressType: 0 }, showOnOneKey }),
-    polkadot: () => sdk.polkadotGetAddress(connectId, '', { path, prefix: 0, showOnOneKey }),
-    aptos: () => sdk.aptosGetAddress(connectId, '', { path, showOnOneKey }),
-    sui: () => sdk.suiGetAddress(connectId, '', { path, showOnOneKey }),
-    near: () => sdk.nearGetAddress(connectId, '', { path, showOnOneKey }),
-    xrp: () => sdk.xrpGetAddress(connectId, '', { path, showOnOneKey }),
-    stellar: () => sdk.stellarGetAddress(connectId, '', { path, showOnOneKey }),
-    ton: () => sdk.tonGetAddress(connectId, '', { path, showOnOneKey }),
-    filecoin: () => sdk.filecoinGetAddress(connectId, '', { path, showOnOneKey }),
-    kaspa: () => sdk.kaspaGetAddress(connectId, '', { path, showOnOneKey, prefix: 'kaspa' }),
-    algo: () => sdk.algoGetAddress(connectId, '', { path, showOnOneKey }),
-    conflux: () => sdk.confluxGetAddress(connectId, '', { path, showOnOneKey }),
-    nervos: () => sdk.nervosGetAddress(connectId, '', { path, showOnOneKey, network: 'ckb' }),
-    alephium: () => sdk.alephiumGetAddress(connectId, '', { path, showOnOneKey, group: 0 }),
-    neo: () => sdk.neoGetAddress(connectId, '', { path, showOnOneKey }),
-    starcoin: () => sdk.starcoinGetAddress(connectId, '', { path, showOnOneKey }),
-    nem: () => sdk.nemGetAddress(connectId, '', { path, showOnOneKey, network: 104 }),
-    dnx: () => sdk.dnxGetAddress(connectId, '', { path, showOnOneKey }),
-    scdo: () => sdk.scdoGetAddress(connectId, '', { path, showOnOneKey }),
-    benfen: () => sdk.benfenGetAddress(connectId, '', { path, showOnOneKey }),
-    nexa: () => sdk.nexaGetAddress(connectId, '', { path, showOnOneKey, prefix: 'nexa' }),
+    evm: () => sdk.evmGetAddress(connectId, deviceId, { path, showOnOneKey, ...commonParams }),
+    btc: () => sdk.btcGetAddress(connectId, deviceId, { path, showOnOneKey, coin: 'btc' }),
+    sol: () => sdk.solGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    tron: () => sdk.tronGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    cosmos: () => sdk.cosmosGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    cardano: () => sdk.cardanoGetAddress(connectId, deviceId, { addressParameters: { path, addressType: 0 }, showOnOneKey }),
+    polkadot: () => sdk.polkadotGetAddress(connectId, deviceId, { path, prefix: 0, showOnOneKey }),
+    aptos: () => sdk.aptosGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    sui: () => sdk.suiGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    near: () => sdk.nearGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    xrp: () => sdk.xrpGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    stellar: () => sdk.stellarGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    ton: () => sdk.tonGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    filecoin: () => sdk.filecoinGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    kaspa: () => sdk.kaspaGetAddress(connectId, deviceId, { path, showOnOneKey, prefix: 'kaspa' }),
+    algo: () => sdk.algoGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    conflux: () => sdk.confluxGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    nervos: () => sdk.nervosGetAddress(connectId, deviceId, { path, showOnOneKey, network: 'ckb' }),
+    alephium: () => sdk.alephiumGetAddress(connectId, deviceId, { path, showOnOneKey, group: 0 }),
+    neo: () => sdk.neoGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    starcoin: () => sdk.starcoinGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    nem: () => sdk.nemGetAddress(connectId, deviceId, { path, showOnOneKey, network: 104 }),
+    dnx: () => sdk.dnxGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    scdo: () => sdk.scdoGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    benfen: () => sdk.benfenGetAddress(connectId, deviceId, { path, showOnOneKey }),
+    nexa: () => sdk.nexaGetAddress(connectId, deviceId, { path, showOnOneKey, prefix: 'nexa' }),
   };
 
   const method = chainMethodMap[chain];
@@ -127,26 +148,26 @@ export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) 
   return { ...result as object, chain, path };
 }
 
-export interface GetPublicKeyParams {
+export interface GetPublicKeyParams extends CommonCLIParams {
   chain: string;
   path?: string;
-  connectId?: string;
 }
 
 export async function resolveGetPublicKey(sdk: CoreApi, params: GetPublicKeyParams) {
   const chain = resolveChain(params.chain);
   const path = params.path || getDefaultPath(chain);
   const connectId = params.connectId || '';
+  const deviceId = params.deviceId || '';
 
   const chainMethodMap: Record<string, () => Promise<unknown>> = {
-    evm: () => sdk.evmGetPublicKey(connectId, '', { path }),
-    btc: () => sdk.btcGetPublicKey(connectId, '', { path, coin: 'btc' }),
-    aptos: () => sdk.aptosGetPublicKey(connectId, '', { path }),
-    cosmos: () => sdk.cosmosGetPublicKey(connectId, '', { path }),
-    sui: () => sdk.suiGetPublicKey(connectId, '', { path }),
-    starcoin: () => sdk.starcoinGetPublicKey(connectId, '', { path }),
-    nostr: () => sdk.nostrGetPublicKey(connectId, '', { path }),
-    benfen: () => sdk.benfenGetPublicKey(connectId, '', { path }),
+    evm: () => sdk.evmGetPublicKey(connectId, deviceId, { path }),
+    btc: () => sdk.btcGetPublicKey(connectId, deviceId, { path, coin: 'btc' }),
+    aptos: () => sdk.aptosGetPublicKey(connectId, deviceId, { path }),
+    cosmos: () => sdk.cosmosGetPublicKey(connectId, deviceId, { path }),
+    sui: () => sdk.suiGetPublicKey(connectId, deviceId, { path }),
+    starcoin: () => sdk.starcoinGetPublicKey(connectId, deviceId, { path }),
+    nostr: () => sdk.nostrGetPublicKey(connectId, deviceId, { path }),
+    benfen: () => sdk.benfenGetPublicKey(connectId, deviceId, { path }),
   };
 
   const method = chainMethodMap[chain];
@@ -158,45 +179,45 @@ export async function resolveGetPublicKey(sdk: CoreApi, params: GetPublicKeyPara
   return { ...result as object, chain, path };
 }
 
-export interface SignTransactionParams {
+export interface SignTransactionParams extends CommonCLIParams {
   chain: string;
   path?: string;
   transaction: Record<string, unknown>;
-  connectId?: string;
 }
 
 export async function resolveSignTransaction(sdk: CoreApi, params: SignTransactionParams) {
   const chain = resolveChain(params.chain);
   const path = params.path || getDefaultPath(chain);
   const connectId = params.connectId || '';
+  const deviceId = params.deviceId || '';
   const tx = params.transaction;
 
   const chainMethodMap: Record<string, () => Promise<unknown>> = {
     // EVM: accepts transaction object with to/value/data/chainId/nonce/gasLimit/gasPrice or maxFeePerGas/maxPriorityFeePerGas
     // Also supports top-level chainId param per docs
-    evm: () => sdk.evmSignTransaction(connectId, '', { path, transaction: tx as any, chainId: tx.chainId as number }),
+    evm: () => sdk.evmSignTransaction(connectId, deviceId, { path, transaction: tx as any, chainId: tx.chainId as number }),
     // BTC: requires inputs/outputs/refTxs/coin format, NOT raw hex. See btcSignPsbt for PSBT.
-    btc: () => sdk.btcSignTransaction(connectId, '', { coin: 'btc', ...tx as any }),
-    sol: () => sdk.solSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    tron: () => sdk.tronSignTransaction(connectId, '', { path, transaction: tx as any }),
-    cosmos: () => sdk.cosmosSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    aptos: () => sdk.aptosSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    sui: () => sdk.suiSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    near: () => sdk.nearSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    xrp: () => sdk.xrpSignTransaction(connectId, '', { path, transaction: tx as any }),
-    stellar: () => sdk.stellarSignTransaction(connectId, '', { path, networkPassphrase: tx.networkPassphrase as string, transaction: tx.transaction as any }),
-    polkadot: () => sdk.polkadotSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string, network: tx.network as string }),
-    filecoin: () => sdk.filecoinSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    kaspa: () => sdk.kaspaSignTransaction(connectId, '', { ...tx as any }),
-    algo: () => sdk.algoSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    conflux: () => sdk.confluxSignTransaction(connectId, '', { path, transaction: tx as any }),
-    nervos: () => sdk.nervosSignTransaction(connectId, '', { ...tx as any }),
-    alephium: () => sdk.alephiumSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    neo: () => sdk.neoSignTransaction(connectId, '', { path, ...tx as any }),
-    dnx: () => sdk.dnxSignTransaction(connectId, '', { path, ...tx as any }),
-    scdo: () => sdk.scdoSignTransaction(connectId, '', { path, transaction: tx as any }),
-    benfen: () => sdk.benfenSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
-    nexa: () => sdk.nexaSignTransaction(connectId, '', { ...tx as any }),
+    btc: () => sdk.btcSignTransaction(connectId, deviceId, { coin: 'btc', ...tx as any }),
+    sol: () => sdk.solSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    tron: () => sdk.tronSignTransaction(connectId, deviceId, { path, transaction: tx as any }),
+    cosmos: () => sdk.cosmosSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    aptos: () => sdk.aptosSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    sui: () => sdk.suiSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    near: () => sdk.nearSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    xrp: () => sdk.xrpSignTransaction(connectId, deviceId, { path, transaction: tx as any }),
+    stellar: () => sdk.stellarSignTransaction(connectId, deviceId, { path, networkPassphrase: tx.networkPassphrase as string, transaction: tx.transaction as any }),
+    polkadot: () => sdk.polkadotSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string, network: tx.network as string }),
+    filecoin: () => sdk.filecoinSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    kaspa: () => sdk.kaspaSignTransaction(connectId, deviceId, { ...tx as any }),
+    algo: () => sdk.algoSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    conflux: () => sdk.confluxSignTransaction(connectId, deviceId, { path, transaction: tx as any }),
+    nervos: () => sdk.nervosSignTransaction(connectId, deviceId, { ...tx as any }),
+    alephium: () => sdk.alephiumSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    neo: () => sdk.neoSignTransaction(connectId, deviceId, { path, ...tx as any }),
+    dnx: () => sdk.dnxSignTransaction(connectId, deviceId, { path, ...tx as any }),
+    scdo: () => sdk.scdoSignTransaction(connectId, deviceId, { path, transaction: tx as any }),
+    benfen: () => sdk.benfenSignTransaction(connectId, deviceId, { path, rawTx: tx.rawTx as string }),
+    nexa: () => sdk.nexaSignTransaction(connectId, deviceId, { ...tx as any }),
   };
 
   const method = chainMethodMap[chain];
@@ -208,38 +229,38 @@ export async function resolveSignTransaction(sdk: CoreApi, params: SignTransacti
   return { ...result as object, chain, path };
 }
 
-export interface SignMessageParams {
+export interface SignMessageParams extends CommonCLIParams {
   chain: string;
   path?: string;
   message: string;
-  connectId?: string;
 }
 
 export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams) {
   const chain = resolveChain(params.chain);
   const path = params.path || getDefaultPath(chain);
   const connectId = params.connectId || '';
+  const deviceId = params.deviceId || '';
 
   const chainMethodMap: Record<string, () => Promise<unknown>> = {
-    evm: () => sdk.evmSignMessage(connectId, '', { path, messageHex: params.message }),
-    btc: () => sdk.btcSignMessage(connectId, '', { path, message: params.message, coin: 'btc' }),
-    sol: () => sdk.solSignMessage(connectId, '', { path, messageHex: params.message }),
-    tron: () => sdk.tronSignMessage(connectId, '', { path, message: params.message }),
-    aptos: () => sdk.aptosSignMessage(connectId, '', { path, payload: { message: params.message } as any }),
-    sui: () => sdk.suiSignMessage(connectId, '', { path, messageHex: params.message }),
-    conflux: () => sdk.confluxSignMessage(connectId, '', { path, message: params.message }),
-    starcoin: () => sdk.starcoinSignMessage(connectId, '', { path, message: params.message }),
+    evm: () => sdk.evmSignMessage(connectId, deviceId, { path, messageHex: params.message }),
+    btc: () => sdk.btcSignMessage(connectId, deviceId, { path, message: params.message, coin: 'btc' }),
+    sol: () => sdk.solSignMessage(connectId, deviceId, { path, messageHex: params.message }),
+    tron: () => sdk.tronSignMessage(connectId, deviceId, { path, message: params.message }),
+    aptos: () => sdk.aptosSignMessage(connectId, deviceId, { path, payload: { message: params.message } as any }),
+    sui: () => sdk.suiSignMessage(connectId, deviceId, { path, messageHex: params.message }),
+    conflux: () => sdk.confluxSignMessage(connectId, deviceId, { path, message: params.message }),
+    starcoin: () => sdk.starcoinSignMessage(connectId, deviceId, { path, message: params.message }),
     // TON: tonSignMessage is actually a transfer-signing method (requires destination/tonAmount/seqno/expireAt).
     // For arbitrary message signing, pass full params via --message as JSON.
     ton: () => {
       const tonParams = JSON.parse(params.message);
-      return sdk.tonSignMessage(connectId, '', { path, ...tonParams });
+      return sdk.tonSignMessage(connectId, deviceId, { path, ...tonParams });
     },
-    nostr: () => sdk.nostrSignEvent(connectId, '', { path, event: params.message }),
-    scdo: () => sdk.scdoSignMessage(connectId, '', { path, message: params.message }),
-    alephium: () => sdk.alephiumSignMessage(connectId, '', { path, messageHex: params.message }),
-    benfen: () => sdk.benfenSignMessage(connectId, '', { path, messageHex: params.message }),
-    cardano: () => sdk.cardanoSignMessage(connectId, '', { path, payload: params.message, derivationType: 1 }),
+    nostr: () => sdk.nostrSignEvent(connectId, deviceId, { path, event: params.message }),
+    scdo: () => sdk.scdoSignMessage(connectId, deviceId, { path, message: params.message }),
+    alephium: () => sdk.alephiumSignMessage(connectId, deviceId, { path, messageHex: params.message }),
+    benfen: () => sdk.benfenSignMessage(connectId, deviceId, { path, messageHex: params.message }),
+    cardano: () => sdk.cardanoSignMessage(connectId, deviceId, { path, payload: params.message, derivationType: 1 }),
   };
 
   const method = chainMethodMap[chain];
@@ -251,13 +272,12 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
   return { ...result as object, chain, path };
 }
 
-export interface BatchGetAddressParams {
+export interface BatchGetAddressParams extends CommonCLIParams {
   bundle: Array<{
     chain: string;
     path?: string;
     showOnDevice?: boolean;
   }>;
-  connectId?: string;
 }
 
 export async function resolveBatchGetAddress(sdk: CoreApi, params: BatchGetAddressParams) {
