@@ -1,0 +1,182 @@
+---
+title: AI Agent 集成
+---
+
+# AI Agent 集成
+
+OneKey Hardware SDK 提供 CLI 工具和 Claude Code 插件技能，使 AI Agent 能够与 OneKey 硬件钱包交互。开发者可以构建利用硬件钱包安全签名能力的 AI 工作流。
+
+## 架构
+
+```
+┌─────────────────────────────────┐
+│  AI Agent (Claude Code 等)       │
+│  读取 SKILL.md → 调用 CLI        │
+├─────────────────────────────────┤
+│  onekey-hw CLI                  │
+│  @onekeyfe/hardware-cli        │
+├─────────────────────────────────┤
+│  Hardware SDK Core              │
+│  @onekeyfe/hd-common-connect-sdk│
+├─────────────────────────────────┤
+│  传输层                          │
+│  HTTP Bridge / WebUSB / BLE     │
+├─────────────────────────────────┤
+│  OneKey 硬件设备                  │
+│  需要物理确认                     │
+└─────────────────────────────────┘
+```
+
+## 安全模型
+
+与软件签名不同，硬件钱包签名为 AI Agent 场景提供了关键的安全保障：
+
+- **物理确认**：每笔签名操作都需要用户在设备上物理按键确认
+- **设备端验证**：交易详情在硬件设备屏幕上显示，供用户核对
+- **密钥隔离**：私钥永远不会离开安全芯片 —— 即使 AI Agent 被攻破，密钥仍然安全
+- **抗注入攻击**：无论 AI Agent 收到什么指令，都无法绕过硬件设备的物理确认
+
+## 快速开始
+
+### 安装
+
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
+
+### Claude Code 插件
+
+CLI 作为 Claude Code 插件提供 4 个专业技能：
+
+| 技能 | 描述 | 命令 |
+|------|------|------|
+| `hardware-device` | 设备搜索、连接、状态 | `search`, `status`, `bridge-status` |
+| `hardware-signing` | 多链地址与签名（27 条链） | `get-address`, `sign-transaction`, `sign-message` |
+| `hardware-firmware` | 固件检查与更新 | `firmware-check`, `firmware-update` |
+| `hardware-security` | PIN、密码短语、备份、恢复 | `change-pin`, `device-backup`, `device-wipe` |
+
+在 Claude Code 中安装插件：
+```bash
+claude plugin install onekey-hardware
+```
+
+### 基本用法
+
+```bash
+# 搜索已连接的设备
+onekey-hw search --json
+
+# 获取以太坊地址（设备端验证）
+onekey-hw get-address --chain evm --json
+
+# 获取比特币地址
+onekey-hw get-address --chain btc --json
+
+# 签名 EVM 交易
+onekey-hw sign-transaction --chain evm \
+  --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
+  --json
+
+# 检查固件更新
+onekey-hw firmware-check-all --json
+```
+
+## 支持的链
+
+CLI 支持 Hardware SDK 中所有 27 条链：
+
+| 类别 | 链 |
+|------|-----|
+| **EVM** | Ethereum、BSC、Polygon、Arbitrum、Base、Optimism、Avalanche 及所有 EVM 兼容链 |
+| **比特币及分叉** | Bitcoin（Legacy/SegWit/Taproot）、Litecoin、Bitcoin Cash 等 |
+| **Layer 1** | Solana、Cardano、Polkadot、Cosmos、Near、Aptos、Sui、TON、Stellar、XRP |
+| **其他** | Tron、Filecoin、Kaspa、Algorand、Conflux、Nervos、Nostr 等 |
+
+各链的完整 API 参数文档，请参考[链方法](/zh/hardware-sdk/chains)文档。
+
+## CLI 参考
+
+### 全局选项
+
+| 选项 | 描述 | 默认值 |
+|------|------|--------|
+| `--json` | 以 JSON 格式输出（供 Agent 消费） | 自动检测 TTY |
+| `--transport <type>` | 传输方式：`http`、`webusb`、`ble` | `http` |
+| `--connect-id <id>` | 设备连接 ID | 自动检测 |
+
+### 输出格式
+
+指定 `--json` 或管道输出（非 TTY）时，所有命令返回结构化 JSON：
+
+```json
+{
+  "success": true,
+  "payload": {
+    "address": "0x1234...",
+    "path": "m/44'/60'/0'/0/0"
+  }
+}
+```
+
+错误响应：
+```json
+{
+  "success": false,
+  "payload": {
+    "error": "Device not found",
+    "code": 801
+  }
+}
+```
+
+## 与 App-Monorepo CLI 的协作
+
+`onekey-hardware` 插件与 app-monorepo 的 [`onekey` 插件](https://github.com/OneKeyHQ/app-monorepo/tree/feat/agent/apps/cli)互为补充：
+
+```
+onekey-plugins marketplace
+├── onekey (app-monorepo)        → 钱包、兑换、行情、安全
+└── onekey-hardware (本 SDK)      → 设备、签名、固件、安全
+```
+
+**示例工作流 —— 硬件安全兑换：**
+1. `onekey balance --chain eth`（app-monorepo：查余额）
+2. `onekey security audit --token <contract>`（app-monorepo：安全检查）
+3. `onekey swap quote ...`（app-monorepo：获取兑换报价）
+4. `onekey-hw sign-transaction --chain evm --tx '...'`（**硬件签名**）
+5. 广播已签名交易
+
+## 评估框架
+
+CLI 包含用于测试 Agent 技能准确性的评估框架：
+
+```bash
+cd packages/hd-cli/evals
+./run-evals.sh                    # 运行所有用例
+./run-evals.sh --model haiku      # 使用指定模型测试
+./run-evals.sh --case device-*    # 运行匹配的用例
+```
+
+评估套件包含 28 个测试用例，覆盖：
+- 设备管理工作流（中英文）
+- 多链地址生成
+- 交易签名流程
+- 固件更新场景
+- 安全管理操作
+
+## API 映射参考
+
+CLI 映射到以下 SDK API。详细参数文档请参考对应的链方法文档：
+
+| CLI 命令 | SDK 方法 | 文档 |
+|----------|---------|------|
+| `get-address --chain evm` | `evmGetAddress` | [evmGetAddress](/zh/hardware-sdk/chains/ethereum-and-evm/evmgetaddress) |
+| `get-address --chain btc` | `btcGetAddress` | [btcGetAddress](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress) |
+| `get-address --chain sol` | `solGetAddress` | [solGetAddress](/zh/hardware-sdk/chains/solana/solgetaddress) |
+| `sign-transaction --chain evm` | `evmSignTransaction` | [evmSignTransaction](/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) |
+| `sign-transaction --chain btc` | `btcSignTransaction` | [btcSignTransaction](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) |
+| `sign-message --chain evm` | `evmSignMessage` | [evmSignMessage](/zh/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) |
+| `firmware-check` | `checkFirmwareRelease` | [checkFirmwareRelease](/zh/hardware-sdk/device-api/checkfirmwarerelease) |
+| `firmware-update` | `firmwareUpdateV2` | [firmwareUpdateV2](/zh/hardware-sdk/device-api/firmwareupdatev2) |
+| `device-verify` | `deviceVerify` | [deviceVerify](/zh/hardware-sdk/device-api/deviceverify) |
+| `change-pin` | `deviceChangePin` | [deviceChangePin](/zh/hardware-sdk/device-api/devicechangepin) |

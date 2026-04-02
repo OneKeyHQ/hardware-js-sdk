@@ -1,0 +1,182 @@
+---
+title: AI Agent Integration
+---
+
+# AI Agent Integration
+
+OneKey Hardware SDK provides CLI tools and Claude Code plugin skills that enable AI agents to interact with OneKey hardware wallets. This allows developers to build AI-powered workflows that leverage the security of hardware wallet signing.
+
+## Architecture
+
+```
+┌─────────────────────────────────┐
+│  AI Agent (Claude Code, etc.)   │
+│  reads SKILL.md → invokes CLI   │
+├─────────────────────────────────┤
+│  onekey-hw CLI                  │
+│  @onekeyfe/hardware-cli        │
+├─────────────────────────────────┤
+│  Hardware SDK Core              │
+│  @onekeyfe/hd-common-connect-sdk│
+├─────────────────────────────────┤
+│  Transport Layer                │
+│  HTTP Bridge / WebUSB / BLE     │
+├─────────────────────────────────┤
+│  OneKey Hardware Device         │
+│  Physical confirmation required │
+└─────────────────────────────────┘
+```
+
+## Security Model
+
+Unlike software-based signing, hardware wallet signing provides a critical security guarantee for AI agent scenarios:
+
+- **Physical confirmation**: Every signing operation requires the user to physically press the confirm button on the device
+- **On-device verification**: Transaction details are displayed on the hardware device screen for user review
+- **Key isolation**: Private keys never leave the secure element — even if the AI agent is compromised, keys remain safe
+- **Prompt injection resistant**: No matter what instructions an AI agent receives, it cannot bypass hardware device confirmation
+
+## Quick Start
+
+### Installation
+
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
+
+### Claude Code Plugin
+
+The CLI is available as a Claude Code plugin with 4 specialized skills:
+
+| Skill | Description | Commands |
+|-------|-------------|----------|
+| `hardware-device` | Device search, connect, status | `search`, `status`, `bridge-status` |
+| `hardware-signing` | Multi-chain address & signing (27 chains) | `get-address`, `sign-transaction`, `sign-message` |
+| `hardware-firmware` | Firmware check & update | `firmware-check`, `firmware-update` |
+| `hardware-security` | PIN, passphrase, backup, recovery | `change-pin`, `device-backup`, `device-wipe` |
+
+To install the plugin in Claude Code:
+```bash
+claude plugin install onekey-hardware
+```
+
+### Basic Usage
+
+```bash
+# Search for connected devices
+onekey-hw search --json
+
+# Get an Ethereum address (verified on device)
+onekey-hw get-address --chain evm --json
+
+# Get a Bitcoin address
+onekey-hw get-address --chain btc --json
+
+# Sign an EVM transaction
+onekey-hw sign-transaction --chain evm \
+  --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
+  --json
+
+# Check firmware updates
+onekey-hw firmware-check-all --json
+```
+
+## Supported Chains
+
+The CLI supports all 27 chains available in the Hardware SDK:
+
+| Category | Chains |
+|----------|--------|
+| **EVM** | Ethereum, BSC, Polygon, Arbitrum, Base, Optimism, Avalanche, and all EVM-compatible chains |
+| **Bitcoin & Forks** | Bitcoin (Legacy/SegWit/Taproot), Litecoin, Bitcoin Cash, and other BTC forks |
+| **Layer 1** | Solana, Cardano, Polkadot, Cosmos, Near, Aptos, Sui, TON, Stellar, XRP |
+| **Others** | Tron, Filecoin, Kaspa, Algorand, Conflux, Nervos, Nostr, and more |
+
+For the complete API reference of each chain's parameters, see the [Chain Methods](/en/hardware-sdk/chains) documentation.
+
+## CLI Reference
+
+### Global Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--json` | Output in JSON format (for agent consumption) | Auto-detect TTY |
+| `--transport <type>` | Transport: `http`, `webusb`, `ble` | `http` |
+| `--connect-id <id>` | Device connection ID | Auto-detect |
+
+### Output Format
+
+When `--json` is specified or output is piped (non-TTY), all commands return structured JSON:
+
+```json
+{
+  "success": true,
+  "payload": {
+    "address": "0x1234...",
+    "path": "m/44'/60'/0'/0/0"
+  }
+}
+```
+
+Error responses:
+```json
+{
+  "success": false,
+  "payload": {
+    "error": "Device not found",
+    "code": 801
+  }
+}
+```
+
+## Integration with App-Monorepo CLI
+
+The `onekey-hardware` plugin is designed to complement the [`onekey` plugin](https://github.com/OneKeyHQ/app-monorepo/tree/feat/agent/apps/cli) from app-monorepo:
+
+```
+onekey-plugins marketplace
+├── onekey (app-monorepo)        → wallet, swap, market, security
+└── onekey-hardware (this SDK)   → device, signing, firmware, security
+```
+
+**Example workflow — Hardware-secured swap:**
+1. `onekey balance --chain eth` (app-monorepo: check balance)
+2. `onekey security audit --token <contract>` (app-monorepo: security check)
+3. `onekey swap quote ...` (app-monorepo: get swap quote)
+4. `onekey-hw sign-transaction --chain evm --tx '...'` (**hardware signing**)
+5. Broadcast signed transaction
+
+## Evaluation Framework
+
+The CLI includes an evaluation framework for testing agent skill accuracy:
+
+```bash
+cd packages/hd-cli/evals
+./run-evals.sh                    # Run all cases
+./run-evals.sh --model haiku      # Test with specific model
+./run-evals.sh --case device-*    # Run matching cases only
+```
+
+The evaluation suite includes 28 test cases covering:
+- Device management workflows (EN/CN)
+- Multi-chain address generation
+- Transaction signing flows
+- Firmware update scenarios
+- Security management operations
+
+## API Mapping Reference
+
+The CLI maps to the following SDK APIs. For detailed parameter documentation, see the corresponding chain method docs:
+
+| CLI Command | SDK Method | Docs |
+|-------------|-----------|------|
+| `get-address --chain evm` | `evmGetAddress` | [evmGetAddress](/en/hardware-sdk/chains/ethereum-and-evm/evmgetaddress) |
+| `get-address --chain btc` | `btcGetAddress` | [btcGetAddress](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress) |
+| `get-address --chain sol` | `solGetAddress` | [solGetAddress](/en/hardware-sdk/chains/solana/solgetaddress) |
+| `sign-transaction --chain evm` | `evmSignTransaction` | [evmSignTransaction](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) |
+| `sign-transaction --chain btc` | `btcSignTransaction` | [btcSignTransaction](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) |
+| `sign-message --chain evm` | `evmSignMessage` | [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) |
+| `firmware-check` | `checkFirmwareRelease` | [checkFirmwareRelease](/en/hardware-sdk/device-api/checkfirmwarerelease) |
+| `firmware-update` | `firmwareUpdateV2` | [firmwareUpdateV2](/en/hardware-sdk/device-api/firmwareupdatev2) |
+| `device-verify` | `deviceVerify` | [deviceVerify](/en/hardware-sdk/device-api/deviceverify) |
+| `change-pin` | `deviceChangePin` | [deviceChangePin](/en/hardware-sdk/device-api/devicechangepin) |

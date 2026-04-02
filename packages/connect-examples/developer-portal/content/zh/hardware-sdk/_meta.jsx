@@ -22,6 +22,8 @@ export default {
     title: <ChainMethodsSidebar lang="zh" />
   },
   chains: { display: 'hidden' },
+  '---agent': { type: 'separator', title: 'AI Agent' },
+  'agent-integration': 'AI Agent 集成',
   '---Reference': { type: 'separator', title: '参考' },
   'legacy-guides': '迁移指引',
   'concepts': '概念'

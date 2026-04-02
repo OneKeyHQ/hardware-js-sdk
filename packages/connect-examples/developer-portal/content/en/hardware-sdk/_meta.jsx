@@ -22,6 +22,8 @@ export default {
     title: <ChainMethodsSidebar lang="en" />
   },
   chains: { display: 'hidden' },
+  '---agent': { type: 'separator', title: 'AI Agent' },
+  'agent-integration': 'AI Agent Integration',
   '---Reference': { type: 'separator', title: 'Reference' },
   'legacy-guides': 'Migration Gudie',
   'concepts': 'concepts'

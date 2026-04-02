@@ -1,22 +1,27 @@
 /**
  * Chain Resolver — maps chain identifiers to the correct SDK API calls.
  * Handles derivation path defaults and chain-specific parameter transformations.
+ *
+ * Reference: developer-portal docs at
+ *   content/en/hardware-sdk/chains/<chain>/<method>.mdx
+ *   content/en/hardware-sdk/core-api-guide.mdx (HD path section)
  */
 
 import type { CoreApi } from '@onekeyfe/hd-core';
 
 // Default BIP44 derivation paths per chain
+// Sources: developer-portal core-api-guide.mdx + chain-specific docs
 const DEFAULT_PATHS: Record<string, string> = {
-  evm: "m/44'/60'/0'/0/0",
-  btc: "m/84'/0'/0'/0/0",
-  sol: "m/44'/501'/0'/0'",
+  evm: "m/44'/60'/0'/0/0",         // EIP-44 standard
+  btc: "m/84'/0'/0'/0/0",          // Native SegWit (bech32). Also: m/44' (legacy), m/49' (nested segwit), m/86' (taproot)
+  sol: "m/44'/501'/0'/0'",         // Fully hardened per Solana spec
   tron: "m/44'/195'/0'/0/0",
   cosmos: "m/44'/118'/0'/0/0",
-  cardano: "m/1852'/1815'/0'/0/0",
+  cardano: "m/1852'/1815'/0'/0/0", // Shelley-era
   polkadot: "m/44'/354'/0'/0'/0'",
-  aptos: "m/44'/637'/0'/0'/0'",
-  sui: "m/44'/784'/0'/0'/0'",
-  near: "m/44'/397'/0'",
+  aptos: "m/44'/637'/0'/0'/0'",    // Fully hardened
+  sui: "m/44'/784'/0'/0'/0'",      // Fully hardened
+  near: "m/44'/397'/0'",           // Short path per NEAR spec
   xrp: "m/44'/144'/0'/0/0",
   stellar: "m/44'/148'/0'",
   ton: "m/44'/607'/0'",
@@ -167,8 +172,11 @@ export async function resolveSignTransaction(sdk: CoreApi, params: SignTransacti
   const tx = params.transaction;
 
   const chainMethodMap: Record<string, () => Promise<unknown>> = {
-    evm: () => sdk.evmSignTransaction(connectId, '', { path, transaction: tx as any }),
-    btc: () => sdk.btcSignTransaction(connectId, '', { ...tx as any }),
+    // EVM: accepts transaction object with to/value/data/chainId/nonce/gasLimit/gasPrice or maxFeePerGas/maxPriorityFeePerGas
+    // Also supports top-level chainId param per docs
+    evm: () => sdk.evmSignTransaction(connectId, '', { path, transaction: tx as any, chainId: tx.chainId as number }),
+    // BTC: requires inputs/outputs/refTxs/coin format, NOT raw hex. See btcSignPsbt for PSBT.
+    btc: () => sdk.btcSignTransaction(connectId, '', { coin: 'btc', ...tx as any }),
     sol: () => sdk.solSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
     tron: () => sdk.tronSignTransaction(connectId, '', { path, transaction: tx as any }),
     cosmos: () => sdk.cosmosSignTransaction(connectId, '', { path, rawTx: tx.rawTx as string }),
@@ -221,7 +229,12 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
     sui: () => sdk.suiSignMessage(connectId, '', { path, messageHex: params.message }),
     conflux: () => sdk.confluxSignMessage(connectId, '', { path, message: params.message }),
     starcoin: () => sdk.starcoinSignMessage(connectId, '', { path, message: params.message }),
-    ton: () => sdk.tonSignMessage(connectId, '', { path, destination: params.message, tonAmount: 0, seqno: 0, expireAt: 0, comment: params.message }),
+    // TON: tonSignMessage is actually a transfer-signing method (requires destination/tonAmount/seqno/expireAt).
+    // For arbitrary message signing, pass full params via --message as JSON.
+    ton: () => {
+      const tonParams = JSON.parse(params.message);
+      return sdk.tonSignMessage(connectId, '', { path, ...tonParams });
+    },
     nostr: () => sdk.nostrSignEvent(connectId, '', { path, event: params.message }),
     scdo: () => sdk.scdoSignMessage(connectId, '', { path, message: params.message }),
     alephium: () => sdk.alephiumSignMessage(connectId, '', { path, messageHex: params.message }),

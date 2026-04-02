@@ -62,7 +62,7 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 | Near | `near` | Yes | Yes | No |
 | XRP | `xrp` | Yes | Yes | No |
 | Stellar | `stellar` | Yes | Yes | No |
-| TON | `ton` | Yes | No | Yes |
+| TON | `ton` | Yes | No | Yes (transfer-style*) |
 | Nostr | `nostr` | Public Key | No | Yes (+ Schnorr) |
 | Filecoin | `filecoin` | Yes | Yes | No |
 | Kaspa | `kaspa` | Yes | Yes | No |
@@ -183,19 +183,29 @@ onekey-hw sign-transaction \
 | `--path` | No | BIP44 derivation path |
 | `--connect-id` | No | Device connection ID |
 
-**EVM Transaction Example:**
+**EVM Transaction Example (EIP-1559):**
 ```bash
 onekey-hw sign-transaction \
   --chain evm \
-  --tx '{"to":"0xAbC...","value":"0x2386F26FC10000","gasLimit":"0x5208","gasPrice":"0x3B9ACA00","nonce":"0x0","chainId":1}'
+  --tx '{"to":"0xAbC...","value":"0xf4240","data":"0x","chainId":1,"nonce":"0x0","maxFeePerGas":"0x14","maxPriorityFeePerGas":"0x0","gasLimit":"0x5208"}'
 ```
 
-**BTC Transaction Example (PSBT):**
+**EVM Transaction Example (Legacy):**
+```bash
+onekey-hw sign-transaction \
+  --chain evm \
+  --tx '{"to":"0xAbC...","value":"0xf4240","data":"0x01","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}'
+```
+
+**BTC Transaction Example (inputs/outputs/refTxs format):**
 ```bash
 onekey-hw sign-transaction \
   --chain btc \
-  --tx '{"psbt":"<base64-psbt-data>"}'
+  --tx '{"coin":"btc","inputs":[{"address_n":[2147483692,2147483648,2147483650,1,0],"prev_index":0,"prev_hash":"b035d89d..."}],"outputs":[{"address":"18WL2iZ...","amount":"200000","script_type":"PAYTOADDRESS"}],"refTxs":[...]}'
 ```
+
+> **Note:** BTC uses `inputs/outputs/refTxs` format, NOT raw hex or PSBT.
+> For PSBT signing, the SDK provides `btcSignPsbt` separately.
 
 **Returns:**
 ```json
@@ -249,6 +259,9 @@ onekey-hw sign-message \
 - Device will show the message for user verification.
 - For EIP-712 typed data on EVM, use `--message-type eip712` and pass structured JSON.
 - For Nostr events, use `--chain nostr` with event JSON as message.
+- **TON note**: `tonSignMessage` is a transfer-signing method, not arbitrary message
+  signing. Pass `--message` as JSON: `'{"destination":"UQ...","tonAmount":100,"seqno":0,"expireAt":1234567890}'`.
+  Required fields: `destination`, `tonAmount`, `seqno`, `expireAt`.
 
 ### `onekey-hw sign-typed-data`
 
