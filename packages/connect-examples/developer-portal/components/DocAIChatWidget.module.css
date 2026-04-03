@@ -752,6 +752,21 @@
 
 .actions button:hover { color: var(--clr-sub); }
 
+/* Streaming indicator shown in place of actions while generating */
+.streamingIndicator {
+  margin-top: 10px;
+  margin-bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--clr-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.streamingText { color: inherit; }
+
 /* Copy action for user messages */
 .userActions {
   margin-top: 4px;

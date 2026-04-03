@@ -1105,23 +1105,34 @@ function ChatWidgetRuntime({ apiUrl, lang }) {
                               </ul>
                             </div>
                           ) : null}
-                          <div className={styles.actions} data-docs-ai="actions">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleCopyMessage(message, shouldShowSources ? messageSources : [])
-                              }
-                            >
-                              <CopyIcon size={14} />
-                              <span>{copiedMessageId === message.id ? copy.copied : copy.copy}</span>
-                            </button>
-                            {latestAssistantMessage?.id === message.id ? (
-                              <button type="button" onClick={() => handleRetryMessage(message)}>
-                                <RotateCcwIcon size={14} />
-                                <span>{copy.retry}</span>
+                          {isStreamingMessage ? (
+                            <div className={styles.streamingIndicator} data-docs-ai="streaming">
+                              <span className={styles.streamingText}>{copy.sending}</span>
+                              <span className={styles.statusDots} aria-hidden="true">
+                                <span />
+                                <span />
+                                <span />
+                              </span>
+                            </div>
+                          ) : (
+                            <div className={styles.actions} data-docs-ai="actions">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleCopyMessage(message, shouldShowSources ? messageSources : [])
+                                }
+                              >
+                                <CopyIcon size={14} />
+                                <span>{copiedMessageId === message.id ? copy.copied : copy.copy}</span>
                               </button>
-                            ) : null}
-                          </div>
+                              {latestAssistantMessage?.id === message.id ? (
+                                <button type="button" onClick={() => handleRetryMessage(message)}>
+                                  <RotateCcwIcon size={14} />
+                                  <span>{copy.retry}</span>
+                                </button>
+                              ) : null}
+                            </div>
+                          )}
                         </div>
                       ) : null}
                     </div>
