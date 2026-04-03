@@ -13,7 +13,7 @@ keywords: [pin, passphrase, backup, reset, wipe, recovery, security, seed,
 
 Every time before running any `onekey-hw` command, follow these steps in order.
 
-1. **Check CLI installed**: Run `onekey-hw version`.
+1. **Check CLI installed**: Run `onekey-hw --version`.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
 
 2. **Check device connected**: Run `onekey-hw status`.

@@ -155,6 +155,9 @@ export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) 
   }
 
   const result = await method();
+  if (result == null) {
+    return { success: false, error: 'No response from device', chain, path };
+  }
   return { ...(result as object), chain, path };
 }
 
@@ -284,9 +287,12 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
   const connectId = params.connectId || '';
   const deviceId = params.deviceId || '';
 
-  // NOTE: Most chains use `messageHex` (hex-encoded), not `message` (plaintext).
-  // The CLI accepts raw string; hex conversion should happen in the application layer.
-  const msg = params.message;
+  // Most chains use `messageHex` (hex-encoded). CLI accepts either:
+  // - Already hex-encoded string (starts with "0x" or matches /^[0-9a-fA-F]+$/)
+  // - Plain text string (auto-converted to hex)
+  const raw = params.message;
+  const isHex = /^(0x)?[0-9a-fA-F]+$/.test(raw);
+  const msg = isHex ? raw.replace(/^0x/, '') : Buffer.from(raw, 'utf8').toString('hex');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chainMethodMap: Record<string, () => Promise<any>> = {
@@ -355,16 +361,27 @@ export interface BatchGetAddressParams extends CommonCLIParams {
 }
 
 export async function resolveBatchGetAddress(sdk: CoreApi, params: BatchGetAddressParams) {
+  // #13 FIX: Collect per-item results with error handling for partial failures
   const results: Array<Record<string, unknown>> = [];
   for (const item of params.bundle) {
-    const result = await resolveGetAddress(sdk, {
-      chain: item.chain,
-      path: item.path,
-      showOnDevice: item.showOnDevice ?? false,
-      connectId: params.connectId,
-      deviceId: params.deviceId,
-    });
-    results.push(result);
+    try {
+      const result = await resolveGetAddress(sdk, {
+        chain: item.chain,
+        path: item.path,
+        showOnDevice: item.showOnDevice ?? false,
+        connectId: params.connectId,
+        deviceId: params.deviceId,
+      });
+      results.push(result);
+    } catch (err) {
+      results.push({
+        chain: item.chain,
+        path: item.path,
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
-  return { success: true, addresses: results };
+  const allSuccess = results.every(r => r.success !== false);
+  return { success: allSuccess, addresses: results };
 }

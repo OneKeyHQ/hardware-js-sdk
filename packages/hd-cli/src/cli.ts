@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { Command } from 'commander';
 
 const program = new Command();
@@ -134,7 +132,7 @@ program
     const { resolveSignTransaction } = await import('./chains');
     const sdk = await createSDK(globalOpts);
     try {
-      const tx = JSON.parse(opts.tx);
+      const tx = safeJsonParse(opts.tx, '--tx') as Record<string, unknown>;
       const result = await resolveSignTransaction(sdk, {
         chain: opts.chain,
         path: opts.path,
@@ -182,7 +180,7 @@ program
     const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
-      const data = JSON.parse(opts.data);
+      const data = safeJsonParse(opts.data, '--data');
       const params = getCommonParams(globalOpts);
       const path = opts.path || "m/44'/60'/0'/0/0";
       const result = await sdk.evmSignTypedData(params.connectId || '', params.deviceId || '', {
@@ -283,7 +281,11 @@ program
     const { resolveBatchGetAddress } = await import('./chains');
     const sdk = await createSDK(globalOpts);
     try {
-      const bundle = JSON.parse(opts.bundle);
+      const bundle = safeJsonParse(opts.bundle, '--bundle') as Array<{
+        chain: string;
+        path?: string;
+        showOnDevice?: boolean;
+      }>;
       const result = await resolveBatchGetAddress(sdk, {
         bundle,
         ...getCommonParams(globalOpts),
@@ -494,7 +496,7 @@ program
       const result = await sdk.tonSignProof(p.connectId || '', p.deviceId || '', {
         path: opts.path,
         appdomain: opts.appdomain,
-        expireAt: parseInt(opts.expireAt, 10),
+        expireAt: safeParseInt(opts.expireAt, '--expire-at'),
         ...(opts.comment ? { comment: opts.comment } : {}),
       });
       outputResult(globalOpts, result);
@@ -553,13 +555,10 @@ program
         platform: opts.platform,
       };
       if (opts.version) {
-        params.version = opts.version.split('.').map(Number);
+        params.version = parseVersion(opts.version);
       }
-      const result = await sdk.firmwareUpdateV2(
-        globalOpts.connectId,
-        globalOpts.deviceId,
-        params as any
-      );
+      // firmwareUpdateV2 signature: (connectId, params) — 2 args only
+      const result = await sdk.firmwareUpdateV2(globalOpts.connectId, params as any);
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -576,19 +575,14 @@ program
     const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
-      // BLE firmware update also uses firmwareUpdateV2 with updateType: 'ble'
       const params: Record<string, unknown> = {
         updateType: 'ble',
         platform: opts.platform,
       };
       if (opts.version) {
-        params.version = opts.version.split('.').map(Number);
+        params.version = parseVersion(opts.version);
       }
-      const result = await sdk.firmwareUpdateV2(
-        globalOpts.connectId,
-        globalOpts.deviceId,
-        params as any
-      );
+      const result = await sdk.firmwareUpdateV2(globalOpts.connectId, params as any);
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -695,7 +689,7 @@ program
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceRecovery(globalOpts.connectId, {
-        wordCount: parseInt(opts.wordCount, 10),
+        wordCount: safeParseInt(opts.wordCount, '--word-count'),
         passphraseProtection: opts.passphraseProtection === 'true',
         pinProtection: opts.pinProtection === 'true',
         label: opts.label,
@@ -719,7 +713,7 @@ program
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceReset(globalOpts.connectId, {
-        strength: wordCountToStrength(parseInt(opts.wordCount, 10)),
+        strength: wordCountToStrength(safeParseInt(opts.wordCount, '--word-count')),
         passphraseProtection: opts.passphraseProtection === 'true',
         pinProtection: opts.pinProtection === 'true',
         label: opts.label,
@@ -764,14 +758,15 @@ program
       const settings: Record<string, unknown> = {};
       if (opts.label !== undefined) settings.label = opts.label;
       if (opts.autoLockDelay !== undefined)
-        settings.autoLockDelayMs = parseInt(opts.autoLockDelay, 10) * 1000;
+        settings.autoLockDelayMs = safeParseInt(opts.autoLockDelay, '--auto-lock-delay') * 1000;
       if (opts.language !== undefined) settings.language = opts.language;
       if (opts.passphraseAlwaysOnDevice !== undefined)
         settings.passphraseAlwaysOnDevice = opts.passphraseAlwaysOnDevice === 'true';
       if (opts.hapticFeedback !== undefined)
         settings.hapticFeedback = opts.hapticFeedback === 'true';
       if (opts.autoShutdownDelay !== undefined)
-        settings.autoShutdownDelayMs = parseInt(opts.autoShutdownDelay, 10) * 1000;
+        settings.autoShutdownDelayMs =
+          safeParseInt(opts.autoShutdownDelay, '--auto-shutdown-delay') * 1000;
 
       if (Object.keys(settings).length === 0) {
         outputResult(globalOpts, {
@@ -836,24 +831,71 @@ function getCommonParams(globalOpts: Record<string, any>) {
 }
 
 function outputResult(globalOpts: { json?: boolean }, result: unknown): void {
-  if (globalOpts.json || !process.stdout.isTTY) {
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    console.log(result);
+  // #10 FIX: Always use JSON.stringify to avoid [Object] truncation
+  console.log(JSON.stringify(result, null, 2));
+
+  // #11 FIX: Exit with code 1 on SDK failure
+  if (result && typeof result === 'object' && 'success' in result && !(result as any).success) {
+    process.exitCode = 1;
   }
 }
 
 function wordCountToStrength(wordCount: number): number {
+  // #8 FIX: Validate word count is one of the allowed values
+  if (![12, 18, 24].includes(wordCount)) {
+    throw new Error(`Invalid word count: ${wordCount}. Must be 12, 18, or 24.`);
+  }
   switch (wordCount) {
     case 12:
       return 128;
     case 18:
       return 192;
     case 24:
-      return 256;
     default:
       return 256;
   }
+}
+
+/**
+ * #6 FIX: Safe JSON.parse with structured error output
+ */
+function safeJsonParse(input: string, label: string): unknown {
+  try {
+    return JSON.parse(input);
+  } catch {
+    console.error(
+      JSON.stringify({
+        success: false,
+        payload: {
+          error: `Invalid JSON for ${label}: ${input.slice(0, 100)}`,
+          code: 'INVALID_JSON',
+        },
+      })
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * #9 FIX: Safe parseInt with NaN check
+ */
+function safeParseInt(input: string, label: string): number {
+  const num = parseInt(input, 10);
+  if (Number.isNaN(num)) {
+    throw new Error(`Invalid number for ${label}: "${input}"`);
+  }
+  return num;
+}
+
+/**
+ * #15 FIX: Validate firmware version format
+ */
+function parseVersion(input: string): number[] {
+  const parts = input.split('.').map(Number);
+  if (parts.length < 2 || parts.length > 4 || parts.some(Number.isNaN)) {
+    throw new Error(`Invalid version format: "${input}". Expected format: "4.8.0"`);
+  }
+  return parts;
 }
 
 program.parse();

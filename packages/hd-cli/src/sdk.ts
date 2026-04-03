@@ -93,7 +93,6 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
     // For Classic devices, PIN uses a matrix mapping.
     // In CLI context, we auto-acknowledge since PIN entry happens on-device.
     if (message.type === UI_REQUEST.REQUEST_PIN) {
-      const device = message.payload?.device;
       const pinType = message.payload?.type;
 
       if (pinType === 'ButtonRequest_PinEntry' || pinType === 'ButtonRequest_AttachPin') {
@@ -191,17 +190,26 @@ export async function createSDK(opts: SDKOptions) {
   //   'react-native' | 'webusb' | 'desktop-web-ble' | 'emulator' | 'lowlevel'
   switch (opts.transport) {
     case 'webusb':
+      // WebUSB requires navigator.usb (browser/Electron only).
+      // In pure Node.js CLI this is not available.
+      process.stderr.write(
+        '[onekey-hw] Warning: --transport webusb requires a browser or Electron environment.\n' +
+          '  In Node.js CLI, use --transport http (default) with OneKey Bridge running.\n'
+      );
       settings.env = 'webusb';
       break;
     case 'ble':
-      // BLE requires React Native or Electron context
-      // CLI via node.js can only use desktop-web-ble (Electron) or lowlevel
+      // BLE requires window.desktopApi.nobleBle (Electron) or React Native context.
+      // Not available in pure Node.js CLI.
+      process.stderr.write(
+        '[onekey-hw] Warning: --transport ble requires an Electron or React Native environment.\n' +
+          '  In Node.js CLI, use --transport http (default) with OneKey Bridge running.\n'
+      );
       settings.env = 'desktop-web-ble';
       break;
     case 'http':
     default:
-      // HTTP Bridge is the primary CLI transport
-      // 'node' maps to HTTP Bridge at http://localhost:21320
+      // HTTP Bridge at http://localhost:21320 — works in all Node.js environments
       settings.env = 'node';
       break;
   }

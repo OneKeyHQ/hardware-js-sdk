@@ -13,13 +13,13 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 Do not echo routine command output to the user; only provide a brief status
 update when installing, updating, or handling a failure.
 
-1. **Check CLI installed**: Run `onekey-hw version`.
+1. **Check CLI installed**: Run `onekey-hw --version`.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
    - Install failed → STOP, point to manual install docs.
 
 2. **Check version is latest** (once per session):
    - Fetch latest: `npm view @onekeyfe/hardware-cli version`
-   - Compare with local `onekey-hw version`
+   - Compare with local `onekey-hw --version`
    - Local version behind → **BLOCK operation**, run `npm update -g @onekeyfe/hardware-cli`
    - Update failed → STOP, suggest manual update.
    - Update succeeded → continue with original command.

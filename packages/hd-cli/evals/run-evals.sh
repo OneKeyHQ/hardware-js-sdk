@@ -90,30 +90,32 @@ for i in $(seq 0 $((TOTAL - 1))); do
       ;;
     contains)
       ALL_FOUND="true"
-      while IFS='; ' read -ra CMDS; do
-        for cmd in "${CMDS[@]}"; do
-          if ! echo "${ACTUAL}" | grep -qF "${cmd}"; then
-            ALL_FOUND="false"
-            break
-          fi
-        done
-      done <<< "${EXPECTED}"
+      # Split on semicolons only, not spaces — commands contain spaces
+      IFS=';' read -ra CMDS <<< "${EXPECTED}"
+      for cmd in "${CMDS[@]}"; do
+        cmd=$(echo "${cmd}" | sed 's/^ *//;s/ *$//')  # trim whitespace
+        if [[ -n "${cmd}" ]] && ! echo "${ACTUAL}" | grep -qF "${cmd}"; then
+          ALL_FOUND="false"
+          break
+        fi
+      done
       MATCH="${ALL_FOUND}"
       ;;
     ordered)
       # Check commands appear in order
       LAST_POS=-1
       ALL_ORDERED="true"
-      while IFS='; ' read -ra CMDS; do
-        for cmd in "${CMDS[@]}"; do
-          POS=$(echo "${ACTUAL}" | grep -nF "${cmd}" | head -1 | cut -d: -f1 || echo "0")
-          if [[ "${POS}" -eq 0 ]] || [[ "${POS}" -le "${LAST_POS}" ]]; then
-            ALL_ORDERED="false"
-            break
-          fi
-          LAST_POS="${POS}"
-        done
-      done <<< "${EXPECTED}"
+      IFS=';' read -ra CMDS <<< "${EXPECTED}"
+      for cmd in "${CMDS[@]}"; do
+        cmd=$(echo "${cmd}" | sed 's/^ *//;s/ *$//')
+        if [[ -z "${cmd}" ]]; then continue; fi
+        POS=$(echo "${ACTUAL}" | grep -nF "${cmd}" | head -1 | cut -d: -f1 || echo "0")
+        if [[ "${POS}" -eq 0 ]] || [[ "${POS}" -le "${LAST_POS}" ]]; then
+          ALL_ORDERED="false"
+          break
+        fi
+        LAST_POS="${POS}"
+      done
       MATCH="${ALL_ORDERED}"
       ;;
   esac
