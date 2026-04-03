@@ -19,7 +19,7 @@
   },
   "scripts": {
     "dev": "rimraf dist && rollup -c rollup.config.js -w",
-    "build": "rimraf dist && rollup -c rollup.config.js",
+    "build": "rimraf dist && rollup -c rollup.config.js && node -e \"const f='dist/cli.js';const c=require('fs').readFileSync(f,'utf8');require('fs').writeFileSync(f,'#!/usr/bin/env node\\n'+c)\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

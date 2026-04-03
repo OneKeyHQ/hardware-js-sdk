@@ -1,5 +1,14 @@
 import { Command } from 'commander';
 
+import { createSDK } from './sdk';
+import {
+  resolveBatchGetAddress,
+  resolveGetAddress,
+  resolveGetPublicKey,
+  resolveSignMessage,
+  resolveSignTransaction,
+} from './chains';
+
 const program = new Command();
 
 program
@@ -30,7 +39,6 @@ program
   .description('Search for connected OneKey hardware wallet devices')
   .option('--timeout <ms>', 'Search timeout in milliseconds', '10000')
   .action(async opts => {
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(program.opts());
     try {
       const result = await sdk.searchDevices();
@@ -45,7 +53,6 @@ program
   .description('Get device features and current status')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.getFeatures(globalOpts.connectId);
@@ -60,7 +67,6 @@ program
   .description('Check if OneKey Bridge is running')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.checkBridgeStatus();
@@ -82,8 +88,6 @@ program
   .option('--show-on-device <bool>', 'Display address on device for verification', 'true')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
-    const { resolveGetAddress } = await import('./chains');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await resolveGetAddress(sdk, {
@@ -105,8 +109,6 @@ program
   .option('--path <path>', 'BIP44 derivation path')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
-    const { resolveGetPublicKey } = await import('./chains');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await resolveGetPublicKey(sdk, {
@@ -128,8 +130,6 @@ program
   .option('--path <path>', 'BIP44 derivation path')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
-    const { resolveSignTransaction } = await import('./chains');
     const sdk = await createSDK(globalOpts);
     try {
       const tx = safeJsonParse(opts.tx, '--tx') as Record<string, unknown>;
@@ -153,8 +153,6 @@ program
   .option('--path <path>', 'BIP44 derivation path')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
-    const { resolveSignMessage } = await import('./chains');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await resolveSignMessage(sdk, {
@@ -177,7 +175,6 @@ program
   .option('--metamask-v4-compat', 'Use MetaMask V4 compatibility mode', true)
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const data = safeJsonParse(opts.data, '--data');
@@ -202,7 +199,6 @@ program
   .option('--coin <coin>', 'Bitcoin network: btc, ltc, etc.', 'btc')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const params = getCommonParams(globalOpts);
@@ -226,7 +222,6 @@ program
   .requiredOption('--signature <sig>', 'Signature to verify')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const params = getCommonParams(globalOpts);
@@ -277,8 +272,6 @@ program
   .requiredOption('--bundle <json>', 'JSON array of {chain, path, showOnDevice}')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
-    const { resolveBatchGetAddress } = await import('./chains');
     const sdk = await createSDK(globalOpts);
     try {
       const bundle = safeJsonParse(opts.bundle, '--bundle') as Array<{
@@ -308,7 +301,6 @@ program
   .option('--path <path>', 'BIP44 derivation path', "m/44'/60'/0'/0/0")
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -330,7 +322,6 @@ program
   .option('--path <path>', 'BIP44 derivation path', "m/44'/501'/0'/0'")
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -353,7 +344,6 @@ program
   .option('--show-on-device <bool>', 'Display on device', 'false')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -378,7 +368,6 @@ program
   .option('--show-on-device <bool>', 'Display on device', 'false')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -401,7 +390,6 @@ program
   .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -422,7 +410,6 @@ program
   .requiredOption('--k1 <hex>', 'Challenge k1 parameter')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -444,7 +431,6 @@ program
   .option('--path <path>', 'BIP44 derivation path', "m/44'/503'/0'/0/0")
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -466,7 +452,6 @@ program
   .option('--path <path>', 'BIP44 derivation path', "m/44'/637'/0'/0'/0'")
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -489,7 +474,6 @@ program
   .option('--path <path>', 'BIP44 derivation path', "m/44'/607'/0'")
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const p = getCommonParams(globalOpts);
@@ -514,7 +498,6 @@ program
   .description('Check if firmware updates are available')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.checkFirmwareRelease(globalOpts.connectId);
@@ -529,7 +512,6 @@ program
   .description('Check all firmware components (system, BLE, bootloader)')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.checkAllFirmwareRelease(globalOpts.connectId);
@@ -546,7 +528,6 @@ program
   .option('--platform <platform>', 'Platform: native | desktop | ext | web', 'desktop')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       // firmwareUpdateV2 requires: connectId, deviceId, { updateType, platform, version? }
@@ -572,7 +553,6 @@ program
   .option('--platform <platform>', 'Platform: native | desktop | ext | web', 'desktop')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const params: Record<string, unknown> = {
@@ -594,7 +574,6 @@ program
   .description('Check bootloader version and status')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.checkBootloaderRelease(globalOpts.connectId);
@@ -614,7 +593,6 @@ program
   .option('--remove', 'Remove PIN protection instead of changing')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceChangePin(globalOpts.connectId, {
@@ -631,7 +609,6 @@ program
   .description('Get current passphrase state (for hidden wallet session management)')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.getPassphraseState(globalOpts.connectId, {
@@ -649,7 +626,6 @@ program
   .requiredOption('--enable <bool>', 'true to enable, false to disable')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceSettings(globalOpts.connectId, {
@@ -666,7 +642,6 @@ program
   .description('Trigger recovery phrase backup on device')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceBackup(globalOpts.connectId);
@@ -685,7 +660,6 @@ program
   .option('--label <name>', 'Device label')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceRecovery(globalOpts.connectId, {
@@ -709,7 +683,6 @@ program
   .option('--label <name>', 'Device label')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceReset(globalOpts.connectId, {
@@ -729,7 +702,6 @@ program
   .description('Factory reset — erase ALL data (IRREVERSIBLE)')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceWipe(globalOpts.connectId);
@@ -750,7 +722,6 @@ program
   .option('--auto-shutdown-delay <seconds>', 'Auto shutdown timeout in seconds')
   .action(async opts => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       // Map CLI options to SDK param names (camelCase → snake_case handled by SDK)
@@ -788,7 +759,6 @@ program
   .description('Verify device is genuine OneKey hardware')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceVerify(globalOpts.connectId);
@@ -803,7 +773,6 @@ program
   .description('Lock the device')
   .action(async () => {
     const globalOpts = program.opts();
-    const { createSDK } = await import('./sdk');
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceLock(globalOpts.connectId);
