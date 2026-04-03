@@ -485,6 +485,84 @@ Step 3 — Present results
 - User wants to broadcast a signed transaction → this skill only SIGNS,
   broadcasting is handled by the application layer.
 
+## Chain-Specific Commands
+
+These commands wrap chain-specific SDK methods that don't fit the generic
+`sign-message` / `sign-transaction` pattern.
+
+### `onekey-hw evm-sign-eip712`
+
+Sign EIP-712 message by pre-computed domain and message hashes.
+Lower-level than `sign-typed-data` — use when you already have the hashes.
+
+```bash
+onekey-hw evm-sign-eip712 --domain-hash <hex> --message-hash <hex> [--path <path>]
+```
+
+### `onekey-hw sol-sign-offchain`
+
+Sign a Solana off-chain message (different from on-chain transaction signing).
+
+```bash
+onekey-hw sol-sign-offchain --message-hex <hex> [--path <path>]
+```
+
+### `onekey-hw nostr-encrypt`
+
+Encrypt a message for a Nostr recipient using NIP-04 encryption.
+
+```bash
+onekey-hw nostr-encrypt --pubkey <hex> --plaintext <text> [--path <path>]
+```
+
+### `onekey-hw nostr-decrypt`
+
+Decrypt a Nostr NIP-04 encrypted message.
+
+```bash
+onekey-hw nostr-decrypt --pubkey <hex> --ciphertext <text> [--path <path>]
+```
+
+### `onekey-hw nostr-sign-schnorr`
+
+Sign a Schnorr signature (BIP-340) for Nostr.
+
+```bash
+onekey-hw nostr-sign-schnorr --hash <hex> [--path <path>]
+```
+
+### `onekey-hw lnurl-auth`
+
+Authenticate with a service using LNURL-auth (Lightning Network).
+
+```bash
+onekey-hw lnurl-auth --domain <domain> --k1 <hex>
+```
+
+### `onekey-hw conflux-sign-cip23`
+
+Sign a Conflux CIP-23 structured message (like EIP-712 for Conflux).
+
+```bash
+onekey-hw conflux-sign-cip23 --domain-hash <hex> --message-hash <hex> [--path <path>]
+```
+
+### `onekey-hw aptos-sign-in`
+
+Sign an Aptos sign-in message (wallet authentication).
+
+```bash
+onekey-hw aptos-sign-in --payload <text> [--path <path>]
+```
+
+### `onekey-hw ton-sign-proof`
+
+Sign a TON Connect proof for wallet authentication.
+
+```bash
+onekey-hw ton-sign-proof --appdomain <domain> --expire-at <timestamp> [--comment <text>] [--path <path>]
+```
+
 ## Air-Gap (QR Code) Signing
 
 For air-gapped (offline) devices, the SDK supports UR (Uniform Resource) encoded

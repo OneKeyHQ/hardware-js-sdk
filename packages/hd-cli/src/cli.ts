@@ -295,6 +295,215 @@ program
   });
 
 // ============================================================
+// Chain-Specific Commands
+// ============================================================
+
+program
+  .command('evm-sign-eip712')
+  .description('Sign EIP-712 message by domain/message hash (EVM, requires device confirmation)')
+  .requiredOption('--domain-hash <hex>', 'EIP-712 domain separator hash')
+  .requiredOption('--message-hash <hex>', 'EIP-712 message hash')
+  .option('--path <path>', 'BIP44 derivation path', "m/44'/60'/0'/0/0")
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.evmSignMessageEIP712(p.connectId || '', p.deviceId || '', {
+        path: opts.path,
+        domainHash: opts.domainHash,
+        messageHash: opts.messageHash,
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('sol-sign-offchain')
+  .description('Sign a Solana off-chain message (requires device confirmation)')
+  .requiredOption('--message-hex <hex>', 'Off-chain message as hex')
+  .option('--path <path>', 'BIP44 derivation path', "m/44'/501'/0'/0'")
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.solSignOffchainMessage(p.connectId || '', p.deviceId || '', {
+        path: opts.path,
+        messageHex: opts.messageHex,
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('nostr-encrypt')
+  .description('Encrypt a message for a Nostr recipient')
+  .requiredOption('--pubkey <hex>', 'Recipient Nostr public key')
+  .requiredOption('--plaintext <text>', 'Message to encrypt')
+  .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
+  .option('--show-on-device <bool>', 'Display on device', 'false')
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.nostrEncryptMessage(p.connectId || '', p.deviceId || '', {
+        path: opts.path,
+        pubkey: opts.pubkey,
+        plaintext: opts.plaintext,
+        showOnOneKey: opts.showOnDevice === 'true',
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('nostr-decrypt')
+  .description('Decrypt a Nostr encrypted message')
+  .requiredOption('--pubkey <hex>', 'Sender Nostr public key')
+  .requiredOption('--ciphertext <text>', 'Encrypted message')
+  .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
+  .option('--show-on-device <bool>', 'Display on device', 'false')
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.nostrDecryptMessage(p.connectId || '', p.deviceId || '', {
+        path: opts.path,
+        pubkey: opts.pubkey,
+        ciphertext: opts.ciphertext,
+        showOnOneKey: opts.showOnDevice === 'true',
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('nostr-sign-schnorr')
+  .description('Sign a Schnorr signature for Nostr')
+  .requiredOption('--hash <hex>', 'Hash to sign (hex)')
+  .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.nostrSignSchnorr(p.connectId || '', p.deviceId || '', {
+        path: opts.path,
+        hash: opts.hash,
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('lnurl-auth')
+  .description('Authenticate with LNURL (Lightning Network)')
+  .requiredOption('--domain <domain>', 'Service domain')
+  .requiredOption('--k1 <hex>', 'Challenge k1 parameter')
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.lnurlAuth(p.connectId || '', p.deviceId || '', {
+        domain: opts.domain,
+        k1: opts.k1,
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('conflux-sign-cip23')
+  .description('Sign a Conflux CIP-23 structured message')
+  .requiredOption('--domain-hash <hex>', 'CIP-23 domain hash')
+  .requiredOption('--message-hash <hex>', 'CIP-23 message hash')
+  .option('--path <path>', 'BIP44 derivation path', "m/44'/503'/0'/0/0")
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.confluxSignMessageCIP23(p.connectId || '', p.deviceId || '', {
+        path: opts.path,
+        domainHash: opts.domainHash,
+        messageHash: opts.messageHash,
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('aptos-sign-in')
+  .description('Sign an Aptos sign-in message')
+  .requiredOption('--payload <text>', 'Sign-in payload string')
+  .option('--path <path>', 'BIP44 derivation path', "m/44'/637'/0'/0'/0'")
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.aptosSignInMessage(p.connectId || '', p.deviceId || '', {
+        path: opts.path,
+        payload: opts.payload,
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+program
+  .command('ton-sign-proof')
+  .description('Sign a TON proof (for wallet authentication)')
+  .requiredOption('--appdomain <domain>', 'Application domain')
+  .requiredOption('--expire-at <timestamp>', 'Proof expiration timestamp')
+  .option('--comment <text>', 'Optional comment')
+  .option('--path <path>', 'BIP44 derivation path', "m/44'/607'/0'")
+  .action(async opts => {
+    const globalOpts = program.opts();
+    const { createSDK } = await import('./sdk');
+    const sdk = await createSDK(globalOpts);
+    try {
+      const p = getCommonParams(globalOpts);
+      const result = await sdk.tonSignProof(p.connectId || '', p.deviceId || '', {
+        path: opts.path,
+        appdomain: opts.appdomain,
+        expireAt: parseInt(opts.expireAt, 10),
+        ...(opts.comment ? { comment: opts.comment } : {}),
+      });
+      outputResult(globalOpts, result);
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+// ============================================================
 // Firmware Commands
 // ============================================================
 

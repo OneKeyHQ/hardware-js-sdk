@@ -272,6 +272,78 @@
       "match_mode": "exact"
     },
     {
+      "id": "nostr-encrypt",
+      "prompt": "Encrypt a message for this Nostr pubkey",
+      "expected_commands": [
+        "onekey-hw nostr-encrypt"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "nostr-decrypt",
+      "prompt": "Decrypt this Nostr message",
+      "expected_commands": [
+        "onekey-hw nostr-decrypt"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "nostr-schnorr",
+      "prompt": "Sign this hash with Schnorr for Nostr",
+      "expected_commands": [
+        "onekey-hw nostr-sign-schnorr"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "lnurl-auth",
+      "prompt": "Authenticate with this Lightning service using LNURL",
+      "expected_commands": [
+        "onekey-hw lnurl-auth"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "sol-offchain-message",
+      "prompt": "Sign this Solana off-chain message",
+      "expected_commands": [
+        "onekey-hw sol-sign-offchain"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "conflux-cip23",
+      "prompt": "Sign this Conflux CIP-23 structured message",
+      "expected_commands": [
+        "onekey-hw conflux-sign-cip23"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "aptos-sign-in",
+      "prompt": "Sign in to this Aptos dApp",
+      "expected_commands": [
+        "onekey-hw aptos-sign-in"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "ton-proof",
+      "prompt": "Generate a TON Connect proof for authentication",
+      "expected_commands": [
+        "onekey-hw ton-sign-proof"
+      ],
+      "match_mode": "contains"
+    },
+    {
+      "id": "evm-eip712-hash",
+      "prompt": "Sign this EIP-712 domain hash and message hash",
+      "expected_commands": [
+        "onekey-hw evm-sign-eip712"
+      ],
+      "match_mode": "contains"
+    },
+    {
       "id": "device-label",
       "prompt": "Rename my device to 'My OneKey Pro'",
       "expected_commands": [
