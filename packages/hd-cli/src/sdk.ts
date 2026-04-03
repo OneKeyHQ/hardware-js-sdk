@@ -8,10 +8,12 @@
  * Reference: packages/core/src/core/index.ts (event registration pattern)
  */
 
+// @ts-ignore - hd-common-connect-sdk may not have type declarations
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
-import type { ConnectSettings } from '@onekeyfe/hd-core';
-import { UI_EVENT, UI_REQUEST, UI_RESPONSE, DEVICE } from '@onekeyfe/hd-core';
+import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import * as readline from 'readline';
+
+import type { ConnectSettings } from '@onekeyfe/hd-core';
 
 export interface SDKOptions {
   transport?: string;
@@ -31,7 +33,7 @@ function promptUser(question: string, hidden = false): Promise<string> {
     return Promise.resolve('');
   }
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stderr, // Use stderr so JSON stdout stays clean
@@ -40,7 +42,7 @@ function promptUser(question: string, hidden = false): Promise<string> {
     if (hidden) {
       // Mute output for PIN entry
       process.stderr.write(question);
-      const stdin = process.stdin;
+      const { stdin } = process;
       const wasRaw = stdin.isRaw;
       if (stdin.setRawMode) stdin.setRawMode(true);
 
@@ -66,7 +68,7 @@ function promptUser(question: string, hidden = false): Promise<string> {
       };
       stdin.on('data', onData);
     } else {
-      rl.question(question, (answer) => {
+      rl.question(question, answer => {
         rl.close();
         resolve(answer);
       });
@@ -85,7 +87,7 @@ function promptUser(question: string, hidden = false): Promise<string> {
  * Reference: packages/core/src/core/index.ts lines 315-330, 1021-1098
  */
 function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void {
-  sdk.on(UI_EVENT, (message) => {
+  sdk.on(UI_EVENT, (message: any) => {
     // PIN Request
     // For Touch/Pro devices, PIN is entered on-device (device screen shows numpad).
     // For Classic devices, PIN uses a matrix mapping.
@@ -102,7 +104,7 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
         // Classic devices: PIN entry via matrix
         // In CLI mode, prompt user or let agent handle
         process.stderr.write('[onekey-hw] PIN required. Please enter PIN on your device.\n');
-        promptUser('PIN (on-device numpad mapping): ', true).then((pin) => {
+        promptUser('PIN (on-device numpad mapping): ', true).then(pin => {
           sdk.uiResponse({
             type: UI_RESPONSE.RECEIVE_PIN,
             payload: pin,
@@ -127,30 +129,28 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
         });
       } else {
         process.stderr.write('[onekey-hw] Passphrase required for hidden wallet.\n');
-        promptUser('Enter passphrase (or press Enter for on-device entry): ').then(
-          (passphrase) => {
-            if (passphrase === '') {
-              // Enter on device
-              sdk.uiResponse({
-                type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-                payload: {
-                  value: '',
-                  passphraseOnDevice: true,
-                  save: false,
-                },
-              });
-            } else {
-              sdk.uiResponse({
-                type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-                payload: {
-                  value: passphrase,
-                  passphraseOnDevice: false,
-                  save: false,
-                },
-              });
-            }
+        promptUser('Enter passphrase (or press Enter for on-device entry): ').then(passphrase => {
+          if (passphrase === '') {
+            // Enter on device
+            sdk.uiResponse({
+              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+              payload: {
+                value: '',
+                passphraseOnDevice: true,
+                save: false,
+              },
+            });
+          } else {
+            sdk.uiResponse({
+              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+              payload: {
+                value: passphrase,
+                passphraseOnDevice: false,
+                save: false,
+              },
+            });
           }
-        );
+        });
       }
     }
 
