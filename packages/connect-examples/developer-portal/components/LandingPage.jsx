@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
   ChevronDown,
   X,
+  Bot,
 } from 'lucide-react'
 
 const heroSecurity05 = '/landing-page/security-05.png'
@@ -136,6 +137,15 @@ export function LandingPage({ locale = 'en' }) {
       description: isZh ? '适用于原生移动端的 BLE 传输。' : 'BLE transport for native mobile apps.',
       icon: Smartphone,
       href: `/${locale}/hardware-sdk/transport/native-ble`,
+      cta: copy.viewDocs,
+    },
+    {
+      title: isZh ? 'AI Agent 集成' : 'AI Agent Integration',
+      description: isZh
+        ? '让 Claude Code 等 AI Agent 通过 CLI 与硬件钱包交互，支持 27+ 链安全签名。'
+        : 'Let AI agents like Claude Code interact with hardware wallets via CLI. 27+ chains with secure signing.',
+      icon: Bot,
+      href: `/${locale}/hardware-sdk/agent-integration`,
       cta: copy.viewDocs,
     },
   ]

@@ -33,7 +33,7 @@
     "check-versions": "node scripts/check-versions.js",
     "publish-packages": "yarn check-versions && lerna publish from-package",
     "update-protobuf": "lerna run update:protobuf --scope=@onekeyfe/hd-transport",
-    "update-version": "lerna version --no-git-tag-version --force-publish=@onekeyfe/hd-core,@onekeyfe/hd-ble-sdk,@onekeyfe/hd-common-connect-sdk,@onekeyfe/hd-transport-electron,@onekeyfe/hd-transport-emulator,@onekeyfe/hd-transport-http,@onekeyfe/hd-transport-lowlevel,@onekeyfe/hd-transport-react-native,@onekeyfe/hd-transport-web-device,@onekeyfe/hd-transport,@onekeyfe/hd-web-sdk,@onekeyfe/hd-shared",
+    "update-version": "lerna version --no-git-tag-version --force-publish=@onekeyfe/hd-core,@onekeyfe/hd-ble-sdk,@onekeyfe/hd-common-connect-sdk,@onekeyfe/hd-transport-electron,@onekeyfe/hd-transport-emulator,@onekeyfe/hd-transport-http,@onekeyfe/hd-transport-lowlevel,@onekeyfe/hd-transport-react-native,@onekeyfe/hd-transport-web-device,@onekeyfe/hd-transport,@onekeyfe/hd-web-sdk,@onekeyfe/hd-shared,@onekeyfe/hardware-cli",
     "example": "cd ./packages/connect-examples/expo-example && yarn start",
     "example:web": "cd ./packages/connect-examples/expo-example && cross-env CONNECT_SRC=https://localhost:8087 yarn start",
     "example:desktop": "cd ./packages/connect-examples/electron-example && yarn dev",
@@ -53,6 +53,7 @@
     "dev:transport-web-device": "cd ./packages/hd-transport-web-device && yarn dev",
     "dev:transport-electron": "cd ./packages/hd-transport-electron && yarn dev",
     "dev:shared": "cd ./packages/shared && yarn dev",
+    "dev:cli": "cd ./packages/hd-cli && yarn dev",
     "debug:watcher": "node ./scripts/monitor.js",
     "dev:docs": "cd ./packages/connect-examples/developer-portal && yarn dev",
     "build:docs": "cd ./packages/connect-examples/developer-portal && yarn build"

@@ -2,9 +2,11 @@
 # =============================================================================
 # OneKey Hardware CLI — Agent Skill Evaluation Runner
 #
-# Runs evaluation cases against Claude Code to verify that the agent
-# correctly interprets natural language prompts and invokes the right
-# CLI commands.
+# Aligned with app-monorepo's eval approach:
+# - Invokes Claude Code in headless mode with actual skill files loaded
+# - System prompt enforces skill-file-first behavior (no --help)
+# - Structured JSON output per case saved to results/ directory
+# - Deferred scoring via follow-up Claude invocation (LLM-as-judge)
 #
 # Usage:
 #   ./run-evals.sh                    # Run all cases with default model
@@ -16,10 +18,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CLI_DIR="$(dirname "${SCRIPT_DIR}")"
 CASES_FILE="${SCRIPT_DIR}/cases.json"
 RESULTS_DIR="${SCRIPT_DIR}/results"
-MODEL="${MODEL:-sonnet}"
-VERBOSE="${VERBOSE:-false}"
+MODEL="sonnet"
+VERBOSE="false"
 CASE_FILTER=""
 
 # Parse arguments
@@ -32,22 +35,35 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-mkdir -p "${RESULTS_DIR}"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+RUN_DIR="${RESULTS_DIR}/${TIMESTAMP}-${MODEL}"
+mkdir -p "${RUN_DIR}"
 
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-RESULT_FILE="${RESULTS_DIR}/eval_${MODEL}_${TIMESTAMP}.json"
+# System prompt: force agent to use skill files, skip preflight, auto-confirm
+SYSTEM_PROMPT="You have the onekey-hardware plugin installed.
+BEFORE running any onekey-hw command, you MUST read the skill files at ${CLI_DIR}/skills/ to understand available commands and their parameters.
+NEVER use onekey-hw --help or --help on subcommands. The skill files are your sole documentation source.
+Skip all pre-flight checks (version checking, bridge status) — assume CLI is installed and ready.
+When a command requires user confirmation, auto-confirm YES.
+If an API call fails, retry at most once before reporting the error.
+Output only the onekey-hw commands you would execute, one per line. No explanations."
 
 echo "============================================="
 echo "OneKey Hardware CLI — Eval Runner"
 echo "Model: ${MODEL}"
 echo "Cases: ${CASES_FILE}"
-echo "Output: ${RESULT_FILE}"
+echo "Output: ${RUN_DIR}"
 echo "============================================="
+
+# Model flag for claude CLI
+MODEL_FLAG=""
+if [[ "${MODEL}" != "sonnet" ]]; then
+  MODEL_FLAG="--model ${MODEL}"
+fi
 
 # Count cases
 TOTAL=$(jq '.cases | length' "${CASES_FILE}")
-PASSED=0
-FAILED=0
+EXECUTED=0
 SKIPPED=0
 
 echo "Running ${TOTAL} evaluation cases..."
@@ -57,8 +73,6 @@ echo ""
 for i in $(seq 0 $((TOTAL - 1))); do
   CASE_ID=$(jq -r ".cases[$i].id" "${CASES_FILE}")
   PROMPT=$(jq -r ".cases[$i].prompt" "${CASES_FILE}")
-  MATCH_MODE=$(jq -r ".cases[$i].match_mode" "${CASES_FILE}")
-  EXPECTED=$(jq -r ".cases[$i].expected_commands | join(\"; \")" "${CASES_FILE}")
 
   # Apply case filter if specified
   if [[ -n "${CASE_FILTER}" ]] && [[ ! "${CASE_ID}" == ${CASE_FILTER} ]]; then
@@ -66,95 +80,57 @@ for i in $(seq 0 $((TOTAL - 1))); do
     continue
   fi
 
-  echo -n "[${i}/${TOTAL}] ${CASE_ID}: "
+  echo -n "[$((i+1))/${TOTAL}] ${CASE_ID}: "
 
-  # Run the prompt through Claude Code in non-interactive mode
-  # Capture the commands that Claude would execute
-  ACTUAL=$(claude --model "${MODEL}" --print \
-    "You have the onekey-hardware plugin installed with skills: hardware-device, hardware-signing, hardware-firmware, hardware-security. Given this user request, list ONLY the onekey-hw commands you would run (one per line, no explanation): ${PROMPT}" \
-    2>/dev/null || echo "ERROR")
+  # Invoke Claude Code in headless mode
+  # Aligned with app-monorepo: -p for prompt, --output-format json,
+  # --max-turns 25, --permission-mode bypassPermissions
+  RESULT_FILE="${RUN_DIR}/${CASE_ID}.json"
 
-  if [[ "${ACTUAL}" == "ERROR" ]]; then
-    echo "SKIP (claude error)"
-    SKIPPED=$((SKIPPED + 1))
-    continue
-  fi
-
-  # Check if expected commands appear in output
-  MATCH="false"
-  case "${MATCH_MODE}" in
-    exact)
-      if echo "${ACTUAL}" | grep -qF "${EXPECTED}"; then
-        MATCH="true"
-      fi
-      ;;
-    contains)
-      ALL_FOUND="true"
-      # Split on semicolons only, not spaces — commands contain spaces
-      IFS=';' read -ra CMDS <<< "${EXPECTED}"
-      for cmd in "${CMDS[@]}"; do
-        cmd=$(echo "${cmd}" | sed 's/^ *//;s/ *$//')  # trim whitespace
-        if [[ -n "${cmd}" ]] && ! echo "${ACTUAL}" | grep -qF "${cmd}"; then
-          ALL_FOUND="false"
-          break
-        fi
-      done
-      MATCH="${ALL_FOUND}"
-      ;;
-    ordered)
-      # Check commands appear in order
-      LAST_POS=-1
-      ALL_ORDERED="true"
-      IFS=';' read -ra CMDS <<< "${EXPECTED}"
-      for cmd in "${CMDS[@]}"; do
-        cmd=$(echo "${cmd}" | sed 's/^ *//;s/ *$//')
-        if [[ -z "${cmd}" ]]; then continue; fi
-        POS=$(echo "${ACTUAL}" | grep -nF "${cmd}" | head -1 | cut -d: -f1 || echo "0")
-        if [[ "${POS}" -eq 0 ]] || [[ "${POS}" -le "${LAST_POS}" ]]; then
-          ALL_ORDERED="false"
-          break
-        fi
-        LAST_POS="${POS}"
-      done
-      MATCH="${ALL_ORDERED}"
-      ;;
-  esac
-
-  if [[ "${MATCH}" == "true" ]]; then
-    echo "PASS"
-    PASSED=$((PASSED + 1))
+  if command -v claude &> /dev/null; then
+    claude -p "${PROMPT}" \
+      --output-format json \
+      --max-turns 25 \
+      --permission-mode bypassPermissions \
+      --system-prompt "${SYSTEM_PROMPT}" \
+      ${MODEL_FLAG} \
+      > "${RESULT_FILE}" 2>/dev/null || echo '{"error": "claude invocation failed"}' > "${RESULT_FILE}"
+    echo "DONE → ${RESULT_FILE}"
+    EXECUTED=$((EXECUTED + 1))
   else
-    echo "FAIL"
-    FAILED=$((FAILED + 1))
-    if [[ "${VERBOSE}" == "true" ]]; then
-      echo "  Expected: ${EXPECTED}"
-      echo "  Actual:   ${ACTUAL}"
-    fi
+    echo "SKIP (claude CLI not found)"
+    echo '{"error": "claude CLI not installed"}' > "${RESULT_FILE}"
+    SKIPPED=$((SKIPPED + 1))
   fi
 done
 
 echo ""
 echo "============================================="
-echo "Results: ${PASSED} passed, ${FAILED} failed, ${SKIPPED} skipped (${TOTAL} total)"
-echo "Pass rate: $(( PASSED * 100 / (PASSED + FAILED + 1) ))%"
+echo "Executed: ${EXECUTED}, Skipped: ${SKIPPED} (${TOTAL} total)"
+echo "Results saved to: ${RUN_DIR}"
 echo "============================================="
 
-# Write results JSON
+# Write run metadata
 jq -n \
   --arg model "${MODEL}" \
   --arg timestamp "${TIMESTAMP}" \
-  --argjson passed "${PASSED}" \
-  --argjson failed "${FAILED}" \
+  --argjson executed "${EXECUTED}" \
   --argjson skipped "${SKIPPED}" \
   --argjson total "${TOTAL}" \
   '{
     model: $model,
     timestamp: $timestamp,
     total: $total,
-    passed: $passed,
-    failed: $failed,
-    skipped: $skipped,
-    pass_rate: (if ($passed + $failed) > 0 then ($passed * 100 / ($passed + $failed)) else 0 end)
-  }' > "${RESULT_FILE}"
+    executed: $executed,
+    skipped: $skipped
+  }' > "${RUN_DIR}/_metadata.json"
 
-echo "Results written to: ${RESULT_FILE}"
+# Print scoring instructions
+echo ""
+echo "To score results, run:"
+echo ""
+echo "  claude -p \"Read all JSON files in ${RUN_DIR}/ and the eval case definitions"
+echo "  in ${CASES_FILE}. For each case, compare the actual commands executed against"
+echo "  the expected commands. Produce a markdown table with columns:"
+echo "  case_id | status (PASS/FAIL) | expected | actual | issues."
+echo "  Also check forbidden patterns if defined. Summary at the end.\""

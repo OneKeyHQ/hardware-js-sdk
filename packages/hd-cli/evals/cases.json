@@ -5,351 +5,574 @@
     {
       "id": "device-search-basic",
       "prompt": "Find my OneKey hardware wallet",
-      "expected_commands": ["onekey-hw search"],
-      "match_mode": "exact"
+      "skill": "device",
+      "expect": {
+        "commands": [
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "device-search-cn",
       "prompt": "搜索我的 OneKey 硬件钱包",
-      "expected_commands": ["onekey-hw search"],
-      "match_mode": "exact"
+      "skill": "device",
+      "expect": {
+        "commands": [
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "device-status",
       "prompt": "What's the status of my hardware wallet?",
-      "expected_commands": ["onekey-hw status"],
-      "match_mode": "exact"
+      "skill": "device",
+      "expect": {
+        "commands": [
+          "onekey-hw status"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "bridge-check",
       "prompt": "Is OneKey Bridge running?",
-      "expected_commands": ["onekey-hw bridge-status"],
-      "match_mode": "exact"
+      "skill": "device",
+      "expect": {
+        "commands": [
+          "onekey-hw bridge-status"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "get-eth-address",
       "prompt": "Get my Ethereum address from hardware wallet",
-      "expected_commands": [
-        "onekey-hw status",
-        "onekey-hw get-address --chain evm --show-on-device true"
-      ],
-      "match_mode": "ordered"
+      "skill": "signing",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw status",
+          "onekey-hw get-address --chain evm --show-on-device true"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "get-btc-address",
       "prompt": "Show me my Bitcoin receive address",
-      "expected_commands": [
-        "onekey-hw status",
-        "onekey-hw get-address --chain btc --show-on-device true"
-      ],
-      "match_mode": "ordered"
+      "skill": "signing",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw status",
+          "onekey-hw get-address --chain btc --show-on-device true"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "get-sol-address",
       "prompt": "I need my Solana address",
-      "expected_commands": [
-        "onekey-hw get-address --chain sol"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw get-address --chain sol"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "get-multi-address",
       "prompt": "Set up addresses for ETH, BTC, and SOL",
-      "expected_commands": [
-        "onekey-hw batch-get-address"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw batch-get-address"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "sign-evm-tx",
       "prompt": "Sign this Ethereum transaction: send 0.1 ETH to 0xAbCdEf1234567890AbCdEf1234567890AbCdEf12",
-      "expected_commands": [
-        "onekey-hw status",
-        "onekey-hw sign-transaction --chain evm"
-      ],
-      "match_mode": "ordered"
+      "skill": "signing",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw status",
+          "onekey-hw sign-transaction --chain evm"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "sign-message",
       "prompt": "Sign this message with my ETH wallet: 'Hello World'",
-      "expected_commands": [
-        "onekey-hw sign-message --chain evm --message"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw sign-message --chain evm --message"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "firmware-check",
       "prompt": "Is my firmware up to date?",
-      "expected_commands": [
-        "onekey-hw firmware-check-all"
-      ],
-      "match_mode": "contains"
+      "skill": "firmware",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw firmware-check-all"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "firmware-check-cn",
       "prompt": "检查固件是否有更新",
-      "expected_commands": [
-        "onekey-hw firmware-check"
-      ],
-      "match_mode": "contains"
+      "skill": "firmware",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw firmware-check"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "firmware-update",
       "prompt": "Update my device firmware to the latest version",
-      "expected_commands": [
-        "onekey-hw firmware-check",
-        "onekey-hw firmware-update"
-      ],
-      "match_mode": "ordered"
+      "skill": "firmware",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw firmware-check",
+          "onekey-hw firmware-update"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "change-pin",
       "prompt": "I want to change my device PIN",
-      "expected_commands": [
-        "onekey-hw status",
-        "onekey-hw change-pin"
-      ],
-      "match_mode": "ordered"
+      "skill": "security",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw status",
+          "onekey-hw change-pin"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "enable-passphrase",
       "prompt": "Enable passphrase protection on my device",
-      "expected_commands": [
-        "onekey-hw toggle-passphrase --enable true"
-      ],
-      "match_mode": "contains"
+      "skill": "security",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw toggle-passphrase --enable true"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "device-backup",
       "prompt": "Back up my recovery phrase",
-      "expected_commands": [
-        "onekey-hw device-backup"
-      ],
-      "match_mode": "contains"
+      "skill": "device",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw device-backup"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "factory-reset",
       "prompt": "Factory reset my OneKey device",
-      "expected_commands": [
-        "onekey-hw device-wipe"
-      ],
-      "match_mode": "contains",
-      "expect_confirmation": true
+      "skill": "security",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw device-wipe"
+        ],
+        "forbidden": [
+          "--help"
+        ],
+        "note": "Must confirm with user before executing"
+      }
     },
     {
       "id": "setup-new-device",
       "prompt": "Set up my new OneKey hardware wallet from scratch",
-      "expected_commands": [
-        "onekey-hw search",
-        "onekey-hw device-verify",
-        "onekey-hw device-reset",
-        "onekey-hw device-backup"
-      ],
-      "match_mode": "ordered"
+      "skill": "device",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw search",
+          "onekey-hw device-verify",
+          "onekey-hw device-reset",
+          "onekey-hw device-backup"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "setup-new-device-cn",
       "prompt": "帮我初始化新的 OneKey 硬件钱包",
-      "expected_commands": [
-        "onekey-hw search",
-        "onekey-hw device-reset"
-      ],
-      "match_mode": "ordered"
+      "skill": "device",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw search",
+          "onekey-hw device-reset"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "recover-wallet",
       "prompt": "Recover my wallet from seed phrase on the hardware device",
-      "expected_commands": [
-        "onekey-hw device-recovery"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw device-recovery"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "verify-genuine",
       "prompt": "How do I know if my OneKey device is genuine?",
-      "expected_commands": [
-        "onekey-hw device-verify"
-      ],
-      "match_mode": "contains"
+      "skill": "security",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw device-verify"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "get-cosmos-address",
       "prompt": "获取我的 Cosmos 地址",
-      "expected_commands": [
-        "onekey-hw get-address --chain cosmos"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw get-address --chain cosmos"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "sign-btc-psbt",
       "prompt": "Sign this Bitcoin PSBT transaction",
-      "expected_commands": [
-        "onekey-hw sign-psbt"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw sign-psbt"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "sign-btc-inputs-outputs",
       "prompt": "Sign a Bitcoin transaction with these inputs and outputs",
-      "expected_commands": [
-        "onekey-hw sign-transaction --chain btc"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw sign-transaction --chain btc"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "sign-eip712",
       "prompt": "Sign this EIP-712 typed data with my hardware wallet",
-      "expected_commands": [
-        "onekey-hw sign-typed-data"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw sign-typed-data"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "verify-eth-message",
       "prompt": "Verify this Ethereum signed message on my device",
-      "expected_commands": [
-        "onekey-hw verify-message --chain evm"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw verify-message --chain evm"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "remove-pin",
       "prompt": "Remove PIN from my device",
-      "expected_commands": [
-        "onekey-hw change-pin --remove"
-      ],
-      "match_mode": "contains"
+      "skill": "security",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw change-pin --remove"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "passphrase-session",
       "prompt": "Get my hidden wallet passphrase state",
-      "expected_commands": [
-        "onekey-hw passphrase-state"
-      ],
-      "match_mode": "contains"
+      "skill": "security",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw passphrase-state"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "haptic-feedback",
       "prompt": "Disable haptic feedback on my device",
-      "expected_commands": [
-        "onekey-hw device-settings --haptic-feedback false"
-      ],
-      "match_mode": "contains"
+      "skill": "security",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw device-settings --haptic-feedback false"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "bootloader-stuck",
       "prompt": "My device is stuck in bootloader mode, help me fix it",
-      "expected_commands": [
-        "onekey-hw status",
-        "onekey-hw firmware-check",
-        "onekey-hw firmware-update"
-      ],
-      "match_mode": "ordered"
+      "skill": "firmware",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw status",
+          "onekey-hw firmware-check",
+          "onekey-hw firmware-update"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "connection-troubleshoot",
       "prompt": "My hardware wallet won't connect",
-      "expected_commands": [
-        "onekey-hw bridge-status",
-        "onekey-hw search"
-      ],
-      "match_mode": "ordered"
+      "skill": "device",
+      "expect": {
+        "commands_ordered": [
+          "onekey-hw bridge-status",
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "nostr-pubkey",
       "prompt": "Get my Nostr public key from hardware wallet",
-      "expected_commands": [
-        "onekey-hw get-public-key --chain nostr"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw get-public-key --chain nostr"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "lock-device",
       "prompt": "Lock my device",
-      "expected_commands": [
-        "onekey-hw lock"
-      ],
-      "match_mode": "exact"
+      "skill": "device",
+      "expect": {
+        "commands": [
+          "onekey-hw lock"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "nostr-encrypt",
       "prompt": "Encrypt a message for this Nostr pubkey",
-      "expected_commands": [
-        "onekey-hw nostr-encrypt"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw nostr-encrypt"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "nostr-decrypt",
       "prompt": "Decrypt this Nostr message",
-      "expected_commands": [
-        "onekey-hw nostr-decrypt"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw nostr-decrypt"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "nostr-schnorr",
       "prompt": "Sign this hash with Schnorr for Nostr",
-      "expected_commands": [
-        "onekey-hw nostr-sign-schnorr"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw nostr-sign-schnorr"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "lnurl-auth",
       "prompt": "Authenticate with this Lightning service using LNURL",
-      "expected_commands": [
-        "onekey-hw lnurl-auth"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw lnurl-auth"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "sol-offchain-message",
       "prompt": "Sign this Solana off-chain message",
-      "expected_commands": [
-        "onekey-hw sol-sign-offchain"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw sol-sign-offchain"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "conflux-cip23",
       "prompt": "Sign this Conflux CIP-23 structured message",
-      "expected_commands": [
-        "onekey-hw conflux-sign-cip23"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw conflux-sign-cip23"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "aptos-sign-in",
       "prompt": "Sign in to this Aptos dApp",
-      "expected_commands": [
-        "onekey-hw aptos-sign-in"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw aptos-sign-in"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "ton-proof",
       "prompt": "Generate a TON Connect proof for authentication",
-      "expected_commands": [
-        "onekey-hw ton-sign-proof"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw ton-sign-proof"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "evm-eip712-hash",
       "prompt": "Sign this EIP-712 domain hash and message hash",
-      "expected_commands": [
-        "onekey-hw evm-sign-eip712"
-      ],
-      "match_mode": "contains"
+      "skill": "signing",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw evm-sign-eip712"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     },
     {
       "id": "device-label",
       "prompt": "Rename my device to 'My OneKey Pro'",
-      "expected_commands": [
-        "onekey-hw device-settings --label"
-      ],
-      "match_mode": "contains"
+      "skill": "device",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw device-settings --label"
+        ],
+        "forbidden": [
+          "--help"
+        ]
+      }
     }
   ]
 }
