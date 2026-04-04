@@ -1,0 +1,28 @@
+{
+  "name": "@onekeyfe/hd-transport-node-hid",
+  "version": "1.1.25-alpha.0",
+  "description": "OneKey hardware wallet Node.js HID transport plugin",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "scripts": {
+    "dev": "rimraf dist && rollup -c ../../build/rollup.config.js -w",
+    "build": "rimraf dist && rollup -c ../../build/rollup.config.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-shared": "1.1.25-alpha.0",
+    "@onekeyfe/hd-transport": "1.1.25-alpha.0",
+    "bytebuffer": "^5.0.1",
+    "node-hid": "^3.1.0"
+  }
+}
