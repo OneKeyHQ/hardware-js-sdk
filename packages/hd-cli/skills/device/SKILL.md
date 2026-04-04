@@ -44,7 +44,6 @@ Default is `usb` — direct USB HID via node-hid, no extra setup required.
 | Transport | Value | Use Case |
 |---|---|---|
 | USB Direct | `usb` (default) | Direct USB HID, zero configuration |
-| HTTP | `http` | Legacy HTTP transport |
 
 If not specified, defaults to `usb` (direct USB HID).
 
@@ -66,7 +65,7 @@ onekey-hw search [--transport <transport>] [--timeout <ms>]
 
 | Parameter | Required | Description |
 |---|---|---|
-| `--transport` | No | Transport type: `usb`, `http` (default: `usb`) |
+| `--transport` | No | Transport type (default: `usb`) |
 | `--timeout` | No | Search timeout in milliseconds (default: 10000) |
 
 **Returns:**
