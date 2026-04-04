@@ -17,7 +17,6 @@ import * as readline from 'readline';
 import type { ConnectSettings } from '@onekeyfe/hd-core';
 
 export interface SDKOptions {
-  transport?: string;
   json?: boolean;
   connectId?: string;
   passphraseState?: string;
@@ -186,41 +185,9 @@ export async function createSDK(opts: SDKOptions) {
     fetchConfig: true,
   };
 
-  // Select transport based on CLI option
-  // Valid env values: 'node' | 'web' | 'webextension' | 'electron' |
-  //   'react-native' | 'webusb' | 'desktop-web-ble' | 'emulator' | 'lowlevel'
-  let plugin;
-  switch (opts.transport) {
-    case 'webusb':
-      // WebUSB requires navigator.usb (browser/Electron only).
-      // In pure Node.js CLI this is not available.
-      process.stderr.write(
-        '[onekey-hw] Warning: --transport webusb requires a browser or Electron environment.\n' +
-          '  In Node.js CLI, use --transport usb (default) or --transport http with OneKey Bridge.\n'
-      );
-      settings.env = 'webusb';
-      break;
-    case 'ble':
-      // BLE requires window.desktopApi.nobleBle (Electron) or React Native context.
-      // Not available in pure Node.js CLI.
-      process.stderr.write(
-        '[onekey-hw] Warning: --transport ble requires an Electron or React Native environment.\n' +
-          '  In Node.js CLI, use --transport usb (default) or --transport http with OneKey Bridge.\n'
-      );
-      settings.env = 'desktop-web-ble';
-      break;
-    case 'http':
-      // HTTP Bridge at http://localhost:21320 — requires OneKey Bridge daemon
-      settings.env = 'node';
-      break;
-    case 'usb':
-    case 'node-hid':
-    default:
-      // Direct USB HID via node-hid — no Bridge required
-      settings.env = 'lowlevel';
-      plugin = NodeHidPlugin;
-      break;
-  }
+  // Direct USB HID via node-hid — zero configuration required
+  settings.env = 'lowlevel';
+  const plugin = NodeHidPlugin;
 
   await HardwareSDK.init(settings, undefined, plugin);
 

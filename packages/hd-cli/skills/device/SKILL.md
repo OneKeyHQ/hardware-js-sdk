@@ -36,17 +36,6 @@ update when installing, updating, or handling a failure.
 
 ## Parameter Rules
 
-### `--transport` Resolution
-
-`--transport` selects how to communicate with the device.
-Default is `usb` — direct USB HID via node-hid, no extra setup required.
-
-| Transport | Value | Use Case |
-|---|---|---|
-| USB Direct | `usb` (default) | Direct USB HID, zero configuration |
-
-If not specified, defaults to `usb` (direct USB HID).
-
 ### Device Identification
 
 - `--connect-id`: Connection identifier from `search` results.
@@ -60,12 +49,11 @@ If not specified, defaults to `usb` (direct USB HID).
 Search for connected OneKey hardware wallet devices.
 
 ```bash
-onekey-hw search [--transport <transport>] [--timeout <ms>]
+onekey-hw search [--timeout <ms>]
 ```
 
 | Parameter | Required | Description |
 |---|---|---|
-| `--transport` | No | Transport type (default: `usb`) |
 | `--timeout` | No | Search timeout in milliseconds (default: 10000) |
 
 **Returns:**

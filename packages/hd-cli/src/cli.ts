@@ -21,7 +21,6 @@ program
 // ============================================================
 
 program.option('--json', 'Output in JSON format (for agent consumption)');
-program.option('--transport <type>', 'Transport type: usb | http | webusb | ble (default: usb via node-hid)', 'usb');
 program.option('--connect-id <id>', 'Device connection ID (USB: serial, iOS: uuid, Android: MAC)');
 program.option(
   '--device-id <id>',
