@@ -16,8 +16,8 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 1. **Check CLI installed**: Run `onekey-hw --version`.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
 
-2. **Check device connected**: Run `onekey-hw status`.
-   - No device → run `onekey-hw search` and connect first (see `hardware-device` skill).
+2. **Check device connected**: Run `onekey-hw search --json`.
+   - No device → guide troubleshooting (USB cable, unlock device, different port).
    - Device in bootloader mode → cannot sign, guide to `hardware-firmware` skill.
    - Device not initialized → guide user to set up device first.
 
@@ -129,10 +129,10 @@ onekey-hw get-address \
 ```json
 {
   "success": true,
-  "address": "0x1234...abcd",
-  "path": "m/44'/60'/0'/0/0",
-  "chain": "evm",
-  "verifiedOnDevice": true
+  "payload": {
+    "address": "0x1234...abcd",
+    "path": "m/44'/60'/0'/0/0"
+  }
 }
 ```
 
@@ -157,9 +157,10 @@ onekey-hw get-public-key \
 ```json
 {
   "success": true,
-  "publicKey": "04abcdef...",
-  "path": "m/44'/60'/0'/0/0",
-  "chain": "evm"
+  "payload": {
+    "publicKey": "04abcdef...",
+    "path": "m/44'/60'/0'/0/0"
+  }
 }
 ```
 
@@ -171,7 +172,7 @@ confirmation on the device.
 ```bash
 onekey-hw sign-transaction \
   --chain <chain> \
-  --tx <transaction-json-or-hex> \
+  --tx <transaction-json> \
   [--path <bip44-path>] \
   [--connect-id <id>]
 ```
@@ -179,7 +180,7 @@ onekey-hw sign-transaction \
 | Parameter | Required | Description |
 |---|---|---|
 | `--chain` | Yes | Target blockchain |
-| `--tx` | Yes | Transaction data (JSON object or hex string, chain-dependent) |
+| `--tx` | Yes | Transaction data (JSON object, chain-dependent) |
 | `--path` | No | BIP44 derivation path |
 | `--connect-id` | No | Device connection ID |
 
@@ -190,13 +191,6 @@ onekey-hw sign-transaction \
   --tx '{"to":"0xAbC...","value":"0xf4240","data":"0x","chainId":1,"nonce":"0x0","maxFeePerGas":"0x14","maxPriorityFeePerGas":"0x0","gasLimit":"0x5208"}'
 ```
 
-**EVM Transaction Example (Legacy):**
-```bash
-onekey-hw sign-transaction \
-  --chain evm \
-  --tx '{"to":"0xAbC...","value":"0xf4240","data":"0x01","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}'
-```
-
 **BTC Transaction Example (inputs/outputs/refTxs format):**
 ```bash
 onekey-hw sign-transaction \
@@ -205,17 +199,7 @@ onekey-hw sign-transaction \
 ```
 
 > **Note:** BTC uses `inputs/outputs/refTxs` format, NOT raw hex or PSBT.
-> For PSBT signing, the SDK provides `btcSignPsbt` separately.
-
-**Returns:**
-```json
-{
-  "success": true,
-  "signature": "0xabc...",
-  "serializedTx": "0xf86c...",
-  "chain": "evm"
-}
-```
+> For PSBT signing, use `sign-psbt` instead.
 
 **Agent notes:**
 - This is the most critical operation — requires physical device confirmation.
@@ -245,44 +229,10 @@ onekey-hw sign-message \
 | `--path` | No | BIP44 derivation path |
 | `--connect-id` | No | Device connection ID |
 
-**Returns:**
-```json
-{
-  "success": true,
-  "signature": "0xabc...",
-  "address": "0x1234...",
-  "chain": "evm"
-}
-```
-
 **Agent notes:**
 - Device will show the message for user verification.
-- For EIP-712 typed data on EVM, use `--message-type eip712` and pass structured JSON.
-- For Nostr events, use `--chain nostr` with event JSON as message.
 - **TON note**: `tonSignMessage` is a transfer-signing method, not arbitrary message
   signing. Pass `--message` as JSON: `'{"destination":"UQ...","tonAmount":100,"seqno":0,"expireAt":1234567890}'`.
-  Required fields: `destination`, `tonAmount`, `seqno`, `expireAt`.
-
-### `onekey-hw sign-typed-data`
-
-Sign EIP-712 typed data (EVM only).
-
-```bash
-onekey-hw sign-typed-data \
-  --chain evm \
-  --data <eip712-json> \
-  [--path <bip44-path>] \
-  [--connect-id <id>]
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "signature": "0xabc...",
-  "address": "0x1234..."
-}
-```
 
 ### `onekey-hw sign-typed-data`
 
@@ -292,6 +242,7 @@ Sign EIP-712 typed data (EVM only).
 onekey-hw sign-typed-data \
   --data <eip712-json> \
   [--path <bip44-path>] \
+  [--metamask-v4-compat] \
   [--connect-id <id>]
 ```
 
@@ -300,17 +251,6 @@ onekey-hw sign-typed-data \
 | `--data` | Yes | EIP-712 typed data as JSON |
 | `--path` | No | BIP44 derivation path (default: m/44'/60'/0'/0/0) |
 | `--metamask-v4-compat` | No | MetaMask V4 compatibility mode (default: true) |
-
-**Returns:**
-```json
-{
-  "success": true,
-  "payload": {
-    "signature": "0xabc...",
-    "address": "0x1234..."
-  }
-}
-```
 
 ### `onekey-hw sign-psbt`
 
@@ -328,16 +268,6 @@ onekey-hw sign-psbt \
 |---|---|---|
 | `--psbt` | Yes | Hex-encoded PSBT data |
 | `--coin` | No | Bitcoin network: btc, ltc, etc. (default: btc) |
-
-**Returns:**
-```json
-{
-  "success": true,
-  "payload": {
-    "psbt": "hex-encoded-signed-psbt"
-  }
-}
-```
 
 **Agent notes:**
 - Simpler than `sign-transaction --chain btc` (no need to construct inputs/outputs/refTxs).
@@ -364,16 +294,6 @@ onekey-hw verify-message \
 | `--message` | Yes | Original message |
 | `--signature` | Yes | Signature to verify |
 
-**Returns:**
-```json
-{
-  "success": true,
-  "payload": {
-    "message": "Message verified"
-  }
-}
-```
-
 ### `onekey-hw batch-get-address`
 
 Get addresses for multiple chains/paths in a single session.
@@ -393,97 +313,9 @@ onekey-hw batch-get-address \
 ]
 ```
 
-**Returns:**
-```json
-{
-  "success": true,
-  "addresses": [
-    { "chain": "evm", "path": "m/44'/60'/0'/0/0", "address": "0x..." },
-    { "chain": "btc", "path": "m/84'/0'/0'/0/0", "address": "bc1q..." },
-    { "chain": "sol", "path": "m/44'/501'/0'/0'", "address": "7xKX..." }
-  ]
-}
-```
-
 **Agent notes:**
 - Batch mode disables on-device verification for speed.
 - Useful for portfolio dashboards or multi-chain wallet setup.
-- Uses `allNetworkGetAddress` API internally for optimal performance.
-
-## Workflows
-
-### Get Receive Address
-
-```
-User: "Give me my Ethereum address"
-
-Step 1 — Ensure device connected
-→ onekey-hw status
-
-Step 2 — Get address with on-device verification
-→ onekey-hw get-address --chain evm --show-on-device true
-→ "Please verify the address on your OneKey device screen."
-→ Display address to user
-```
-
-### Sign an EVM Transaction
-
-```
-User: "Sign this transaction: send 0.1 ETH to 0xAbc..."
-
-Step 1 — Ensure device connected
-→ onekey-hw status
-
-Step 2 — Display transaction details to user
-→ "You are about to sign: Send 0.1 ETH to 0xAbc... on Ethereum"
-→ "Estimated gas: ~21000 (0.00063 ETH at 30 gwei)"
-
-Step 3 — Wait for user confirmation in chat
-→ User says "yes" / "confirm"
-
-Step 4 — Sign
-→ onekey-hw sign-transaction --chain evm --tx '{"to":"0xAbc...","value":"0x16345785D8A0000",...}'
-→ "Please review and confirm on your OneKey device."
-
-Step 5 — Return signature
-→ Display signed transaction hash
-```
-
-### Multi-Chain Address Setup
-
-```
-User: "Set up my wallet with addresses for ETH, BTC, and SOL"
-
-Step 1 — Ensure device connected
-→ onekey-hw status
-
-Step 2 — Batch get addresses
-→ onekey-hw batch-get-address --bundle '[
-    {"chain":"evm","path":"m/44'/60'/0'/0/0","showOnDevice":false},
-    {"chain":"btc","path":"m/84'/0'/0'/0/0","showOnDevice":false},
-    {"chain":"sol","path":"m/44'/501'/0'/0'","showOnDevice":false}
-  ]'
-
-Step 3 — Present results
-→ Display all addresses in a clean table
-```
-
-## When To Use
-
-- User wants to get a cryptocurrency address for receiving funds.
-- User wants to sign any blockchain transaction.
-- User wants to sign or verify a message.
-- User needs public keys for multi-sig or advanced setups.
-- User wants addresses across multiple chains.
-
-## When NOT To Use
-
-- User wants to connect or search for devices → use `hardware-device`.
-- User wants to update firmware → use `hardware-firmware`.
-- User wants to change PIN/passphrase → use `hardware-security`.
-- User wants to swap tokens → use `onekey` plugin's `swap` skill.
-- User wants to broadcast a signed transaction → this skill only SIGNS,
-  broadcasting is handled by the application layer.
 
 ## Chain-Specific Commands
 
@@ -493,7 +325,6 @@ These commands wrap chain-specific SDK methods that don't fit the generic
 ### `onekey-hw evm-sign-eip712`
 
 Sign EIP-712 message by pre-computed domain and message hashes.
-Lower-level than `sign-typed-data` — use when you already have the hashes.
 
 ```bash
 onekey-hw evm-sign-eip712 --domain-hash <hex> --message-hash <hex> [--path <path>]
@@ -501,25 +332,18 @@ onekey-hw evm-sign-eip712 --domain-hash <hex> --message-hash <hex> [--path <path
 
 ### `onekey-hw sol-sign-offchain`
 
-Sign a Solana off-chain message (different from on-chain transaction signing).
+Sign a Solana off-chain message.
 
 ```bash
 onekey-hw sol-sign-offchain --message-hex <hex> [--path <path>]
 ```
 
-### `onekey-hw nostr-encrypt`
+### `onekey-hw nostr-encrypt` / `nostr-decrypt`
 
-Encrypt a message for a Nostr recipient using NIP-04 encryption.
+Encrypt/decrypt Nostr NIP-04 messages.
 
 ```bash
 onekey-hw nostr-encrypt --pubkey <hex> --plaintext <text> [--path <path>]
-```
-
-### `onekey-hw nostr-decrypt`
-
-Decrypt a Nostr NIP-04 encrypted message.
-
-```bash
 onekey-hw nostr-decrypt --pubkey <hex> --ciphertext <text> [--path <path>]
 ```
 
@@ -541,7 +365,7 @@ onekey-hw lnurl-auth --domain <domain> --k1 <hex>
 
 ### `onekey-hw conflux-sign-cip23`
 
-Sign a Conflux CIP-23 structured message (like EIP-712 for Conflux).
+Sign a Conflux CIP-23 structured message.
 
 ```bash
 onekey-hw conflux-sign-cip23 --domain-hash <hex> --message-hash <hex> [--path <path>]
@@ -563,21 +387,76 @@ Sign a TON Connect proof for wallet authentication.
 onekey-hw ton-sign-proof --appdomain <domain> --expire-at <timestamp> [--comment <text>] [--path <path>]
 ```
 
-## Air-Gap (QR Code) Signing
+## Workflows
 
-For air-gapped (offline) devices, the SDK supports UR (Uniform Resource) encoded
-QR code signing via `@ngraveio/bc-ur` and `@keystonehq/keystone-sdk`:
+### Get Receive Address
 
-- **Supported chains**: EVM, BTC, SOL
-- **Flow**: Generate request QR → Device scans → Signs offline → Generates response QR → Scan response
-- **CLI**: Air-gap signing is NOT available via CLI commands (requires camera/QR UI).
-  Use the SDK's AirGap API directly for QR-based workflows.
-- **Reference**: `packages/connect-examples/react-native-demo/air-gap/sdk/`
+```
+User: "Give me my Ethereum address"
 
-## Cross-References
+Step 1 — Ensure device connected
+→ onekey-hw search --json
+→ onekey-hw status --connect-id <id>
 
-- Device connection required → `hardware-device` skill handles connection.
-- Firmware check recommended → `hardware-firmware` skill can verify compatibility.
-- Transaction building → use `onekey` plugin (app-monorepo) to build transactions,
-  then use this skill to sign them with hardware security.
-- Air-gap signing → requires native app with QR code UI, not available via CLI.
+Step 2 — Get address with on-device verification
+→ onekey-hw get-address --chain evm --show-on-device true --connect-id <id>
+→ "Please verify the address on your OneKey device screen."
+→ Display address to user
+```
+
+### Sign an EVM Transaction
+
+```
+User: "Sign this transaction: send 0.1 ETH to 0xAbc..."
+
+Step 1 — Ensure device connected
+→ onekey-hw search --json
+
+Step 2 — Display transaction details to user
+→ "You are about to sign: Send 0.1 ETH to 0xAbc... on Ethereum"
+
+Step 3 — Wait for user confirmation in chat
+→ User says "yes" / "confirm"
+
+Step 4 — Sign
+→ onekey-hw sign-transaction --chain evm --tx '{"to":"0xAbc...","value":"0x16345785D8A0000",...}' --connect-id <id>
+→ "Please review and confirm on your OneKey device."
+
+Step 5 — Return signature
+→ Display signed transaction
+```
+
+### Multi-Chain Address Setup
+
+```
+User: "Set up my wallet with addresses for ETH, BTC, and SOL"
+
+Step 1 — Ensure device connected
+→ onekey-hw search --json
+
+Step 2 — Batch get addresses
+→ onekey-hw batch-get-address --bundle '[
+    {"chain":"evm","path":"m/44'/60'/0'/0/0","showOnDevice":false},
+    {"chain":"btc","path":"m/84'/0'/0'/0/0","showOnDevice":false},
+    {"chain":"sol","path":"m/44'/501'/0'/0'","showOnDevice":false}
+  ]' --connect-id <id>
+
+Step 3 — Present results
+→ Display all addresses in a clean table
+```
+
+## When To Use
+
+- User wants to get a cryptocurrency address for receiving funds.
+- User wants to sign any blockchain transaction.
+- User wants to sign or verify a message.
+- User needs public keys for multi-sig or advanced setups.
+- User wants addresses across multiple chains.
+
+## When NOT To Use
+
+- User wants to connect or search for devices → use `hardware-device`.
+- User wants to update firmware → use `hardware-firmware`.
+- User wants to change PIN/passphrase → use `hardware-security`.
+- User wants to broadcast a signed transaction → this skill only SIGNS,
+  broadcasting is handled by the application layer.

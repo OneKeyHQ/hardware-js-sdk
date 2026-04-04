@@ -62,20 +62,6 @@ program
     }
   });
 
-program
-  .command('bridge-status')
-  .description('Check if OneKey Bridge is running')
-  .action(async () => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await sdk.checkBridgeStatus();
-      outputResult(globalOpts, result);
-    } finally {
-      sdk.dispose();
-    }
-  });
-
 // ============================================================
 // Signing Commands
 // ============================================================

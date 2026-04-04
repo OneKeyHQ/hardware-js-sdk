@@ -6,7 +6,7 @@ description: OneKey hardware wallet security and device management — PIN chang
   back up their device, recover from a seed phrase, reset to factory, or
   manage device security settings.
 keywords: [pin, passphrase, backup, reset, wipe, recovery, security, seed,
-  factory-reset, label, settings, lock, unlock]
+  factory-reset, label, settings, lock]
 ---
 
 ## Pre-flight Checks
@@ -16,8 +16,8 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 1. **Check CLI installed**: Run `onekey-hw --version`.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
 
-2. **Check device connected**: Run `onekey-hw status`.
-   - No device → run `onekey-hw search` and connect first (see `hardware-device` skill).
+2. **Check device connected**: Run `onekey-hw search --json`.
+   - No device → guide troubleshooting (USB cable, unlock device, different port).
 
 ## Security Rules — ABSOLUTE
 
@@ -61,14 +61,6 @@ onekey-hw change-pin [--remove] [--connect-id <id>]
 |---|---|---|
 | `--remove` | No | Remove PIN protection instead of changing |
 
-**Returns:**
-```json
-{
-  "success": true,
-  "message": "PIN changed successfully"
-}
-```
-
 **Agent notes:**
 - PIN entry happens entirely on the device screen — the CLI does not see the PIN.
 - If no PIN was set, this creates a new PIN.
@@ -82,14 +74,6 @@ Get current passphrase state for hidden wallet session management.
 
 ```bash
 onekey-hw passphrase-state [--use-empty-passphrase] [--connect-id <id>]
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "payload": "passphrase_state_hash"
-}
 ```
 
 **Agent notes:**
@@ -111,16 +95,6 @@ onekey-hw toggle-passphrase \
 | Parameter | Required | Description |
 |---|---|---|
 | `--enable` | Yes | `true` to enable, `false` to disable |
-| `--connect-id` | No | Device connection ID |
-
-**Returns:**
-```json
-{
-  "success": true,
-  "passphraseEnabled": true,
-  "message": "Passphrase protection enabled. You will be asked for a passphrase on each connection."
-}
-```
 
 **Agent notes:**
 - Passphrase creates a "hidden wallet" — different passphrase = different wallet.
@@ -134,14 +108,6 @@ Trigger the device to display the recovery phrase for backup verification.
 
 ```bash
 onekey-hw device-backup [--connect-id <id>]
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "message": "Backup process completed on device"
-}
 ```
 
 **Agent notes:**
@@ -169,15 +135,6 @@ onekey-hw device-recovery \
 | `--passphrase-protection` | No | Enable passphrase after recovery (default: false) |
 | `--pin-protection` | No | Set PIN after recovery (default: true) |
 | `--label` | No | Device label / name |
-| `--connect-id` | No | Device connection ID |
-
-**Returns:**
-```json
-{
-  "success": true,
-  "message": "Device recovered successfully"
-}
-```
 
 **Agent notes:**
 - Recovery phrase is entered DIRECTLY on the device screen — NEVER in the CLI or chat.
@@ -203,15 +160,6 @@ onekey-hw device-reset \
 | `--passphrase-protection` | No | Enable passphrase (default: false) |
 | `--pin-protection` | No | Set PIN (default: true) |
 | `--label` | No | Device label / name |
-| `--connect-id` | No | Device connection ID |
-
-**Returns:**
-```json
-{
-  "success": true,
-  "message": "Device initialized with new wallet. Please back up your recovery phrase."
-}
-```
 
 **Agent notes:**
 - This DESTROYS the current wallet and creates a new one.
@@ -224,14 +172,6 @@ Factory reset — erase all data from the device.
 
 ```bash
 onekey-hw device-wipe [--connect-id <id>]
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "message": "Device wiped to factory settings"
-}
 ```
 
 **Agent notes:**
@@ -265,31 +205,12 @@ onekey-hw device-settings \
 | `--haptic-feedback` | No | Enable/disable haptic feedback (true/false) |
 | `--auto-shutdown-delay` | No | Auto power-off timeout in seconds |
 
-**Returns:**
-```json
-{
-  "success": true,
-  "payload": {
-    "message": "Settings applied"
-  }
-}
-```
-
 ### `onekey-hw device-verify`
 
 Verify the device is genuine OneKey hardware (anti-tampering check).
 
 ```bash
 onekey-hw device-verify [--connect-id <id>]
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "genuine": true,
-  "message": "Device verified as genuine OneKey hardware"
-}
 ```
 
 **Agent notes:**
@@ -305,14 +226,6 @@ Lock the device (require PIN to unlock).
 onekey-hw lock [--connect-id <id>]
 ```
 
-### `onekey-hw unlock`
-
-Prompt device unlock (PIN entry on device).
-
-```bash
-onekey-hw unlock [--connect-id <id>]
-```
-
 ## Workflows
 
 ### First-Time Device Setup
@@ -320,23 +233,21 @@ onekey-hw unlock [--connect-id <id>]
 ```
 User: "Set up my new OneKey device"
 
-Step 1 — Connect device
-→ onekey-hw search → onekey-hw connect
-
-Step 2 — Verify genuine
-→ onekey-hw device-verify
+Step 1 — Search and verify
+→ onekey-hw search --json
+→ onekey-hw device-verify --connect-id <id>
 → "Device verified as genuine OneKey hardware."
 
-Step 3 — Initialize with new wallet
+Step 2 — Initialize with new wallet
 → "This will create a new wallet. You'll set a PIN and back up your recovery phrase."
-→ onekey-hw device-reset --word-count 24 --pin-protection true --label "My OneKey"
+→ onekey-hw device-reset --word-count 24 --pin-protection true --label "My OneKey" --connect-id <id>
 
-Step 4 — Backup recovery phrase
-→ onekey-hw device-backup
+Step 3 — Backup recovery phrase
+→ onekey-hw device-backup --connect-id <id>
 → "Write down the 24 words shown on your device. Store securely offline."
 
-Step 5 — Verify setup
-→ onekey-hw status
+Step 4 — Verify setup
+→ onekey-hw status --connect-id <id>
 → Display device info, confirm PIN and backup status.
 ```
 
@@ -346,10 +257,10 @@ Step 5 — Verify setup
 User: "Change my device PIN"
 
 Step 1 — Verify device connected
-→ onekey-hw status
+→ onekey-hw search --json
 
 Step 2 — Change PIN
-→ onekey-hw change-pin
+→ onekey-hw change-pin --connect-id <id>
 → "Follow the prompts on your device screen:
    1. Enter your current PIN
    2. Enter your new PIN
@@ -370,7 +281,7 @@ Step 2 — Confirm user understands
 → Wait for explicit "I understand" / "yes"
 
 Step 3 — Enable
-→ onekey-hw toggle-passphrase --enable true
+→ onekey-hw toggle-passphrase --enable true --connect-id <id>
 → "Passphrase protection enabled."
 ```
 
@@ -389,7 +300,7 @@ Step 2 — Second confirmation
 → "Type 'WIPE' to confirm factory reset."
 
 Step 3 — Execute
-→ onekey-hw device-wipe
+→ onekey-hw device-wipe --connect-id <id>
 → "Device has been wiped. You can set it up as new or recover from a seed."
 ```
 

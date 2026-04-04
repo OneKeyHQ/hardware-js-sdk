@@ -24,10 +24,6 @@ update when installing, updating, or handling a failure.
    - Update failed → STOP, suggest manual update.
    - Update succeeded → continue with original command.
 
-3. **Check bridge status**: Run `onekey-hw bridge-status`.
-   - Bridge not running → instruct user to start OneKey Bridge or connect via USB directly.
-   - Bridge running → continue.
-
 ## Security Rules — ABSOLUTE
 
 - NEVER expose device seeds, mnemonics, or private keys in any output.
@@ -43,14 +39,14 @@ update when installing, updating, or handling a failure.
 ### `--transport` Resolution
 
 `--transport` selects how to communicate with the device.
+Default is `usb` — direct USB HID via node-hid, no extra setup required.
 
 | Transport | Value | Use Case |
 |---|---|---|
-| HTTP Bridge | `http` (default) | Desktop via OneKey Bridge |
-| WebUSB | `webusb` | Direct USB (Chrome/Electron) |
-| BLE | `ble` | Mobile Bluetooth |
+| USB Direct | `usb` (default) | Direct USB HID, zero configuration |
+| HTTP | `http` | Legacy HTTP transport |
 
-If not specified, defaults to `http` (OneKey Bridge).
+If not specified, defaults to `usb` (direct USB HID).
 
 ### Device Identification
 
@@ -70,21 +66,19 @@ onekey-hw search [--transport <transport>] [--timeout <ms>]
 
 | Parameter | Required | Description |
 |---|---|---|
-| `--transport` | No | Transport type: `http`, `webusb`, `ble` (default: `http`) |
+| `--transport` | No | Transport type: `usb`, `http` (default: `usb`) |
 | `--timeout` | No | Search timeout in milliseconds (default: 10000) |
 
 **Returns:**
 ```json
 {
   "success": true,
-  "devices": [
+  "payload": [
     {
       "connectId": "ABC123",
       "deviceId": "DEV456",
       "name": "OneKey Pro",
-      "label": "My Wallet",
-      "model": "pro",
-      "transportType": "http"
+      "label": "My Wallet"
     }
   ]
 }
@@ -92,31 +86,8 @@ onekey-hw search [--transport <transport>] [--timeout <ms>]
 
 **Agent notes:**
 - Always run `search` before any device operation if no `connectId` is known.
-- If no devices found, suggest: check USB cable, start OneKey Bridge, unlock device.
+- If no devices found, suggest: check USB cable, unlock device, try a different USB port.
 - Multiple devices → present list, ask user to select.
-
-### `onekey-hw connect`
-
-Connect to a specific device and initialize a session.
-
-```bash
-onekey-hw connect --connect-id <id> [--transport <transport>]
-```
-
-| Parameter | Required | Description |
-|---|---|---|
-| `--connect-id` | Yes | Connection ID from `search` results |
-| `--transport` | No | Transport type (default: `http`) |
-
-**Returns:**
-```json
-{
-  "success": true,
-  "connectId": "ABC123",
-  "deviceId": "DEV456",
-  "sessionId": "session_789"
-}
-```
 
 ### `onekey-hw status`
 
@@ -130,19 +101,17 @@ onekey-hw status [--connect-id <id>]
 ```json
 {
   "success": true,
-  "device": {
+  "payload": {
     "connectId": "ABC123",
     "deviceId": "DEV456",
     "model": "pro",
     "label": "My Wallet",
     "firmwareVersion": "4.8.0",
-    "bleFirmwareVersion": "2.1.0",
     "bootloaderMode": false,
     "pinProtection": true,
     "passphraseProtection": false,
     "initialized": true,
-    "needsBackup": false,
-    "serialNumber": "OK-PRO-XXXX"
+    "needsBackup": false
   }
 }
 ```
@@ -153,40 +122,12 @@ onekey-hw status [--connect-id <id>]
 - If `needsBackup` is true, strongly recommend backup before any signing.
 - If `bootloaderMode` is true, only firmware operations are available.
 
-### `onekey-hw disconnect`
+### `onekey-hw lock`
 
-Disconnect from the current device and release the session.
-
-```bash
-onekey-hw disconnect [--connect-id <id>]
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "message": "Device disconnected"
-}
-```
-
-### `onekey-hw bridge-status`
-
-Check if OneKey Bridge (HTTP transport daemon) is running.
+Lock the device (require PIN to unlock).
 
 ```bash
-onekey-hw bridge-status
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "bridge": {
-    "running": true,
-    "version": "2.3.0",
-    "url": "http://127.0.0.1:21320"
-  }
-}
+onekey-hw lock [--connect-id <id>]
 ```
 
 ## Workflows
@@ -197,14 +138,11 @@ onekey-hw bridge-status
 User: "Connect my OneKey hardware wallet"
 
 Step 1 — Search for devices
-→ onekey-hw search
-→ If no devices found, guide troubleshooting (USB cable, bridge, unlock)
+→ onekey-hw search --json
+→ If no devices found, guide troubleshooting (USB cable, unlock, different port)
 
-Step 2 — Connect (if multiple, ask user to choose)
-→ onekey-hw connect --connect-id <selected-id>
-
-Step 3 — Check device status
-→ onekey-hw status
+Step 2 — Check device status
+→ onekey-hw status --connect-id <id-from-search>
 → Report: model, firmware version, PIN status, backup status
 ```
 
@@ -213,15 +151,13 @@ Step 3 — Check device status
 ```
 User: "My device won't connect"
 
-Step 1 — Check bridge
-→ onekey-hw bridge-status
-→ Bridge not running → "Please install and start OneKey Bridge from https://onekey.so/download"
-
-Step 2 — Search with extended timeout
+Step 1 — Search with extended timeout
 → onekey-hw search --timeout 30000
 
-Step 3 — Try alternative transport if USB fails
-→ onekey-hw search --transport webusb
+Step 2 — Guide the user:
+  - Is the device powered on and unlocked?
+  - Try a different USB cable or port
+  - On Linux, check udev rules for HID device permissions
 ```
 
 ## When To Use

@@ -13,8 +13,8 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 1. **Check CLI installed**: Run `onekey-hw --version`.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
 
-2. **Check device connected**: Run `onekey-hw status`.
-   - No device → run `onekey-hw search` and connect first (see `hardware-device` skill).
+2. **Check device connected**: Run `onekey-hw search --json`.
+   - No device → guide troubleshooting (USB cable, unlock device, different port).
 
 ## Security Rules — ABSOLUTE
 
@@ -45,49 +45,18 @@ Check if a firmware update is available for the connected device.
 onekey-hw firmware-check [--connect-id <id>]
 ```
 
-**Returns (update available):**
-```json
-{
-  "success": true,
-  "current": {
-    "firmwareVersion": "4.7.0",
-    "bleFirmwareVersion": "2.0.0",
-    "bootloaderVersion": "2.3.0"
-  },
-  "available": {
-    "firmware": {
-      "version": "4.8.0",
-      "changelog": "Bug fixes, new chain support (TON, Benfen)",
-      "required": false
-    },
-    "ble": {
-      "version": "2.1.0",
-      "changelog": "Improved BLE stability",
-      "required": false
-    }
-  },
-  "upToDate": false
-}
-```
-
-**Returns (up to date):**
-```json
-{
-  "success": true,
-  "current": {
-    "firmwareVersion": "4.8.0",
-    "bleFirmwareVersion": "2.1.0",
-    "bootloaderVersion": "2.3.0"
-  },
-  "available": null,
-  "upToDate": true
-}
-```
-
 **Agent notes:**
 - Always check firmware before any operation to ensure compatibility.
 - If `required` is true, the update is mandatory — signing may not work until updated.
 - Present changelog to user so they can make an informed decision.
+
+### `onekey-hw firmware-check-all`
+
+Check all firmware components at once (system, BLE, bootloader).
+
+```bash
+onekey-hw firmware-check-all [--connect-id <id>]
+```
 
 ### `onekey-hw firmware-update`
 
@@ -96,28 +65,20 @@ Update the device firmware (system firmware).
 ```bash
 onekey-hw firmware-update \
   [--connect-id <id>] \
-  [--version <version>]
+  [--version <version>] \
+  [--platform <platform>]
 ```
 
 | Parameter | Required | Description |
 |---|---|---|
 | `--connect-id` | No | Device connection ID |
-| `--version` | No | Target version (defaults to latest available) |
-
-**Returns:**
-```json
-{
-  "success": true,
-  "previousVersion": "4.7.0",
-  "updatedVersion": "4.8.0",
-  "message": "Firmware updated successfully. Please re-enter your PIN."
-}
-```
+| `--version` | No | Target version, e.g. "4.8.0" (defaults to latest) |
+| `--platform` | No | Platform: native, desktop, ext, web (default: desktop) |
 
 **Agent notes:**
 - This operation takes 1-3 minutes. Inform the user to be patient.
 - The device will reboot during the update — this is normal.
-- After update, the device session is invalidated — run `onekey-hw connect` again.
+- After update, run `onekey-hw search` again to re-detect the device.
 - If the update fails, the device may enter bootloader mode — guide recovery.
 
 ### `onekey-hw firmware-update-ble`
@@ -127,17 +88,8 @@ Update the BLE (Bluetooth) firmware.
 ```bash
 onekey-hw firmware-update-ble \
   [--connect-id <id>] \
-  [--version <version>]
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "previousVersion": "2.0.0",
-  "updatedVersion": "2.1.0",
-  "message": "BLE firmware updated successfully."
-}
+  [--version <version>] \
+  [--platform <platform>]
 ```
 
 **Agent notes:**
@@ -153,38 +105,6 @@ Check bootloader version and status.
 onekey-hw bootloader-check [--connect-id <id>]
 ```
 
-**Returns:**
-```json
-{
-  "success": true,
-  "bootloaderVersion": "2.3.0",
-  "bootloaderMode": false,
-  "updateAvailable": false
-}
-```
-
-### `onekey-hw firmware-check-all`
-
-Check all firmware components at once (system, BLE, bootloader).
-
-```bash
-onekey-hw firmware-check-all [--connect-id <id>]
-```
-
-**Returns:**
-```json
-{
-  "success": true,
-  "device": "OneKey Pro",
-  "components": {
-    "firmware": { "current": "4.8.0", "latest": "4.8.0", "upToDate": true },
-    "ble": { "current": "2.0.0", "latest": "2.1.0", "upToDate": false },
-    "bootloader": { "current": "2.3.0", "latest": "2.3.0", "upToDate": true }
-  },
-  "allUpToDate": false
-}
-```
-
 ## Workflows
 
 ### Check & Update Firmware
@@ -193,7 +113,7 @@ onekey-hw firmware-check-all [--connect-id <id>]
 User: "Is my firmware up to date?"
 
 Step 1 — Check all components
-→ onekey-hw firmware-check-all
+→ onekey-hw firmware-check-all --connect-id <id> --json
 → Present results in a clear table
 
 Step 2 — If updates available, ask user
@@ -202,7 +122,7 @@ Step 2 — If updates available, ask user
 
 Step 3 — User confirms → update
 → "DO NOT disconnect your device during the update."
-→ onekey-hw firmware-update-ble
+→ onekey-hw firmware-update-ble --connect-id <id>
 → "BLE firmware updated to v2.1.0."
 ```
 
@@ -212,16 +132,13 @@ Step 3 — User confirms → update
 User: "My device shows a bootloader screen"
 
 Step 1 — Verify bootloader mode
-→ onekey-hw status
+→ onekey-hw status --connect-id <id>
 → If bootloaderMode: true, proceed
 
-Step 2 — Check if update was interrupted
-→ onekey-hw firmware-check
-
-Step 3 — Attempt firmware update to recover
+Step 2 — Attempt firmware update to recover
 → "Your device is in bootloader mode. This usually means a firmware update
    was interrupted. Let's reinstall the firmware."
-→ onekey-hw firmware-update
+→ onekey-hw firmware-update --connect-id <id>
 → "Firmware installed. Your device should restart normally."
 ```
 
