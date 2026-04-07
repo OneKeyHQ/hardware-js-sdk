@@ -1,6 +1,6 @@
 # @onekeyfe/hardware-cli
 
-OneKey hardware wallet CLI for AI agent integration. Enables Claude Code, Cursor, and other AI agents to interact with OneKey hardware wallets — search devices, get addresses, sign transactions, manage firmware and security.
+OneKey hardware wallet CLI for AI agent integration. Enables Claude Code and other AI agents to interact with OneKey hardware wallets — search devices, get addresses, sign transactions, manage firmware and security.
 
 ## Install
 
@@ -10,20 +10,12 @@ OneKey hardware wallet CLI for AI agent integration. Enables Claude Code, Cursor
 npm install -g @onekeyfe/hardware-cli
 ```
 
-Verify:
-
-```bash
-onekey-hw --version
-```
-
 ### 2. Install Claude Code Plugin
 
-**Option A: From marketplace (recommended)**
-
-Run in your terminal (not inside Claude Code):
+Run in your terminal:
 
 ```bash
-# Add marketplace (one time, uses sparse checkout for speed)
+# Add marketplace (one time, uses sparse checkout)
 claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
 
 # Install the plugin
@@ -37,52 +29,68 @@ Or inside Claude Code:
 /plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
-**Option B: Load from local path (for development/testing)**
+For development/testing:
 
 ```bash
 claude --plugin-dir /path/to/hardware-js-sdk/packages/hd-cli
 ```
 
-### Installed Skills
+## Commands
 
-| Skill | Namespace | Description |
-|-------|-----------|-------------|
-| hardware-device | `/onekey-hardware:hardware-device` | Search, connect, check device status |
-| hardware-signing | `/onekey-hardware:hardware-signing` | Get addresses, sign transactions/messages (27 chains) |
-| hardware-firmware | `/onekey-hardware:hardware-firmware` | Check and update firmware |
-| hardware-security | `/onekey-hardware:hardware-security` | PIN, passphrase, backup, recovery, factory reset |
+### Device
 
-## Usage
+| Command | Description | Needs PIN? |
+|---------|-------------|:----------:|
+| `onekey-hw search` | Search devices + auto-fetch features | No |
+| `onekey-hw lock` | Lock the device | No |
+| `onekey-hw device-verify` | Verify device is genuine | Yes |
+| `onekey-hw device-settings` | Update label, language, etc. | Yes |
+| `onekey-hw device-wipe` | Factory reset (IRREVERSIBLE) | Yes |
 
-### CLI (Terminal)
+### Address & Signing
 
-```bash
-# Search for connected devices
-onekey-hw search
+| Command | Description | Needs PIN? |
+|---------|-------------|:----------:|
+| `onekey-hw get-address --chain <chain>` | Get address (27 chains) | Yes |
+| `onekey-hw get-public-key --chain <chain>` | Get public key | Yes |
+| `onekey-hw batch-get-address --bundle <json>` | Multi-chain batch | Yes |
+| `onekey-hw sign-transaction --chain <chain> --tx <json>` | Sign transaction | Yes |
+| `onekey-hw sign-message --chain <chain> --message <msg>` | Sign message | Yes |
+| `onekey-hw sign-typed-data --data <json>` | Sign EIP-712 (EVM) | Yes |
+| `onekey-hw sign-psbt --psbt <hex>` | Sign Bitcoin PSBT | Yes |
+| `onekey-hw verify-message --chain <chain> ...` | Verify signed message | Yes |
 
-# Get ETH address
-onekey-hw get-address --chain evm --use-empty-passphrase
+### Chain-Specific
 
-# Get BTC address
-onekey-hw get-address --chain btc --use-empty-passphrase
+| Command | Description |
+|---------|-------------|
+| `onekey-hw evm-sign-eip712` | EIP-712 by hash |
+| `onekey-hw sol-sign-offchain` | Solana off-chain message |
+| `onekey-hw nostr-encrypt` | Nostr NIP-04 encrypt |
+| `onekey-hw nostr-decrypt` | Nostr NIP-04 decrypt |
+| `onekey-hw nostr-sign-schnorr` | Nostr Schnorr signature |
+| `onekey-hw lnurl-auth` | Lightning LNURL auth |
+| `onekey-hw conflux-sign-cip23` | Conflux CIP-23 message |
+| `onekey-hw aptos-sign-in` | Aptos sign-in |
+| `onekey-hw ton-sign-proof` | TON Connect proof |
 
-# Sign a message
-onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
+### Firmware (Read-Only)
 
-# Batch get addresses
-onekey-hw batch-get-address --bundle '[{"chain":"evm","showOnDevice":false},{"chain":"btc","showOnDevice":false}]' --use-empty-passphrase
-```
+| Command | Description |
+|---------|-------------|
+| `onekey-hw firmware-check` | Check firmware updates |
+| `onekey-hw firmware-check-all` | Check all components |
+| `onekey-hw bootloader-check` | Check bootloader |
 
-### Claude Code (Natural Language)
+Firmware updates must be done via the [OneKey App](https://onekey.so/download) or [firmware.onekey.so](https://firmware.onekey.so/).
 
-After installing the plugin, just ask:
+### Security
 
-```
-"Search for my OneKey device"
-"Get my Ethereum address"
-"Sign this message: hello world"
-"Check if my firmware is up to date"
-```
+| Command | Description |
+|---------|-------------|
+| `onekey-hw change-pin` | Change/set PIN |
+| `onekey-hw passphrase-state` | Get passphrase state |
+| `onekey-hw toggle-passphrase --enable <bool>` | Enable/disable passphrase |
 
 ## Supported Chains
 
@@ -103,14 +111,6 @@ After installing the plugin, just ask:
 | TON | `ton` | ✅ | — | ✅ |
 | Nostr | `nostr` | ✅ | — | ✅ |
 | +13 more | | ✅ | ✅ | varies |
-
-## Device Interaction
-
-All commands that communicate with the device (except `search`) may require:
-- **PIN entry** on the device screen
-- **Button confirmation** on the device
-
-Commands will block until the user acts on the device. Set a timeout of 120+ seconds.
 
 ## Transport
 
