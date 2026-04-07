@@ -20,7 +20,8 @@ OneKey Hardware SDK 提供 CLI 工具和 Claude Code 插件技能，使 AI Agent
 │  @onekeyfe/hd-common-connect-sdk│
 ├─────────────────────────────────┤
 │  传输层                          │
-│  HTTP Bridge / WebUSB / BLE     │
+│  @onekeyfe/hd-transport-usb    │
+│  (libusb 直连 USB)               │
 ├─────────────────────────────────┤
 │  OneKey 硬件设备                  │
 │  需要物理确认                     │
@@ -38,44 +39,68 @@ OneKey Hardware SDK 提供 CLI 工具和 Claude Code 插件技能，使 AI Agent
 
 ## 快速开始
 
-### 安装
+### 1. 安装 CLI
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
 ```
 
-### Claude Code 插件
+验证安装：
 
-CLI 作为 Claude Code 插件提供 4 个专业技能：
+```bash
+onekey-hw --version
+```
 
-| 技能 | 描述 | 命令 |
-|------|------|------|
-| `hardware-device` | 设备搜索、连接、状态 | `search`, `status`, `bridge-status` |
+### 2. 安装 Claude Code 插件
+
+添加 OneKey 插件市场（一次性操作）：
+
+```
+/plugin marketplace add OneKeyHQ/hardware-js-sdk
+```
+
+安装插件：
+
+```
+/plugin install onekey-hardware@onekey-hardware-plugins
+```
+
+安装后获得 4 个技能：
+
+| 技能 | 描述 | 关键命令 |
+|------|------|----------|
+| `hardware-device` | 设备搜索、状态查询 | `search`, `status`, `lock` |
 | `hardware-signing` | 多链地址与签名（27 条链） | `get-address`, `sign-transaction`, `sign-message` |
 | `hardware-firmware` | 固件检查与更新 | `firmware-check`, `firmware-update` |
 | `hardware-security` | PIN、密码短语、备份、恢复 | `change-pin`, `device-backup`, `device-wipe` |
 
-在 Claude Code 中安装插件：
-```bash
-claude plugin install onekey-hardware
+### 3. 在 Claude Code 中使用
+
+安装插件后，直接用自然语言交互：
+
+```
+"搜索我的 OneKey 硬件钱包"
+"获取我的以太坊地址"
+"帮我签名一条消息：hello world"
+"检查固件是否需要更新"
 ```
 
-### 基本用法
+### 基本 CLI 用法
 
 ```bash
 # 搜索已连接的设备
 onekey-hw search --json
 
-# 获取以太坊地址（设备端验证）
-onekey-hw get-address --chain evm --json
+# 获取以太坊地址（在设备上验证）
+onekey-hw get-address --chain evm --use-empty-passphrase --json
 
 # 获取比特币地址
-onekey-hw get-address --chain btc --json
+onekey-hw get-address --chain btc --use-empty-passphrase --json
 
 # 签名 EVM 交易
 onekey-hw sign-transaction --chain evm \
   --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
-  --json
+  --use-empty-passphrase --json
 
 # 检查固件更新
 onekey-hw firmware-check-all --json
@@ -87,12 +112,27 @@ CLI 支持 Hardware SDK 中所有 27 条链：
 
 | 类别 | 链 |
 |------|-----|
-| **EVM** | Ethereum、BSC、Polygon、Arbitrum、Base、Optimism、Avalanche 及所有 EVM 兼容链 |
-| **比特币及分叉** | Bitcoin（Legacy/SegWit/Taproot）、Litecoin、Bitcoin Cash 等 |
-| **Layer 1** | Solana、Cardano、Polkadot、Cosmos、Near、Aptos、Sui、TON、Stellar、XRP |
-| **其他** | Tron、Filecoin、Kaspa、Algorand、Conflux、Nervos、Nostr 等 |
+| **EVM** | Ethereum, BSC, Polygon, Arbitrum, Base, Optimism, Avalanche 及所有 EVM 兼容链 |
+| **Bitcoin 系** | Bitcoin (Legacy/SegWit/Taproot), Litecoin, Bitcoin Cash 及其他 BTC 分叉 |
+| **Layer 1** | Solana, Cardano, Polkadot, Cosmos, Near, Aptos, Sui, TON, Stellar, XRP |
+| **其他** | Tron, Filecoin, Kaspa, Algorand, Conflux, Nervos, Nostr 等 |
 
-各链的完整 API 参数文档，请参考[链方法](/zh/hardware-sdk/chains)文档。
+各链的完整 API 参数请参考 [链方法文档](/zh/hardware-sdk/chains)。
+
+## 设备交互
+
+除 `search` 外，所有与设备通信的命令都可能需要物理交互：
+
+| 事件 | 用户操作 |
+|------|---------|
+| PIN 输入 | 在设备触摸屏上输入 PIN |
+| 按钮确认 | 在设备上按确认（地址显示、签名） |
+| 密码短语 | 在设备上输入密码短语（隐藏钱包） |
+
+命令会阻塞直到用户在设备上操作。AI Agent 应当：
+1. **运行命令前警告用户**需要设备交互
+2. **设置超时 120 秒以上**（签名需要时间审核）
+3. **超时后不自动重试** —— 用户可能在设备上拒绝了
 
 ## CLI 参考
 
@@ -100,13 +140,13 @@ CLI 支持 Hardware SDK 中所有 27 条链：
 
 | 选项 | 描述 | 默认值 |
 |------|------|--------|
-| `--json` | 以 JSON 格式输出（供 Agent 消费） | 自动检测 TTY |
-| `--transport <type>` | 传输方式：`http`、`webusb`、`ble` | `http` |
+| `--json` | JSON 格式输出（供 Agent 消费） | 自动检测 TTY |
 | `--connect-id <id>` | 设备连接 ID | 自动检测 |
+| `--use-empty-passphrase` | 使用标准钱包（跳过密码短语） | — |
 
 ### 输出格式
 
-指定 `--json` 或管道输出（非 TTY）时，所有命令返回结构化 JSON：
+所有命令返回结构化 JSON：
 
 ```json
 {
@@ -129,18 +169,18 @@ CLI 支持 Hardware SDK 中所有 27 条链：
 }
 ```
 
-## 与 App-Monorepo CLI 的协作
+## 与 App-Monorepo CLI 集成
 
-`onekey-hardware` 插件与 app-monorepo 的 [`onekey` 插件](https://github.com/OneKeyHQ/app-monorepo/tree/feat/agent/apps/cli)互为补充：
+`onekey-hardware` 插件与 app-monorepo 的 [`onekey` 插件](https://github.com/OneKeyHQ/app-monorepo/tree/feat/agent/apps/cli) 互补：
 
 ```
 onekey-plugins marketplace
 ├── onekey (app-monorepo)        → 钱包、兑换、行情、安全
-└── onekey-hardware (本 SDK)      → 设备、签名、固件、安全
+└── onekey-hardware (本 SDK)     → 设备、签名、固件、安全
 ```
 
-**示例工作流 —— 硬件安全兑换：**
-1. `onekey balance --chain eth`（app-monorepo：查余额）
+**示例工作流 — 硬件安全兑换：**
+1. `onekey balance --chain eth`（app-monorepo：查询余额）
 2. `onekey security audit --token <contract>`（app-monorepo：安全检查）
 3. `onekey swap quote ...`（app-monorepo：获取兑换报价）
 4. `onekey-hw sign-transaction --chain evm --tx '...'`（**硬件签名**）
@@ -148,21 +188,14 @@ onekey-plugins marketplace
 
 ## 评估框架
 
-CLI 包含用于测试 Agent 技能准确性的评估框架：
+CLI 包含评估框架用于测试 Agent 技能准确性：
 
 ```bash
 cd packages/hd-cli/evals
-./run-evals.sh                    # 运行所有用例
-./run-evals.sh --model haiku      # 使用指定模型测试
-./run-evals.sh --case device-*    # 运行匹配的用例
+./run-evals.sh                    # 运行所有测试
+./run-evals.sh --model haiku      # 指定模型测试
+./run-evals.sh --case device-*    # 运行匹配的测试
 ```
-
-评估套件包含 28 个测试用例，覆盖：
-- 设备管理工作流（中英文）
-- 多链地址生成
-- 交易签名流程
-- 固件更新场景
-- 安全管理操作
 
 ## API 映射参考
 

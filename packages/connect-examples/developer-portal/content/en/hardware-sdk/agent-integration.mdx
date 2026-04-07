@@ -20,7 +20,8 @@ OneKey Hardware SDK provides CLI tools and Claude Code plugin skills that enable
 │  @onekeyfe/hd-common-connect-sdk│
 ├─────────────────────────────────┤
 │  Transport Layer                │
-│  HTTP Bridge / WebUSB / BLE     │
+│  @onekeyfe/hd-transport-usb    │
+│  (libusb direct USB)            │
 ├─────────────────────────────────┤
 │  OneKey Hardware Device         │
 │  Physical confirmation required │
@@ -38,44 +39,68 @@ Unlike software-based signing, hardware wallet signing provides a critical secur
 
 ## Quick Start
 
-### Installation
+### 1. Install CLI
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
 ```
 
-### Claude Code Plugin
+Verify:
 
-The CLI is available as a Claude Code plugin with 4 specialized skills:
+```bash
+onekey-hw --version
+```
 
-| Skill | Description | Commands |
-|-------|-------------|----------|
-| `hardware-device` | Device search, connect, status | `search`, `status`, `bridge-status` |
+### 2. Install Claude Code Plugin
+
+Add the OneKey marketplace (one time):
+
+```
+/plugin marketplace add OneKeyHQ/hardware-js-sdk
+```
+
+Install the plugin:
+
+```
+/plugin install onekey-hardware@onekey-hardware-plugins
+```
+
+This installs 4 skills:
+
+| Skill | Description | Key Commands |
+|-------|-------------|--------------|
+| `hardware-device` | Device search, connect, status | `search`, `status`, `lock` |
 | `hardware-signing` | Multi-chain address & signing (27 chains) | `get-address`, `sign-transaction`, `sign-message` |
 | `hardware-firmware` | Firmware check & update | `firmware-check`, `firmware-update` |
 | `hardware-security` | PIN, passphrase, backup, recovery | `change-pin`, `device-backup`, `device-wipe` |
 
-To install the plugin in Claude Code:
-```bash
-claude plugin install onekey-hardware
+### 3. Use with Claude Code
+
+After installing the plugin, just ask in natural language:
+
+```
+"Search for my OneKey device"
+"Get my Ethereum address"
+"Sign this message: hello world"
+"Check if my firmware is up to date"
 ```
 
-### Basic Usage
+### Basic CLI Usage
 
 ```bash
 # Search for connected devices
 onekey-hw search --json
 
 # Get an Ethereum address (verified on device)
-onekey-hw get-address --chain evm --json
+onekey-hw get-address --chain evm --use-empty-passphrase --json
 
 # Get a Bitcoin address
-onekey-hw get-address --chain btc --json
+onekey-hw get-address --chain btc --use-empty-passphrase --json
 
 # Sign an EVM transaction
 onekey-hw sign-transaction --chain evm \
   --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
-  --json
+  --use-empty-passphrase --json
 
 # Check firmware updates
 onekey-hw firmware-check-all --json
@@ -94,6 +119,21 @@ The CLI supports all 27 chains available in the Hardware SDK:
 
 For the complete API reference of each chain's parameters, see the [Chain Methods](/en/hardware-sdk/chains) documentation.
 
+## Device Interaction
+
+All commands that communicate with the device (except `search`) may require physical interaction:
+
+| Event | What User Must Do |
+|-------|-------------------|
+| PIN entry | Enter PIN on device touchscreen |
+| Button confirmation | Press confirm on device (address display, signing) |
+| Passphrase | Enter passphrase on device (hidden wallets) |
+
+Commands block until the user acts on the device. AI agents should:
+1. **Warn the user before running** any device command
+2. **Set timeout to 120+ seconds** (signing may need time for review)
+3. **Not retry automatically** if timeout — user likely rejected on device
+
 ## CLI Reference
 
 ### Global Options
@@ -101,12 +141,12 @@ For the complete API reference of each chain's parameters, see the [Chain Method
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--json` | Output in JSON format (for agent consumption) | Auto-detect TTY |
-| `--transport <type>` | Transport: `http`, `webusb`, `ble` | `http` |
 | `--connect-id <id>` | Device connection ID | Auto-detect |
+| `--use-empty-passphrase` | Use standard wallet (skip passphrase) | — |
 
 ### Output Format
 
-When `--json` is specified or output is piped (non-TTY), all commands return structured JSON:
+All commands return structured JSON:
 
 ```json
 {
@@ -156,13 +196,6 @@ cd packages/hd-cli/evals
 ./run-evals.sh --model haiku      # Test with specific model
 ./run-evals.sh --case device-*    # Run matching cases only
 ```
-
-The evaluation suite includes 28 test cases covering:
-- Device management workflows (EN/CN)
-- Multi-chain address generation
-- Transaction signing flows
-- Firmware update scenarios
-- Security management operations
 
 ## API Mapping Reference
 
