@@ -206,14 +206,31 @@ export async function createSDK(opts: SDKOptions) {
   };
 
   // Auto-detect transport:
-  //   1. If Bridge is running → use HTTP transport (Bridge handles USB exclusively)
-  //   2. Otherwise → use node-hid direct USB HID
+  //   1. Bridge running → use HTTP transport (recommended, works on all platforms)
+  //   2. Bridge not running + macOS → warn user to install Bridge
+  //   3. Bridge not running + Linux/Windows → use node-hid direct USB HID
+  //
+  // Why Bridge first: On macOS, the HID framework hides the vendor-defined
+  // interface (usagePage 0xFF00) that OneKey devices use for communication.
+  // Only libusb (used by Bridge) can access it. node-hid works on Linux/Windows
+  // where all HID interfaces are visible.
   let plugin;
   const bridgeAvailable = await isBridgeRunning();
   if (bridgeAvailable) {
     settings.env = 'node';
     process.stderr.write('[onekey-hw] Using OneKey Bridge transport\n');
+  } else if (process.platform === 'darwin') {
+    // macOS: node-hid cannot access the correct USB interface — Bridge is required
+    settings.env = 'lowlevel';
+    plugin = NodeHidPlugin;
+    process.stderr.write(
+      '[onekey-hw] Warning: OneKey Bridge not detected.\n' +
+        '[onekey-hw] On macOS, Bridge is required for device communication.\n' +
+        '[onekey-hw] Install from: https://onekey.so/download\n' +
+        '[onekey-hw] Falling back to direct USB (limited functionality).\n'
+    );
   } else {
+    // Linux/Windows: node-hid direct USB works
     settings.env = 'lowlevel';
     plugin = NodeHidPlugin;
     process.stderr.write('[onekey-hw] Using direct USB transport (node-hid)\n');
