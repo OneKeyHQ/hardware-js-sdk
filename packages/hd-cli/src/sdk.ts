@@ -12,6 +12,7 @@
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { NodeHidPlugin } from '@onekeyfe/hd-transport-node-hid';
+import * as http from 'http';
 import * as readline from 'readline';
 
 import type { ConnectSettings } from '@onekeyfe/hd-core';
@@ -179,15 +180,44 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
   });
 }
 
+/**
+ * Probe whether OneKey Bridge is running on localhost:21320.
+ * Returns true if reachable within 2 seconds, false otherwise.
+ */
+function isBridgeRunning(): Promise<boolean> {
+  return new Promise(resolve => {
+    const req = http.get('http://127.0.0.1:21320/', { timeout: 2000 }, res => {
+      // Any response (even redirect) means Bridge is alive
+      res.resume();
+      resolve(true);
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
 export async function createSDK(opts: SDKOptions) {
   const settings: Partial<ConnectSettings> = {
     debug: false,
     fetchConfig: true,
   };
 
-  // Direct USB HID via node-hid — zero configuration required
-  settings.env = 'lowlevel';
-  const plugin = NodeHidPlugin;
+  // Auto-detect transport:
+  //   1. If Bridge is running → use HTTP transport (Bridge handles USB exclusively)
+  //   2. Otherwise → use node-hid direct USB HID
+  let plugin;
+  const bridgeAvailable = await isBridgeRunning();
+  if (bridgeAvailable) {
+    settings.env = 'node';
+    process.stderr.write('[onekey-hw] Using OneKey Bridge transport\n');
+  } else {
+    settings.env = 'lowlevel';
+    plugin = NodeHidPlugin;
+    process.stderr.write('[onekey-hw] Using direct USB transport (node-hid)\n');
+  }
 
   await HardwareSDK.init(settings, undefined, plugin);
 

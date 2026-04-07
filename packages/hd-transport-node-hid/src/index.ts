@@ -1,10 +1,11 @@
 import ByteBuffer from 'bytebuffer';
 import * as HID from 'node-hid';
 import transport from '@onekeyfe/hd-transport';
+import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 
 import type { LowlevelTransportSharedPlugin, LowLevelDevice } from '@onekeyfe/hd-transport';
 
-import { VENDOR_ID, PRODUCT_IDS, PACKET_SIZE, REPORT_ID, HEADER_LENGTH } from './constants';
+import { PACKET_SIZE, REPORT_ID, HEADER_LENGTH } from './constants';
 
 const { decodeProtocol } = transport;
 
@@ -71,15 +72,18 @@ export const NodeHidPlugin: LowlevelTransportSharedPlugin = {
   async enumerate(): Promise<LowLevelDevice[]> {
     const allDevices = await HID.devicesAsync();
 
-    // Filter to OneKey devices and deduplicate by path (interface 0 only)
-    const onekeyDevices = allDevices.filter(
-      d =>
-        d.vendorId === VENDOR_ID &&
-        PRODUCT_IDS.includes(d.productId ?? 0) &&
-        (d.interface === 0 || d.interface === -1) && // -1 on macOS when interface is not reported
-        d.path != null &&
-        d.path.length > 0
-    );
+    // Use the same VID/PID filter as WebUSB (from @onekeyfe/hd-shared)
+    const seen = new Set<string>();
+    const onekeyDevices = allDevices.filter(d => {
+      const isOneKey = ONEKEY_WEBUSB_FILTER.some(
+        f => d.vendorId === f.vendorId && d.productId === f.productId
+      );
+      if (!isOneKey || !d.path || d.path.length === 0) return false;
+      // Deduplicate: a device may expose multiple HID interfaces
+      if (seen.has(d.path)) return false;
+      seen.add(d.path);
+      return true;
+    });
 
     return onekeyDevices.map(d => ({
       id: d.path!,
@@ -181,4 +185,4 @@ export const NodeHidPlugin: LowlevelTransportSharedPlugin = {
 };
 
 export default NodeHidPlugin;
-export { VENDOR_ID, PRODUCT_IDS, PACKET_SIZE } from './constants';
+export { PACKET_SIZE } from './constants';
