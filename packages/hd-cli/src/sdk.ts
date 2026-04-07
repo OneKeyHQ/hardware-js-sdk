@@ -165,16 +165,18 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
     }
   });
 
-  // Device connection events
+  // Device connection events — only show when device has a known name
   sdk.on(DEVICE.CONNECT, (device: any) => {
-    if (!opts.json) {
-      process.stderr.write(`[onekey-hw] Device connected: ${device?.name || 'Unknown'}\n`);
+    const name = device?.label || device?.name;
+    if (name) {
+      process.stderr.write(`[onekey-hw] Device connected: ${name}\n`);
     }
   });
 
   sdk.on(DEVICE.DISCONNECT, (device: any) => {
-    if (!opts.json) {
-      process.stderr.write(`[onekey-hw] Device disconnected: ${device?.name || 'Unknown'}\n`);
+    const name = device?.label || device?.name;
+    if (name) {
+      process.stderr.write(`[onekey-hw] Device disconnected: ${name}\n`);
     }
   });
 }

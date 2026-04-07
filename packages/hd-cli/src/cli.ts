@@ -38,10 +38,30 @@ program
   .description('Search for connected OneKey hardware wallet devices')
   .option('--timeout <ms>', 'Search timeout in milliseconds', '10000')
   .action(async opts => {
-    const sdk = await createSDK(program.opts());
+    const globalOpts = program.opts();
+    const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.searchDevices();
-      outputResult(program.opts(), result);
+
+      // Auto-fetch features for each discovered device (doesn't require PIN)
+      if (result?.success && Array.isArray(result.payload)) {
+        for (const device of result.payload) {
+          if (device.connectId) {
+            try {
+              const features = await sdk.getFeatures(device.connectId);
+              if (features?.success && features.payload) {
+                device.features = features.payload;
+                device.name = features.payload.label || features.payload.ble_name || device.name;
+                device.deviceType = features.payload.onekey_device_type?.toLowerCase() || device.deviceType;
+              }
+            } catch {
+              // Features fetch failed — device may need PIN, continue with basic info
+            }
+          }
+        }
+      }
+
+      outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
     }
@@ -788,9 +808,11 @@ function outputResult(globalOpts: { json?: boolean }, result: unknown): void {
   // #10 FIX: Always use JSON.stringify to avoid [Object] truncation
   console.log(JSON.stringify(result, null, 2));
 
-  // #11 FIX: Exit with code 1 on SDK failure
+  // Exit after output — SDK event listeners keep the process alive otherwise
   if (result && typeof result === 'object' && 'success' in result && !(result as any).success) {
-    process.exitCode = 1;
+    process.exit(1);
+  } else {
+    process.exit(0);
   }
 }
 
