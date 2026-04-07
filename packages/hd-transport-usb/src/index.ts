@@ -152,8 +152,9 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async connect(uuid: string): Promise<void> {
-    if (openDevices.has(uuid)) {
-      activeDevice = openDevices.get(uuid)!;
+    const existing = openDevices.get(uuid);
+    if (existing) {
+      activeDevice = existing;
       return;
     }
 
