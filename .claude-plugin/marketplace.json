@@ -15,7 +15,8 @@
       "source": {
         "source": "git-subdir",
         "url": "OneKeyHQ/hardware-js-sdk",
-        "path": "packages/hd-cli"
+        "path": "packages/hd-cli",
+        "ref": "feat/agent"
       },
       "description": "4 OneKey hardware wallet skills — device (search, status), signing (27 chains, address, tx, message), firmware (check, update), security (PIN, backup, recovery, wipe)",
       "version": "1.1.25-alpha.0",
