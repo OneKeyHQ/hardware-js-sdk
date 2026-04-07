@@ -35,8 +35,7 @@ program.option('--use-empty-passphrase', 'Use standard wallet (skip passphrase p
 program
   .command('search')
   .description('Search for connected OneKey hardware wallet devices')
-  .option('--timeout <ms>', 'Search timeout in milliseconds', '10000')
-  .action(async opts => {
+  .action(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {

@@ -92,12 +92,8 @@ Search for connected OneKey hardware wallet devices.
 **Does NOT require device interaction — no PIN or confirmation needed.**
 
 ```bash
-onekey-hw search [--timeout <ms>]
+onekey-hw search
 ```
-
-| Parameter | Required | Description |
-|---|---|---|
-| `--timeout` | No | Search timeout in milliseconds (default: 10000) |
 
 **Returns:**
 ```json
@@ -146,8 +142,8 @@ Step 2 — Report device info from search results
 ```
 User: "My device won't connect"
 
-Step 1 — Search with extended timeout
-→ onekey-hw search --timeout 30000
+Step 1 — Search for devices
+→ onekey-hw search
 
 Step 2 — Guide the user:
   - Is the device powered on and unlocked?

@@ -121,32 +121,11 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
       return ONEKEY_WEBUSB_FILTER.some(f => idVendor === f.vendorId && idProduct === f.productId);
     });
 
-    return onekeyDevices.map(d => {
-      // Try to get product name
-      let name = 'OneKey';
-      try {
-        d.open();
-        const iface = d.interface(INTERFACE_NUMBER);
-        // Check interface class is 255 (vendor-specific) — the communication interface
-        if (iface && iface.descriptor.bInterfaceClass === 255) {
-          name = 'OneKey';
-        }
-        d.close();
-      } catch {
-        // Can't open — might be in use, just return basic info
-        try {
-          d.close();
-        } catch {
-          /* ignore */
-        }
-      }
-
-      return {
-        id: getDeviceId(d),
-        name,
-        commType: 'usb' as const,
-      };
-    });
+    return onekeyDevices.map(d => ({
+      id: getDeviceId(d),
+      name: 'OneKey',
+      commType: 'usb' as const,
+    }));
   },
 
   // eslint-disable-next-line @typescript-eslint/require-await
