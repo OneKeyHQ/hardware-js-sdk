@@ -19,6 +19,14 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 2. **Check device connected**: Run `onekey-hw search --json`.
    - No device → guide troubleshooting (USB cable, unlock device, different port).
 
+## Device Interaction — IMPORTANT
+
+**All security commands require physical interaction on the device (PIN entry,
+button confirmation).** Always warn the user before running any command:
+"You will need to interact with your device — enter PIN, confirm actions, etc."
+Use `timeout: 120000` (120 seconds) for most commands, `timeout: 300000`
+(5 minutes) for recovery/reset operations that involve multi-step device interaction.
+
 ## Security Rules — ABSOLUTE
 
 ### CRITICAL — Destructive Operations

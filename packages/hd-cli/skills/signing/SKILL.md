@@ -21,6 +21,22 @@ Every time before running any `onekey-hw` command, follow these steps in order.
    - Device in bootloader mode → cannot sign, guide to `hardware-firmware` skill.
    - Device not initialized → guide user to set up device first.
 
+## Device Interaction — IMPORTANT
+
+**All signing commands block while waiting for physical interaction on the device.**
+You MUST follow this pattern for every signing/address command:
+
+1. **BEFORE running the command** → Tell the user:
+   "I'm about to [get your address / sign this transaction]. You will need to
+   confirm on your OneKey device. You may also need to enter your PIN if the
+   device is locked."
+
+2. **Run the command** with `timeout: 120000` (120 seconds minimum).
+   The user sees real-time `[onekey-hw]` prompts in their terminal via stderr.
+
+3. **If the command times out or returns `success: false`** → The user likely
+   did not confirm on the device. Ask if they want to retry. Do NOT retry automatically.
+
 ## Security Rules — ABSOLUTE
 
 ### Physical Confirmation Required

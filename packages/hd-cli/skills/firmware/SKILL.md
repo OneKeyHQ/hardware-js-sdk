@@ -16,6 +16,13 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 2. **Check device connected**: Run `onekey-hw search --json`.
    - No device → guide troubleshooting (USB cable, unlock device, different port).
 
+## Device Interaction — IMPORTANT
+
+**Firmware commands block while waiting for device interaction (PIN, confirmation).**
+Always warn the user before running: "You may need to enter your PIN and confirm
+on the device." Use `timeout: 300000` (5 minutes) for firmware update commands —
+updates take 1-3 minutes to complete.
+
 ## Security Rules — ABSOLUTE
 
 ### Firmware Update Safety
