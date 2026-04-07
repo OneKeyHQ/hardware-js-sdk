@@ -11,7 +11,7 @@
 // @ts-ignore - hd-common-connect-sdk may not have type declarations
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-import { NodeHidPlugin } from '@onekeyfe/hd-transport-node-hid';
+import { UsbPlugin } from '@onekeyfe/hd-transport-usb';
 import * as http from 'http';
 import * as readline from 'readline';
 
@@ -215,7 +215,7 @@ export async function createSDK(opts: SDKOptions) {
     process.stderr.write('[onekey-hw] Using OneKey Bridge transport\n');
   } else {
     settings.env = 'lowlevel';
-    plugin = NodeHidPlugin;
+    plugin = UsbPlugin;
     process.stderr.write('[onekey-hw] Using direct USB transport (libusb)\n');
   }
 

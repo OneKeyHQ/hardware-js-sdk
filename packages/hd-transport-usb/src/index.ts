@@ -106,7 +106,7 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
  * which is NOT visible to the HID framework on macOS.
  * This is the same approach OneKey Bridge uses.
  */
-export const NodeHidPlugin: LowlevelTransportSharedPlugin = {
+export const UsbPlugin: LowlevelTransportSharedPlugin = {
   version: '1.0.0',
 
   async init(): Promise<void> {
@@ -274,5 +274,5 @@ export const NodeHidPlugin: LowlevelTransportSharedPlugin = {
   },
 };
 
-export default NodeHidPlugin;
+export default UsbPlugin;
 export { PACKET_SIZE } from './constants';
