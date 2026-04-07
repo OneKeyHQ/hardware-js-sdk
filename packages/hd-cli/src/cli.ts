@@ -66,20 +66,6 @@ program
     }
   });
 
-program
-  .command('status')
-  .description('Get device features and current status')
-  .action(async () => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await sdk.getFeatures(globalOpts.connectId);
-      outputResult(globalOpts, result);
-    } finally {
-      sdk.dispose();
-    }
-  });
-
 // ============================================================
 // Signing Commands
 // ============================================================
@@ -527,50 +513,28 @@ program
 
 program
   .command('firmware-update')
-  .description('Update device firmware')
-  .option('--version <ver>', 'Target firmware version (e.g., "4.8.0")')
-  .option('--platform <platform>', 'Platform: native | desktop | ext | web', 'desktop')
-  .action(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      // firmwareUpdateV2 requires: connectId, deviceId, { updateType, platform, version? }
-      const params: Record<string, unknown> = {
-        updateType: 'firmware',
-        platform: opts.platform,
-      };
-      if (opts.version) {
-        params.version = parseVersion(opts.version);
-      }
-      // firmwareUpdateV2 signature: (connectId, params) — 2 args only
-      const result = await sdk.firmwareUpdateV2(globalOpts.connectId, params as any);
-      outputResult(globalOpts, result);
-    } finally {
-      sdk.dispose();
-    }
+  .description('Firmware update is not supported via CLI')
+  .action(async () => {
+    outputResult(program.opts(), {
+      success: false,
+      payload: {
+        error: 'Firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
+        code: 'FIRMWARE_UPDATE_NOT_SUPPORTED',
+      },
+    });
   });
 
 program
   .command('firmware-update-ble')
-  .description('Update BLE (Bluetooth) firmware')
-  .option('--version <ver>', 'Target BLE firmware version')
-  .option('--platform <platform>', 'Platform: native | desktop | ext | web', 'desktop')
-  .action(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params: Record<string, unknown> = {
-        updateType: 'ble',
-        platform: opts.platform,
-      };
-      if (opts.version) {
-        params.version = parseVersion(opts.version);
-      }
-      const result = await sdk.firmwareUpdateV2(globalOpts.connectId, params as any);
-      outputResult(globalOpts, result);
-    } finally {
-      sdk.dispose();
-    }
+  .description('BLE firmware update is not supported via CLI')
+  .action(async () => {
+    outputResult(program.opts(), {
+      success: false,
+      payload: {
+        error: 'BLE firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
+        code: 'FIRMWARE_UPDATE_NOT_SUPPORTED',
+      },
+    });
   });
 
 program
@@ -641,65 +605,6 @@ program
     }
   });
 
-program
-  .command('device-backup')
-  .description('Trigger recovery phrase backup on device')
-  .action(async () => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await sdk.deviceBackup(globalOpts.connectId);
-      outputResult(globalOpts, result);
-    } finally {
-      sdk.dispose();
-    }
-  });
-
-program
-  .command('device-recovery')
-  .description('Recover wallet from recovery phrase (entered on device)')
-  .option('--word-count <count>', 'Recovery phrase length: 12, 18, or 24', '24')
-  .option('--passphrase-protection <bool>', 'Enable passphrase after recovery', 'false')
-  .option('--pin-protection <bool>', 'Set PIN after recovery', 'true')
-  .option('--label <name>', 'Device label')
-  .action(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await sdk.deviceRecovery(globalOpts.connectId, {
-        wordCount: safeParseInt(opts.wordCount, '--word-count'),
-        passphraseProtection: opts.passphraseProtection === 'true',
-        pinProtection: opts.pinProtection === 'true',
-        label: opts.label,
-      });
-      outputResult(globalOpts, result);
-    } finally {
-      sdk.dispose();
-    }
-  });
-
-program
-  .command('device-reset')
-  .description('Initialize device with a new wallet seed (DESTROYS current wallet)')
-  .option('--word-count <count>', 'Seed phrase length: 12, 18, or 24', '24')
-  .option('--passphrase-protection <bool>', 'Enable passphrase', 'false')
-  .option('--pin-protection <bool>', 'Set PIN', 'true')
-  .option('--label <name>', 'Device label')
-  .action(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await sdk.deviceReset(globalOpts.connectId, {
-        strength: wordCountToStrength(safeParseInt(opts.wordCount, '--word-count')),
-        passphraseProtection: opts.passphraseProtection === 'true',
-        pinProtection: opts.pinProtection === 'true',
-        label: opts.label,
-      });
-      outputResult(globalOpts, result);
-    } finally {
-      sdk.dispose();
-    }
-  });
 
 program
   .command('device-wipe')

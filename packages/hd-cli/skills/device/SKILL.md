@@ -119,22 +119,6 @@ onekey-hw search [--timeout <ms>]
 - If no devices found, suggest: check USB cable, unlock device, try a different USB port.
 - Multiple devices → present list, ask user to select.
 
-### `onekey-hw status`
-
-Get detailed device features and current status.
-**May require PIN entry on device if device is locked.**
-
-```bash
-onekey-hw status [--connect-id <id>]
-```
-
-**Agent notes:**
-- Use this to verify device state before any operation.
-- If `initialized` is false, guide user through device setup.
-- If `needsBackup` is true, strongly recommend backup before any signing.
-- If `bootloaderMode` is true, only firmware operations are available.
-- **Warn user before running:** "You may need to enter your PIN on the device."
-
 ### `onekey-hw lock`
 
 Lock the device (require PIN to unlock).
@@ -150,17 +134,12 @@ onekey-hw lock [--connect-id <id>]
 ```
 User: "Connect my OneKey hardware wallet"
 
-Step 1 — Search for devices (no device interaction needed)
+Step 1 — Search for devices (auto-fetches device info, no PIN needed)
 → onekey-hw search
 → If no devices found, guide troubleshooting (USB cable, unlock, different port)
 
-Step 2 — Tell user what to expect
-→ "Found your OneKey Pro. I'll check its status now — you may need to enter
-   your PIN on the device."
-
-Step 3 — Check device status (may need PIN)
-→ onekey-hw status --connect-id <id>  [timeout: 120000]
-→ Report: model, firmware version, PIN status, backup status
+Step 2 — Report device info from search results
+→ Report: name, model, firmware version, PIN status, backup status
 ```
 
 ### Troubleshooting Connection

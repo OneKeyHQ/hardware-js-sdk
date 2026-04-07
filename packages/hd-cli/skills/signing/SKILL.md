@@ -412,7 +412,7 @@ User: "Give me my Ethereum address"
 
 Step 1 — Ensure device connected
 → onekey-hw search
-→ onekey-hw status --connect-id <id>
+→ onekey-hw search --connect-id <id>
 
 Step 2 — Get address with on-device verification
 → onekey-hw get-address --chain evm --show-on-device true --connect-id <id>
