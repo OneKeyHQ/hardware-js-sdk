@@ -4,32 +4,22 @@ OneKey hardware wallet CLI for AI agent integration. Enables Claude Code and oth
 
 ## Install
 
-### 1. Install CLI
+### Claude Code
+
+```bash
+claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
+claude plugin install onekey-hardware@onekey-hardware-plugins
+```
+
+The CLI is installed automatically on first use via the skill's pre-flight check.
+
+### Other AI Tools (Codex, Gemini, Cursor)
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
 ```
 
-### 2. Install Claude Code Plugin
-
-Run in your terminal:
-
-```bash
-# Add marketplace (one time, uses sparse checkout)
-claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
-
-# Install the plugin
-claude plugin install onekey-hardware@onekey-hardware-plugins
-```
-
-Or inside Claude Code:
-
-```
-/plugin marketplace add OneKeyHQ/hardware-js-sdk
-/plugin install onekey-hardware@onekey-hardware-plugins
-```
-
-For development/testing:
+### Development / Testing
 
 ```bash
 claude --plugin-dir /path/to/hardware-js-sdk/packages/hd-cli

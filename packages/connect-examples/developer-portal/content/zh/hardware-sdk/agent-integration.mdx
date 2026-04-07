@@ -8,20 +8,20 @@ title: AI Agent 集成
 
 ## 安装
 
-### 1. 安装 CLI
-
-```bash
-npm install -g @onekeyfe/hardware-cli
-```
-
-### 2. 安装 Claude Code 插件
+### Claude Code
 
 ```bash
 claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
 claude plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
-### 3. 其他 AI 工具（Codex、Gemini、Cursor）
+CLI（`@onekeyfe/hardware-cli`）会在首次使用时通过 skill 的 pre-flight 自动安装。
+
+### 其他 AI 工具（Codex、Gemini、Cursor）
+
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
 
 将 [AGENTS.md](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/hd-cli/AGENTS.md) 放到你的项目中，AI Agent 会读取它来了解可用命令。
 

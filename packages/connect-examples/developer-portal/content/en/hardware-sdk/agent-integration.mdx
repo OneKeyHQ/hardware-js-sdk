@@ -8,20 +8,20 @@ title: AI Agent Integration
 
 ## Install
 
-### 1. Install CLI
-
-```bash
-npm install -g @onekeyfe/hardware-cli
-```
-
-### 2. Install Claude Code Plugin
+### Claude Code
 
 ```bash
 claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
 claude plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
-### 3. For Other AI Tools (Codex, Gemini, Cursor)
+The CLI (`@onekeyfe/hardware-cli`) is installed automatically on first use via the skill's pre-flight check.
+
+### Other AI Tools (Codex, Gemini, Cursor)
+
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
 
 Place [AGENTS.md](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/hd-cli/AGENTS.md) in your project. The AI agent reads it and learns the available commands.
 
