@@ -1,18 +1,31 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "onekey-hardware-plugins",
+  "description": "OneKey hardware wallet skills for AI coding assistants — device management, multi-chain signing, firmware updates, security",
   "owner": {
     "name": "OneKey",
     "email": "dev@onekey.so"
   },
   "metadata": {
-    "description": "Official OneKey hardware wallet plugins for Claude Code"
+    "description": "OneKey hardware wallet skills for device search, multi-chain address generation, transaction signing, firmware management, and security operations"
   },
   "plugins": [
     {
       "name": "onekey-hardware",
-      "source": "./packages/hd-cli",
-      "description": "OneKey hardware wallet skills — device management, secure multi-chain signing, firmware updates, security settings",
-      "version": "1.1.25-alpha.0"
+      "source": {
+        "source": "git-subdir",
+        "url": "OneKeyHQ/hardware-js-sdk",
+        "path": "packages/hd-cli"
+      },
+      "description": "4 OneKey hardware wallet skills — device (search, status), signing (27 chains, address, tx, message), firmware (check, update), security (PIN, backup, recovery, wipe)",
+      "version": "1.1.25-alpha.0",
+      "author": { "name": "OneKey" },
+      "homepage": "https://onekey.so",
+      "repository": "https://github.com/OneKeyHQ/hardware-js-sdk",
+      "license": "Apache-2.0",
+      "keywords": ["skills", "onekey", "hardware-wallet", "signing", "bitcoin", "ethereum", "security", "web3"],
+      "category": "web3",
+      "tags": ["skills", "hardware-wallet", "signing", "device", "firmware", "security"]
     }
   ]
 }
