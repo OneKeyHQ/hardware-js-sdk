@@ -13,7 +13,7 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 1. **Check CLI installed**: Run `onekey-hw --version`.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
 
-2. **Check device connected**: Run `onekey-hw search --json`.
+2. **Check device connected**: Run `onekey-hw search`.
    - No device → guide troubleshooting (USB cable, unlock device, different port).
 
 ## Device Interaction — IMPORTANT
@@ -120,7 +120,7 @@ onekey-hw bootloader-check [--connect-id <id>]
 User: "Is my firmware up to date?"
 
 Step 1 — Check all components
-→ onekey-hw firmware-check-all --connect-id <id> --json
+→ onekey-hw firmware-check-all --connect-id <id>
 → Present results in a clear table
 
 Step 2 — If updates available, ask user

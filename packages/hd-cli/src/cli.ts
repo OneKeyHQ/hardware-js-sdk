@@ -20,7 +20,6 @@ program
 // Global Options
 // ============================================================
 
-program.option('--json', 'Output in JSON format (for agent consumption)');
 program.option('--connect-id <id>', 'Device connection ID (USB: serial, iOS: uuid, Android: MAC)');
 program.option(
   '--device-id <id>',
@@ -804,7 +803,7 @@ function getCommonParams(globalOpts: Record<string, any>) {
   };
 }
 
-function outputResult(globalOpts: { json?: boolean }, result: unknown): void {
+function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
   // #10 FIX: Always use JSON.stringify to avoid [Object] truncation
   console.log(JSON.stringify(result, null, 2));
 

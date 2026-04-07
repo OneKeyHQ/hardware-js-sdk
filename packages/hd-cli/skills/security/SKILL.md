@@ -16,7 +16,7 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 1. **Check CLI installed**: Run `onekey-hw --version`.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
 
-2. **Check device connected**: Run `onekey-hw search --json`.
+2. **Check device connected**: Run `onekey-hw search`.
    - No device → guide troubleshooting (USB cable, unlock device, different port).
 
 ## Device Interaction — IMPORTANT
@@ -242,7 +242,7 @@ onekey-hw lock [--connect-id <id>]
 User: "Set up my new OneKey device"
 
 Step 1 — Search and verify
-→ onekey-hw search --json
+→ onekey-hw search
 → onekey-hw device-verify --connect-id <id>
 → "Device verified as genuine OneKey hardware."
 
@@ -265,7 +265,7 @@ Step 4 — Verify setup
 User: "Change my device PIN"
 
 Step 1 — Verify device connected
-→ onekey-hw search --json
+→ onekey-hw search
 
 Step 2 — Change PIN
 → onekey-hw change-pin --connect-id <id>

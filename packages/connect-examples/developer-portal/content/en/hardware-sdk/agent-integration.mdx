@@ -94,21 +94,21 @@ After installing the plugin, just ask in natural language:
 
 ```bash
 # Search for connected devices
-onekey-hw search --json
+onekey-hw search
 
 # Get an Ethereum address (verified on device)
-onekey-hw get-address --chain evm --use-empty-passphrase --json
+onekey-hw get-address --chain evm --use-empty-passphrase
 
 # Get a Bitcoin address
-onekey-hw get-address --chain btc --use-empty-passphrase --json
+onekey-hw get-address --chain btc --use-empty-passphrase
 
 # Sign an EVM transaction
 onekey-hw sign-transaction --chain evm \
   --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
-  --use-empty-passphrase --json
+  --use-empty-passphrase
 
 # Check firmware updates
-onekey-hw firmware-check-all --json
+onekey-hw firmware-check-all
 ```
 
 ## Supported Chains
@@ -145,7 +145,6 @@ Commands block until the user acts on the device. AI agents should:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--json` | Output in JSON format (for agent consumption) | Auto-detect TTY |
 | `--connect-id <id>` | Device connection ID | Auto-detect |
 | `--use-empty-passphrase` | Use standard wallet (skip passphrase) | — |
 

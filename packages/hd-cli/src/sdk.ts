@@ -17,7 +17,6 @@ import * as readline from 'readline';
 import type { ConnectSettings } from '@onekeyfe/hd-core';
 
 export interface SDKOptions {
-  json?: boolean;
   connectId?: string;
   passphraseState?: string;
   useEmptyPassphrase?: boolean;

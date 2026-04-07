@@ -58,19 +58,19 @@ claude --plugin-dir /path/to/hardware-js-sdk/packages/hd-cli
 
 ```bash
 # Search for connected devices
-onekey-hw search --json
+onekey-hw search
 
 # Get ETH address
-onekey-hw get-address --chain evm --use-empty-passphrase --json
+onekey-hw get-address --chain evm --use-empty-passphrase
 
 # Get BTC address
-onekey-hw get-address --chain btc --use-empty-passphrase --json
+onekey-hw get-address --chain btc --use-empty-passphrase
 
 # Sign a message
-onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase --json
+onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
 
 # Batch get addresses
-onekey-hw batch-get-address --bundle '[{"chain":"evm","showOnDevice":false},{"chain":"btc","showOnDevice":false}]' --use-empty-passphrase --json
+onekey-hw batch-get-address --bundle '[{"chain":"evm","showOnDevice":false},{"chain":"btc","showOnDevice":false}]' --use-empty-passphrase
 ```
 
 ### Claude Code (Natural Language)

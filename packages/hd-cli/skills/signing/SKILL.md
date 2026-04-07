@@ -16,7 +16,7 @@ Every time before running any `onekey-hw` command, follow these steps in order.
 1. **Check CLI installed**: Run `onekey-hw --version`.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
 
-2. **Check device connected**: Run `onekey-hw search --json`.
+2. **Check device connected**: Run `onekey-hw search`.
    - No device → guide troubleshooting (USB cable, unlock device, different port).
    - Device in bootloader mode → cannot sign, guide to `hardware-firmware` skill.
    - Device not initialized → guide user to set up device first.
@@ -411,7 +411,7 @@ onekey-hw ton-sign-proof --appdomain <domain> --expire-at <timestamp> [--comment
 User: "Give me my Ethereum address"
 
 Step 1 — Ensure device connected
-→ onekey-hw search --json
+→ onekey-hw search
 → onekey-hw status --connect-id <id>
 
 Step 2 — Get address with on-device verification
@@ -426,7 +426,7 @@ Step 2 — Get address with on-device verification
 User: "Sign this transaction: send 0.1 ETH to 0xAbc..."
 
 Step 1 — Ensure device connected
-→ onekey-hw search --json
+→ onekey-hw search
 
 Step 2 — Display transaction details to user
 → "You are about to sign: Send 0.1 ETH to 0xAbc... on Ethereum"
@@ -448,7 +448,7 @@ Step 5 — Return signature
 User: "Set up my wallet with addresses for ETH, BTC, and SOL"
 
 Step 1 — Ensure device connected
-→ onekey-hw search --json
+→ onekey-hw search
 
 Step 2 — Batch get addresses
 → onekey-hw batch-get-address --bundle '[

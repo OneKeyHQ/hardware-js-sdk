@@ -151,7 +151,7 @@ onekey-hw lock [--connect-id <id>]
 User: "Connect my OneKey hardware wallet"
 
 Step 1 — Search for devices (no device interaction needed)
-→ onekey-hw search --json
+→ onekey-hw search
 → If no devices found, guide troubleshooting (USB cable, unlock, different port)
 
 Step 2 — Tell user what to expect

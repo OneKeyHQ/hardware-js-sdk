@@ -10,7 +10,7 @@
  *   npx @onekeyfe/hardware-cli get-address --chain evm
  *   npx @onekeyfe/hardware-cli sign-transaction --chain evm --tx '{...}'
  *
- * For AI agent integration, use --json flag for structured output.
+ * All output is structured JSON for AI agent consumption.
  *
  * IMPORTANT: All signing operations require physical confirmation on the
  * hardware device. The CLI handles PIN/Passphrase prompts via stdin for

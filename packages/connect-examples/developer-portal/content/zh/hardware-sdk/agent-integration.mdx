@@ -94,21 +94,21 @@ claude plugin install onekey-hardware@onekey-hardware-plugins
 
 ```bash
 # 搜索已连接的设备
-onekey-hw search --json
+onekey-hw search
 
 # 获取以太坊地址（在设备上验证）
-onekey-hw get-address --chain evm --use-empty-passphrase --json
+onekey-hw get-address --chain evm --use-empty-passphrase
 
 # 获取比特币地址
-onekey-hw get-address --chain btc --use-empty-passphrase --json
+onekey-hw get-address --chain btc --use-empty-passphrase
 
 # 签名 EVM 交易
 onekey-hw sign-transaction --chain evm \
   --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
-  --use-empty-passphrase --json
+  --use-empty-passphrase
 
 # 检查固件更新
-onekey-hw firmware-check-all --json
+onekey-hw firmware-check-all
 ```
 
 ## 支持的链
@@ -145,7 +145,6 @@ CLI 支持 Hardware SDK 中所有 27 条链：
 
 | 选项 | 描述 | 默认值 |
 |------|------|--------|
-| `--json` | JSON 格式输出（供 Agent 消费） | 自动检测 TTY |
 | `--connect-id <id>` | 设备连接 ID | 自动检测 |
 | `--use-empty-passphrase` | 使用标准钱包（跳过密码短语） | — |
 
