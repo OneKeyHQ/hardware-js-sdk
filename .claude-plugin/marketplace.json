@@ -11,11 +11,10 @@
     {
       "name": "onekey-hardware",
       "source": {
-        "source": "git-subdir",
-        "url": "OneKeyHQ/hardware-js-sdk",
-        "path": "packages/hd-cli"
+        "source": "npm",
+        "package": "@onekeyfe/hardware-cli"
       },
-      "description": "OneKey hardware wallet skills — device management, secure signing, firmware updates, security settings"
+      "description": "OneKey hardware wallet skills — device management, secure multi-chain signing, firmware updates, security settings"
     }
   ]
 }
