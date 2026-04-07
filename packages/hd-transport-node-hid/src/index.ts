@@ -1,5 +1,5 @@
 import ByteBuffer from 'bytebuffer';
-import * as HID from 'node-hid';
+import * as usb from 'usb';
 import transport from '@onekeyfe/hd-transport';
 import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 
@@ -9,35 +9,77 @@ import { PACKET_SIZE, REPORT_ID, HEADER_LENGTH } from './constants';
 
 const { decodeProtocol } = transport;
 
-/** Read timeout in milliseconds */
-const READ_TIMEOUT_MS = 30000;
+/** USB interface number for vendor-specific communication (same as Bridge) */
+const INTERFACE_NUMBER = 0;
+/** USB endpoint addresses (same as Bridge's normalIface) */
+const ENDPOINT_IN = 0x81;
+const ENDPOINT_OUT = 0x01;
+
+/** Transfer timeout in milliseconds */
+const TRANSFER_TIMEOUT_MS = 30000;
 
 /**
- * The currently connected device — used by receive() since
- * LowlevelTransportSharedPlugin.receive() takes no uuid parameter.
- * The LowlevelTransport always calls send() then receive() on the
- * same device, so we track the "active" device from connect/send.
+ * Opened device state — holds the USB device, claimed interface, and endpoints.
  */
-let activeDevice: HID.HIDAsync | null = null;
-
-/** Map of uuid (HID path) → open HIDAsync device */
-const openDevices = new Map<string, HID.HIDAsync>();
-
-/**
- * Read a single HID packet from the device.
- * Uses HIDAsync.read(timeout) — non-blocking, with timeout protection.
- */
-async function readPacket(device: HID.HIDAsync): Promise<Buffer> {
-  const data = await device.read(READ_TIMEOUT_MS);
-  if (!data || data.length === 0) {
-    throw new Error('Empty read from HID device (timeout or disconnected)');
-  }
-  return data;
+interface OpenDevice {
+  device: usb.Device;
+  iface: usb.Interface;
+  epIn: usb.InEndpoint;
+  epOut: usb.OutEndpoint;
 }
 
 /**
- * Skip the 0x3F protocol marker byte from an HID packet.
- * The device sends 0x3F as the first byte of every packet.
+ * The currently active device — used by receive() since
+ * LowlevelTransportSharedPlugin.receive() takes no uuid parameter.
+ */
+let activeDevice: OpenDevice | null = null;
+
+/** Map of uuid → open device state */
+const openDevices = new Map<string, OpenDevice>();
+
+/**
+ * Build a unique identifier for a USB device.
+ * Uses bus number + device address which is stable within a session.
+ */
+function getDeviceId(dev: usb.Device): string {
+  return `usb:${dev.busNumber}:${dev.deviceAddress}`;
+}
+
+/**
+ * Promisified USB IN transfer.
+ */
+function transferIn(ep: usb.InEndpoint, length: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    ep.transfer(length, (err: Error | undefined, data: Buffer | undefined) => {
+      if (err) return reject(err);
+      if (!data || data.length === 0) return reject(new Error('Empty USB transfer'));
+      resolve(data);
+    });
+  });
+}
+
+/**
+ * Promisified USB OUT transfer.
+ */
+function transferOut(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ep.transfer(data, (err: Error | undefined) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+}
+
+/**
+ * Read a single 64-byte packet from the device via libusb bulk/interrupt transfer.
+ */
+async function readPacket(dev: OpenDevice): Promise<Buffer> {
+  return transferIn(dev.epIn, PACKET_SIZE);
+}
+
+/**
+ * Skip the 0x3F protocol marker byte from a USB packet.
+ * The device sends 0x3F as the first byte of every response packet.
  */
 function skipReportByte(packet: Buffer): Buffer {
   if (packet[0] === REPORT_ID) {
@@ -54,100 +96,151 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
 }
 
 /**
- * Node.js HID plugin for LowlevelTransport.
+ * Node.js USB plugin for LowlevelTransport.
  *
  * Implements the 6-method LowlevelTransportSharedPlugin interface
- * using the `node-hid` library for direct USB HID communication
- * with OneKey hardware wallets — no Bridge daemon required.
+ * using the `usb` (libusb) library for direct USB communication
+ * with OneKey hardware wallets.
  *
- * Uses node-hid v3 HIDAsync API for non-blocking I/O.
+ * Uses libusb to access the vendor-specific interface (class 255)
+ * which is NOT visible to the HID framework on macOS.
+ * This is the same approach OneKey Bridge uses.
  */
 export const NodeHidPlugin: LowlevelTransportSharedPlugin = {
   version: '1.0.0',
 
   async init(): Promise<void> {
-    // node-hid requires no global initialization
+    // libusb requires no global initialization
   },
 
   async enumerate(): Promise<LowLevelDevice[]> {
-    const allDevices = await HID.devicesAsync();
+    const allDevices = usb.getDeviceList();
 
-    // Use the same VID/PID filter as WebUSB (from @onekeyfe/hd-shared)
-    const seen = new Set<string>();
     const onekeyDevices = allDevices.filter(d => {
-      const isOneKey = ONEKEY_WEBUSB_FILTER.some(
-        f => d.vendorId === f.vendorId && d.productId === f.productId
+      const { idVendor, idProduct } = d.deviceDescriptor;
+      return ONEKEY_WEBUSB_FILTER.some(
+        f => idVendor === f.vendorId && idProduct === f.productId
       );
-      if (!isOneKey || !d.path || d.path.length === 0) return false;
-      // Deduplicate: a device may expose multiple HID interfaces
-      if (seen.has(d.path)) return false;
-      seen.add(d.path);
-      return true;
     });
 
-    return onekeyDevices.map(d => ({
-      id: d.path!,
-      name: d.product || 'OneKey',
-      commType: 'usb' as const,
-    }));
+    return onekeyDevices.map(d => {
+      // Try to get product name
+      let name = 'OneKey';
+      try {
+        d.open();
+        const iface = d.interface(INTERFACE_NUMBER);
+        // Check interface class is 255 (vendor-specific) — the communication interface
+        if (iface && iface.descriptor.bInterfaceClass === 255) {
+          name = 'OneKey';
+        }
+        d.close();
+      } catch {
+        // Can't open — might be in use, just return basic info
+        try { d.close(); } catch { /* ignore */ }
+      }
+
+      return {
+        id: getDeviceId(d),
+        name,
+        commType: 'usb' as const,
+      };
+    });
   },
 
   async connect(uuid: string): Promise<void> {
     if (openDevices.has(uuid)) {
-      // Already open — just set as active
       activeDevice = openDevices.get(uuid)!;
       return;
     }
 
-    const device = await HID.HIDAsync.open(uuid);
-    openDevices.set(uuid, device);
-    activeDevice = device;
+    // Find the device by our uuid (bus:address)
+    const allDevices = usb.getDeviceList();
+    const dev = allDevices.find(d => getDeviceId(d) === uuid);
+    if (!dev) {
+      throw new Error(`USB device not found: ${uuid}`);
+    }
+
+    dev.open();
+    dev.timeout = TRANSFER_TIMEOUT_MS;
+
+    const iface = dev.interface(INTERFACE_NUMBER);
+
+    // On Linux, detach kernel driver if active
+    if (process.platform === 'linux') {
+      try {
+        if (iface.isKernelDriverActive()) {
+          iface.detachKernelDriver();
+        }
+      } catch {
+        // May not be supported — continue
+      }
+    }
+
+    iface.claim();
+
+    // Find IN and OUT endpoints
+    const epIn = iface.endpoints.find(
+      (e): e is usb.InEndpoint => e.direction === 'in' && e.address === ENDPOINT_IN
+    );
+    const epOut = iface.endpoints.find(
+      (e): e is usb.OutEndpoint => e.direction === 'out' && e.address === ENDPOINT_OUT
+    );
+
+    if (!epIn || !epOut) {
+      dev.close();
+      throw new Error('USB endpoints not found (expected IN 0x81, OUT 0x01)');
+    }
+
+    epIn.timeout = TRANSFER_TIMEOUT_MS;
+    epOut.timeout = TRANSFER_TIMEOUT_MS;
+
+    const openDev: OpenDevice = { device: dev, iface, epIn, epOut };
+    openDevices.set(uuid, openDev);
+    activeDevice = openDev;
   },
 
   async disconnect(uuid: string): Promise<void> {
-    const device = openDevices.get(uuid);
-    if (device) {
+    const openDev = openDevices.get(uuid);
+    if (openDev) {
       try {
-        await device.close();
+        openDev.iface.release(() => {
+          try { openDev.device.close(); } catch { /* ignore */ }
+        });
       } catch {
-        // Ignore close errors (device may already be disconnected)
+        try { openDev.device.close(); } catch { /* ignore */ }
       }
       openDevices.delete(uuid);
-      if (activeDevice === device) {
+      if (activeDevice === openDev) {
         activeDevice = null;
       }
     }
   },
 
   async send(uuid: string, data: string): Promise<void> {
-    const device = openDevices.get(uuid);
-    if (!device) {
+    const openDev = openDevices.get(uuid);
+    if (!openDev) {
       throw new Error(`Device not connected: ${uuid}`);
     }
-    activeDevice = device;
+    activeDevice = openDev;
 
     // data is a hex string of a 64-byte packet (0x3F + 63 bytes payload),
     // already framed by LowlevelTransport's buildBuffers().
     const dataBuffer = Buffer.from(data, 'hex');
 
-    // node-hid write() requires first byte = Report ID on ALL platforms.
-    // OneKey devices don't use numbered reports, so prepend 0x00.
-    // See: https://github.com/node-hid/node-hid#devicewritedata
-    const withReportId = Buffer.alloc(dataBuffer.length + 1);
-    withReportId[0] = 0x00;
-    dataBuffer.copy(withReportId, 1);
-    await device.write([...withReportId]);
+    // libusb transfers the raw packet directly — no Report ID prepend needed
+    // (Report ID is a HID concept; libusb operates at USB level)
+    await transferOut(openDev.epOut, dataBuffer);
   },
 
   async receive(): Promise<string> {
     if (!activeDevice) {
       throw new Error('No active device for receive');
     }
-    const device = activeDevice;
+    const dev = activeDevice;
 
     // Mirrors WebUsbTransport.receiveData() exactly:
     // 1. Read first 64-byte packet, skip byte[0] (0x3F marker)
-    const firstPacket = await readPacket(device);
+    const firstPacket = await readPacket(dev);
     const firstData = skipReportByte(firstPacket);
 
     // 2. Use SDK's decodeChunked to parse ## header → { typeId, length, restBuffer }
@@ -163,11 +256,8 @@ export const NodeHidPlugin: LowlevelTransportSharedPlugin = {
     }
 
     // 4. Read subsequent packets until complete
-    // Note: comparison uses PACKET_SIZE (64) matching WebUSB's receiveData().
-    // After skipReportByte the actual data is 63 bytes, but the comparison
-    // is intentionally loose — same pattern as webusb.ts:402.
     while (decoded.offset < lengthWithHeader) {
-      const packet = await readPacket(device);
+      const packet = await readPacket(dev);
       const pktData = skipReportByte(packet);
       const buf = toArrayBuffer(pktData);
       if (lengthWithHeader - decoded.offset >= PACKET_SIZE) {
