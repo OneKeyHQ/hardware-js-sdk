@@ -53,15 +53,20 @@ onekey-hw --version
 
 ### 2. Install Claude Code Plugin
 
-Add the OneKey marketplace (one time):
+Run in your terminal (not inside Claude Code):
+
+```bash
+# Add marketplace (one time, uses sparse checkout for speed)
+claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
+
+# Install the plugin
+claude plugin install onekey-hardware@onekey-hardware-plugins
+```
+
+Or inside Claude Code interactive session:
 
 ```
 /plugin marketplace add OneKeyHQ/hardware-js-sdk
-```
-
-Install the plugin:
-
-```
 /plugin install onekey-hardware@onekey-hardware-plugins
 ```
 

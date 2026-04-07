@@ -20,15 +20,20 @@ onekey-hw --version
 
 **Option A: From marketplace (recommended)**
 
-Add the OneKey marketplace (one time):
+Run in your terminal (not inside Claude Code):
+
+```bash
+# Add marketplace (one time, uses sparse checkout for speed)
+claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
+
+# Install the plugin
+claude plugin install onekey-hardware@onekey-hardware-plugins
+```
+
+Or inside Claude Code:
 
 ```
 /plugin marketplace add OneKeyHQ/hardware-js-sdk
-```
-
-Then install the plugin:
-
-```
 /plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
@@ -36,17 +41,6 @@ Then install the plugin:
 
 ```bash
 claude --plugin-dir /path/to/hardware-js-sdk/packages/hd-cli
-```
-
-Or within an active Claude Code session:
-
-```bash
-# Symlink skills manually
-NPM_ROOT=$(npm root -g)
-ln -s $NPM_ROOT/@onekeyfe/hardware-cli/skills/device ~/.claude/skills/hardware-device
-ln -s $NPM_ROOT/@onekeyfe/hardware-cli/skills/signing ~/.claude/skills/hardware-signing
-ln -s $NPM_ROOT/@onekeyfe/hardware-cli/skills/firmware ~/.claude/skills/hardware-firmware
-ln -s $NPM_ROOT/@onekeyfe/hardware-cli/skills/security ~/.claude/skills/hardware-security
 ```
 
 ### Installed Skills

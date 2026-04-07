@@ -53,15 +53,20 @@ onekey-hw --version
 
 ### 2. 安装 Claude Code 插件
 
-添加 OneKey 插件市场（一次性操作）：
+在终端中运行（不是在 Claude Code 内部）：
+
+```bash
+# 添加插件市场（一次性操作，使用 sparse checkout 加速）
+claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
+
+# 安装插件
+claude plugin install onekey-hardware@onekey-hardware-plugins
+```
+
+或在 Claude Code 交互式会话中：
 
 ```
 /plugin marketplace add OneKeyHQ/hardware-js-sdk
-```
-
-安装插件：
-
-```
 /plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
