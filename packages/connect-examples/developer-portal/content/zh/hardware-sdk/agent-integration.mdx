@@ -74,10 +74,10 @@ claude plugin install onekey-hardware@onekey-hardware-plugins
 
 | 技能 | 描述 | 关键命令 |
 |------|------|----------|
-| `hardware-device` | 设备搜索、状态查询 | `search`, `status`, `lock` |
+| `hardware-device` | 设备搜索、锁定、验真、重置 | `search`, `lock`, `device-verify` |
 | `hardware-signing` | 多链地址与签名（27 条链） | `get-address`, `sign-transaction`, `sign-message` |
-| `hardware-firmware` | 固件检查与更新 | `firmware-check`, `firmware-update` |
-| `hardware-security` | PIN、密码短语、备份、恢复 | `change-pin`, `device-backup`, `device-wipe` |
+| `hardware-firmware` | 固件版本检查（更新需通过 OneKey App） | `firmware-check`, `firmware-check-all` |
+| `hardware-security` | PIN、密码短语、设备设置 | `change-pin`, `toggle-passphrase`, `device-wipe` |
 
 ### 3. 在 Claude Code 中使用
 
@@ -214,6 +214,5 @@ CLI 映射到以下 SDK API。详细参数文档请参考对应的链方法文�
 | `sign-transaction --chain btc` | `btcSignTransaction` | [btcSignTransaction](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) |
 | `sign-message --chain evm` | `evmSignMessage` | [evmSignMessage](/zh/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) |
 | `firmware-check` | `checkFirmwareRelease` | [checkFirmwareRelease](/zh/hardware-sdk/device-api/checkfirmwarerelease) |
-| `firmware-update` | `firmwareUpdateV2` | [firmwareUpdateV2](/zh/hardware-sdk/device-api/firmwareupdatev2) |
 | `device-verify` | `deviceVerify` | [deviceVerify](/zh/hardware-sdk/device-api/deviceverify) |
 | `change-pin` | `deviceChangePin` | [deviceChangePin](/zh/hardware-sdk/device-api/devicechangepin) |

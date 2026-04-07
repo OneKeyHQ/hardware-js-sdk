@@ -74,10 +74,10 @@ This installs 4 skills:
 
 | Skill | Description | Key Commands |
 |-------|-------------|--------------|
-| `hardware-device` | Device search, connect, status | `search`, `status`, `lock` |
+| `hardware-device` | Device search, lock, verify, wipe | `search`, `lock`, `device-verify` |
 | `hardware-signing` | Multi-chain address & signing (27 chains) | `get-address`, `sign-transaction`, `sign-message` |
-| `hardware-firmware` | Firmware check & update | `firmware-check`, `firmware-update` |
-| `hardware-security` | PIN, passphrase, backup, recovery | `change-pin`, `device-backup`, `device-wipe` |
+| `hardware-firmware` | Firmware version check (updates via OneKey App) | `firmware-check`, `firmware-check-all` |
+| `hardware-security` | PIN, passphrase, device settings | `change-pin`, `toggle-passphrase`, `device-wipe` |
 
 ### 3. Use with Claude Code
 
@@ -214,6 +214,5 @@ The CLI maps to the following SDK APIs. For detailed parameter documentation, se
 | `sign-transaction --chain btc` | `btcSignTransaction` | [btcSignTransaction](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) |
 | `sign-message --chain evm` | `evmSignMessage` | [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) |
 | `firmware-check` | `checkFirmwareRelease` | [checkFirmwareRelease](/en/hardware-sdk/device-api/checkfirmwarerelease) |
-| `firmware-update` | `firmwareUpdateV2` | [firmwareUpdateV2](/en/hardware-sdk/device-api/firmwareupdatev2) |
 | `device-verify` | `deviceVerify` | [deviceVerify](/en/hardware-sdk/device-api/deviceverify) |
 | `change-pin` | `deviceChangePin` | [deviceChangePin](/en/hardware-sdk/device-api/devicechangepin) |

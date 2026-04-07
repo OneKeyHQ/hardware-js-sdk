@@ -720,22 +720,6 @@ function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
   }
 }
 
-function wordCountToStrength(wordCount: number): number {
-  // #8 FIX: Validate word count is one of the allowed values
-  if (![12, 18, 24].includes(wordCount)) {
-    throw new Error(`Invalid word count: ${wordCount}. Must be 12, 18, or 24.`);
-  }
-  switch (wordCount) {
-    case 12:
-      return 128;
-    case 18:
-      return 192;
-    case 24:
-    default:
-      return 256;
-  }
-}
-
 /**
  * #6 FIX: Safe JSON.parse with structured error output
  */
@@ -765,17 +749,6 @@ function safeParseInt(input: string, label: string): number {
     throw new Error(`Invalid number for ${label}: "${input}"`);
   }
   return num;
-}
-
-/**
- * #15 FIX: Validate firmware version format
- */
-function parseVersion(input: string): number[] {
-  const parts = input.split('.').map(Number);
-  if (parts.length < 2 || parts.length > 4 || parts.some(Number.isNaN)) {
-    throw new Error(`Invalid version format: "${input}". Expected format: "4.8.0"`);
-  }
-  return parts;
 }
 
 program.parse();

@@ -8,7 +8,7 @@ command signatures, workflows, and security rules.
 
 | Skill | Path | Use When |
 |---|---|---|
-| **Device** | `skills/device/SKILL.md` | Search devices, check status, lock, verify, wipe |
+| **Device** | `skills/device/SKILL.md` | Search devices (with features), lock, verify, wipe |
 | **Signing** | `skills/signing/SKILL.md` | Get addresses, sign transactions/messages (27 chains) |
 | **Firmware** | `skills/firmware/SKILL.md` | Check firmware versions (updates via OneKey App only) |
 | **Security** | `skills/security/SKILL.md` | PIN, passphrase, device settings, factory reset |

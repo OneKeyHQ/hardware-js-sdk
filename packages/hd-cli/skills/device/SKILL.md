@@ -1,10 +1,9 @@
 ---
 name: hardware-device
 description: OneKey hardware wallet device management. Use whenever the user
-  wants to search for, connect to, or check the status of their OneKey
-  hardware wallet device. Also triggered as a pre-check before any signing
-  or firmware operation to ensure a device is connected and ready.
-keywords: [device, connect, search, hardware, onekey, status, features, disconnect]
+  wants to search for or check their OneKey hardware wallet device.
+  Also triggered as a pre-check before any signing or firmware operation.
+keywords: [device, search, hardware, onekey, features, verify, lock, wipe]
 ---
 
 ## Pre-flight Checks

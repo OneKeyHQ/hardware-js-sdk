@@ -190,19 +190,6 @@
       }
     },
     {
-      "id": "device-backup",
-      "prompt": "Back up my recovery phrase",
-      "skill": "device",
-      "expect": {
-        "commands_any_order": [
-          "onekey-hw device-backup"
-        ],
-        "forbidden": [
-          "--help"
-        ]
-      }
-    },
-    {
       "id": "factory-reset",
       "prompt": "Factory reset my OneKey device",
       "skill": "security",
@@ -223,40 +210,9 @@
       "expect": {
         "commands_ordered": [
           "onekey-hw search",
-          "onekey-hw device-verify",
-          "onekey-hw device-reset",
-          "onekey-hw device-backup"
+          "onekey-hw device-verify"
         ],
-        "forbidden": [
-          "--help"
-        ]
-      }
-    },
-    {
-      "id": "setup-new-device-cn",
-      "prompt": "帮我初始化新的 OneKey 硬件钱包",
-      "skill": "device",
-      "expect": {
-        "commands_ordered": [
-          "onekey-hw search",
-          "onekey-hw device-reset"
-        ],
-        "forbidden": [
-          "--help"
-        ]
-      }
-    },
-    {
-      "id": "recover-wallet",
-      "prompt": "Recover my wallet from seed phrase on the hardware device",
-      "skill": "signing",
-      "expect": {
-        "commands_any_order": [
-          "onekey-hw device-recovery"
-        ],
-        "forbidden": [
-          "--help"
-        ]
+        "note": "Device setup (seed generation, backup) must be done via OneKey App"
       }
     },
     {
