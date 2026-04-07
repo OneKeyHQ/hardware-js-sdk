@@ -4,7 +4,9 @@ title: AI Agent Integration
 
 # AI Agent Integration
 
-`@onekeyfe/hardware-cli` enables AI agents (Claude Code, Codex, Gemini CLI, etc.) to interact with OneKey hardware wallets via USB.
+`@onekeyfe/hardware-cli` enables AI agents to interact with OneKey hardware wallets via USB.
+
+Skills follow the [Agent Skills](https://agentskills.io) open standard, supported by 30+ tools including Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, and JetBrains.
 
 ## Install
 
@@ -15,15 +17,23 @@ claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin p
 claude plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
-The CLI (`@onekeyfe/hardware-cli`) is installed automatically on first use via the skill's pre-flight check.
+The CLI is installed automatically on first use via the skill's pre-flight check.
 
-### Other AI Tools (Codex, Gemini, Cursor)
+### Codex (OpenAI)
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
 ```
 
-Place [AGENTS.md](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/hd-cli/AGENTS.md) in your project. The AI agent reads it and learns the available commands.
+Codex reads `AGENTS.md` automatically. Place it in your project root, or run Codex from the `packages/hd-cli/` directory where skills are discovered automatically.
+
+### Gemini CLI / Copilot / Cursor / Others
+
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
+
+Copy the [skills/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-cli/skills) directory into your project's `.claude/skills/` or equivalent skill path for your tool.
 
 ## Skills
 

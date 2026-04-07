@@ -4,7 +4,9 @@ title: AI Agent 集成
 
 # AI Agent 集成
 
-`@onekeyfe/hardware-cli` 使 AI Agent（Claude Code、Codex、Gemini CLI 等）能够通过 USB 与 OneKey 硬件钱包交互。
+`@onekeyfe/hardware-cli` 使 AI Agent 能够通过 USB 与 OneKey 硬件钱包交互。
+
+Skills 遵循 [Agent Skills](https://agentskills.io) 开放标准，已被 30+ 工具支持，包括 Claude Code、Codex、Gemini CLI、GitHub Copilot、Cursor、JetBrains 等。
 
 ## 安装
 
@@ -15,15 +17,23 @@ claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin p
 claude plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
-CLI（`@onekeyfe/hardware-cli`）会在首次使用时通过 skill 的 pre-flight 自动安装。
+CLI 会在首次使用时通过 skill 的 pre-flight 自动安装。
 
-### 其他 AI 工具（Codex、Gemini、Cursor）
+### Codex (OpenAI)
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
 ```
 
-将 [AGENTS.md](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/hd-cli/AGENTS.md) 放到你的项目中，AI Agent 会读取它来了解可用命令。
+Codex 会自动读取 `AGENTS.md`。将它放到项目根目录，或在 `packages/hd-cli/` 目录下运行 Codex 即可自动发现 skills。
+
+### Gemini CLI / Copilot / Cursor / 其他
+
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
+
+将 [skills/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-cli/skills) 目录复制到你项目的 `.claude/skills/` 或对应工具的 skill 路径中。
 
 ## 技能
 
