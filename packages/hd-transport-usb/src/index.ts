@@ -3,9 +3,9 @@ import * as usb from 'usb';
 import transport from '@onekeyfe/hd-transport';
 import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 
-import type { LowlevelTransportSharedPlugin, LowLevelDevice } from '@onekeyfe/hd-transport';
+import { HEADER_LENGTH, PACKET_SIZE, REPORT_ID } from './constants';
 
-import { PACKET_SIZE, REPORT_ID, HEADER_LENGTH } from './constants';
+import type { LowLevelDevice, LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 
 const { decodeProtocol } = transport;
 
@@ -113,14 +113,13 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
     // libusb requires no global initialization
   },
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async enumerate(): Promise<LowLevelDevice[]> {
     const allDevices = usb.getDeviceList();
 
     const onekeyDevices = allDevices.filter(d => {
       const { idVendor, idProduct } = d.deviceDescriptor;
-      return ONEKEY_WEBUSB_FILTER.some(
-        f => idVendor === f.vendorId && idProduct === f.productId
-      );
+      return ONEKEY_WEBUSB_FILTER.some(f => idVendor === f.vendorId && idProduct === f.productId);
     });
 
     return onekeyDevices.map(d => {
@@ -136,7 +135,11 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
         d.close();
       } catch {
         // Can't open — might be in use, just return basic info
-        try { d.close(); } catch { /* ignore */ }
+        try {
+          d.close();
+        } catch {
+          /* ignore */
+        }
       }
 
       return {
@@ -147,6 +150,7 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
     });
   },
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async connect(uuid: string): Promise<void> {
     if (openDevices.has(uuid)) {
       activeDevice = openDevices.get(uuid)!;
@@ -199,15 +203,24 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
     activeDevice = openDev;
   },
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async disconnect(uuid: string): Promise<void> {
     const openDev = openDevices.get(uuid);
     if (openDev) {
       try {
         openDev.iface.release(() => {
-          try { openDev.device.close(); } catch { /* ignore */ }
+          try {
+            openDev.device.close();
+          } catch {
+            /* ignore */
+          }
         });
       } catch {
-        try { openDev.device.close(); } catch { /* ignore */ }
+        try {
+          openDev.device.close();
+        } catch {
+          /* ignore */
+        }
       }
       openDevices.delete(uuid);
       if (activeDevice === openDev) {
