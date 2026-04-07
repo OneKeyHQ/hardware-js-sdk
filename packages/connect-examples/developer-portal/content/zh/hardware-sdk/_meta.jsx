@@ -2,6 +2,9 @@ import { ChainMethodsSidebar } from '../../../components/ChainMethodsSidebar'
 
 export default {
   index: '概览',
+  'agent-integration': {
+    title: '🤖 AI Agent 集成',
+  },
   playground: {
     title: '交互演示',
     theme: {
@@ -22,8 +25,6 @@ export default {
     title: <ChainMethodsSidebar lang="zh" />
   },
   chains: { display: 'hidden' },
-  '---agent': { type: 'separator', title: 'AI Agent' },
-  'agent-integration': 'AI Agent 集成',
   '---Reference': { type: 'separator', title: '参考' },
   'legacy-guides': '迁移指引',
   'concepts': '概念'

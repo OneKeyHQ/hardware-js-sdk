@@ -2,6 +2,9 @@ import { ChainMethodsSidebar } from '../../../components/ChainMethodsSidebar'
 
 export default {
   index: 'Overview',
+  'agent-integration': {
+    title: '🤖 AI Agent Integration',
+  },
   playground: {
     title: 'Playground',
     theme: {
@@ -22,8 +25,6 @@ export default {
     title: <ChainMethodsSidebar lang="en" />
   },
   chains: { display: 'hidden' },
-  '---agent': { type: 'separator', title: 'AI Agent' },
-  'agent-integration': 'AI Agent Integration',
   '---Reference': { type: 'separator', title: 'Reference' },
   'legacy-guides': 'Migration Gudie',
   'concepts': 'concepts'
