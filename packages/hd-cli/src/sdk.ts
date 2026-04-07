@@ -12,7 +12,6 @@
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 import { UsbPlugin } from '@onekeyfe/hd-transport-usb';
-import * as http from 'http';
 import * as readline from 'readline';
 
 import type { ConnectSettings } from '@onekeyfe/hd-core';
@@ -180,44 +179,15 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
   });
 }
 
-/**
- * Probe whether OneKey Bridge is running on localhost:21320.
- * Returns true if reachable within 2 seconds, false otherwise.
- */
-function isBridgeRunning(): Promise<boolean> {
-  return new Promise(resolve => {
-    const req = http.get('http://127.0.0.1:21320/', { timeout: 2000 }, res => {
-      // Any response (even redirect) means Bridge is alive
-      res.resume();
-      resolve(true);
-    });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => {
-      req.destroy();
-      resolve(false);
-    });
-  });
-}
-
 export async function createSDK(opts: SDKOptions) {
   const settings: Partial<ConnectSettings> = {
     debug: false,
     fetchConfig: true,
   };
 
-  // Auto-detect transport:
-  //   1. Bridge running → use HTTP transport (avoids USB exclusive access conflicts)
-  //   2. Bridge not running → use libusb direct USB (works on all platforms)
-  let plugin;
-  const bridgeAvailable = await isBridgeRunning();
-  if (bridgeAvailable) {
-    settings.env = 'node';
-    process.stderr.write('[onekey-hw] Using OneKey Bridge transport\n');
-  } else {
-    settings.env = 'lowlevel';
-    plugin = UsbPlugin;
-    process.stderr.write('[onekey-hw] Using direct USB transport (libusb)\n');
-  }
+  // Direct USB via libusb — works on macOS, Linux, Windows
+  settings.env = 'lowlevel';
+  const plugin = UsbPlugin;
 
   await HardwareSDK.init(settings, undefined, plugin);
 
