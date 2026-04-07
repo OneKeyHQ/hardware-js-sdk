@@ -18,42 +18,45 @@ onekey-hw --version
 
 ### 2. Install Claude Code Plugin
 
+**Option A: From marketplace (recommended)**
+
 Add the OneKey marketplace (one time):
 
 ```
 /plugin marketplace add OneKeyHQ/hardware-js-sdk
 ```
 
-Install the plugin:
+Then install the plugin:
 
 ```
 /plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
-This installs 4 skills:
-- **hardware-device** — Search, connect, check device status
-- **hardware-signing** — Get addresses, sign transactions/messages (27 chains)
-- **hardware-firmware** — Check and update firmware
-- **hardware-security** — PIN, passphrase, backup, recovery, factory reset
-
-### Alternative: Install from npm directly
-
-```
-/plugin marketplace add OneKeyHQ/hardware-js-sdk
-```
-
-Or install skills manually:
+**Option B: Load from local path (for development/testing)**
 
 ```bash
-# Get the npm global root
-NPM_ROOT=$(npm root -g)
+claude --plugin-dir /path/to/hardware-js-sdk/packages/hd-cli
+```
 
-# Symlink skills
+Or within an active Claude Code session:
+
+```bash
+# Symlink skills manually
+NPM_ROOT=$(npm root -g)
 ln -s $NPM_ROOT/@onekeyfe/hardware-cli/skills/device ~/.claude/skills/hardware-device
 ln -s $NPM_ROOT/@onekeyfe/hardware-cli/skills/signing ~/.claude/skills/hardware-signing
 ln -s $NPM_ROOT/@onekeyfe/hardware-cli/skills/firmware ~/.claude/skills/hardware-firmware
 ln -s $NPM_ROOT/@onekeyfe/hardware-cli/skills/security ~/.claude/skills/hardware-security
 ```
+
+### Installed Skills
+
+| Skill | Namespace | Description |
+|-------|-----------|-------------|
+| hardware-device | `/onekey-hardware:hardware-device` | Search, connect, check device status |
+| hardware-signing | `/onekey-hardware:hardware-signing` | Get addresses, sign transactions/messages (27 chains) |
+| hardware-firmware | `/onekey-hardware:hardware-firmware` | Check and update firmware |
+| hardware-security | `/onekey-hardware:hardware-security` | PIN, passphrase, backup, recovery, factory reset |
 
 ## Usage
 

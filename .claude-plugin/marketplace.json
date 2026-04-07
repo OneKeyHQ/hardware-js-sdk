@@ -10,11 +10,9 @@
   "plugins": [
     {
       "name": "onekey-hardware",
-      "source": {
-        "source": "npm",
-        "package": "@onekeyfe/hardware-cli"
-      },
-      "description": "OneKey hardware wallet skills — device management, secure multi-chain signing, firmware updates, security settings"
+      "source": "./packages/hd-cli",
+      "description": "OneKey hardware wallet skills — device management, secure multi-chain signing, firmware updates, security settings",
+      "version": "1.1.25-alpha.0"
     }
   ]
 }
