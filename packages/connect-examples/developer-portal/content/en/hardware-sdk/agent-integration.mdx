@@ -4,40 +4,9 @@ title: AI Agent Integration
 
 # AI Agent Integration
 
-OneKey Hardware SDK provides CLI tools and Claude Code plugin skills that enable AI agents to interact with OneKey hardware wallets. This allows developers to build AI-powered workflows that leverage the security of hardware wallet signing.
+`@onekeyfe/hardware-cli` enables AI agents (Claude Code, Codex, Gemini CLI, etc.) to interact with OneKey hardware wallets via USB.
 
-## Architecture
-
-```
-┌─────────────────────────────────┐
-│  AI Agent (Claude Code, etc.)   │
-│  reads SKILL.md → invokes CLI   │
-├─────────────────────────────────┤
-│  onekey-hw CLI                  │
-│  @onekeyfe/hardware-cli        │
-├─────────────────────────────────┤
-│  Hardware SDK Core              │
-│  @onekeyfe/hd-common-connect-sdk│
-├─────────────────────────────────┤
-│  Transport Layer                │
-│  @onekeyfe/hd-transport-usb    │
-│  (libusb direct USB)            │
-├─────────────────────────────────┤
-│  OneKey Hardware Device         │
-│  Physical confirmation required │
-└─────────────────────────────────┘
-```
-
-## Security Model
-
-Unlike software-based signing, hardware wallet signing provides a critical security guarantee for AI agent scenarios:
-
-- **Physical confirmation**: Every signing operation requires the user to physically press the confirm button on the device
-- **On-device verification**: Transaction details are displayed on the hardware device screen for user review
-- **Key isolation**: Private keys never leave the secure element — even if the AI agent is compromised, keys remain safe
-- **Prompt injection resistant**: No matter what instructions an AI agent receives, it cannot bypass hardware device confirmation
-
-## Quick Start
+## Install
 
 ### 1. Install CLI
 
@@ -45,75 +14,53 @@ Unlike software-based signing, hardware wallet signing provides a critical secur
 npm install -g @onekeyfe/hardware-cli
 ```
 
-Verify:
-
-```bash
-onekey-hw --version
-```
-
 ### 2. Install Claude Code Plugin
 
-Run in your terminal (not inside Claude Code):
-
 ```bash
-# Add marketplace (one time, uses sparse checkout for speed)
 claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
-
-# Install the plugin
 claude plugin install onekey-hardware@onekey-hardware-plugins
 ```
 
-Or inside Claude Code interactive session:
+### 3. For Other AI Tools (Codex, Gemini, Cursor)
 
-```
-/plugin marketplace add OneKeyHQ/hardware-js-sdk
-/plugin install onekey-hardware@onekey-hardware-plugins
-```
+Place [AGENTS.md](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/hd-cli/AGENTS.md) in your project. The AI agent reads it and learns the available commands.
 
-This installs 4 skills:
+## Skills
 
-| Skill | Description | Key Commands |
-|-------|-------------|--------------|
-| `hardware-device` | Device search, lock, verify, wipe | `search`, `lock`, `device-verify` |
-| `hardware-signing` | Multi-chain address & signing (27 chains) | `get-address`, `sign-transaction`, `sign-message` |
-| `hardware-firmware` | Firmware version check (updates via OneKey App) | `firmware-check`, `firmware-check-all` |
-| `hardware-security` | PIN, passphrase, device settings | `change-pin`, `toggle-passphrase`, `device-wipe` |
+| Skill | Key Commands |
+|-------|--------------|
+| **Device** | `search`, `lock`, `device-verify`, `device-settings`, `device-wipe` |
+| **Signing** (27 chains) | `get-address`, `sign-transaction`, `sign-message`, `sign-typed-data`, `sign-psbt`, `batch-get-address` |
+| **Firmware** (read-only) | `firmware-check`, `firmware-check-all`, `bootloader-check` |
+| **Security** | `change-pin`, `toggle-passphrase`, `passphrase-state` |
 
-### 3. Use with Claude Code
-
-After installing the plugin, just ask in natural language:
-
-```
-"Search for my OneKey device"
-"Get my Ethereum address"
-"Sign this message: hello world"
-"Check if my firmware is up to date"
-```
-
-### Basic CLI Usage
+## Usage
 
 ```bash
-# Search for connected devices
+# Search for connected devices (auto-fetches device info)
 onekey-hw search
 
-# Get an Ethereum address (verified on device)
+# Get an Ethereum address
 onekey-hw get-address --chain evm --use-empty-passphrase
 
 # Get a Bitcoin address
 onekey-hw get-address --chain btc --use-empty-passphrase
+
+# Sign a message
+onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
 
 # Sign an EVM transaction
 onekey-hw sign-transaction --chain evm \
   --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
   --use-empty-passphrase
 
-# Check firmware updates
+# Check firmware
 onekey-hw firmware-check-all
 ```
 
-## Supported Chains
+Firmware updates must be done via the [OneKey App](https://onekey.so/download) or [firmware.onekey.so](https://firmware.onekey.so/).
 
-The CLI supports all 27 chains available in the Hardware SDK:
+## Supported Chains
 
 | Category | Chains |
 |----------|--------|
@@ -122,33 +69,9 @@ The CLI supports all 27 chains available in the Hardware SDK:
 | **Layer 1** | Solana, Cardano, Polkadot, Cosmos, Near, Aptos, Sui, TON, Stellar, XRP |
 | **Others** | Tron, Filecoin, Kaspa, Algorand, Conflux, Nervos, Nostr, and more |
 
-For the complete API reference of each chain's parameters, see the [Chain Methods](/en/hardware-sdk/chains) documentation.
+For chain-specific parameters, see the [Chain Methods](/en/hardware-sdk/chains) documentation.
 
-## Device Interaction
-
-All commands that communicate with the device (except `search`) may require physical interaction:
-
-| Event | What User Must Do |
-|-------|-------------------|
-| PIN entry | Enter PIN on device touchscreen |
-| Button confirmation | Press confirm on device (address display, signing) |
-| Passphrase | Enter passphrase on device (hidden wallets) |
-
-Commands block until the user acts on the device. AI agents should:
-1. **Warn the user before running** any device command
-2. **Set timeout to 120+ seconds** (signing may need time for review)
-3. **Not retry automatically** if timeout — user likely rejected on device
-
-## CLI Reference
-
-### Global Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--connect-id <id>` | Device connection ID | Auto-detect |
-| `--use-empty-passphrase` | Use standard wallet (skip passphrase) | — |
-
-### Output Format
+## Output Format
 
 All commands return structured JSON:
 
@@ -162,48 +85,7 @@ All commands return structured JSON:
 }
 ```
 
-Error responses:
-```json
-{
-  "success": false,
-  "payload": {
-    "error": "Device not found",
-    "code": 801
-  }
-}
-```
-
-## Integration with App-Monorepo CLI
-
-The `onekey-hardware` plugin is designed to complement the [`onekey` plugin](https://github.com/OneKeyHQ/app-monorepo/tree/feat/agent/apps/cli) from app-monorepo:
-
-```
-onekey-plugins marketplace
-├── onekey (app-monorepo)        → wallet, swap, market, security
-└── onekey-hardware (this SDK)   → device, signing, firmware, security
-```
-
-**Example workflow — Hardware-secured swap:**
-1. `onekey balance --chain eth` (app-monorepo: check balance)
-2. `onekey security audit --token <contract>` (app-monorepo: security check)
-3. `onekey swap quote ...` (app-monorepo: get swap quote)
-4. `onekey-hw sign-transaction --chain evm --tx '...'` (**hardware signing**)
-5. Broadcast signed transaction
-
-## Evaluation Framework
-
-The CLI includes an evaluation framework for testing agent skill accuracy:
-
-```bash
-cd packages/hd-cli/evals
-./run-evals.sh                    # Run all cases
-./run-evals.sh --model haiku      # Test with specific model
-./run-evals.sh --case device-*    # Run matching cases only
-```
-
-## API Mapping Reference
-
-The CLI maps to the following SDK APIs. For detailed parameter documentation, see the corresponding chain method docs:
+## API Mapping
 
 | CLI Command | SDK Method | Docs |
 |-------------|-----------|------|
