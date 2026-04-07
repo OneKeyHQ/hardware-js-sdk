@@ -9,9 +9,9 @@ import type { LowLevelDevice, LowlevelTransportSharedPlugin } from '@onekeyfe/hd
 
 const { decodeProtocol } = transport;
 
-/** USB interface number for vendor-specific communication (same as Bridge) */
+/** USB interface number for vendor-specific communication */
 const INTERFACE_NUMBER = 0;
-/** USB endpoint addresses (same as Bridge's normalIface) */
+/** USB endpoint addresses */
 const ENDPOINT_IN = 0x81;
 const ENDPOINT_OUT = 0x01;
 
@@ -104,7 +104,6 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
  *
  * Uses libusb to access the vendor-specific interface (class 255)
  * which is NOT visible to the HID framework on macOS.
- * This is the same approach OneKey Bridge uses.
  */
 export const UsbPlugin: LowlevelTransportSharedPlugin = {
   version: '1.0.0',

@@ -42,19 +42,6 @@
       }
     },
     {
-      "id": "bridge-check",
-      "prompt": "Is OneKey Bridge running?",
-      "skill": "device",
-      "expect": {
-        "commands": [
-          "onekey-hw bridge-status"
-        ],
-        "forbidden": [
-          "--help"
-        ]
-      }
-    },
-    {
       "id": "get-eth-address",
       "prompt": "Get my Ethereum address from hardware wallet",
       "skill": "signing",
@@ -410,7 +397,6 @@
       "skill": "device",
       "expect": {
         "commands_ordered": [
-          "onekey-hw bridge-status",
           "onekey-hw search"
         ],
         "forbidden": [

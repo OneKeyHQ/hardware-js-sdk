@@ -43,7 +43,7 @@ mkdir -p "${RUN_DIR}"
 SYSTEM_PROMPT="You have the onekey-hardware plugin installed.
 BEFORE running any onekey-hw command, you MUST read the skill files at ${CLI_DIR}/skills/ to understand available commands and their parameters.
 NEVER use onekey-hw --help or --help on subcommands. The skill files are your sole documentation source.
-Skip all pre-flight checks (version checking, bridge status) — assume CLI is installed and ready.
+Skip all pre-flight checks (version checking) — assume CLI is installed and ready.
 When a command requires user confirmation, auto-confirm YES.
 If an API call fails, retry at most once before reporting the error.
 Output only the onekey-hw commands you would execute, one per line. No explanations."
