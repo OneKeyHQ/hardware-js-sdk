@@ -23,17 +23,36 @@ The CLI is installed automatically on first use via the skill's pre-flight check
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
+
+# Copy skills to Codex skill directory
+git clone --depth 1 --filter=blob:none --sparse https://github.com/OneKeyHQ/hardware-js-sdk.git /tmp/onekey-hw-skills
+cd /tmp/onekey-hw-skills && git sparse-checkout set packages/hd-cli/skills
+cp -r packages/hd-cli/skills/device ~/.codex/skills/hardware-device
+cp -r packages/hd-cli/skills/signing ~/.codex/skills/hardware-signing
+cp -r packages/hd-cli/skills/firmware ~/.codex/skills/hardware-firmware
+cp -r packages/hd-cli/skills/security ~/.codex/skills/hardware-security
+rm -rf /tmp/onekey-hw-skills
 ```
 
-Codex reads `AGENTS.md` automatically. Place it in your project root, or run Codex from the `packages/hd-cli/` directory where skills are discovered automatically.
+### Gemini CLI
 
-### Gemini CLI / Copilot / Cursor / Others
+```bash
+npm install -g @onekeyfe/hardware-cli
+
+# Install skills via Gemini's built-in command
+gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/device
+gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/signing
+gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/firmware
+gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/security
+```
+
+### Cursor / Copilot / Others
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
 ```
 
-Copy the [skills/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-cli/skills) directory into your project's `.claude/skills/` or equivalent skill path for your tool.
+Copy the [skills/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-cli/skills) directory into your project, or place `AGENTS.md` in your project root.
 
 ## Skills
 

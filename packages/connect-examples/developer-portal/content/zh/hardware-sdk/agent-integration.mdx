@@ -23,17 +23,36 @@ CLI 会在首次使用时通过 skill 的 pre-flight 自动安装。
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
+
+# 复制 skills 到 Codex skill 目录
+git clone --depth 1 --filter=blob:none --sparse https://github.com/OneKeyHQ/hardware-js-sdk.git /tmp/onekey-hw-skills
+cd /tmp/onekey-hw-skills && git sparse-checkout set packages/hd-cli/skills
+cp -r packages/hd-cli/skills/device ~/.codex/skills/hardware-device
+cp -r packages/hd-cli/skills/signing ~/.codex/skills/hardware-signing
+cp -r packages/hd-cli/skills/firmware ~/.codex/skills/hardware-firmware
+cp -r packages/hd-cli/skills/security ~/.codex/skills/hardware-security
+rm -rf /tmp/onekey-hw-skills
 ```
 
-Codex 会自动读取 `AGENTS.md`。将它放到项目根目录，或在 `packages/hd-cli/` 目录下运行 Codex 即可自动发现 skills。
+### Gemini CLI
 
-### Gemini CLI / Copilot / Cursor / 其他
+```bash
+npm install -g @onekeyfe/hardware-cli
+
+# 通过 Gemini 内置命令安装 skills
+gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/device
+gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/signing
+gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/firmware
+gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/security
+```
+
+### Cursor / Copilot / 其他
 
 ```bash
 npm install -g @onekeyfe/hardware-cli
 ```
 
-将 [skills/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-cli/skills) 目录复制到你项目的 `.claude/skills/` 或对应工具的 skill 路径中。
+将 [skills/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-cli/skills) 目录复制到你的项目中，或将 `AGENTS.md` 放到项目根目录。
 
 ## 技能
 
