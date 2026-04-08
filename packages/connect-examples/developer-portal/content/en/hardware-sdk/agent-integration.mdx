@@ -8,9 +8,13 @@ title: AI Agent Integration
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard, supported by 30+ tools including Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, and JetBrains.
 
-## Install
+## Install CLI
 
-### Claude Code
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
+
+## Claude Code
 
 ```bash
 claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
@@ -19,40 +23,36 @@ claude plugin install onekey-hardware@onekey-hardware-plugins
 
 The CLI is installed automatically on first use via the skill's pre-flight check.
 
-### Codex (OpenAI)
+## Other AI Assistants (skills only)
+
+The `skills/*/SKILL.md` files follow the universal skill format and work with any tool that reads it.
+
+| Tool | How to use | What works |
+|------|-----------|------------|
+| **Gemini CLI** | Copy skill folders to `~/.gemini/skills/` | Skills only |
+| **Codex CLI** | Copy skill folders to `~/.codex/skills/` | Skills only |
+| **Cursor** | Copy skill folders to `.cursor/skills/` | Skills only |
+| **OpenCode** | Copy skill folders to `.opencode/skills/` | Skills only |
+| **Kiro** | Copy skill folders to `.kiro/skills/` | Skills only |
 
 ```bash
-npm install -g @onekeyfe/hardware-cli
+# Clone skills only (sparse checkout)
+git clone --depth 1 --filter=blob:none --sparse https://github.com/OneKeyHQ/hardware-js-sdk.git /tmp/onekey-hw
+cd /tmp/onekey-hw && git sparse-checkout set packages/hd-cli/skills
 
-# Copy skills to Codex skill directory
-git clone --depth 1 --filter=blob:none --sparse https://github.com/OneKeyHQ/hardware-js-sdk.git /tmp/onekey-hw-skills
-cd /tmp/onekey-hw-skills && git sparse-checkout set packages/hd-cli/skills
-cp -r packages/hd-cli/skills/device ~/.codex/skills/hardware-device
-cp -r packages/hd-cli/skills/signing ~/.codex/skills/hardware-signing
-cp -r packages/hd-cli/skills/firmware ~/.codex/skills/hardware-firmware
-cp -r packages/hd-cli/skills/security ~/.codex/skills/hardware-security
-rm -rf /tmp/onekey-hw-skills
+# Example: copy all skills for Codex CLI (global)
+for skill in packages/hd-cli/skills/*/; do
+  cp -r "$skill" ~/.codex/skills/ 2>/dev/null
+done
+
+# Example: copy all skills for Gemini CLI (global)
+for skill in packages/hd-cli/skills/*/; do
+  cp -r "$skill" ~/.gemini/skills/ 2>/dev/null
+done
+
+# Cleanup
+rm -rf /tmp/onekey-hw
 ```
-
-### Gemini CLI
-
-```bash
-npm install -g @onekeyfe/hardware-cli
-
-# Install skills via Gemini's built-in command
-gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/device
-gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/signing
-gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/firmware
-gemini skills install https://github.com/OneKeyHQ/hardware-js-sdk.git --path packages/hd-cli/skills/security
-```
-
-### Cursor / Copilot / Others
-
-```bash
-npm install -g @onekeyfe/hardware-cli
-```
-
-Copy the [skills/](https://github.com/OneKeyHQ/hardware-js-sdk/tree/onekey/packages/hd-cli/skills) directory into your project, or place `AGENTS.md` in your project root.
 
 ## Skills
 
