@@ -1,0 +1,139 @@
+---
+title: AI Agent Integration
+---
+
+# AI Agent Integration
+
+`@onekeyfe/hardware-cli` enables AI agents to interact with OneKey hardware wallets via USB.
+
+Skills follow the [Agent Skills](https://agentskills.io) open standard, supported by 30+ tools including Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, and JetBrains.
+
+## Install CLI
+
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
+
+## Install Skills (Universal)
+
+Works with all Agent Skills compatible tools (30+):
+
+```bash
+npx skills add OneKeyHQ/hardware-js-sdk
+```
+
+This auto-detects your tool (Claude Code, Codex, Gemini, Cursor, etc.) and installs skills to the correct location.
+
+## Claude Code
+
+```bash
+claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
+claude plugin install onekey-hardware@onekey-hardware-plugins
+```
+
+The CLI is installed automatically on first use via the skill's pre-flight check.
+
+## Other AI Assistants (skills only)
+
+The `skills/*/SKILL.md` files follow the universal skill format and work with any tool that reads it.
+
+| Tool | How to use | What works |
+|------|-----------|------------|
+| **Gemini CLI** | Copy skill folders to `~/.gemini/skills/` | Skills only |
+| **Codex CLI** | Copy skill folders to `~/.codex/skills/` | Skills only |
+| **Cursor** | Copy skill folders to `.cursor/skills/` | Skills only |
+| **OpenCode** | Copy skill folders to `.opencode/skills/` | Skills only |
+| **Kiro** | Copy skill folders to `.kiro/skills/` | Skills only |
+
+```bash
+# Clone skills only (sparse checkout)
+git clone --depth 1 --filter=blob:none --sparse https://github.com/OneKeyHQ/hardware-js-sdk.git /tmp/onekey-hw
+cd /tmp/onekey-hw && git sparse-checkout set packages/hd-cli/skills
+
+# Example: copy all skills for Codex CLI (global)
+for skill in packages/hd-cli/skills/*/; do
+  cp -r "$skill" ~/.codex/skills/ 2>/dev/null
+done
+
+# Example: copy all skills for Gemini CLI (global)
+for skill in packages/hd-cli/skills/*/; do
+  cp -r "$skill" ~/.gemini/skills/ 2>/dev/null
+done
+
+# Cleanup
+rm -rf /tmp/onekey-hw
+```
+
+## Skills
+
+| Skill | Key Commands |
+|-------|--------------|
+| **Device** | `search`, `lock`, `device-verify`, `device-settings`, `device-wipe` |
+| **Signing** (27 chains) | `get-address`, `sign-transaction`, `sign-message`, `sign-typed-data`, `sign-psbt`, `batch-get-address` |
+| **Firmware** (read-only) | `firmware-check`, `firmware-check-all`, `bootloader-check` |
+| **Security** | `change-pin`, `toggle-passphrase`, `passphrase-state` |
+
+## Usage
+
+```bash
+# Search for connected devices (auto-fetches device info)
+onekey-hw search
+
+# Get an Ethereum address
+onekey-hw get-address --chain evm --use-empty-passphrase
+
+# Get a Bitcoin address
+onekey-hw get-address --chain btc --use-empty-passphrase
+
+# Sign a message
+onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
+
+# Sign an EVM transaction
+onekey-hw sign-transaction --chain evm \
+  --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
+  --use-empty-passphrase
+
+# Check firmware
+onekey-hw firmware-check-all
+```
+
+Firmware updates must be done via the [OneKey App](https://onekey.so/download) or [firmware.onekey.so](https://firmware.onekey.so/).
+
+## Supported Chains
+
+| Category | Chains |
+|----------|--------|
+| **EVM** | Ethereum, BSC, Polygon, Arbitrum, Base, Optimism, Avalanche, and all EVM-compatible chains |
+| **Bitcoin & Forks** | Bitcoin (Legacy/SegWit/Taproot), Litecoin, Bitcoin Cash, and other BTC forks |
+| **Layer 1** | Solana, Cardano, Polkadot, Cosmos, Near, Aptos, Sui, TON, Stellar, XRP |
+| **Others** | Tron, Filecoin, Kaspa, Algorand, Conflux, Nervos, Nostr, and more |
+
+For chain-specific parameters, see the [Chain Methods](/en/hardware-sdk/chains) documentation.
+
+## Output Format
+
+All commands return structured JSON:
+
+```json
+{
+  "success": true,
+  "payload": {
+    "address": "0x1234...",
+    "path": "m/44'/60'/0'/0/0"
+  }
+}
+```
+
+## API Mapping
+
+| CLI Command | SDK Method | Docs |
+|-------------|-----------|------|
+| `get-address --chain evm` | `evmGetAddress` | [evmGetAddress](/en/hardware-sdk/chains/ethereum-and-evm/evmgetaddress) |
+| `get-address --chain btc` | `btcGetAddress` | [btcGetAddress](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress) |
+| `get-address --chain sol` | `solGetAddress` | [solGetAddress](/en/hardware-sdk/chains/solana/solgetaddress) |
+| `sign-transaction --chain evm` | `evmSignTransaction` | [evmSignTransaction](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) |
+| `sign-transaction --chain btc` | `btcSignTransaction` | [btcSignTransaction](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) |
+| `sign-message --chain evm` | `evmSignMessage` | [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) |
+| `firmware-check` | `checkFirmwareRelease` | [checkFirmwareRelease](/en/hardware-sdk/device-api/checkfirmwarerelease) |
+| `device-verify` | `deviceVerify` | [deviceVerify](/en/hardware-sdk/device-api/deviceverify) |
+| `change-pin` | `deviceChangePin` | [deviceChangePin](/en/hardware-sdk/device-api/devicechangepin) |

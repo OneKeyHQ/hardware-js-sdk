@@ -1,0 +1,139 @@
+---
+title: AI Agent 集成
+---
+
+# AI Agent 集成
+
+`@onekeyfe/hardware-cli` 使 AI Agent 能够通过 USB 与 OneKey 硬件钱包交互。
+
+Skills 遵循 [Agent Skills](https://agentskills.io) 开放标准，已被 30+ 工具支持，包括 Claude Code、Codex、Gemini CLI、GitHub Copilot、Cursor、JetBrains 等。
+
+## 安装 CLI
+
+```bash
+npm install -g @onekeyfe/hardware-cli
+```
+
+## 安装 Skills（通用）
+
+适用于所有 Agent Skills 兼容工具（30+）：
+
+```bash
+npx skills add OneKeyHQ/hardware-js-sdk
+```
+
+自动检测你使用的工具（Claude Code、Codex、Gemini、Cursor 等），将 skills 安装到正确位置。
+
+## Claude Code
+
+```bash
+claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
+claude plugin install onekey-hardware@onekey-hardware-plugins
+```
+
+CLI 会在首次使用时通过 skill 的 pre-flight 自动安装。
+
+## 其他 AI 工具（仅 skills）
+
+`skills/*/SKILL.md` 文件遵循通用 skill 格式，所有支持该格式的工具均可读取。
+
+| 工具 | 使用方式 | 支持范围 |
+|------|---------|---------|
+| **Gemini CLI** | 复制 skill 文件夹到 `~/.gemini/skills/` | 仅 Skills |
+| **Codex CLI** | 复制 skill 文件夹到 `~/.codex/skills/` | 仅 Skills |
+| **Cursor** | 复制 skill 文件夹到 `.cursor/skills/` | 仅 Skills |
+| **OpenCode** | 复制 skill 文件夹到 `.opencode/skills/` | 仅 Skills |
+| **Kiro** | 复制 skill 文件夹到 `.kiro/skills/` | 仅 Skills |
+
+```bash
+# 仅克隆 skills（sparse checkout）
+git clone --depth 1 --filter=blob:none --sparse https://github.com/OneKeyHQ/hardware-js-sdk.git /tmp/onekey-hw
+cd /tmp/onekey-hw && git sparse-checkout set packages/hd-cli/skills
+
+# 示例：复制所有 skills 到 Codex CLI（全局）
+for skill in packages/hd-cli/skills/*/; do
+  cp -r "$skill" ~/.codex/skills/ 2>/dev/null
+done
+
+# 示例：复制所有 skills 到 Gemini CLI（全局）
+for skill in packages/hd-cli/skills/*/; do
+  cp -r "$skill" ~/.gemini/skills/ 2>/dev/null
+done
+
+# 清理
+rm -rf /tmp/onekey-hw
+```
+
+## 技能
+
+| 技能 | 关键命令 |
+|------|----------|
+| **设备** | `search`, `lock`, `device-verify`, `device-settings`, `device-wipe` |
+| **签名**（27 条链） | `get-address`, `sign-transaction`, `sign-message`, `sign-typed-data`, `sign-psbt`, `batch-get-address` |
+| **固件**（只读） | `firmware-check`, `firmware-check-all`, `bootloader-check` |
+| **安全** | `change-pin`, `toggle-passphrase`, `passphrase-state` |
+
+## 使用
+
+```bash
+# 搜索已连接的设备（自动获取设备信息）
+onekey-hw search
+
+# 获取以太坊地址
+onekey-hw get-address --chain evm --use-empty-passphrase
+
+# 获取比特币地址
+onekey-hw get-address --chain btc --use-empty-passphrase
+
+# 签名消息
+onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
+
+# 签名 EVM 交易
+onekey-hw sign-transaction --chain evm \
+  --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
+  --use-empty-passphrase
+
+# 检查固件
+onekey-hw firmware-check-all
+```
+
+固件更新需通过 [OneKey App](https://onekey.so/download) 或 [firmware.onekey.so](https://firmware.onekey.so/)。
+
+## 支持的链
+
+| 类别 | 链 |
+|------|-----|
+| **EVM** | Ethereum, BSC, Polygon, Arbitrum, Base, Optimism, Avalanche 及所有 EVM 兼容链 |
+| **Bitcoin 系** | Bitcoin (Legacy/SegWit/Taproot), Litecoin, Bitcoin Cash 及其他 BTC 分叉 |
+| **Layer 1** | Solana, Cardano, Polkadot, Cosmos, Near, Aptos, Sui, TON, Stellar, XRP |
+| **其他** | Tron, Filecoin, Kaspa, Algorand, Conflux, Nervos, Nostr 等 |
+
+各链参数请参考[链方法文档](/zh/hardware-sdk/chains)。
+
+## 输出格式
+
+所有命令返回结构化 JSON：
+
+```json
+{
+  "success": true,
+  "payload": {
+    "address": "0x1234...",
+    "path": "m/44'/60'/0'/0/0"
+  }
+}
+```
+
+## API 映射
+
+| CLI 命令 | SDK 方法 | 文档 |
+|----------|---------|------|
+| `get-address --chain evm` | `evmGetAddress` | [evmGetAddress](/zh/hardware-sdk/chains/ethereum-and-evm/evmgetaddress) |
+| `get-address --chain btc` | `btcGetAddress` | [btcGetAddress](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress) |
+| `get-address --chain sol` | `solGetAddress` | [solGetAddress](/zh/hardware-sdk/chains/solana/solgetaddress) |
+| `sign-transaction --chain evm` | `evmSignTransaction` | [evmSignTransaction](/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) |
+| `sign-transaction --chain btc` | `btcSignTransaction` | [btcSignTransaction](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) |
+| `sign-message --chain evm` | `evmSignMessage` | [evmSignMessage](/zh/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) |
+| `firmware-check` | `checkFirmwareRelease` | [checkFirmwareRelease](/zh/hardware-sdk/device-api/checkfirmwarerelease) |
+| `device-verify` | `deviceVerify` | [deviceVerify](/zh/hardware-sdk/device-api/deviceverify) |
+| `change-pin` | `deviceChangePin` | [deviceChangePin](/zh/hardware-sdk/device-api/devicechangepin) |

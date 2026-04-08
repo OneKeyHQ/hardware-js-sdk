@@ -234,6 +234,10 @@ const getWidgetCopy = isZh => {
           text: 'EVM 交易签名',
           prompt: '请给出使用 OneKey Hardware SDK 签名一笔 EVM 交易的完整流程和代码示例，包括 PIN/Passphrase 处理。',
         },
+        {
+          text: 'AI Agent 集成',
+          prompt: '如何让 AI Agent（如 Claude Code）通过 CLI 与 OneKey 硬件钱包交互？请介绍安装、支持的链和安全模型。',
+        },
       ],
     };
   }
@@ -277,6 +281,10 @@ const getWidgetCopy = isZh => {
       {
         text: 'EVM transaction signing',
         prompt: 'Show me the complete flow and code example for signing an EVM transaction using the OneKey Hardware SDK, including PIN/Passphrase handling.',
+      },
+      {
+        text: 'AI Agent integration',
+        prompt: 'How can AI agents like Claude Code interact with OneKey hardware wallets via the CLI? Explain the installation, supported chains, and security model.',
       },
     ],
   };

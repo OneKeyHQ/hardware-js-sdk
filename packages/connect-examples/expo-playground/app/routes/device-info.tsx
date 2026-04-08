@@ -29,12 +29,32 @@ const DeviceInfoPage: React.FC = () => {
   const { currentDevice } = useDeviceStore();
   const { t } = useTranslation();
 
+  // Field fallback mapping: some fields have legacy names in features
+  // e.g. Classic1s reports boot hash as `bootloader_hash` instead of `onekey_boot_hash`
+  const fieldFallbacks: Record<string, string[]> = {
+    onekey_boot_hash: ['onekey_boot_hash', 'bootloader_hash'],
+    onekey_boot_version: ['onekey_boot_version', 'bootloader_version'],
+  };
+
   // 获取字段值的辅助函数 - 整合 onekeyFeatures 和 features
   const getFieldValue = (field: string): string => {
-    const onekeyValue =
-      currentDevice?.onekeyFeatures?.[field as keyof typeof currentDevice.onekeyFeatures];
-    const featuresValue = currentDevice?.features?.[field as keyof typeof currentDevice.features];
-    const value = onekeyValue || featuresValue;
+    const lookupFields = fieldFallbacks[field] ?? [field];
+
+    let value: unknown;
+    for (const f of lookupFields) {
+      const onekeyValue =
+        currentDevice?.onekeyFeatures?.[f as keyof typeof currentDevice.onekeyFeatures];
+      if (onekeyValue != null && onekeyValue !== '') {
+        value = onekeyValue;
+        break;
+      }
+      const featuresValue =
+        currentDevice?.features?.[f as keyof typeof currentDevice.features];
+      if (featuresValue != null && featuresValue !== '') {
+        value = featuresValue;
+        break;
+      }
+    }
 
     // Convert value to string
     if (value === null || value === undefined) {
