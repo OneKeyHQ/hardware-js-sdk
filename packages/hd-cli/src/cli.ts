@@ -50,7 +50,8 @@ program
               if (features?.success && features.payload) {
                 device.features = features.payload;
                 device.name = features.payload.label || features.payload.ble_name || device.name;
-                device.deviceType = features.payload.onekey_device_type?.toLowerCase() || device.deviceType;
+                device.deviceType =
+                  features.payload.onekey_device_type?.toLowerCase() || device.deviceType;
               }
             } catch {
               // Features fetch failed — device may need PIN, continue with basic info
@@ -513,11 +514,12 @@ program
 program
   .command('firmware-update')
   .description('Firmware update is not supported via CLI')
-  .action(async () => {
+  .action(() => {
     outputResult(program.opts(), {
       success: false,
       payload: {
-        error: 'Firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
+        error:
+          'Firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
         code: 'FIRMWARE_UPDATE_NOT_SUPPORTED',
       },
     });
@@ -526,11 +528,12 @@ program
 program
   .command('firmware-update-ble')
   .description('BLE firmware update is not supported via CLI')
-  .action(async () => {
+  .action(() => {
     outputResult(program.opts(), {
       success: false,
       payload: {
-        error: 'BLE firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
+        error:
+          'BLE firmware update via CLI is not supported. Please use the OneKey App or https://firmware.onekey.so/ to update firmware.',
         code: 'FIRMWARE_UPDATE_NOT_SUPPORTED',
       },
     });
@@ -603,7 +606,6 @@ program
       sdk.dispose();
     }
   });
-
 
 program
   .command('device-wipe')
