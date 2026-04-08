@@ -93,7 +93,7 @@ function bindHardwareEvents() {
 ```
 
 ### 注意事项
-- 尽早订阅 `UI_EVENT`，以免请求在等待 PIN/密码短语时停滞。参见 [配置事件](../../api-reference#events-ui)。
+- 尽早订阅 `UI_EVENT`，以免请求在等待 PIN/密码短语时停滞。参见 [配置事件](/zh/hardware-sdk/core-api-guide#events-ui)。
 - PIN：优先使用设备端输入（`@@ONEKEY_INPUT_PIN_IN_DEVICE`）。如果提供软件输入，请使用盲键盘映射（`7,8,9,4,5,6,1,2,3`）。
 - 密码短语：支持设备端输入或软件输入，可选择 `save` 用于会话缓存。
 - 设备事件有助于在电缆拔出时更新 UI。
@@ -270,5 +270,5 @@ function showPassphraseDialog(): Promise<{ mode: 'device'|'software'; value: str
 
 ## 继续
 
-- [快速开始](../../getting-started)
-- [错误码](../../api-reference#error-codes)、[通用参数](../../core-api-guide#common-params)
+- [简介](/zh/hardware-sdk)
+- [错误码](/zh/hardware-sdk/core-api-guide#error-codes)、[通用参数](/zh/hardware-sdk/core-api-guide#common-params)

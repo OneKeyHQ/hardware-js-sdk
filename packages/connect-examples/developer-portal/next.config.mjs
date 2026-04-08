@@ -63,6 +63,12 @@ export default withNextra({
   assetPrefix: normalizedAssetPrefix || undefined,
   trailingSlash: true,
   output: 'export',
+  // Transpile ESM-only remark/unist packages for webpack compatibility
+  transpilePackages: [
+    'remark-gfm',
+    'unist-util-visit',
+    'unist-util-visit-parents',
+  ],
   images: {
     unoptimized: true
   },

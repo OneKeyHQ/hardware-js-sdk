@@ -15,6 +15,7 @@ Hardware-js-sdk is designed to allow third-party developers to quickly access th
 | [@onekeyfe/hd-transport-react-native](./packages/hd-transport-react-native) | communication lib for React Native                                    |
 | [@onekeyfe/hd-transport-webusb](./packages/hd-transport-webusb)             | communication lib for WebUSB                                          |
 | [@onekeyfe/hd-shared](./packages/shared)                                    | Tools, error definitions, constants                                   |
+| [@onekeyfe/hardware-cli](./packages/hd-cli)                                | CLI for AI agent integration (Claude Code, Cursor, etc.)              |
 
 ## Documentation
 

@@ -30,7 +30,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
       resetState();
       onClose();
     } catch (error) {
-      console.error('Passphrase提交失败:', error);
+      console.error('Passphrase submit failed:', error);
     }
   };
 
@@ -49,7 +49,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
       resetState();
       onClose();
     } catch (error) {
-      console.error('使用设备输入失败:', error);
+      console.error('Device input failed:', error);
     }
   };
 
@@ -79,17 +79,17 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
         {/* 头部区域 */}
         <div className="text-center mb-4">
           <DialogTitle className="text-lg font-semibold mb-1">
-            {t('passphrase.title', '输入 Passphrase')}
+            {t('passphrase.title', 'Enter Passphrase')}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            {t('passphrase.webInputDescription', '在网页上输入passphrase以继续')}
+            {t('passphrase.webInputDescription', 'Enter passphrase on web to continue')}
           </DialogDescription>
         </div>
 
         {/* 警告提示 - 简化 */}
         <Alert className="mb-3 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 py-2 flex items-center gap-2">
           <AlertDescription className="text-orange-800 dark:text-orange-200 text-xs">
-            {t('passphrase.warningMessage', 'Passphrase 遗失将无法恢复')}
+            {t('passphrase.warningMessage', 'Lost passphrase cannot be recovered')}
           </AlertDescription>
         </Alert>
 
@@ -104,7 +104,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
                 id="passphrase-input"
                 name="device-passphrase"
                 type={showPassphrase ? 'text' : 'password'}
-                placeholder={t('passphrase.placeholder', '请输入passphrase')}
+                placeholder={t('passphrase.placeholder', 'Enter passphrase')}
                 value={passphrase}
                 onChange={e => setPassphrase(e.target.value)}
                 className="h-10 pr-10"
@@ -129,14 +129,14 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
           {/* 确认 Passphrase */}
           <div className="space-y-2">
             <label htmlFor="confirm-passphrase" className="text-sm font-medium text-foreground">
-              {t('passphrase.confirmPassphrase', '确认 passphrase')}
+              {t('passphrase.confirmPassphrase', 'Confirm Passphrase')}
             </label>
             <div className="relative">
               <Input
                 id="confirm-passphrase"
                 name="device-passphrase-confirm"
                 type={showPassphrase ? 'text' : 'password'}
-                placeholder={t('passphrase.confirmPlaceholder', '请再次输入passphrase')}
+                placeholder={t('passphrase.confirmPlaceholder', 'Re-enter passphrase')}
                 value={confirmPassphrase}
                 onChange={e => setConfirmPassphrase(e.target.value)}
                 className="h-10 pr-10"
@@ -165,7 +165,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
               disabled={!isFormValid}
               className="w-full h-10 bg-neutral-800 text-white hover:bg-neutral-700 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-neutral-300 border-none shadow-none"
             >
-              {t('common.confirm', '确认')}
+              {t('common.confirm', 'Confirm')}
             </Button>
 
             {/* 次要操作 - 合并为一行 */}
@@ -175,7 +175,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
                 onClick={handleUseDevice}
                 className="flex-1 h-10 border border-neutral-300 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white text-sm shadow-none"
               >
-                {t('passphrase.inputOnDevice', '在设备上输入')}
+                {t('passphrase.inputOnDevice', 'Enter on device')}
               </Button>
 
               <Button
@@ -183,7 +183,7 @@ const PassphraseDialog: React.FC<PassphraseDialogProps> = ({ isOpen, onClose }) 
                 onClick={handleCancel}
                 className="flex-1 h-10 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-white text-sm shadow-none"
               >
-                {t('common.cancel', '取消')}
+                {t('common.cancel', 'Cancel')}
               </Button>
             </div>
           </div>

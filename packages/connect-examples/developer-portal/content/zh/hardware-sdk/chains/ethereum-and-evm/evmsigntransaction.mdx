@@ -19,7 +19,7 @@ const result = await HardwareSDK.evmSignTransaction(connectId, deviceId, params)
 
 [**可选通用参数**](../../../core-api-guide#common-params)
 
-* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](../../../api-reference#hd-path)
+* `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
 * `transaction` - _必需_ `Object` 类型为 `EthereumTransactionEIP1559|EthereumSignTransaction`，每个字段的 "0x" 前缀是可选的
 * `chainId` - _可选_ `number` ETH 中的 ChainId 是特定以太坊网络的唯一标识符，用于区分不同版本的区块链。[参考](https://github.com/ethereum-lists/chains/tree/master/_data/chains)
 

@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
   ChevronDown,
   X,
+  Bot,
 } from 'lucide-react'
 
 const heroSecurity05 = '/landing-page/security-05.png'
@@ -136,6 +137,15 @@ export function LandingPage({ locale = 'en' }) {
       description: isZh ? '适用于原生移动端的 BLE 传输。' : 'BLE transport for native mobile apps.',
       icon: Smartphone,
       href: `/${locale}/hardware-sdk/transport/native-ble`,
+      cta: copy.viewDocs,
+    },
+    {
+      title: isZh ? 'AI Agent 集成' : 'AI Agent Integration',
+      description: isZh
+        ? '让 Claude Code 等 AI Agent 通过 CLI 与硬件钱包交互，支持 27+ 链安全签名。'
+        : 'Let AI agents like Claude Code interact with hardware wallets via CLI. 27+ chains with secure signing.',
+      icon: Bot,
+      href: `/${locale}/hardware-sdk/agent-integration`,
       cta: copy.viewDocs,
     },
   ]
@@ -339,23 +349,23 @@ export function LandingPage({ locale = 'en' }) {
         </section>
       </main>
 
-      <footer className="mt-[180px] w-full bg-[#101111]">
-        <div className="mx-auto flex w-full max-w-[1440px] flex-col px-[64px] pb-[80px]">
-          <div className="flex flex-col gap-[80px] lg:flex-row lg:gap-[120px]">
-            <div className="flex shrink-0 flex-col gap-[32px]">
+      <footer className="mt-[120px] w-full rounded-t-[64px] bg-[#101111]">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-[80px] px-[64px] py-[120px] lg:flex-row lg:gap-[133px]">
+          <div className="flex shrink-0 flex-col gap-[10px]">
+            <div className="flex flex-col gap-[16px]">
               <img
                 src="/landing-page/onekey-brand.svg"
                 alt="OneKey"
-                className="h-[40px] w-auto"
+                className="h-[57px] w-[233px]"
               />
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                  className="flex w-fit items-center gap-[8px] rounded-[50px] border border-white/20 px-[20px] py-[10px] text-[14px] font-medium text-white"
+                  className="flex w-fit items-center gap-[8px] rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white"
                 >
                   {isZh ? '中文' : 'English'}
-                  <ChevronDown className={`size-[16px] transition-transform ${showLanguageMenu ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`size-[24px] transition-transform ${showLanguageMenu ? 'rotate-180' : ''}`} />
                 </button>
                 {showLanguageMenu && (
                   <div className="absolute left-0 top-full z-20 mt-[8px] flex flex-col overflow-hidden rounded-[12px] border border-white/10 bg-[#1a1a1a]">
@@ -377,19 +387,88 @@ export function LandingPage({ locale = 'en' }) {
                 )}
               </div>
             </div>
+            <div className="flex flex-col gap-[24px] pt-[10px]">
+              <div className="flex items-center gap-[16px]">
+                <a
+                  href="https://twitter.com/onekeyHQ"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Twitter"
+                >
+                  <img src="/landing-page/social/twitter.svg" alt="" className="size-[24px]" />
+                </a>
+                <a
+                  href="https://github.com/OneKeyHQ"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="GitHub"
+                >
+                  <img src="/landing-page/social/github.svg" alt="" className="size-[24px]" />
+                </a>
+                <a
+                  href="https://discord.gg/onekey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Discord"
+                >
+                  <img src="/landing-page/social/discord.svg" alt="" className="size-[24px]" />
+                </a>
+              </div>
+              <div className="flex flex-col gap-[16px]">
+                <div className="flex items-center gap-[16px]">
+                  <a
+                    href="https://github.com/OneKeyHQ"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <img
+                      src="/landing-page/badge-osi.svg"
+                      alt="Open Source"
+                      className="h-[33px] w-[96px]"
+                    />
+                  </a>
+                  <img
+                    src="/landing-page/badge-cceal.svg"
+                    alt="CCEAL 5+ ISO 27001"
+                    className="h-[32px] w-[108px]"
+                  />
+                </div>
+                <p className="text-[12px] leading-[15px] text-white/60">
+                  Since 2019 - {new Date().getFullYear()} | OneKey Limited All Rights Reserved
+                </p>
+                <p className="mt-2 font-mono text-[11px] leading-[14px] text-white/40">
+                  SDK v{process.env.NEXT_PUBLIC_SDK_VERSION || 'dev'}
+                  {process.env.NEXT_PUBLIC_COMMIT_SHORT && process.env.NEXT_PUBLIC_COMMIT_SHORT !== 'local' && (
+                    <>
+                      {' '}
+                      ·{' '}
+                      <a
+                        href={`https://github.com/OneKeyHQ/hardware-js-sdk/commit/${process.env.NEXT_PUBLIC_COMMIT_ID || ''}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="transition-colors hover:text-white/60"
+                      >
+                        {process.env.NEXT_PUBLIC_COMMIT_SHORT}
+                      </a>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
 
-            <div className="flex flex-1 flex-wrap gap-[60px] lg:gap-[120px]">
-              <div className="flex flex-col gap-[24px]">
-                <span className="text-[14px] leading-[20px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+          <div className="flex flex-1 flex-col gap-[80px]">
+            <div className="flex flex-wrap gap-[40px] lg:gap-[80px]">
+              <div className="flex flex-col gap-[32px]">
+                <p className="text-[14px] font-medium leading-[20px] text-white/60">
                   {getFooterData(isZh, locale).portalColumn.title}
-                </span>
+                </p>
                 <div className="flex flex-col gap-[16px]">
                   {getFooterData(isZh, locale).portalColumn.items.map((item) => (
                     <a
                       key={item.label}
                       href={item.href}
-                      className="text-[14px] leading-[20px] hover:opacity-80"
-                      style={{ color: '#FFFFFF' }}
+                      className="text-[16px] leading-[20px] text-white hover:text-white/80"
                       target={item.href.startsWith('http') ? '_blank' : undefined}
                       rel={item.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                     >
@@ -399,17 +478,16 @@ export function LandingPage({ locale = 'en' }) {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-[24px]">
-                <span className="text-[14px] leading-[20px]" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+              <div className="flex flex-col gap-[32px]">
+                <p className="text-[14px] font-medium leading-[17px] text-white/60">
                   {getFooterData(isZh, locale).legalColumn.title}
-                </span>
+                </p>
                 <div className="flex flex-col gap-[16px]">
                   {getFooterData(isZh, locale).legalColumn.items.map((item) => (
                     <a
                       key={item.label}
                       href={item.href}
-                      className="text-[14px] font-medium leading-[20px] hover:opacity-80"
-                      style={{ color: '#FFFFFF' }}
+                      className="text-[16px] font-medium leading-[20px] text-white hover:text-white/80"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -419,61 +497,12 @@ export function LandingPage({ locale = 'en' }) {
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="mt-[100px] flex flex-col gap-[28px]">
-            <div className="flex items-center gap-[16px]">
-              <a
-                href="https://twitter.com/onekeyHQ"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Twitter"
-              >
-                <img src="/landing-page/social/twitter.svg" alt="" className="size-[24px]" />
-              </a>
-              <a
-                href="https://github.com/OneKeyHQ"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="GitHub"
-              >
-                <img src="/landing-page/social/github.svg" alt="" className="size-[24px]" />
-              </a>
-              <a
-                href="https://discord.gg/onekey"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Discord"
-              >
-                <img src="/landing-page/social/discord.svg" alt="" className="size-[24px]" />
-              </a>
-            </div>
-            <div className="flex items-center gap-[16px]">
-              <a
-                href="https://github.com/OneKeyHQ"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <img
-                  src="/landing-page/badge-osi.svg"
-                  alt="Open Source"
-                  className="h-[28px] w-auto"
-                />
-              </a>
-              <img
-                src="/landing-page/badge-cceal.svg"
-                alt="CEPREI ISO/IEC 27001"
-                className="h-[28px] w-auto"
-              />
-            </div>
-            <div className="flex items-center gap-[24px]">
-              <span className="text-[12px] leading-[16px]" style={{ color: 'rgba(255, 255, 255, 0.4)' }}>
-                {new Date().getFullYear()} OneKey, Inc. All rights reserved.
-              </span>
+            <div className="flex flex-col gap-[16px]">
               <button
                 type="button"
                 onClick={() => setShowSubscribeModal(true)}
-                className="w-fit rounded-[50px] border border-white/20 px-[24px] py-[10px] text-[14px] font-medium text-white hover:bg-white/10"
+                className="w-fit rounded-[50px] border border-white px-[20px] py-[10px] text-[16px] font-medium text-white hover:bg-white/10"
               >
                 {isZh ? '订阅我们的通知' : 'Subscribe to our notifications'}
               </button>

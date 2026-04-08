@@ -17,6 +17,7 @@ import enterPinOnProLight from '../../assets/animation/enter-pin-on-pro-light.js
 import enterPinOnProDark from '../../assets/animation/enter-pin-on-pro-dark.json';
 import enterPinOnTouch from '../../assets/animation/enter-pin-on-touch.json';
 import { UI_REQUEST, UiEvent } from '@onekeyfe/hd-core';
+import { useTranslation } from 'react-i18next';
 
 // 动效类型
 export type AnimationType = UiEvent['type'] | 'success' | 'error';
@@ -49,6 +50,7 @@ const DeviceActionAnimation: React.FC<DeviceActionAnimationProps> = ({
   className = '',
   onComplete,
 }) => {
+  const { t } = useTranslation();
   // 获取对应的动画数据
   const getAnimationData = (): LottieAnimationData | null => {
     // 处理自定义状态
@@ -106,19 +108,19 @@ const DeviceActionAnimation: React.FC<DeviceActionAnimationProps> = ({
   const getActionDescription = () => {
     switch (action) {
       case 'success':
-        return '执行成功！';
+        return t('deviceAction.success', 'Execution successful!');
       case 'error':
-        return '执行失败';
+        return t('deviceAction.failed', 'Execution failed');
       case UI_REQUEST.REQUEST_BUTTON:
-        return '请在设备上确认操作';
+        return t('deviceAction.confirmOnDevice', 'Please confirm on your device');
       case UI_REQUEST.REQUEST_PASSPHRASE:
-        return '请在设备上输入密语';
+        return t('deviceAction.enterPassphrase', 'Please enter passphrase on your device');
       case UI_REQUEST.REQUEST_PIN:
-        return '请在设备上输入PIN码';
+        return t('deviceAction.enterPin', 'Please enter PIN on your device');
       case UI_REQUEST.FIRMWARE_PROCESSING:
-        return '固件更新中...';
+        return t('deviceAction.firmwareUpdating', 'Firmware updating...');
       default:
-        return '正在处理...';
+        return t('deviceAction.processing', 'Processing...');
     }
   };
 
@@ -198,7 +200,7 @@ const DeviceActionAnimation: React.FC<DeviceActionAnimationProps> = ({
         </div>
         <div className="text-center">
           <p className="text-sm font-medium text-foreground mb-1">{getDeviceName()}</p>
-          <p className="text-xs text-muted-foreground">{getActionDescription() || '正在处理...'}</p>
+          <p className="text-xs text-muted-foreground">{getActionDescription() || t('deviceAction.processing', 'Processing...')}</p>
         </div>
       </div>
     );

@@ -4,6 +4,7 @@ import { OneKeyWordmark } from '../../components/OneKeyLogo'
 import { NavbarMenuActiveMarker } from '../../components/NavbarMenuActiveMarker'
 import OneKeyNavbar from '../../components/OneKeyNavbar'
 import Footer from '../../components/Footer'
+import DocAIChatWidget from '../../components/DocAIChatWidget.client'
 
 // Static params for i18n routing (Next.js App Router pattern)
 // See: https://nextjs.org/docs/app/guides/internationalization#static-rendering
@@ -59,6 +60,7 @@ export default async function LocaleLayout({ children, params }) {
       >
         {children}
       </Layout>
+      <DocAIChatWidget lang={lang} />
     </>
   )
 }

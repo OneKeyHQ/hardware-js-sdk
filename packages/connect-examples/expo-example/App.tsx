@@ -25,6 +25,7 @@ const FunctionalTestingScreen = lazy(() => import('./src/views/FunctionalTesting
 const AttachToPinTestingScreen = lazy(() => import('./src/views/AttachToPinTestingScreen'));
 const SLIP39TestScreen = lazy(() => import('./src/views/SLIP39TestScreen'));
 const ChainMethodTestScreen = lazy(() => import('./src/views/ChainMethodTestScreen'));
+const AutomationTestScreen = lazy(() => import('./src/views/AutomationTest'));
 
 // React Navigation v6 linking 配置
 const linking: LinkingOptions<ParamListBase> = {
@@ -46,6 +47,7 @@ const linking: LinkingOptions<ParamListBase> = {
       [Routes.FunctionalTesting]: 'expo-example/functional-testing',
       [Routes.SLIP39Test]: 'expo-example/slip39-test',
       [Routes.ChainMethodTest]: 'expo-example/chain-method-test',
+      [Routes.AutomationTest]: 'expo-example/automation-test',
     },
   },
 };
@@ -96,6 +98,7 @@ function NavigationContent() {
         />
         <StackNavigator.Screen name={Routes.SLIP39Test} component={SLIP39TestScreen} />
         <StackNavigator.Screen name={Routes.ChainMethodTest} component={ChainMethodTestScreen} />
+        <StackNavigator.Screen name={Routes.AutomationTest} component={AutomationTestScreen} />
       </StackNavigator.Navigator>
     </NavigationContainer>
   );

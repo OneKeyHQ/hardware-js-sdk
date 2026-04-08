@@ -83,6 +83,8 @@ export function convertTestData(
             path,
           },
           expect: item.expected[key],
+          confirmCount: item.confirmCount,
+          noSlide: item.noSlide,
         });
       } else if (item.params.inputs.length && item.params.inputs[0].path != null) {
         const path = replaceTemplate(key, item.params.inputs[0].path);
@@ -100,6 +102,8 @@ export function convertTestData(
             })),
           },
           expect: item.expected[key],
+          confirmCount: item.confirmCount,
+          noSlide: item.noSlide,
         });
       }
     }

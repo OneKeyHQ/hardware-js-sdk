@@ -1,6 +1,6 @@
-import { type PlaygroundProps } from '../../../components/Playground';
+import type { ChainMethodEntry } from './index';
 
-const ethData: PlaygroundProps[] = [
+const ethData: ChainMethodEntry[] = [
   {
     method: 'evmGetAddress',
     description: 'Get a EVM address for your account.',
@@ -16,26 +16,11 @@ const ethData: PlaygroundProps[] = [
         title: 'Batch Get Address',
         value: {
           bundle: [
-            {
-              path: "m/44'/60'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/60'/0'/0/1",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/60'/0'/0/2",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/60'/0'/0/3",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/60'/0'/0/4",
-              showOnOneKey: false,
-            },
+            { path: "m/44'/60'/0'/0/0", showOnOneKey: false },
+            { path: "m/44'/60'/0'/0/1", showOnOneKey: false },
+            { path: "m/44'/60'/0'/0/2", showOnOneKey: false },
+            { path: "m/44'/60'/0'/0/3", showOnOneKey: false },
+            { path: "m/44'/60'/0'/0/4", showOnOneKey: false },
           ],
         },
       },
@@ -56,18 +41,9 @@ const ethData: PlaygroundProps[] = [
         title: 'Batch Get Public Key',
         value: {
           bundle: [
-            {
-              path: "m/44'/60'/0'/0/0",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/60'/0'/0/1",
-              showOnOneKey: false,
-            },
-            {
-              path: "m/44'/60'/0'/0/2",
-              showOnOneKey: false,
-            },
+            { path: "m/44'/60'/0'/0/0", showOnOneKey: false },
+            { path: "m/44'/60'/0'/0/1", showOnOneKey: false },
+            { path: "m/44'/60'/0'/0/2", showOnOneKey: false },
           ],
         },
       },
@@ -75,6 +51,8 @@ const ethData: PlaygroundProps[] = [
   },
   {
     method: 'evmSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     description: 'Sign a message with your EVM account.',
     presupposes: [
       {
@@ -90,6 +68,7 @@ const ethData: PlaygroundProps[] = [
   },
   {
     method: 'evmSignTransaction',
+    confirmCount: 1,
     description: 'Sign a transaction with your EVM account.',
     presupposes: [
       {
@@ -160,7 +139,7 @@ const ethData: PlaygroundProps[] = [
           transaction: {
             to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
             value: '0x0',
-            data: '0x', // empty data for code authorization only
+            data: '0x',
             chainId: 1,
             nonce: '0x0',
             gasLimit: '0x5208',
@@ -184,7 +163,7 @@ const ethData: PlaygroundProps[] = [
           transaction: {
             to: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
             value: '0x0',
-            data: '0x', // empty data for code authorization only
+            data: '0x',
             chainId: 1,
             nonce: '0x1',
             gasLimit: '0x5208',
@@ -208,7 +187,7 @@ const ethData: PlaygroundProps[] = [
           transaction: {
             to: '0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb',
             value: '0x0',
-            data: '0x8129fc1c', // initialize() function
+            data: '0x8129fc1c',
             chainId: 1,
             nonce: '0x2',
             gasLimit: '0x5208',
@@ -232,7 +211,7 @@ const ethData: PlaygroundProps[] = [
           transaction: {
             to: '0x0000000000000000000000000000000000000000',
             value: '0x0',
-            data: '0x', // empty data for revoke
+            data: '0x',
             chainId: 1,
             nonce: '0x3',
             gasLimit: '0x5208',
@@ -250,13 +229,13 @@ const ethData: PlaygroundProps[] = [
         },
       },
       {
-        title: 'EIP-7702 With Pre-signed Authorization (Test)',
+        title: 'EIP-7702 Additional Authorization',
         value: {
           path: "m/44'/60'/0'/0/0",
           transaction: {
             to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
             value: '0x0',
-            data: '0x', // empty data for authorization only
+            data: '0x',
             chainId: 1,
             nonce: '0x5',
             gasLimit: '0x7530',
@@ -268,9 +247,6 @@ const ethData: PlaygroundProps[] = [
                 chainId: 1,
                 address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
                 nonce: '0x5',
-                yParity: 1,
-                r: '0xdeadbeef1234567890abcdef1234567890abcdef1234567890abcdef123456789',
-                s: '0xcafebabe567890abcdef1234567890abcdef1234567890abcdef1234567890abc',
               },
             ],
           },
@@ -280,6 +256,7 @@ const ethData: PlaygroundProps[] = [
   },
   {
     method: 'evmSignTypedData',
+    confirmCount: 3,
     description: 'Sign a typed data with your EVM account.',
     presupposes: [
       {
@@ -292,31 +269,15 @@ const ethData: PlaygroundProps[] = [
           chainId: 1,
           data: {
             types: {
-              EIP712Domain: [
-                {
-                  name: 'name',
-                  type: 'string',
-                },
-              ],
+              EIP712Domain: [{ name: 'name', type: 'string' }],
               Message: [
-                {
-                  name: 'Wallet',
-                  type: 'string',
-                },
-                {
-                  name: 'Number',
-                  type: 'uint64',
-                },
+                { name: 'Wallet', type: 'string' },
+                { name: 'Number', type: 'uint64' },
               ],
             },
             primaryType: 'Message',
-            domain: {
-              name: 'example.onekey.so',
-            },
-            message: {
-              Wallet: 'Onekey Touch',
-              Number: '911112119',
-            },
+            domain: { name: 'example.onekey.so' },
+            message: { Wallet: 'Onekey Touch', Number: '911112119' },
           },
         },
       },
@@ -324,6 +285,8 @@ const ethData: PlaygroundProps[] = [
   },
   {
     method: 'evmVerifyMessage',
+    confirmCount: 2,
+    noSlide: true,
     description: 'Verify a message with your EVM account.',
     presupposes: [
       {

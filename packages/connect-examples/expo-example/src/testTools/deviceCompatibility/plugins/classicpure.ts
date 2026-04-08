@@ -23,12 +23,6 @@ export const classicPurePlugin: DevicePlugin = {
       expected: true,
     },
     {
-      id: 'classicpure-sol-coin501-expected-fail',
-      methods: 'solSignTransaction',
-      when: ({ key }) => key === '501',
-      expected: false,
-    },
-    {
       id: 'classicpure-dnx-sign-tx-expected-fail',
       methods: 'dnxSignTransaction',
       expected: false,

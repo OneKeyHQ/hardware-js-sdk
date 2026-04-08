@@ -36,10 +36,11 @@ console.log(res.payload.address);
 
 | Item | Purpose | How to get/refresh | Notes |
 | --- | --- | --- | --- |
-| `connectId` | Connection identifier; routes calls to a specific device/connection | `searchDevices()` | Stable for the same device (reset does not change it); WebUSB/Bridge ≈ device serial; BLE = OS-level identifier (Android MAC / iOS UUID). |
+| `connectId` | Connection identifier; routes calls to a specific device/connection | `searchDevices()` | Stable for the same device (reset does not change it). Format depends on transport: **WebUSB/Bridge** = device serial (e.g. `PRC10J0017A`); **Android BLE** = MAC address (e.g. `AA:BB:CC:DD:EE:FF`); **iOS BLE** = CoreBluetooth UUID (e.g. `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`); **Desktop BLE (Electron/Noble, macOS)** = 32-char hex UUID (e.g. `1f6dad0b8782aab31d2f7ae2b11e5b6c`); **Desktop BLE (Electron/Noble, Windows)** = 12-char lowercase hex MAC without colons (e.g. `e4e65539cf33`); **Desktop BLE (Electron/Noble, Linux)** = MAC address. ⚠️ The same physical device has different `connectId` values on USB vs BLE — never pass a USB serial as a BLE `connectId`. |
 | `deviceId` | Current seed/wallet-state identifier | `getFeatures(connectId)` | Changes after reset/wipe/recovery/seed switch; used to prevent signing on the wrong seed. |
 
 - Cache `connectId + deviceId` as a pair; on `DeviceCheckDeviceIdError`, device reset, or device switch, re-run `getFeatures`.
+- If your app supports both USB and BLE transports for the same device, store `connectId` separately per transport — they are different values and are not interchangeable.
 - SDK set: `@onekeyfe/hd-common-connect-sdk` + `@onekeyfe/hd-core` + `@onekeyfe/hd-shared`; align versions with firmware/Bridge.
 - Runtime: `webusb` needs HTTPS + user gesture; `react-native` needs BLE + often location permission; `lowlevel` needs 64-byte frame adapter.
 - Device/firmware: stay on latest stable; some APIs fail in Bootloader; Bridge must run and keep port free.
@@ -250,7 +251,7 @@ Pattern: map error → user message + developer action; provide UI buttons for r
 
 **Related links**
 
-- Getting Started (install + first call): [quick start](/en/hardware-sdk/getting-started)
+- Getting Started (install + first call): [Introduction](/en/hardware-sdk)
 - Transports: WebUSB · React Native BLE · iOS/Android low-level adapters
 - Chain APIs: sidebar `sign` / `getAddress` method pages by chain
 - Legacy migration: bridge-to-common-connect/WebUSB migration guides

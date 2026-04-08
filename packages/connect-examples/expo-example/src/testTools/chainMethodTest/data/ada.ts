@@ -1,6 +1,6 @@
-import { type PlaygroundProps } from '../../../components/Playground';
+import type { ChainMethodEntry } from './index';
 
-const adaData: PlaygroundProps[] = [
+const adaData: ChainMethodEntry[] = [
   {
     method: 'cardanoGetAddress',
     description: 'Get a Cardano address for your account.',
@@ -134,21 +134,9 @@ const adaData: PlaygroundProps[] = [
         title: 'Classic Batch Get PublicKey',
         value: {
           bundle: [
-            {
-              path: "m/1852'/1815'/0'",
-              showOnOneKey: false,
-              derivationType: 1,
-            },
-            {
-              path: "m/1852'/1815'/0'",
-              showOnOneKey: false,
-              derivationType: 1,
-            },
-            {
-              path: "m/1852'/1815'/0'",
-              showOnOneKey: false,
-              derivationType: 1,
-            },
+            { path: "m/1852'/1815'/0'", showOnOneKey: false, derivationType: 1 },
+            { path: "m/1852'/1815'/0'", showOnOneKey: false, derivationType: 1 },
+            { path: "m/1852'/1815'/0'", showOnOneKey: false, derivationType: 1 },
           ],
         },
       },
@@ -156,21 +144,9 @@ const adaData: PlaygroundProps[] = [
         title: 'Touch Batch Get PublicKey',
         value: {
           bundle: [
-            {
-              path: "m/1852'/1815'/0'",
-              showOnOneKey: false,
-              derivationType: 2,
-            },
-            {
-              path: "m/1852'/1815'/0'",
-              showOnOneKey: false,
-              derivationType: 1,
-            },
-            {
-              path: "m/1852'/1815'/0'",
-              showOnOneKey: false,
-              derivationType: 2,
-            },
+            { path: "m/1852'/1815'/0'", showOnOneKey: false, derivationType: 2 },
+            { path: "m/1852'/1815'/0'", showOnOneKey: false, derivationType: 1 },
+            { path: "m/1852'/1815'/0'", showOnOneKey: false, derivationType: 2 },
           ],
         },
       },
@@ -178,6 +154,7 @@ const adaData: PlaygroundProps[] = [
   },
   {
     method: 'cardanoSignTransaction',
+    confirmCount: 5,
     description: 'Sign a Cardano transaction.',
     presupposes: [
       {
@@ -232,6 +209,8 @@ const adaData: PlaygroundProps[] = [
   },
   {
     method: 'cardanoSignMessage',
+    confirmCount: 1,
+    noSlide: true,
     description: 'Sign a Cardano message.',
     presupposes: [
       {

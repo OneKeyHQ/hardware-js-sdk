@@ -40,6 +40,13 @@
 - 📖 **参考**: [docs/architecture.md](./docs/architecture.md)
 - 🤖 **Agent**: hardware-sdk-expert
 
+### 🤖 AI Agent 集成
+**症状**: CLI 命令使用、Agent Skill 配置、链支持查询
+- 📖 **参考**: [packages/hd-cli/](./packages/hd-cli/) — CLI 源码和 Skills
+- 📖 **文档**: developer-portal 的 `agent-integration.mdx`
+- 🔧 **CLI**: `@onekeyfe/hardware-cli` — 41 个命令，覆盖 27 链
+- 🔌 **Plugin**: `.claude-plugin/marketplace.json` — Claude Code 插件入口
+
 ## 🤖 专业Agent
 
 **hardware-sdk-expert** - 硬件SDK架构专家

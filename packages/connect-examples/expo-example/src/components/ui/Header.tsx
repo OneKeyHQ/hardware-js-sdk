@@ -23,6 +23,7 @@ const menuItems: MenuItem[] = [
   { route: Routes.FunctionalTesting, labelId: 'tab__functional_testing' },
   { route: Routes.AttachToPinTestingScreen, labelId: 'tab__attach_to_pin_testing' },
   { route: Routes.ChainMethodTest, labelId: 'tab__chain_method_test' },
+  { route: Routes.AutomationTest, labelId: 'tab__automation_test' },
 ];
 
 // 菜单按钮组件
