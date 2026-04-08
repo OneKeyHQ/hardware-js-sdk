@@ -56,9 +56,9 @@ describe('EVMSignTypedData — hasClassicFamilyTypedDataFormatViolations', () =>
         domain: {},
         message: {},
       } as any);
-      expect(
-        method.hasClassicFamilyTypedDataFormatViolations({ types: baseDomain() } as any)
-      ).toBe(false);
+      expect(method.hasClassicFamilyTypedDataFormatViolations({ types: baseDomain() } as any)).toBe(
+        false
+      );
     });
   });
 
@@ -202,7 +202,7 @@ describe('EVMSignTypedData — hasClassicFamilyTypedDataFormatViolations', () =>
         fields.push({ name: `d${i}`, type: depName });
         message[`d${i}`] = JSON.stringify({ v: '1' });
       }
-      types['Root'] = fields;
+      types.Root = fields;
       const data: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> = {
         types,
         primaryType: 'Root',
@@ -223,7 +223,7 @@ describe('EVMSignTypedData — hasClassicFamilyTypedDataFormatViolations', () =>
         fields.push({ name: `d${i}`, type: depName });
         message[`d${i}`] = JSON.stringify({ v: '1' });
       }
-      types['Root'] = fields;
+      types.Root = fields;
       const data: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> = {
         types,
         primaryType: 'Root',
@@ -268,7 +268,7 @@ describe('EVMSignTypedData — hasClassicFamilyTypedDataFormatViolations', () =>
         types: { ...baseDomain(), Blob: [{ name: 'raw', type: 'bytes' }] },
         primaryType: 'Blob',
         domain: { name: 'test' },
-        message: { raw: '0x' + 'ab'.repeat(1536) },
+        message: { raw: `0x${'ab'.repeat(1536)}` },
       };
       const method = createMethod(data);
       expect(method.hasClassicFamilyTypedDataFormatViolations(data)).toBe(false);
@@ -279,7 +279,7 @@ describe('EVMSignTypedData — hasClassicFamilyTypedDataFormatViolations', () =>
         types: { ...baseDomain(), Blob: [{ name: 'raw', type: 'bytes' }] },
         primaryType: 'Blob',
         domain: { name: 'test' },
-        message: { raw: '0x' + 'ab'.repeat(1537) },
+        message: { raw: `0x${'ab'.repeat(1537)}` },
       };
       const method = createMethod(data);
       expect(method.hasClassicFamilyTypedDataFormatViolations(data)).toBe(true);
@@ -363,16 +363,20 @@ describe('EVMSignTypedData — hasClassicFamilyTypedDataFormatViolations', () =>
         fieldsA.push({ name: `a${i}`, type: 'uint256[]' });
         fieldsB.push({ name: `b${i}`, type: 'uint256[]' });
       }
-      types['PartA'] = fieldsA;
-      types['PartB'] = fieldsB;
-      types['Root'] = [
+      types.PartA = fieldsA;
+      types.PartB = fieldsB;
+      types.Root = [
         { name: 'partA', type: 'PartA' },
         { name: 'partB', type: 'PartB' },
       ];
       const messageA: Record<string, string[]> = {};
       const messageB: Record<string, string[]> = {};
-      fieldsA.forEach(f => { messageA[f.name] = ['1']; });
-      fieldsB.forEach(f => { messageB[f.name] = ['1']; });
+      fieldsA.forEach(f => {
+        messageA[f.name] = ['1'];
+      });
+      fieldsB.forEach(f => {
+        messageB[f.name] = ['1'];
+      });
       const data: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes> = {
         types,
         primaryType: 'Root',
@@ -395,9 +399,9 @@ describe('EVMSignTypedData — hasClassicFamilyTypedDataFormatViolations', () =>
       for (let i = 0; i < 12; i++) {
         fieldsB.push({ name: `b${i}`, type: 'uint256[]' });
       }
-      types['PartA'] = fieldsA;
-      types['PartB'] = fieldsB;
-      types['Root'] = [
+      types.PartA = fieldsA;
+      types.PartB = fieldsB;
+      types.Root = [
         { name: 'partA', type: 'PartA' },
         { name: 'partB', type: 'PartB' },
       ];

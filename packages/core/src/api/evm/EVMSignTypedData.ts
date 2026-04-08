@@ -393,7 +393,9 @@ export default class EVMSignTypedData extends BaseMethod<EVMSignTypedDataParams>
     return false;
   }
 
-  hasClassicFamilyTypedDataFormatViolations(item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>) {
+  hasClassicFamilyTypedDataFormatViolations(
+    item: EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>
+  ) {
     if (!item?.types || !item.primaryType) return false;
 
     const isArrayType = (typeName: string) => /\[[0-9]*\]$/.test(typeName);
