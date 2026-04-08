@@ -2,50 +2,61 @@
 
 ## 📁 核心架构
 
-OneKey Hardware SDK 采用三层架构设计：
+OneKey Hardware SDK 采用分层架构设计，入口 SDK、核心逻辑和传输实现彼此解耦：
 
 ```
-应用层 (DApps)
+应用层 (DApps / examples)
     ↓
-SDK接口层 (@onekeyfe/core) 
+SDK入口层 (@onekeyfe/hd-web-sdk / @onekeyfe/hd-ble-sdk / @onekeyfe/hd-common-connect-sdk)
+    ↓
+核心层 (@onekeyfe/hd-core)
     ↓
 传输抽象层 (@onekeyfe/hd-transport)
     ↓
-平台适配层 (WebUSB/BLE/HTTP)
+传输实现层 (WebUSB / Electron BLE / HTTP / Lowlevel / Emulator / React Native)
     ↓
-硬件设备层 (OneKey设备)
+硬件设备层 (OneKey设备 / Emulator)
 ```
 
 ## 🏗️ 核心包结构
 
-### API层
-- **`@onekeyfe/hd-core`** - 核心API和业务逻辑
-- **`@onekeyfe/hd-transport`** - 传输层抽象
+### SDK入口层
+- **`@onekeyfe/hd-web-sdk`** - 浏览器场景的 SDK 入口
+- **`@onekeyfe/hd-ble-sdk`** - React Native / BLE 场景的 SDK 入口
+- **`@onekeyfe/hd-common-connect-sdk`** - 通用入口，按 `env` 选择具体传输实现
+
+### 核心层
+- **`@onekeyfe/hd-core`** - 核心 API、方法调度和设备状态管理
+- **`@onekeyfe/hd-transport`** - 消息序列化、协议封包和传输抽象
 
 ### 传输层
-- **`@onekeyfe/hd-transport-webusb`** - WebUSB传输
-- **`@onekeyfe/hd-transport-http`** - HTTP Bridge传输
-
-### 平台SDK
-- **`@onekeyfe/hd-web-sdk`** - Web平台SDK
-- **`@onekeyfe/hd-ble-sdk`** - 移动端BLE SDK
+- **`@onekeyfe/hd-transport-web-device`** - WebUSB 和桌面端 BLE 传输入口
+- **`@onekeyfe/hd-transport-http`** - HTTP Bridge 传输
+- **`@onekeyfe/hd-transport-react-native`** - React Native 传输
+- **`@onekeyfe/hd-transport-lowlevel`** - Lowlevel 传输
+- **`@onekeyfe/hd-transport-emulator`** - Emulator 传输
 
 ### 示例应用
 - **`@onekeyfe/connect-examples`** - 集成示例
-  - `expo-example` - Web集成示例
+  - `expo-example` - Web / Mobile 集成示例
+  - `electron-example` - Desktop 集成示例
   - `expo-playground` - 开发测试平台
 
 ## 🔄 API调用流程
 
 ```typescript
 // 典型调用链
-HardwareSDK.btcGetAddress()
+HardwareSDK.init({ env })
+    ↓
+hd-common-connect-sdk.getTransport(env)
+    ↓
+initCore(settings, Transport)
     ↓
 BaseMethod.run()
     ↓
 Device.call()
     ↓
-Transport.send()
+Transport.call()
     ↓
 硬件设备响应
 ```
@@ -84,12 +95,13 @@ abstract class BaseMethod<Request, Response> {
 
 ### 策略模式 (Transport)
 ```typescript
-// 根据环境选择传输方式
-switch(env) {
-  case 'webusb': return new WebUsbTransport();
-  case 'ble': return new BleTransport();
-  case 'http': return new HttpTransport();
-}
+const getTransport = (env: ConnectSettings['env']) => {
+  if (env === 'desktop-web-ble') return ElectronBleTransport;
+  if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
+  if (env === 'lowlevel') return LowlevelTransport;
+  if (env === 'emulator') return EmulatorTransport;
+  return HttpTransport;
+};
 ```
 
 ## 📦 依赖关系
@@ -97,14 +109,21 @@ switch(env) {
 ```
 应用层
 ├── @onekeyfe/hd-web-sdk
+│   └── @onekeyfe/hd-core
+│       └── @onekeyfe/hd-transport
+│           ├── @onekeyfe/hd-transport-web-device
+│           └── @onekeyfe/hd-transport-http
 ├── @onekeyfe/hd-ble-sdk
-    │
-    ├── @onekeyfe/hd-core ←── 核心层
-    │   └── @onekeyfe/hd-transport
-    │
-    └── 传输层实现
-        ├── @onekeyfe/hd-transport-webusb
-        └── @onekeyfe/hd-transport-http
+│   └── @onekeyfe/hd-core
+│       └── @onekeyfe/hd-transport
+│           └── @onekeyfe/hd-transport-react-native
+└── @onekeyfe/hd-common-connect-sdk
+    └── @onekeyfe/hd-core
+        └── @onekeyfe/hd-transport
+            ├── @onekeyfe/hd-transport-web-device
+            ├── @onekeyfe/hd-transport-http
+            ├── @onekeyfe/hd-transport-lowlevel
+            └── @onekeyfe/hd-transport-emulator
 ```
 
 ## 🔧 开发工具
@@ -122,6 +141,12 @@ yarn install
 # 构建项目
 yarn build
 
-# 启动示例
-yarn workspace @onekeyfe/connect-examples start
+# 启动 Expo 示例
+yarn example
+
+# 启动桌面示例
+yarn example:desktop
+
+# 启动 Playground
+yarn example:playground
 ```

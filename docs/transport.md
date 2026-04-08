@@ -132,6 +132,35 @@ export default class WebUsbTransport {
 }
 ```
 
+### Transport Selection in Common Connect SDK
+
+`@onekeyfe/hd-common-connect-sdk` does not implement a transport by itself. During `init()`, it selects a transport class from `ConnectSettings['env']` and passes that class into `initCore()`.
+
+| `env` value | Transport class | Package |
+| --- | --- | --- |
+| `desktop-web-ble` | `ElectronBleTransport` | `@onekeyfe/hd-transport-web-device` |
+| `webusb`, `desktop-webusb` | `WebUsbTransport` | `@onekeyfe/hd-transport-web-device` |
+| `lowlevel` | `LowlevelTransport` | `@onekeyfe/hd-transport-lowlevel` |
+| `emulator` | `EmulatorTransport` | `@onekeyfe/hd-transport-emulator` |
+| default (`node` and other fallbacks) | `HttpTransport` | `@onekeyfe/hd-transport-http` |
+
+```typescript
+// packages/hd-common-connect-sdk/src/index.ts
+const getTransport = (env: ConnectSettings['env']) => {
+  if (env === 'desktop-web-ble') return ElectronBleTransport;
+  if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
+  if (env === 'lowlevel') return LowlevelTransport;
+  if (env === 'emulator') return EmulatorTransport;
+  return HttpTransport;
+};
+```
+
+### Choosing the Right Entry Point
+
+- Use `@onekeyfe/hd-web-sdk` when your app is browser-first and you want the web-oriented SDK wrapper.
+- Use `@onekeyfe/hd-ble-sdk` when the runtime is React Native and BLE is the primary transport.
+- Use `@onekeyfe/hd-common-connect-sdk` when the runtime decides the transport via `env`, such as desktop, emulator, lowlevel tooling, or mixed web / node setups.
+
 ## Session Management
 
 ### Session Lifecycle
