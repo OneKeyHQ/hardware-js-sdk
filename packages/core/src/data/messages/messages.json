@@ -10274,6 +10274,13 @@
           "rule": "required",
           "type": "uint32",
           "id": 14
+        },
+        "soroban_data_size": {
+          "type": "uint32",
+          "id": 60,
+          "options": {
+            "default": 0
+          }
         }
       },
       "nested": {
@@ -10663,6 +10670,76 @@
           "rule": "required",
           "type": "uint64",
           "id": 2
+        }
+      }
+    },
+    "StellarInvokeHostFunctionOp": {
+      "fields": {
+        "source_account": {
+          "type": "string",
+          "id": 1
+        },
+        "contract_address": {
+          "rule": "required",
+          "type": "string",
+          "id": 2
+        },
+        "function_name": {
+          "rule": "required",
+          "type": "string",
+          "id": 3
+        },
+        "call_args_xdr_size": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 4
+        },
+        "call_args_xdr_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 5
+        },
+        "soroban_auth_xdr_size": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 6
+        },
+        "soroban_auth_xdr_initial_chunk": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 7
+        }
+      }
+    },
+    "StellarSorobanDataRequest": {
+      "fields": {
+        "type": {
+          "rule": "required",
+          "type": "StellarRequestType",
+          "id": 1
+        },
+        "data_length": {
+          "rule": "required",
+          "type": "uint32",
+          "id": 2
+        }
+      },
+      "nested": {
+        "StellarRequestType": {
+          "values": {
+            "CALL": 0,
+            "AUTH": 1,
+            "EXT": 2
+          }
+        }
+      }
+    },
+    "StellarSorobanDataAck": {
+      "fields": {
+        "data_xdr": {
+          "rule": "required",
+          "type": "bytes",
+          "id": 1
         }
       }
     },
@@ -12201,6 +12278,9 @@
         "MessageType_StellarManageBuyOfferOp": 222,
         "MessageType_StellarPathPaymentStrictSendOp": 223,
         "MessageType_StellarSignedTx": 230,
+        "MessageType_StellarInvokeHostFunctionOp": 260,
+        "MessageType_StellarSorobanDataRequest": 261,
+        "MessageType_StellarSorobanDataAck": 262,
         "MessageType_CardanoGetPublicKey": 305,
         "MessageType_CardanoPublicKey": 306,
         "MessageType_CardanoGetAddress": 307,
