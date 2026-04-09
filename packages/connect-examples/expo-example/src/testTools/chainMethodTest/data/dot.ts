@@ -46,7 +46,7 @@ const dotData: ChainMethodEntry[] = [
   },
   {
     method: 'polkadotSignTransaction',
-    confirmCount: 2,
+    confirmCount: 1,
     description: 'Sign a Polkadot transaction.',
     presupposes: [
       {

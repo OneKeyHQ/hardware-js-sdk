@@ -540,6 +540,15 @@ export const zh = {
       warningMessage: 'Passphrase 遗失将无法恢复',
       maxLength: '最多 50 个字符',
     },
+    deviceAction: {
+      success: '执行成功！',
+      failed: '执行失败',
+      confirmOnDevice: '请在设备上确认操作',
+      enterPassphrase: '请在设备上输入密语',
+      enterPin: '请在设备上输入PIN码',
+      firmwareUpdating: '固件更新中...',
+      processing: '正在处理...',
+    },
     transport: {
       webusb: {
         description: '推荐',

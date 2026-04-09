@@ -2,6 +2,7 @@ import { ChainMethodsSidebar } from '../../../components/ChainMethodsSidebar'
 
 export default {
   index: 'Overview',
+  'agent-integration': 'AI Agent Integration',
   playground: {
     title: 'Playground',
     theme: {

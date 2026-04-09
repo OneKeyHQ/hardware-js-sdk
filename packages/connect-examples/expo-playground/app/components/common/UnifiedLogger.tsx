@@ -109,7 +109,7 @@ const SmartContentDisplay: React.FC<{
 const UnifiedLogger: React.FC<UnifiedLoggerProps> = ({
   logs,
   onClearLogs,
-  title = '执行日志',
+  title = 'Execution Logs',
   showFilters = false,
   showHeader = true,
   className = '',
