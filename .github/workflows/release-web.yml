@@ -20,6 +20,8 @@ jobs:
           yarn
           yarn bootstrap
       - name: Build Target
+        env:
+          PUBLIC_PATH: ${{ env.PUBLIC_PATH }}
         run: |
           yarn build
 
