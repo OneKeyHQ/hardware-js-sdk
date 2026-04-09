@@ -29,6 +29,31 @@ onekey-hw get-address --chain evm --use-empty-passphrase
 onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
 ```
 
+## Schema Discovery (for AI Agents)
+
+```bash
+# List all commands with their options
+onekey-hw schema list
+
+# Get schema for a specific command
+onekey-hw schema get-address
+onekey-hw schema sign-transaction
+```
+
+## Integration with app-monorepo CLI
+
+The `@onekeyfe/hardware-cli` package exports a `HardwareSigner` interface
+for programmatic integration:
+
+```typescript
+import { createHardwareSigner } from '@onekeyfe/hardware-cli';
+
+const signer = await createHardwareSigner({ useEmptyPassphrase: true });
+const { address } = await signer.getAddress('evm');
+const signed = await signer.signTransaction('evm', txData);
+signer.dispose();
+```
+
 ## Important
 
 - All signing operations require **physical confirmation** on the hardware device

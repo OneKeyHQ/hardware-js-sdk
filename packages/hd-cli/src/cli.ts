@@ -693,6 +693,78 @@ program
   });
 
 // ============================================================
+// Schema Discovery (for AI Agent integration)
+// ============================================================
+
+const schemaCmd = program
+  .command('schema')
+  .description('Show JSON Schema for CLI commands (for AI agent integration)');
+
+schemaCmd
+  .command('list')
+  .description('List all available commands')
+  .action(() => {
+    const commands = program.commands
+      .filter(c => c.name() !== 'schema')
+      .map(c => ({
+        name: c.name(),
+        description: c.description(),
+        options: c.options.map(o => ({
+          flags: o.flags,
+          description: o.description,
+          required: o.required,
+          defaultValue: o.defaultValue,
+        })),
+      }));
+    console.log(JSON.stringify({ commands }, null, 2));
+    process.exit(0);
+  });
+
+schemaCmd
+  .argument('[command]', 'Command name to get schema for')
+  .action((cmdName: string | undefined) => {
+    if (!cmdName) {
+      // Same as schema list
+      const commands = program.commands
+        .filter(c => c.name() !== 'schema')
+        .map(c => ({
+          name: c.name(),
+          description: c.description(),
+          options: c.options.map(o => ({
+            flags: o.flags,
+            description: o.description,
+            required: o.required,
+            defaultValue: o.defaultValue,
+          })),
+        }));
+      console.log(JSON.stringify({ commands }, null, 2));
+      process.exit(0);
+      return;
+    }
+    const cmd = program.commands.find(c => c.name() === cmdName);
+    if (!cmd) {
+      console.error(JSON.stringify({
+        success: false,
+        payload: { error: `Unknown command: ${cmdName}`, code: 'UNKNOWN_COMMAND' },
+      }));
+      process.exit(1);
+      return;
+    }
+    const schema = {
+      name: cmd.name(),
+      description: cmd.description(),
+      options: cmd.options.map(o => ({
+        flags: o.flags,
+        description: o.description,
+        required: o.required,
+        defaultValue: o.defaultValue,
+      })),
+    };
+    console.log(JSON.stringify(schema, null, 2));
+    process.exit(0);
+  });
+
+// ============================================================
 // Helpers
 // ============================================================
 
