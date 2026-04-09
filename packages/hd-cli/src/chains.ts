@@ -227,10 +227,10 @@ export async function resolveSignTransaction(sdk: CoreApi, params: SignTransacti
     // XRP: implementation reads path + transaction from payload despite type declaration
     // eslint-disable-next-line @typescript-eslint/ban-types
     xrp: () =>
-      (sdk.xrpSignTransaction as (...args: unknown[]) => Promise<unknown>)(connectId, deviceId, {
+      sdk.xrpSignTransaction(connectId, deviceId, {
         path,
         transaction: tx,
-      }),
+      } as any),
     stellar: () =>
       sdk.stellarSignTransaction(connectId, deviceId, {
         path,

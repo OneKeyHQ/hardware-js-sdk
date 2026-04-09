@@ -19,8 +19,8 @@ update when installing, updating, or handling a failure.
 2. **Check version is latest** (once per session):
    - Fetch latest: `npm view @onekeyfe/hardware-cli version`
    - Compare with local `onekey-hw --version`
-   - Local version behind → **BLOCK operation**, run `npm update -g @onekeyfe/hardware-cli`
-   - Update failed → STOP, suggest manual update.
+   - Local version behind → **warn user**, run `npm update -g @onekeyfe/hardware-cli`
+   - If update fails → continue with current version (warn, do not block)
    - Update succeeded → continue with original command.
 
 ## Device Interaction Model

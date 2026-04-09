@@ -490,7 +490,8 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.checkFirmwareRelease(globalOpts.connectId);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.checkFirmwareRelease(params.connectId);
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -504,7 +505,8 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.checkAllFirmwareRelease(globalOpts.connectId);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.checkAllFirmwareRelease(params.connectId);
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -546,7 +548,8 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.checkBootloaderRelease(globalOpts.connectId);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.checkBootloaderRelease(params.connectId);
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -610,7 +613,18 @@ program
 program
   .command('device-wipe')
   .description('Factory reset — erase ALL data (IRREVERSIBLE)')
-  .action(async () => {
+  .requiredOption('--confirm-wipe', 'Confirm you understand this will erase ALL data permanently')
+  .action(async (opts) => {
+    if (!opts.confirmWipe) {
+      outputResult(program.opts(), {
+        success: false,
+        payload: {
+          error: 'Factory reset requires --confirm-wipe flag. WARNING: This will erase ALL data on the device permanently.',
+          code: 'CONFIRMATION_REQUIRED',
+        },
+      });
+      return;
+    }
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {

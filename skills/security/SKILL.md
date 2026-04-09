@@ -77,12 +77,14 @@ onekey-hw toggle-passphrase --enable <bool> [--connect-id <id>]
 Factory reset — erase all data from the device.
 
 ```bash
-onekey-hw device-wipe [--connect-id <id>]
+onekey-hw device-wipe --confirm-wipe [--connect-id <id>]
 ```
 
 **Agent notes:**
 - This is the most destructive operation. ALL data is permanently erased.
-- Require EXPLICIT double confirmation before executing.
+- The `--confirm-wipe` flag is REQUIRED — the command will not execute without it.
+- Require EXPLICIT double confirmation from the user before executing.
+- Verify user has recovery phrase backed up before proceeding.
 
 ### `onekey-hw device-settings`
 
@@ -139,9 +141,11 @@ Step 1 — Double confirmation
 → "WARNING: Factory reset will PERMANENTLY erase all data on your device.
    Do you have your recovery phrase backed up?"
 → Wait for confirmation
+→ "Are you absolutely sure? This cannot be undone."
+→ Wait for second confirmation
 
 Step 2 — Execute
-→ onekey-hw device-wipe --connect-id <id>
+→ onekey-hw device-wipe --confirm-wipe --connect-id <id>
 → "Device has been wiped. Use the OneKey App to set it up again."
 ```
 

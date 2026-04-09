@@ -21,6 +21,10 @@ Every time before running any `onekey-hw` command, follow these steps in order.
    - Device in bootloader mode → cannot sign, guide to `hardware-firmware` skill.
    - Device not initialized → guide user to set up device first.
 
+3. **Check passphrase mode**: If user hasn't specified hidden wallet:
+   - Add `--use-empty-passphrase` to avoid passphrase prompt
+   - If user explicitly needs hidden wallet, use `--passphrase-state <state>`
+
 ## Device Interaction — IMPORTANT
 
 **All signing commands block while waiting for physical interaction on the device.**
@@ -247,8 +251,10 @@ onekey-hw sign-message \
 
 **Agent notes:**
 - Device will show the message for user verification.
-- **TON note**: `tonSignMessage` is a transfer-signing method, not arbitrary message
-  signing. Pass `--message` as JSON: `'{"destination":"UQ...","tonAmount":100,"seqno":0,"expireAt":1234567890}'`.
+- **TON note**: `sign-message --chain ton` is a **transfer-signing** method (tonSignMessage),
+  not arbitrary message signing. The `--message` parameter must be a JSON object:
+  `'{"destination":"UQ...","tonAmount":100,"seqno":0,"expireAt":1234567890}'`.
+  For TON wallet authentication, use `ton-sign-proof` instead.
 
 ### `onekey-hw sign-typed-data`
 
