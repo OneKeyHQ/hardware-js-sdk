@@ -22,6 +22,7 @@ import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import HttpTransport from '@onekeyfe/hd-transport-http';
 import { ElectronBleTransport, WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
+import NodeUsbTransport from '@onekeyfe/hd-transport-usb';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
@@ -41,6 +42,7 @@ const getTransport = (env: ConnectSettings['env']) => {
   if (env === 'desktop-web-ble') return ElectronBleTransport;
   if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
   if (env === 'lowlevel') return LowlevelTransport;
+  if (env === 'node-usb') return NodeUsbTransport;
   if (env === 'emulator') return EmulatorTransport;
   return HttpTransport;
 };

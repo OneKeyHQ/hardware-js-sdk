@@ -53,11 +53,14 @@ export default class TransportManager {
         } else {
           Log.debug('React Native Do Not Initializing transports');
         }
+      } else if (env === 'node-usb') {
+        // NodeUsbTransport handles USB I/O directly — no plugin needed
+        await this.transport.init(LowLevelLogger, DevicePool.emitter);
       } else if (env === 'lowlevel') {
         if (!this.plugin) {
           throw ERRORS.TypedError(
             HardwareErrorCode.TransportNotConfigured,
-            'Lowlevel transport mast have plugin'
+            'Lowlevel transport must have plugin'
           );
         }
         await this.transport.init(LowLevelLogger, DevicePool.emitter, this.plugin);

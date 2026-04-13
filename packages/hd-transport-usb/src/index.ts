@@ -1,13 +1,14 @@
 import ByteBuffer from 'bytebuffer';
 import * as usb from 'usb';
-import transport from '@onekeyfe/hd-transport';
-import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
+import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
 
-import { HEADER_LENGTH, PACKET_SIZE, REPORT_ID } from './constants';
+import { HEADER_LENGTH, PACKET_SIZE, PAYLOAD_SIZE, REPORT_ID } from './constants';
 
-import type { LowLevelDevice, LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
+import type EventEmitter from 'events';
+import type { AcquireInput, OneKeyDeviceInfo } from '@onekeyfe/hd-transport';
 
-const { decodeProtocol } = transport;
+const { parseConfigure, buildEncodeBuffers, decodeProtocol, receiveOne, check } = transport;
 
 /** USB interface number for vendor-specific communication */
 const INTERFACE_NUMBER = 0;
@@ -29,20 +30,47 @@ interface OpenDevice {
 }
 
 /**
- * The currently active device — used by receive() since
- * LowlevelTransportSharedPlugin.receive() takes no uuid parameter.
+ * Fallback identifier using bus topology (unstable across re-plugs).
  */
-let activeDevice: OpenDevice | null = null;
-
-/** Map of uuid → open device state */
-const openDevices = new Map<string, OpenDevice>();
+function getBusId(dev: usb.Device): string {
+  return `usb:${dev.busNumber}:${dev.deviceAddress}`;
+}
 
 /**
- * Build a unique identifier for a USB device.
- * Uses bus number + device address which is stable within a session.
+ * Read USB string descriptor serial number from a device.
+ * Opens device briefly, reads serial, then closes.
+ * Falls back to bus path if serial cannot be read.
  */
-function getDeviceId(dev: usb.Device): string {
-  return `usb:${dev.busNumber}:${dev.deviceAddress}`;
+function readSerialNumber(dev: usb.Device): Promise<string> {
+  const { iSerialNumber } = dev.deviceDescriptor;
+  if (!iSerialNumber) return Promise.resolve(getBusId(dev));
+
+  return new Promise(resolve => {
+    try {
+      dev.open();
+      try {
+        dev.getStringDescriptor(iSerialNumber, (_err: Error | undefined, data?: string) => {
+          try {
+            dev.close();
+          } catch {
+            /* ignore */
+          }
+          resolve(data || getBusId(dev));
+        });
+      } catch {
+        // getStringDescriptor threw synchronously after open — close device
+        try {
+          dev.close();
+        } catch {
+          /* ignore */
+        }
+        resolve(getBusId(dev));
+      }
+    } catch {
+      // dev.open() failed
+      resolve(getBusId(dev));
+    }
+  });
 }
 
 /**
@@ -71,15 +99,7 @@ function transferOut(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
 }
 
 /**
- * Read a single 64-byte packet from the device via libusb bulk/interrupt transfer.
- */
-async function readPacket(dev: OpenDevice): Promise<Buffer> {
-  return transferIn(dev.epIn, PACKET_SIZE);
-}
-
-/**
  * Skip the 0x3F protocol marker byte from a USB packet.
- * The device sends 0x3F as the first byte of every response packet.
  */
 function skipReportByte(packet: Buffer): Buffer {
   if (packet[0] === REPORT_ID) {
@@ -96,24 +116,58 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
 }
 
 /**
- * Node.js USB plugin for LowlevelTransport.
+ * Node.js USB Transport — complete transport implementation using libusb.
  *
- * Implements the 6-method LowlevelTransportSharedPlugin interface
- * using the `usb` (libusb) library for direct USB communication
- * with OneKey hardware wallets.
+ * Unlike the old UsbPlugin (which was a LowlevelTransportSharedPlugin piped
+ * through LowlevelTransport), this class is a standalone transport that handles
+ * both protocol encoding/decoding and USB I/O directly.
  *
- * Uses libusb to access the vendor-specific interface (class 255)
- * which is NOT visible to the HID framework on macOS.
+ * Modeled after WebUsbTransport.
  */
-export const UsbPlugin: LowlevelTransportSharedPlugin = {
-  version: '1.0.0',
+export default class NodeUsbTransport {
+  messages: ReturnType<typeof transport.parseConfigure> | undefined;
 
-  async init(): Promise<void> {
-    // libusb requires no global initialization
-  },
+  name = 'NodeUsbTransport';
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async enumerate(): Promise<LowLevelDevice[]> {
+  version = 'usb';
+
+  configured = false;
+
+  Log?: any;
+
+  emitter?: EventEmitter;
+
+  /** serial → bus id, built during enumerate */
+  private serialToBusId = new Map<string, string>();
+
+  /** path → opened device state */
+  private openDevices = new Map<string, OpenDevice>();
+
+  /**
+   * Initialize transport.
+   * Signature matches the Transport.init interface (logger, emitter).
+   */
+  init(logger: any, emitter?: EventEmitter) {
+    this.Log = logger;
+    this.emitter = emitter;
+  }
+
+  configure(signedData: any) {
+    const messages = parseConfigure(signedData);
+    this.configured = true;
+    this.messages = messages;
+  }
+
+  listen() {
+    // empty — could add hotplug events via usb.on('attach'/'detach')
+  }
+
+  /**
+   * Enumerate connected OneKey USB devices.
+   * Opens each device briefly to read its serial number (used as `path`),
+   * then closes it. acquire() re-opens from a fresh getDeviceList().
+   */
+  async enumerate(): Promise<OneKeyDeviceInfo[]> {
     const allDevices = usb.getDeviceList();
 
     const onekeyDevices = allDevices.filter(d => {
@@ -121,26 +175,130 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
       return ONEKEY_WEBUSB_FILTER.some(f => idVendor === f.vendorId && idProduct === f.productId);
     });
 
-    return onekeyDevices.map(d => ({
-      id: getDeviceId(d),
-      name: 'OneKey',
-      commType: 'usb' as const,
-    }));
-  },
+    this.serialToBusId.clear();
+    const results: OneKeyDeviceInfo[] = [];
+    for (const d of onekeyDevices) {
+      const busId = getBusId(d);
+      const serial = await readSerialNumber(d);
+      this.serialToBusId.set(serial, busId);
+      results.push({
+        path: serial,
+        id: serial,
+        name: 'OneKey',
+        commType: 'usb',
+        debug: false,
+      });
+    }
+    return results;
+  }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async connect(uuid: string): Promise<void> {
-    const existing = openDevices.get(uuid);
-    if (existing) {
-      activeDevice = existing;
-      return;
+  /**
+   * Acquire device — open USB device, claim interface, return path (string).
+   */
+  async acquire(input: AcquireInput): Promise<string> {
+    const path = input.path ?? '';
+    if (!path) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, 'No device path provided');
     }
 
-    // Find the device by our uuid (bus:address)
+    try {
+      await this.openDevice(path);
+      return path;
+    } catch (error: any) {
+      this.Log?.debug('NodeUsbTransport acquire error: ', error);
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, error.message ?? String(error));
+    }
+  }
+
+  /**
+   * Release device — release interface and close.
+   */
+  async release(path: string, _onclose?: boolean): Promise<void> {
+    const openDev = this.openDevices.get(path);
+    if (!openDev) return;
+
+    try {
+      await new Promise<void>(resolve => {
+        openDev.iface.release(() => {
+          try {
+            openDev.device.close();
+          } catch {
+            /* ignore */
+          }
+          resolve();
+        });
+      });
+    } catch {
+      try {
+        openDev.device.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.openDevices.delete(path);
+  }
+
+  /**
+   * Call device method — encode protobuf, send packets, receive response.
+   * This is the core method that replaces LowlevelTransport's call + UsbPlugin's send/receive.
+   */
+  async call(path: string, name: string, data: Record<string, unknown>) {
+    if (!this.messages) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+
+    const openDev = this.openDevices.get(path);
+    if (!openDev) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device not acquired: ${path}`);
+    }
+
+    const { messages } = this;
+    if (LogBlockCommand.has(name)) {
+      this.Log?.debug('NodeUsbTransport call-', ' name: ', name);
+    } else {
+      this.Log?.debug('NodeUsbTransport call-', ' name: ', name, ' data: ', data);
+    }
+
+    // Encode protobuf message into 63-byte chunks (same as WebUsbTransport)
+    const encodeBuffers = buildEncodeBuffers(messages, name, data);
+
+    // Send each chunk with 0x3F report ID prefix
+    for (const buffer of encodeBuffers) {
+      const packet = new Uint8Array(PACKET_SIZE);
+      packet[0] = REPORT_ID;
+      packet.set(new Uint8Array(buffer), 1);
+      await transferOut(openDev.epOut, Buffer.from(packet));
+    }
+
+    // Receive response
+    const resData = await this.receiveData(openDev);
+    if (typeof resData !== 'string') {
+      throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
+    }
+    const jsonData = receiveOne(messages, resData);
+    return check.call(jsonData);
+  }
+
+  cancel() {
+    this.Log?.debug('NodeUsbTransport cancel');
+  }
+
+  // --- Private helpers ---
+
+  /**
+   * Open a USB device by path (serial number), claim interface, cache endpoints.
+   */
+  // eslint-disable-next-line @typescript-eslint/require-await
+  private async openDevice(path: string): Promise<void> {
+    const existing = this.openDevices.get(path);
+    if (existing) return;
+
+    // Resolve serial → bus id, then find a fresh device object
+    const busId = this.serialToBusId.get(path) ?? path;
     const allDevices = usb.getDeviceList();
-    const dev = allDevices.find(d => getDeviceId(d) === uuid);
+    const dev = allDevices.find(d => getBusId(d) === busId);
     if (!dev) {
-      throw new Error(`USB device not found: ${uuid}`);
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `USB device not found: ${path}`);
     }
 
     dev.open();
@@ -161,7 +319,6 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
 
     iface.claim();
 
-    // Find IN and OUT endpoints
     const epIn = iface.endpoints.find(
       (e): e is usb.InEndpoint => e.direction === 'in' && e.address === ENDPOINT_IN
     );
@@ -171,74 +328,31 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
 
     if (!epIn || !epOut) {
       dev.close();
-      throw new Error('USB endpoints not found (expected IN 0x81, OUT 0x01)');
+      throw ERRORS.TypedError(
+        HardwareErrorCode.DeviceNotFound,
+        'USB endpoints not found (expected IN 0x81, OUT 0x01)'
+      );
     }
 
     epIn.timeout = TRANSFER_TIMEOUT_MS;
     epOut.timeout = TRANSFER_TIMEOUT_MS;
 
-    const openDev: OpenDevice = { device: dev, iface, epIn, epOut };
-    openDevices.set(uuid, openDev);
-    activeDevice = openDev;
-  },
+    this.openDevices.set(path, { device: dev, iface, epIn, epOut });
+  }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async disconnect(uuid: string): Promise<void> {
-    const openDev = openDevices.get(uuid);
-    if (openDev) {
-      try {
-        openDev.iface.release(() => {
-          try {
-            openDev.device.close();
-          } catch {
-            /* ignore */
-          }
-        });
-      } catch {
-        try {
-          openDev.device.close();
-        } catch {
-          /* ignore */
-        }
-      }
-      openDevices.delete(uuid);
-      if (activeDevice === openDev) {
-        activeDevice = null;
-      }
-    }
-  },
-
-  async send(uuid: string, data: string): Promise<void> {
-    const openDev = openDevices.get(uuid);
-    if (!openDev) {
-      throw new Error(`Device not connected: ${uuid}`);
-    }
-    activeDevice = openDev;
-
-    // data is a hex string of a 64-byte packet (0x3F + 63 bytes payload),
-    // already framed by LowlevelTransport's buildBuffers().
-    const dataBuffer = Buffer.from(data, 'hex');
-
-    // libusb transfers the raw packet directly — no Report ID prepend needed
-    // (Report ID is a HID concept; libusb operates at USB level)
-    await transferOut(openDev.epOut, dataBuffer);
-  },
-
-  async receive(): Promise<string> {
-    if (!activeDevice) {
-      throw new Error('No active device for receive');
-    }
-    const dev = activeDevice;
-
-    // Mirrors WebUsbTransport.receiveData() exactly:
-    // 1. Read first 64-byte packet, skip byte[0] (0x3F marker)
-    const firstPacket = await readPacket(dev);
+  /**
+   * Receive a complete protobuf response from the device.
+   * Reads 64-byte packets, strips 0x3F marker, reassembles into hex string.
+   */
+  private async receiveData(dev: OpenDevice): Promise<string> {
+    // Read first packet, skip report byte
+    const firstPacket = await transferIn(dev.epIn, PACKET_SIZE);
     const firstData = skipReportByte(firstPacket);
 
-    // 2. Use SDK's decodeChunked to parse ## header → { typeId, length, restBuffer }
+    // Decode header: ## marker → { typeId, length, restBuffer }
     const { length, typeId, restBuffer } = decodeProtocol.decodeChunked(toArrayBuffer(firstData));
 
-    // 3. Allocate result buffer: typeId(2) + length(4) + payload(length)
+    // Allocate result: typeId(2) + length(4) + payload(length)
     const lengthWithHeader = Number(length) + HEADER_LENGTH;
     const decoded = new ByteBuffer(lengthWithHeader);
     decoded.writeUint16(typeId);
@@ -247,24 +361,22 @@ export const UsbPlugin: LowlevelTransportSharedPlugin = {
       decoded.append(restBuffer);
     }
 
-    // 4. Read subsequent packets until complete
+    // Read subsequent packets until complete
     while (decoded.offset < lengthWithHeader) {
-      const packet = await readPacket(dev);
+      const packet = await transferIn(dev.epIn, PACKET_SIZE);
       const pktData = skipReportByte(packet);
       const buf = toArrayBuffer(pktData);
-      if (lengthWithHeader - decoded.offset >= PACKET_SIZE) {
+      if (lengthWithHeader - decoded.offset >= PAYLOAD_SIZE) {
         decoded.append(buf);
       } else {
         decoded.append(buf.slice(0, lengthWithHeader - decoded.offset));
       }
     }
 
-    // 5. Return as hex string
     decoded.reset();
     const result = decoded.toBuffer();
     return Buffer.from(result as unknown as ArrayBuffer).toString('hex');
-  },
-};
+  }
+}
 
-export default UsbPlugin;
 export { PACKET_SIZE } from './constants';
