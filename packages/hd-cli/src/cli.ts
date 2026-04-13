@@ -8,7 +8,7 @@ import {
   resolveSignMessage,
   resolveSignTransaction,
 } from './chains';
-import { detectAndSetMode, getMode, outputResult } from './output';
+import { ansi, detectAndSetMode, getMode, outputResult } from './output';
 
 const program = new Command();
 
@@ -674,7 +674,7 @@ program
 program
   .command('device-wipe')
   .description('Factory reset — erase ALL data (IRREVERSIBLE)')
-  .requiredOption('--confirm-wipe', 'Confirm you understand this will erase ALL data permanently')
+  .option('--confirm-wipe', 'Confirm you understand this will erase ALL data permanently')
   .action(async opts => {
     if (!opts.confirmWipe) {
       outputResult({
@@ -807,9 +807,9 @@ function collectAllSchemas(): SchemaEntry[] {
 function printSchemaList(schemas: SchemaEntry[]): never {
   if (getMode() === 'human') {
     schemas.forEach(c => {
-      process.stdout.write(`\x1b[1m${c.name}\x1b[0m  ${c.description}\n`);
+      process.stdout.write(`${ansi.bold(c.name)}  ${c.description}\n`);
       c.options.forEach(o => {
-        process.stdout.write(`  \x1b[2m${o.flags}\x1b[0m  ${o.description || ''}\n`);
+        process.stdout.write(`  ${ansi.dim(o.flags)}  ${o.description || ''}\n`);
       });
     });
     process.exit(0);
@@ -820,9 +820,9 @@ function printSchemaList(schemas: SchemaEntry[]): never {
 
 function printSingleSchema(schema: SchemaEntry): never {
   if (getMode() === 'human') {
-    process.stdout.write(`\x1b[1m${schema.name}\x1b[0m  ${schema.description}\n`);
+    process.stdout.write(`${ansi.bold(schema.name)}  ${schema.description}\n`);
     schema.options.forEach(o => {
-      process.stdout.write(`  \x1b[2m${o.flags}\x1b[0m  ${o.description || ''}\n`);
+      process.stdout.write(`  ${ansi.dim(o.flags)}  ${o.description || ''}\n`);
     });
     process.exit(0);
   }
@@ -904,7 +904,14 @@ function safeJsonParse(input: string, label: string): unknown {
 function safeParseInt(input: string, label: string): number {
   const num = parseInt(input, 10);
   if (Number.isNaN(num)) {
-    throw new Error(`Invalid number for ${label}: "${input}"`);
+    outputResult({
+      success: false,
+      payload: {
+        error: `Invalid number for ${label}: "${input}"`,
+        code: 'INVALID_PARAM',
+      },
+    });
+    return 0; // unreachable — outputResult exits process
   }
   return num;
 }

@@ -374,14 +374,14 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
     // Starcoin: uses messageHex
     starcoin: () =>
       sdk.starcoinSignMessage(connectId, deviceId, { path, messageHex: msg, ...common }),
-    // TON: tonSignMessage is transfer-signing, pass JSON params
+    // TON: tonSignMessage is transfer-signing, pass JSON params (uses raw input, not hex)
     ton: () => {
-      const tonParams = JSON.parse(msg);
+      const tonParams = JSON.parse(raw);
       return sdk.tonSignMessage(connectId, deviceId, { path, ...tonParams, ...common });
     },
     // Nostr: event must be a NostrEvent object (kind, content, tags, created_at)
     nostr: () => {
-      const event = JSON.parse(msg);
+      const event = JSON.parse(raw);
       return sdk.nostrSignEvent(connectId, deviceId, { path, event, ...common });
     },
     // SCDO: uses messageHex

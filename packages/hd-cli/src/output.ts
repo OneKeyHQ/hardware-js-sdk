@@ -30,19 +30,26 @@ export function getMode(): OutputMode {
 }
 
 // --- ANSI helpers (no chalk dependency, respects NO_COLOR) ---
-const isColorSupported = () => process.stderr.isTTY && !process.env.NO_COLOR;
-const isStdoutColor = () => process.stdout.isTTY && !process.env.NO_COLOR;
+const canColor = (stream: NodeJS.WriteStream) => stream.isTTY && !process.env.NO_COLOR;
+const wrap = (code: string, s: string, stream: NodeJS.WriteStream) =>
+  canColor(stream) ? `\x1b[${code}m${s}\x1b[0m` : s;
 
+/** stdout-targeted colors (for success output, data display) */
 const ansi = {
-  green: (s: string) => (isStdoutColor() ? `\x1b[32m${s}\x1b[0m` : s),
-  red: (s: string) => (isStdoutColor() ? `\x1b[31m${s}\x1b[0m` : s),
-  yellow: (s: string) => (isColorSupported() ? `\x1b[33m${s}\x1b[0m` : s),
-  cyan: (s: string) => (isStdoutColor() ? `\x1b[36m${s}\x1b[0m` : s),
-  dim: (s: string) => (isStdoutColor() ? `\x1b[2m${s}\x1b[0m` : s),
-  bold: (s: string) => (isStdoutColor() ? `\x1b[1m${s}\x1b[0m` : s),
+  green: (s: string) => wrap('32', s, process.stdout),
+  cyan: (s: string) => wrap('36', s, process.stdout),
+  dim: (s: string) => wrap('2', s, process.stdout),
+  bold: (s: string) => wrap('1', s, process.stdout),
 };
 
-export { ansi };
+/** stderr-targeted colors (for errors, events, prompts) */
+const ansiErr = {
+  red: (s: string) => wrap('31', s, process.stderr),
+  yellow: (s: string) => wrap('33', s, process.stderr),
+  dim: (s: string) => wrap('2', s, process.stderr),
+};
+
+export { ansi, ansiErr };
 
 // --- stdout: final result ---
 // Returns `never` because it always calls process.exit.
@@ -76,9 +83,9 @@ function formatHumanResult(result: unknown): void {
 
   if (!isSuccess) {
     const payload = obj.payload as Record<string, unknown> | undefined;
-    process.stderr.write(`${ansi.red(`✘ Error: ${payload?.error || 'Unknown error'}`)}\n`);
+    process.stderr.write(`${ansiErr.red(`✘ Error: ${payload?.error || 'Unknown error'}`)}\n`);
     if (payload?.code) {
-      process.stderr.write(`${ansi.dim(`  Code: ${payload.code}`)}\n`);
+      process.stderr.write(`${ansiErr.dim(`  Code: ${payload.code}`)}\n`);
     }
     return;
   }
@@ -135,7 +142,7 @@ export function emitEvent(
     const event = { event: type, message, ...(detail ? { detail } : {}) };
     process.stderr.write(`${JSON.stringify(event)}\n`);
   } else {
-    const prefix = ansi.yellow('[onekey-hw]');
+    const prefix = ansiErr.yellow('[onekey-hw]');
     process.stderr.write(`${prefix} ${message}\n`);
   }
 }
