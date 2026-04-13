@@ -4,6 +4,11 @@ description: OneKey hardware wallet firmware information. Use whenever the user
   wants to check firmware versions or see if updates are available.
   Firmware updates must be done via the OneKey App or firmware.onekey.so.
 keywords: [firmware, version, check, bootloader, ble, bluetooth]
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
 ---
 
 ## Pre-flight Checks
@@ -38,6 +43,19 @@ Check bootloader version and status.
 ```bash
 onekey-hw bootloader-check [--connect-id <id>]
 ```
+
+### `onekey-hw firmware-update` / `onekey-hw firmware-update-ble`
+
+**These commands return an error by design.** They exist to provide a clear
+error message guiding users to the correct update method.
+
+```bash
+onekey-hw firmware-update
+# Returns: { success: false, payload: { error: "Firmware update via CLI is not supported...", code: "FIRMWARE_UPDATE_NOT_SUPPORTED" } }
+```
+
+**Agent note:** If the user requests firmware update, do NOT run these commands.
+Instead, directly guide them to the OneKey App or https://firmware.onekey.so/
 
 ### Firmware Updates
 

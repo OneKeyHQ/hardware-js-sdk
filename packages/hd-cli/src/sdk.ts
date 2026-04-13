@@ -11,8 +11,9 @@
 // @ts-ignore - hd-common-connect-sdk may not have type declarations
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-import { UsbPlugin } from '@onekeyfe/hd-transport-usb';
 import * as readline from 'readline';
+
+import { emitEvent } from './output';
 
 import type { ConnectSettings } from '@onekeyfe/hd-core';
 
@@ -96,12 +97,27 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
 
       if (pinType === 'ButtonRequest_PinEntry' || pinType === 'ButtonRequest_AttachPin') {
         // PIN is entered directly on device screen (Touch/Pro)
-        process.stderr.write('[onekey-hw] Please enter PIN on your device screen...\n');
+        emitEvent('pin_request', 'Please enter PIN on your device screen.', {
+          inputMode: 'on_device',
+        });
         // No uiResponse needed — device handles PIN input internally
+      } else if (!process.stdin.isTTY) {
+        // Classic devices in non-interactive mode: cannot collect PIN
+        emitEvent(
+          'pin_request',
+          'Classic device requires PIN entry but no terminal is available. PIN cannot be entered in non-interactive (agent) mode.',
+          { inputMode: 'host', error: true, code: 'PIN_INPUT_UNAVAILABLE' }
+        );
+        // Send empty pin - SDK will return auth error
+        sdk.uiResponse({
+          type: UI_RESPONSE.RECEIVE_PIN,
+          payload: '',
+        });
       } else {
         // Classic devices: PIN entry via matrix
-        // In CLI mode, prompt user or let agent handle
-        process.stderr.write('[onekey-hw] PIN required. Please enter PIN on your device.\n');
+        emitEvent('pin_request', 'PIN required. Please enter PIN on your device.', {
+          inputMode: 'host',
+        });
         promptUser('PIN (on-device numpad mapping): ', true).then(pin => {
           sdk.uiResponse({
             type: UI_RESPONSE.RECEIVE_PIN,
@@ -126,7 +142,7 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
           },
         });
       } else {
-        process.stderr.write('[onekey-hw] Passphrase required for hidden wallet.\n');
+        emitEvent('passphrase_request', 'Passphrase required for hidden wallet.');
         promptUser('Enter passphrase (or press Enter for on-device entry): ').then(passphrase => {
           if (passphrase === '') {
             // Enter on device
@@ -154,13 +170,13 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
 
     // Passphrase On Device
     if (message.type === UI_REQUEST.REQUEST_PASSPHRASE_ON_DEVICE) {
-      process.stderr.write('[onekey-hw] Please enter passphrase on your device screen...\n');
+      emitEvent('passphrase_on_device', 'Please enter passphrase on your device screen.');
     }
 
     // Button Confirmation
     // User must physically press confirm/reject on the device.
     if (message.type === UI_REQUEST.REQUEST_BUTTON) {
-      process.stderr.write('[onekey-hw] Please confirm the action on your device...\n');
+      emitEvent('button_confirm', 'Please confirm the action on your device.');
     }
   });
 
@@ -168,14 +184,14 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
   sdk.on(DEVICE.CONNECT, (device: any) => {
     const name = device?.label || device?.name;
     if (name) {
-      process.stderr.write(`[onekey-hw] Device connected: ${name}\n`);
+      emitEvent('device_connect', `Device connected: ${name}`, { name });
     }
   });
 
   sdk.on(DEVICE.DISCONNECT, (device: any) => {
     const name = device?.label || device?.name;
     if (name) {
-      process.stderr.write(`[onekey-hw] Device disconnected: ${name}\n`);
+      emitEvent('device_disconnect', `Device disconnected: ${name}`, { name });
     }
   });
 }
@@ -186,11 +202,10 @@ export async function createSDK(opts: SDKOptions) {
     fetchConfig: true,
   };
 
-  // Direct USB via libusb — works on macOS, Linux, Windows
-  settings.env = 'lowlevel';
-  const plugin = UsbPlugin;
+  // Direct USB via libusb — NodeUsbTransport handles protocol + I/O directly
+  settings.env = 'node-usb';
 
-  await HardwareSDK.init(settings, undefined, plugin);
+  await HardwareSDK.init(settings);
 
   // Register event handlers AFTER init
   registerEventHandlers(HardwareSDK, opts);

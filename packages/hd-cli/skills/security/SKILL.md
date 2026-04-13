@@ -3,6 +3,12 @@ name: hardware-security
 description: OneKey hardware wallet security and device management — PIN changes,
   passphrase settings, device wipe, device verification, and settings management.
 keywords: [pin, passphrase, reset, wipe, security, label, settings, lock, verify]
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
+  - AskUserQuestion
 ---
 
 ## Pre-flight Checks
@@ -15,9 +21,42 @@ keywords: [pin, passphrase, reset, wipe, security, label, settings, lock, verify
 ## Device Interaction — IMPORTANT
 
 **All security commands require physical interaction on the device (PIN entry,
-button confirmation).** Always warn the user before running any command:
-"You will need to interact with your device — enter PIN, confirm actions, etc."
-Use `timeout: 120000` (120 seconds) for most commands.
+button confirmation).** Use `AskUserQuestion` before running any command:
+
+```
+AskUserQuestion:
+  Question: "This operation requires interaction on your device.
+    Please make sure the device is connected and powered on."
+  Header: "Device"
+  Options:
+    A) Device is ready (Recommended)
+    B) Cancel
+```
+
+For **destructive operations** (device-wipe), use double confirmation:
+
+```
+AskUserQuestion:
+  Question: "WARNING: Factory reset permanently erases ALL data on your device.
+    Do you have your recovery phrase backed up?"
+  Header: "Factory Reset"
+  Options:
+    A) Yes, I have my backup — proceed
+    B) Cancel
+```
+
+Then a second confirmation:
+
+```
+AskUserQuestion:
+  Question: "Are you absolutely sure? This CANNOT be undone."
+  Header: "Final Confirmation"
+  Options:
+    A) Yes, wipe the device
+    B) Cancel
+```
+
+Use `timeout: 120000` (120 seconds) for all device commands.
 
 ## Security Rules — ABSOLUTE
 
@@ -57,8 +96,11 @@ onekey-hw change-pin [--remove] [--connect-id <id>]
 Get current passphrase state for hidden wallet session management.
 
 ```bash
-onekey-hw passphrase-state [--use-empty-passphrase] [--connect-id <id>]
+onekey-hw passphrase-state [--connect-id <id>]
 ```
+
+**Note:** Do NOT use `--use-empty-passphrase` with this command — it will return an error.
+This command's purpose is to trigger passphrase input on the device.
 
 ### `onekey-hw toggle-passphrase`
 
@@ -77,12 +119,14 @@ onekey-hw toggle-passphrase --enable <bool> [--connect-id <id>]
 Factory reset — erase all data from the device.
 
 ```bash
-onekey-hw device-wipe [--connect-id <id>]
+onekey-hw device-wipe --confirm-wipe [--connect-id <id>]
 ```
 
 **Agent notes:**
 - This is the most destructive operation. ALL data is permanently erased.
-- Require EXPLICIT double confirmation before executing.
+- The `--confirm-wipe` flag is REQUIRED — the command will not execute without it.
+- Require EXPLICIT double confirmation from the user before executing.
+- Verify user has recovery phrase backed up before proceeding.
 
 ### `onekey-hw device-settings`
 
@@ -97,14 +141,6 @@ onekey-hw device-settings \
   [--haptic-feedback <bool>] \
   [--auto-shutdown-delay <seconds>] \
   [--connect-id <id>]
-```
-
-### `onekey-hw device-verify`
-
-Verify the device is genuine OneKey hardware (anti-tampering check).
-
-```bash
-onekey-hw device-verify [--connect-id <id>]
 ```
 
 ### `onekey-hw lock`
@@ -139,9 +175,11 @@ Step 1 — Double confirmation
 → "WARNING: Factory reset will PERMANENTLY erase all data on your device.
    Do you have your recovery phrase backed up?"
 → Wait for confirmation
+→ "Are you absolutely sure? This cannot be undone."
+→ Wait for second confirmation
 
 Step 2 — Execute
-→ onekey-hw device-wipe --connect-id <id>
+→ onekey-hw device-wipe --confirm-wipe --connect-id <id>
 → "Device has been wiped. Use the OneKey App to set it up again."
 ```
 

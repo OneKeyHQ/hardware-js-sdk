@@ -3,7 +3,13 @@ name: hardware-device
 description: OneKey hardware wallet device management. Use whenever the user
   wants to search for or check their OneKey hardware wallet device.
   Also triggered as a pre-check before any signing or firmware operation.
-keywords: [device, search, hardware, onekey, features, verify, lock, wipe]
+keywords: [device, search, hardware, onekey, features, verify, lock]
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
+  - AskUserQuestion
 ---
 
 ## Pre-flight Checks
@@ -19,8 +25,8 @@ update when installing, updating, or handling a failure.
 2. **Check version is latest** (once per session):
    - Fetch latest: `npm view @onekeyfe/hardware-cli version`
    - Compare with local `onekey-hw --version`
-   - Local version behind → **BLOCK operation**, run `npm update -g @onekeyfe/hardware-cli`
-   - Update failed → STOP, suggest manual update.
+   - Local version behind → **warn user**, run `npm update -g @onekeyfe/hardware-cli`
+   - If update fails → continue with current version (warn, do not block)
    - Update succeeded → continue with original command.
 
 ## Device Interaction Model
@@ -32,7 +38,7 @@ You MUST inform the user BEFORE running the command.**
 ### How It Works
 
 1. **Before running the command** → Tell the user what device interaction to expect.
-2. **Run the command** → It blocks (up to 60s) while waiting for the user to act on the device.
+2. **Run the command** → It blocks (up to 120s) while waiting for the user to act on the device.
    The user sees real-time `[onekey-hw]` status messages in their terminal (via stderr).
 3. **Command completes** → You see the full output and present the result.
 
@@ -54,9 +60,24 @@ You MUST inform the user BEFORE running the command.**
 
 ### Example Interaction Pattern
 
+**Before any device command (except `search` and `schema`)**, use AskUserQuestion:
+
 ```
-Agent → User: "I'm going to request your ETH address from the device.
-              You may need to enter your PIN and confirm on the device screen."
+AskUserQuestion:
+  Question: "I need to connect to your OneKey hardware wallet.
+    Please make sure the device is plugged in via USB and powered on.
+    You may need to enter your PIN on the device screen."
+  Header: "Device"
+  Options:
+    A) Device is ready (Recommended)
+    B) Cancel
+```
+
+If user selects B → stop and explain what they need.
+
+Then run the command:
+
+```
 Agent → Bash: onekey-hw get-address --chain evm --connect-id <id>  (timeout: 120000)
 [user sees in terminal: "[onekey-hw] Please enter PIN on your device screen..."]
 [user enters PIN on device]
@@ -64,6 +85,18 @@ Agent → Bash: onekey-hw get-address --chain evm --connect-id <id>  (timeout: 1
 [user confirms on device]
 Agent ← result: { success: true, payload: { address: "0x..." } }
 Agent → User: "Your ETH address is 0x..."
+```
+
+**If command times out**, use AskUserQuestion:
+
+```
+AskUserQuestion:
+  Question: "The device operation timed out. This usually means you didn't
+    confirm on the device in time. Want to try again?"
+  Header: "Retry"
+  Options:
+    A) Try again
+    B) Cancel
 ```
 
 ## Security Rules — ABSOLUTE

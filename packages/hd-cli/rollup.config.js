@@ -13,6 +13,7 @@ const config = [
       cli: './src/cli.ts',
       sdk: './src/sdk.ts',
       chains: './src/chains.ts',
+      output: './src/output.ts',
     },
     output: [{ dir: 'dist', format: 'cjs' }],
     plugins: [typescript(), commonjs(), json()],

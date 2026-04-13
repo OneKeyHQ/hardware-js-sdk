@@ -8,13 +8,14 @@ import {
   resolveSignMessage,
   resolveSignTransaction,
 } from './chains';
+import { detectAndSetMode, getMode, outputResult } from './output';
 
 const program = new Command();
 
 program
   .name('onekey-hw')
   .description('OneKey hardware wallet CLI for AI agent integration')
-  .version('1.1.25-alpha.1');
+  .version('1.1.26-alpha.0');
 
 // ============================================================
 // Global Options
@@ -27,6 +28,25 @@ program.option(
 );
 program.option('--passphrase-state <state>', 'Passphrase state for hidden wallet access');
 program.option('--use-empty-passphrase', 'Use standard wallet (skip passphrase prompt)');
+program.option('--human', 'Force human-readable output (auto-detected when running in terminal)');
+
+program.hook('preAction', () => {
+  const opts = program.opts();
+  detectAndSetMode({ human: opts.human });
+
+  // Mutual exclusion: --use-empty-passphrase and --passphrase-state cannot coexist
+  if (opts.useEmptyPassphrase && opts.passphraseState) {
+    outputResult({
+      success: false,
+      payload: {
+        error:
+          '--use-empty-passphrase and --passphrase-state are mutually exclusive. ' +
+          'Use --use-empty-passphrase for standard wallet, or --passphrase-state for hidden wallet.',
+        code: 'INVALID_PARAMS',
+      },
+    });
+  }
+});
 
 // ============================================================
 // Device Commands
@@ -60,7 +80,7 @@ program
         }
       }
 
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -86,7 +106,7 @@ program
         showOnDevice: opts.showOnDevice === 'true',
         ...getCommonParams(globalOpts),
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -106,7 +126,7 @@ program
         path: opts.path,
         ...getCommonParams(globalOpts),
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -129,7 +149,7 @@ program
         transaction: tx,
         ...getCommonParams(globalOpts),
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -151,7 +171,7 @@ program
         message: opts.message,
         ...getCommonParams(globalOpts),
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -173,10 +193,11 @@ program
       const result = await sdk.evmSignTypedData(params.connectId || '', params.deviceId || '', {
         path,
         metamaskV4Compat: opts.metamaskV4Compat,
-        data,
-        ...params,
-      } as any);
-      outputResult(globalOpts, result);
+        data: data as Parameters<typeof sdk.evmSignTypedData>[2]['data'],
+        useEmptyPassphrase: params.useEmptyPassphrase,
+        passphraseState: params.passphraseState,
+      });
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -195,9 +216,10 @@ program
       const result = await sdk.btcSignPsbt(params.connectId || '', params.deviceId || '', {
         psbt: opts.psbt,
         coin: opts.coin,
-        ...params,
-      } as any);
-      outputResult(globalOpts, result);
+        useEmptyPassphrase: params.useEmptyPassphrase,
+        passphraseState: params.passphraseState,
+      });
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -226,6 +248,8 @@ program
             address: opts.address,
             messageHex: opts.message,
             signature: opts.signature,
+            useEmptyPassphrase: params.useEmptyPassphrase,
+            passphraseState: params.passphraseState,
           });
           break;
         case 'btc':
@@ -235,6 +259,8 @@ program
             message: opts.message,
             signature: opts.signature,
             coin: 'btc',
+            useEmptyPassphrase: params.useEmptyPassphrase,
+            passphraseState: params.passphraseState,
           });
           break;
         case 'starcoin':
@@ -243,6 +269,8 @@ program
             publicKey: opts.address,
             message: opts.message,
             signature: opts.signature,
+            useEmptyPassphrase: params.useEmptyPassphrase,
+            passphraseState: params.passphraseState,
           });
           break;
         default:
@@ -250,7 +278,7 @@ program
             `verifyMessage not supported for chain: ${opts.chain}. Supported: evm, btc, starcoin`
           );
       }
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -273,7 +301,7 @@ program
         bundle,
         ...getCommonParams(globalOpts),
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -298,8 +326,10 @@ program
         path: opts.path,
         domainHash: opts.domainHash,
         messageHash: opts.messageHash,
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -318,8 +348,10 @@ program
       const result = await sdk.solSignOffchainMessage(p.connectId || '', p.deviceId || '', {
         path: opts.path,
         messageHex: opts.messageHex,
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -342,8 +374,10 @@ program
         pubkey: opts.pubkey,
         plaintext: opts.plaintext,
         showOnOneKey: opts.showOnDevice === 'true',
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -366,8 +400,10 @@ program
         pubkey: opts.pubkey,
         ciphertext: opts.ciphertext,
         showOnOneKey: opts.showOnDevice === 'true',
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -386,8 +422,10 @@ program
       const result = await sdk.nostrSignSchnorr(p.connectId || '', p.deviceId || '', {
         path: opts.path,
         hash: opts.hash,
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -406,8 +444,10 @@ program
       const result = await sdk.lnurlAuth(p.connectId || '', p.deviceId || '', {
         domain: opts.domain,
         k1: opts.k1,
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -428,8 +468,10 @@ program
         path: opts.path,
         domainHash: opts.domainHash,
         messageHash: opts.messageHash,
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -448,8 +490,10 @@ program
       const result = await sdk.aptosSignInMessage(p.connectId || '', p.deviceId || '', {
         path: opts.path,
         payload: opts.payload,
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -472,8 +516,10 @@ program
         appdomain: opts.appdomain,
         expireAt: safeParseInt(opts.expireAt, '--expire-at'),
         ...(opts.comment ? { comment: opts.comment } : {}),
+        useEmptyPassphrase: p.useEmptyPassphrase,
+        passphraseState: p.passphraseState,
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -490,8 +536,9 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.checkFirmwareRelease(globalOpts.connectId);
-      outputResult(globalOpts, result);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.checkFirmwareRelease(params.connectId);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -504,8 +551,9 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.checkAllFirmwareRelease(globalOpts.connectId);
-      outputResult(globalOpts, result);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.checkAllFirmwareRelease(params.connectId);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -515,7 +563,7 @@ program
   .command('firmware-update')
   .description('Firmware update is not supported via CLI')
   .action(() => {
-    outputResult(program.opts(), {
+    outputResult({
       success: false,
       payload: {
         error:
@@ -529,7 +577,7 @@ program
   .command('firmware-update-ble')
   .description('BLE firmware update is not supported via CLI')
   .action(() => {
-    outputResult(program.opts(), {
+    outputResult({
       success: false,
       payload: {
         error:
@@ -546,8 +594,9 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.checkBootloaderRelease(globalOpts.connectId);
-      outputResult(globalOpts, result);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.checkBootloaderRelease(params.connectId);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -565,10 +614,11 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.deviceChangePin(globalOpts.connectId, {
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.deviceChangePin(params.connectId, {
         remove: opts.remove ?? false,
-      } as any);
-      outputResult(globalOpts, result);
+      });
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -579,12 +629,25 @@ program
   .description('Get current passphrase state (for hidden wallet session management)')
   .action(async () => {
     const globalOpts = program.opts();
+    // This command's purpose is to trigger passphrase input — using
+    // --use-empty-passphrase with it is a contradiction.
+    if (globalOpts.useEmptyPassphrase) {
+      outputResult({
+        success: false,
+        payload: {
+          error:
+            'passphrase-state cannot be used with --use-empty-passphrase. ' +
+            'This command triggers passphrase input to get the hidden wallet state.',
+          code: 'INVALID_PARAMS',
+        },
+      });
+      return;
+    }
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.getPassphraseState(globalOpts.connectId, {
-        useEmptyPassphrase: globalOpts.useEmptyPassphrase,
-      } as any);
-      outputResult(globalOpts, result);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.getPassphraseState(params.connectId);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -598,10 +661,11 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.deviceSettings(globalOpts.connectId, {
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.deviceSettings(params.connectId, {
         usePassphrase: opts.enable === 'true',
       });
-      outputResult(globalOpts, result);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -610,12 +674,25 @@ program
 program
   .command('device-wipe')
   .description('Factory reset — erase ALL data (IRREVERSIBLE)')
-  .action(async () => {
+  .requiredOption('--confirm-wipe', 'Confirm you understand this will erase ALL data permanently')
+  .action(async opts => {
+    if (!opts.confirmWipe) {
+      outputResult({
+        success: false,
+        payload: {
+          error:
+            'Factory reset requires --confirm-wipe flag. WARNING: This will erase ALL data on the device permanently.',
+          code: 'CONFIRMATION_REQUIRED',
+        },
+      });
+      return;
+    }
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.deviceWipe(globalOpts.connectId);
-      outputResult(globalOpts, result);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.deviceWipe(params.connectId);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -650,15 +727,19 @@ program
           safeParseInt(opts.autoShutdownDelay, '--auto-shutdown-delay') * 1000;
 
       if (Object.keys(settings).length === 0) {
-        outputResult(globalOpts, {
+        outputResult({
           success: false,
-          error: 'No settings provided. Use --label, --auto-lock-delay, --language, etc.',
+          payload: {
+            error: 'No settings provided. Use --label, --auto-lock-delay, --language, etc.',
+            code: 'INVALID_PARAMS',
+          },
         });
         return;
       }
 
-      const result = await sdk.deviceSettings(globalOpts.connectId, settings);
-      outputResult(globalOpts, result);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.deviceSettings(params.connectId, settings);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -671,8 +752,9 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.deviceVerify(globalOpts.connectId);
-      outputResult(globalOpts, result);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.deviceVerify(params.connectId);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
@@ -685,11 +767,100 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.deviceLock(globalOpts.connectId);
-      outputResult(globalOpts, result);
+      const params = getCommonParams(globalOpts);
+      const result = await sdk.deviceLock(params.connectId);
+      outputResult(result);
     } finally {
       sdk.dispose();
     }
+  });
+
+// ============================================================
+// Schema Discovery (for AI Agent integration)
+// ============================================================
+
+const schemaCmd = program
+  .command('schema')
+  .description('Show JSON Schema for CLI commands (for AI agent integration)');
+
+interface SchemaEntry {
+  name: string;
+  description: string;
+  options: { flags: string; description: string; required: boolean; defaultValue: unknown }[];
+}
+
+function collectAllSchemas(): SchemaEntry[] {
+  return program.commands
+    .filter(c => c.name() !== 'schema')
+    .map(c => ({
+      name: c.name(),
+      description: c.description(),
+      options: c.options.map(o => ({
+        flags: o.flags,
+        description: o.description,
+        required: o.required,
+        defaultValue: o.defaultValue,
+      })),
+    }));
+}
+
+function printSchemaList(schemas: SchemaEntry[]): never {
+  if (getMode() === 'human') {
+    schemas.forEach(c => {
+      process.stdout.write(`\x1b[1m${c.name}\x1b[0m  ${c.description}\n`);
+      c.options.forEach(o => {
+        process.stdout.write(`  \x1b[2m${o.flags}\x1b[0m  ${o.description || ''}\n`);
+      });
+    });
+    process.exit(0);
+  }
+  // Agent mode: wrap in standard success envelope
+  outputResult({ success: true, payload: { commands: schemas } });
+}
+
+function printSingleSchema(schema: SchemaEntry): never {
+  if (getMode() === 'human') {
+    process.stdout.write(`\x1b[1m${schema.name}\x1b[0m  ${schema.description}\n`);
+    schema.options.forEach(o => {
+      process.stdout.write(`  \x1b[2m${o.flags}\x1b[0m  ${o.description || ''}\n`);
+    });
+    process.exit(0);
+  }
+  // Agent mode: wrap in standard success envelope
+  outputResult({ success: true, payload: schema });
+}
+
+schemaCmd
+  .command('list')
+  .description('List all available commands')
+  .action(() => {
+    printSchemaList(collectAllSchemas());
+  });
+
+schemaCmd
+  .argument('[command]', 'Command name to get schema for')
+  .action((cmdName: string | undefined) => {
+    if (!cmdName) {
+      printSchemaList(collectAllSchemas());
+      return;
+    }
+    const cmd = program.commands.find(c => c.name() === cmdName);
+    if (!cmd) {
+      outputResult({
+        success: false,
+        payload: { error: `Unknown command: ${cmdName}`, code: 'UNKNOWN_COMMAND' },
+      });
+      return;
+    }
+    const schema = collectAllSchemas().find(s => s.name === cmdName);
+    if (!schema) {
+      outputResult({
+        success: false,
+        payload: { error: `Schema not found for: ${cmdName}`, code: 'UNKNOWN_COMMAND' },
+      });
+      return;
+    }
+    printSingleSchema(schema);
   });
 
 // ============================================================
@@ -709,18 +880,6 @@ function getCommonParams(globalOpts: Record<string, any>) {
   };
 }
 
-function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
-  // #10 FIX: Always use JSON.stringify to avoid [Object] truncation
-  console.log(JSON.stringify(result, null, 2));
-
-  // Exit after output — SDK event listeners keep the process alive otherwise
-  if (result && typeof result === 'object' && 'success' in result && !(result as any).success) {
-    process.exit(1);
-  } else {
-    process.exit(0);
-  }
-}
-
 /**
  * #6 FIX: Safe JSON.parse with structured error output
  */
@@ -728,16 +887,14 @@ function safeJsonParse(input: string, label: string): unknown {
   try {
     return JSON.parse(input);
   } catch {
-    console.error(
-      JSON.stringify({
-        success: false,
-        payload: {
-          error: `Invalid JSON for ${label}: ${input.slice(0, 100)}`,
-          code: 'INVALID_JSON',
-        },
-      })
-    );
-    process.exit(1);
+    outputResult({
+      success: false,
+      payload: {
+        error: `Invalid JSON for ${label}: ${input.slice(0, 100)}`,
+        code: 'INVALID_JSON',
+      },
+    });
+    return undefined; // unreachable — outputResult exits process
   }
 }
 

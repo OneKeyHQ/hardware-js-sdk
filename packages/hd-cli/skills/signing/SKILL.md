@@ -7,6 +7,12 @@ description: Multi-chain address generation and transaction signing using OneKey
 keywords: [sign, address, transaction, message, bitcoin, ethereum, solana, verify,
   btc, eth, sol, evm, cosmos, cardano, polkadot, tron, aptos, sui, near, xrp,
   stellar, ton, nostr]
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
+  - AskUserQuestion
 ---
 
 ## Pre-flight Checks
@@ -21,21 +27,60 @@ Every time before running any `onekey-hw` command, follow these steps in order.
    - Device in bootloader mode → cannot sign, guide to `hardware-firmware` skill.
    - Device not initialized → guide user to set up device first.
 
+3. **Check passphrase mode**: If user hasn't specified hidden wallet:
+   - Add `--use-empty-passphrase` to avoid passphrase prompt
+   - If user explicitly needs hidden wallet, use `--passphrase-state <state>`
+
+**IMPORTANT:** Always include `--use-empty-passphrase` as a global option unless the user explicitly requests a hidden (passphrase) wallet.
+
 ## Device Interaction — IMPORTANT
 
 **All signing commands block while waiting for physical interaction on the device.**
-You MUST follow this pattern for every signing/address command:
+You MUST use `AskUserQuestion` before every signing/address command:
 
-1. **BEFORE running the command** → Tell the user:
-   "I'm about to [get your address / sign this transaction]. You will need to
-   confirm on your OneKey device. You may also need to enter your PIN if the
-   device is locked."
+### Before address/signing commands:
 
-2. **Run the command** with `timeout: 120000` (120 seconds minimum).
-   The user sees real-time `[onekey-hw]` prompts in their terminal via stderr.
+```
+AskUserQuestion:
+  Question: "I need to [get your address / sign a transaction] on your hardware wallet.
+    Please make sure your device is plugged in and powered on.
+    You may need to enter your PIN and confirm on the device."
+  Header: "Device"
+  Options:
+    A) Device is ready (Recommended)
+    B) Cancel
+```
 
-3. **If the command times out or returns `success: false`** → The user likely
-   did not confirm on the device. Ask if they want to retry. Do NOT retry automatically.
+### Before signing operations specifically:
+
+```
+AskUserQuestion:
+  Question: "I'm about to sign a transaction on your hardware wallet:
+    • Action: Send 0.1 ETH
+    • To: 0xABC...
+    • Chain: Ethereum
+    Please verify these details match what appears on your device screen."
+  Header: "Sign"
+  Options:
+    A) Proceed — I'll confirm on device (Recommended)
+    B) Cancel
+```
+
+### Run the command with `timeout: 120000` (120 seconds minimum).
+The user sees real-time `[onekey-hw]` prompts in their terminal via stderr.
+
+### If the command times out or returns `success: false`:
+
+```
+AskUserQuestion:
+  Question: "The operation timed out or was rejected. Want to try again?"
+  Header: "Retry"
+  Options:
+    A) Try again
+    B) Cancel
+```
+
+Do NOT retry automatically.
 
 ## Security Rules — ABSOLUTE
 
@@ -247,8 +292,10 @@ onekey-hw sign-message \
 
 **Agent notes:**
 - Device will show the message for user verification.
-- **TON note**: `tonSignMessage` is a transfer-signing method, not arbitrary message
-  signing. Pass `--message` as JSON: `'{"destination":"UQ...","tonAmount":100,"seqno":0,"expireAt":1234567890}'`.
+- **TON note**: `sign-message --chain ton` is a **transfer-signing** method (tonSignMessage),
+  not arbitrary message signing. The `--message` parameter must be a JSON object:
+  `'{"destination":"UQ...","tonAmount":100,"seqno":0,"expireAt":1234567890}'`.
+  For TON wallet authentication, use `ton-sign-proof` instead.
 
 ### `onekey-hw sign-typed-data`
 

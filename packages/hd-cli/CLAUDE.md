@@ -8,7 +8,7 @@ command signatures, workflows, and security rules.
 
 | Skill | Path | Use When |
 |---|---|---|
-| **Device** | `skills/device/SKILL.md` | Search devices (with features), lock, verify, wipe |
+| **Device** | `skills/device/SKILL.md` | Search devices (with features), lock, verify |
 | **Signing** | `skills/signing/SKILL.md` | Get addresses, sign transactions/messages (27 chains) |
 | **Firmware** | `skills/firmware/SKILL.md` | Check firmware versions (updates via OneKey App only) |
 | **Security** | `skills/security/SKILL.md` | PIN, passphrase, device settings, factory reset |
@@ -27,6 +27,31 @@ onekey-hw get-address --chain evm --use-empty-passphrase
 
 # Sign a message
 onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
+```
+
+## Schema Discovery (for AI Agents)
+
+```bash
+# List all commands with their options
+onekey-hw schema list
+
+# Get schema for a specific command
+onekey-hw schema get-address
+onekey-hw schema sign-transaction
+```
+
+## Integration with app-monorepo CLI
+
+The `@onekeyfe/hardware-cli` package exports a `HardwareSigner` interface
+for programmatic integration:
+
+```typescript
+import { createHardwareSigner } from '@onekeyfe/hardware-cli';
+
+const signer = await createHardwareSigner({ useEmptyPassphrase: true });
+const { address } = await signer.getAddress('evm');
+const signed = await signer.signTransaction('evm', txData);
+signer.dispose();
 ```
 
 ## Important
