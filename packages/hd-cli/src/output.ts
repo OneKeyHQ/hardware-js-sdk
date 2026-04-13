@@ -5,6 +5,8 @@
  * - Human mode (TTY / --human): colored formatted output on stdout, colored prompts on stderr
  */
 
+import chalk from 'chalk';
+
 export type OutputMode = 'human' | 'agent';
 export type EventType =
   | 'pin_request'
@@ -28,28 +30,6 @@ export function detectAndSetMode(opts: { human?: boolean }): OutputMode {
 export function getMode(): OutputMode {
   return currentMode;
 }
-
-// --- ANSI helpers (no chalk dependency, respects NO_COLOR) ---
-const canColor = (stream: NodeJS.WriteStream) => stream.isTTY && !process.env.NO_COLOR;
-const wrap = (code: string, s: string, stream: NodeJS.WriteStream) =>
-  canColor(stream) ? `\x1b[${code}m${s}\x1b[0m` : s;
-
-/** stdout-targeted colors (for success output, data display) */
-const ansi = {
-  green: (s: string) => wrap('32', s, process.stdout),
-  cyan: (s: string) => wrap('36', s, process.stdout),
-  dim: (s: string) => wrap('2', s, process.stdout),
-  bold: (s: string) => wrap('1', s, process.stdout),
-};
-
-/** stderr-targeted colors (for errors, events, prompts) */
-const ansiErr = {
-  red: (s: string) => wrap('31', s, process.stderr),
-  yellow: (s: string) => wrap('33', s, process.stderr),
-  dim: (s: string) => wrap('2', s, process.stderr),
-};
-
-export { ansi, ansiErr };
 
 // --- stdout: final result ---
 // Returns `never` because it always calls process.exit.
@@ -83,21 +63,21 @@ function formatHumanResult(result: unknown): void {
 
   if (!isSuccess) {
     const payload = obj.payload as Record<string, unknown> | undefined;
-    process.stderr.write(`${ansiErr.red(`✘ Error: ${payload?.error || 'Unknown error'}`)}\n`);
+    process.stderr.write(`${chalk.red(`✘ Error: ${payload?.error || 'Unknown error'}`)}\n`);
     if (payload?.code) {
-      process.stderr.write(`${ansiErr.dim(`  Code: ${payload.code}`)}\n`);
+      process.stderr.write(`${chalk.dim(`  Code: ${payload.code}`)}\n`);
     }
     return;
   }
 
-  process.stdout.write(`${ansi.green('✔ Success')}\n`);
+  process.stdout.write(`${chalk.green('✔ Success')}\n`);
   const payload = obj.payload ?? obj;
   formatHumanData(payload, 2);
 }
 
 function formatHumanData(data: unknown, indent: number): void {
   if (data === null || data === undefined) {
-    process.stdout.write(`${' '.repeat(indent) + ansi.dim('—')}\n`);
+    process.stdout.write(`${' '.repeat(indent) + chalk.dim('—')}\n`);
     return;
   }
   if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') {
@@ -106,11 +86,11 @@ function formatHumanData(data: unknown, indent: number): void {
   }
   if (Array.isArray(data)) {
     if (data.length === 0) {
-      process.stdout.write(`${' '.repeat(indent) + ansi.dim('(no results)')}\n`);
+      process.stdout.write(`${' '.repeat(indent) + chalk.dim('(no results)')}\n`);
       return;
     }
     data.forEach((item, i) => {
-      process.stdout.write(`${' '.repeat(indent) + ansi.cyan(`[${i}]`)}\n`);
+      process.stdout.write(`${' '.repeat(indent) + chalk.cyan(`[${i}]`)}\n`);
       formatHumanData(item, indent + 2);
     });
     return;
@@ -118,14 +98,14 @@ function formatHumanData(data: unknown, indent: number): void {
   if (typeof data === 'object') {
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
       if (value && typeof value === 'object' && !Array.isArray(value)) {
-        process.stdout.write(`${' '.repeat(indent) + ansi.dim(`${key}:`)}\n`);
+        process.stdout.write(`${' '.repeat(indent) + chalk.dim(`${key}:`)}\n`);
         formatHumanData(value, indent + 2);
       } else if (Array.isArray(value)) {
-        process.stdout.write(`${' '.repeat(indent) + ansi.dim(`${key}:`)}\n`);
+        process.stdout.write(`${' '.repeat(indent) + chalk.dim(`${key}:`)}\n`);
         formatHumanData(value, indent + 2);
       } else {
         process.stdout.write(
-          `${' '.repeat(indent) + ansi.dim(`${key}:`)} ${String(value ?? '—')}\n`
+          `${' '.repeat(indent) + chalk.dim(`${key}:`)} ${String(value ?? '—')}\n`
         );
       }
     }
@@ -142,7 +122,7 @@ export function emitEvent(
     const event = { event: type, message, ...(detail ? { detail } : {}) };
     process.stderr.write(`${JSON.stringify(event)}\n`);
   } else {
-    const prefix = ansiErr.yellow('[onekey-hw]');
+    const prefix = chalk.yellow('[onekey-hw]');
     process.stderr.write(`${prefix} ${message}\n`);
   }
 }

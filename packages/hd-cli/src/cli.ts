@@ -8,7 +8,9 @@ import {
   resolveSignMessage,
   resolveSignTransaction,
 } from './chains';
-import { ansi, detectAndSetMode, getMode, outputResult } from './output';
+import chalk from 'chalk';
+
+import { detectAndSetMode, getMode, outputResult } from './output';
 
 const program = new Command();
 
@@ -807,9 +809,9 @@ function collectAllSchemas(): SchemaEntry[] {
 function printSchemaList(schemas: SchemaEntry[]): never {
   if (getMode() === 'human') {
     schemas.forEach(c => {
-      process.stdout.write(`${ansi.bold(c.name)}  ${c.description}\n`);
+      process.stdout.write(`${chalk.bold(c.name)}  ${c.description}\n`);
       c.options.forEach(o => {
-        process.stdout.write(`  ${ansi.dim(o.flags)}  ${o.description || ''}\n`);
+        process.stdout.write(`  ${chalk.dim(o.flags)}  ${o.description || ''}\n`);
       });
     });
     process.exit(0);
@@ -820,9 +822,9 @@ function printSchemaList(schemas: SchemaEntry[]): never {
 
 function printSingleSchema(schema: SchemaEntry): never {
   if (getMode() === 'human') {
-    process.stdout.write(`${ansi.bold(schema.name)}  ${schema.description}\n`);
+    process.stdout.write(`${chalk.bold(schema.name)}  ${schema.description}\n`);
     schema.options.forEach(o => {
-      process.stdout.write(`  ${ansi.dim(o.flags)}  ${o.description || ''}\n`);
+      process.stdout.write(`  ${chalk.dim(o.flags)}  ${o.description || ''}\n`);
     });
     process.exit(0);
   }
