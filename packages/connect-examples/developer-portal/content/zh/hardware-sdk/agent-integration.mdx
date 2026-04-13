@@ -24,6 +24,22 @@ npx skills add OneKeyHQ/hardware-js-sdk
 
 自动检测你使用的工具（Claude Code、Codex、Gemini、Cursor 等），将 skills 安装到正确位置。
 
+## Schema 发现
+
+安装 CLI 后，可以使用内置的 schema 系统探索所有可用命令及其参数：
+
+```bash
+# 列出所有可用命令及描述
+onekey-hw schema list
+
+# 查看特定命令的完整 schema（参数、类型、示例）
+onekey-hw schema get-address
+onekey-hw schema sign-transaction
+onekey-hw schema device-wipe
+```
+
+这对 AI Agent 动态发现支持的命令并构造有效调用特别有用，无需硬编码知识。
+
 ## Claude Code
 
 ```bash
@@ -68,12 +84,14 @@ rm -rf /tmp/onekey-hw
 
 | 技能 | 关键命令 |
 |------|----------|
-| **设备** | `search`, `lock`, `device-verify`, `device-settings`, `device-wipe` |
+| **设备** | `search`, `lock`, `device-verify`, `device-settings`, `device-wipe --confirm-wipe` |
 | **签名**（27 条链） | `get-address`, `sign-transaction`, `sign-message`, `sign-typed-data`, `sign-psbt`, `batch-get-address` |
 | **固件**（只读） | `firmware-check`, `firmware-check-all`, `bootloader-check` |
 | **安全** | `change-pin`, `toggle-passphrase`, `passphrase-state` |
 
 ## 使用
+
+> **注意：** 大多数与设备交互的命令需要 `--use-empty-passphrase` 来跳过密码提示（当未设置密码时）。如果设备启用了密码，请省略此标志以获得提示。
 
 ```bash
 # 搜索已连接的设备（自动获取设备信息）
@@ -123,6 +141,41 @@ onekey-hw firmware-check-all
   }
 }
 ```
+
+## 编程集成 (HardwareSigner)
+
+对于 TypeScript/JavaScript 应用，可以使用 `createHardwareSigner` 以编程方式与 OneKey 硬件钱包交互：
+
+```typescript
+import { createHardwareSigner } from '@onekeyfe/hardware-cli';
+
+// 创建签名器（初始化 SDK + USB 传输）
+const signer = await createHardwareSigner({ useEmptyPassphrase: true });
+
+try {
+  // 获取以太坊地址
+  const { address, path } = await signer.getAddress('evm');
+  console.log(address); // 0x3611...
+
+  // 签名交易
+  const signed = await signer.signTransaction('evm', {
+    to: '0x1234...',
+    value: '0xf4240',
+    chainId: 1,
+    nonce: '0x0',
+    gasLimit: '0x5208',
+    gasPrice: '0xbebc200',
+  });
+
+  // 签名消息
+  const { signature } = await signer.signMessage('evm', 'hello');
+} finally {
+  // 始终释放 USB 连接
+  signer.dispose();
+}
+```
+
+`createHardwareSigner` 封装了 CLI 的传输和 SDK 层，提供类型化的异步 API，适用于 Agent 框架、后端服务和自动化脚本。
 
 ## API 映射
 

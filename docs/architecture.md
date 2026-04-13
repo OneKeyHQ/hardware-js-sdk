@@ -23,8 +23,10 @@ SDK接口层 (@onekeyfe/core)
 - **`@onekeyfe/hd-transport`** - 传输层抽象
 
 ### 传输层
-- **`@onekeyfe/hd-transport-webusb`** - WebUSB传输
+- **`@onekeyfe/hd-transport-webusb`** - WebUSB传输（浏览器）
+- **`@onekeyfe/hd-transport-usb`** - Node.js USB传输（CLI/服务端，基于 libusb）
 - **`@onekeyfe/hd-transport-http`** - HTTP Bridge传输
+- **`@onekeyfe/hd-transport-lowlevel`** - 低层传输（BLE 插件模式）
 
 ### 平台SDK
 - **`@onekeyfe/hd-web-sdk`** - Web平台SDK
@@ -86,9 +88,10 @@ abstract class BaseMethod<Request, Response> {
 ```typescript
 // 根据环境选择传输方式
 switch(env) {
-  case 'webusb': return new WebUsbTransport();
-  case 'ble': return new BleTransport();
-  case 'http': return new HttpTransport();
+  case 'webusb': return new WebUsbTransport();       // 浏览器 WebUSB
+  case 'node-usb': return new NodeUsbTransport();      // Node.js libusb (CLI)
+  case 'lowlevel': return new LowlevelTransport();    // BLE 插件模式
+  case 'http': return new HttpTransport();             // HTTP Bridge
 }
 ```
 
@@ -103,8 +106,10 @@ switch(env) {
     │   └── @onekeyfe/hd-transport
     │
     └── 传输层实现
-        ├── @onekeyfe/hd-transport-webusb
-        └── @onekeyfe/hd-transport-http
+        ├── @onekeyfe/hd-transport-webusb      (浏览器)
+        ├── @onekeyfe/hd-transport-usb          (Node.js CLI)
+        ├── @onekeyfe/hd-transport-lowlevel     (BLE 插件)
+        └── @onekeyfe/hd-transport-http         (Bridge)
 ```
 
 ## 🔧 开发工具

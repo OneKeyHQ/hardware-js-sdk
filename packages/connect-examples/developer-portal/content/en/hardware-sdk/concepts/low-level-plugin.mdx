@@ -6,6 +6,8 @@ title: Low-level transport plugin
 
 > Use this only when WebUSB / React Native BLE / official native adapters cannot meet your scenario. You will own device lifecycle and message frame handling, so expect higher maintenance cost.
 
+> **Note:** The `lowlevel` env and `LowlevelTransportSharedPlugin` are designed for **BLE (Bluetooth)** communication only. For **USB** communication in Node.js/CLI environments, use `NodeUsbTransport` (env `node-usb`) instead — it handles protocol encoding and USB I/O directly via libusb without needing a plugin.
+
 Our Bluetooth SDK is developed using React Native. You may not be using React Native to develop your application, for example, you may be using Swift, Kotlin, or Flutter. At this point, adding a dependency on React Native to your project may not be a good choice.
 
 We provide a new communication method where you can use the LowlevelTransportSharedPlugin to communicate with the hardware. You are free to use any technology stack of your choice. You will need to finish the protocol for device connect, disconnect, send data, and receive data.

@@ -24,6 +24,22 @@ npx skills add OneKeyHQ/hardware-js-sdk
 
 This auto-detects your tool (Claude Code, Codex, Gemini, Cursor, etc.) and installs skills to the correct location.
 
+## Schema Discovery
+
+After installing the CLI, you can explore all available commands and their parameters using the built-in schema system:
+
+```bash
+# List all available commands with descriptions
+onekey-hw schema list
+
+# Show full schema for a specific command (parameters, types, examples)
+onekey-hw schema get-address
+onekey-hw schema sign-transaction
+onekey-hw schema device-wipe
+```
+
+This is especially useful for AI agents to dynamically discover supported commands and construct valid invocations without hardcoded knowledge.
+
 ## Claude Code
 
 ```bash
@@ -68,12 +84,14 @@ rm -rf /tmp/onekey-hw
 
 | Skill | Key Commands |
 |-------|--------------|
-| **Device** | `search`, `lock`, `device-verify`, `device-settings`, `device-wipe` |
+| **Device** | `search`, `lock`, `device-verify`, `device-settings`, `device-wipe --confirm-wipe` |
 | **Signing** (27 chains) | `get-address`, `sign-transaction`, `sign-message`, `sign-typed-data`, `sign-psbt`, `batch-get-address` |
 | **Firmware** (read-only) | `firmware-check`, `firmware-check-all`, `bootloader-check` |
 | **Security** | `change-pin`, `toggle-passphrase`, `passphrase-state` |
 
 ## Usage
+
+> **Note:** Most commands that interact with the device require `--use-empty-passphrase` to skip the passphrase prompt when no passphrase is set. If the device has a passphrase enabled, omit this flag to be prompted.
 
 ```bash
 # Search for connected devices (auto-fetches device info)
@@ -123,6 +141,41 @@ All commands return structured JSON:
   }
 }
 ```
+
+## Programmatic Integration (HardwareSigner)
+
+For TypeScript/JavaScript applications, you can use `createHardwareSigner` to interact with OneKey hardware wallets programmatically:
+
+```typescript
+import { createHardwareSigner } from '@onekeyfe/hardware-cli';
+
+// Create signer (initializes SDK + USB transport)
+const signer = await createHardwareSigner({ useEmptyPassphrase: true });
+
+try {
+  // Get an Ethereum address
+  const { address, path } = await signer.getAddress('evm');
+  console.log(address); // 0x3611...
+
+  // Sign a transaction
+  const signed = await signer.signTransaction('evm', {
+    to: '0x1234...',
+    value: '0xf4240',
+    chainId: 1,
+    nonce: '0x0',
+    gasLimit: '0x5208',
+    gasPrice: '0xbebc200',
+  });
+
+  // Sign a message
+  const { signature } = await signer.signMessage('evm', 'hello');
+} finally {
+  // Always dispose to release USB connection
+  signer.dispose();
+}
+```
+
+`createHardwareSigner` wraps the CLI's transport and SDK layers, providing a typed async API suitable for agent frameworks, backend services, and automation scripts.
 
 ## API Mapping
 
