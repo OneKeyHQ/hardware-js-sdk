@@ -161,6 +161,7 @@ const call = async (params: any) => {
       Log.debug('response: ', response);
 
       if (!response.success) {
+        console.log('response.payload?.code: ', response.payload?.code);
         if (response.payload?.code === HardwareErrorCode.BleUnsupported) {
           postMessage(createUiMessage(UI_REQUEST.BLUETOOTH_UNSUPPORTED), false);
         }
