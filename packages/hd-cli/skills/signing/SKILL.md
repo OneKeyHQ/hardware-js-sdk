@@ -17,24 +17,16 @@ allowed-tools:
 
 ## MANDATORY RULES — Read Before Every Command
 
-**RULE 0 — CHECK `passphrase_protection` FIRST.** Before running ANY address or
-signing command, run `onekey-hw search` and inspect
-`payload[].features.passphrase_protection`.
-
-- If `passphrase_protection === false`, do NOT ask wallet-mode questions. Use
-  `--use-empty-passphrase`.
-- If `passphrase_protection === true`, ask which wallet the user wants to access
-  on this passphrase-enabled device: standard wallet (`--use-empty-passphrase`)
-  or hidden wallet (`--passphrase` or device entry).
-- If `passphrase_protection` is `null` or missing, do NOT assume hidden wallet.
-  Start with `--use-empty-passphrase`, and only ask the wallet question if the
-  command later fails with Error 114 or a refreshed feature check returns `true`.
+**RULE 0 — UNLOCK DEVICE, THEN CHECK `passphrase_protection`.** The pre-flight
+flow below handles everything: search → unlock → get reliable features → decide
+wallet mode. Do NOT skip steps. Do NOT ask "is your device ready" — just run the
+commands and let the device prompt for PIN automatically.
 
 1. **Standard wallet**: use `--use-empty-passphrase` on every command.
 
 2. **Hidden wallet (passphrase-protected)**:
    - If the user chooses host/chat passphrase entry, use `--passphrase "<value>"`
-     on every hidden-wallet address/signing command in that flow.
+     on every command in this session.
    - Each CLI invocation is a new process — passphrase must always be supplied.
    - **Default (1-2 commands)**: just use `--passphrase "<value>"` — no extra steps needed.
    - **`batch-get-address`**: passphrase is entered only **once** for the entire
@@ -42,7 +34,7 @@ signing command, run `onekey-hw search` and inspect
      on stderr regardless of how many items are in the bundle.
    - **Multi-step session (3+ commands)**: optionally pre-fetch `passphraseState` for
      session validation — see "Multi-Step Passphrase Session" workflow below.
-     `--passphrase` is still required on every subsequent hidden-wallet command;
+     `--passphrase` is still required on every subsequent command;
      `--passphrase-state` only adds on-device session validation.
    - **If a command fails**, fix the original command first. Do NOT call `passphrase-state`
      without `--passphrase "<value>"` — omitting it causes the device to prompt on-screen.
@@ -55,69 +47,71 @@ signing command, run `onekey-hw search` and inspect
 
 ## Pre-flight Checks
 
-1. **Check CLI installed**: Run `onekey-hw --version`.
-   - Not found → install: `npm install -g @onekeyfe/hardware-cli`
+**Run these steps in order. Do NOT skip any step.**
 
-2. **Check device connected**: Run `onekey-hw search`.
-   - No device → guide troubleshooting.
-   - Record `connectId` and `features.passphrase_protection` from the chosen device.
+### Step 1 — Check CLI installed
+```bash
+onekey-hw --version
+```
+Not found → `npm install -g @onekeyfe/hardware-cli`
 
-3. **Determine wallet flow from `features.passphrase_protection`:**
+### Step 2 — Search device
+```bash
+onekey-hw search
+```
+- No device → guide troubleshooting.
+- Record `connectId` from `payload[0].connectId`.
+- Check `payload[0].features.unlocked` and `payload[0].features.passphrase_protection`.
 
-   - **`false`** → standard wallet. Do NOT ask wallet-mode questions. Use
-     `--use-empty-passphrase` on all commands.
-   - **`true`** → this device has passphrase enabled. Ask ONE question with
-     all options (do NOT split into two separate questions):
+### Step 3 — Ensure device is unlocked
+If `features.unlocked === false` (or `null`):
+- Tell user: "Please enter your PIN on the device screen when prompted."
+- Run any lightweight command to trigger PIN unlock:
+  ```bash
+  onekey-hw get-address --chain evm --show-on-device false --use-empty-passphrase --connect-id <id>
+  ```
+- **If this succeeds** → device is now unlocked AND passphrase is not enabled (or
+  standard wallet works). You already have the address — skip to using it.
+- **If this fails with Error 114** → device is now unlocked but passphrase is
+  enabled. Continue to Step 4.
 
-     ```
-     AskUserQuestion:
-       Question: "Your device has passphrase protection enabled.\n\nWhich wallet do you want to access?"
-       Header: "Wallet Mode"
-       Options:
-         A) Standard wallet — no passphrase (Recommended)
-         B) Hidden wallet — type passphrase in this chat
-         C) Hidden wallet — enter passphrase on device screen (Pro/Touch)
-         D) Cancel
-     ```
+If `features.unlocked === true`:
+- Device is already unlocked. Check `passphrase_protection` directly → go to Step 4.
 
-     - **Option A** → use `--use-empty-passphrase` on all commands.
-     - **Option B** → ask user for the passphrase value, then use
-       `--passphrase "<value>"` on every command in this session.
-     - **Option C** → do NOT pass `--passphrase`; user enters on device
-       screen for each command. Set timeout to 120000.
-     - **Option D** → stop.
+### Step 4 — Check passphrase_protection (device MUST be unlocked)
+If you got Error 114 in Step 3, or `features.passphrase_protection === true`:
+- Run `onekey-hw search` again if needed to refresh features.
+- **passphrase_protection is now reliable.** Ask ONE question:
 
-   - **`null` or missing** → feature state is not reliable yet (common when the
-     device is still locked or features were not refreshed). Do NOT ask
-     wallet-mode questions yet. Start with `--use-empty-passphrase`.
-     - If the command succeeds, continue with standard-wallet flow.
-     - If the command fails with Error 114, or a later `search` / refreshed
-       feature check shows `passphrase_protection === true`, ask the wallet-mode
-       question above.
+```
+AskUserQuestion:
+  Question: "Your device has passphrase protection enabled.\n\nWhich wallet do you want to access?"
+  Header: "Wallet Mode"
+  Options:
+    A) Standard wallet — no passphrase (Recommended)
+    B) Hidden wallet — type passphrase in this chat
+    C) Hidden wallet — enter passphrase on device screen (Pro/Touch)
+    D) Cancel
+```
 
-**Error handling:**
-- Error 114: passphrase required but not set → re-check
-  `features.passphrase_protection`; if `true` (or now refreshed to `true`), go
-  back to step 3 and ask the wallet-mode question.
-- NEVER add `--json` to any command.
+- **Option A** → use `--use-empty-passphrase` on all commands.
+- **Option B** → ask user for the passphrase value, then use
+  `--passphrase "<value>"` on every command in this session.
+- **Option C** → do NOT pass `--passphrase`; user enters on device
+  screen for each command. Set timeout to 120000.
+- **Option D** → stop.
+
+If `passphrase_protection === false`:
+- Standard wallet. Use `--use-empty-passphrase`. No questions needed.
 
 ---
 
 ## Device Interaction
 
-**All commands block waiting for physical interaction. Use `AskUserQuestion` before signing/address commands:**
+**All commands block waiting for physical interaction (PIN, button press).**
+Set **`timeout: 120000`** on all device commands.
 
-```
-AskUserQuestion:
-  Question: "Please make sure your device is plugged in and powered on.
-    You may need to enter your PIN and confirm on the device."
-  Header: "Device"
-  Options:
-    A) Device is ready (Recommended)
-    B) Cancel
-```
-
-**For signing specifically, add transaction details:**
+**For signing specifically, show transaction details before running:**
 ```
 AskUserQuestion:
   Question: "I'm about to sign:\n• Action: Send 0.1 ETH\n• To: 0xABC...\n• Chain: Ethereum"
@@ -126,8 +120,6 @@ AskUserQuestion:
     A) Proceed — I'll confirm on device
     B) Cancel
 ```
-
-Set **`timeout: 120000`** on all device commands.
 
 ---
 
