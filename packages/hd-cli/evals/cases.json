@@ -7,8 +7,13 @@
       "prompt": "Find my OneKey hardware wallet",
       "skill": "device",
       "expect": {
-        "commands": ["onekey-hw search"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -16,8 +21,13 @@
       "prompt": "搜索我的 OneKey 硬件钱包",
       "skill": "device",
       "expect": {
-        "commands": ["onekey-hw search"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -25,8 +35,13 @@
       "prompt": "What's the status of my hardware wallet?",
       "skill": "device",
       "expect": {
-        "commands": ["onekey-hw search"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -34,8 +49,16 @@
       "prompt": "Get my Ethereum address from hardware wallet",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw get-address", "--chain evm", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw get-address",
+          "--chain evm",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -43,8 +66,17 @@
       "prompt": "Show me my Bitcoin receive address",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw get-address", "--chain btc", "--use-empty-passphrase", "--connect-id", "--show-on-device true"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw get-address",
+          "--chain btc",
+          "--use-empty-passphrase",
+          "--connect-id",
+          "--show-on-device true"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -52,8 +84,16 @@
       "prompt": "I need my Solana address",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw get-address", "--chain sol", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw get-address",
+          "--chain sol",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -61,8 +101,15 @@
       "prompt": "Set up addresses for ETH, BTC, and SOL",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw batch-get-address", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "forbidden": [
+          "--help",
+          "--json"
+        ],
+        "commands_any_order": [
+          "onekey-hw batch-get-address",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ]
       }
     },
     {
@@ -70,8 +117,16 @@
       "prompt": "Sign this Ethereum transaction: send 0.1 ETH to 0xAbCdEf1234567890AbCdEf1234567890AbCdEf12",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw sign-transaction", "--chain evm", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw sign-transaction",
+          "--chain evm",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -79,8 +134,16 @@
       "prompt": "Sign this message with my ETH wallet: 'Hello World'",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw sign-message", "--chain evm", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw sign-message",
+          "--chain evm",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -88,8 +151,14 @@
       "prompt": "Is my firmware up to date?",
       "skill": "firmware",
       "expect": {
-        "commands": ["onekey-hw firmware-check", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw firmware-check",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -97,8 +166,14 @@
       "prompt": "检查固件是否有更新",
       "skill": "firmware",
       "expect": {
-        "commands": ["onekey-hw firmware-check", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw firmware-check",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -107,7 +182,11 @@
       "skill": "firmware",
       "expect": {
         "commands": [],
-        "forbidden": ["--help", "onekey-hw firmware-update"],
+        "forbidden": [
+          "--help",
+          "onekey-hw firmware-update",
+          "--json"
+        ],
         "note": "Agent should check firmware then redirect to OneKey App or firmware.onekey.so"
       }
     },
@@ -116,8 +195,14 @@
       "prompt": "I want to change my device PIN",
       "skill": "security",
       "expect": {
-        "commands": ["onekey-hw change-pin", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw change-pin",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -125,8 +210,15 @@
       "prompt": "Enable passphrase protection on my device",
       "skill": "security",
       "expect": {
-        "commands": ["onekey-hw toggle-passphrase", "--enable true", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw toggle-passphrase",
+          "--enable true",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -135,7 +227,14 @@
       "skill": "security",
       "expect": {
         "commands": [],
-        "forbidden": ["--help", "device-wipe", "wipe", "factory-reset", "--reset"],
+        "forbidden": [
+          "--help",
+          "device-wipe",
+          "wipe",
+          "factory-reset",
+          "--reset",
+          "--json"
+        ],
         "note": "Must guide user to OneKey App — CLI does not support factory reset"
       }
     },
@@ -144,8 +243,13 @@
       "prompt": "Set up my new OneKey hardware wallet from scratch",
       "skill": "device",
       "expect": {
-        "commands": ["onekey-hw search"],
-        "forbidden": ["--help"],
+        "commands": [
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ],
         "note": "Device setup (seed generation, backup) must be done via OneKey App"
       }
     },
@@ -154,8 +258,14 @@
       "prompt": "How do I know if my OneKey device is genuine?",
       "skill": "security",
       "expect": {
-        "commands": ["onekey-hw device-verify", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw device-verify",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -163,8 +273,16 @@
       "prompt": "获取我的 Cosmos 地址",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw get-address", "--chain cosmos", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw get-address",
+          "--chain cosmos",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -172,8 +290,15 @@
       "prompt": "Sign this Bitcoin PSBT: cHNidP8BAHUCAAAAASaBcTce3/KF6Tet7qSze3gADAVmy7utIckEB9NbIUMUAAAAAAD/////AgPk+CgAAAAAF6kUyY4DtEKlFM7woMHMxbhPKhN2bgSHAAAAAAAAAAAXqRSoiWUhq1ORhZJBjqOiE7v8AAAAAAAAAAAAAAAAAAAABASsA4fUFAAAAACIAIIYfDpFcRqRjhqiMNBVuCBBuHMC0Z6yxRb9yHjHWu1fFAQMEAQAAAAAAAAA=",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw sign-psbt", "--psbt", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw sign-psbt",
+          "--psbt",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -181,8 +306,17 @@
       "prompt": "Sign a Bitcoin transaction with these inputs and outputs",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw sign-transaction", "--chain btc", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "forbidden": [
+          "--help",
+          "--json"
+        ],
+        "commands_any_order": [
+          "onekey-hw sign-transaction",
+          "--chain btc",
+          "--tx",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ]
       }
     },
     {
@@ -190,8 +324,16 @@
       "prompt": "Sign this EIP-712 typed data with my hardware wallet: {\"types\":{\"EIP712Domain\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"version\",\"type\":\"string\"},{\"name\":\"chainId\",\"type\":\"uint256\"}],\"Mail\":[{\"name\":\"from\",\"type\":\"address\"},{\"name\":\"to\",\"type\":\"address\"},{\"name\":\"contents\",\"type\":\"string\"}]},\"primaryType\":\"Mail\",\"domain\":{\"name\":\"Ether Mail\",\"version\":\"1\",\"chainId\":1},\"message\":{\"from\":\"0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826\",\"to\":\"0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF\",\"contents\":\"Hello Bob\"}}",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw sign-typed-data", "--data", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw sign-typed-data",
+          "--data",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -199,8 +341,15 @@
       "prompt": "Verify this Ethereum signed message: address 0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826, message 'Hello World', signature 0x1b3a4f5e6d7c8b9a0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c1b",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw verify-message", "--chain evm", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw verify-message",
+          "--chain evm",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -208,8 +357,15 @@
       "prompt": "Remove PIN from my device",
       "skill": "security",
       "expect": {
-        "commands": ["onekey-hw change-pin", "--remove", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw change-pin",
+          "--remove",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -217,8 +373,16 @@
       "prompt": "Get my hidden wallet passphrase state",
       "skill": "security",
       "expect": {
-        "commands": ["onekey-hw passphrase-state", "--connect-id"],
-        "forbidden": ["--help"]
+        "forbidden": [
+          "--help",
+          "--json"
+        ],
+        "commands": [
+          "onekey-hw passphrase-state",
+          "--passphrase",
+          "--connect-id"
+        ],
+        "note": "Must include --passphrase; omitting it causes device screen prompt"
       }
     },
     {
@@ -226,8 +390,15 @@
       "prompt": "Disable haptic feedback on my device",
       "skill": "security",
       "expect": {
-        "commands": ["onekey-hw device-settings", "--haptic-feedback false", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw device-settings",
+          "--haptic-feedback false",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -235,8 +406,13 @@
       "prompt": "My device is stuck in bootloader mode, help me fix it",
       "skill": "firmware",
       "expect": {
-        "commands": ["onekey-hw search"],
-        "forbidden": ["--help"],
+        "commands": [
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ],
         "note": "Agent should diagnose and redirect to OneKey App for firmware recovery"
       }
     },
@@ -245,8 +421,14 @@
       "prompt": "Check my device bootloader version",
       "skill": "firmware",
       "expect": {
-        "commands": ["onekey-hw bootloader-check", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw bootloader-check",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -254,8 +436,13 @@
       "prompt": "My hardware wallet won't connect",
       "skill": "device",
       "expect": {
-        "commands": ["onekey-hw search"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw search"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -263,8 +450,16 @@
       "prompt": "Get my Nostr public key from hardware wallet",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw get-address", "--chain nostr", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw get-address",
+          "--chain nostr",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -272,8 +467,13 @@
       "prompt": "Lock my device",
       "skill": "device",
       "expect": {
-        "commands": ["onekey-hw lock"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw lock"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -281,8 +481,17 @@
       "prompt": "Encrypt a message for Nostr pubkey e8b487c079b0f67c695ae6c4c2552a47f38adfa2533cc5926bb2c1a87a4730dc: Hello Nostr world",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw nostr-encrypt", "--pubkey", "--plaintext", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw nostr-encrypt",
+          "--pubkey",
+          "--plaintext",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -290,8 +499,17 @@
       "prompt": "Decrypt this Nostr message from pubkey e8b487c079b0f67c695ae6c4c2552a47f38adfa2533cc5926bb2c1a87a4730dc: encrypted_content_here?iv=base64iv",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw nostr-decrypt", "--pubkey", "--ciphertext", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw nostr-decrypt",
+          "--pubkey",
+          "--ciphertext",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -299,8 +517,16 @@
       "prompt": "Sign this hash with Schnorr for Nostr: a9b4e0d63b9b6c5b7f5e8b487c079b0f67c695ae6c4c2552a47f38adfa2533c",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw nostr-sign-schnorr", "--hash", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw nostr-sign-schnorr",
+          "--hash",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -308,8 +534,17 @@
       "prompt": "Authenticate with this Lightning service using LNURL: domain service.lnurl.example.com, k1 9b4e0d63b9b6c5b7f5e8b487c079b0f67c695ae6c4c2552a47f38adfa253",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw lnurl-auth", "--domain", "--k1", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw lnurl-auth",
+          "--domain",
+          "--k1",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -317,8 +552,16 @@
       "prompt": "Sign this Solana off-chain message hex: 68656c6c6f20736f6c616e61",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw sol-sign-offchain", "--message-hex", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw sol-sign-offchain",
+          "--message-hex",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -326,8 +569,17 @@
       "prompt": "Sign this Conflux CIP-23 structured message: domain-hash 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef, message-hash 0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw conflux-sign-cip23", "--domain-hash", "--message-hash", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw conflux-sign-cip23",
+          "--domain-hash",
+          "--message-hash",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -335,8 +587,16 @@
       "prompt": "Sign in to this Aptos dApp with payload: APTOS\nuri: https://myapp.com\nchain_id: 1\napplication: myapp.com\nnonce: abc123",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw aptos-sign-in", "--payload", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw aptos-sign-in",
+          "--payload",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -344,8 +604,17 @@
       "prompt": "Generate a TON Connect proof for authentication: appdomain myapp.ton, expire-at 1999999999",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw ton-sign-proof", "--appdomain", "--expire-at", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw ton-sign-proof",
+          "--appdomain",
+          "--expire-at",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -353,8 +622,17 @@
       "prompt": "Sign this EIP-712 domain hash and message hash: domain-hash 0xf2cee375fa42b42143804025fc449deafd50cc031ca257e0b194a650a912090f, message-hash 0x4a953a8c00d02a9d1f7f50f6abb7cc7a1b8f4e3d2c1b0a9e8d7c6b5a4f3e2d1",
       "skill": "signing",
       "expect": {
-        "commands": ["onekey-hw evm-sign-eip712", "--domain-hash", "--message-hash", "--use-empty-passphrase", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw evm-sign-eip712",
+          "--domain-hash",
+          "--message-hash",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
       }
     },
     {
@@ -362,8 +640,226 @@
       "prompt": "Rename my device to 'My OneKey Pro'",
       "skill": "device",
       "expect": {
-        "commands": ["onekey-hw device-settings", "--label", "--connect-id"],
-        "forbidden": ["--help"]
+        "commands": [
+          "onekey-hw device-settings",
+          "--label",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ]
+      }
+    },
+    {
+      "id": "routing-balance-to-onekey-skills",
+      "skill": "routing",
+      "prompt": "What's my ETH balance?",
+      "expect": {
+        "commands": [
+          "onekey balance"
+        ],
+        "forbidden": [
+          "onekey-hw get-address",
+          "--help",
+          "--json"
+        ],
+        "note": "Balance query should use onekey CLI (onekey-skills:wallet), not hardware CLI"
+      }
+    },
+    {
+      "id": "routing-balance-cn",
+      "skill": "routing",
+      "prompt": "查一下我的 ETH 余额",
+      "expect": {
+        "commands": [
+          "onekey balance"
+        ],
+        "forbidden": [
+          "onekey-hw get-address",
+          "--help",
+          "--json"
+        ],
+        "note": "Balance query routes to onekey-skills:wallet"
+      }
+    },
+    {
+      "id": "routing-hardware-balance",
+      "skill": "routing",
+      "prompt": "What's the ETH balance on my hardware wallet?",
+      "expect": {
+        "commands_any_order": [
+          "onekey-hw get-address",
+          "--chain evm",
+          "onekey balance"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ],
+        "note": "Hardware wallet balance: get address from device first, then query balance with onekey"
+      }
+    },
+    {
+      "id": "routing-market-price",
+      "skill": "routing",
+      "prompt": "What's the current price of ETH?",
+      "expect": {
+        "commands": [
+          "onekey token price"
+        ],
+        "forbidden": [
+          "onekey-hw",
+          "--help"
+        ],
+        "note": "Price query routes to onekey-skills:market, no hardware needed"
+      }
+    },
+    {
+      "id": "routing-sign-not-balance",
+      "skill": "routing",
+      "prompt": "Sign a transaction on my hardware wallet",
+      "expect": {
+        "commands": [
+          "onekey-hw sign-transaction",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "onekey balance",
+          "onekey transfer",
+          "--help",
+          "--json"
+        ],
+        "note": "Signing explicitly on hardware wallet routes to onekey-hw"
+      }
+    },
+    {
+      "id": "passphrase-hidden-wallet-address",
+      "skill": "signing",
+      "prompt": "Get my ETH address from my hidden wallet (passphrase: mySecret)",
+      "expect": {
+        "commands": [
+          "onekey-hw get-address",
+          "--chain evm",
+          "--passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--use-empty-passphrase",
+          "--help",
+          "--json"
+        ],
+        "note": "Hidden wallet must use --passphrase, never --use-empty-passphrase"
+      }
+    },
+    {
+      "id": "passphrase-batch-once",
+      "skill": "signing",
+      "prompt": "Get ETH and BTC addresses from my hidden wallet with passphrase 'mySecret'. Only prompt me once.",
+      "expect": {
+        "commands": [
+          "onekey-hw batch-get-address",
+          "--passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--use-empty-passphrase",
+          "--help",
+          "--json"
+        ],
+        "note": "Batch with --passphrase triggers only 1 passphrase event for entire bundle"
+      }
+    },
+    {
+      "id": "passphrase-state-reuse",
+      "skill": "security",
+      "prompt": "I need to run multiple hardware commands with my hidden wallet passphrase 'mySecret'. Get the passphraseState first.",
+      "expect": {
+        "commands": [
+          "onekey-hw passphrase-state",
+          "--passphrase mySecret",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--use-empty-passphrase",
+          "--help",
+          "--json"
+        ],
+        "note": "Must pass --passphrase to passphrase-state; without it device prompts on-screen"
+      }
+    },
+    {
+      "id": "param-chain-alias",
+      "skill": "signing",
+      "prompt": "Get my Ethereum address from hardware wallet",
+      "expect": {
+        "commands": [
+          "--chain evm"
+        ],
+        "forbidden": [
+          "--chain ethereum",
+          "--chain ETH",
+          "--help",
+          "--json"
+        ],
+        "note": "Chain aliases: ethereum→evm, bitcoin→btc. Must use canonical alias."
+      }
+    },
+    {
+      "id": "param-toggle-passphrase-string",
+      "skill": "security",
+      "prompt": "Enable passphrase protection on my device",
+      "expect": {
+        "commands": [
+          "onekey-hw toggle-passphrase",
+          "--enable true",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--enable True",
+          "--enable 1",
+          "--enable yes",
+          "--help",
+          "--json"
+        ],
+        "note": "--enable takes lowercase string 'true' or 'false', not bool/int/yes"
+      }
+    },
+    {
+      "id": "param-no-json-flag",
+      "skill": "signing",
+      "prompt": "Get my Solana address and output as JSON",
+      "expect": {
+        "commands": [
+          "onekey-hw get-address",
+          "--chain sol",
+          "--use-empty-passphrase"
+        ],
+        "forbidden": [
+          "--json",
+          "--output json",
+          "--help"
+        ],
+        "note": "onekey-hw output is always JSON. --json is not a valid flag and must never be added."
+      }
+    },
+    {
+      "id": "param-no-timeout-flag",
+      "skill": "signing",
+      "prompt": "Sign this message, make sure it doesn't timeout: 'Hello'",
+      "expect": {
+        "commands": [
+          "onekey-hw sign-message",
+          "--message",
+          "--use-empty-passphrase",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--timeout",
+          "--help",
+          "--json"
+        ],
+        "note": "Timeout is set via Bash tool parameter, never as a CLI flag"
       }
     }
   ]
