@@ -40,7 +40,7 @@ export function outputResult(result: unknown): never {
     // Use synchronous write to guarantee output is flushed before process.exit().
     // console.log() buffers async writes — they can be silently dropped when
     // process.exit() fires immediately after (common in piped/agent contexts).
-    writeSync(1, JSON.stringify(result, null, 2) + '\n');
+    writeSync(1, `${JSON.stringify(result, null, 2)}\n`);
   } else {
     formatHumanResult(result);
   }

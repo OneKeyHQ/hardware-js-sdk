@@ -9,7 +9,7 @@
  * Type definitions: packages/core/src/types/api/*.ts
  */
 
-import type { CoreApi, TonSignMessageParams, AptosSignMessageParams } from '@onekeyfe/hd-core';
+import type { AptosSignMessageParams, CoreApi, TonSignMessageParams } from '@onekeyfe/hd-core';
 
 // Types not directly exported from hd-core — extracted from CoreApi signatures
 type NostrEvent = Parameters<CoreApi['nostrSignEvent']>[2]['event'];
@@ -112,8 +112,7 @@ export interface CommonCLIParams {
  *   cause the process to exit between batch items.
  */
 function extractCommon(params: CommonCLIParams) {
-  const skipPassphraseCheck =
-    !params.passphraseState && !params.useEmptyPassphrase;
+  const skipPassphraseCheck = !params.passphraseState && !params.useEmptyPassphrase;
   return {
     connectId: params.connectId || '',
     deviceId: params.deviceId || '',
@@ -197,7 +196,12 @@ export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) 
 
   const result = await method();
   if (result == null) {
-    return { success: false, payload: { error: 'No response from device', code: 'NO_RESPONSE' }, chain, path };
+    return {
+      success: false,
+      payload: { error: 'No response from device', code: 'NO_RESPONSE' },
+      chain,
+      path,
+    };
   }
   return { ...(result as object), chain, path };
 }
@@ -391,10 +395,17 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
         tonParams = JSON.parse(raw);
       } catch {
         throw new Error(
-          `TON sign-message requires JSON input (e.g. '{"destination":"...","tonAmount":"...","seqno":0}'). Got: ${raw.slice(0, 80)}`
+          `TON sign-message requires JSON input (e.g. '{"destination":"...","tonAmount":"...","seqno":0}'). Got: ${raw.slice(
+            0,
+            80
+          )}`
         );
       }
-      return sdk.tonSignMessage(connectId, deviceId, { ...(tonParams as TonSignMessageParams), path, ...common });
+      return sdk.tonSignMessage(connectId, deviceId, {
+        ...(tonParams as TonSignMessageParams),
+        path,
+        ...common,
+      });
     },
     // Nostr: event must be a NostrEvent object (kind, content, tags, created_at)
     nostr: () => {
@@ -403,10 +414,17 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
         event = JSON.parse(raw);
       } catch {
         throw new Error(
-          `Nostr sign-event requires JSON input (e.g. '{"kind":1,"content":"...","tags":[],"created_at":0}'). Got: ${raw.slice(0, 80)}`
+          `Nostr sign-event requires JSON input (e.g. '{"kind":1,"content":"...","tags":[],"created_at":0}'). Got: ${raw.slice(
+            0,
+            80
+          )}`
         );
       }
-      return sdk.nostrSignEvent(connectId, deviceId, { path, event: event as NostrEvent, ...common });
+      return sdk.nostrSignEvent(connectId, deviceId, {
+        path,
+        event: event as NostrEvent,
+        ...common,
+      });
     },
     // SCDO: uses messageHex
     scdo: () => sdk.scdoSignMessage(connectId, deviceId, { path, messageHex: msg, ...common }),

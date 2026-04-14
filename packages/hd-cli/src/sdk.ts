@@ -34,7 +34,7 @@ import * as readline from 'readline';
 
 import { emitEvent } from './output';
 
-import type { ConnectSettings, UiEventMessage, KnownDevice } from '@onekeyfe/hd-core';
+import type { ConnectSettings, KnownDevice, UiEventMessage } from '@onekeyfe/hd-core';
 
 export interface SDKOptions {
   connectId?: string;

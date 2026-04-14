@@ -1,8 +1,5 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import type { IDeviceType, SearchDevice, Features } from '@onekeyfe/hd-core';
-
-type SearchDeviceWithFeatures = SearchDevice & { features?: Features };
 
 import { createSDK } from './sdk';
 import {
@@ -13,6 +10,10 @@ import {
   resolveSignTransaction,
 } from './chains';
 import { detectAndSetMode, emitEvent, getMode, outputResult } from './output';
+
+import type { Features, IDeviceType, SearchDevice } from '@onekeyfe/hd-core';
+
+type SearchDeviceWithFeatures = SearchDevice & { features?: Features };
 
 const program = new Command();
 
@@ -30,7 +31,10 @@ program.option(
   '--device-id <id>',
   'Persistent device ID from getFeatures (changes when seed changes)'
 );
-program.option('--passphrase-state <state>', 'Hidden wallet state identifier for wallet validation');
+program.option(
+  '--passphrase-state <state>',
+  'Hidden wallet state identifier for wallet validation'
+);
 program.option('--use-empty-passphrase', 'Access standard wallet (no passphrase)');
 program.option(
   '--passphrase <value>',
@@ -77,36 +81,38 @@ program.hook('preAction', () => {
 program
   .command('search')
   .description('Search for connected OneKey hardware wallet devices')
-  .action(withErrorHandler(async () => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await sdk.searchDevices();
+  .action(
+    withErrorHandler(async () => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const result = await sdk.searchDevices();
 
-      // Auto-fetch features for each discovered device (doesn't require PIN)
-      if (result?.success && Array.isArray(result.payload)) {
-        for (const device of result.payload) {
-          if (device.connectId) {
-            try {
-              const features = await sdk.getFeatures(device.connectId);
-              if (features?.success && features.payload) {
-                (device as SearchDeviceWithFeatures).features = features.payload;
-                device.name = features.payload.label || features.payload.ble_name || device.name;
-                device.deviceType =
-                  (features.payload.onekey_device_type?.toLowerCase() || device.deviceType) as IDeviceType;
+        // Auto-fetch features for each discovered device (doesn't require PIN)
+        if (result?.success && Array.isArray(result.payload)) {
+          for (const device of result.payload) {
+            if (device.connectId) {
+              try {
+                const features = await sdk.getFeatures(device.connectId);
+                if (features?.success && features.payload) {
+                  (device as SearchDeviceWithFeatures).features = features.payload;
+                  device.name = features.payload.label || features.payload.ble_name || device.name;
+                  device.deviceType = (features.payload.onekey_device_type?.toLowerCase() ||
+                    device.deviceType) as IDeviceType;
+                }
+              } catch {
+                // Features fetch failed — device may need PIN, continue with basic info
               }
-            } catch {
-              // Features fetch failed — device may need PIN, continue with basic info
             }
           }
         }
-      }
 
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 // ============================================================
 // Signing Commands
@@ -118,41 +124,45 @@ program
   .requiredOption('--chain <chain>', 'Target blockchain (evm, btc, sol, ...)')
   .option('--path <path>', 'BIP44 derivation path')
   .option('--show-on-device <bool>', 'Display address on device for verification', 'true')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await resolveGetAddress(sdk, {
-        chain: opts.chain,
-        path: opts.path,
-        showOnDevice: opts.showOnDevice === 'true',
-        ...getCommonParams(globalOpts),
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const result = await resolveGetAddress(sdk, {
+          chain: opts.chain,
+          path: opts.path,
+          showOnDevice: opts.showOnDevice === 'true',
+          ...getCommonParams(globalOpts),
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('get-public-key')
   .description('Get public key from the hardware wallet')
   .requiredOption('--chain <chain>', 'Target blockchain')
   .option('--path <path>', 'BIP44 derivation path')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await resolveGetPublicKey(sdk, {
-        chain: opts.chain,
-        path: opts.path,
-        ...getCommonParams(globalOpts),
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const result = await resolveGetPublicKey(sdk, {
+          chain: opts.chain,
+          path: opts.path,
+          ...getCommonParams(globalOpts),
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('sign-transaction')
@@ -160,22 +170,24 @@ program
   .requiredOption('--chain <chain>', 'Target blockchain')
   .requiredOption('--tx <json>', 'Transaction data (JSON)')
   .option('--path <path>', 'BIP44 derivation path')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const tx = safeJsonParse(opts.tx, '--tx') as Record<string, unknown>;
-      const result = await resolveSignTransaction(sdk, {
-        chain: opts.chain,
-        path: opts.path,
-        transaction: tx,
-        ...getCommonParams(globalOpts),
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const tx = safeJsonParse(opts.tx, '--tx') as Record<string, unknown>;
+        const result = await resolveSignTransaction(sdk, {
+          chain: opts.chain,
+          path: opts.path,
+          transaction: tx,
+          ...getCommonParams(globalOpts),
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('sign-message')
@@ -183,21 +195,23 @@ program
   .requiredOption('--chain <chain>', 'Target blockchain')
   .requiredOption('--message <msg>', 'Message to sign')
   .option('--path <path>', 'BIP44 derivation path')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const result = await resolveSignMessage(sdk, {
-        chain: opts.chain,
-        path: opts.path,
-        message: opts.message,
-        ...getCommonParams(globalOpts),
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const result = await resolveSignMessage(sdk, {
+          chain: opts.chain,
+          path: opts.path,
+          message: opts.message,
+          ...getCommonParams(globalOpts),
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('sign-typed-data')
@@ -205,47 +219,51 @@ program
   .requiredOption('--data <json>', 'EIP-712 typed data JSON')
   .option('--path <path>', 'BIP44 derivation path')
   .option('--metamask-v4-compat', 'Use MetaMask V4 compatibility mode', true)
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const data = safeJsonParse(opts.data, '--data');
-      const params = getCommonParams(globalOpts);
-      const path = opts.path || "m/44'/60'/0'/0/0";
-      const result = await sdk.evmSignTypedData(params.connectId || '', params.deviceId || '', {
-        path,
-        metamaskV4Compat: opts.metamaskV4Compat,
-        data: data as Parameters<typeof sdk.evmSignTypedData>[2]['data'],
-        useEmptyPassphrase: params.useEmptyPassphrase,
-        passphraseState: params.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const data = safeJsonParse(opts.data, '--data');
+        const params = getCommonParams(globalOpts);
+        const path = opts.path || "m/44'/60'/0'/0/0";
+        const result = await sdk.evmSignTypedData(params.connectId || '', params.deviceId || '', {
+          path,
+          metamaskV4Compat: opts.metamaskV4Compat,
+          data: data as Parameters<typeof sdk.evmSignTypedData>[2]['data'],
+          useEmptyPassphrase: params.useEmptyPassphrase,
+          passphraseState: params.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('sign-psbt')
   .description('Sign a Bitcoin PSBT (Pro/Classic1s only, requires device confirmation)')
   .requiredOption('--psbt <hex>', 'Hex-encoded PSBT data')
   .option('--coin <coin>', 'Bitcoin network: btc, ltc, etc.', 'btc')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.btcSignPsbt(params.connectId || '', params.deviceId || '', {
-        psbt: opts.psbt,
-        coin: opts.coin,
-        useEmptyPassphrase: params.useEmptyPassphrase,
-        passphraseState: params.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.btcSignPsbt(params.connectId || '', params.deviceId || '', {
+          psbt: opts.psbt,
+          coin: opts.coin,
+          useEmptyPassphrase: params.useEmptyPassphrase,
+          passphraseState: params.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('verify-message')
@@ -254,105 +272,110 @@ program
   .requiredOption('--address <addr>', 'Signer address')
   .requiredOption('--message <msg>', 'Original message')
   .requiredOption('--signature <sig>', 'Signature to verify')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const cid = params.connectId || '';
-      const did = params.deviceId || '';
-      let result: unknown;
-      switch (opts.chain.toLowerCase()) {
-        case 'evm':
-        case 'eth':
-        case 'ethereum':
-          result = await sdk.evmVerifyMessage(cid, did, {
-            address: opts.address,
-            messageHex: opts.message,
-            signature: opts.signature,
-            useEmptyPassphrase: params.useEmptyPassphrase,
-            passphraseState: params.passphraseState,
-          });
-          break;
-        case 'btc':
-        case 'bitcoin':
-          result = await sdk.btcVerifyMessage(cid, did, {
-            address: opts.address,
-            messageHex: opts.message,
-            signature: opts.signature,
-            coin: 'btc',
-            useEmptyPassphrase: params.useEmptyPassphrase,
-            passphraseState: params.passphraseState,
-          });
-          break;
-        case 'starcoin':
-        case 'stc':
-          result = await sdk.starcoinVerifyMessage(cid, did, {
-            publicKey: opts.address,
-            messageHex: opts.message,
-            signature: opts.signature,
-            useEmptyPassphrase: params.useEmptyPassphrase,
-            passphraseState: params.passphraseState,
-          });
-          break;
-        default:
-          throw new Error(
-            `verifyMessage not supported for chain: ${opts.chain}. Supported: evm, btc, starcoin`
-          );
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const cid = params.connectId || '';
+        const did = params.deviceId || '';
+        let result: unknown;
+        switch (opts.chain.toLowerCase()) {
+          case 'evm':
+          case 'eth':
+          case 'ethereum':
+            result = await sdk.evmVerifyMessage(cid, did, {
+              address: opts.address,
+              messageHex: opts.message,
+              signature: opts.signature,
+              useEmptyPassphrase: params.useEmptyPassphrase,
+              passphraseState: params.passphraseState,
+            });
+            break;
+          case 'btc':
+          case 'bitcoin':
+            result = await sdk.btcVerifyMessage(cid, did, {
+              address: opts.address,
+              messageHex: opts.message,
+              signature: opts.signature,
+              coin: 'btc',
+              useEmptyPassphrase: params.useEmptyPassphrase,
+              passphraseState: params.passphraseState,
+            });
+            break;
+          case 'starcoin':
+          case 'stc':
+            result = await sdk.starcoinVerifyMessage(cid, did, {
+              publicKey: opts.address,
+              messageHex: opts.message,
+              signature: opts.signature,
+              useEmptyPassphrase: params.useEmptyPassphrase,
+              passphraseState: params.passphraseState,
+            });
+            break;
+          default:
+            throw new Error(
+              `verifyMessage not supported for chain: ${opts.chain}. Supported: evm, btc, starcoin`
+            );
+        }
+        outputResult(result);
+      } finally {
+        sdk.dispose();
       }
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+    })
+  );
 
 program
   .command('batch-get-address')
   .description('Get addresses for multiple chains/paths in a single session')
   .requiredOption('--bundle <json>', 'JSON array of {chain, path, showOnDevice}')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const bundle = safeJsonParse(opts.bundle, '--bundle') as Array<{
-        chain: string;
-        path?: string;
-        showOnDevice?: boolean;
-      }>;
-      let commonParams = getCommonParams(globalOpts);
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const bundle = safeJsonParse(opts.bundle, '--bundle') as Array<{
+          chain: string;
+          path?: string;
+          showOnDevice?: boolean;
+        }>;
+        let commonParams = getCommonParams(globalOpts);
 
-      // When --passphrase is provided but --passphrase-state is not, auto-obtain the
-      // passphraseState before the batch loop. This serves two purposes:
-      //   1. Passphrase is entered only ONCE on the device, not once per item.
-      //   2. keepSession: true keeps the USB device acquired so the Node.js event loop
-      //      does not drain (no active libuv handles) in the gap between items.
-      // Subsequent items pass passphraseState to GetPassphraseState → device validates
-      // the cached session without re-prompting the user.
-      if (
-        globalOpts.passphrase !== undefined &&
-        !commonParams.passphraseState &&
-        !commonParams.useEmptyPassphrase
-      ) {
-        const stateResult = await sdk.getPassphraseState(commonParams.connectId, {
-          keepSession: true,
-        });
-        const state = stateResult && typeof stateResult === 'object' && 'payload' in stateResult
-          ? (stateResult as { success: boolean; payload?: string }).payload
-          : undefined;
-        if (state) {
-          commonParams = { ...commonParams, passphraseState: state };
+        // When --passphrase is provided but --passphrase-state is not, auto-obtain the
+        // passphraseState before the batch loop. This serves two purposes:
+        //   1. Passphrase is entered only ONCE on the device, not once per item.
+        //   2. keepSession: true keeps the USB device acquired so the Node.js event loop
+        //      does not drain (no active libuv handles) in the gap between items.
+        // Subsequent items pass passphraseState to GetPassphraseState → device validates
+        // the cached session without re-prompting the user.
+        if (
+          globalOpts.passphrase !== undefined &&
+          !commonParams.passphraseState &&
+          !commonParams.useEmptyPassphrase
+        ) {
+          const stateResult = await sdk.getPassphraseState(commonParams.connectId, {
+            keepSession: true,
+          });
+          const state =
+            stateResult && typeof stateResult === 'object' && 'payload' in stateResult
+              ? (stateResult as { success: boolean; payload?: string }).payload
+              : undefined;
+          if (state) {
+            commonParams = { ...commonParams, passphraseState: state };
+          }
         }
-      }
 
-      const result = await resolveBatchGetAddress(sdk, {
-        bundle,
-        ...commonParams,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+        const result = await resolveBatchGetAddress(sdk, {
+          bundle,
+          ...commonParams,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 // ============================================================
 // Chain-Specific Commands
@@ -364,45 +387,49 @@ program
   .requiredOption('--domain-hash <hex>', 'EIP-712 domain separator hash')
   .requiredOption('--message-hash <hex>', 'EIP-712 message hash')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/60'/0'/0/0")
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.evmSignMessageEIP712(p.connectId || '', p.deviceId || '', {
-        path: opts.path,
-        domainHash: opts.domainHash,
-        messageHash: opts.messageHash,
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.evmSignMessageEIP712(p.connectId || '', p.deviceId || '', {
+          path: opts.path,
+          domainHash: opts.domainHash,
+          messageHash: opts.messageHash,
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('sol-sign-offchain')
   .description('Sign a Solana off-chain message (requires device confirmation)')
   .requiredOption('--message-hex <hex>', 'Off-chain message as hex')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/501'/0'/0'")
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.solSignOffchainMessage(p.connectId || '', p.deviceId || '', {
-        path: opts.path,
-        messageHex: opts.messageHex,
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.solSignOffchainMessage(p.connectId || '', p.deviceId || '', {
+          path: opts.path,
+          messageHex: opts.messageHex,
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('nostr-encrypt')
@@ -411,24 +438,26 @@ program
   .requiredOption('--plaintext <text>', 'Message to encrypt')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
   .option('--show-on-device <bool>', 'Display on device', 'false')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.nostrEncryptMessage(p.connectId || '', p.deviceId || '', {
-        path: opts.path,
-        pubkey: opts.pubkey,
-        plaintext: opts.plaintext,
-        showOnOneKey: opts.showOnDevice === 'true',
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.nostrEncryptMessage(p.connectId || '', p.deviceId || '', {
+          path: opts.path,
+          pubkey: opts.pubkey,
+          plaintext: opts.plaintext,
+          showOnOneKey: opts.showOnDevice === 'true',
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('nostr-decrypt')
@@ -437,68 +466,74 @@ program
   .requiredOption('--ciphertext <text>', 'Encrypted message')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
   .option('--show-on-device <bool>', 'Display on device', 'false')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.nostrDecryptMessage(p.connectId || '', p.deviceId || '', {
-        path: opts.path,
-        pubkey: opts.pubkey,
-        ciphertext: opts.ciphertext,
-        showOnOneKey: opts.showOnDevice === 'true',
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.nostrDecryptMessage(p.connectId || '', p.deviceId || '', {
+          path: opts.path,
+          pubkey: opts.pubkey,
+          ciphertext: opts.ciphertext,
+          showOnOneKey: opts.showOnDevice === 'true',
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('nostr-sign-schnorr')
   .description('Sign a Schnorr signature for Nostr')
   .requiredOption('--hash <hex>', 'Hash to sign (hex)')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.nostrSignSchnorr(p.connectId || '', p.deviceId || '', {
-        path: opts.path,
-        hash: opts.hash,
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.nostrSignSchnorr(p.connectId || '', p.deviceId || '', {
+          path: opts.path,
+          hash: opts.hash,
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('lnurl-auth')
   .description('Authenticate with LNURL (Lightning Network)')
   .requiredOption('--domain <domain>', 'Service domain')
   .requiredOption('--k1 <hex>', 'Challenge k1 parameter')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.lnurlAuth(p.connectId || '', p.deviceId || '', {
-        domain: opts.domain,
-        k1: opts.k1,
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.lnurlAuth(p.connectId || '', p.deviceId || '', {
+          domain: opts.domain,
+          k1: opts.k1,
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('conflux-sign-cip23')
@@ -506,45 +541,49 @@ program
   .requiredOption('--domain-hash <hex>', 'CIP-23 domain hash')
   .requiredOption('--message-hash <hex>', 'CIP-23 message hash')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/503'/0'/0/0")
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.confluxSignMessageCIP23(p.connectId || '', p.deviceId || '', {
-        path: opts.path,
-        domainHash: opts.domainHash,
-        messageHash: opts.messageHash,
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.confluxSignMessageCIP23(p.connectId || '', p.deviceId || '', {
+          path: opts.path,
+          domainHash: opts.domainHash,
+          messageHash: opts.messageHash,
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('aptos-sign-in')
   .description('Sign an Aptos sign-in message')
   .requiredOption('--payload <text>', 'Sign-in payload string')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/637'/0'/0'/0'")
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.aptosSignInMessage(p.connectId || '', p.deviceId || '', {
-        path: opts.path,
-        payload: opts.payload,
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.aptosSignInMessage(p.connectId || '', p.deviceId || '', {
+          path: opts.path,
+          payload: opts.payload,
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('ton-sign-proof')
@@ -553,24 +592,26 @@ program
   .requiredOption('--expire-at <timestamp>', 'Proof expiration timestamp')
   .option('--comment <text>', 'Optional comment')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/607'/0'")
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const p = getCommonParams(globalOpts);
-      const result = await sdk.tonSignProof(p.connectId || '', p.deviceId || '', {
-        path: opts.path,
-        appdomain: opts.appdomain,
-        expireAt: safeParseInt(opts.expireAt, '--expire-at'),
-        ...(opts.comment ? { comment: opts.comment } : {}),
-        useEmptyPassphrase: p.useEmptyPassphrase,
-        passphraseState: p.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const p = getCommonParams(globalOpts);
+        const result = await sdk.tonSignProof(p.connectId || '', p.deviceId || '', {
+          path: opts.path,
+          appdomain: opts.appdomain,
+          expireAt: safeParseInt(opts.expireAt, '--expire-at'),
+          ...(opts.comment ? { comment: opts.comment } : {}),
+          useEmptyPassphrase: p.useEmptyPassphrase,
+          passphraseState: p.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 // ============================================================
 // Firmware Commands
@@ -579,32 +620,36 @@ program
 program
   .command('firmware-check')
   .description('Check if firmware updates are available')
-  .action(withErrorHandler(async () => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.checkFirmwareRelease(params.connectId);
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async () => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.checkFirmwareRelease(params.connectId);
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('firmware-check-all')
   .description('Check all firmware components (system, BLE, bootloader)')
-  .action(withErrorHandler(async () => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.checkAllFirmwareRelease(params.connectId);
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async () => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.checkAllFirmwareRelease(params.connectId);
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('firmware-update')
@@ -637,17 +682,19 @@ program
 program
   .command('bootloader-check')
   .description('Check bootloader version and status')
-  .action(withErrorHandler(async () => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.checkBootloaderRelease(params.connectId);
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async () => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.checkBootloaderRelease(params.connectId);
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 // ============================================================
 // Security / Management Commands
@@ -657,19 +704,21 @@ program
   .command('change-pin')
   .description('Change or set the device PIN code')
   .option('--remove', 'Remove PIN protection instead of changing')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.deviceChangePin(params.connectId, {
-        remove: opts.remove ?? false,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.deviceChangePin(params.connectId, {
+          remove: opts.remove ?? false,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('passphrase-state')
@@ -678,57 +727,61 @@ program
       'Use --passphrase to supply the passphrase, or omit to enter it on the device screen. ' +
       'Returns a passphraseState value that can be passed to subsequent commands for wallet validation.'
   )
-  .action(withErrorHandler(async () => {
-    const globalOpts = program.opts();
-    if (globalOpts.useEmptyPassphrase) {
-      outputResult({
-        success: false,
-        payload: {
-          error:
-            'passphrase-state cannot be used with --use-empty-passphrase. ' +
-            'This command is for hidden wallets only.',
-          code: 'INVALID_PARAMS',
-        },
-      });
-      return;
-    }
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.getPassphraseState(params.connectId);
-      // Emit the passphraseState to stderr so agents can read it from the event stream
-      if (result && typeof result === 'object' && 'success' in result && result.success) {
-        const state = (result as { success: boolean; payload?: string }).payload;
-        if (state) {
-          emitEvent('passphrase_state_ready', 'Passphrase state obtained', {
-            passphraseState: state,
-            usage: `Pass --passphrase <your-passphrase> --passphrase-state ${state} to subsequent commands`,
-          });
-        }
+  .action(
+    withErrorHandler(async () => {
+      const globalOpts = program.opts();
+      if (globalOpts.useEmptyPassphrase) {
+        outputResult({
+          success: false,
+          payload: {
+            error:
+              'passphrase-state cannot be used with --use-empty-passphrase. ' +
+              'This command is for hidden wallets only.',
+            code: 'INVALID_PARAMS',
+          },
+        });
+        return;
       }
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.getPassphraseState(params.connectId);
+        // Emit the passphraseState to stderr so agents can read it from the event stream
+        if (result && typeof result === 'object' && 'success' in result && result.success) {
+          const state = (result as { success: boolean; payload?: string }).payload;
+          if (state) {
+            emitEvent('passphrase_state_ready', 'Passphrase state obtained', {
+              passphraseState: state,
+              usage: `Pass --passphrase <your-passphrase> --passphrase-state ${state} to subsequent commands`,
+            });
+          }
+        }
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('toggle-passphrase')
   .description('Enable or disable passphrase (hidden wallet) protection')
   .requiredOption('--enable <bool>', 'true to enable, false to disable')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.deviceSettings(params.connectId, {
-        usePassphrase: opts.enable === 'true',
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.deviceSettings(params.connectId, {
+          usePassphrase: opts.enable === 'true',
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('device-settings')
@@ -739,81 +792,91 @@ program
   .option('--passphrase-always-on-device <bool>', 'Always enter passphrase on device')
   .option('--haptic-feedback <bool>', 'Enable/disable haptic feedback')
   .option('--auto-shutdown-delay <seconds>', 'Auto shutdown timeout in seconds')
-  .action(withErrorHandler(async opts => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      // Map CLI options to SDK param names (camelCase → snake_case handled by SDK)
-      // Reference: packages/core/src/api/device/DeviceSettings.ts
-      const settings: Record<string, unknown> = {};
-      if (opts.label !== undefined) settings.label = opts.label;
-      if (opts.autoLockDelay !== undefined)
-        settings.autoLockDelayMs = safeParseInt(opts.autoLockDelay, '--auto-lock-delay') * 1000;
-      if (opts.language !== undefined) settings.language = opts.language;
-      if (opts.passphraseAlwaysOnDevice !== undefined)
-        settings.passphraseAlwaysOnDevice = opts.passphraseAlwaysOnDevice === 'true';
-      if (opts.hapticFeedback !== undefined)
-        settings.hapticFeedback = opts.hapticFeedback === 'true';
-      if (opts.autoShutdownDelay !== undefined)
-        settings.autoShutdownDelayMs =
-          safeParseInt(opts.autoShutdownDelay, '--auto-shutdown-delay') * 1000;
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        // Map CLI options to SDK param names (camelCase → snake_case handled by SDK)
+        // Reference: packages/core/src/api/device/DeviceSettings.ts
+        const settings: Record<string, unknown> = {};
+        if (opts.label !== undefined) settings.label = opts.label;
+        if (opts.autoLockDelay !== undefined)
+          settings.autoLockDelayMs = safeParseInt(opts.autoLockDelay, '--auto-lock-delay') * 1000;
+        if (opts.language !== undefined) settings.language = opts.language;
+        if (opts.passphraseAlwaysOnDevice !== undefined)
+          settings.passphraseAlwaysOnDevice = opts.passphraseAlwaysOnDevice === 'true';
+        if (opts.hapticFeedback !== undefined)
+          settings.hapticFeedback = opts.hapticFeedback === 'true';
+        if (opts.autoShutdownDelay !== undefined)
+          settings.autoShutdownDelayMs =
+            safeParseInt(opts.autoShutdownDelay, '--auto-shutdown-delay') * 1000;
 
-      if (Object.keys(settings).length === 0) {
-        outputResult({
-          success: false,
-          payload: {
-            error: 'No settings provided. Use --label, --auto-lock-delay, --language, etc.',
-            code: 'INVALID_PARAMS',
-          },
-        });
-        return;
+        if (Object.keys(settings).length === 0) {
+          outputResult({
+            success: false,
+            payload: {
+              error: 'No settings provided. Use --label, --auto-lock-delay, --language, etc.',
+              code: 'INVALID_PARAMS',
+            },
+          });
+          return;
+        }
+
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.deviceSettings(params.connectId, settings);
+        outputResult(result);
+      } finally {
+        sdk.dispose();
       }
-
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.deviceSettings(params.connectId, settings);
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+    })
+  );
 
 program
   .command('device-verify')
   .description('Verify device is genuine OneKey hardware')
-  .option('--data-hex <hex>', 'Challenge hex data for verification', '0x' + Math.random().toString(16).slice(2).padEnd(10, '0'))
-  .action(withErrorHandler(async (opts) => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.deviceVerify(params.connectId, {
-        dataHex: opts.dataHex,
-        useEmptyPassphrase: params.useEmptyPassphrase,
-        passphraseState: params.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .option(
+    '--data-hex <hex>',
+    'Challenge hex data for verification',
+    `0x${Math.random().toString(16).slice(2).padEnd(10, '0')}`
+  )
+  .action(
+    withErrorHandler(async opts => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.deviceVerify(params.connectId, {
+          dataHex: opts.dataHex,
+          useEmptyPassphrase: params.useEmptyPassphrase,
+          passphraseState: params.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 program
   .command('lock')
   .description('Lock the device')
-  .action(withErrorHandler(async () => {
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.deviceLock(params.connectId, {
-        useEmptyPassphrase: params.useEmptyPassphrase,
-        passphraseState: params.passphraseState,
-      });
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
+  .action(
+    withErrorHandler(async () => {
+      const globalOpts = program.opts();
+      const sdk = await createSDK(globalOpts);
+      try {
+        const params = getCommonParams(globalOpts);
+        const result = await sdk.deviceLock(params.connectId, {
+          useEmptyPassphrase: params.useEmptyPassphrase,
+          passphraseState: params.passphraseState,
+        });
+        outputResult(result);
+      } finally {
+        sdk.dispose();
+      }
+    })
+  );
 
 // ============================================================
 // Schema Discovery (for AI Agent integration)
