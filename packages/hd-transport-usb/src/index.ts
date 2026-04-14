@@ -19,6 +19,10 @@ const ENDPOINT_OUT = 0x01;
 /** Transfer timeout in milliseconds */
 const TRANSFER_TIMEOUT_MS = 30000;
 
+/** Packet I/O retry configuration (matches WebUsbTransport) */
+const PACKET_IO_MAX_RETRIES = 3;
+const PACKET_IO_RETRY_DELAY = 300;
+
 /**
  * Opened device state — holds the USB device, claimed interface, and endpoints.
  */
@@ -86,9 +90,9 @@ function readSerialNumber(
 }
 
 /**
- * Promisified USB IN transfer.
+ * Promisified USB IN transfer (single attempt).
  */
-function transferIn(ep: usb.InEndpoint, length: number): Promise<Buffer> {
+function transferInOnce(ep: usb.InEndpoint, length: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     ep.transfer(length, (err: Error | undefined, data: Buffer | undefined) => {
       if (err) return reject(err);
@@ -99,15 +103,55 @@ function transferIn(ep: usb.InEndpoint, length: number): Promise<Buffer> {
 }
 
 /**
- * Promisified USB OUT transfer.
+ * Promisified USB OUT transfer (single attempt).
  */
-function transferOut(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
+function transferOutOnce(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
     ep.transfer(data, (err: Error | undefined) => {
       if (err) return reject(err);
       resolve();
     });
   });
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * USB IN transfer with retry.
+ */
+async function transferIn(ep: usb.InEndpoint, length: number): Promise<Buffer> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
+    try {
+      return await transferInOnce(ep, length);
+    } catch (err) {
+      lastError = err;
+      if (attempt < PACKET_IO_MAX_RETRIES) {
+        await wait(attempt * PACKET_IO_RETRY_DELAY);
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * USB OUT transfer with retry.
+ */
+async function transferOut(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
+    try {
+      return await transferOutOnce(ep, data);
+    } catch (err) {
+      lastError = err;
+      if (attempt < PACKET_IO_MAX_RETRIES) {
+        await wait(attempt * PACKET_IO_RETRY_DELAY);
+      }
+    }
+  }
+  throw lastError;
 }
 
 /**
