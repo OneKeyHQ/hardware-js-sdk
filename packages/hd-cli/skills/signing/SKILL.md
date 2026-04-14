@@ -66,33 +66,26 @@ signing command, run `onekey-hw search` and inspect
 
    - **`false`** → standard wallet. Do NOT ask wallet-mode questions. Use
      `--use-empty-passphrase` on all commands.
-   - **`true`** → this device has passphrase enabled. Ask which wallet the user
-     wants to access:
+   - **`true`** → this device has passphrase enabled. Ask ONE question with
+     all options (do NOT split into two separate questions):
 
      ```
      AskUserQuestion:
-       Question: "Your device has passphrase protection enabled.\n\nWhich wallet do you want to access?\nStandard wallet = empty passphrase.\nHidden wallet = BIP39 passphrase wallet."
+       Question: "Your device has passphrase protection enabled.\n\nWhich wallet do you want to access?"
        Header: "Wallet Mode"
        Options:
-         A) Standard wallet — use empty passphrase (Recommended)
-         B) Hidden wallet — I use a passphrase
-         C) Cancel
+         A) Standard wallet — no passphrase (Recommended)
+         B) Hidden wallet — type passphrase in this chat
+         C) Hidden wallet — enter passphrase on device screen (Pro/Touch)
+         D) Cancel
      ```
 
-     - **Option A** → use `--use-empty-passphrase` on all commands. Continue.
-     - **Option B** →
-       ```
-       AskUserQuestion:
-         Question: "How do you want to enter your passphrase?"
-         Header: "Passphrase Input"
-         Options:
-           A) Type passphrase in this chat
-           B) Enter passphrase on device screen (Pro/Touch) — prompted for each command
-       ```
-       - **B-A**: ask user for passphrase, store it, use `--passphrase "<value>"`
-         on each hidden-wallet address/signing command in this flow.
-       - **B-B**: do NOT pass `--passphrase`; user enters on device screen for each command.
-     - **Option C** → stop.
+     - **Option A** → use `--use-empty-passphrase` on all commands.
+     - **Option B** → ask user for the passphrase value, then use
+       `--passphrase "<value>"` on every command in this session.
+     - **Option C** → do NOT pass `--passphrase`; user enters on device
+       screen for each command. Set timeout to 120000.
+     - **Option D** → stop.
 
    - **`null` or missing** → feature state is not reliable yet (common when the
      device is still locked or features were not refreshed). Do NOT ask
