@@ -128,8 +128,11 @@ onekey-hw batch-get-address --bundle '[{"chain":"evm"},{"chain":"btc"}]' \
 Enable or disable BIP39 passphrase (hidden wallet) protection.
 
 ```bash
-onekey-hw toggle-passphrase --enable <bool> [--connect-id <id>]
+onekey-hw toggle-passphrase --enable true [--connect-id <id>]
+onekey-hw toggle-passphrase --enable false [--connect-id <id>]
 ```
+
+**Note:** `--enable` takes the string `"true"` or `"false"`, not a bare boolean.
 
 **Agent notes:**
 - WARN user: "If you forget your passphrase, there is NO way to recover the

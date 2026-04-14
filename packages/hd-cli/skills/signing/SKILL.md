@@ -148,19 +148,68 @@ Set **`timeout: 120000`** on all device commands.
 
 ## Commands
 
-```bash
-# Standard wallet
-onekey-hw get-address --chain evm --show-on-device false --use-empty-passphrase --connect-id <id>
-onekey-hw batch-get-address --bundle '[...]' --use-empty-passphrase --connect-id <id>
-onekey-hw sign-transaction --chain evm --tx '...' --use-empty-passphrase --connect-id <id>
-onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase --connect-id <id>
+### Address & Public Key
 
-# Hidden wallet — --passphrase required on every command
-onekey-hw get-address --chain evm --show-on-device false --passphrase "mypassphrase" --connect-id <id>
-onekey-hw batch-get-address --bundle '[...]' --passphrase "mypassphrase" --connect-id <id>
-onekey-hw sign-transaction --chain evm --tx '...' --passphrase "mypassphrase" --connect-id <id>
-onekey-hw sign-message --chain evm --message "hello" --passphrase "mypassphrase" --connect-id <id>
+```bash
+# Get address (standard wallet)
+onekey-hw get-address --chain evm [--path <bip44>] [--show-on-device true] --use-empty-passphrase --connect-id <id>
+
+# Get public key
+onekey-hw get-public-key --chain evm [--path <bip44>] --use-empty-passphrase --connect-id <id>
+
+# Batch addresses (standard wallet)
+onekey-hw batch-get-address --bundle '[{"chain":"evm"},{"chain":"btc"}]' --use-empty-passphrase --connect-id <id>
 ```
+
+`--show-on-device` defaults to `true`. Use `false` for balance queries; always `true` for receive addresses.
+
+### Transaction & Message Signing
+
+```bash
+# Sign transaction
+onekey-hw sign-transaction --chain evm --tx '<json>' [--path <bip44>] --use-empty-passphrase --connect-id <id>
+
+# Sign message
+onekey-hw sign-message --chain evm --message '<msg>' [--path <bip44>] --use-empty-passphrase --connect-id <id>
+
+# Sign EIP-712 typed data (EVM only)
+onekey-hw sign-typed-data --data '<eip712-json>' [--path <bip44>] [--metamask-v4-compat] --use-empty-passphrase --connect-id <id>
+
+# Sign Bitcoin PSBT (Pro/Classic1s only)
+onekey-hw sign-psbt --psbt <hex> [--coin btc] --use-empty-passphrase --connect-id <id>
+
+# Verify signed message on-device (btc, evm, starcoin only)
+onekey-hw verify-message --chain evm --address <addr> --message <msg> --signature <sig> --use-empty-passphrase --connect-id <id>
+```
+
+### Chain-Specific Commands
+
+```bash
+# EVM — sign EIP-712 by hash (when full typed data is unavailable)
+onekey-hw evm-sign-eip712 --domain-hash <hex> --message-hash <hex> [--path m/44'/60'/0'/0/0] --use-empty-passphrase --connect-id <id>
+
+# Solana — off-chain message signing
+onekey-hw sol-sign-offchain --message-hex <hex> [--path m/44'/501'/0'/0'] --use-empty-passphrase --connect-id <id>
+
+# Nostr
+onekey-hw nostr-encrypt --pubkey <hex> --plaintext <text> [--path m/44'/1237'/0'/0/0] --use-empty-passphrase --connect-id <id>
+onekey-hw nostr-decrypt --pubkey <hex> --ciphertext <text> [--path m/44'/1237'/0'/0/0] --use-empty-passphrase --connect-id <id>
+onekey-hw nostr-sign-schnorr --hash <hex> [--path m/44'/1237'/0'/0/0] --use-empty-passphrase --connect-id <id>
+
+# Lightning Network (LNURL auth)
+onekey-hw lnurl-auth --domain <domain> --k1 <hex> --use-empty-passphrase --connect-id <id>
+
+# Conflux CIP-23
+onekey-hw conflux-sign-cip23 --domain-hash <hex> --message-hash <hex> [--path m/44'/503'/0'/0/0] --use-empty-passphrase --connect-id <id>
+
+# Aptos sign-in
+onekey-hw aptos-sign-in --payload <text> [--path m/44'/637'/0'/0'/0'] --use-empty-passphrase --connect-id <id>
+
+# TON proof
+onekey-hw ton-sign-proof --appdomain <domain> --expire-at <timestamp> [--comment <text>] [--path m/44'/607'/0'] --use-empty-passphrase --connect-id <id>
+```
+
+For hidden wallet, replace `--use-empty-passphrase` with `--passphrase "<value>"` on every command.
 
 ### BIP44 Default Paths
 
