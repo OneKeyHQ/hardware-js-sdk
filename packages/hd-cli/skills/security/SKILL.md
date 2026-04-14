@@ -97,7 +97,8 @@ onekey-hw passphrase-state [--passphrase <value>] [--connect-id <id>]
 
 **IMPORTANT:**
 - For **single commands** (`get-address`, `sign-transaction`, etc.): you still need
-  `--passphrase <value>` on every command — `passphraseState` alone is not enough.
+  `--passphrase <value>` on every hidden-wallet command when using host/chat
+  passphrase entry — `passphraseState` alone is not enough.
 - For **`batch-get-address`**: only `--passphrase` is needed. The CLI auto-fetches
   `passphraseState` before the loop — passphrase is entered only once.
 - Do NOT add `--use-empty-passphrase` — mutually exclusive with this command.
@@ -113,14 +114,15 @@ onekey-hw passphrase-state [--passphrase <value>] [--connect-id <id>]
 onekey-hw passphrase-state --passphrase "mypassphrase" --connect-id <id>
 # → {"success": true, "payload": "abc123..."}
 
-# Step 2+: Use BOTH --passphrase AND --passphrase-state on every command
+# Step 2+: Use BOTH --passphrase AND --passphrase-state on every subsequent
+# hidden-wallet command in this flow
 onekey-hw get-address --chain evm \
   --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
 ```
 
 **Simpler (no session validation needed):**
 ```bash
-# Just use --passphrase on every single command — no passphrase-state step needed
+# Just use --passphrase on each hidden-wallet command — no passphrase-state step needed
 onekey-hw get-address --chain evm --passphrase "mypassphrase" --connect-id <id>
 
 # For batch: --passphrase is entered only ONCE regardless of bundle size

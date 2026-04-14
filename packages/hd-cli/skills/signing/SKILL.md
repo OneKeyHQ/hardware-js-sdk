@@ -17,15 +17,24 @@ allowed-tools:
 
 ## MANDATORY RULES — Read Before Every Command
 
-**RULE 0 — ASK WALLET MODE FIRST.** Before running ANY address or signing command,
-you MUST ask the user which wallet mode they use. Do NOT assume standard wallet.
-Use the AskUserQuestion in "Pre-flight Checks → Step 3" below. This determines
-whether to use `--use-empty-passphrase` or `--passphrase`.
+**RULE 0 — CHECK `passphrase_protection` FIRST.** Before running ANY address or
+signing command, run `onekey-hw search` and inspect
+`payload[].features.passphrase_protection`.
+
+- If `passphrase_protection === false`, do NOT ask wallet-mode questions. Use
+  `--use-empty-passphrase`.
+- If `passphrase_protection === true`, ask which wallet the user wants to access
+  on this passphrase-enabled device: standard wallet (`--use-empty-passphrase`)
+  or hidden wallet (`--passphrase` or device entry).
+- If `passphrase_protection` is `null` or missing, do NOT assume hidden wallet.
+  Start with `--use-empty-passphrase`, and only ask the wallet question if the
+  command later fails with Error 114 or a refreshed feature check returns `true`.
 
 1. **Standard wallet**: use `--use-empty-passphrase` on every command.
 
 2. **Hidden wallet (passphrase-protected)**:
-   - Use `--passphrase "<value>"` on EVERY single-item command.
+   - If the user chooses host/chat passphrase entry, use `--passphrase "<value>"`
+     on every hidden-wallet address/signing command in that flow.
    - Each CLI invocation is a new process — passphrase must always be supplied.
    - **Default (1-2 commands)**: just use `--passphrase "<value>"` — no extra steps needed.
    - **`batch-get-address`**: passphrase is entered only **once** for the entire
@@ -33,8 +42,8 @@ whether to use `--use-empty-passphrase` or `--passphrase`.
      on stderr regardless of how many items are in the bundle.
    - **Multi-step session (3+ commands)**: optionally pre-fetch `passphraseState` for
      session validation — see "Multi-Step Passphrase Session" workflow below.
-     `--passphrase` is still required on every command; `--passphrase-state` only adds
-     on-device session validation (skips re-prompting).
+     `--passphrase` is still required on every subsequent hidden-wallet command;
+     `--passphrase-state` only adds on-device session validation.
    - **If a command fails**, fix the original command first. Do NOT call `passphrase-state`
      without `--passphrase "<value>"` — omitting it causes the device to prompt on-screen.
 
@@ -51,35 +60,52 @@ whether to use `--use-empty-passphrase` or `--passphrase`.
 
 2. **Check device connected**: Run `onekey-hw search`.
    - No device → guide troubleshooting.
+   - Record `connectId` and `features.passphrase_protection` from the chosen device.
 
-3. **Determine wallet mode** — MANDATORY AskUserQuestion before ANY signing or address command:
+3. **Determine wallet flow from `features.passphrase_protection`:**
 
-   ```
-   AskUserQuestion:
-     Question: "Does your OneKey device use a hidden wallet (passphrase-protected)?\n\nStandard wallet = no passphrase, most users.\nHidden wallet = BIP39 passphrase enabled on device."
-     Header: "Wallet Mode"
-     Options:
-       A) Standard wallet — no passphrase (Recommended)
-       B) Hidden wallet — I use a passphrase
-       C) Cancel
-   ```
+   - **`false`** → standard wallet. Do NOT ask wallet-mode questions. Use
+     `--use-empty-passphrase` on all commands.
+   - **`true`** → this device has passphrase enabled. Ask which wallet the user
+     wants to access:
 
-   - **Option A** → use `--use-empty-passphrase` on all commands. Continue.
-   - **Option B** →
      ```
      AskUserQuestion:
-       Question: "How do you want to enter your passphrase?"
-       Header: "Passphrase Input"
+       Question: "Your device has passphrase protection enabled.\n\nWhich wallet do you want to access?\nStandard wallet = empty passphrase.\nHidden wallet = BIP39 passphrase wallet."
+       Header: "Wallet Mode"
        Options:
-         A) Type passphrase in this chat
-         B) Enter passphrase on device screen (Pro/Touch) — prompted for each command
+         A) Standard wallet — use empty passphrase (Recommended)
+         B) Hidden wallet — I use a passphrase
+         C) Cancel
      ```
-     - **B-A**: ask user for passphrase, store it, use `--passphrase "<value>"` on every command.
-     - **B-B**: do NOT pass `--passphrase`; user enters on device screen for each command.
-   - **Option C** → stop.
+
+     - **Option A** → use `--use-empty-passphrase` on all commands. Continue.
+     - **Option B** →
+       ```
+       AskUserQuestion:
+         Question: "How do you want to enter your passphrase?"
+         Header: "Passphrase Input"
+         Options:
+           A) Type passphrase in this chat
+           B) Enter passphrase on device screen (Pro/Touch) — prompted for each command
+       ```
+       - **B-A**: ask user for passphrase, store it, use `--passphrase "<value>"`
+         on each hidden-wallet address/signing command in this flow.
+       - **B-B**: do NOT pass `--passphrase`; user enters on device screen for each command.
+     - **Option C** → stop.
+
+   - **`null` or missing** → feature state is not reliable yet (common when the
+     device is still locked or features were not refreshed). Do NOT ask
+     wallet-mode questions yet. Start with `--use-empty-passphrase`.
+     - If the command succeeds, continue with standard-wallet flow.
+     - If the command fails with Error 114, or a later `search` / refreshed
+       feature check shows `passphrase_protection === true`, ask the wallet-mode
+       question above.
 
 **Error handling:**
-- Error 114: passphrase required but not set → go back to step 3.
+- Error 114: passphrase required but not set → re-check
+  `features.passphrase_protection`; if `true` (or now refreshed to `true`), go
+  back to step 3 and ask the wallet-mode question.
 - NEVER add `--json` to any command.
 
 ---
@@ -217,7 +243,8 @@ onekey-hw aptos-sign-in --payload <text> [--path m/44'/637'/0'/0'/0'] --use-empt
 onekey-hw ton-sign-proof --appdomain <domain> --expire-at <timestamp> [--comment <text>] [--path m/44'/607'/0'] --use-empty-passphrase --connect-id <id>
 ```
 
-For hidden wallet, replace `--use-empty-passphrase` with `--passphrase "<value>"` on every command.
+For hidden-wallet address/signing commands in host-entry mode, replace
+`--use-empty-passphrase` with `--passphrase "<value>"`.
 
 ### BIP44 Default Paths
 
@@ -236,10 +263,11 @@ For hidden wallet, replace `--use-empty-passphrase` with `--passphrase "<value>"
 ### Hidden Wallet — Type Passphrase in Chat
 
 ```
-1. AskUserQuestion: wallet mode → B (hidden wallet)
-2. AskUserQuestion: passphrase input → A (type in chat)
-3. Ask user for passphrase value (e.g. "test"), remember it for this session.
-4. Run all commands with --passphrase "<value>":
+1. Confirm `features.passphrase_protection === true`
+2. AskUserQuestion: wallet mode → B (hidden wallet)
+3. AskUserQuestion: passphrase input → A (type in chat)
+4. Ask user for passphrase value (e.g. "test"), remember it for this session.
+5. Run each hidden-wallet command in this flow with `--passphrase "<value>"`:
    onekey-hw get-address --chain evm --passphrase "test" --connect-id <id>
    onekey-hw batch-get-address --bundle '[...]' --passphrase "test" --connect-id <id>
 ```
@@ -253,9 +281,10 @@ For hidden wallet, replace `--use-empty-passphrase` with `--passphrase "<value>"
 ### Hidden Wallet — Enter on Device (Pro/Touch)
 
 ```
-1. AskUserQuestion: wallet mode → B (hidden wallet)
-2. AskUserQuestion: passphrase input → B (enter on device)
-3. Run commands WITHOUT --passphrase; tell user to enter on device when prompted:
+1. Confirm `features.passphrase_protection === true`
+2. AskUserQuestion: wallet mode → B (hidden wallet)
+3. AskUserQuestion: passphrase input → B (enter on device)
+4. Run commands WITHOUT --passphrase; tell user to enter on device when prompted:
    onekey-hw get-address --chain evm --connect-id <id>  (timeout: 120000)
 ```
 
@@ -263,7 +292,8 @@ For hidden wallet, replace `--use-empty-passphrase` with `--passphrase "<value>"
 
 When running 3 or more separate hidden-wallet commands in one conversation,
 optionally pre-fetch `passphraseState` to add session validation and skip
-device re-prompting. **`--passphrase` is still required on every command.**
+wallet mismatch errors. **`--passphrase` is still required on every subsequent
+hidden-wallet command.**
 
 ```
 1. Pre-fetch passphraseState:
