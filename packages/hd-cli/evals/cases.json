@@ -826,6 +826,119 @@
       }
     },
     {
+      "id": "passphrase-disable",
+      "skill": "security",
+      "prompt": "Disable passphrase protection on my device",
+      "expect": {
+        "commands": [
+          "onekey-hw toggle-passphrase",
+          "--enable false",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--enable true",
+          "--enable 0",
+          "--enable False",
+          "--help",
+          "--json"
+        ],
+        "note": "Disable passphrase uses --enable false (lowercase string)"
+      }
+    },
+    {
+      "id": "passphrase-device-input",
+      "skill": "signing",
+      "prompt": "Get my ETH address from my hidden wallet. I want to enter the passphrase on my device screen.",
+      "expect": {
+        "commands": [
+          "onekey-hw get-address",
+          "--chain evm",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--use-empty-passphrase",
+          "--passphrase",
+          "--help",
+          "--json"
+        ],
+        "note": "Device-screen passphrase input: do NOT pass --passphrase; user enters it on device"
+      }
+    },
+    {
+      "id": "passphrase-state-combo",
+      "skill": "signing",
+      "prompt": "I already have my passphraseState token 'abc123xyz'. Use it along with my passphrase 'mySecret' to get my ETH address without re-prompting.",
+      "expect": {
+        "commands": [
+          "onekey-hw get-address",
+          "--chain evm",
+          "--passphrase",
+          "--passphrase-state",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--use-empty-passphrase",
+          "--help",
+          "--json"
+        ],
+        "note": "Multi-step session: both --passphrase AND --passphrase-state required on each command"
+      }
+    },
+    {
+      "id": "passphrase-mutually-exclusive",
+      "skill": "signing",
+      "prompt": "Get my ETH address using both --use-empty-passphrase and my passphrase 'secret'",
+      "expect": {
+        "commands": [
+          "onekey-hw get-address",
+          "--chain evm",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--use-empty-passphrase",
+          "--help",
+          "--json"
+        ],
+        "note": "--use-empty-passphrase and --passphrase are mutually exclusive; agent must use --passphrase when passphrase is given"
+      }
+    },
+    {
+      "id": "passphrase-error-114",
+      "skill": "signing",
+      "prompt": "Get my ETH address. The device returned error 114.",
+      "expect": {
+        "commands": [
+          "onekey-hw get-address",
+          "--chain evm",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--help",
+          "--json"
+        ],
+        "note": "Error 114 = passphrase required but not set. Agent should re-run with correct passphrase option"
+      }
+    },
+    {
+      "id": "passphrase-batch-single-event",
+      "skill": "signing",
+      "prompt": "Get ETH, BTC, and SOL addresses from my hidden wallet with passphrase 'mySecret'. How many times will the device ask for passphrase?",
+      "expect": {
+        "commands": [
+          "onekey-hw batch-get-address",
+          "--passphrase",
+          "--bundle",
+          "--connect-id"
+        ],
+        "forbidden": [
+          "--use-empty-passphrase",
+          "--help",
+          "--json"
+        ],
+        "note": "batch-get-address with --passphrase triggers exactly 1 passphrase_request event for entire bundle, not once per item"
+      }
+    },
+    {
       "id": "param-no-json-flag",
       "skill": "signing",
       "prompt": "Get my Solana address and output as JSON",
