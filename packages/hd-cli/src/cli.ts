@@ -673,33 +673,6 @@ program
   }));
 
 program
-  .command('device-wipe')
-  .description('Factory reset — erase ALL data (IRREVERSIBLE)')
-  .option('--confirm-wipe', 'Confirm you understand this will erase ALL data permanently')
-  .action(withErrorHandler(async opts => {
-    if (!opts.confirmWipe) {
-      outputResult({
-        success: false,
-        payload: {
-          error:
-            'Factory reset requires --confirm-wipe flag. WARNING: This will erase ALL data on the device permanently.',
-          code: 'CONFIRMATION_REQUIRED',
-        },
-      });
-      return;
-    }
-    const globalOpts = program.opts();
-    const sdk = await createSDK(globalOpts);
-    try {
-      const params = getCommonParams(globalOpts);
-      const result = await sdk.deviceWipe(params.connectId);
-      outputResult(result);
-    } finally {
-      sdk.dispose();
-    }
-  }));
-
-program
   .command('device-settings')
   .description('Update device label and settings')
   .option('--label <name>', 'Device display name')

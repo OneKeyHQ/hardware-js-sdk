@@ -1,8 +1,8 @@
 ---
 name: hardware-security
 description: OneKey hardware wallet security and device management — PIN changes,
-  passphrase settings, device wipe, device verification, and settings management.
-keywords: [pin, passphrase, reset, wipe, security, label, settings, lock, verify]
+  passphrase settings, device verification, and settings management.
+keywords: [pin, passphrase, security, label, settings, lock, verify]
 allowed-tools:
   - Bash
   - Read
@@ -33,38 +33,15 @@ AskUserQuestion:
     B) Cancel
 ```
 
-For **destructive operations** (device-wipe), use double confirmation:
-
-```
-AskUserQuestion:
-  Question: "WARNING: Factory reset permanently erases ALL data on your device.
-    Do you have your recovery phrase backed up?"
-  Header: "Factory Reset"
-  Options:
-    A) Yes, I have my backup — proceed
-    B) Cancel
-```
-
-Then a second confirmation:
-
-```
-AskUserQuestion:
-  Question: "Are you absolutely sure? This CANNOT be undone."
-  Header: "Final Confirmation"
-  Options:
-    A) Yes, wipe the device
-    B) Cancel
-```
-
 Use `timeout: 120000` (120 seconds) for all device commands.
 
 ## Security Rules — ABSOLUTE
 
-### CRITICAL — Destructive Operations
+### FORBIDDEN — Device Wipe
 
-- `device-wipe` erases ALL data including seeds. This is IRREVERSIBLE.
-  - MUST confirm with user AT LEAST TWICE before executing.
-  - MUST verify user has their recovery phrase backed up.
+- Device wipe (factory reset) is **NOT available via CLI**.
+- If the user asks to wipe/reset their device, guide them to the **OneKey App**.
+- NEVER attempt to call any wipe-related API.
 
 ### FORBIDDEN — Seeds & Recovery Phrases
 
@@ -114,20 +91,6 @@ onekey-hw toggle-passphrase --enable <bool> [--connect-id <id>]
 - WARN user: "If you forget your passphrase, there is NO way to recover the
   hidden wallet's funds."
 
-### `onekey-hw device-wipe`
-
-Factory reset — erase all data from the device.
-
-```bash
-onekey-hw device-wipe --confirm-wipe [--connect-id <id>]
-```
-
-**Agent notes:**
-- This is the most destructive operation. ALL data is permanently erased.
-- The `--confirm-wipe` flag is REQUIRED — the command will not execute without it.
-- Require EXPLICIT double confirmation from the user before executing.
-- Verify user has recovery phrase backed up before proceeding.
-
 ### `onekey-hw device-settings`
 
 Update device label and other settings.
@@ -166,27 +129,9 @@ Step 2 — Change PIN
 → "Follow the prompts on your device screen."
 ```
 
-### Factory Reset
-
-```
-User: "Reset my device to factory settings"
-
-Step 1 — Double confirmation
-→ "WARNING: Factory reset will PERMANENTLY erase all data on your device.
-   Do you have your recovery phrase backed up?"
-→ Wait for confirmation
-→ "Are you absolutely sure? This cannot be undone."
-→ Wait for second confirmation
-
-Step 2 — Execute
-→ onekey-hw device-wipe --confirm-wipe --connect-id <id>
-→ "Device has been wiped. Use the OneKey App to set it up again."
-```
-
 ## When To Use
 
 - User wants to change PIN or passphrase settings.
-- User wants to factory reset their device.
 - User wants to check device authenticity.
 - User wants to change device label or settings.
 
