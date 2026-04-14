@@ -22,13 +22,16 @@ allowed-tools:
 2. **Hidden wallet (passphrase-protected)**:
    - Use `--passphrase "<value>"` on EVERY single-item command.
    - Each CLI invocation is a new process — passphrase must always be supplied.
-   - Do NOT run `passphrase-state` first — it is not needed.
-   - **`batch-get-address` is special**: passphrase is entered only **once** for the entire
+   - **Default (1-2 commands)**: just use `--passphrase "<value>"` — no extra steps needed.
+   - **`batch-get-address`**: passphrase is entered only **once** for the entire
      batch (auto-fetched internally). You will see exactly **1** `passphrase_request` event
      on stderr regardless of how many items are in the bundle.
-   - **If a command fails**, do NOT fall back to calling `passphrase-state` as a workaround.
-     Fix the original command. If you must call `passphrase-state`, always include
-     `--passphrase "<value>"` — omitting it causes the device to prompt on-screen.
+   - **Multi-step session (3+ commands)**: optionally pre-fetch `passphraseState` for
+     session validation — see "Multi-Step Passphrase Session" workflow below.
+     `--passphrase` is still required on every command; `--passphrase-state` only adds
+     on-device session validation (skips re-prompting).
+   - **If a command fails**, fix the original command first. Do NOT call `passphrase-state`
+     without `--passphrase "<value>"` — omitting it causes the device to prompt on-screen.
 
 3. **NEVER combine** `--use-empty-passphrase` with `--passphrase`.
 
@@ -250,6 +253,31 @@ For hidden wallet, replace `--use-empty-passphrase` with `--passphrase "<value>"
 3. Run commands WITHOUT --passphrase; tell user to enter on device when prompted:
    onekey-hw get-address --chain evm --connect-id <id>  (timeout: 120000)
 ```
+
+### Multi-Step Passphrase Session (3+ commands)
+
+When running 3 or more separate hidden-wallet commands in one conversation,
+optionally pre-fetch `passphraseState` to add session validation and skip
+device re-prompting. **`--passphrase` is still required on every command.**
+
+```
+1. Pre-fetch passphraseState:
+   onekey-hw passphrase-state --passphrase "mypassphrase" --connect-id <id>
+   → {"success": true, "payload": "abc123..."}
+
+2. Use BOTH flags on every subsequent command:
+   onekey-hw get-address --chain evm \
+     --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
+   onekey-hw get-address --chain btc \
+     --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
+   onekey-hw sign-message --chain evm --message "hello" \
+     --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
+```
+
+**Key rules:**
+- `--passphrase-state` alone is NOT enough — always include `--passphrase` too.
+- For 1-2 commands, skip this — just use `--passphrase` directly (simpler).
+- For `batch-get-address`, skip this — the CLI handles session internally.
 
 ### Standard Wallet — Get Address
 

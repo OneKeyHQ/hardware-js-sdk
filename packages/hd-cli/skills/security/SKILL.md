@@ -102,13 +102,18 @@ onekey-hw passphrase-state [--passphrase <value>] [--connect-id <id>]
   `passphraseState` before the loop — passphrase is entered only once.
 - Do NOT add `--use-empty-passphrase` — mutually exclusive with this command.
 
-**Typical workflow (for multi-step single-command sequences):**
-```bash
-# Step 1: Get passphraseState once
-onekey-hw passphrase-state --passphrase "mypassphrase" --connect-id <id>
-# → {"event":"passphrase_state_ready","detail":{"passphraseState":"abc123..."}}
+**When to use `passphrase-state`:**
+- **1-2 commands**: skip — just use `--passphrase` on each command (simpler).
+- **`batch-get-address`**: skip — the CLI handles session internally.
+- **3+ separate commands**: optionally pre-fetch for session validation.
 
-# Step 2: Use BOTH --passphrase AND --passphrase-state to skip re-prompting
+**Multi-step workflow:**
+```bash
+# Step 1: Get passphraseState once (MUST include --passphrase)
+onekey-hw passphrase-state --passphrase "mypassphrase" --connect-id <id>
+# → {"success": true, "payload": "abc123..."}
+
+# Step 2+: Use BOTH --passphrase AND --passphrase-state on every command
 onekey-hw get-address --chain evm \
   --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
 ```

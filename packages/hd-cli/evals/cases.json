@@ -887,36 +887,37 @@
     {
       "id": "passphrase-mutually-exclusive",
       "skill": "signing",
-      "prompt": "Get my ETH address using both --use-empty-passphrase and my passphrase 'secret'",
+      "prompt": "Get my ETH address from my hidden wallet. My passphrase is 'secret'. Use standard wallet mode too so I can compare both addresses.",
       "expect": {
         "commands": [
           "onekey-hw get-address",
           "--chain evm",
+          "--passphrase",
           "--connect-id"
         ],
         "forbidden": [
-          "--use-empty-passphrase",
           "--help",
           "--json"
         ],
-        "note": "--use-empty-passphrase and --passphrase are mutually exclusive; agent must use --passphrase when passphrase is given"
+        "note": "Agent should run two SEPARATE commands: one with --passphrase and one with --use-empty-passphrase. NEVER combine both flags on the same command."
       }
     },
     {
       "id": "passphrase-error-114",
       "skill": "signing",
-      "prompt": "Get my ETH address. The device returned error 114.",
+      "prompt": "Get my ETH address from my standard wallet. If I get error 114, retry with --use-empty-passphrase.",
       "expect": {
         "commands": [
           "onekey-hw get-address",
           "--chain evm",
+          "--use-empty-passphrase",
           "--connect-id"
         ],
         "forbidden": [
           "--help",
           "--json"
         ],
-        "note": "Error 114 = passphrase required but not set. Agent should re-run with correct passphrase option"
+        "note": "Error 114 = passphrase required but not set. Agent should retry with --use-empty-passphrase for standard wallet."
       }
     },
     {
