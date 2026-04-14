@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import chalk from 'chalk';
 
 import { createSDK } from './sdk';
 import {
@@ -8,8 +9,6 @@ import {
   resolveSignMessage,
   resolveSignTransaction,
 } from './chains';
-import chalk from 'chalk';
-
 import { detectAndSetMode, getMode, outputResult } from './output';
 
 const program = new Command();

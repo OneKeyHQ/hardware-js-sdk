@@ -14,6 +14,7 @@ const Log = getLogger(LoggerNames.Transport);
 const BleLogger = getLogger(LoggerNames.HdBleTransport);
 const HttpLogger = getLogger(LoggerNames.HdTransportHttp);
 const LowLevelLogger = getLogger(LoggerNames.HdTransportLowLevel);
+const NodeUsbLogger = getLogger(LoggerNames.HdTransportNodeUsb);
 const WebBleLogger = getLogger(LoggerNames.HdWebBleTransport);
 const WebUsbLogger = getLogger(LoggerNames.HdTransportWebUsb);
 
@@ -55,7 +56,7 @@ export default class TransportManager {
         }
       } else if (env === 'node-usb') {
         // NodeUsbTransport handles USB I/O directly — no plugin needed
-        await this.transport.init(LowLevelLogger, DevicePool.emitter);
+        await this.transport.init(NodeUsbLogger, DevicePool.emitter);
       } else if (env === 'lowlevel') {
         if (!this.plugin) {
           throw ERRORS.TypedError(
