@@ -66,22 +66,26 @@ onekey-hw search
 ### Step 3 — Ensure device is unlocked
 If `features.unlocked === false` (or `null`):
 - Tell user: "Please enter your PIN on the device screen when prompted."
-- Run any lightweight command to trigger PIN unlock:
+- Run a lightweight command to trigger PIN unlock:
   ```bash
   onekey-hw get-address --chain evm --show-on-device false --use-empty-passphrase --connect-id <id>
   ```
-- **If this succeeds** → device is now unlocked AND passphrase is not enabled (or
-  standard wallet works). You already have the address — skip to using it.
-- **If this fails with Error 114** → device is now unlocked but passphrase is
-  enabled. Continue to Step 4.
+- Whether this succeeds or fails with Error 114, the device is now **unlocked**.
+  Do NOT use the result yet — continue to Step 4 to check passphrase state.
 
-If `features.unlocked === true`:
-- Device is already unlocked. Check `passphrase_protection` directly → go to Step 4.
+If `features.unlocked === true` → skip to Step 4.
 
-### Step 4 — Check passphrase_protection (device MUST be unlocked)
-If you got Error 114 in Step 3, or `features.passphrase_protection === true`:
-- Run `onekey-hw search` again if needed to refresh features.
-- **passphrase_protection is now reliable.** Ask ONE question:
+### Step 4 — Re-search and check passphrase_protection (device MUST be unlocked)
+
+**ALWAYS run `onekey-hw search` again after unlocking** to get reliable features:
+```bash
+onekey-hw search
+```
+Check `payload[0].features.passphrase_protection`:
+
+- **`false`** → standard wallet. Use `--use-empty-passphrase`.
+  If Step 3 already returned an address, use it directly.
+- **`true`** → passphrase is enabled. Ask ONE question:
 
 ```
 AskUserQuestion:
