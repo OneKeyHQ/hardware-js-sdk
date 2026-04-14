@@ -17,6 +17,11 @@ allowed-tools:
 
 ## MANDATORY RULES — Read Before Every Command
 
+**RULE 0 — ASK WALLET MODE FIRST.** Before running ANY address or signing command,
+you MUST ask the user which wallet mode they use. Do NOT assume standard wallet.
+Use the AskUserQuestion in "Pre-flight Checks → Step 3" below. This determines
+whether to use `--use-empty-passphrase` or `--passphrase`.
+
 1. **Standard wallet**: use `--use-empty-passphrase` on every command.
 
 2. **Hidden wallet (passphrase-protected)**:
