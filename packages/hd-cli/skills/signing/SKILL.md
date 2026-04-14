@@ -312,26 +312,6 @@ hidden-wallet command.**
 
 ---
 
-## Balance Query After Getting Address
-
-After getting a hardware address, use `onekey balance` (NOT public APIs like
-etherscan/blockstream) to query the balance:
-
-```bash
-# Check if onekey CLI is available
-command -v onekey >/dev/null 2>&1 && echo "available" || echo "not installed"
-
-# Query balance (EVM chains)
-onekey balance --chain eth --address <address-from-get-address>
-
-# Query with specific token
-onekey balance --chain eth --token USDC --address <address>
-```
-
-**IMPORTANT:** NEVER use curl/fetch to public APIs (etherscan, blockstream, etc.)
-for balance queries. Always use `onekey balance` which uses OneKey's backend API.
-If `onekey` is not installed: `npm install -g @onekeyfe/cli`
-
 ---
 
 ## When To Use
@@ -345,3 +325,17 @@ If `onekey` is not installed: `npm install -g @onekeyfe/cli`
 - Device search/connection → `hardware-device`
 - Firmware updates → `hardware-firmware`
 - PIN/passphrase settings → `hardware-security`
+
+## Companion: OneKey Wallet CLI (`onekey`)
+
+**NEVER use curl/fetch to public APIs (etherscan, blockstream, etc.).**
+Use `onekey` CLI for all non-hardware queries. If not installed: `npm install -g @onekeyfe/cli`
+
+| After hardware operation | Follow up with |
+|---|---|
+| Got address → query balance | `onekey balance --chain eth --address <addr>` |
+| Got address → query specific token | `onekey balance --chain eth --token USDC --address <addr>` |
+| Need token price / market data | `onekey token price --symbol ETH` |
+| Need to send/transfer | `onekey transfer --chain eth --to <addr> --amount <n>` |
+| Need token security audit | `onekey security audit --chain eth --token <addr>` |
+| Need swap quote | `onekey swap quote --from ETH --to USDC --amount 1 --chain eth` |

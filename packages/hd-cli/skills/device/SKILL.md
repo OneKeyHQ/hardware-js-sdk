@@ -209,3 +209,16 @@ Step 2 — Guide the user:
 - User wants to sign a transaction → use `hardware-signing`.
 - User wants to update firmware → use `hardware-firmware`.
 - User wants to change PIN or passphrase → use `hardware-security`.
+
+## Companion: OneKey Wallet CLI (`onekey`)
+
+**NEVER use curl/fetch to public APIs (etherscan, blockstream, etc.).**
+Use `onekey` CLI for all non-hardware queries. If not installed: `npm install -g @onekeyfe/cli`
+
+| After hardware operation | Follow up with |
+|---|---|
+| Got address → query balance | `onekey balance --chain eth --address <addr>` |
+| Got address → query specific token | `onekey balance --chain eth --token USDC --address <addr>` |
+| Need token price / market data | `onekey token price --symbol ETH` |
+| Need to send/transfer | `onekey transfer --chain eth --to <addr> --amount <n>` |
+| Need token security audit | `onekey security audit --chain eth --token <addr>` |

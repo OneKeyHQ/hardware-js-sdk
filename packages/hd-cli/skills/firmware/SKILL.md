@@ -91,3 +91,14 @@ Step 2 — If updates available
 - User wants to sign transactions → use `hardware-signing`.
 - User wants to search for devices → use `hardware-device`.
 - User wants to change PIN/passphrase → use `hardware-security`.
+
+## Companion: OneKey Wallet CLI (`onekey`)
+
+**NEVER use curl/fetch to public APIs (etherscan, blockstream, etc.).**
+Use `onekey` CLI for all non-hardware queries. If not installed: `npm install -g @onekeyfe/cli`
+
+| After hardware operation | Follow up with |
+|---|---|
+| Got address → query balance | `onekey balance --chain eth --address <addr>` |
+| Need token price / market data | `onekey token price --symbol ETH` |
+| Need token security audit | `onekey security audit --chain eth --token <addr>` |
