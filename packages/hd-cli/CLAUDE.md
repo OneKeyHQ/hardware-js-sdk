@@ -40,20 +40,6 @@ onekey-hw schema get-address
 onekey-hw schema sign-transaction
 ```
 
-## Integration with app-monorepo CLI
-
-The `@onekeyfe/hardware-cli` package exports a `HardwareSigner` interface
-for programmatic integration:
-
-```typescript
-import { createHardwareSigner } from '@onekeyfe/hardware-cli';
-
-const signer = await createHardwareSigner({ useEmptyPassphrase: true });
-const { address } = await signer.getAddress('evm');
-const signed = await signer.signTransaction('evm', txData);
-signer.dispose();
-```
-
 ## Important
 
 - All signing operations require **physical confirmation** on the hardware device
