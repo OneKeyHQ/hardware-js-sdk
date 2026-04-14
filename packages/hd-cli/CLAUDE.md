@@ -13,10 +13,43 @@ command signatures, workflows, and security rules.
 | **Firmware** | `skills/firmware/SKILL.md` | Check firmware versions (updates via OneKey App only) |
 | **Security** | `skills/security/SKILL.md` | PIN, passphrase, device settings, factory reset |
 
+## Companion Plugin: OneKey Wallet Skills
+
+**At the start of any session involving balance, market data, or token operations,
+run this check:**
+
+```bash
+command -v onekey >/dev/null 2>&1 && echo "onekey-skills: available" || echo "onekey-skills: not installed"
+```
+
+If `onekey` CLI is available, route non-hardware tasks to the `onekey-skills` plugin:
+
+| Task | Route to |
+|---|---|
+| Balance query, transfer, tx history | `onekey-skills:wallet` skill |
+| Token price, market data, kline | `onekey-skills:market` skill |
+| Token swap / exchange | `onekey-skills:swap` skill |
+| Token security audit | `onekey-skills:security` skill |
+
+**Typical combined workflow (hardware address + balance):**
+
+```bash
+# 1. Get address from hardware device
+onekey-hw get-address --chain evm --show-on-device false --use-empty-passphrase --connect-id <id>
+
+# 2. Query balance using OneKey wallet skill (if onekey CLI is available)
+onekey balance --chain eth --address <address-from-step-1>
+```
+
+If `onekey` is not installed, guide the user:
+```
+npm install -g @onekeyfe/cli
+```
+
 ## Quick Start
 
 ```bash
-# Install globally
+# Install hardware CLI
 npm install -g @onekeyfe/hardware-cli
 
 # Search for connected devices (auto-fetches device info)
