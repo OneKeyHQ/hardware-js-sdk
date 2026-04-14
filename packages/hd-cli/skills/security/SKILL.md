@@ -70,14 +70,58 @@ onekey-hw change-pin [--remove] [--connect-id <id>]
 
 ### `onekey-hw passphrase-state`
 
-Get current passphrase state for hidden wallet session management.
+Get the hidden wallet `passphraseState` identifier for wallet validation.
 
 ```bash
-onekey-hw passphrase-state [--connect-id <id>]
+onekey-hw passphrase-state [--passphrase <value>] [--connect-id <id>]
 ```
 
-**Note:** Do NOT use `--use-empty-passphrase` with this command — it will return an error.
-This command's purpose is to trigger passphrase input on the device.
+**Returns:**
+```json
+{ "success": true, "payload": "abc123def456..." }
+```
+
+**Concepts:**
+- **passphrase** — the BIP39 passphrase string the user knows (e.g. "mypassphrase").
+  Provided via `--passphrase <value>` on single commands. For `batch-get-address`,
+  it is enough to pass `--passphrase` once — the CLI fetches the session token internally.
+- **passphraseState** — a device-side session token derived from the passphrase.
+  Optional: if provided, the SDK verifies each command accesses the same hidden wallet
+  without re-prompting for the passphrase. Useful for multi-step workflows.
+
+**How it works:**
+1. SDK fires REQUEST_PASSPHRASE → CLI responds with `--passphrase` value (or device keyboard).
+2. Device derives the wallet and returns the `passphraseState` session token.
+3. Subsequent calls with `--passphrase-state <value>` validate the session on-device
+   without re-entering the passphrase (device skips PassphraseRequest).
+
+**IMPORTANT:**
+- For **single commands** (`get-address`, `sign-transaction`, etc.): you still need
+  `--passphrase <value>` on every command — `passphraseState` alone is not enough.
+- For **`batch-get-address`**: only `--passphrase` is needed. The CLI auto-fetches
+  `passphraseState` before the loop — passphrase is entered only once.
+- Do NOT add `--use-empty-passphrase` — mutually exclusive with this command.
+
+**Typical workflow (for multi-step single-command sequences):**
+```bash
+# Step 1: Get passphraseState once
+onekey-hw passphrase-state --passphrase "mypassphrase" --connect-id <id>
+# → {"event":"passphrase_state_ready","detail":{"passphraseState":"abc123..."}}
+
+# Step 2: Use BOTH --passphrase AND --passphrase-state to skip re-prompting
+onekey-hw get-address --chain evm \
+  --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
+```
+
+**Simpler (no session validation needed):**
+```bash
+# Just use --passphrase on every single command — no passphrase-state step needed
+onekey-hw get-address --chain evm --passphrase "mypassphrase" --connect-id <id>
+
+# For batch: --passphrase is entered only ONCE regardless of bundle size
+onekey-hw batch-get-address --bundle '[{"chain":"evm"},{"chain":"btc"}]' \
+  --passphrase "mypassphrase" --connect-id <id>
+```
 
 ### `onekey-hw toggle-passphrase`
 

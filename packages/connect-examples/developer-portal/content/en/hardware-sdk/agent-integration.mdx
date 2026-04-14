@@ -35,7 +35,6 @@ onekey-hw schema list
 # Show full schema for a specific command (parameters, types, examples)
 onekey-hw schema get-address
 onekey-hw schema sign-transaction
-onekey-hw schema device-wipe
 ```
 
 This is especially useful for AI agents to dynamically discover supported commands and construct valid invocations without hardcoded knowledge.
@@ -91,7 +90,9 @@ rm -rf /tmp/onekey-hw
 
 ## Usage
 
-> **Note:** Most commands that interact with the device require `--use-empty-passphrase` to skip the passphrase prompt when no passphrase is set. If the device has a passphrase enabled, omit this flag to be prompted.
+### Standard wallet (no passphrase)
+
+Use `--use-empty-passphrase` on every command to target the standard wallet.
 
 ```bash
 # Search for connected devices (auto-fetches device info)
@@ -114,6 +115,40 @@ onekey-hw sign-transaction --chain evm \
 # Check firmware
 onekey-hw firmware-check-all
 ```
+
+### Hidden wallet (passphrase-protected)
+
+Hidden wallets require a two-step flow. Obtain `passphraseState` once per session, then use it on all subsequent commands — no passphrase re-entry needed.
+
+```bash
+# Step 1: Get passphraseState (prompts passphrase on device once)
+# --passphrase can be omitted to enter on the device screen (Pro/Touch)
+onekey-hw passphrase-state --passphrase "mypassphrase" --connect-id <id>
+```
+
+The output includes a `passphrase_state_ready` event on stderr:
+
+```json
+{"event":"passphrase_state_ready","detail":{"passphraseState":"abc123...","usage":"..."}}
+```
+
+Extract `detail.passphraseState` and use it alongside `--passphrase` on all subsequent commands:
+
+```bash
+# Step 2: All subsequent commands — use BOTH --passphrase AND --passphrase-state
+onekey-hw get-address --chain evm --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
+onekey-hw get-address --chain btc --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
+onekey-hw batch-get-address --bundle '[...]' --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
+onekey-hw sign-transaction --chain evm --tx '...' --passphrase "mypassphrase" --passphrase-state abc123... --connect-id <id>
+```
+
+> **Why `--passphrase` is always required**: The CLI is stateless — each invocation is a new process with no session cache. The device always requests passphrase on a fresh connection. `passphraseState` is a wallet fingerprint (validator) that ensures you always access the same hidden wallet, but it does not replace passphrase entry.
+
+**Simpler (no validation):** just use `--passphrase "mypassphrase"` directly without the `passphrase-state` step.
+
+> **Error 112 (Device passphrase state error)**: Session expired — re-run `passphrase-state` to obtain a fresh state value, then retry.
+
+> **Never combine** `--use-empty-passphrase` with `--passphrase` or `--passphrase-state`.
 
 Firmware updates must be done via the [OneKey App](https://onekey.so/download) or [firmware.onekey.so](https://firmware.onekey.so/).
 

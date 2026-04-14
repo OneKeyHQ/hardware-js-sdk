@@ -1,5 +1,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import type { IDeviceType, SearchDevice, Features } from '@onekeyfe/hd-core';
+
+type SearchDeviceWithFeatures = SearchDevice & { features?: Features };
 
 import { createSDK } from './sdk';
 import {
@@ -9,7 +12,7 @@ import {
   resolveSignMessage,
   resolveSignTransaction,
 } from './chains';
-import { detectAndSetMode, getMode, outputResult } from './output';
+import { detectAndSetMode, emitEvent, getMode, outputResult } from './output';
 
 const program = new Command();
 
@@ -27,15 +30,20 @@ program.option(
   '--device-id <id>',
   'Persistent device ID from getFeatures (changes when seed changes)'
 );
-program.option('--passphrase-state <state>', 'Passphrase state for hidden wallet access');
-program.option('--use-empty-passphrase', 'Use standard wallet (skip passphrase prompt)');
+program.option('--passphrase-state <state>', 'Hidden wallet state identifier for wallet validation');
+program.option('--use-empty-passphrase', 'Access standard wallet (no passphrase)');
+program.option(
+  '--passphrase <value>',
+  'Passphrase for hidden wallet access. Provided to the SDK on every REQUEST_PASSPHRASE event. ' +
+    'Mutually exclusive with --use-empty-passphrase.'
+);
 program.option('--human', 'Force human-readable output (auto-detected when running in terminal)');
 
 program.hook('preAction', () => {
   const opts = program.opts();
   detectAndSetMode({ human: opts.human });
 
-  // Mutual exclusion: --use-empty-passphrase and --passphrase-state cannot coexist
+  // --use-empty-passphrase and --passphrase-state are for different wallet types
   if (opts.useEmptyPassphrase && opts.passphraseState) {
     outputResult({
       success: false,
@@ -43,6 +51,19 @@ program.hook('preAction', () => {
         error:
           '--use-empty-passphrase and --passphrase-state are mutually exclusive. ' +
           'Use --use-empty-passphrase for standard wallet, or --passphrase-state for hidden wallet.',
+        code: 'INVALID_PARAMS',
+      },
+    });
+  }
+
+  // --use-empty-passphrase and --passphrase access different wallet types
+  if (opts.useEmptyPassphrase && opts.passphrase !== undefined) {
+    outputResult({
+      success: false,
+      payload: {
+        error:
+          '--use-empty-passphrase and --passphrase are mutually exclusive. ' +
+          'Use --use-empty-passphrase for standard wallet, or --passphrase for hidden wallet.',
         code: 'INVALID_PARAMS',
       },
     });
@@ -69,10 +90,10 @@ program
             try {
               const features = await sdk.getFeatures(device.connectId);
               if (features?.success && features.payload) {
-                device.features = features.payload;
+                (device as SearchDeviceWithFeatures).features = features.payload;
                 device.name = features.payload.label || features.payload.ble_name || device.name;
                 device.deviceType =
-                  features.payload.onekey_device_type?.toLowerCase() || device.deviceType;
+                  (features.payload.onekey_device_type?.toLowerCase() || device.deviceType) as IDeviceType;
               }
             } catch {
               // Features fetch failed — device may need PIN, continue with basic info
@@ -257,7 +278,7 @@ program
         case 'bitcoin':
           result = await sdk.btcVerifyMessage(cid, did, {
             address: opts.address,
-            message: opts.message,
+            messageHex: opts.message,
             signature: opts.signature,
             coin: 'btc',
             useEmptyPassphrase: params.useEmptyPassphrase,
@@ -268,7 +289,7 @@ program
         case 'stc':
           result = await sdk.starcoinVerifyMessage(cid, did, {
             publicKey: opts.address,
-            message: opts.message,
+            messageHex: opts.message,
             signature: opts.signature,
             useEmptyPassphrase: params.useEmptyPassphrase,
             passphraseState: params.passphraseState,
@@ -298,9 +319,34 @@ program
         path?: string;
         showOnDevice?: boolean;
       }>;
+      let commonParams = getCommonParams(globalOpts);
+
+      // When --passphrase is provided but --passphrase-state is not, auto-obtain the
+      // passphraseState before the batch loop. This serves two purposes:
+      //   1. Passphrase is entered only ONCE on the device, not once per item.
+      //   2. keepSession: true keeps the USB device acquired so the Node.js event loop
+      //      does not drain (no active libuv handles) in the gap between items.
+      // Subsequent items pass passphraseState to GetPassphraseState → device validates
+      // the cached session without re-prompting the user.
+      if (
+        globalOpts.passphrase !== undefined &&
+        !commonParams.passphraseState &&
+        !commonParams.useEmptyPassphrase
+      ) {
+        const stateResult = await sdk.getPassphraseState(commonParams.connectId, {
+          keepSession: true,
+        });
+        const state = stateResult && typeof stateResult === 'object' && 'payload' in stateResult
+          ? (stateResult as { success: boolean; payload?: string }).payload
+          : undefined;
+        if (state) {
+          commonParams = { ...commonParams, passphraseState: state };
+        }
+      }
+
       const result = await resolveBatchGetAddress(sdk, {
         bundle,
-        ...getCommonParams(globalOpts),
+        ...commonParams,
       });
       outputResult(result);
     } finally {
@@ -627,18 +673,20 @@ program
 
 program
   .command('passphrase-state')
-  .description('Get current passphrase state (for hidden wallet session management)')
+  .description(
+    'Get the hidden wallet passphrase state identifier. ' +
+      'Use --passphrase to supply the passphrase, or omit to enter it on the device screen. ' +
+      'Returns a passphraseState value that can be passed to subsequent commands for wallet validation.'
+  )
   .action(withErrorHandler(async () => {
     const globalOpts = program.opts();
-    // This command's purpose is to trigger passphrase input — using
-    // --use-empty-passphrase with it is a contradiction.
     if (globalOpts.useEmptyPassphrase) {
       outputResult({
         success: false,
         payload: {
           error:
             'passphrase-state cannot be used with --use-empty-passphrase. ' +
-            'This command triggers passphrase input to get the hidden wallet state.',
+            'This command is for hidden wallets only.',
           code: 'INVALID_PARAMS',
         },
       });
@@ -648,6 +696,16 @@ program
     try {
       const params = getCommonParams(globalOpts);
       const result = await sdk.getPassphraseState(params.connectId);
+      // Emit the passphraseState to stderr so agents can read it from the event stream
+      if (result && typeof result === 'object' && 'success' in result && result.success) {
+        const state = (result as { success: boolean; payload?: string }).payload;
+        if (state) {
+          emitEvent('passphrase_state_ready', 'Passphrase state obtained', {
+            passphraseState: state,
+            usage: `Pass --passphrase <your-passphrase> --passphrase-state ${state} to subsequent commands`,
+          });
+        }
+      }
       outputResult(result);
     } finally {
       sdk.dispose();
@@ -722,12 +780,17 @@ program
 program
   .command('device-verify')
   .description('Verify device is genuine OneKey hardware')
-  .action(withErrorHandler(async () => {
+  .option('--data-hex <hex>', 'Challenge hex data for verification', '0x' + Math.random().toString(16).slice(2).padEnd(10, '0'))
+  .action(withErrorHandler(async (opts) => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
       const params = getCommonParams(globalOpts);
-      const result = await sdk.deviceVerify(params.connectId);
+      const result = await sdk.deviceVerify(params.connectId, {
+        dataHex: opts.dataHex,
+        useEmptyPassphrase: params.useEmptyPassphrase,
+        passphraseState: params.passphraseState,
+      });
       outputResult(result);
     } finally {
       sdk.dispose();
@@ -742,7 +805,10 @@ program
     const sdk = await createSDK(globalOpts);
     try {
       const params = getCommonParams(globalOpts);
-      const result = await sdk.deviceLock(params.connectId);
+      const result = await sdk.deviceLock(params.connectId, {
+        useEmptyPassphrase: params.useEmptyPassphrase,
+        passphraseState: params.passphraseState,
+      });
       outputResult(result);
     } finally {
       sdk.dispose();
@@ -846,7 +912,9 @@ schemaCmd
  * Catches thrown errors and routes them through outputResult
  * so agent consumers always receive valid JSON.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function withErrorHandler(fn: (...args: any[]) => Promise<void>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async (...args: any[]) => {
     try {
       await fn(...args);

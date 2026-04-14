@@ -9,7 +9,11 @@
  * Type definitions: packages/core/src/types/api/*.ts
  */
 
-import type { CoreApi } from '@onekeyfe/hd-core';
+import type { CoreApi, TonSignMessageParams, AptosSignMessageParams } from '@onekeyfe/hd-core';
+
+// Types not directly exported from hd-core — extracted from CoreApi signatures
+type NostrEvent = Parameters<CoreApi['nostrSignEvent']>[2]['event'];
+type AptosMessagePayload = AptosSignMessageParams['payload'];
 
 // Default BIP44 derivation paths per chain
 // Sources: developer-portal core-api-guide.mdx + chain-specific docs
@@ -89,16 +93,35 @@ export interface CommonCLIParams {
   deviceId?: string;
   passphraseState?: string;
   useEmptyPassphrase?: boolean;
+  /** Keep the device session open after the call (for multi-call batches). */
+  keepSession?: boolean;
 }
 
-/** Extract the passphrase/session fields that every SDK call needs. */
+/** Extract the passphrase/session fields that every SDK call needs.
+ *
+ * skipPassphraseCheck:
+ *   When only --passphrase is supplied (no --passphrase-state, no --use-empty-passphrase),
+ *   the SDK would require passphraseState (error 114) and then try to validate it via
+ *   GetPassphraseState — which fails (ActionCancelled 803) because each CLI invocation is a
+ *   new process with no cached session. Setting skipPassphraseCheck bypasses both checks,
+ *   letting the device passphrase handler do its job normally.
+ *
+ * keepSession:
+ *   When true, the device is NOT released after the call. This is used in batch operations
+ *   to avoid the USB close/reopen gap that would otherwise drain the Node.js event loop and
+ *   cause the process to exit between batch items.
+ */
 function extractCommon(params: CommonCLIParams) {
+  const skipPassphraseCheck =
+    !params.passphraseState && !params.useEmptyPassphrase;
   return {
     connectId: params.connectId || '',
     deviceId: params.deviceId || '',
     common: {
       passphraseState: params.passphraseState,
       useEmptyPassphrase: params.useEmptyPassphrase,
+      skipPassphraseCheck,
+      ...(params.keepSession !== undefined ? { keepSession: params.keepSession } : {}),
     },
   };
 }
@@ -115,8 +138,7 @@ export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) 
   const showOnOneKey = params.showOnDevice ?? true;
   const { connectId, deviceId, common } = extractCommon(params);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chainMethodMap: Record<string, () => Promise<any>> = {
+  const chainMethodMap: Record<string, () => Promise<unknown>> = {
     evm: () => sdk.evmGetAddress(connectId, deviceId, { path, showOnOneKey, ...common }),
     btc: () =>
       sdk.btcGetAddress(connectId, deviceId, { path, showOnOneKey, coin: 'btc', ...common }),
@@ -190,8 +212,7 @@ export async function resolveGetPublicKey(sdk: CoreApi, params: GetPublicKeyPara
   const path = params.path || getDefaultPath(chain);
   const { connectId, deviceId, common } = extractCommon(params);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chainMethodMap: Record<string, () => Promise<any>> = {
+  const chainMethodMap: Record<string, () => Promise<unknown>> = {
     evm: () => sdk.evmGetPublicKey(connectId, deviceId, { path, ...common }),
     btc: () => sdk.btcGetPublicKey(connectId, deviceId, { path, coin: 'btc', ...common }),
     aptos: () => sdk.aptosGetPublicKey(connectId, deviceId, { path, ...common }),
@@ -229,8 +250,7 @@ export async function resolveSignTransaction(sdk: CoreApi, params: SignTransacti
   const tx = params.transaction;
   const { connectId, deviceId, common } = extractCommon(params);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chainMethodMap: Record<string, () => Promise<any>> = {
+  const chainMethodMap: Record<string, () => Promise<unknown>> = {
     // EVM: chainId is inside the transaction object, not top-level
     evm: () =>
       sdk.evmSignTransaction(connectId, deviceId, { path, transaction: tx as any, ...common }),
@@ -343,8 +363,7 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
   const isHex = /^0x[0-9a-fA-F]+$/.test(raw);
   const msg = isHex ? raw.slice(2) : Buffer.from(raw, 'utf8').toString('hex');
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chainMethodMap: Record<string, () => Promise<any>> = {
+  const chainMethodMap: Record<string, () => Promise<unknown>> = {
     evm: () => sdk.evmSignMessage(connectId, deviceId, { path, messageHex: msg, ...common }),
     // BTC: uses messageHex, not message
     btc: () =>
@@ -355,7 +374,7 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
     aptos: () =>
       sdk.aptosSignMessage(connectId, deviceId, {
         path,
-        payload: { message: msg } as any,
+        payload: { message: msg } as AptosMessagePayload,
         ...common,
       }),
     sui: () => sdk.suiSignMessage(connectId, deviceId, { path, messageHex: msg, ...common }),
@@ -375,7 +394,7 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
           `TON sign-message requires JSON input (e.g. '{"destination":"...","tonAmount":"...","seqno":0}'). Got: ${raw.slice(0, 80)}`
         );
       }
-      return sdk.tonSignMessage(connectId, deviceId, { path, ...tonParams, ...common });
+      return sdk.tonSignMessage(connectId, deviceId, { ...(tonParams as TonSignMessageParams), path, ...common });
     },
     // Nostr: event must be a NostrEvent object (kind, content, tags, created_at)
     nostr: () => {
@@ -387,7 +406,7 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
           `Nostr sign-event requires JSON input (e.g. '{"kind":1,"content":"...","tags":[],"created_at":0}'). Got: ${raw.slice(0, 80)}`
         );
       }
-      return sdk.nostrSignEvent(connectId, deviceId, { path, event, ...common });
+      return sdk.nostrSignEvent(connectId, deviceId, { path, event: event as NostrEvent, ...common });
     },
     // SCDO: uses messageHex
     scdo: () => sdk.scdoSignMessage(connectId, deviceId, { path, messageHex: msg, ...common }),
@@ -433,9 +452,17 @@ export interface BatchGetAddressParams extends CommonCLIParams {
 }
 
 export async function resolveBatchGetAddress(sdk: CoreApi, params: BatchGetAddressParams) {
-  // #13 FIX: Collect per-item results with error handling for partial failures
+  // Collect per-item results with error handling for partial failures.
+  //
+  // keepSession: true is passed for every item except the last. This tells the SDK not to
+  // release the USB device between calls. Without it, device.release() closes the USB handle,
+  // draining the Node.js event loop (no active libuv handles), causing the process to exit
+  // before the next batch item's acquire() can register a new handle.
   const results: Array<Record<string, unknown>> = [];
-  for (const item of params.bundle) {
+  const lastIndex = params.bundle.length - 1;
+  for (let i = 0; i <= lastIndex; i++) {
+    const item = params.bundle[i];
+    const isLast = i === lastIndex;
     try {
       const result = await resolveGetAddress(sdk, {
         chain: item.chain,
@@ -445,6 +472,7 @@ export async function resolveBatchGetAddress(sdk: CoreApi, params: BatchGetAddre
         deviceId: params.deviceId,
         passphraseState: params.passphraseState,
         useEmptyPassphrase: params.useEmptyPassphrase,
+        keepSession: !isLast,
       });
       results.push(result);
     } catch (err) {

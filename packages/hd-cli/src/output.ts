@@ -6,6 +6,7 @@
  */
 
 import chalk from 'chalk';
+import { writeSync } from 'fs';
 
 export type OutputMode = 'human' | 'agent';
 export type EventType =
@@ -14,7 +15,8 @@ export type EventType =
   | 'passphrase_on_device'
   | 'button_confirm'
   | 'device_connect'
-  | 'device_disconnect';
+  | 'device_disconnect'
+  | 'passphrase_state_ready';
 
 let currentMode: OutputMode = 'agent';
 
@@ -35,7 +37,10 @@ export function getMode(): OutputMode {
 // Returns `never` because it always calls process.exit.
 export function outputResult(result: unknown): never {
   if (currentMode === 'agent') {
-    console.log(JSON.stringify(result, null, 2));
+    // Use synchronous write to guarantee output is flushed before process.exit().
+    // console.log() buffers async writes — they can be silently dropped when
+    // process.exit() fires immediately after (common in piped/agent contexts).
+    writeSync(1, JSON.stringify(result, null, 2) + '\n');
   } else {
     formatHumanResult(result);
   }

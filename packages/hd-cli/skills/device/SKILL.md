@@ -146,6 +146,7 @@ onekey-hw search
 - Always run `search` before any device operation if no `connectId` is known.
 - If no devices found, suggest: check USB cable, unlock device, try a different USB port.
 - Multiple devices → present list, ask user to select.
+- NEVER add `--json` — it is not a valid option. Output is always JSON by default.
 
 ### `onekey-hw device-verify`
 
