@@ -91,6 +91,18 @@ export interface CommonCLIParams {
   useEmptyPassphrase?: boolean;
 }
 
+/** Extract the passphrase/session fields that every SDK call needs. */
+function extractCommon(params: CommonCLIParams) {
+  return {
+    connectId: params.connectId || '',
+    deviceId: params.deviceId || '',
+    common: {
+      passphraseState: params.passphraseState,
+      useEmptyPassphrase: params.useEmptyPassphrase,
+    },
+  };
+}
+
 export interface GetAddressParams extends CommonCLIParams {
   chain: string;
   path?: string;
@@ -101,13 +113,7 @@ export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) 
   const chain = resolveChain(params.chain);
   const path = params.path || getDefaultPath(chain);
   const showOnOneKey = params.showOnDevice ?? true;
-  const connectId = params.connectId || '';
-  const deviceId = params.deviceId || '';
-  // CommonParams passthrough — without these, passphrase/session params are lost
-  const common = {
-    passphraseState: params.passphraseState,
-    useEmptyPassphrase: params.useEmptyPassphrase,
-  };
+  const { connectId, deviceId, common } = extractCommon(params);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chainMethodMap: Record<string, () => Promise<any>> = {
@@ -182,12 +188,7 @@ export interface GetPublicKeyParams extends CommonCLIParams {
 export async function resolveGetPublicKey(sdk: CoreApi, params: GetPublicKeyParams) {
   const chain = resolveChain(params.chain);
   const path = params.path || getDefaultPath(chain);
-  const connectId = params.connectId || '';
-  const deviceId = params.deviceId || '';
-  const common = {
-    passphraseState: params.passphraseState,
-    useEmptyPassphrase: params.useEmptyPassphrase,
-  };
+  const { connectId, deviceId, common } = extractCommon(params);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chainMethodMap: Record<string, () => Promise<any>> = {
@@ -225,13 +226,8 @@ export interface SignTransactionParams extends CommonCLIParams {
 export async function resolveSignTransaction(sdk: CoreApi, params: SignTransactionParams) {
   const chain = resolveChain(params.chain);
   const path = params.path || getDefaultPath(chain);
-  const connectId = params.connectId || '';
-  const deviceId = params.deviceId || '';
   const tx = params.transaction;
-  const common = {
-    passphraseState: params.passphraseState,
-    useEmptyPassphrase: params.useEmptyPassphrase,
-  };
+  const { connectId, deviceId, common } = extractCommon(params);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chainMethodMap: Record<string, () => Promise<any>> = {
@@ -337,12 +333,7 @@ export interface SignMessageParams extends CommonCLIParams {
 export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams) {
   const chain = resolveChain(params.chain);
   const path = params.path || getDefaultPath(chain);
-  const connectId = params.connectId || '';
-  const deviceId = params.deviceId || '';
-  const common = {
-    passphraseState: params.passphraseState,
-    useEmptyPassphrase: params.useEmptyPassphrase,
-  };
+  const { connectId, deviceId, common } = extractCommon(params);
 
   // Most chains use `messageHex` (hex-encoded). CLI accepts either:
   // - Explicit hex: must start with "0x" prefix (e.g., "0xdeadbeef")
