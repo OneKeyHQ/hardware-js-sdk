@@ -26,6 +26,9 @@ allowed-tools:
    - **`batch-get-address` is special**: passphrase is entered only **once** for the entire
      batch (auto-fetched internally). You will see exactly **1** `passphrase_request` event
      on stderr regardless of how many items are in the bundle.
+   - **If a command fails**, do NOT fall back to calling `passphrase-state` as a workaround.
+     Fix the original command. If you must call `passphrase-state`, always include
+     `--passphrase "<value>"` — omitting it causes the device to prompt on-screen.
 
 3. **NEVER combine** `--use-empty-passphrase` with `--passphrase`.
 
