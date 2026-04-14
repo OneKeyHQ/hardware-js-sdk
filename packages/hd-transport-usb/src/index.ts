@@ -141,8 +141,6 @@ export default class NodeUsbTransport {
 
   name = 'NodeUsbTransport';
 
-  version = 'usb';
-
   configured = false;
 
   Log?: any;
