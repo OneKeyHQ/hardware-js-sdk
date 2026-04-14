@@ -312,10 +312,33 @@ hidden-wallet command.**
 
 ---
 
+## Balance Query After Getting Address
+
+After getting a hardware address, use `onekey balance` (NOT public APIs like
+etherscan/blockstream) to query the balance:
+
+```bash
+# Check if onekey CLI is available
+command -v onekey >/dev/null 2>&1 && echo "available" || echo "not installed"
+
+# Query balance (EVM chains)
+onekey balance --chain eth --address <address-from-get-address>
+
+# Query with specific token
+onekey balance --chain eth --token USDC --address <address>
+```
+
+**IMPORTANT:** NEVER use curl/fetch to public APIs (etherscan, blockstream, etc.)
+for balance queries. Always use `onekey balance` which uses OneKey's backend API.
+If `onekey` is not installed: `npm install -g @onekeyfe/cli`
+
+---
+
 ## When To Use
 
 - Get cryptocurrency addresses, sign transactions, sign/verify messages.
 - Multi-chain address setup.
+- **Hardware address + balance query** (get address via `onekey-hw`, then balance via `onekey`).
 
 ## When NOT To Use
 
