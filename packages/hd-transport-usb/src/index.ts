@@ -41,9 +41,22 @@ function getBusId(dev: usb.Device): string {
  * Opens device briefly, reads serial, then closes.
  * Falls back to bus path if serial cannot be read.
  */
-function readSerialNumber(dev: usb.Device): Promise<string> {
+function readSerialNumber(
+  dev: usb.Device,
+  openDevices?: Map<string, OpenDevice>
+): Promise<string> {
   const { iSerialNumber } = dev.deviceDescriptor;
   if (!iSerialNumber) return Promise.resolve(getBusId(dev));
+
+  // If the device is already open (acquired), read serial without open/close
+  const busId = getBusId(dev);
+  if (openDevices) {
+    for (const [serial, od] of openDevices) {
+      if (od.device === dev || getBusId(od.device) === busId) {
+        return Promise.resolve(serial);
+      }
+    }
+  }
 
   return new Promise(resolve => {
     try {
@@ -55,20 +68,19 @@ function readSerialNumber(dev: usb.Device): Promise<string> {
           } catch {
             /* ignore */
           }
-          resolve(data || getBusId(dev));
+          resolve(data || busId);
         });
       } catch {
-        // getStringDescriptor threw synchronously after open — close device
         try {
           dev.close();
         } catch {
           /* ignore */
         }
-        resolve(getBusId(dev));
+        resolve(busId);
       }
     } catch {
-      // dev.open() failed
-      resolve(getBusId(dev));
+      // dev.open() failed (e.g. LIBUSB_ERROR_BUSY if already open elsewhere)
+      resolve(busId);
     }
   });
 }
@@ -175,12 +187,12 @@ export default class NodeUsbTransport {
       return ONEKEY_WEBUSB_FILTER.some(f => idVendor === f.vendorId && idProduct === f.productId);
     });
 
-    this.serialToBusId.clear();
+    const newSerialToBusId = new Map<string, string>();
     const results: OneKeyDeviceInfo[] = [];
     for (const d of onekeyDevices) {
       const busId = getBusId(d);
-      const serial = await readSerialNumber(d);
-      this.serialToBusId.set(serial, busId);
+      const serial = await readSerialNumber(d, this.openDevices);
+      newSerialToBusId.set(serial, busId);
       results.push({
         path: serial,
         id: serial,
@@ -189,6 +201,8 @@ export default class NodeUsbTransport {
         debug: false,
       });
     }
+    // Atomic swap — concurrent acquire() always sees a complete map
+    this.serialToBusId = newSerialToBusId;
     return results;
   }
 

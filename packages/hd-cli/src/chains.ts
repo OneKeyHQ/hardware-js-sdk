@@ -169,7 +169,7 @@ export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) 
 
   const result = await method();
   if (result == null) {
-    return { success: false, error: 'No response from device', chain, path };
+    return { success: false, payload: { error: 'No response from device', code: 'NO_RESPONSE' }, chain, path };
   }
   return { ...(result as object), chain, path };
 }
@@ -376,12 +376,26 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
       sdk.starcoinSignMessage(connectId, deviceId, { path, messageHex: msg, ...common }),
     // TON: tonSignMessage is transfer-signing, pass JSON params (uses raw input, not hex)
     ton: () => {
-      const tonParams = JSON.parse(raw);
+      let tonParams: Record<string, unknown>;
+      try {
+        tonParams = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          `TON sign-message requires JSON input (e.g. '{"destination":"...","tonAmount":"...","seqno":0}'). Got: ${raw.slice(0, 80)}`
+        );
+      }
       return sdk.tonSignMessage(connectId, deviceId, { path, ...tonParams, ...common });
     },
     // Nostr: event must be a NostrEvent object (kind, content, tags, created_at)
     nostr: () => {
-      const event = JSON.parse(raw);
+      let event: Record<string, unknown>;
+      try {
+        event = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          `Nostr sign-event requires JSON input (e.g. '{"kind":1,"content":"...","tags":[],"created_at":0}'). Got: ${raw.slice(0, 80)}`
+        );
+      }
       return sdk.nostrSignEvent(connectId, deviceId, { path, event, ...common });
     },
     // SCDO: uses messageHex

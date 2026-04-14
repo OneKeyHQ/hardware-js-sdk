@@ -57,7 +57,7 @@ program.hook('preAction', () => {
 program
   .command('search')
   .description('Search for connected OneKey hardware wallet devices')
-  .action(async () => {
+  .action(withErrorHandler(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -86,7 +86,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 // ============================================================
 // Signing Commands
@@ -98,7 +98,7 @@ program
   .requiredOption('--chain <chain>', 'Target blockchain (evm, btc, sol, ...)')
   .option('--path <path>', 'BIP44 derivation path')
   .option('--show-on-device <bool>', 'Display address on device for verification', 'true')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -112,14 +112,14 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('get-public-key')
   .description('Get public key from the hardware wallet')
   .requiredOption('--chain <chain>', 'Target blockchain')
   .option('--path <path>', 'BIP44 derivation path')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -132,7 +132,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('sign-transaction')
@@ -140,7 +140,7 @@ program
   .requiredOption('--chain <chain>', 'Target blockchain')
   .requiredOption('--tx <json>', 'Transaction data (JSON)')
   .option('--path <path>', 'BIP44 derivation path')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -155,7 +155,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('sign-message')
@@ -163,7 +163,7 @@ program
   .requiredOption('--chain <chain>', 'Target blockchain')
   .requiredOption('--message <msg>', 'Message to sign')
   .option('--path <path>', 'BIP44 derivation path')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -177,7 +177,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('sign-typed-data')
@@ -185,7 +185,7 @@ program
   .requiredOption('--data <json>', 'EIP-712 typed data JSON')
   .option('--path <path>', 'BIP44 derivation path')
   .option('--metamask-v4-compat', 'Use MetaMask V4 compatibility mode', true)
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -203,14 +203,14 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('sign-psbt')
   .description('Sign a Bitcoin PSBT (Pro/Classic1s only, requires device confirmation)')
   .requiredOption('--psbt <hex>', 'Hex-encoded PSBT data')
   .option('--coin <coin>', 'Bitcoin network: btc, ltc, etc.', 'btc')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -225,7 +225,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('verify-message')
@@ -234,7 +234,7 @@ program
   .requiredOption('--address <addr>', 'Signer address')
   .requiredOption('--message <msg>', 'Original message')
   .requiredOption('--signature <sig>', 'Signature to verify')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -284,13 +284,13 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('batch-get-address')
   .description('Get addresses for multiple chains/paths in a single session')
   .requiredOption('--bundle <json>', 'JSON array of {chain, path, showOnDevice}')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -307,7 +307,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 // ============================================================
 // Chain-Specific Commands
@@ -319,7 +319,7 @@ program
   .requiredOption('--domain-hash <hex>', 'EIP-712 domain separator hash')
   .requiredOption('--message-hash <hex>', 'EIP-712 message hash')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/60'/0'/0/0")
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -335,14 +335,14 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('sol-sign-offchain')
   .description('Sign a Solana off-chain message (requires device confirmation)')
   .requiredOption('--message-hex <hex>', 'Off-chain message as hex')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/501'/0'/0'")
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -357,7 +357,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('nostr-encrypt')
@@ -366,7 +366,7 @@ program
   .requiredOption('--plaintext <text>', 'Message to encrypt')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
   .option('--show-on-device <bool>', 'Display on device', 'false')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -383,7 +383,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('nostr-decrypt')
@@ -392,7 +392,7 @@ program
   .requiredOption('--ciphertext <text>', 'Encrypted message')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
   .option('--show-on-device <bool>', 'Display on device', 'false')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -409,14 +409,14 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('nostr-sign-schnorr')
   .description('Sign a Schnorr signature for Nostr')
   .requiredOption('--hash <hex>', 'Hash to sign (hex)')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/1237'/0'/0/0")
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -431,14 +431,14 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('lnurl-auth')
   .description('Authenticate with LNURL (Lightning Network)')
   .requiredOption('--domain <domain>', 'Service domain')
   .requiredOption('--k1 <hex>', 'Challenge k1 parameter')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -453,7 +453,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('conflux-sign-cip23')
@@ -461,7 +461,7 @@ program
   .requiredOption('--domain-hash <hex>', 'CIP-23 domain hash')
   .requiredOption('--message-hash <hex>', 'CIP-23 message hash')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/503'/0'/0/0")
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -477,14 +477,14 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('aptos-sign-in')
   .description('Sign an Aptos sign-in message')
   .requiredOption('--payload <text>', 'Sign-in payload string')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/637'/0'/0'/0'")
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -499,7 +499,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('ton-sign-proof')
@@ -508,7 +508,7 @@ program
   .requiredOption('--expire-at <timestamp>', 'Proof expiration timestamp')
   .option('--comment <text>', 'Optional comment')
   .option('--path <path>', 'BIP44 derivation path', "m/44'/607'/0'")
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -525,7 +525,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 // ============================================================
 // Firmware Commands
@@ -534,7 +534,7 @@ program
 program
   .command('firmware-check')
   .description('Check if firmware updates are available')
-  .action(async () => {
+  .action(withErrorHandler(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -544,12 +544,12 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('firmware-check-all')
   .description('Check all firmware components (system, BLE, bootloader)')
-  .action(async () => {
+  .action(withErrorHandler(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -559,7 +559,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('firmware-update')
@@ -592,7 +592,7 @@ program
 program
   .command('bootloader-check')
   .description('Check bootloader version and status')
-  .action(async () => {
+  .action(withErrorHandler(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -602,7 +602,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 // ============================================================
 // Security / Management Commands
@@ -612,7 +612,7 @@ program
   .command('change-pin')
   .description('Change or set the device PIN code')
   .option('--remove', 'Remove PIN protection instead of changing')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -624,12 +624,12 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('passphrase-state')
   .description('Get current passphrase state (for hidden wallet session management)')
-  .action(async () => {
+  .action(withErrorHandler(async () => {
     const globalOpts = program.opts();
     // This command's purpose is to trigger passphrase input — using
     // --use-empty-passphrase with it is a contradiction.
@@ -653,13 +653,13 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('toggle-passphrase')
   .description('Enable or disable passphrase (hidden wallet) protection')
   .requiredOption('--enable <bool>', 'true to enable, false to disable')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -671,13 +671,13 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('device-wipe')
   .description('Factory reset — erase ALL data (IRREVERSIBLE)')
   .option('--confirm-wipe', 'Confirm you understand this will erase ALL data permanently')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     if (!opts.confirmWipe) {
       outputResult({
         success: false,
@@ -698,7 +698,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('device-settings')
@@ -709,7 +709,7 @@ program
   .option('--passphrase-always-on-device <bool>', 'Always enter passphrase on device')
   .option('--haptic-feedback <bool>', 'Enable/disable haptic feedback')
   .option('--auto-shutdown-delay <seconds>', 'Auto shutdown timeout in seconds')
-  .action(async opts => {
+  .action(withErrorHandler(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -745,12 +745,12 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('device-verify')
   .description('Verify device is genuine OneKey hardware')
-  .action(async () => {
+  .action(withErrorHandler(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -760,12 +760,12 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 program
   .command('lock')
   .description('Lock the device')
-  .action(async () => {
+  .action(withErrorHandler(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
@@ -775,7 +775,7 @@ program
     } finally {
       sdk.dispose();
     }
-  });
+  }));
 
 // ============================================================
 // Schema Discovery (for AI Agent integration)
@@ -868,6 +868,27 @@ schemaCmd
 // ============================================================
 // Helpers
 // ============================================================
+
+/**
+ * Wrap an async action handler with structured error output.
+ * Catches thrown errors and routes them through outputResult
+ * so agent consumers always receive valid JSON.
+ */
+function withErrorHandler(fn: (...args: any[]) => Promise<void>) {
+  return async (...args: any[]) => {
+    try {
+      await fn(...args);
+    } catch (err) {
+      outputResult({
+        success: false,
+        payload: {
+          error: err instanceof Error ? err.message : String(err),
+          code: 'RUNTIME_ERROR',
+        },
+      });
+    }
+  };
+}
 
 /**
  * Extract common device params from global CLI options.

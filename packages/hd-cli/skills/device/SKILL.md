@@ -147,6 +147,18 @@ onekey-hw search
 - If no devices found, suggest: check USB cable, unlock device, try a different USB port.
 - Multiple devices → present list, ask user to select.
 
+### `onekey-hw device-verify`
+
+Verify the device is genuine OneKey hardware (anti-tampering check).
+
+```bash
+onekey-hw device-verify --connect-id <id> --use-empty-passphrase
+```
+
+**Agent notes:**
+- Requires device interaction (button confirmation).
+- Use when user asks "is my device genuine?" or "verify my device".
+
 ### `onekey-hw lock`
 
 Lock the device (require PIN to unlock).
