@@ -44,7 +44,7 @@
 **症状**: CLI 命令使用、Agent Skill 配置、链支持查询
 - 📖 **入口**: [packages/hd-cli/CLAUDE.md](./packages/hd-cli/CLAUDE.md) — Skills、Schema
 - 📖 **文档**: developer-portal 的 `agent-integration.mdx`
-- 🔧 **CLI**: `@onekeyfe/hardware-cli` — 30 个命令，覆盖 27 链
+- 🔧 **CLI**: `@onekeyfe/hardware-cli` — 29 个命令，覆盖 27 链
 - 🔌 **Plugin**: `.claude-plugin/marketplace.json` — Claude Code 插件入口
 
 如果你要**使用硬件钱包**（获取地址、签名、管理设备），请先阅读 [packages/hd-cli/CLAUDE.md](./packages/hd-cli/CLAUDE.md)。

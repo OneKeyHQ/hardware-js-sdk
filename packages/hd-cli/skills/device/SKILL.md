@@ -22,13 +22,6 @@ update when installing, updating, or handling a failure.
    - Not found → install: `npm install -g @onekeyfe/hardware-cli`
    - Install failed → STOP, point to manual install docs.
 
-2. **Check version is latest** (once per session):
-   - Fetch latest: `npm view @onekeyfe/hardware-cli version`
-   - Compare with local `onekey-hw --version`
-   - Local version behind → **warn user**, run `npm update -g @onekeyfe/hardware-cli`
-   - If update fails → continue with current version (warn, do not block)
-   - Update succeeded → continue with original command.
-
 ## Device Interaction Model
 
 **CRITICAL: Most `onekey-hw` commands block while waiting for physical interaction
@@ -146,7 +139,7 @@ onekey-hw search
 - Always run `search` before any device operation if no `connectId` is known.
 - If no devices found, suggest: check USB cable, unlock device, try a different USB port.
 - Multiple devices → present list, ask user to select.
-- NEVER add `--json` — it is not a valid option. Output is always JSON by default.
+- Output is JSON by default when piped. Use `--json` to force JSON in a terminal.
 
 ### `onekey-hw device-verify`
 
@@ -158,6 +151,9 @@ onekey-hw device-verify --connect-id <id> --use-empty-passphrase
 
 **Agent notes:**
 - Requires device interaction (button confirmation).
+- Requires wallet flag: use `--use-empty-passphrase` for standard wallet,
+  or `--passphrase "<value>"` for hidden wallet. Without it, the command
+  may fail if passphrase protection is enabled.
 - Use when user asks "is my device genuine?" or "verify my device".
 
 ### `onekey-hw lock`

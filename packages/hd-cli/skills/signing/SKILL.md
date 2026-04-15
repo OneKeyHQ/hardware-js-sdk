@@ -17,10 +17,10 @@ allowed-tools:
 
 ## MANDATORY RULES — Read Before Every Command
 
-**RULE 0 — UNLOCK DEVICE, THEN CHECK `passphrase_protection`.** The pre-flight
-flow below handles everything: search → unlock → get reliable features → decide
-wallet mode. Do NOT skip steps. Do NOT ask "is your device ready" — just run the
-commands and let the device prompt for PIN automatically.
+**RULE 0 — SEARCH, THEN DECIDE WALLET MODE.** The pre-flight flow below handles
+everything: search → decide wallet mode based on `passphrase_protection`. Device
+unlocking (PIN entry) is handled automatically by the CLI when needed — no manual
+unlock step required. Do NOT skip steps.
 
 1. **Standard wallet**: use `--use-empty-passphrase` on every command.
 
@@ -41,7 +41,7 @@ commands and let the device prompt for PIN automatically.
 
 3. **NEVER combine** `--use-empty-passphrase` with `--passphrase`.
 
-4. **NEVER add `--json`** — not a valid option. Output is always JSON by default.
+4. Output is JSON by default when piped. Use `--json` to force JSON in a terminal.
 
 ---
 
@@ -61,30 +61,23 @@ onekey-hw search
 ```
 - No device → guide troubleshooting.
 - Record `connectId` from `payload[0].connectId`.
-- Check `payload[0].features.unlocked` and `payload[0].features.passphrase_protection`.
+- Check `payload[0].features.passphrase_protection`.
 
-### Step 3 — Ensure device is unlocked
-If `features.unlocked === false` (or `null`):
-- Tell user: "Please enter your PIN on the device screen when prompted."
-- Run a lightweight command to trigger PIN unlock:
-  ```bash
-  onekey-hw get-address --chain evm --show-on-device false --use-empty-passphrase --connect-id <id>
-  ```
-- Whether this succeeds or fails with Error 114, the device is now **unlocked**.
-  Do NOT use the result yet — continue to Step 4 to check passphrase state.
+**Note:** The CLI automatically handles device unlocking (PIN entry) when needed.
+If the device is locked, the first command that requires it will trigger PIN input
+on the device screen — no manual unlock step is needed. This mirrors the OneKey
+App behavior where unlocking is transparent to the caller.
 
-If `features.unlocked === true` → skip to Step 4.
+### Step 3 — Determine wallet mode
 
-### Step 4 — Re-search and check passphrase_protection (device MUST be unlocked)
+Check `payload[0].features.passphrase_protection` from the search result:
 
-**ALWAYS run `onekey-hw search` again after unlocking** to get reliable features:
-```bash
-onekey-hw search
-```
-Check `payload[0].features.passphrase_protection`:
-
-- **`false`** → standard wallet. Use `--use-empty-passphrase`.
-  If Step 3 already returned an address, use it directly.
+- **`false`** → standard wallet. Use `--use-empty-passphrase`. No questions needed.
+- **`null`** → device is locked, passphrase state unknown. Proceed with
+  `--use-empty-passphrase` (the CLI will auto-unlock via PIN). If the command
+  returns **error 114** (`DeviceNotOpenedPassphrase`), the device actually has
+  passphrase enabled — re-run `onekey-hw search` to get the real
+  `passphrase_protection` value, then follow the `true` branch below.
 - **`true`** → passphrase is enabled. Ask ONE question:
 
 ```
@@ -104,9 +97,6 @@ AskUserQuestion:
 - **Option C** → do NOT pass `--passphrase`; user enters on device
   screen for each command. Set timeout to 120000.
 - **Option D** → stop.
-
-If `passphrase_protection === false`:
-- Standard wallet. Use `--use-empty-passphrase`. No questions needed.
 
 ---
 
@@ -309,8 +299,6 @@ hidden-wallet command.**
 → onekey-hw get-address --chain evm --show-on-device true --use-empty-passphrase --connect-id <id>
 → "Please verify the address on your OneKey device screen."
 ```
-
----
 
 ---
 

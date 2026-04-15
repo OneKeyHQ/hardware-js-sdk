@@ -11,7 +11,7 @@ command signatures, workflows, and security rules.
 | **Device** | `skills/device/SKILL.md` | Search devices (with features), lock, verify |
 | **Signing** | `skills/signing/SKILL.md` | Get addresses, sign transactions/messages (27 chains) |
 | **Firmware** | `skills/firmware/SKILL.md` | Check firmware versions (updates via OneKey App only) |
-| **Security** | `skills/security/SKILL.md` | PIN, passphrase, device settings, factory reset |
+| **Security** | `skills/security/SKILL.md` | PIN, passphrase, device settings, device wipe (via OneKey App) |
 
 ## Companion Plugin: OneKey Wallet Skills
 
@@ -77,7 +77,7 @@ onekey-hw schema sign-transaction
 
 - All signing operations require **physical confirmation** on the hardware device
 - Commands block while waiting for device interaction (PIN, button press)
-- All output is structured JSON
+- All output is structured JSON (auto-detected; use `--json` to force JSON in TTY)
 - Uses direct USB (libusb) — no external daemon needed
 
 Each skill file includes pre-flight checks, security rules, and parameter

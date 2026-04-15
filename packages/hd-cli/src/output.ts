@@ -1,8 +1,8 @@
 /**
  * Output formatting for human/agent modes.
  *
- * - Agent mode (piped / AI agent): structured JSON on stdout, JSON events on stderr
- * - Human mode (TTY / --human): colored formatted output on stdout, colored prompts on stderr
+ * - Agent mode (piped / --json / AI agent): structured JSON on stdout, JSON events on stderr
+ * - Human mode (TTY): colored formatted output on stdout, colored prompts on stderr
  */
 
 import chalk from 'chalk';
@@ -20,9 +20,9 @@ export type EventType =
 
 let currentMode: OutputMode = 'agent';
 
-export function detectAndSetMode(opts: { human?: boolean }): OutputMode {
-  if (opts.human) {
-    currentMode = 'human';
+export function detectAndSetMode(opts: { json?: boolean }): OutputMode {
+  if (opts.json) {
+    currentMode = 'agent';
   } else {
     currentMode = process.stdout.isTTY ? 'human' : 'agent';
   }

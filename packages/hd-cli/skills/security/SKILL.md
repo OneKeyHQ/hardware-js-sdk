@@ -160,14 +160,6 @@ onekey-hw device-settings \
   [--connect-id <id>]
 ```
 
-### `onekey-hw lock`
-
-Lock the device (require PIN to unlock).
-
-```bash
-onekey-hw lock [--connect-id <id>]
-```
-
 ## Workflows
 
 ### Change PIN

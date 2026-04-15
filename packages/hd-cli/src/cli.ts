@@ -41,11 +41,11 @@ program.option(
   'Passphrase for hidden wallet access. Provided to the SDK on every REQUEST_PASSPHRASE event. ' +
     'Mutually exclusive with --use-empty-passphrase.'
 );
-program.option('--human', 'Force human-readable output (auto-detected when running in terminal)');
+program.option('--json', 'Force JSON output (auto-detected when piped)');
 
 program.hook('preAction', () => {
   const opts = program.opts();
-  detectAndSetMode({ human: opts.human });
+  detectAndSetMode({ json: opts.json });
 
   // --use-empty-passphrase and --passphrase-state are for different wallet types
   if (opts.useEmptyPassphrase && opts.passphraseState) {
