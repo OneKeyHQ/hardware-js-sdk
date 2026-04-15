@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 
-import { createSDK } from './sdk';
+import { createSDK, ensureDeviceUnlocked } from './sdk';
 import {
   resolveBatchGetAddress,
   resolveGetAddress,
@@ -129,11 +129,13 @@ program
       const globalOpts = program.opts();
       const sdk = await createSDK(globalOpts);
       try {
+        const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const result = await resolveGetAddress(sdk, {
           chain: opts.chain,
           path: opts.path,
           showOnDevice: opts.showOnDevice === 'true',
-          ...getCommonParams(globalOpts),
+          ...params,
         });
         outputResult(result);
       } finally {
@@ -152,10 +154,12 @@ program
       const globalOpts = program.opts();
       const sdk = await createSDK(globalOpts);
       try {
+        const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const result = await resolveGetPublicKey(sdk, {
           chain: opts.chain,
           path: opts.path,
-          ...getCommonParams(globalOpts),
+          ...params,
         });
         outputResult(result);
       } finally {
@@ -176,11 +180,13 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const tx = safeJsonParse(opts.tx, '--tx') as Record<string, unknown>;
+        const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const result = await resolveSignTransaction(sdk, {
           chain: opts.chain,
           path: opts.path,
           transaction: tx,
-          ...getCommonParams(globalOpts),
+          ...params,
         });
         outputResult(result);
       } finally {
@@ -200,11 +206,13 @@ program
       const globalOpts = program.opts();
       const sdk = await createSDK(globalOpts);
       try {
+        const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const result = await resolveSignMessage(sdk, {
           chain: opts.chain,
           path: opts.path,
           message: opts.message,
-          ...getCommonParams(globalOpts),
+          ...params,
         });
         outputResult(result);
       } finally {
@@ -226,6 +234,7 @@ program
       try {
         const data = safeJsonParse(opts.data, '--data');
         const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const path = opts.path || "m/44'/60'/0'/0/0";
         const result = await sdk.evmSignTypedData(params.connectId || '', params.deviceId || '', {
           path,
@@ -252,6 +261,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const result = await sdk.btcSignPsbt(params.connectId || '', params.deviceId || '', {
           psbt: opts.psbt,
           coin: opts.coin,
@@ -278,6 +288,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const cid = params.connectId || '';
         const did = params.deviceId || '';
         let result: unknown;
@@ -341,6 +352,7 @@ program
           showOnDevice?: boolean;
         }>;
         let commonParams = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, commonParams.connectId);
 
         // When --passphrase is provided but --passphrase-state is not, auto-obtain the
         // passphraseState before the batch loop. This serves two purposes:
@@ -393,6 +405,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.evmSignMessageEIP712(p.connectId || '', p.deviceId || '', {
           path: opts.path,
           domainHash: opts.domainHash,
@@ -418,6 +431,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.solSignOffchainMessage(p.connectId || '', p.deviceId || '', {
           path: opts.path,
           messageHex: opts.messageHex,
@@ -444,6 +458,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.nostrEncryptMessage(p.connectId || '', p.deviceId || '', {
           path: opts.path,
           pubkey: opts.pubkey,
@@ -472,6 +487,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.nostrDecryptMessage(p.connectId || '', p.deviceId || '', {
           path: opts.path,
           pubkey: opts.pubkey,
@@ -498,6 +514,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.nostrSignSchnorr(p.connectId || '', p.deviceId || '', {
           path: opts.path,
           hash: opts.hash,
@@ -522,6 +539,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.lnurlAuth(p.connectId || '', p.deviceId || '', {
           domain: opts.domain,
           k1: opts.k1,
@@ -547,6 +565,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.confluxSignMessageCIP23(p.connectId || '', p.deviceId || '', {
           path: opts.path,
           domainHash: opts.domainHash,
@@ -572,6 +591,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.aptosSignInMessage(p.connectId || '', p.deviceId || '', {
           path: opts.path,
           payload: opts.payload,
@@ -598,6 +618,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const p = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, p.connectId);
         const result = await sdk.tonSignProof(p.connectId || '', p.deviceId || '', {
           path: opts.path,
           appdomain: opts.appdomain,
@@ -745,6 +766,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const result = await sdk.getPassphraseState(params.connectId);
         // Emit the passphraseState to stderr so agents can read it from the event stream
         if (result && typeof result === 'object' && 'success' in result && result.success) {
@@ -846,6 +868,7 @@ program
       const sdk = await createSDK(globalOpts);
       try {
         const params = getCommonParams(globalOpts);
+        await ensureDeviceUnlocked(sdk, params.connectId);
         const result = await sdk.deviceVerify(params.connectId, {
           dataHex: opts.dataHex,
           useEmptyPassphrase: params.useEmptyPassphrase,

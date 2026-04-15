@@ -242,3 +242,35 @@ export async function createSDK(opts: SDKOptions) {
 
   return HardwareSDK;
 }
+
+/**
+ * Pre-unlock Pro/Touch devices before SDK API calls that require passphrase state.
+ *
+ * Unlike the OneKey App (which has a UI-driven unlock flow before any wallet
+ * operation), the CLI may invoke SDK methods on a cold/locked device. The SDK's
+ * checkPassphraseStateSafety() calls GetPassphraseState internally, which returns
+ * Failure_ActionCancelled (error 803) on locked Pro/Touch devices.
+ *
+ * This function mirrors what the App does implicitly: unlock first, then proceed.
+ * Call it after createSDK() and before any SDK method that uses passphrase state
+ * (i.e. signing, address generation, etc.).
+ */
+export async function ensureDeviceUnlocked(
+  sdk: typeof HardwareSDK,
+  connectId?: string
+): Promise<void> {
+  if (!connectId) return;
+
+  const featuresResult = await sdk.getFeatures(connectId);
+  if (!featuresResult?.success || !featuresResult.payload) return;
+
+  const features = featuresResult.payload;
+  const deviceType = features.onekey_device_type?.toLowerCase();
+  const isProOrTouch = deviceType === 'touch' || deviceType === 'pro';
+
+  if (isProOrTouch && features.unlocked === false) {
+    // Device is locked — unlock via PIN entry (handled on-device for Pro/Touch).
+    // Without this, GetPassphraseState will fail with error 803.
+    await sdk.deviceUnlock(connectId);
+  }
+}

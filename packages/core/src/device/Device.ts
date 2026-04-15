@@ -840,31 +840,12 @@ export class Device extends EventEmitter {
   ) {
     if (!this.features) return false;
 
-    // Pro/Touch devices must be unlocked via UnLockDevice before GetPassphraseState.
-    // A locked device (unlocked === false) returns Failure_ActionCancelled (803) if
-    // GetPassphraseState is called directly. UnLockDevice handles PIN entry and also
-    // reveals the actual passphrase_protection state (which is null when locked).
-    const isModeT =
-      getDeviceType(this.features) === EDeviceType.Touch ||
-      getDeviceType(this.features) === EDeviceType.Pro;
-    const isLocked = isModeT && this.features?.unlocked === false;
-
-    if (isLocked) {
-      await this.unlockDevice();
-      // If passphrase is disabled after unlock, no further passphrase check is needed.
-      if (!this.features?.passphrase_protection) {
-        return true;
-      }
-    }
-
     const { passphraseState: newPassphraseState, unlockedAttachPin } =
       await getPassphraseStateWithRefreshDeviceInfo(this, {
         expectPassphraseState: passphraseState,
         onlyMainPin: useEmptyPassphrase,
       });
 
-    // skipPassphraseCheck: skip safety validation of passphraseState.
-    // Used when --passphrase is provided without --passphrase-state.
     if (skipPassphraseCheck) {
       return true;
     }
