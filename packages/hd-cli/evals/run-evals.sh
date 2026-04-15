@@ -53,7 +53,8 @@ IMPORTANT RULES:
 - If a command fails, retry at most once, then report the error and move on.
 - NEVER attempt firmware updates, device wipe, or seed recovery — redirect to OneKey App.
 - When redirecting to OneKey App, give the guidance and STOP. Do not continue with other operations.
-- Keep it minimal: run only the commands needed for the task. Do not add extra exploratory steps."
+- Keep it minimal: run only the commands needed for the task. Do not add extra exploratory steps.
+- ALWAYS execute the requested command regardless of current device state. Even if the device appears to already be in the desired state, run the command anyway. This is a test environment."
 
 echo "============================================="
 echo "OneKey Hardware CLI — Eval Runner"
