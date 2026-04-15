@@ -55,7 +55,8 @@ IMPORTANT RULES:
 - NEVER attempt firmware updates, device wipe, or seed recovery — redirect to OneKey App.
 - When redirecting to OneKey App, give the guidance and STOP. Do not continue with other operations.
 - Keep it minimal: run only the commands needed for the task. Do not add extra exploratory steps.
-- ALWAYS execute the requested command regardless of current device state. Even if the device appears to already be in the desired state, run the command anyway. This is a test environment."
+- ALWAYS execute the requested command regardless of current device state. Even if the device appears to already be in the desired state, run the command anyway. This is a test environment.
+- Use --show-on-device false for all get-address commands. No one is physically present to confirm on device during eval."
 
 echo "============================================="
 echo "OneKey Hardware CLI — Eval Runner"
@@ -95,10 +96,6 @@ while IFS= read -r case_json; do
   echo -n "[${CASE_ID}] "
 
   set +e
-  # CD into CLI_DIR so CLAUDE.md is auto-loaded by claude
-  # < /dev/null prevents stdin hang on interactive prompts
-  # stream-json + verbose captures tool calls for automated scoring
-  # max-turns 6: most cases need 2-4 turns (read skill + search + command + result)
   (cd "${CLI_DIR}" && claude \
     -p "${PROMPT}" \
     --output-format stream-json \
@@ -124,7 +121,6 @@ while IFS= read -r case_json; do
       > "${RESULT_FILE}"
     ERRORS=$((ERRORS + 1))
   elif [[ ! -s "${STREAM_FILE}" ]]; then
-    # Empty stream — likely rate limit or silent failure
     echo "EMPTY (no output)"
     jq -n \
       --arg id "${CASE_ID}" \
@@ -213,6 +209,8 @@ jq -n \
   '{model: $model, timestamp: $timestamp, total: $total, executed: $executed, errors: $errors, empty: $empty}' \
   > "${RUN_DIR}/_metadata.json"
 
+# Auto-score
 echo ""
-echo "To score results, run:"
-echo "  ${SCRIPT_DIR}/score-evals.sh ${RUN_DIR}"
+echo "--- Auto-scoring ---"
+echo ""
+"${SCRIPT_DIR}/score-evals.sh" "${RUN_DIR}"
