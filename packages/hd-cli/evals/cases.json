@@ -1023,28 +1023,28 @@
       "prompt": "What's my ETH balance?",
       "skill": "routing",
       "expect": {
-        "commands": [
-          "onekey balance"
-        ],
+        "commands": [],
         "forbidden": [
-          "onekey-hw"
+          "onekey-hw get-address",
+          "onekey-hw sign"
         ],
         "note": "Balance query → wallet skill, not hardware"
-      }
+      },
+      "note": "Agent should either run onekey balance directly OR ask which wallet. Must NOT route to hardware."
     },
     {
       "id": "routing-balance-cn",
       "prompt": "查一下我的 ETH 余额",
       "skill": "routing",
       "expect": {
-        "commands": [
-          "onekey balance"
-        ],
+        "commands": [],
         "forbidden": [
-          "onekey-hw"
+          "onekey-hw get-address",
+          "onekey-hw sign"
         ],
         "note": "Balance query → wallet skill"
-      }
+      },
+      "note": "Agent should either run onekey balance directly OR ask which wallet. Must NOT route to hardware."
     },
     {
       "id": "routing-hardware-balance",
@@ -1058,7 +1058,8 @@
         ],
         "forbidden": [],
         "note": "Hardware wallet balance: get address from device first, then query balance"
-      }
+      },
+      "requires_device": true
     },
     {
       "id": "routing-market-price",
@@ -1086,7 +1087,8 @@
           "onekey transfer"
         ],
         "note": "Explicit hardware signing → onekey-hw"
-      }
+      },
+      "requires_device": true
     },
     {
       "id": "routing-swap-not-hardware",
@@ -1139,7 +1141,8 @@
           "onekey balance"
         ],
         "note": "Explicit mention of OneKey device → must route to onekey-hw"
-      }
+      },
+      "requires_device": true
     },
     {
       "id": "routing-transfer-not-hardware",
@@ -1177,7 +1180,8 @@
         ],
         "forbidden": [],
         "note": "Hardware signing + broadcast: sign with onekey-hw, then broadcast"
-      }
+      },
+      "requires_device": true
     },
     {
       "id": "routing-firmware-is-hardware",
@@ -1192,7 +1196,8 @@
           "onekey firmware"
         ],
         "note": "Firmware check is a hardware operation"
-      }
+      },
+      "requires_device": true
     },
     {
       "id": "edge-unsupported-chain",
