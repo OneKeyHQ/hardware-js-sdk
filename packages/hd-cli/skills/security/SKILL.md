@@ -189,14 +189,7 @@ Step 2 — Change PIN
 - User wants to backup/recover wallet → guide them to the OneKey App.
 - User wants to update firmware → guide them to the OneKey App or https://firmware.onekey.so/
 
-## Companion: OneKey Wallet CLI (`onekey`)
+## Scope
 
-**NEVER use curl/fetch to public APIs (etherscan, blockstream, etc.).**
-Use `onekey` CLI for all non-hardware queries. If not installed: `npm install -g @onekeyfe/cli`
-
-| After hardware operation | Follow up with |
-|---|---|
-| Got address → query balance | `onekey balance --chain eth --address <addr>` |
-| Need token price / market data | `onekey token price --symbol ETH` |
-| Need to send/transfer | `onekey transfer --chain eth --to <addr> --amount <n>` |
-| Need token security audit | `onekey security audit --chain eth --token <addr>` |
+`onekey-hw` handles device-level operations only. For balance queries, transfers,
+swaps, and market data, use the `onekey` CLI (`@onekeyfe/cli`) with `--hardware` flag.
