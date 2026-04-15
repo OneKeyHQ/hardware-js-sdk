@@ -56,7 +56,8 @@ IMPORTANT RULES:
 - When redirecting to OneKey App, give the guidance and STOP. Do not continue with other operations.
 - Keep it minimal: run only the commands needed for the task. Do not add extra exploratory steps.
 - ALWAYS execute the requested command regardless of current device state. Even if the device appears to already be in the desired state, run the command anyway. This is a test environment.
-- Use --show-on-device false for all get-address commands. No one is physically present to confirm on device during eval."
+- Use --show-on-device false for all get-address commands. No one is physically present to confirm on device during eval.
+- Wrap all onekey-hw commands (except search) with a bash timeout: timeout 30 onekey-hw <command>. Device commands may hang waiting for physical confirmation. If a command times out, report it and move on — do NOT retry."
 
 echo "============================================="
 echo "OneKey Hardware CLI — Eval Runner"
@@ -95,22 +96,36 @@ while IFS= read -r case_json; do
 
   echo -n "[${CASE_ID}] "
 
+  # Per-case timeout (seconds) — prevents hanging on device interaction
+  CASE_TIMEOUT=120
+
   set +e
-  (cd "${CLI_DIR}" && claude \
-    -p "${PROMPT}" \
-    --output-format stream-json \
-    --verbose \
-    --max-turns 6 \
-    --permission-mode bypassPermissions \
-    --system-prompt "${SYSTEM_PROMPT}" \
-    ${MODEL_FLAG} \
-    < /dev/null \
-    > "${STREAM_FILE}" \
-    2> "${STDERR_FILE}")
+  timeout "${CASE_TIMEOUT}" bash -c "
+    cd '${CLI_DIR}' && claude \
+      -p '$(echo "${PROMPT}" | sed "s/'/'\\\\''/g")' \
+      --output-format stream-json \
+      --verbose \
+      --max-turns 6 \
+      --permission-mode bypassPermissions \
+      --system-prompt '$(echo "${SYSTEM_PROMPT}" | sed "s/'/'\\\\''/g")' \
+      ${MODEL_FLAG} \
+      < /dev/null \
+      > '${STREAM_FILE}' \
+      2> '${STDERR_FILE}'
+  "
   EXIT_CODE=$?
   set -e
 
-  if [[ ${EXIT_CODE} -ne 0 ]]; then
+  if [[ ${EXIT_CODE} -eq 124 ]]; then
+    echo "TIMEOUT (${CASE_TIMEOUT}s)"
+    jq -n \
+      --arg id "${CASE_ID}" \
+      --arg prompt "${PROMPT}" \
+      --argjson timeout "${CASE_TIMEOUT}" \
+      '{id: $id, prompt: $prompt, status: "timeout", timeout_seconds: $timeout}' \
+      > "${RESULT_FILE}"
+    ERRORS=$((ERRORS + 1))
+  elif [[ ${EXIT_CODE} -ne 0 ]]; then
     echo "ERROR (exit ${EXIT_CODE})"
     jq -n \
       --arg id "${CASE_ID}" \

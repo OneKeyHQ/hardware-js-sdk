@@ -53,7 +53,7 @@ def check_case(case, result):
     issues = []
     expect = case.get("expect", {})
     status = result.get("status", "unknown")
-    if status in ("error", "parse_error", "empty_response"):
+    if status in ("error", "parse_error", "empty_response", "timeout"):
         return False, [status]
 
     all_text, tool_text, resp_text = build_scopes(result)
