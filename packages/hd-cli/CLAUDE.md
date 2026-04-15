@@ -31,6 +31,28 @@ If `onekey` CLI is available, route non-hardware tasks to the `onekey-skills` pl
 | Token swap / exchange | `onekey-skills:swap` skill |
 | Token security audit | `onekey-skills:security` skill |
 
+## Routing: Hardware vs Other Skills
+
+| User says | Route to | Why |
+|---|---|---|
+| "check my balance" / "查余额" | **wallet** (`onekey balance`) | Balance query doesn't need hardware |
+| "check my hardware wallet balance" | **hardware** → then **wallet** | Need hardware address first, then query balance |
+| "send ETH" / "转账" | **wallet** (`onekey transfer`) | Default to software wallet |
+| "what's the price of ETH" | **market** (`onekey token price`) | Market data, no hardware needed |
+| "swap ETH to USDC" | **swap** (`onekey swap`) | Token swap, no hardware needed |
+| "is this token safe?" | **security** (`onekey security`) | Token audit, no hardware needed |
+| "get my address" / "获取地址" | **ask which wallet** | Ambiguous — could be hardware or software |
+| "get my hardware wallet address" | **hardware** (`onekey-hw get-address`) | Explicit hardware mention |
+| "sign on my OneKey device" | **hardware** (`onekey-hw sign-*`) | Explicit hardware mention |
+| "what's my device firmware?" | **hardware** (`onekey-hw firmware-check`) | Device-specific |
+| "change my PIN" | **hardware** (`onekey-hw change-pin`) | Device-specific |
+| "what tokens are trending?" | **market** (`onekey token trending`) | Market data, no hardware needed |
+
+**Key rules:**
+- If user mentions "hardware wallet", "OneKey device", "my device" → route to `onekey-hw`
+- If user asks about balance, price, swap, transfer WITHOUT mentioning hardware → route to `onekey` (wallet/market/swap)
+- If ambiguous (e.g., "get my address") → ask which wallet before proceeding
+
 **Typical combined workflow (hardware address + balance):**
 
 ```bash

@@ -31,6 +31,11 @@ If `onekey` CLI is available, route non-hardware tasks to the `onekey-skills` pl
 | Token swap / exchange | `onekey-skills:swap` skill |
 | Token security audit | `onekey-skills:security` skill |
 
+**Routing rules:**
+- User mentions "hardware wallet" / "OneKey device" / "my device" → `onekey-hw`
+- User asks about balance, price, swap, transfer WITHOUT mentioning hardware → `onekey` (wallet/market/swap)
+- Ambiguous (e.g., "get my address") → ask which wallet first
+
 If `onekey` is not installed: `npm install -g @onekeyfe/cli`
 
 ## Quick Start

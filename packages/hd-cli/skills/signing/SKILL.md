@@ -157,6 +157,9 @@ AskUserQuestion:
 | Benfen | `benfen` |
 | Nexa | `nexa` |
 
+> **Note:** Nostr uses `get-public-key` only (not `get-address`). For Nostr public keys, use:
+> `onekey-hw get-public-key --chain nostr --use-empty-passphrase --connect-id <id>`
+
 ---
 
 ## Commands
@@ -164,11 +167,11 @@ AskUserQuestion:
 ### Address & Public Key
 
 ```bash
-# Get address (standard wallet)
+# Get address (standard wallet) — all chains EXCEPT nostr
 onekey-hw get-address --chain evm [--path <bip44>] [--show-on-device true] --use-empty-passphrase --connect-id <id>
 
-# Get public key
-onekey-hw get-public-key --chain evm [--path <bip44>] --use-empty-passphrase --connect-id <id>
+# Get public key — required for nostr, optional for other chains
+onekey-hw get-public-key --chain nostr [--path <bip44>] --use-empty-passphrase --connect-id <id>
 
 # Batch addresses (standard wallet)
 onekey-hw batch-get-address --bundle '[{"chain":"evm"},{"chain":"btc"}]' --use-empty-passphrase --connect-id <id>
