@@ -103,7 +103,7 @@ while IFS= read -r case_json; do
     -p "${PROMPT}" \
     --output-format stream-json \
     --verbose \
-    --max-turns 5 \
+    --max-turns 6 \
     --permission-mode bypassPermissions \
     --system-prompt "${SYSTEM_PROMPT}" \
     ${MODEL_FLAG} \
