@@ -45,10 +45,7 @@ function getBusId(dev: usb.Device): string {
  * Opens device briefly, reads serial, then closes.
  * Falls back to bus path if serial cannot be read.
  */
-function readSerialNumber(
-  dev: usb.Device,
-  openDevices?: Map<string, OpenDevice>
-): Promise<string> {
+function readSerialNumber(dev: usb.Device, openDevices?: Map<string, OpenDevice>): Promise<string> {
   const { iSerialNumber } = dev.deviceDescriptor;
   if (!iSerialNumber) return Promise.resolve(getBusId(dev));
 
@@ -115,7 +112,9 @@ function transferOutOnce(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
 }
 
 function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
 }
 
 /**
