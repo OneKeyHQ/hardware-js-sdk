@@ -47,7 +47,8 @@ IMPORTANT RULES:
 - Read the skill files FIRST before running any onekey-hw command.
 - Skill files are at: ${CLI_DIR}/skills/ — read the relevant one for the task.
 - NEVER use --help to discover commands. Skill files are your sole source of truth.
-- Skip all pre-flight checks (version, npm view) — assume CLI is installed and ready.
+- Skip all pre-flight checks (version, npm view, --version) — assume CLI is installed and ready.
+- Be efficient with turns: read the skill file AND run commands in the same turn when possible.
 - Auto-confirm YES for any AskUserQuestion prompts about device readiness.
 - Do NOT pause to ask the user for clarification. Proceed with reasonable defaults.
 - If a command fails, retry at most once, then report the error and move on.
@@ -102,7 +103,7 @@ while IFS= read -r case_json; do
     -p "${PROMPT}" \
     --output-format stream-json \
     --verbose \
-    --max-turns 3 \
+    --max-turns 5 \
     --permission-mode bypassPermissions \
     --system-prompt "${SYSTEM_PROMPT}" \
     ${MODEL_FLAG} \
