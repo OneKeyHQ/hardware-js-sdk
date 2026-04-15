@@ -42,12 +42,17 @@
 
 ### 🤖 AI Agent 集成 / CLI 使用
 **症状**: CLI 命令使用、Agent Skill 配置、链支持查询
-- 📖 **入口**: [packages/hd-cli/CLAUDE.md](./packages/hd-cli/CLAUDE.md) — Skills、Schema
 - 📖 **文档**: developer-portal 的 `agent-integration.mdx`
-- 🔧 **CLI**: `@onekeyfe/hardware-cli` — 29 个命令，覆盖 27 链
-- 🔌 **Plugin**: `.claude-plugin/marketplace.json` — Claude Code 插件入口
+- 🔧 **CLI**: `@onekeyfe/cli`（`onekey` 命令）— 钱包操作 + `--hardware` 硬件签名 + `device` 设备管理
+- ⚠️ `@onekeyfe/hardware-cli`（`onekey-hw`）已 **deprecated**，请使用 `onekey` CLI
 
-如果你要**使用硬件钱包**（获取地址、签名、管理设备），请先阅读 [packages/hd-cli/CLAUDE.md](./packages/hd-cli/CLAUDE.md)。
+如果你要**使用硬件钱包**，请使用 `onekey` CLI：
+```bash
+npm install -g @onekeyfe/cli
+onekey balance --chain eth --hardware        # 硬件钱包余额
+onekey device search                         # 搜索设备
+onekey device firmware                       # 检查固件
+```
 
 ## 🤖 专业Agent
 

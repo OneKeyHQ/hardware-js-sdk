@@ -1,7 +1,8 @@
 {
   "name": "@onekeyfe/hardware-cli",
   "version": "1.1.26-alpha.0",
-  "description": "OneKey hardware wallet CLI for AI agent integration",
+  "description": "DEPRECATED — Use @onekeyfe/cli instead. OneKey hardware wallet CLI.",
+  "deprecated": "Use @onekeyfe/cli with --hardware flag and device subcommands instead.",
   "author": "OneKey",
   "license": "Apache-2.0",
   "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
