@@ -116,7 +116,10 @@ function promptUser(question: string, hidden = false): Promise<string> {
  * in checkPassphraseStateSafety() before the device call. It has no bearing
  * on what value to return in response to REQUEST_PASSPHRASE.
  */
+let handlersRegistered = false;
 function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void {
+  if (handlersRegistered) return;
+  handlersRegistered = true;
   sdk.on(UI_EVENT, (message: UiEventMessage) => {
     // ── PIN Request ────────────────────────────────────────────────────────
     // Touch/Pro: PIN is entered on-device (device screen shows numpad).

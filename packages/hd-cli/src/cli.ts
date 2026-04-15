@@ -291,6 +291,10 @@ program
         await ensureDeviceUnlocked(sdk, params.connectId);
         const cid = params.connectId || '';
         const did = params.deviceId || '';
+        // Hex-encode the message the same way sign-message does (resolveSignMessage)
+        const rawMsg = opts.message;
+        const isHex = /^0x[0-9a-fA-F]+$/.test(rawMsg);
+        const messageHex = isHex ? rawMsg.slice(2) : Buffer.from(rawMsg, 'utf8').toString('hex');
         let result: unknown;
         switch (opts.chain.toLowerCase()) {
           case 'evm':
@@ -298,7 +302,7 @@ program
           case 'ethereum':
             result = await sdk.evmVerifyMessage(cid, did, {
               address: opts.address,
-              messageHex: opts.message,
+              messageHex,
               signature: opts.signature,
               useEmptyPassphrase: params.useEmptyPassphrase,
               passphraseState: params.passphraseState,
@@ -308,7 +312,7 @@ program
           case 'bitcoin':
             result = await sdk.btcVerifyMessage(cid, did, {
               address: opts.address,
-              messageHex: opts.message,
+              messageHex,
               signature: opts.signature,
               coin: 'btc',
               useEmptyPassphrase: params.useEmptyPassphrase,
@@ -319,7 +323,7 @@ program
           case 'stc':
             result = await sdk.starcoinVerifyMessage(cid, did, {
               publicKey: opts.address,
-              messageHex: opts.message,
+              messageHex,
               signature: opts.signature,
               useEmptyPassphrase: params.useEmptyPassphrase,
               passphraseState: params.passphraseState,
