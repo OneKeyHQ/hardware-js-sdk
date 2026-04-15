@@ -65,8 +65,8 @@ while IFS= read -r case_json; do
 
   # Check for error/parse_error status
   FILE_STATUS=$(jq -r '.status // "unknown"' "${RESULT_FILE}" 2>/dev/null || echo "unknown")
-  if [[ "${FILE_STATUS}" == "error" || "${FILE_STATUS}" == "parse_error" ]]; then
-    ISSUES="execution error"
+  if [[ "${FILE_STATUS}" == "error" || "${FILE_STATUS}" == "parse_error" || "${FILE_STATUS}" == "empty_response" ]]; then
+    ISSUES="${FILE_STATUS}"
     CASE_PASS="false"
     RESULT_TEXT=""
     TOOL_TEXT=""

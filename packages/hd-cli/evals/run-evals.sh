@@ -40,19 +40,20 @@ if [[ -n "${MODEL}" ]]; then
   MODEL_FLAG="--model ${MODEL}"
 fi
 
-# System prompt — aligned with app-monorepo approach
-# CD to CLI_DIR handles CLAUDE.md auto-load; system prompt adds eval-mode rules
+# System prompt — eval-mode rules on top of CLAUDE.md auto-loaded from CLI_DIR
 SYSTEM_PROMPT="You are testing the OneKey hardware wallet CLI (onekey-hw).
 
 IMPORTANT RULES:
 - Read the skill files FIRST before running any onekey-hw command.
 - Skill files are at: ${CLI_DIR}/skills/ — read the relevant one for the task.
-- NEVER use --help or --json to discover commands. Skill files are your sole source.
+- NEVER use --help to discover commands. Skill files are your sole source of truth.
 - Skip all pre-flight checks (version, npm view) — assume CLI is installed and ready.
 - Auto-confirm YES for any AskUserQuestion prompts about device readiness.
 - Do NOT pause to ask the user for clarification. Proceed with reasonable defaults.
-- If a command fails, retry at most once, then report the error and continue.
-- NEVER attempt firmware updates, device wipe, or seed recovery — redirect to OneKey App."
+- If a command fails, retry at most once, then report the error and move on.
+- NEVER attempt firmware updates, device wipe, or seed recovery — redirect to OneKey App.
+- When redirecting to OneKey App, give the guidance and STOP. Do not continue with other operations.
+- Keep it minimal: run only the commands needed for the task. Do not add extra exploratory steps."
 
 echo "============================================="
 echo "OneKey Hardware CLI — Eval Runner"
@@ -70,6 +71,7 @@ fi
 
 EXECUTED=0
 ERRORS=0
+EMPTY=0
 
 echo "Running ${TOTAL} evaluation cases..."
 echo ""
@@ -94,11 +96,12 @@ while IFS= read -r case_json; do
   # CD into CLI_DIR so CLAUDE.md is auto-loaded by claude
   # < /dev/null prevents stdin hang on interactive prompts
   # stream-json + verbose captures tool calls for automated scoring
+  # max-turns 6: most cases need 2-4 turns (read skill + search + command + result)
   (cd "${CLI_DIR}" && claude \
     -p "${PROMPT}" \
     --output-format stream-json \
     --verbose \
-    --max-turns 25 \
+    --max-turns 6 \
     --permission-mode bypassPermissions \
     --system-prompt "${SYSTEM_PROMPT}" \
     ${MODEL_FLAG} \
@@ -118,6 +121,15 @@ while IFS= read -r case_json; do
       '{id: $id, prompt: $prompt, status: "error", exit_code: $exit_code, stderr: $stderr}' \
       > "${RESULT_FILE}"
     ERRORS=$((ERRORS + 1))
+  elif [[ ! -s "${STREAM_FILE}" ]]; then
+    # Empty stream — likely rate limit or silent failure
+    echo "EMPTY (no output)"
+    jq -n \
+      --arg id "${CASE_ID}" \
+      --arg prompt "${PROMPT}" \
+      '{id: $id, prompt: $prompt, status: "empty_response"}' \
+      > "${RESULT_FILE}"
+    EMPTY=$((EMPTY + 1))
   else
     # Parse stream-json into structured result for scoring
     python3 -c "
@@ -184,6 +196,7 @@ echo ""
 echo "============================================="
 echo "Executed: ${EXECUTED} / ${TOTAL}"
 echo "Errors:   ${ERRORS}"
+echo "Empty:    ${EMPTY}"
 echo "Results:  ${RUN_DIR}"
 echo "============================================="
 
@@ -194,7 +207,8 @@ jq -n \
   --argjson total "${TOTAL}" \
   --argjson executed "${EXECUTED}" \
   --argjson errors "${ERRORS}" \
-  '{model: $model, timestamp: $timestamp, total: $total, executed: $executed, errors: $errors}' \
+  --argjson empty "${EMPTY}" \
+  '{model: $model, timestamp: $timestamp, total: $total, executed: $executed, errors: $errors, empty: $empty}' \
   > "${RUN_DIR}/_metadata.json"
 
 echo ""
