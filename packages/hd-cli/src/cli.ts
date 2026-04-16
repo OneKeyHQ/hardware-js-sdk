@@ -14,7 +14,7 @@ const program = new Command();
 program
   .name('onekey-hw')
   .description('OneKey hardware wallet CLI for AI agent integration')
-  .version('1.1.26');
+  .version('1.1.26-alpha.1');
 
 // ============================================================
 // Global Options
