@@ -260,8 +260,7 @@ export default class NodeUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
 
-    const openDev = this.openDevices.get(path);
-    if (!openDev) {
+    if (!this.openDevices.get(path)) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device not acquired: ${path}`);
     }
 
@@ -276,15 +275,16 @@ export default class NodeUsbTransport {
     const encodeBuffers = buildEncodeBuffers(messages, name, data);
 
     // Send each chunk with 0x3F report ID prefix
+    // Re-resolve openDev on each iteration — reconnect may replace it
     for (const buffer of encodeBuffers) {
       const packet = new Uint8Array(PACKET_SIZE);
       packet[0] = REPORT_ID;
       packet.set(new Uint8Array(buffer), 1);
-      await this.transferOutWithRetry(path, openDev, Buffer.from(packet));
+      await this.transferOutWithRetry(path, this.getOpenDevice(path), Buffer.from(packet));
     }
 
-    // Receive response
-    const resData = await this.receiveData(path, openDev);
+    // Receive response — re-resolve in case reconnect happened during send
+    const resData = await this.receiveData(path, this.getOpenDevice(path));
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
@@ -297,6 +297,18 @@ export default class NodeUsbTransport {
   }
 
   // --- Private helpers ---
+
+  /**
+   * Get the current open device for a path, re-resolving from the map
+   * so callers always use a fresh reference after reconnect.
+   */
+  private getOpenDevice(path: string): OpenDevice {
+    const dev = this.openDevices.get(path);
+    if (!dev) {
+      throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, `Device not acquired: ${path}`);
+    }
+    return dev;
+  }
 
   private getErrorMessage(error: unknown): string {
     if (!error) return '';
