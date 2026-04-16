@@ -1,0 +1,37 @@
+{
+  "name": "@onekeyfe/hardware-cli",
+  "version": "1.1.26",
+  "description": "OneKey hardware wallet CLI for testing device communication",
+  "author": "OneKey",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/OneKeyHQ/hardware-js-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneKeyHQ/hardware-js-sdk.git"
+  },
+  "bin": {
+    "onekey-hw": "./dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prestart": "tsc",
+    "start": "node dist/cli.js",
+    "search": "node dist/cli.js search",
+    "get-features": "node dist/cli.js get-features",
+    "get-address": "node dist/cli.js get-address",
+    "ping": "node dist/cli.js ping",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@onekeyfe/hd-common-connect-sdk": "1.1.26",
+    "@onekeyfe/hd-core": "1.1.26",
+    "@onekeyfe/hd-shared": "1.1.26",
+    "@onekeyfe/hd-transport-usb": "1.1.26"
+  }
+}

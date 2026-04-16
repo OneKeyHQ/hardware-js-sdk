@@ -1,11 +1,12 @@
+#!/usr/bin/env node
 /**
- * CLI Example — test NodeUsbTransport communication with OneKey hardware devices.
+ * OneKey Hardware CLI — test NodeUsbTransport communication with OneKey devices.
  *
  * Usage:
- *   yarn start search          — search for connected devices
- *   yarn start get-features    — get device features (auto-selects first device)
- *   yarn start get-address     — get an EVM address (default path m/44'/60'/0'/0/0)
- *   yarn start ping            — ping device with a message
+ *   onekey-hw search          — search for connected devices
+ *   onekey-hw get-features    — get device features (auto-selects first device)
+ *   onekey-hw get-address     — get an EVM address (default path m/44'/60'/0'/0/0)
+ *   onekey-hw ping            — ping device with a message
  */
 import * as readline from 'readline';
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
@@ -95,7 +96,11 @@ async function getFirstDevice(): Promise<{ connectId: string; deviceId: string }
     process.exit(1);
   }
   const device = res.payload[0];
-  log('Using device', { connectId: device.connectId, name: device.name, deviceType: device.deviceType });
+  log('Using device', {
+    connectId: device.connectId,
+    name: device.name,
+    deviceType: device.deviceType,
+  });
   return { connectId: device.connectId ?? '', deviceId: device.deviceId ?? '' };
 }
 
@@ -118,7 +123,6 @@ async function getAddress() {
 
 async function ping() {
   const { connectId } = await getFirstDevice();
-  // Use getFeatures as a connectivity test
   const res = await HardwareSDK.getFeatures(connectId);
   log('ping (getFeatures)', res);
 }
@@ -151,7 +155,6 @@ async function main() {
       break;
   }
 
-  // Give time for any pending events, then exit
   setTimeout(() => process.exit(0), 1000);
 }
 
