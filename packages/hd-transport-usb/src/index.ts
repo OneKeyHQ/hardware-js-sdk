@@ -329,8 +329,10 @@ export default class NodeUsbTransport {
       message.includes('device not found') ||
       message.includes('busy') ||
       message.includes('pipe') ||
-      message.includes('io') ||
-      message.includes('empty usb transfer')
+      message.includes('empty usb transfer') ||
+      message.includes('network') ||
+      message.includes('timeout') ||
+      message.includes('interrupt')
     );
   }
 
