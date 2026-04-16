@@ -7,11 +7,12 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc",
-    "start": "ts-node src/index.ts",
-    "search": "ts-node src/index.ts search",
-    "get-features": "ts-node src/index.ts get-features",
-    "get-address": "ts-node src/index.ts get-address",
-    "dev": "ts-node-dev --respawn src/index.ts"
+    "prestart": "tsc",
+    "start": "node dist/index.js",
+    "search": "node dist/index.js search",
+    "get-features": "node dist/index.js get-features",
+    "get-address": "node dist/index.js get-address",
+    "ping": "node dist/index.js ping"
   },
   "dependencies": {
     "@onekeyfe/hd-common-connect-sdk": "1.1.26",
@@ -20,8 +21,6 @@
     "@onekeyfe/hd-shared": "1.1.26"
   },
   "devDependencies": {
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.3",
     "@types/node": "^20.11.0"
   }

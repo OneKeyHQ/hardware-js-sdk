@@ -8,13 +8,8 @@
  *   yarn start ping            — ping device with a message
  */
 import * as readline from 'readline';
-import HardwareSDK, {
-  DEVICE,
-  DEVICE_EVENT,
-  UI_EVENT,
-  UI_REQUEST,
-  UI_RESPONSE,
-} from '@onekeyfe/hd-common-connect-sdk';
+import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
+import { DEVICE, DEVICE_EVENT, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,7 +35,7 @@ function prompt(question: string): Promise<string> {
 
 async function initSDK() {
   // Listen for device connect/disconnect
-  HardwareSDK.on(DEVICE_EVENT, e => {
+  HardwareSDK.on(DEVICE_EVENT, (e: any) => {
     if (e.type === DEVICE.CONNECT) {
       log('DEVICE.CONNECT', e.payload);
     } else if (e.type === DEVICE.DISCONNECT) {
@@ -49,7 +44,7 @@ async function initSDK() {
   });
 
   // Handle PIN request — prompt user in terminal
-  HardwareSDK.on(UI_EVENT, async e => {
+  HardwareSDK.on(UI_EVENT, async (e: any) => {
     if (e.type === UI_REQUEST.REQUEST_PIN) {
       const pin = await prompt('Enter PIN: ');
       HardwareSDK.uiResponse({
@@ -93,15 +88,15 @@ async function searchDevices() {
   return res;
 }
 
-async function getFirstDevice(): Promise<{ connectId: string; deviceId: string | undefined }> {
+async function getFirstDevice(): Promise<{ connectId: string; deviceId: string }> {
   const res = await HardwareSDK.searchDevices();
   if (!res.success || !res.payload?.length) {
     console.error('No device found. Is your OneKey connected via USB?');
     process.exit(1);
   }
   const device = res.payload[0];
-  log('Using device', { path: device.path, label: device.label });
-  return { connectId: device.path ?? '', deviceId: device.deviceId };
+  log('Using device', { connectId: device.connectId, name: device.name, deviceType: device.deviceType });
+  return { connectId: device.connectId ?? '', deviceId: device.deviceId ?? '' };
 }
 
 async function getFeatures() {
@@ -114,7 +109,7 @@ async function getAddress() {
   const { connectId, deviceId } = await getFirstDevice();
   const path = "m/44'/60'/0'/0/0";
   log('getAddress', { path });
-  const res = await HardwareSDK.evmGetAddress(connectId, deviceId ?? '', {
+  const res = await HardwareSDK.evmGetAddress(connectId, deviceId, {
     path,
     showOnOneKey: false,
   });
@@ -123,17 +118,9 @@ async function getAddress() {
 
 async function ping() {
   const { connectId } = await getFirstDevice();
-  const message = 'Hello from cli-example!';
-  // @ts-expect-error — deviceActionPing may not be in type defs but works at runtime
-  const res = await HardwareSDK.deviceActionPing?.(connectId, { message });
-  if (res) {
-    log('ping', res);
-  } else {
-    // Fallback: use getFeatures as a connectivity test
-    log('ping', 'deviceActionPing not available, using getFeatures as ping');
-    const features = await HardwareSDK.getFeatures(connectId);
-    log('ping (getFeatures)', features);
-  }
+  // Use getFeatures as a connectivity test
+  const res = await HardwareSDK.getFeatures(connectId);
+  log('ping (getFeatures)', res);
 }
 
 // ---------------------------------------------------------------------------
