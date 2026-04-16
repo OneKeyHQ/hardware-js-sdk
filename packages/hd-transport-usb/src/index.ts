@@ -357,42 +357,51 @@ export default class NodeUsbTransport {
     }
 
     dev.open();
-    dev.timeout = TRANSFER_TIMEOUT_MS;
 
-    const iface = dev.interface(INTERFACE_NUMBER);
+    try {
+      dev.timeout = TRANSFER_TIMEOUT_MS;
 
-    // On Linux, detach kernel driver if active
-    if (process.platform === 'linux') {
-      try {
-        if (iface.isKernelDriverActive()) {
-          iface.detachKernelDriver();
+      const iface = dev.interface(INTERFACE_NUMBER);
+
+      // On Linux, detach kernel driver if active
+      if (process.platform === 'linux') {
+        try {
+          if (iface.isKernelDriverActive()) {
+            iface.detachKernelDriver();
+          }
+        } catch {
+          // May not be supported — continue
         }
-      } catch {
-        // May not be supported — continue
       }
-    }
 
-    iface.claim();
+      iface.claim();
 
-    const epIn = iface.endpoints.find(
-      (e): e is usb.InEndpoint => e.direction === 'in' && e.address === ENDPOINT_IN
-    );
-    const epOut = iface.endpoints.find(
-      (e): e is usb.OutEndpoint => e.direction === 'out' && e.address === ENDPOINT_OUT
-    );
-
-    if (!epIn || !epOut) {
-      dev.close();
-      throw ERRORS.TypedError(
-        HardwareErrorCode.DeviceNotFound,
-        'USB endpoints not found (expected IN 0x81, OUT 0x01)'
+      const epIn = iface.endpoints.find(
+        (e): e is usb.InEndpoint => e.direction === 'in' && e.address === ENDPOINT_IN
       );
+      const epOut = iface.endpoints.find(
+        (e): e is usb.OutEndpoint => e.direction === 'out' && e.address === ENDPOINT_OUT
+      );
+
+      if (!epIn || !epOut) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotFound,
+          'USB endpoints not found (expected IN 0x81, OUT 0x01)'
+        );
+      }
+
+      epIn.timeout = TRANSFER_TIMEOUT_MS;
+      epOut.timeout = TRANSFER_TIMEOUT_MS;
+
+      this.openDevices.set(path, { device: dev, iface, epIn, epOut });
+    } catch (err) {
+      try {
+        dev.close();
+      } catch {
+        // ignore close errors during cleanup
+      }
+      throw err;
     }
-
-    epIn.timeout = TRANSFER_TIMEOUT_MS;
-    epOut.timeout = TRANSFER_TIMEOUT_MS;
-
-    this.openDevices.set(path, { device: dev, iface, epIn, epOut });
   }
 
   /**
