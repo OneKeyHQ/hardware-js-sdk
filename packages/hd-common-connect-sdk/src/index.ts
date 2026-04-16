@@ -22,7 +22,6 @@ import { ERRORS, HardwareErrorCode, createDeferred } from '@onekeyfe/hd-shared';
 import HttpTransport from '@onekeyfe/hd-transport-http';
 import { ElectronBleTransport, WebUsbTransport } from '@onekeyfe/hd-transport-web-device';
 import LowlevelTransport from '@onekeyfe/hd-transport-lowlevel';
-import NodeUsbTransport from '@onekeyfe/hd-transport-usb';
 import EmulatorTransport from '@onekeyfe/hd-transport-emulator';
 
 import type { Deferred } from '@onekeyfe/hd-shared';
@@ -38,11 +37,16 @@ import type { LowlevelTransportSharedPlugin } from '@onekeyfe/hd-transport';
 const eventEmitter = new EventEmitter();
 const Log = getLogger(LoggerNames.HdCommonConnectSdk);
 
-const getTransport = (env: ConnectSettings['env']) => {
+const getTransport = async (env: ConnectSettings['env']) => {
   if (env === 'desktop-web-ble') return ElectronBleTransport;
   if (env === 'webusb' || env === 'desktop-webusb') return WebUsbTransport;
   if (env === 'lowlevel') return LowlevelTransport;
-  if (env === 'node-usb') return NodeUsbTransport;
+  if (env === 'node-usb') {
+    // Dynamic import — usb is a native Node.js module (libusb C++ bindings)
+    // that cannot be resolved by browser/React Native bundlers
+    const { default: NodeUsbTransport } = await import('@onekeyfe/hd-transport-usb');
+    return NodeUsbTransport;
+  }
   if (env === 'emulator') return EmulatorTransport;
   return HttpTransport;
 };
@@ -139,7 +143,7 @@ const init = async (
   Log.debug('init');
 
   try {
-    const Transport = getTransport(_settings.env);
+    const Transport = await getTransport(_settings.env);
     _core = await initCore(_settings, Transport, plugin);
     _core?.on(CORE_EVENT, handleMessage);
     setLoggerPostMessage(handleMessage);
