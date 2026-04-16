@@ -1,7 +1,7 @@
 import ByteBuffer from 'bytebuffer';
 import * as usb from 'usb';
 import transport, { LogBlockCommand } from '@onekeyfe/hd-transport';
-import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode, ONEKEY_WEBUSB_FILTER, wait } from '@onekeyfe/hd-shared';
 
 import { HEADER_LENGTH, PACKET_SIZE, PAYLOAD_SIZE, REPORT_ID } from './constants';
 
@@ -109,48 +109,6 @@ function transferOutOnce(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
       resolve();
     });
   });
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
-
-/**
- * USB IN transfer with retry.
- */
-async function transferIn(ep: usb.InEndpoint, length: number): Promise<Buffer> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
-    try {
-      return await transferInOnce(ep, length);
-    } catch (err) {
-      lastError = err;
-      if (attempt < PACKET_IO_MAX_RETRIES) {
-        await wait(attempt * PACKET_IO_RETRY_DELAY);
-      }
-    }
-  }
-  throw lastError;
-}
-
-/**
- * USB OUT transfer with retry.
- */
-async function transferOut(ep: usb.OutEndpoint, data: Buffer): Promise<void> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
-    try {
-      return await transferOutOnce(ep, data);
-    } catch (err) {
-      lastError = err;
-      if (attempt < PACKET_IO_MAX_RETRIES) {
-        await wait(attempt * PACKET_IO_RETRY_DELAY);
-      }
-    }
-  }
-  throw lastError;
 }
 
 /**
@@ -322,11 +280,11 @@ export default class NodeUsbTransport {
       const packet = new Uint8Array(PACKET_SIZE);
       packet[0] = REPORT_ID;
       packet.set(new Uint8Array(buffer), 1);
-      await transferOut(openDev.epOut, Buffer.from(packet));
+      await this.transferOutWithRetry(path, openDev, Buffer.from(packet));
     }
 
     // Receive response
-    const resData = await this.receiveData(openDev);
+    const resData = await this.receiveData(path, openDev);
     if (typeof resData !== 'string') {
       throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
     }
@@ -339,6 +297,135 @@ export default class NodeUsbTransport {
   }
 
   // --- Private helpers ---
+
+  private getErrorMessage(error: unknown): string {
+    if (!error) return '';
+    if (typeof error === 'string') return error;
+    if (typeof error === 'object' && 'message' in error) {
+      const { message } = error as { message?: unknown };
+      return typeof message === 'string' ? message : String(message ?? '');
+    }
+    return String(error);
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    const message = this.getErrorMessage(error).toLowerCase();
+    return (
+      message.includes('libusb') ||
+      message.includes('transfer') ||
+      message.includes('disconnected') ||
+      message.includes('device not found') ||
+      message.includes('busy') ||
+      message.includes('pipe') ||
+      message.includes('io') ||
+      message.includes('empty usb transfer')
+    );
+  }
+
+  /**
+   * Reconnect device before retrying a failed transfer (aligned with WebUsbTransport).
+   */
+  private async reconnectForRetry(
+    path: string,
+    direction: 'in' | 'out',
+    attempt: number,
+    error: unknown
+  ): Promise<OpenDevice> {
+    this.Log?.debug(
+      `[NodeUsbTransport] transfer${direction} failed, retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+        error
+      )}`
+    );
+    await wait(attempt * PACKET_IO_RETRY_DELAY);
+
+    // Close the existing device
+    try {
+      await this.release(path);
+    } catch (releaseError) {
+      this.Log?.debug('[NodeUsbTransport] release before retry error:', releaseError);
+    }
+
+    // Re-enumerate to refresh device list, then re-open
+    await this.enumerate();
+    await this.openDevice(path);
+
+    const openDev = this.openDevices.get(path);
+    if (!openDev) {
+      throw ERRORS.TypedError(
+        HardwareErrorCode.DeviceNotFound,
+        `Device not found after reconnect: ${path}`
+      );
+    }
+    return openDev;
+  }
+
+  /**
+   * USB IN transfer with retry and reconnect (aligned with WebUsbTransport).
+   */
+  private async transferInWithRetry(
+    path: string,
+    openDev: OpenDevice,
+    length: number
+  ): Promise<Buffer> {
+    let lastError: unknown;
+    let currentDev = openDev;
+    for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
+      try {
+        return await transferInOnce(currentDev.epIn, length);
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryableError(error);
+        if (!shouldRetry) {
+          throw error;
+        }
+        try {
+          currentDev = await this.reconnectForRetry(path, 'in', attempt, error);
+        } catch (reconnectError) {
+          lastError = reconnectError;
+          this.Log?.debug(
+            `[NodeUsbTransport] reconnect failed on retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+              reconnectError
+            )}`
+          );
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  /**
+   * USB OUT transfer with retry and reconnect (aligned with WebUsbTransport).
+   */
+  private async transferOutWithRetry(
+    path: string,
+    openDev: OpenDevice,
+    data: Buffer
+  ): Promise<void> {
+    let lastError: unknown;
+    let currentDev = openDev;
+    for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
+      try {
+        return await transferOutOnce(currentDev.epOut, data);
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryableError(error);
+        if (!shouldRetry) {
+          throw error;
+        }
+        try {
+          currentDev = await this.reconnectForRetry(path, 'out', attempt, error);
+        } catch (reconnectError) {
+          lastError = reconnectError;
+          this.Log?.debug(
+            `[NodeUsbTransport] reconnect failed on retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+              reconnectError
+            )}`
+          );
+        }
+      }
+    }
+    throw lastError;
+  }
 
   /**
    * Open a USB device by path (serial number), claim interface, cache endpoints.
@@ -408,9 +495,9 @@ export default class NodeUsbTransport {
    * Receive a complete protobuf response from the device.
    * Reads 64-byte packets, strips 0x3F marker, reassembles into hex string.
    */
-  private async receiveData(dev: OpenDevice): Promise<string> {
+  private async receiveData(path: string, dev: OpenDevice): Promise<string> {
     // Read first packet, skip report byte
-    const firstPacket = await transferIn(dev.epIn, PACKET_SIZE);
+    const firstPacket = await this.transferInWithRetry(path, dev, PACKET_SIZE);
     const firstData = skipReportByte(firstPacket);
 
     // Decode header: ## marker → { typeId, length, restBuffer }
@@ -427,7 +514,7 @@ export default class NodeUsbTransport {
 
     // Read subsequent packets until complete
     while (decoded.offset < lengthWithHeader) {
-      const packet = await transferIn(dev.epIn, PACKET_SIZE);
+      const packet = await this.transferInWithRetry(path, dev, PACKET_SIZE);
       const pktData = skipReportByte(packet);
       const buf = toArrayBuffer(pktData);
       if (lengthWithHeader - decoded.offset >= PAYLOAD_SIZE) {
