@@ -880,14 +880,30 @@ async function prepareSession(
       features?: {
         device_id?: string;
         session_id?: string;
-        passphrase_protection?: boolean;
+        passphrase_protection?: boolean | null;
       };
     };
     const connectId = device.connectId || globalOpts.connectId || '';
-    const deviceId = device.features?.device_id || device.deviceId || '';
+
+    // searchDevices may not Initialize the device, so features can be null.
+    // Call getFeatures to get device_id and passphrase_protection.
+    let deviceId = device.features?.device_id || device.deviceId || '';
+    let passphraseProtection = device.features?.passphrase_protection;
+
+    if (!deviceId || passphraseProtection == null) {
+      try {
+        const featResult = await sdk.getFeatures(connectId);
+        if (featResult?.success && featResult.payload) {
+          deviceId = featResult.payload.device_id || deviceId;
+          passphraseProtection = featResult.payload.passphrase_protection;
+        }
+      } catch {
+        /* non-fatal */
+      }
+    }
 
     // Device doesn't have passphrase protection → standard wallet
-    if (device.features?.passphrase_protection === false) {
+    if (passphraseProtection === false) {
       return undefined;
     }
 
