@@ -34,7 +34,7 @@ type IPassphraseProvider = () =>
 
 let passphraseProvider: IPassphraseProvider | undefined;
 
-export function setPassphraseProvider(provider: IPassphraseProvider | undefined): void {
+function setPassphraseProvider(provider: IPassphraseProvider | undefined): void {
   passphraseProvider = provider;
 }
 

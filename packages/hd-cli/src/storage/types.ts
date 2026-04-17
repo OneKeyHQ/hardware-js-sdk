@@ -8,10 +8,7 @@ export interface ISecureStorage {
 }
 
 export interface IProcessRunner {
-  execFileAsync(
-    cmd: string,
-    args: string[]
-  ): Promise<{ stdout: string; stderr: string }>;
+  execFileAsync(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }>;
   spawnWithStdin(
     cmd: string,
     args: string[],
