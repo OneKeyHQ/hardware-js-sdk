@@ -162,7 +162,7 @@ program
   .description('Sign EIP-712 typed data (EVM only, requires device confirmation)')
   .requiredOption('--data <json>', 'EIP-712 typed data JSON')
   .option('--path <path>', 'BIP44 derivation path')
-  .option('--metamask-v4-compat', 'Use MetaMask V4 compatibility mode', true)
+  .option('--no-metamask-v4-compat', 'Disable MetaMask V4 compatibility mode')
   .action(async opts => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
@@ -609,9 +609,20 @@ program
 
 program
   .command('device-wipe')
-  .description('Factory reset — erase ALL data (IRREVERSIBLE)')
-  .action(async () => {
+  .description('Factory reset — erase ALL data (IRREVERSIBLE, requires --yes)')
+  .option('--yes', 'Confirm factory reset (required)')
+  .action(async opts => {
     const globalOpts = program.opts();
+    if (!opts.yes) {
+      outputResult(globalOpts, {
+        success: false,
+        payload: {
+          error: 'Factory reset requires --yes flag to confirm. This operation is IRREVERSIBLE.',
+          code: 'CONFIRMATION_REQUIRED',
+        },
+      });
+      return;
+    }
     const sdk = await createSDK(globalOpts);
     try {
       const result = await sdk.deviceWipe(globalOpts.connectId);
@@ -713,12 +724,13 @@ function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
   // #10 FIX: Always use JSON.stringify to avoid [Object] truncation
   console.log(JSON.stringify(result, null, 2));
 
-  // Exit after output — SDK event listeners keep the process alive otherwise
+  // Set exit code and let event loop drain so async cleanup (USB release) can complete
   if (result && typeof result === 'object' && 'success' in result && !(result as any).success) {
-    process.exit(1);
-  } else {
-    process.exit(0);
+    process.exitCode = 1;
   }
+  // Allow a short delay for async USB release, then force exit
+  // (SDK event listeners would otherwise keep the process alive indefinitely)
+  setTimeout(() => process.exit(process.exitCode ?? 0), 200);
 }
 
 /**

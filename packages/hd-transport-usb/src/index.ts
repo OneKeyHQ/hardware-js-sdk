@@ -142,7 +142,11 @@ export default class NodeUsbTransport {
 
   name = 'NodeUsbTransport';
 
+  version = '';
+
   configured = false;
+
+  isOutdated = false;
 
   Log?: any;
 
@@ -154,6 +158,9 @@ export default class NodeUsbTransport {
   /** path → opened device state */
   private openDevices = new Map<string, OpenDevice>();
 
+  /** per-path reconnect lock to prevent concurrent reconnects */
+  private reconnectLocks = new Map<string, Promise<OpenDevice>>();
+
   /**
    * Initialize transport.
    * Signature matches the Transport.init interface (logger, emitter).
@@ -161,16 +168,55 @@ export default class NodeUsbTransport {
   init(logger: any, emitter?: EventEmitter) {
     this.Log = logger;
     this.emitter = emitter;
+    return Promise.resolve('');
   }
 
   configure(signedData: any) {
     const messages = parseConfigure(signedData);
     this.configured = true;
     this.messages = messages;
+    return Promise.resolve();
   }
 
   listen() {
     // empty — could add hotplug events via usb.on('attach'/'detach')
+  }
+
+  stop() {
+    // Placeholder — no background listeners to tear down
+  }
+
+  /**
+   * Low-level post (send only, no response). Not used by NodeUsbTransport
+   * since call() handles the full send+receive cycle, but required by the Transport interface.
+   */
+  async post(path: string, name: string, data: Record<string, unknown>): Promise<void> {
+    if (!this.messages) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+    const encodeBuffers = buildEncodeBuffers(this.messages, name, data);
+    for (const buffer of encodeBuffers) {
+      const packet = new Uint8Array(PACKET_SIZE);
+      packet[0] = REPORT_ID;
+      packet.set(new Uint8Array(buffer), 1);
+      await this.transferOutWithRetry(path, this.getOpenDevice(path), Buffer.from(packet));
+    }
+  }
+
+  /**
+   * Low-level read (receive only). Not used by NodeUsbTransport
+   * since call() handles the full send+receive cycle, but required by the Transport interface.
+   */
+  async read(path: string) {
+    const dev = this.getOpenDevice(path);
+    const resData = await this.receiveData(path, dev);
+    if (typeof resData !== 'string') {
+      throw ERRORS.TypedError(HardwareErrorCode.NetworkError, 'Returning data is not string.');
+    }
+    if (!this.messages) {
+      throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
+    }
+    return receiveOne(this.messages, resData);
   }
 
   /**
@@ -208,15 +254,15 @@ export default class NodeUsbTransport {
   /**
    * Acquire device — open USB device, claim interface, return path (string).
    */
-  async acquire(input: AcquireInput): Promise<string> {
+  acquire(input: AcquireInput): Promise<string> {
     const path = input.path ?? '';
     if (!path) {
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, 'No device path provided');
     }
 
     try {
-      await this.openDevice(path);
-      return path;
+      this.openDevice(path);
+      return Promise.resolve(path);
     } catch (error: any) {
       this.Log?.debug('NodeUsbTransport acquire error: ', error);
       throw ERRORS.TypedError(HardwareErrorCode.DeviceNotFound, error.message ?? String(error));
@@ -274,14 +320,9 @@ export default class NodeUsbTransport {
     // Encode protobuf message into 63-byte chunks (same as WebUsbTransport)
     const encodeBuffers = buildEncodeBuffers(messages, name, data);
 
-    // Send each chunk with 0x3F report ID prefix
-    // Re-resolve openDev on each iteration — reconnect may replace it
-    for (const buffer of encodeBuffers) {
-      const packet = new Uint8Array(PACKET_SIZE);
-      packet[0] = REPORT_ID;
-      packet.set(new Uint8Array(buffer), 1);
-      await this.transferOutWithRetry(path, this.getOpenDevice(path), Buffer.from(packet));
-    }
+    // Send all chunks with retry — if any chunk fails and reconnects,
+    // restart the entire send sequence from chunk 0 (device resets state on reconnect)
+    await this.sendAllChunksWithRetry(path, encodeBuffers);
 
     // Receive response — re-resolve in case reconnect happened during send
     const resData = await this.receiveData(path, this.getOpenDevice(path));
@@ -338,39 +379,90 @@ export default class NodeUsbTransport {
 
   /**
    * Reconnect device before retrying a failed transfer (aligned with WebUsbTransport).
+   * Uses per-path lock to prevent concurrent reconnects to the same device.
    */
-  private async reconnectForRetry(
+  private reconnectForRetry(
     path: string,
     direction: 'in' | 'out',
     attempt: number,
     error: unknown
   ): Promise<OpenDevice> {
-    this.Log?.debug(
-      `[NodeUsbTransport] transfer${direction} failed, retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
-        error
-      )}`
-    );
-    await wait(attempt * PACKET_IO_RETRY_DELAY);
+    // If a reconnect is already in progress for this path, reuse it
+    const existing = this.reconnectLocks.get(path);
+    if (existing) return existing;
 
-    // Close the existing device
-    try {
-      await this.release(path);
-    } catch (releaseError) {
-      this.Log?.debug('[NodeUsbTransport] release before retry error:', releaseError);
-    }
-
-    // Re-enumerate to refresh device list, then re-open
-    await this.enumerate();
-    await this.openDevice(path);
-
-    const openDev = this.openDevices.get(path);
-    if (!openDev) {
-      throw ERRORS.TypedError(
-        HardwareErrorCode.DeviceNotFound,
-        `Device not found after reconnect: ${path}`
+    const doReconnect = async (): Promise<OpenDevice> => {
+      this.Log?.debug(
+        `[NodeUsbTransport] transfer${direction} failed, retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+          error
+        )}`
       );
+      await wait(attempt * PACKET_IO_RETRY_DELAY);
+
+      // Close the existing device
+      try {
+        await this.release(path);
+      } catch (releaseError) {
+        this.Log?.debug('[NodeUsbTransport] release before retry error:', releaseError);
+      }
+
+      // Re-enumerate to refresh device list, then re-open
+      await this.enumerate();
+      this.openDevice(path);
+
+      const openDev = this.openDevices.get(path);
+      if (!openDev) {
+        throw ERRORS.TypedError(
+          HardwareErrorCode.DeviceNotFound,
+          `Device not found after reconnect: ${path}`
+        );
+      }
+      return openDev;
+    };
+
+    const promise = doReconnect().finally(() => {
+      this.reconnectLocks.delete(path);
+    });
+    this.reconnectLocks.set(path, promise);
+    return promise;
+  }
+
+  /**
+   * Send all encoded chunks to the device with retry.
+   * If a chunk fails and triggers reconnect, the entire sequence restarts
+   * from chunk 0 because the device resets protocol state on reconnect.
+   */
+  private async sendAllChunksWithRetry(path: string, encodeBuffers: ArrayBuffer[]): Promise<void> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
+      try {
+        for (const buffer of encodeBuffers) {
+          const packet = new Uint8Array(PACKET_SIZE);
+          packet[0] = REPORT_ID;
+          packet.set(new Uint8Array(buffer), 1);
+          await transferOutOnce(this.getOpenDevice(path).epOut, Buffer.from(packet));
+        }
+        return; // all chunks sent successfully
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryableError(error);
+        if (!shouldRetry) {
+          throw error;
+        }
+        try {
+          await this.reconnectForRetry(path, 'out', attempt, error);
+          // Reconnected — loop will restart from chunk 0
+        } catch (reconnectError) {
+          lastError = reconnectError;
+          this.Log?.debug(
+            `[NodeUsbTransport] reconnect failed on send retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
+              reconnectError
+            )}`
+          );
+        }
+      }
     }
-    return openDev;
+    throw lastError;
   }
 
   /**
@@ -444,8 +536,7 @@ export default class NodeUsbTransport {
   /**
    * Open a USB device by path (serial number), claim interface, cache endpoints.
    */
-  // eslint-disable-next-line @typescript-eslint/require-await
-  private async openDevice(path: string): Promise<void> {
+  private openDevice(path: string): void {
     const existing = this.openDevices.get(path);
     if (existing) return;
 
