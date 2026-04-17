@@ -273,16 +273,25 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
       } else {
         // Interactive: let user choose wallet type
         // eslint-disable-next-line no-void
-        void promptPassphraseMode().then(result => {
-          sdk.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-            payload: {
-              value: result.value,
-              passphraseOnDevice: result.passphraseOnDevice,
-              save: false,
-            },
+        void promptPassphraseMode()
+          .then(result => {
+            sdk.uiResponse({
+              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+              payload: {
+                value: result.value,
+                passphraseOnDevice: result.passphraseOnDevice,
+                save: false,
+              },
+            });
+          })
+          .catch(() => {
+            // Fallback: on-device entry if pinentry/prompt fails
+            process.stderr.write('[onekey-hw] Passphrase prompt failed, falling back to on-device entry.\n');
+            sdk.uiResponse({
+              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+              payload: { value: '', passphraseOnDevice: true, save: false },
+            });
           });
-        });
       }
     }
 
