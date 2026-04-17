@@ -966,16 +966,15 @@ async function withPassphraseRetry<T>(
     (result.payload as { code?: number })?.code === 112 &&
     !globalOpts.useEmptyPassphrase
   ) {
-    process.stderr.write('[onekey-hw] Passphrase state expired, re-authenticating...\n');
+    process.stderr.write(
+      '[onekey-hw] Passphrase changed or session expired. Updating session...\n'
+    );
 
-    // Clear stale session
+    // Clear stale session from keychain
+    let deviceId: string | undefined;
     try {
-      const searchResult = await sdk.searchDevices();
-      const device = // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        (searchResult?.payload as any)?.[0] as
-          | { deviceId?: string; features?: { device_id?: string } }
-          | undefined;
-      const deviceId = device?.features?.device_id || device?.deviceId;
+      const featResult = await sdk.getFeatures(globalOpts.connectId || '');
+      deviceId = (featResult?.payload as any)?.device_id;
       if (deviceId) {
         const { clearSessionFromKeychain } = await import('./session');
         await clearSessionFromKeychain(deviceId);
@@ -984,10 +983,35 @@ async function withPassphraseRetry<T>(
       /* non-fatal */
     }
 
-    // Clear passphraseState from opts so SDK re-prompts
-    delete globalOpts.passphraseState;
+    // Get fresh passphraseState — the SDK already has the new passphrase
+    // from the user's recent input, so this should not re-prompt.
+    try {
+      const connectId = globalOpts.connectId || '';
+      const psResult = await sdk.getPassphraseState(connectId, {
+        initSession: true,
+        useEmptyPassphrase: false,
+      });
+      if (psResult.success && psResult.payload) {
+        globalOpts.passphraseState = psResult.payload as string;
 
-    // Retry — will go through prepareSession again which handles prompt + save
+        // Save new session to keychain
+        if (deviceId) {
+          const freshSearch = await sdk.searchDevices();
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+          const freshDevice = (freshSearch?.payload as any)?.[0];
+          const sessionId = freshDevice?.features?.session_id;
+          if (sessionId) {
+            const { saveSessionToKeychain } = await import('./session');
+            await saveSessionToKeychain(deviceId, globalOpts.passphraseState, sessionId);
+          }
+        }
+      }
+    } catch {
+      // If this fails, clear passphraseState so SDK re-prompts
+      delete globalOpts.passphraseState;
+    }
+
+    // Retry with new passphraseState
     return fn();
   }
 
