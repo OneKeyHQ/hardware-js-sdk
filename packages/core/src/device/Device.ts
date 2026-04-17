@@ -117,7 +117,7 @@ const deviceSessionCache: Record<string, string> = {};
 export function preloadSessionCache(
   deviceId: string,
   passphraseState: string,
-  sessionId: string,
+  sessionId: string
 ): void {
   const key = `${deviceId}@${passphraseState}`;
   deviceSessionCache[key] = sessionId;
