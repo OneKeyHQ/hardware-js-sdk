@@ -176,7 +176,7 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 });
 ```
 
-> **Important: device locking invalidates sessions.** Touch and Pro devices auto-lock after a timeout. Once locked, all passphrase sessions are cleared — the cached `session_id` becomes invalid and the user must re-enter their passphrase after unlocking (PIN). Session reuse only works when the device remains unlocked between invocations.
+> **Important: device locking invalidates sessions.** All OneKey devices clear passphrase sessions when locked (whether by auto-lock timeout, manual lock, or USB disconnection). Once locked, the cached `session_id` becomes invalid and the user must re-enter their passphrase after unlocking (PIN). Session reuse only works when the device remains unlocked between invocations.
 
 ### Unlock-first pattern (recommended for CLI)
 

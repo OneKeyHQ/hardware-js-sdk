@@ -154,7 +154,7 @@ await HardwareSDK.evmGetAddress(connectId, deviceId, {
 });
 ```
 
-> **重要：设备锁定会使会话失效。** Touch 和 Pro 设备有自动锁屏功能。锁定后所有 passphrase 会话被清除——缓存的 `session_id` 失效，用户必须在解锁（输入 PIN）后重新输入 passphrase。会话复用仅在设备保持解锁状态时有效。
+> **重要：设备锁定会使会话失效。** 所有 OneKey 设备在锁定时（无论是自动锁屏、手动锁定还是 USB 断开）都会清除 passphrase 会话。锁定后缓存的 `session_id` 失效，用户必须在解锁（输入 PIN）后重新输入 passphrase。会话复用仅在设备保持解锁状态时有效。
 
 ### 先解锁模式（CLI 推荐）
 
