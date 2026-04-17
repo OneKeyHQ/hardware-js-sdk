@@ -44,11 +44,8 @@ export async function preloadSessionFromKeychain(deviceId: string): Promise<stri
       const passphraseState = psBuf.toString('utf-8');
       const sessionId = sidBuf.toString('utf-8');
 
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
-      const { preloadSessionCache } = require('@onekeyfe/hd-core') as {
-        preloadSessionCache: (d: string, p: string, s: string) => void;
-      };
-      preloadSessionCache(deviceId, passphraseState, sessionId);
+      const hdCore = await import('@onekeyfe/hd-core');
+      (hdCore as any).preloadSessionCache(deviceId, passphraseState, sessionId);
       return passphraseState;
     }
   } catch {
