@@ -8,10 +8,12 @@
  * Reference: packages/core/src/core/index.ts (event registration pattern)
  */
 
+import { execFile, execFileSync } from 'node:child_process';
+import * as readline from 'readline';
+
 // @ts-ignore - hd-common-connect-sdk may not have type declarations
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
-import * as readline from 'readline';
 
 import type { ConnectSettings } from '@onekeyfe/hd-core';
 
@@ -74,6 +76,96 @@ function promptUser(question: string, hidden = false): Promise<string> {
   });
 }
 
+const PINENTRY_PROGRAMS = ['pinentry-mac', 'pinentry', 'pinentry-gnome3', 'pinentry-qt'];
+
+function findPinentry(): string | null {
+  for (const prog of PINENTRY_PROGRAMS) {
+    try {
+      const result = execFileSync('which', [prog], {
+        encoding: 'utf-8',
+        timeout: 2000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      if (result.trim()) return prog;
+    } catch {
+      // not found, try next
+    }
+  }
+  return null;
+}
+
+/**
+ * Prompt for passphrase using pinentry (native OS dialog).
+ *
+ * The passphrase is entered in a secure OS dialog — never appears in
+ * terminal output, shell history, or process arguments.
+ *
+ * Falls back to on-device entry if pinentry is unavailable.
+ */
+function promptPassphraseViaPinentry(): Promise<{
+  value: string;
+  passphraseOnDevice: boolean;
+}> {
+  return new Promise((resolve, reject) => {
+    const pinentryBin = findPinentry();
+    if (!pinentryBin) {
+      // No pinentry available — fall back to on-device entry
+      process.stderr.write(
+        '[onekey-hw] No pinentry found, falling back to on-device passphrase entry.\n'
+      );
+      resolve({ value: '', passphraseOnDevice: true });
+      return;
+    }
+
+    const commands = [
+      'SETDESC OneKey Hardware Wallet',
+      'SETPROMPT Enter passphrase',
+      'GETPIN',
+      'BYE',
+    ].join('\n');
+
+    const child = execFile(
+      pinentryBin,
+      [],
+      { timeout: 120_000, encoding: 'utf-8' },
+      (error, stdout) => {
+        if (error) {
+          if (error.killed || (stdout && stdout.includes('ERR 83886179'))) {
+            // User cancelled — fall back to on-device
+            process.stderr.write(
+              '[onekey-hw] Passphrase entry cancelled, falling back to on-device entry.\n'
+            );
+            resolve({ value: '', passphraseOnDevice: true });
+            return;
+          }
+          reject(error);
+          return;
+        }
+
+        const dataLine = stdout.split('\n').find(l => l.startsWith('D '));
+        if (dataLine) {
+          resolve({ value: dataLine.slice(2), passphraseOnDevice: false });
+          return;
+        }
+
+        if (stdout.includes('ERR 83886179') || stdout.includes('Operation cancelled')) {
+          process.stderr.write(
+            '[onekey-hw] Passphrase entry cancelled, falling back to on-device entry.\n'
+          );
+          resolve({ value: '', passphraseOnDevice: true });
+          return;
+        }
+
+        // Empty passphrase — use on-device
+        resolve({ value: '', passphraseOnDevice: true });
+      }
+    );
+
+    child.stdin?.write(commands);
+    child.stdin?.end();
+  });
+}
+
 /**
  * Register UI event handlers for interactive device operations.
  *
@@ -111,8 +203,9 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
     }
 
     // Passphrase Request
-    // User must provide passphrase for hidden wallet access.
-    // Passphrase can be entered on-device (Touch/Pro) or via host.
+    // Hidden wallet: prompt via pinentry (secure OS dialog, never in terminal/history).
+    // Falls back to on-device entry if pinentry unavailable or cancelled.
+    // Standard wallet: auto-respond with empty passphrase.
     if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
       if (opts.useEmptyPassphrase) {
         // Standard wallet (no passphrase)
@@ -126,27 +219,16 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
         });
       } else {
         process.stderr.write('[onekey-hw] Passphrase required for hidden wallet.\n');
-        promptUser('Enter passphrase (or press Enter for on-device entry): ').then(passphrase => {
-          if (passphrase === '') {
-            // Enter on device
-            sdk.uiResponse({
-              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-              payload: {
-                value: '',
-                passphraseOnDevice: true,
-                save: false,
-              },
-            });
-          } else {
-            sdk.uiResponse({
-              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-              payload: {
-                value: passphrase,
-                passphraseOnDevice: false,
-                save: false,
-              },
-            });
-          }
+        // eslint-disable-next-line no-void
+        void promptPassphraseViaPinentry().then(result => {
+          sdk.uiResponse({
+            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+            payload: {
+              value: result.value,
+              passphraseOnDevice: result.passphraseOnDevice,
+              save: false,
+            },
+          });
         });
       }
     }
