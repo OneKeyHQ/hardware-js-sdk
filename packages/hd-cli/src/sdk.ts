@@ -232,17 +232,13 @@ function promptPassphraseMode(): Promise<{
 
 function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void {
   sdk.on(UI_EVENT, (message: any) => {
-    // PIN Request
+    // PIN Request — always on-device for CLI security (no terminal echo)
     if (message.type === UI_REQUEST.REQUEST_PIN) {
-      const pinType = message.payload?.type;
-      if (pinType === 'ButtonRequest_PinEntry' || pinType === 'ButtonRequest_AttachPin') {
-        process.stderr.write('[onekey-hw] Please enter PIN on your device screen...\n');
-      } else {
-        process.stderr.write('[onekey-hw] PIN required. Please enter PIN on your device.\n');
-        promptUser('PIN (on-device numpad mapping): ', true).then(pin => {
-          sdk.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: pin });
-        });
-      }
+      process.stderr.write('[onekey-hw] Please enter PIN on your device screen...\n');
+      // Respond with empty PIN to let device handle on-device PIN entry.
+      // All OneKey devices support on-device PIN (Classic/Mini via matrix,
+      // Touch/Pro via touchscreen). CLI should never collect PIN from stdin.
+      sdk.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: '' });
     }
 
     // Passphrase Request
