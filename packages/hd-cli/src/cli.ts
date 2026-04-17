@@ -935,8 +935,11 @@ async function prepareSession(
           (freshSearch?.payload as any)?.[0];
         const sessionId = freshDevice?.features?.session_id;
         if (sessionId) {
-          const { saveSessionToKeychain } = await import('./session');
+          const { saveSessionToKeychain, preloadSessionFromKeychain } = await import('./session');
           await saveSessionToKeychain(deviceId, passphraseState, sessionId);
+          // Also preload in current process so the immediate SDK call
+          // finds session_id and skips REQUEST_PASSPHRASE.
+          await preloadSessionFromKeychain(deviceId);
         }
       }
 
