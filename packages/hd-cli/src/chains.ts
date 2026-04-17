@@ -11,6 +11,22 @@
 
 import type { CoreApi } from '@onekeyfe/hd-core';
 
+/**
+ * Extract common SDK params including passphrase-related fields.
+ * Ensures skipPassphraseCheck is forwarded to SDK methods.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractCommonParams(params: Record<string, any>): Record<string, unknown> {
+  const result: Record<string, unknown> = {
+    passphraseState: params.passphraseState,
+    useEmptyPassphrase: params.useEmptyPassphrase,
+  };
+  if (params.skipPassphraseCheck) {
+    result.skipPassphraseCheck = true;
+  }
+  return result;
+}
+
 // Default BIP44 derivation paths per chain
 // Sources: developer-portal core-api-guide.mdx + chain-specific docs
 const DEFAULT_PATHS: Record<string, string> = {
@@ -103,10 +119,7 @@ export async function resolveGetAddress(sdk: CoreApi, params: GetAddressParams) 
   const showOnOneKey = params.showOnDevice ?? true;
   const connectId = params.connectId || '';
   const deviceId = params.deviceId || '';
-  const commonParams = {
-    passphraseState: params.passphraseState,
-    useEmptyPassphrase: params.useEmptyPassphrase,
-  };
+  const commonParams = extractCommonParams(params);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chainMethodMap: Record<string, () => Promise<any>> = {
@@ -209,10 +222,7 @@ export async function resolveGetPublicKey(sdk: CoreApi, params: GetPublicKeyPara
   const path = params.path || getDefaultPath(chain);
   const connectId = params.connectId || '';
   const deviceId = params.deviceId || '';
-  const commonParams = {
-    passphraseState: params.passphraseState,
-    useEmptyPassphrase: params.useEmptyPassphrase,
-  };
+  const commonParams = extractCommonParams(params);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chainMethodMap: Record<string, () => Promise<any>> = {
@@ -253,10 +263,7 @@ export async function resolveSignTransaction(sdk: CoreApi, params: SignTransacti
   const connectId = params.connectId || '';
   const deviceId = params.deviceId || '';
   const tx = params.transaction;
-  const commonParams = {
-    passphraseState: params.passphraseState,
-    useEmptyPassphrase: params.useEmptyPassphrase,
-  };
+  const commonParams = extractCommonParams(params);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chainMethodMap: Record<string, () => Promise<any>> = {
@@ -397,10 +404,7 @@ export async function resolveSignMessage(sdk: CoreApi, params: SignMessageParams
   const path = params.path || getDefaultPath(chain);
   const connectId = params.connectId || '';
   const deviceId = params.deviceId || '';
-  const commonParams = {
-    passphraseState: params.passphraseState,
-    useEmptyPassphrase: params.useEmptyPassphrase,
-  };
+  const commonParams = extractCommonParams(params);
 
   // Most chains use `messageHex` (hex-encoded). CLI accepts either:
   // - Already hex-encoded string (starts with "0x" or matches /^[0-9a-fA-F]+$/)

@@ -728,11 +728,11 @@ program
 
 const sessionCmd = program
   .command('session')
-  .description('Manage passphrase session cache (keychain)');
+  .description('Manage device passphrase session cache');
 
 sessionCmd
-  .command('login')
-  .description('Establish a passphrase session and cache it for subsequent commands')
+  .command('connect')
+  .description('Connect device and establish passphrase session (cached for subsequent commands)')
   .action(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
@@ -786,7 +786,7 @@ sessionCmd
           deviceId,
           sessionId: sessionId ? '(cached)' : '(not available)',
           address: addrResult?.success ? addrResult.payload.address : undefined,
-          message: 'Session cached. Subsequent commands will use cached session.',
+          message: 'Device session established. Subsequent commands will reuse this session.',
         },
       });
     } finally {
@@ -795,8 +795,8 @@ sessionCmd
   });
 
 sessionCmd
-  .command('clear')
-  .description('Clear cached passphrase session from keychain')
+  .command('disconnect')
+  .description('Clear cached device session')
   .action(async () => {
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
@@ -810,7 +810,7 @@ sessionCmd
       }
       outputResult(globalOpts, {
         success: true,
-        payload: { message: 'Session cache cleared.', deviceId: deviceId || 'unknown' },
+        payload: { message: 'Device session cleared.', deviceId: deviceId || 'unknown' },
       });
     } finally {
       sdk.dispose();
