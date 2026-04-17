@@ -378,10 +378,26 @@ export class Device extends EventEmitter {
 
     const deviceId = _deviceId || this.features?.device_id;
     if (!deviceId) return undefined;
-    if (!this.passphraseState) return undefined;
 
-    const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
-    return deviceSessionCache[usePassKey];
+    if (this.passphraseState) {
+      const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
+      return deviceSessionCache[usePassKey];
+    }
+
+    // Fallback: when passphraseState is not yet set (e.g. new Device instance
+    // created after clearDeviceCache), look up any preloaded session that
+    // matches this deviceId. This allows preloadSessionCache() data to survive
+    // Device instance recreation.
+    const prefix = `${deviceId}@`;
+    for (const key of Object.keys(deviceSessionCache)) {
+      if (key.startsWith(prefix)) {
+        this.passphraseState = key.slice(prefix.length);
+        Log.debug('getInternalState fallback hit: ', key, deviceSessionCache[key]);
+        return deviceSessionCache[key];
+      }
+    }
+
+    return undefined;
   }
 
   // attach to pin to fix internal state

@@ -38,9 +38,6 @@ function setPassphraseProvider(provider: IPassphraseProvider | undefined): void 
   passphraseProvider = provider;
 }
 
-// Remember user's last passphrase mode selection (1/2/3) so retry
-// after error 112 can reuse it without re-prompting.
-let lastPassphraseChoice: '1' | '2' | '3' | undefined;
 
 // ---------------------------------------------------------------------------
 // Pinentry — secure passphrase input via native OS dialog
@@ -191,14 +188,6 @@ function promptPassphraseMode(): Promise<{
   value: string;
   passphraseOnDevice: boolean;
 }> {
-  // If user already selected a mode in this process, reuse it (e.g. retry after 112)
-  if (lastPassphraseChoice) {
-    process.stderr.write(
-      `[onekey-hw] Reusing previous wallet type selection (${lastPassphraseChoice})...\n`
-    );
-    return resolvePassphraseByChoice(lastPassphraseChoice);
-  }
-
   if (!process.stdin.isTTY) {
     return Promise.resolve({ value: '', passphraseOnDevice: true });
   }
@@ -224,7 +213,6 @@ function promptPassphraseMode(): Promise<{
       rl.question('Enter selection [1/2/3]: ', answer => {
         const n = answer.trim() as '1' | '2' | '3';
         if (n === '1' || n === '2' || n === '3') {
-          lastPassphraseChoice = n;
           rl.close();
           resolvePassphraseByChoice(n).then(resolve);
           return;
@@ -236,6 +224,7 @@ function promptPassphraseMode(): Promise<{
     prompt();
   });
 }
+
 
 // ---------------------------------------------------------------------------
 // Event handlers

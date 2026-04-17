@@ -94,17 +94,12 @@ program
     const sdk = await createSDK(globalOpts);
     try {
       await prepareSession(sdk, globalOpts);
-      const result = await withPassphraseRetry(
-        sdk,
-        globalOpts,
-        () =>
-          resolveGetAddress(sdk, {
-            chain: opts.chain,
-            path: opts.path,
-            showOnDevice: opts.showOnDevice === 'true',
-            ...getCommonParams(globalOpts),
-          }) as Promise<any>
-      );
+      const result = await resolveGetAddress(sdk, {
+        chain: opts.chain,
+        path: opts.path,
+        showOnDevice: opts.showOnDevice === 'true',
+        ...getCommonParams(globalOpts),
+      });
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -866,6 +861,7 @@ async function prepareSession(
   }
 
   try {
+    // ── Step 1: Discover device ──────────────────────────────────────
     const searchResult = await sdk.searchDevices();
     if (
       !searchResult?.success ||
@@ -882,20 +878,25 @@ async function prepareSession(
         device_id?: string;
         session_id?: string;
         passphrase_protection?: boolean | null;
+        unlocked?: boolean | null;
       };
     };
     const connectId = device.connectId || globalOpts.connectId || '';
+    if (!globalOpts.connectId && connectId) {
+      globalOpts.connectId = connectId;
+    }
 
-    // searchDevices may not Initialize the device, so features can be null.
-    // Call getFeatures to get device_id and passphrase_protection.
+    // ── Step 2: Get features (may need getFeatures if searchDevices didn't init) ──
     let deviceId = device.features?.device_id || device.deviceId || '';
+    let unlocked = device.features?.unlocked;
     let passphraseProtection = device.features?.passphrase_protection;
 
-    if (!deviceId || passphraseProtection == null) {
+    if (!deviceId || unlocked == null || passphraseProtection == null) {
       try {
         const featResult = await sdk.getFeatures(connectId);
         if (featResult?.success && featResult.payload) {
           deviceId = featResult.payload.device_id || deviceId;
+          unlocked = featResult.payload.unlocked;
           passphraseProtection = featResult.payload.passphrase_protection;
         }
       } catch {
@@ -903,12 +904,35 @@ async function prepareSession(
       }
     }
 
-    // Device doesn't have passphrase protection → standard wallet
+    // ── Step 3: Unlock if locked (matches app-monorepo ServiceHardware flow) ──
+    if (unlocked === false) {
+      process.stderr.write('[onekey-hw] Device is locked. Unlocking (PIN required)...\n');
+      try {
+        const unlockResult = await sdk.deviceUnlock(connectId, {});
+        if (unlockResult?.success && unlockResult.payload) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const feat = unlockResult.payload as any;
+          deviceId = feat.device_id || deviceId;
+          unlocked = feat.unlocked;
+          passphraseProtection = feat.passphrase_protection;
+        }
+      } catch {
+        // Unlock failed — continue anyway, device may still work
+        process.stderr.write('[onekey-hw] Unlock failed, continuing...\n');
+      }
+    }
+
+    if (!globalOpts.deviceId && deviceId) {
+      globalOpts.deviceId = deviceId;
+    }
+
+    // ── Step 4: Check passphrase protection ──────────────────────────
+    // After unlock, passphrase_protection is reliable
     if (passphraseProtection === false) {
       return undefined;
     }
 
-    // 1. Try keychain
+    // ── Step 5: Try keychain session reuse ───────────────────────────
     if (deviceId) {
       const { preloadSessionFromKeychain } = await import('./session');
       const cached = await preloadSessionFromKeychain(deviceId);
@@ -918,7 +942,7 @@ async function prepareSession(
       }
     }
 
-    // 2. Keychain miss → getPassphraseState (triggers interactive prompt)
+    // ── Step 6: Keychain miss → getPassphraseState (triggers 1/2/3 prompt) ──
     const psResult = await sdk.getPassphraseState(connectId, {
       initSession: true,
       useEmptyPassphrase: false,
@@ -930,7 +954,6 @@ async function prepareSession(
 
       // Save session to keychain for next invocation
       if (deviceId) {
-        // Re-search to get fresh session_id
         const freshSearch = await sdk.searchDevices();
         const freshDevice = // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
           (freshSearch?.payload as any)?.[0];
@@ -938,8 +961,6 @@ async function prepareSession(
         if (sessionId) {
           const { saveSessionToKeychain, preloadSessionFromKeychain } = await import('./session');
           await saveSessionToKeychain(deviceId, passphraseState, sessionId);
-          // Also preload in current process so the immediate SDK call
-          // finds session_id and skips REQUEST_PASSPHRASE.
           await preloadSessionFromKeychain(deviceId);
         }
       }
@@ -952,75 +973,6 @@ async function prepareSession(
   return undefined;
 }
 
-/**
- * Wrap an SDK call with error-112 retry logic.
- * If passphrase state is stale (device was relocked), clear keychain,
- * re-prompt, save new session, and retry once.
- */
-async function withPassphraseRetry<T>(
-  sdk: typeof import('@onekeyfe/hd-common-connect-sdk').default,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  globalOpts: Record<string, any>,
-  fn: () => Promise<{ success: boolean; payload: T | { code?: number; error?: string } }>
-): Promise<{ success: boolean; payload: T | { code?: number; error?: string } }> {
-  const result = await fn();
-
-  if (
-    !result.success &&
-    (result.payload as { code?: number })?.code === 112 &&
-    !globalOpts.useEmptyPassphrase
-  ) {
-    process.stderr.write(
-      '[onekey-hw] Passphrase changed or session expired. Updating session...\n'
-    );
-
-    // Clear stale session from keychain
-    let deviceId: string | undefined;
-    try {
-      const featResult = await sdk.getFeatures(globalOpts.connectId || '');
-      deviceId = (featResult?.payload as any)?.device_id;
-      if (deviceId) {
-        const { clearSessionFromKeychain } = await import('./session');
-        await clearSessionFromKeychain(deviceId);
-      }
-    } catch {
-      /* non-fatal */
-    }
-
-    // Get fresh passphraseState — the SDK already has the new passphrase
-    // from the user's recent input, so this should not re-prompt.
-    try {
-      const connectId = globalOpts.connectId || '';
-      const psResult = await sdk.getPassphraseState(connectId, {
-        initSession: true,
-        useEmptyPassphrase: false,
-      });
-      if (psResult.success && psResult.payload) {
-        globalOpts.passphraseState = psResult.payload as string;
-
-        // Save new session to keychain
-        if (deviceId) {
-          const freshSearch = await sdk.searchDevices();
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-          const freshDevice = (freshSearch?.payload as any)?.[0];
-          const sessionId = freshDevice?.features?.session_id;
-          if (sessionId) {
-            const { saveSessionToKeychain } = await import('./session');
-            await saveSessionToKeychain(deviceId, globalOpts.passphraseState, sessionId);
-          }
-        }
-      }
-    } catch {
-      // If this fails, clear passphraseState so SDK re-prompts
-      delete globalOpts.passphraseState;
-    }
-
-    // Retry with new passphraseState
-    return fn();
-  }
-
-  return result;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
