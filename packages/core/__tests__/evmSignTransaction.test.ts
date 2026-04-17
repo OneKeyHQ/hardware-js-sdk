@@ -378,5 +378,42 @@ describe('EVMSignTransaction EIP-7702', () => {
       });
     });
 
+    it('should throw error for non-self-sponsoring transactions', async () => {
+      const transaction: EVMTransactionEIP7702 = {
+        to: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+        value: '0x0',
+        gasLimit: '0x5208',
+        nonce: '0x0',
+        chainId: 1,
+        maxFeePerGas: '0xbebc200',
+        maxPriorityFeePerGas: '0x9502f900',
+        authorizationList: [
+          {
+            chainId: 1,
+            address: '0x4Cd241E8d1510e30b2076397afc7508Ae59C66c9',
+            nonce: '0x1',
+            addressN: [44, 60, 0, 0, 1], // Different from transaction signer
+          },
+        ],
+      };
+
+      const method = new EVMSignTransaction({
+        id: 1,
+        payload: {
+          method: 'evmSignTransaction',
+          path: "m/44'/60'/0'/0/0", // Different from authorization addressN
+          transaction,
+        },
+      });
+      method.device = mockDevice;
+      method.init();
+
+      await expect(method.run()).rejects.toMatchObject({
+        errorCode: 400,
+        message: expect.stringContaining(
+          'Hardware currently only supports self-sponsoring EIP-7702 transactions'
+        ),
+      });
+    });
   });
 });
