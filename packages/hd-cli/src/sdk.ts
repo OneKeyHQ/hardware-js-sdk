@@ -167,6 +167,65 @@ function promptPassphraseViaPinentry(): Promise<{
 }
 
 /**
+ * Prompt user to select wallet type (aligns with app-monorepo flow):
+ *   1. Standard wallet (no passphrase)
+ *   2. Hidden wallet — enter passphrase via pinentry (secure OS dialog)
+ *   3. Hidden wallet — enter passphrase on device screen
+ */
+function promptPassphraseMode(): Promise<{
+  value: string;
+  passphraseOnDevice: boolean;
+}> {
+  if (!process.stdin.isTTY) {
+    // Non-interactive: fall back to on-device entry
+    return Promise.resolve({ value: '', passphraseOnDevice: true });
+  }
+
+  return new Promise(resolve => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stderr,
+      terminal: true,
+    });
+
+    const prompt = () => {
+      process.stderr.write(
+        [
+          '[onekey-hw] Select wallet type:',
+          '  1. Standard wallet (no passphrase)',
+          '  2. Hidden wallet — enter passphrase on this computer (pinentry)',
+          '  3. Hidden wallet — enter passphrase on device screen',
+          '',
+        ].join('\n')
+      );
+
+      rl.question('Enter selection [1/2/3]: ', answer => {
+        const n = answer.trim();
+        if (n === '1') {
+          rl.close();
+          resolve({ value: '', passphraseOnDevice: false });
+          return;
+        }
+        if (n === '2') {
+          rl.close();
+          // Prompt via pinentry (secure OS dialog)
+          promptPassphraseViaPinentry().then(resolve);
+          return;
+        }
+        if (n === '3') {
+          rl.close();
+          resolve({ value: '', passphraseOnDevice: true });
+          return;
+        }
+        process.stderr.write('Invalid selection. Enter 1, 2, or 3.\n');
+        prompt();
+      });
+    };
+    prompt();
+  });
+}
+
+/**
  * Register UI event handlers for interactive device operations.
  *
  * The SDK emits events when the device needs user interaction:
@@ -203,24 +262,18 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
     }
 
     // Passphrase Request
-    // Hidden wallet: prompt via pinentry (secure OS dialog, never in terminal/history).
-    // Falls back to on-device entry if pinentry unavailable or cancelled.
-    // Standard wallet: auto-respond with empty passphrase.
+    // Aligns with app-monorepo pattern: offer three choices.
     if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
       if (opts.useEmptyPassphrase) {
-        // Standard wallet (no passphrase)
+        // Explicit --use-empty-passphrase: standard wallet, auto-respond
         sdk.uiResponse({
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-          payload: {
-            value: '',
-            passphraseOnDevice: false,
-            save: false,
-          },
+          payload: { value: '', passphraseOnDevice: false, save: false },
         });
       } else {
-        process.stderr.write('[onekey-hw] Passphrase required for hidden wallet.\n');
+        // Interactive: let user choose wallet type
         // eslint-disable-next-line no-void
-        void promptPassphraseViaPinentry().then(result => {
+        void promptPassphraseMode().then(result => {
           sdk.uiResponse({
             type: UI_RESPONSE.RECEIVE_PASSPHRASE,
             payload: {

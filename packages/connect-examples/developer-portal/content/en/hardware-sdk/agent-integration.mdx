@@ -118,31 +118,31 @@ onekey-hw firmware-check-all
 
 ### Hidden wallet (passphrase-protected)
 
-Hidden wallets require a two-step flow. Obtain `passphraseState` once per session, then pass it with `--passphrase-state` on all subsequent commands.
+Use `--hidden-wallet` to access a hidden wallet. Passphrase is entered securely via a native OS dialog (pinentry) — never visible in terminal or shell history.
+
+**Option A: Two-step flow (recommended for agents)**
 
 ```bash
-# Step 1: Get passphraseState (CLI prompts for passphrase interactively)
-# Do NOT use --use-empty-passphrase here — omit it to trigger passphrase input
+# Step 1: Get passphraseState (pinentry dialog prompts for passphrase)
 onekey-hw passphrase-state --connect-id <id>
-# CLI will prompt: "Enter passphrase (or press Enter for on-device entry): "
+
+# Step 2: Use --passphrase-state + --hidden-wallet on subsequent commands
+onekey-hw get-address --chain evm --hidden-wallet --passphrase-state abc123... --connect-id <id>
+onekey-hw sign-transaction --chain evm --tx '...' --hidden-wallet --passphrase-state abc123... --connect-id <id>
 ```
 
-The output includes the `passphraseState` value. Extract it and use `--passphrase-state` on all subsequent commands:
+**Option B: Direct access (pinentry prompts each time)**
 
 ```bash
-# Step 2: All subsequent commands — use --passphrase-state
-# The CLI will interactively prompt for passphrase on each new connection
-onekey-hw get-address --chain evm --passphrase-state abc123... --connect-id <id>
-onekey-hw get-address --chain btc --passphrase-state abc123... --connect-id <id>
-onekey-hw batch-get-address --bundle '[...]' --passphrase-state abc123... --connect-id <id>
-onekey-hw sign-transaction --chain evm --tx '...' --passphrase-state abc123... --connect-id <id>
+# No passphrase-state needed — pinentry prompts on each command
+onekey-hw get-address --chain evm --hidden-wallet --connect-id <id>
 ```
 
-> **Note**: The CLI is stateless — each invocation is a new process. The SDK will interactively prompt for passphrase on each new connection. `--passphrase-state` ensures you always access the same hidden wallet.
+> **Note**: Each CLI invocation is a new process. Passphrase is prompted via pinentry on each new device connection. If pinentry is unavailable, falls back to on-device entry.
 
-> **Error 112 (Device passphrase state error)**: Session expired — re-run `passphrase-state` to obtain a fresh state value, then retry.
+> **Error 112 (Device passphrase state error)**: Session expired — re-run `passphrase-state` to obtain a fresh state value.
 
-> **Never combine** `--use-empty-passphrase` with `--passphrase-state`.
+> **Never combine** `--use-empty-passphrase` with `--hidden-wallet` or `--passphrase-state`.
 
 Firmware updates must be done via the [OneKey App](https://onekey.so/download) or [firmware.onekey.so](https://firmware.onekey.so/).
 
