@@ -19,6 +19,9 @@ const ENDPOINT_OUT = 0x01;
 /** Transfer timeout in milliseconds */
 const TRANSFER_TIMEOUT_MS = 30000;
 
+/** Timeout for reading serial number descriptor during enumeration */
+const SERIAL_READ_TIMEOUT_MS = 5000;
+
 /** Packet I/O retry configuration (matches WebUsbTransport) */
 const PACKET_IO_MAX_RETRIES = 3;
 const PACKET_IO_RETRY_DELAY = 300;
@@ -59,29 +62,49 @@ function readSerialNumber(dev: usb.Device, openDevices?: Map<string, OpenDevice>
     }
   }
 
-  return new Promise(resolve => {
+  return new Promise<string>(resolve => {
+    let settled = false;
+    const settle = (value: string) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    // Guard against getStringDescriptor never calling back
+    const timer = setTimeout(() => {
+      try {
+        dev.close();
+      } catch {
+        /* ignore */
+      }
+      settle(busId);
+    }, SERIAL_READ_TIMEOUT_MS);
+
     try {
       dev.open();
       try {
         dev.getStringDescriptor(iSerialNumber, (_err: Error | undefined, data?: string) => {
+          clearTimeout(timer);
           try {
             dev.close();
           } catch {
             /* ignore */
           }
-          resolve(data || busId);
+          settle(data || busId);
         });
       } catch {
+        clearTimeout(timer);
         try {
           dev.close();
         } catch {
           /* ignore */
         }
-        resolve(busId);
+        settle(busId);
       }
     } catch {
       // dev.open() failed (e.g. LIBUSB_ERROR_BUSY if already open elsewhere)
-      resolve(busId);
+      clearTimeout(timer);
+      settle(busId);
     }
   });
 }
@@ -161,6 +184,9 @@ export default class NodeUsbTransport {
   /** per-path reconnect lock to prevent concurrent reconnects */
   private reconnectLocks = new Map<string, Promise<OpenDevice>>();
 
+  /** set to true when cancel() is called; checked by retry loops */
+  private cancelled = false;
+
   /**
    * Initialize transport.
    * Signature matches the Transport.init interface (logger, emitter).
@@ -195,12 +221,7 @@ export default class NodeUsbTransport {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
     const encodeBuffers = buildEncodeBuffers(this.messages, name, data);
-    for (const buffer of encodeBuffers) {
-      const packet = new Uint8Array(PACKET_SIZE);
-      packet[0] = REPORT_ID;
-      packet.set(new Uint8Array(buffer), 1);
-      await this.transferOutWithRetry(path, this.getOpenDevice(path), Buffer.from(packet));
-    }
+    await this.sendAllChunksWithRetry(path, encodeBuffers);
   }
 
   /**
@@ -302,6 +323,8 @@ export default class NodeUsbTransport {
    * This is the core method that replaces LowlevelTransport's call + UsbPlugin's send/receive.
    */
   async call(path: string, name: string, data: Record<string, unknown>) {
+    this.cancelled = false;
+
     if (!this.messages) {
       throw ERRORS.TypedError(HardwareErrorCode.TransportNotConfigured);
     }
@@ -335,6 +358,7 @@ export default class NodeUsbTransport {
 
   cancel() {
     this.Log?.debug('NodeUsbTransport cancel');
+    this.cancelled = true;
   }
 
   // --- Private helpers ---
@@ -435,6 +459,9 @@ export default class NodeUsbTransport {
   private async sendAllChunksWithRetry(path: string, encodeBuffers: ArrayBuffer[]): Promise<void> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
+      if (this.cancelled) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
+      }
       try {
         for (const buffer of encodeBuffers) {
           const packet = new Uint8Array(PACKET_SIZE);
@@ -459,6 +486,8 @@ export default class NodeUsbTransport {
               reconnectError
             )}`
           );
+          // Reconnect failed — no point retrying with a dead device
+          break;
         }
       }
     }
@@ -476,6 +505,9 @@ export default class NodeUsbTransport {
     let lastError: unknown;
     let currentDev = openDev;
     for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
+      if (this.cancelled) {
+        throw ERRORS.TypedError(HardwareErrorCode.DeviceInterruptedFromOutside, 'Cancelled');
+      }
       try {
         return await transferInOnce(currentDev.epIn, length);
       } catch (error) {
@@ -493,40 +525,7 @@ export default class NodeUsbTransport {
               reconnectError
             )}`
           );
-        }
-      }
-    }
-    throw lastError;
-  }
-
-  /**
-   * USB OUT transfer with retry and reconnect (aligned with WebUsbTransport).
-   */
-  private async transferOutWithRetry(
-    path: string,
-    openDev: OpenDevice,
-    data: Buffer
-  ): Promise<void> {
-    let lastError: unknown;
-    let currentDev = openDev;
-    for (let attempt = 1; attempt <= PACKET_IO_MAX_RETRIES; attempt++) {
-      try {
-        return await transferOutOnce(currentDev.epOut, data);
-      } catch (error) {
-        lastError = error;
-        const shouldRetry = attempt < PACKET_IO_MAX_RETRIES && this.isRetryableError(error);
-        if (!shouldRetry) {
-          throw error;
-        }
-        try {
-          currentDev = await this.reconnectForRetry(path, 'out', attempt, error);
-        } catch (reconnectError) {
-          lastError = reconnectError;
-          this.Log?.debug(
-            `[NodeUsbTransport] reconnect failed on retry ${attempt}/${PACKET_IO_MAX_RETRIES}: ${this.getErrorMessage(
-              reconnectError
-            )}`
-          );
+          break;
         }
       }
     }

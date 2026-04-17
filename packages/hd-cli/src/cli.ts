@@ -9,6 +9,17 @@ import {
   resolveSignTransaction,
 } from './chains';
 
+import type {
+  EthereumSignTypedDataMessage,
+  EthereumSignTypedDataTypes,
+  Features,
+  IDeviceType,
+  SearchDevice,
+} from '@onekeyfe/hd-core';
+
+/** SearchDevice enriched with features fetched after discovery */
+type EnrichedSearchDevice = SearchDevice & { features?: Features };
+
 const program = new Command();
 
 program
@@ -43,15 +54,17 @@ program
 
       // Auto-fetch features for each discovered device (doesn't require PIN)
       if (result?.success && Array.isArray(result.payload)) {
-        for (const device of result.payload) {
+        for (const device of result.payload as EnrichedSearchDevice[]) {
           if (device.connectId) {
             try {
               const features = await sdk.getFeatures(device.connectId);
               if (features?.success && features.payload) {
-                (device as any).features = features.payload;
+                device.features = features.payload;
                 device.name = features.payload.label || features.payload.ble_name || device.name;
-                device.deviceType =
-                  (features.payload.onekey_device_type?.toLowerCase() as any) || device.deviceType;
+                const devType = features.payload.onekey_device_type?.toLowerCase();
+                if (devType) {
+                  device.deviceType = devType as IDeviceType;
+                }
               }
             } catch {
               // Features fetch failed — device may need PIN, continue with basic info
@@ -167,7 +180,7 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const data = safeJsonParse(opts.data, '--data');
+      const data = safeJsonParse(opts.data, '--data') as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
       const params = getCommonParams(globalOpts);
       const path = opts.path || "m/44'/60'/0'/0/0";
       const result = await sdk.evmSignTypedData(params.connectId || '', params.deviceId || '', {
@@ -175,7 +188,7 @@ program
         metamaskV4Compat: opts.metamaskV4Compat,
         data,
         ...params,
-      } as any);
+      });
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -196,7 +209,7 @@ program
         psbt: opts.psbt,
         coin: opts.coin,
         ...params,
-      } as any);
+      });
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -567,7 +580,7 @@ program
     try {
       const result = await sdk.deviceChangePin(globalOpts.connectId, {
         remove: opts.remove ?? false,
-      } as any);
+      });
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -583,7 +596,7 @@ program
     try {
       const result = await sdk.getPassphraseState(globalOpts.connectId, {
         useEmptyPassphrase: globalOpts.useEmptyPassphrase,
-      } as any);
+      });
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -682,7 +695,7 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.deviceVerify(globalOpts.connectId, { dataHex: '' } as any);
+      const result = await sdk.deviceVerify(globalOpts.connectId, { dataHex: '' });
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -696,7 +709,7 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await sdk.deviceLock(globalOpts.connectId, {} as any);
+      const result = await sdk.deviceLock(globalOpts.connectId, {});
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -711,6 +724,7 @@ program
  * Extract common device params from global CLI options.
  * These are passed to every SDK method call.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getCommonParams(globalOpts: Record<string, any>) {
   return {
     connectId: globalOpts.connectId,
@@ -720,12 +734,18 @@ function getCommonParams(globalOpts: Record<string, any>) {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function outputResult(_globalOpts: Record<string, any>, result: unknown): void {
   // #10 FIX: Always use JSON.stringify to avoid [Object] truncation
   console.log(JSON.stringify(result, null, 2));
 
   // Set exit code and let event loop drain so async cleanup (USB release) can complete
-  if (result && typeof result === 'object' && 'success' in result && !(result as any).success) {
+  if (
+    result &&
+    typeof result === 'object' &&
+    'success' in result &&
+    !(result as { success: boolean }).success
+  ) {
     process.exitCode = 1;
   }
   // Allow a short delay for async USB release, then force exit
