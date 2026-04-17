@@ -102,6 +102,27 @@ export interface Device {
 
 const deviceSessionCache: Record<string, string> = {};
 
+/**
+ * Pre-populate the device session cache with a known session ID.
+ *
+ * This allows short-lived processes (e.g. CLI) to restore a previously
+ * obtained session, avoiding the need to re-enter passphrase on every
+ * invocation. The session must have been obtained from a prior
+ * getPassphraseState() call on the same device.
+ *
+ * @param deviceId - The device's device_id (from features)
+ * @param passphraseState - The passphrase state token
+ * @param sessionId - The session_id to cache (from features.session_id)
+ */
+export function preloadSessionCache(
+  deviceId: string,
+  passphraseState: string,
+  sessionId: string,
+): void {
+  const key = `${deviceId}@${passphraseState}`;
+  deviceSessionCache[key] = sessionId;
+}
+
 export class Device extends EventEmitter {
   /**
    * 设备标识对象
