@@ -38,6 +38,10 @@ function setPassphraseProvider(provider: IPassphraseProvider | undefined): void 
   passphraseProvider = provider;
 }
 
+// Remember user's last passphrase mode selection (1/2/3) so retry
+// after error 112 can reuse it without re-prompting.
+let lastPassphraseChoice: '1' | '2' | '3' | undefined;
+
 // ---------------------------------------------------------------------------
 // Pinentry — secure passphrase input via native OS dialog
 // ---------------------------------------------------------------------------
@@ -175,10 +179,26 @@ function promptUser(question: string, hidden = false): Promise<string> {
  *   2. Hidden wallet — enter passphrase via pinentry (secure OS dialog)
  *   3. Hidden wallet — enter passphrase on device screen
  */
+function resolvePassphraseByChoice(
+  choice: '1' | '2' | '3'
+): Promise<{ value: string; passphraseOnDevice: boolean }> {
+  if (choice === '1') return Promise.resolve({ value: '', passphraseOnDevice: false });
+  if (choice === '2') return promptPassphraseViaPinentry();
+  return Promise.resolve({ value: '', passphraseOnDevice: true });
+}
+
 function promptPassphraseMode(): Promise<{
   value: string;
   passphraseOnDevice: boolean;
 }> {
+  // If user already selected a mode in this process, reuse it (e.g. retry after 112)
+  if (lastPassphraseChoice) {
+    process.stderr.write(
+      `[onekey-hw] Reusing previous wallet type selection (${lastPassphraseChoice})...\n`
+    );
+    return resolvePassphraseByChoice(lastPassphraseChoice);
+  }
+
   if (!process.stdin.isTTY) {
     return Promise.resolve({ value: '', passphraseOnDevice: true });
   }
@@ -202,20 +222,11 @@ function promptPassphraseMode(): Promise<{
       );
 
       rl.question('Enter selection [1/2/3]: ', answer => {
-        const n = answer.trim();
-        if (n === '1') {
+        const n = answer.trim() as '1' | '2' | '3';
+        if (n === '1' || n === '2' || n === '3') {
+          lastPassphraseChoice = n;
           rl.close();
-          resolve({ value: '', passphraseOnDevice: false });
-          return;
-        }
-        if (n === '2') {
-          rl.close();
-          promptPassphraseViaPinentry().then(resolve);
-          return;
-        }
-        if (n === '3') {
-          rl.close();
-          resolve({ value: '', passphraseOnDevice: true });
+          resolvePassphraseByChoice(n).then(resolve);
           return;
         }
         process.stderr.write('Invalid selection. Enter 1, 2, or 3.\n');
