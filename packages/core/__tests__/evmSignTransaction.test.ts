@@ -377,6 +377,5 @@ describe('EVMSignTransaction EIP-7702', () => {
         s: 'efab5678901234567890abcdef1234567890abcdef1234567890abcdef123456',
       });
     });
-
   });
 });

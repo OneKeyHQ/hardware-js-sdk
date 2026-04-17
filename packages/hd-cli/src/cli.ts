@@ -180,7 +180,10 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const data = safeJsonParse(opts.data, '--data') as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
+      const data = safeJsonParse(
+        opts.data,
+        '--data'
+      ) as EthereumSignTypedDataMessage<EthereumSignTypedDataTypes>;
       const params = getCommonParams(globalOpts);
       const path = opts.path || "m/44'/60'/0'/0/0";
       const result = await sdk.evmSignTypedData(params.connectId || '', params.deviceId || '', {
