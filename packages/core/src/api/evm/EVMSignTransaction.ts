@@ -1,4 +1,4 @@
-import { ERRORS } from '@onekeyfe/hd-shared';
+import { ERRORS, HardwareErrorCode } from '@onekeyfe/hd-shared';
 
 import { UI_REQUEST } from '../../constants/ui-request';
 import { validatePath } from '../helpers/pathUtils';
@@ -119,6 +119,26 @@ export default class EVMSignTransaction extends BaseMethod {
     const { addressN, isEIP1559, isEIP7702, formattedTx } = this;
 
     if (formattedTx == null) throw ERRORS.TypedError('Runtime', 'formattedTx is not set');
+
+    // EIP-7702: Validate all authorizations use the same key as the transaction signer.
+    // Hardware currently only supports self-sponsoring EIP-7702 transactions.
+    if (isEIP7702) {
+      const tx = formattedTx as EVMTransactionEIP7702;
+      for (const auth of tx.authorizationList) {
+        if (
+          auth.addressN &&
+          auth.addressN.length > 0 &&
+          (auth.addressN.length !== addressN.length ||
+            auth.addressN.some((v, i) => v !== addressN[i]))
+        ) {
+          throw ERRORS.TypedError(
+            HardwareErrorCode.CallMethodError,
+            'Hardware currently only supports self-sponsoring EIP-7702 transactions. ' +
+              'All authorization addressN must match the transaction signer path.'
+          );
+        }
+      }
+    }
 
     if (TransportManager.getMessageVersion() === 'v1') {
       return signTransactionLegacyV1({
