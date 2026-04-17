@@ -905,7 +905,10 @@ async function prepareSession(
     }
 
     // ── Step 3: Unlock if locked (matches app-monorepo ServiceHardware flow) ──
-    if (unlocked === false) {
+    // Track whether device was locked — locking invalidates passphrase sessions,
+    // so keychain session reuse is only possible if device was already unlocked.
+    const wasLocked = unlocked === false;
+    if (wasLocked) {
       process.stderr.write('[onekey-hw] Device is locked. Unlocking (PIN required)...\n');
       try {
         const unlockResult = await sdk.deviceUnlock(connectId, {});
@@ -917,7 +920,6 @@ async function prepareSession(
           passphraseProtection = feat.passphrase_protection;
         }
       } catch {
-        // Unlock failed — continue anyway, device may still work
         process.stderr.write('[onekey-hw] Unlock failed, continuing...\n');
       }
     }
@@ -927,13 +929,14 @@ async function prepareSession(
     }
 
     // ── Step 4: Check passphrase protection ──────────────────────────
-    // After unlock, passphrase_protection is reliable
     if (passphraseProtection === false) {
       return undefined;
     }
 
     // ── Step 5: Try keychain session reuse ───────────────────────────
-    if (deviceId) {
+    // Only attempt if device was already unlocked — locking invalidates
+    // all passphrase sessions, so cached session_id is useless after unlock.
+    if (!wasLocked && deviceId) {
       const { preloadSessionFromKeychain } = await import('./session');
       const cached = await preloadSessionFromKeychain(deviceId);
       if (cached) {

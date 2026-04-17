@@ -136,6 +136,50 @@ await HardwareSDK.btcGetAddress(connectId, deviceId, {
 });
 ```
 
+### 跨进程会话复用（CLI / 脚本）
+
+对于短生命周期的进程（CLI 工具、自动化脚本），可以使用 `preloadSessionCache` 持久化并恢复会话。
+
+```ts
+import { preloadSessionCache } from '@onekeyfe/hd-core';
+
+// 启动时：从持久化存储恢复会话
+const { deviceId, passphraseState, sessionId } = loadFromStorage();
+preloadSessionCache(deviceId, passphraseState, sessionId);
+
+// 后续 SDK 调用使用此 passphraseState，跳过 passphrase 提示
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  passphraseState,
+});
+```
+
+> **重要：设备锁定会使会话失效。** Touch 和 Pro 设备有自动锁屏功能。锁定后所有 passphrase 会话被清除——缓存的 `session_id` 失效，用户必须在解锁（输入 PIN）后重新输入 passphrase。会话复用仅在设备保持解锁状态时有效。
+
+### 先解锁模式（CLI 推荐）
+
+对于可能自动锁屏的设备（Touch/Pro），始终先解锁再尝试会话复用：
+
+```ts
+// 1. 检查设备是否锁定
+const features = await HardwareSDK.getFeatures(connectId);
+
+// 2. 如需要则解锁（设备上输入 PIN）
+let wasLocked = false;
+if (!features.payload.unlocked) {
+  wasLocked = true;
+  await HardwareSDK.deviceUnlock(connectId, {});
+}
+
+// 3. 仅在设备原本就是解锁状态时复用缓存会话
+if (!wasLocked) {
+  // 从持久化存储加载 preloadSessionCache
+  preloadSessionCache(deviceId, savedPassphraseState, savedSessionId);
+} else {
+  // 设备曾锁定 → 旧会话失效 → 需要重新输入 passphrase
+}
+```
+
 ## 注意事项
 
 - **不要记录或持久化** Passphrase 明文。

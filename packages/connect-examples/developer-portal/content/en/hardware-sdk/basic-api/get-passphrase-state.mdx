@@ -19,7 +19,7 @@ Session flow:
   btcGetAddress(..., { passphraseState: "abc123" })  ← no passphrase prompt
 ```
 
-> **Error 112 (Device passphrase state error)**: The session has expired. Call `getPassphraseState` again to obtain a fresh state, then retry.
+> **Error 112 (Device passphrase state error)**: The session has expired (e.g. device was locked and re-unlocked, or seed changed). Call `getPassphraseState` again to obtain a fresh state, then retry. You can prevent error 112 by passing `skipPassphraseCheck: true` in your API calls — in that case, the SDK fires `REQUEST_PASSPHRASE` instead, letting your event handler re-prompt the user.
 
 ```typescript
 const response = await HardwareSDK.getPassphraseState(connectId);
