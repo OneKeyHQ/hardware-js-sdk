@@ -93,12 +93,15 @@ program
     const globalOpts = program.opts();
     const sdk = await createSDK(globalOpts);
     try {
-      const result = await resolveGetAddress(sdk, {
-        chain: opts.chain,
-        path: opts.path,
-        showOnDevice: opts.showOnDevice === 'true',
-        ...getCommonParams(globalOpts),
-      });
+      await prepareSession(sdk, globalOpts);
+      const result = await withPassphraseRetry(sdk, globalOpts, () =>
+        resolveGetAddress(sdk, {
+          chain: opts.chain,
+          path: opts.path,
+          showOnDevice: opts.showOnDevice === 'true',
+          ...getCommonParams(globalOpts),
+        }) as Promise<any>
+      );
       outputResult(globalOpts, result);
     } finally {
       sdk.dispose();
@@ -720,21 +723,211 @@ program
   });
 
 // ============================================================
+// Session Management Commands
+// ============================================================
+
+const sessionCmd = program
+  .command('session')
+  .description('Manage passphrase session cache (keychain)');
+
+sessionCmd
+  .command('login')
+  .description('Establish a passphrase session and cache it for subsequent commands')
+  .action(async () => {
+    const globalOpts = program.opts();
+    const sdk = await createSDK(globalOpts);
+    try {
+      // 1. Search for device
+      const searchResult = await sdk.searchDevices();
+      if (!searchResult?.success || !searchResult.payload?.length) {
+        outputResult(globalOpts, {
+          success: false,
+          payload: { error: 'No device found', code: 'NO_DEVICE' },
+        });
+        return;
+      }
+      const device = searchResult.payload[0];
+      const connectId = device.connectId || globalOpts.connectId;
+
+      // 2. Get passphraseState (triggers 1/2/3 selection)
+      const psResult = await sdk.getPassphraseState(connectId, {
+        initSession: true,
+        useEmptyPassphrase: false,
+      });
+      if (!psResult.success) {
+        outputResult(globalOpts, psResult);
+        return;
+      }
+      const passphraseState = psResult.payload;
+
+      // 3. Get address to verify + extract deviceId
+      const addrResult = await sdk.evmGetAddress(connectId, device.deviceId || '', {
+        path: "m/44'/60'/0'/0/0",
+        showOnOneKey: false,
+        passphraseState,
+      });
+
+      // 4. Get sessionId from features
+      const featResult = await sdk.searchDevices();
+      const featDevice = (featResult?.payload as any)?.[0];
+      const deviceId = featDevice?.features?.device_id || device.deviceId || '';
+      const sessionId = featDevice?.features?.session_id || '';
+
+      // 5. Save to keychain
+      if (passphraseState && deviceId && sessionId) {
+        const { saveSessionToKeychain } = await import('./session');
+        await saveSessionToKeychain(deviceId, passphraseState, sessionId);
+      }
+
+      outputResult(globalOpts, {
+        success: true,
+        payload: {
+          passphraseState,
+          deviceId,
+          sessionId: sessionId ? '(cached)' : '(not available)',
+          address: addrResult?.success ? addrResult.payload.address : undefined,
+          message: 'Session cached. Subsequent commands will use cached session.',
+        },
+      });
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+sessionCmd
+  .command('clear')
+  .description('Clear cached passphrase session from keychain')
+  .action(async () => {
+    const globalOpts = program.opts();
+    const sdk = await createSDK(globalOpts);
+    try {
+      const searchResult = await sdk.searchDevices();
+      const device = (searchResult?.payload as any)?.[0];
+      const deviceId = device?.features?.device_id || device?.deviceId;
+      if (deviceId) {
+        const { clearSessionFromKeychain } = await import('./session');
+        await clearSessionFromKeychain(deviceId);
+      }
+      outputResult(globalOpts, {
+        success: true,
+        payload: { message: 'Session cache cleared.', deviceId: deviceId || 'unknown' },
+      });
+    } finally {
+      sdk.dispose();
+    }
+  });
+
+// ============================================================
 // Helpers
 // ============================================================
 
 /**
  * Extract common device params from global CLI options.
  * These are passed to every SDK method call.
+ *
+ * When neither --use-empty-passphrase nor --passphrase-state is set,
+ * skipPassphraseCheck is enabled so the SDK proceeds to REQUEST_PASSPHRASE
+ * (where our interactive handler runs) instead of throwing error 114.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getCommonParams(globalOpts: Record<string, any>) {
+  const hasExplicitPassphrase = globalOpts.useEmptyPassphrase || globalOpts.passphraseState;
   return {
     connectId: globalOpts.connectId,
     deviceId: globalOpts.deviceId,
     passphraseState: globalOpts.passphraseState,
     useEmptyPassphrase: globalOpts.useEmptyPassphrase,
+    // Bypass SDK's pre-check so REQUEST_PASSPHRASE fires for interactive handling
+    skipPassphraseCheck: hasExplicitPassphrase ? undefined : true,
   };
+}
+
+/**
+ * Prepare passphrase session: try keychain → preloadSessionCache.
+ * Returns the loaded passphraseState (if any) so callers can pass it to SDK.
+ */
+async function prepareSession(
+  sdk: typeof import('@onekeyfe/hd-common-connect-sdk').default,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  globalOpts: Record<string, any>
+): Promise<string | undefined> {
+  // Skip if standard wallet or passphraseState already provided
+  if (globalOpts.useEmptyPassphrase || globalOpts.passphraseState) {
+    return globalOpts.passphraseState;
+  }
+
+  // Try to get deviceId from a quick search
+  try {
+    const searchResult = await sdk.searchDevices();
+    if (
+      searchResult?.success &&
+      Array.isArray(searchResult.payload) &&
+      searchResult.payload.length > 0
+    ) {
+      const device = searchResult.payload[0] as {
+        deviceId?: string;
+        features?: { device_id?: string };
+      };
+      const deviceId = device.features?.device_id || device.deviceId;
+      if (deviceId) {
+        const { preloadSessionFromKeychain } = await import('./session');
+        const cached = await preloadSessionFromKeychain(deviceId);
+        if (cached) {
+          // Update globalOpts so getCommonParams picks it up
+          globalOpts.passphraseState = cached;
+          return cached;
+        }
+      }
+    }
+  } catch {
+    // Non-fatal — will prompt for passphrase if needed
+  }
+  return undefined;
+}
+
+/**
+ * Wrap an SDK call with error-112 retry logic.
+ * If passphrase state is stale (device was relocked), clear keychain,
+ * re-prompt, save new session, and retry once.
+ */
+async function withPassphraseRetry<T>(
+  sdk: typeof import('@onekeyfe/hd-common-connect-sdk').default,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  globalOpts: Record<string, any>,
+  fn: () => Promise<{ success: boolean; payload: T | { code?: number; error?: string } }>
+): Promise<{ success: boolean; payload: T | { code?: number; error?: string } }> {
+  const result = await fn();
+
+  if (
+    !result.success &&
+    (result.payload as { code?: number })?.code === 112 &&
+    !globalOpts.useEmptyPassphrase
+  ) {
+    process.stderr.write('[onekey-hw] Passphrase state expired, re-authenticating...\n');
+
+    // Clear stale session
+    try {
+      const searchResult = await sdk.searchDevices();
+      const device = (searchResult?.payload as any)?.[0] as
+        | { deviceId?: string; features?: { device_id?: string } }
+        | undefined;
+      const deviceId = device?.features?.device_id || device?.deviceId;
+      if (deviceId) {
+        const { clearSessionFromKeychain } = await import('./session');
+        await clearSessionFromKeychain(deviceId);
+      }
+    } catch {
+      /* non-fatal */
+    }
+
+    // Clear passphraseState from opts so SDK re-prompts
+    delete globalOpts.passphraseState;
+
+    // Retry — SDK will fire REQUEST_PASSPHRASE, handler will prompt
+    return fn();
+  }
+
+  return result;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
