@@ -828,20 +828,21 @@ sessionCmd
  * Extract common device params from global CLI options.
  * These are passed to every SDK method call.
  *
- * When neither --use-empty-passphrase nor --passphrase-state is set,
- * skipPassphraseCheck is enabled so the SDK proceeds to REQUEST_PASSPHRASE
- * (where our interactive handler runs) instead of throwing error 114.
+ * skipPassphraseCheck is always true because:
+ * - prepareSession handles passphrase selection (1/2/3 + pinentry/device)
+ * - Without it, SDK's checkPassphraseStateSafety triggers a SECOND
+ *   REQUEST_PASSPHRASE (double prompt) even when passphraseState is set
+ * - Error 114 (no passphrase state) is also bypassed — our interactive
+ *   handler in REQUEST_PASSPHRASE handles it correctly
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getCommonParams(globalOpts: Record<string, any>) {
-  const hasExplicitPassphrase = globalOpts.useEmptyPassphrase || globalOpts.passphraseState;
   return {
     connectId: globalOpts.connectId,
     deviceId: globalOpts.deviceId,
     passphraseState: globalOpts.passphraseState,
     useEmptyPassphrase: globalOpts.useEmptyPassphrase,
-    // Bypass SDK's pre-check so REQUEST_PASSPHRASE fires for interactive handling
-    skipPassphraseCheck: hasExplicitPassphrase ? undefined : true,
+    skipPassphraseCheck: true,
   };
 }
 
