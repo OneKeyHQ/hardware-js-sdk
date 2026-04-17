@@ -618,8 +618,9 @@ export default class NodeUsbTransport {
     }
 
     // Read subsequent packets until complete
+    // Re-resolve device on each iteration so we use a fresh handle after any reconnect
     while (decoded.offset < lengthWithHeader) {
-      const packet = await this.transferInWithRetry(path, dev, PACKET_SIZE);
+      const packet = await this.transferInWithRetry(path, this.getOpenDevice(path), PACKET_SIZE);
       const pktData = skipReportByte(packet);
       const buf = toArrayBuffer(pktData);
       if (lengthWithHeader - decoded.offset >= PAYLOAD_SIZE) {
