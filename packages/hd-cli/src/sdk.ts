@@ -24,19 +24,27 @@ export interface SDKOptions {
   useEmptyPassphrase?: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Passphrase provider — module-level, async-capable
-// ---------------------------------------------------------------------------
+/**
+ * Current per-invocation CLI options. Event handlers read from this object
+ * so that invoking createSDK() with different opts never results in stale
+ * closure captures — the SDK is a singleton, but opts can change per call.
+ */
+let currentOpts: SDKOptions = {};
 
-type IPassphraseProvider = () =>
-  | { value: string; passphraseOnDevice: boolean }
-  | Promise<{ value: string; passphraseOnDevice: boolean }>;
-
-let passphraseProvider: IPassphraseProvider | undefined;
-
-function setPassphraseProvider(provider: IPassphraseProvider | undefined): void {
-  passphraseProvider = provider;
-}
+/**
+ * Promise-singleton that resolves to the initialised SDK. Set on first call,
+ * reused by all subsequent (and concurrent) callers.
+ *
+ * Using a Promise instead of a boolean flag eliminates the race where two
+ * concurrent createSDK() calls could both pass the "initialised?" check
+ * before the flag was set, then both run init() — each call replaces the
+ * internal Core/Connector at the hd-core layer and leaks USB handles.
+ *
+ * Mirrors app-monorepo's apps/cli/src/commands/device/hardware-sdk.ts
+ * (sdkReadyPromise). Cleared by disposeSDK() so REPL/test harnesses can
+ * re-init cleanly after an explicit tear-down.
+ */
+let sdkReadyPromise: Promise<typeof HardwareSDK> | null = null;
 
 
 // ---------------------------------------------------------------------------
@@ -125,51 +133,6 @@ function promptPassphraseViaPinentry(): Promise<{
 // Interactive prompts
 // ---------------------------------------------------------------------------
 
-function promptUser(question: string, hidden = false): Promise<string> {
-  if (!process.stdin.isTTY) {
-    return Promise.resolve('');
-  }
-
-  return new Promise(resolve => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stderr,
-    });
-
-    if (hidden) {
-      process.stderr.write(question);
-      const { stdin } = process;
-      const wasRaw = stdin.isRaw;
-      if (stdin.setRawMode) stdin.setRawMode(true);
-
-      let input = '';
-      const onData = (char: Buffer) => {
-        const c = char.toString('utf8');
-        if (c === '\n' || c === '\r' || c === '\u0004') {
-          if (stdin.setRawMode) stdin.setRawMode(wasRaw ?? false);
-          stdin.removeListener('data', onData);
-          process.stderr.write('\n');
-          rl.close();
-          resolve(input);
-        } else if (c === '\u0003') {
-          process.exit(1);
-        } else if (c === '\u007F' || c === '\b') {
-          input = input.slice(0, -1);
-        } else {
-          input += c;
-          process.stderr.write('*');
-        }
-      };
-      stdin.on('data', onData);
-    } else {
-      rl.question(question, answer => {
-        rl.close();
-        resolve(answer);
-      });
-    }
-  });
-}
-
 /**
  * Prompt user to select wallet type (aligns with app-monorepo flow):
  *   1. Standard wallet (no passphrase)
@@ -230,21 +193,27 @@ function promptPassphraseMode(): Promise<{
 // Event handlers
 // ---------------------------------------------------------------------------
 
-function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void {
+function registerEventHandlers(sdk: typeof HardwareSDK): void {
   sdk.on(UI_EVENT, (message: any) => {
-    // PIN Request — always on-device for CLI security (no terminal echo)
+    // PIN Request — always on-device for CLI security (no terminal echo).
+    // The sentinel '@@ONEKEY_INPUT_PIN_IN_DEVICE' makes DeviceCommands send
+    // `BixinPinInputOnDevice` so the device switches to on-device PIN entry.
+    // Sending an empty string would be treated as a wrong (empty) PIN and
+    // would consume a PIN retry on Classic/1S/Mini/Pure.
+    // Touch/Pro never emit PinMatrixRequest — they handle PIN on touchscreen
+    // before this code path runs, so the sentinel is harmless there.
     if (message.type === UI_REQUEST.REQUEST_PIN) {
       process.stderr.write('[onekey-hw] Please enter PIN on your device screen...\n');
-      // Respond with empty PIN to let device handle on-device PIN entry.
-      // All OneKey devices support on-device PIN (Classic/Mini via matrix,
-      // Touch/Pro via touchscreen). CLI should never collect PIN from stdin.
-      sdk.uiResponse({ type: UI_RESPONSE.RECEIVE_PIN, payload: '' });
+      sdk.uiResponse({
+        type: UI_RESPONSE.RECEIVE_PIN,
+        payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE',
+      });
     }
 
     // Passphrase Request
     if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
       // 1. Explicit --use-empty-passphrase: auto-respond
-      if (opts.useEmptyPassphrase) {
+      if (currentOpts.useEmptyPassphrase) {
         sdk.uiResponse({
           type: UI_RESPONSE.RECEIVE_PASSPHRASE,
           payload: { value: '', passphraseOnDevice: false, save: false },
@@ -252,33 +221,7 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
         return;
       }
 
-      // 2. External provider set (e.g. by session.ts during resolvePassphraseState)
-      if (passphraseProvider) {
-        const resultOrPromise = passphraseProvider();
-        const respond = (result: { value: string; passphraseOnDevice: boolean }) => {
-          sdk.uiResponse({
-            type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-            payload: {
-              value: result.value,
-              passphraseOnDevice: result.passphraseOnDevice,
-              save: false,
-            },
-          });
-        };
-        if (resultOrPromise instanceof Promise) {
-          resultOrPromise.then(respond).catch(() => {
-            process.stderr.write(
-              '[onekey-hw] Passphrase provider failed, falling back to on-device.\n'
-            );
-            respond({ value: '', passphraseOnDevice: true });
-          });
-        } else {
-          respond(resultOrPromise);
-        }
-        return;
-      }
-
-      // 3. Interactive: 1/2/3 selection
+      // 2. Interactive: 1/2/3 selection
       promptPassphraseMode()
         .then(result => {
           sdk.uiResponse({
@@ -327,15 +270,53 @@ function registerEventHandlers(sdk: typeof HardwareSDK, opts: SDKOptions): void 
 // SDK Factory
 // ---------------------------------------------------------------------------
 
-export async function createSDK(opts: SDKOptions) {
+async function initSDK(): Promise<typeof HardwareSDK> {
   const settings: Partial<ConnectSettings> = {
     debug: false,
     fetchConfig: true,
+    env: 'node-usb',
   };
-  settings.env = 'node-usb';
-
   await HardwareSDK.init(settings);
-  registerEventHandlers(HardwareSDK, opts);
+
+  // Defensive: strip any stale listeners (e.g. left over from a previous
+  // dispose/init cycle in a long-running process) before wiring ours.
+  // Mirrors app-monorepo's cleanupHardwareSDKInstance() which removes
+  // listeners for ALL events at once.
+  // @ts-expect-error CoreApi types require an event name; passing none
+  // removes listeners for ALL events (Node.js EventEmitter semantics).
+  HardwareSDK.removeAllListeners();
+  registerEventHandlers(HardwareSDK);
 
   return HardwareSDK;
+}
+
+export async function createSDK(opts: SDKOptions): Promise<typeof HardwareSDK> {
+  // Always refresh opts — event handlers read from the module-level ref,
+  // so subsequent createSDK() calls pick up new opts without re-registering.
+  currentOpts = opts;
+
+  if (!sdkReadyPromise) {
+    sdkReadyPromise = initSDK();
+  }
+  return sdkReadyPromise;
+}
+
+/**
+ * Release the SDK and clear the singleton. Must be called before the CLI
+ * process exits — the USB transport holds open handles (event listeners,
+ * polling timers) that otherwise keep Node.js alive for ~26s.
+ *
+ * Safe to call multiple times (no-op after the first successful call).
+ */
+export async function disposeSDK(): Promise<void> {
+  if (!sdkReadyPromise) return;
+  try {
+    const sdk = await sdkReadyPromise;
+    sdk.dispose();
+  } catch {
+    // ignore errors during cleanup
+  } finally {
+    sdkReadyPromise = null;
+    currentOpts = {};
+  }
 }

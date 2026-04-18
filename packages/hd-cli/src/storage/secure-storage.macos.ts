@@ -17,17 +17,15 @@ export class MacOSSecureStorage implements ISecureStorage {
 
   async set(key: string, value: Buffer): Promise<void> {
     const hex = value.toString('hex');
-    await this.runner.spawnWithStdin(
-      'sh',
-      [
-        '-c',
-        'read -r secret && security add-generic-password -s "$1" -a "$2" -w "$secret" -U',
-        '--',
-        SERVICE_NAME,
-        key,
-      ],
-      hex
-    );
+    // Use `security -i` (interactive/batch mode): the tool parses commands
+    // from stdin internally instead of re-spawning a sub-process per command,
+    // so the password argument never appears in /proc or `ps aux` output.
+    //
+    // Keys are of the form `onekey-hw:<deviceId>/<slot>` and hex values only
+    // contain 0-9a-f, so neither contains shell metacharacters that would
+    // break the simple quoting security's parser expects.
+    const cmd = `add-generic-password -s "${SERVICE_NAME}" -a "${key}" -w "${hex}" -U`;
+    await this.runner.spawnWithStdin('security', ['-i'], cmd);
   }
 
   async get(key: string): Promise<Buffer | null> {
