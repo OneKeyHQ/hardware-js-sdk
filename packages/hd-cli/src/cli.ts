@@ -75,6 +75,34 @@ program
     })
   );
 
+program
+  .command('get-features')
+  .description('Get device features (firmware, unlock state, passphrase protection, etc.)')
+  .action(() =>
+    runCommand({}, async ({ sdk, globalOpts }) => {
+      // Resolve connectId: explicit flag wins, else pick the first attached device
+      let connectId: string | undefined = globalOpts.connectId;
+      if (!connectId) {
+        const searchResult = await sdk.searchDevices();
+        if (
+          !searchResult?.success ||
+          !Array.isArray(searchResult.payload) ||
+          searchResult.payload.length === 0
+        ) {
+          outputResult(globalOpts, {
+            success: false,
+            payload: { error: 'No device found', code: 'NO_DEVICE' },
+          });
+          return;
+        }
+        connectId =
+          (searchResult.payload[0] as EnrichedSearchDevice).connectId ?? undefined;
+      }
+      const result = await sdk.getFeatures(connectId || '');
+      outputResult(globalOpts, result);
+    })
+  );
+
 // ============================================================
 // Signing Commands
 // ============================================================
