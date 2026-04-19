@@ -15,6 +15,7 @@ export default {
   signers: 'Signer Guides',
   '---api': { type: 'separator', title: 'APIs' },
   'core-api-guide': 'Core API Guide',
+  'common-params': 'Common Params',
   'basic-api': 'Basic API',
   'device-api': 'Device API',
   // Chain Methods - custom sidebar selector

@@ -1,0 +1,95 @@
+---
+title: Common Params
+---
+
+# Common Params
+
+Every `HardwareSDK.method(...)` call takes a `params` object. A handful of
+keys are accepted by **every** method — they're documented here once so chain-
+and device-specific pages can stay focused on their unique fields.
+
+> This page is about **parameters you pass in**.
+> For the meaning and lifetime of response IDs (`connectId`, `deviceId`,
+> `uuid`, `session_id`, `passphraseState`, …), see
+> [Identifiers](./concepts/identifiers).
+
+## Parameter reference
+
+| Param | Type | Purpose | Notes |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | Bind the call to a specific hidden wallet | Obtain once via `getPassphraseState`; pass on every subsequent call that must stay on the same hidden wallet. Cannot be combined with `useEmptyPassphrase`. |
+| `useEmptyPassphrase` | `boolean` | Force standard wallet (no passphrase) | Prevents accidental hidden-wallet prompts. Cannot be combined with `passphraseState`. |
+| `initSession` | `boolean` | Force session init before the call | Pair with `passphraseState` to build the session up-front and skip a subsequent prompt. |
+| `deriveCardano` | `boolean` | Pre-derive the Cardano sub-tree on the device | Set on the first Cardano call in a session. |
+| `retryCount` | `number` | Device-call retries on transport error | Mainly useful for BLE on flaky links. |
+| `pollIntervalTime` | `number` | Polling interval (ms) between retries | Paired with `retryCount`; BLE-oriented. |
+| `timeout` | `number` | Per-call timeout (ms) | Raise for long-running ops (firmware update, big PSBT). |
+| `detectBootloaderDevice` | `boolean` | Fail fast if device is in Bootloader mode | Use on signing paths where Bootloader mode is never valid. |
+| `skipWebDevicePrompt` | `boolean` | Skip the WebUSB chooser on re-entry | **WebUSB only.** Reuses prior WebUSB authorization. |
+| `keepSession` | `boolean` | **Deprecated — use `initSession + passphraseState` instead** | Legacy flows only. |
+
+## Transport-specific notes
+
+Most params are transport-agnostic. A few only matter on specific transports:
+
+| Param | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | Desktop BLE |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | no-op in practice | no-op in practice | no-op in practice | **useful** | **useful** | **useful** |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## Common combos
+
+### Standard wallet — avoid accidental hidden-wallet prompts
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+### Hidden wallet — reuse a session across calls
+
+```ts
+// Once: acquire passphraseState (prompts for passphrase)
+const { payload: passphraseState } = await HardwareSDK.getPassphraseState(
+  connectId,
+  { initSession: true }
+);
+
+// On every subsequent call that must stay on this hidden wallet
+const hiddenWallet = { initSession: true, passphraseState };
+
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  ...hiddenWallet,
+});
+```
+
+### BLE with conservative retries (recommended starting point)
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
+};
+
+await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  ...tx,
+  ...bleDefaults,
+});
+```
+
+## See also
+
+- [Identifiers](./concepts/identifiers) — response ID fields (`connectId`, `deviceId`, `passphraseState`, `session_id`, `uuid`, `serial_no`)
+- [Passphrase](./concepts/passphrase) — hidden wallet flow in depth
+- [PIN Code](./concepts/pin) — PIN entry flow

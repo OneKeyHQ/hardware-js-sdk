@@ -1,0 +1,95 @@
+---
+title: 通用参数
+---
+
+# 通用参数
+
+每次调用 `HardwareSDK.method(...)` 都会传入一个 `params` 对象。其中有一组
+**所有方法都接受**的字段——集中在这里说明一次，各链 / 设备方法页专注写自己独
+有的字段。
+
+> 本页讲的是**传入 SDK 的参数**。
+> 响应 payload 里的 ID 字段（`connectId`、`deviceId`、`uuid`、
+> `session_id`、`passphraseState` 等）含义与生命周期，请看
+> [标识符（Identifiers）](./concepts/identifiers)。
+
+## 参数表
+
+| 参数 | 类型 | 作用 | 说明 |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | 把这次调用绑定到某个隐藏钱包 | 一次性通过 `getPassphraseState` 拿到；后续所有要保持在同一隐藏钱包的调用都传它。**不能**和 `useEmptyPassphrase` 同时传。 |
+| `useEmptyPassphrase` | `boolean` | 强制走标准钱包（空 passphrase） | 避免意外触发隐藏钱包提示。**不能**和 `passphraseState` 同时传。 |
+| `initSession` | `boolean` | 调用前强制初始化 session | 搭配 `passphraseState` 提前建立 session，减少后续调用的提示。 |
+| `deriveCardano` | `boolean` | 在设备上预派生 Cardano 子树 | 一个 session 里第一次调 Cardano 方法时设为 `true`。 |
+| `retryCount` | `number` | 传输错误时的重试次数 | 主要用于不稳定的 BLE 链路。 |
+| `pollIntervalTime` | `number` | 重试间隔（毫秒） | 和 `retryCount` 配合，主要用于 BLE。 |
+| `timeout` | `number` | 单次调用超时（毫秒） | 固件升级、大 PSBT 这类耗时操作可以调大。 |
+| `detectBootloaderDevice` | `boolean` | 设备处于 Bootloader 模式时立刻失败 | 用在签名路径上（Bootloader 模式无法签名）。 |
+| `skipWebDevicePrompt` | `boolean` | 跳过 WebUSB 设备选择弹窗 | **仅 WebUSB 有效**，复用之前的 WebUSB 授权。 |
+| `keepSession` | `boolean` | **已废弃 — 用 `initSession + passphraseState` 代替** | 仅遗留流程保留。 |
+
+## 各传输方式差异
+
+大多数参数和传输方式无关。以下几个仅对特定传输生效：
+
+| 参数 | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | Desktop BLE |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | 实际无影响 | 实际无影响 | 实际无影响 | **有用** | **有用** | **有用** |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## 常见组合
+
+### 标准钱包 —— 避免误触发隐藏钱包提示
+
+```ts
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+### 隐藏钱包 —— 多次调用复用 session
+
+```ts
+// 一次性获取 passphraseState（会提示用户输 passphrase）
+const { payload: passphraseState } = await HardwareSDK.getPassphraseState(
+  connectId,
+  { initSession: true }
+);
+
+// 后续所有隐藏钱包调用统一带上
+const hiddenWallet = { initSession: true, passphraseState };
+
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  ...hiddenWallet,
+});
+```
+
+### BLE 推荐的保守重试参数
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
+};
+
+await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  ...tx,
+  ...bleDefaults,
+});
+```
+
+## 参考
+
+- [标识符（Identifiers）](./concepts/identifiers) —— 响应里的 ID 字段（`connectId`、`deviceId`、`passphraseState`、`session_id`、`uuid`、`serial_no`）
+- [Passphrase](./concepts/passphrase) —— 隐藏钱包完整流程
+- [PIN 码](./concepts/pin) —— PIN 输入流程

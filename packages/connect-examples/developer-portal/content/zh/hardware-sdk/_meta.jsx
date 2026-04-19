@@ -15,6 +15,7 @@ export default {
   signers: '交易签名指引',
   '---api': { type: 'separator', title: 'API' },
   'core-api-guide': '开发指南',
+  'common-params': '通用参数',
   'basic-api': '基础 API',
   'device-api': '设备 API',
   // Chain Methods - custom sidebar selector
