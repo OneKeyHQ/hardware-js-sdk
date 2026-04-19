@@ -54,6 +54,7 @@ console.log(res.payload.address);
 | 🔵 需要 `connectId` + `deviceId` | 区块链签名、地址派生、加解密 | `evmSignTransaction` `btcSignTransaction` `solanaSignMessage` `allNetworkGetAddress` |
 
 ## 推荐调用流程
+<div id="standard-lifecycle" />
 
 标准流程：**初始化** → **搜索设备** → **获取设备信息** → **订阅事件** → **执行操作** → **清理资源**
 

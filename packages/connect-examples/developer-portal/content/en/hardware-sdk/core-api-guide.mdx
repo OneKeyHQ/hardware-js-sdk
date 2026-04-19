@@ -54,6 +54,7 @@ console.log(res.payload.address);
 | 🔵 `connectId` + `deviceId` | Blockchain signing, address, encryption | `evmSignTransaction` `btcSignTransaction` `solanaSignMessage` `allNetworkGetAddress` |
 
 ## Standard lifecycle (recommended)
+<div id="standard-lifecycle" />
 
 Standard loop: `init → search → getFeatures(connectId) → subscribe UI/DEVICE/FIRMWARE → call + uiResponse → cleanup`
 
