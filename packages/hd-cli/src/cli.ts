@@ -700,9 +700,8 @@ sessionCmd
         payload: {
           passphraseState,
           deviceId,
-          sessionId: sessionId ? '(cached)' : '(not available)',
-          address: addrResult?.success ? addrResult.payload.address : undefined,
-          message: 'Device session established. Subsequent commands will reuse this session.',
+          ...(sessionId ? { sessionId } : {}),
+          ...(addrResult?.success ? { address: addrResult.payload.address } : {}),
         },
       });
     })
@@ -723,7 +722,7 @@ sessionCmd
       }
       outputResult(globalOpts, {
         success: true,
-        payload: { message: 'Device session cleared.', deviceId: deviceId || 'unknown' },
+        payload: deviceId ? { deviceId } : {},
       });
     })
   );
