@@ -35,15 +35,29 @@ console.log(res.payload.address);
 
 ## 核心标识与环境
 
-| 项 | 作用 | 获取/刷新 | 注意点 |
-| --- | --- | --- | --- |
-| `connectId` | 连接标识，决定路由到哪台设备/连接 | `searchDevices()` | 同一设备稳定不变（设备重置不影响）；WebUSB/Bridge 通常等于序列号；BLE 为系统层标识（Android MAC / iOS UUID）。 |
-| `deviceId` | 当前种子/钱包状态标识 | `getFeatures(connectId)` | 设备重置/擦除/恢复/换种子后会变；敏感操作会校验避免错设备。 |
+几乎每次 SDK 调用路由都靠这两个标识 —— `connectId`（路由到哪个连接）和 `deviceId`（使用哪个种子）。
 
-- `connectId + deviceId` 成对缓存；遇到 `DeviceCheckDeviceIdError`、设备重置或切换设备时重新 `getFeatures`。
-- SDK 组合：`@onekeyfe/hd-common-connect-sdk` + `@onekeyfe/hd-core` + `@onekeyfe/hd-shared`，与固件/Bridge 版本对齐。
-- 运行环境：`webusb` 需 HTTPS + 用户手势；`react-native` 需 BLE + 常见定位权限；`lowlevel` 需 64 字节帧自定义适配。
-- 设备/固件：尽量用最新稳定版，Bootloader 模式部分 API 不可用；Bridge 需保持运行且端口空闲。
+| 标识 | 作用 | 获取来源 | 何时变化 |
+| --- | --- | --- | --- |
+| `connectId` | 路由到特定设备/连接 | `searchDevices()` | 新连接建立（USB 重插、BLE 重配对、切换传输方式）。 |
+| `deviceId` | 标识当前加载的种子/钱包状态 | `getFeatures(connectId)` | 恢复出厂、擦除、重导助记词、切换种子。 |
+
+> ⚠️ **同一台物理设备在 USB 和 BLE 下的 `connectId` 不是同一个值** —— 不能把 USB 序列号当 BLE 句柄用，缓存要按传输方式分开。
+
+`connectId` 格式依传输方式而定（WebUSB = 设备序列号、Android BLE = MAC、iOS BLE = CoreBluetooth UUID、Desktop BLE = 十六进制 UUID/MAC 等）。完整的跨传输格式表和真实例子参见 [Identifiers → `connectId`](/zh/hardware-sdk/concepts/identifiers#connectid)。
+
+**缓存与生命周期**
+
+- `connectId + deviceId` 成对缓存。遇到 `DeviceCheckDeviceIdError`、设备重置或切换设备时重跑 `getFeatures`。
+- 同时支持 USB 和 BLE 连同一台设备时，**按传输方式分别缓存 `connectId`** —— 两套值不能互换。
+
+**运行环境要求**
+
+- `webusb` —— HTTPS + 用户手势。
+- `react-native` —— BLE 权限 + 通常还需要定位权限。
+- `lowlevel` —— 宿主侧需要 64 字节帧适配器。
+- Bridge —— 必须运行中且独占端口。
+- 固件 —— 保持最新稳定版；Bootloader 模式下部分 API 不可用。
 
 ### 不同接口所需的标识
 

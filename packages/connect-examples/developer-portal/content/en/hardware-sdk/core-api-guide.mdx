@@ -34,16 +34,29 @@ console.log(res.payload.address);
 
 ## Core identifiers & environments
 
-| Item | Purpose | How to get/refresh | Notes |
-| --- | --- | --- | --- |
-| `connectId` | Connection identifier; routes calls to a specific device/connection | `searchDevices()` | Stable for the same device (reset does not change it). Format depends on transport: **WebUSB/Bridge** = device serial (e.g. `PRC10J0017A`); **Android BLE** = MAC address (e.g. `AA:BB:CC:DD:EE:FF`); **iOS BLE** = CoreBluetooth UUID (e.g. `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`); **Desktop BLE (Electron/Noble, macOS)** = 32-char hex UUID (e.g. `1f6dad0b8782aab31d2f7ae2b11e5b6c`); **Desktop BLE (Electron/Noble, Windows)** = 12-char lowercase hex MAC without colons (e.g. `e4e65539cf33`); **Desktop BLE (Electron/Noble, Linux)** = MAC address. ⚠️ The same physical device has different `connectId` values on USB vs BLE — never pass a USB serial as a BLE `connectId`. |
-| `deviceId` | Current seed/wallet-state identifier | `getFeatures(connectId)` | Changes after reset/wipe/recovery/seed switch; used to prevent signing on the wrong seed. |
+Two identifiers do the routing in almost every SDK call — `connectId` (which connection) and `deviceId` (which seed).
 
-- Cache `connectId + deviceId` as a pair; on `DeviceCheckDeviceIdError`, device reset, or device switch, re-run `getFeatures`.
-- If your app supports both USB and BLE transports for the same device, store `connectId` separately per transport — they are different values and are not interchangeable.
-- SDK set: `@onekeyfe/hd-common-connect-sdk` + `@onekeyfe/hd-core` + `@onekeyfe/hd-shared`; align versions with firmware/Bridge.
-- Runtime: `webusb` needs HTTPS + user gesture; `react-native` needs BLE + often location permission; `lowlevel` needs 64-byte frame adapter.
-- Device/firmware: stay on latest stable; some APIs fail in Bootloader; Bridge must run and keep port free.
+| ID | Purpose | Obtain via | Changes when |
+| --- | --- | --- | --- |
+| `connectId` | Routes calls to a specific device/connection | `searchDevices()` | A new connection opens (USB re-plug, BLE pairing, transport switch). |
+| `deviceId` | Identifies the currently-loaded seed / wallet state | `getFeatures(connectId)` | Factory reset, wipe, seed recovery, or seed switch. |
+
+> ⚠️ **USB and BLE `connectId` values for the same physical device are different** — never pass a USB serial where a BLE handle is expected, and cache them separately per transport.
+
+`connectId` format varies per transport (WebUSB = device serial, Android BLE = MAC, iOS BLE = CoreBluetooth UUID, Desktop BLE = hex UUID/MAC, …). See [Identifiers → `connectId`](/en/hardware-sdk/concepts/identifiers#connectid) for the full per-transport table and worked examples.
+
+**Caching & lifecycle**
+
+- Cache `connectId + deviceId` as a pair. On `DeviceCheckDeviceIdError`, reset, or device switch, re-run `getFeatures`.
+- If you support both USB and BLE for the same device, store `connectId` **separately per transport** — the two values are not interchangeable.
+
+**Runtime requirements**
+
+- `webusb` — HTTPS + user gesture.
+- `react-native` — BLE entitlement + (commonly) location permission.
+- `lowlevel` — 64-byte frame adapter on the host side.
+- Bridge — must be running and hold the port free if used.
+- Firmware — stay on latest stable; some APIs fail in Bootloader.
 
 ### Which identifiers are required?
 
