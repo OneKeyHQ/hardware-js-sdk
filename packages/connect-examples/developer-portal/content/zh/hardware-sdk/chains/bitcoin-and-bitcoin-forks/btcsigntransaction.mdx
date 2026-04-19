@@ -14,7 +14,7 @@ const result = await HardwareSDK.btcSignTransaction(connectId, deviceId, params)
 
 ## 参数
 
-[**可选通用参数**](../../../core-api-guide#common-params)
+[**可选通用参数**](/zh/hardware-sdk/common-params)
 
 * `coin` - _必需_ `string` 决定 [bitcoin.json](https://github.com/OneKeyHQ/hardware-js-sdk/blob/onekey/packages/core/src/data/coins/bitcoin.json) 文件中指定的网络定义。可以使用币种的 `shortcut`、`name` 或 `label`。
 * `inputs` - _必需_ [TxInputType](https://github.com/OneKeyHQ/hardware-js-sdk/blob/728279dc70c5bde56c5d72d86598815f977b0c7f/packages/hd-transport/src/types/messages.ts#L363) 的 `Array`

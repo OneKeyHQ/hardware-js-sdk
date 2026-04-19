@@ -13,7 +13,7 @@ title: evmSignTypedData
 * **支持 EIP-712（v3 和 v4）**
 * **使用 `evmSignTypedData` 来签名类型化结构数据**
 * **不适用于 EIP-191 类型化数据签名**
-* **使用** [evmSignMessage](../evmsignmessage) **来签名 EIP-191（personal_sign）**
+* **使用** [evmSignMessage](./evmsignmessage) **来签名 EIP-191（personal_sign）**
 
 ```typescript
 const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
@@ -21,7 +21,7 @@ const result = await HardwareSDK.evmSignTypedData(connectId, deviceId, params);
 
 ### 参数
 
-[**可选通用参数**](../../../core-api-guide#common-params)
+[**可选通用参数**](/zh/hardware-sdk/common-params)
 
 * `path` - _必需_ `string | Array<number>` 最小长度为 `3`。[更多信息](/zh/hardware-sdk/core-api-guide#hd-path)
 * `data` - _必需_ `Object` 类型为 `EthereumSignTypedDataMessage`。JSON Schema 定义可在 EIP-712 规范中找到。
