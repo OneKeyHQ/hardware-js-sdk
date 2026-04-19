@@ -89,32 +89,87 @@ Concurrency/cleanup: serialize per device; refresh `getFeatures` when switching 
 ## Params & paths (essentials)
 
 ### Common params
+<div id="common-params" />
 
-| Param | Purpose | Typical usage |
-| --- | --- | --- |
-| `initSession?: boolean` | Force a hardware session init; can pair with passphrase state retrieval | Pre-build session before first call to reduce prompts |
-| `passphraseState?: string` | Hidden wallet identifier; include to bind to that hidden wallet | Required when using a hidden wallet to stay on the same one |
-| `useEmptyPassphrase?: boolean` | Force standard wallet (empty) | Prevent accidental hidden wallet |
-| `deriveCardano?: boolean` | Pre-derive Cardano | First Cardano call in a session |
-| `retryCount?` / `pollIntervalTime?` / `timeout?` | Polling/timeout tuning | BLE or flaky network scenarios |
-| `detectBootloaderDevice?: boolean` | Fail fast in Bootloader | Ask user to exit Bootloader |
-| `skipWebDevicePrompt?: boolean` | Skip WebUSB chooser | Reuse prior WebUSB authorization |
-| `keepSession?` | (Deprecated; avoid using) | Use `initSession + passphraseState` instead |
+Every `HardwareSDK.method(...)` takes a `params` object. A handful of keys are
+accepted by **every** method — the "common params" documented here. Chain-
+and device-specific fields (e.g. `path`, `coin`, `tx`, `message`) are
+documented on each method page.
 
-Common combo:
+> This table describes **parameters you pass in**. For the meaning of response
+> ID fields (`connectId`, `deviceId`, `uuid`, `session_id`, `passphraseState`,
+> …), see [Identifiers](/en/hardware-sdk/concepts/identifiers).
+
+| Param | Type | Purpose | Notes |
+| --- | --- | --- | --- |
+| `passphraseState` | `string` | Bind the call to a specific hidden wallet | Obtain once via `getPassphraseState`; pass on every subsequent call that must stay on the same hidden wallet. Cannot be combined with `useEmptyPassphrase`. |
+| `useEmptyPassphrase` | `boolean` | Force standard wallet (no passphrase) | Prevents accidental hidden-wallet prompts. Cannot be combined with `passphraseState`. |
+| `initSession` | `boolean` | Force session init before the call | Pair with `passphraseState` to build the session up-front and skip a subsequent prompt. |
+| `deriveCardano` | `boolean` | Pre-derive the Cardano sub-tree on the device | Set on the first Cardano call in a session. |
+| `retryCount` | `number` | Device-call retries on transport error | Mainly useful for BLE on flaky links. |
+| `pollIntervalTime` | `number` | Polling interval (ms) between retries | Paired with `retryCount`; BLE-oriented. |
+| `timeout` | `number` | Per-call timeout (ms) | Raise for long-running ops (firmware update, big PSBT). |
+| `detectBootloaderDevice` | `boolean` | Fail fast if device is in Bootloader mode | Use on signing paths where Bootloader mode is never valid. |
+| `skipWebDevicePrompt` | `boolean` | Skip the WebUSB chooser on re-entry | **WebUSB only.** Reuses prior WebUSB authorization. |
+| `keepSession` | `boolean` | **Deprecated — use `initSession + passphraseState` instead** | Legacy flows only. |
+
+#### Transport-specific notes
+
+Most params are transport-agnostic. A few only matter on specific transports:
+
+| Param | WebUSB | Bridge | node-usb | Android BLE | iOS BLE | Desktop BLE |
+| --- | --- | --- | --- | --- | --- | --- |
+| `skipWebDevicePrompt` | ✅ | — | — | — | — | — |
+| `retryCount` / `pollIntervalTime` / `timeout` | no-op in practice | no-op in practice | no-op in practice | **useful** | **useful** | **useful** |
+| `passphraseState` / `useEmptyPassphrase` / `initSession` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `deriveCardano` / `detectBootloaderDevice` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+#### Common combos
+
+**Standard wallet — avoid accidental hidden-wallet prompts**
 
 ```ts
-// Hidden wallet + multiple calls without repeated prompts
-const commonParams = {
-  initSession: true,
-  keepSession: true,
-  passphraseState: 'hidden-wallet-id',
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+```
+
+**Hidden wallet — reuse a session across calls**
+
+```ts
+// Once: acquire passphraseState (prompts for passphrase)
+const { payload: passphraseState } = await HardwareSDK.getPassphraseState(
+  connectId,
+  { initSession: true }
+);
+
+// On every subsequent call that must stay on this hidden wallet
+const hiddenWallet = { initSession: true, passphraseState };
+
+await HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  ...hiddenWallet,
+});
+await HardwareSDK.btcGetAddress(connectId, deviceId, {
+  path: "m/84'/0'/0'/0/0",
+  coin: 'btc',
+  ...hiddenWallet,
+});
+```
+
+**BLE with conservative retries**
+
+```ts
+const bleDefaults = {
+  retryCount: 3,
+  pollIntervalTime: 1000,
+  timeout: 30_000,
 };
 
-await HardwareSDK.evmSignMessage(connectId, deviceId, {
-  path: "m/44'/60'/0'/0/0",
-  messageHex,
-  ...commonParams,
+await HardwareSDK.btcSignTransaction(connectId, deviceId, {
+  ...tx,
+  ...bleDefaults,
 });
 ```
 
