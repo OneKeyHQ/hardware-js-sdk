@@ -91,7 +91,9 @@ rm -rf /tmp/onekey-hw
 
 ## 使用
 
-> **注意：** 大多数与设备交互的命令需要 `--use-empty-passphrase` 来跳过密码提示（当未设置密码时）。如果设备启用了密码，请省略此标志以获得提示。
+### 标准钱包（无密码短语）
+
+设备未开启密码短语时，所有命令加上 `--use-empty-passphrase` 即可跳过密码交互：
 
 ```bash
 # 搜索已连接的设备（自动获取设备信息）
@@ -114,6 +116,58 @@ onekey-hw sign-transaction --chain evm \
 # 检查固件
 onekey-hw firmware-check-all
 ```
+
+### 隐藏钱包（带密码短语）
+
+不传 `--use-empty-passphrase` 即访问隐藏钱包。密码短语通过系统原生弹窗（pinentry）或设备屏幕输入，**不会出现在终端或 shell history 里**。三种工作流：
+
+**方案 A：Session 缓存（推荐日常使用）**
+
+`session connect` 建立 session 并加密存入 OS keychain，之后所有命令自动复用缓存、无需再次输入：
+
+```bash
+# 首次建立 + 缓存 session（pinentry 提示输入密码短语）
+onekey-hw session connect
+
+# 后续命令直接复用 session
+onekey-hw get-address --chain evm
+onekey-hw sign-transaction --chain evm --tx '...'
+
+# 用完清除缓存
+onekey-hw session disconnect
+```
+
+**方案 B：显式 passphrase-state（推荐 AI Agent）**
+
+先取一次 session token，之后每条命令显式传入。不落盘：
+
+```bash
+# Step 1：获取 session token（pinentry 提示输入密码短语）
+STATE=$(onekey-hw passphrase-state --connect-id <id> | jq -r .payload)
+
+# Step 2：后续命令带上 --passphrase-state
+onekey-hw get-address --chain evm --passphrase-state "$STATE" --connect-id <id>
+onekey-hw sign-transaction --chain evm --tx '...' --passphrase-state "$STATE" --connect-id <id>
+```
+
+**方案 C：交互式选择钱包类型**
+
+不传任何钱包 flag 时，CLI 会在 stderr 询问：
+
+```
+[onekey-hw] Select wallet type:
+  1. Standard wallet (no passphrase)
+  2. Hidden wallet — enter passphrase on this computer (pinentry)
+  3. Hidden wallet — enter passphrase on device screen
+```
+
+适合人工在终端使用；不适合无人值守的 agent。
+
+> **说明**：PIN **始终在设备上输入**，CLI 不会从 stdin 读 PIN。
+
+> **错误 112（passphrase state 不匹配）**：缓存的 session 已失效（设备被锁或重启）。执行 `onekey-hw session disconnect` 再 `onekey-hw session connect` 重建；或重取 `--passphrase-state`。
+
+> **Flag 优先级**：同时传 `--use-empty-passphrase` 和 `--passphrase-state` 时，`--passphrase-state` 生效。建议只传一个。
 
 固件更新需通过 [OneKey App](https://onekey.so/download) 或 [firmware.onekey.so](https://firmware.onekey.so/)。
 

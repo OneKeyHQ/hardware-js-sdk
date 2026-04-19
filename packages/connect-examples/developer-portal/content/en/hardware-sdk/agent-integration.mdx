@@ -118,31 +118,55 @@ onekey-hw firmware-check-all
 
 ### Hidden wallet (passphrase-protected)
 
-Use `--hidden-wallet` to access a hidden wallet. Passphrase is entered securely via a native OS dialog (pinentry) — never visible in terminal or shell history.
+Omit `--use-empty-passphrase` to access a hidden wallet. The passphrase is entered via a native OS dialog (pinentry) or directly on the device screen — never read from stdin or shell history. Three workflows are supported:
 
-**Option A: Two-step flow (recommended for agents)**
+**Option A: Cached session (recommended for repeat use)**
 
-```bash
-# Step 1: Get passphraseState (pinentry dialog prompts for passphrase)
-onekey-hw passphrase-state --connect-id <id>
-
-# Step 2: Use --passphrase-state + --hidden-wallet on subsequent commands
-onekey-hw get-address --chain evm --hidden-wallet --passphrase-state abc123... --connect-id <id>
-onekey-hw sign-transaction --chain evm --tx '...' --hidden-wallet --passphrase-state abc123... --connect-id <id>
-```
-
-**Option B: Direct access (pinentry prompts each time)**
+`session connect` establishes the passphrase session and stores it encrypted in the OS keychain. Subsequent commands in any process auto-reuse the cached session with no further prompts.
 
 ```bash
-# No passphrase-state needed — pinentry prompts on each command
-onekey-hw get-address --chain evm --hidden-wallet --connect-id <id>
+# One-time: establish + cache session (pinentry prompts for passphrase)
+onekey-hw session connect
+
+# Subsequent commands skip the passphrase prompt entirely
+onekey-hw get-address --chain evm
+onekey-hw sign-transaction --chain evm --tx '...'
+
+# Drop the cached session when finished
+onekey-hw session disconnect
 ```
 
-> **Note**: Each CLI invocation is a new process. Passphrase is prompted via pinentry on each new device connection. If pinentry is unavailable, falls back to on-device entry.
+**Option B: Explicit passphrase-state (recommended for AI agents)**
 
-> **Error 112 (Device passphrase state error)**: Session expired — re-run `passphrase-state` to obtain a fresh state value.
+Fetch the session token once, then pass it on every subsequent command. Nothing is written to disk.
 
-> **Never combine** `--use-empty-passphrase` with `--hidden-wallet` or `--passphrase-state`.
+```bash
+# Step 1: Obtain session token (pinentry dialog prompts for passphrase)
+STATE=$(onekey-hw passphrase-state --connect-id <id> | jq -r .payload)
+
+# Step 2: Pass --passphrase-state on each command
+onekey-hw get-address --chain evm --passphrase-state "$STATE" --connect-id <id>
+onekey-hw sign-transaction --chain evm --tx '...' --passphrase-state "$STATE" --connect-id <id>
+```
+
+**Option C: Interactive wallet-type prompt**
+
+With no wallet flag, the CLI asks on stderr which wallet to use:
+
+```
+[onekey-hw] Select wallet type:
+  1. Standard wallet (no passphrase)
+  2. Hidden wallet — enter passphrase on this computer (pinentry)
+  3. Hidden wallet — enter passphrase on device screen
+```
+
+Best for interactive terminal use; not useful for unattended agents.
+
+> **Note**: PIN is **always** entered on the device — the CLI never collects it from stdin.
+
+> **Error 112 (passphrase state mismatch)**: Cached session is stale (device was locked or rebooted). Run `onekey-hw session disconnect` then `onekey-hw session connect` again, or fetch a fresh `--passphrase-state`.
+
+> **Flag precedence**: `--passphrase-state` takes precedence over `--use-empty-passphrase` when both are supplied. For clarity, pass only one.
 
 Firmware updates must be done via the [OneKey App](https://onekey.so/download) or [firmware.onekey.so](https://firmware.onekey.so/).
 

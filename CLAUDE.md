@@ -43,15 +43,27 @@
 ### 🤖 AI Agent 集成 / CLI 使用
 **症状**: CLI 命令使用、Agent Skill 配置、链支持查询
 - 📖 **文档**: developer-portal 的 `agent-integration.mdx`
-- 🔧 **CLI**: `@onekeyfe/cli`（`onekey` 命令）— 钱包操作 + `--hardware` 硬件签名 + `device` 设备管理
-- ⚠️ `@onekeyfe/hardware-cli`（`onekey-hw`）已 **deprecated**，请使用 `onekey` CLI
+- 🔧 **`@onekeyfe/cli`**（`onekey` 命令）— 全功能钱包 CLI：`auth login` 选择登录方式（mnemonic / app-transfer / hardware），`balance` / `transfer` / `swap` / `device ...` 等业务命令登录后自动沿用该模式
+- 🔧 **`@onekeyfe/hardware-cli`**（`onekey-hw` 命令）— 纯硬件钱包 CLI，AI Agent 直连设备优先选它
 
-如果你要**使用硬件钱包**，请使用 `onekey` CLI：
+如果你要**通过 `onekey` CLI 使用硬件钱包**：
 ```bash
 npm install -g @onekeyfe/cli
-onekey balance --chain eth --hardware        # 硬件钱包余额
-onekey device search                         # 搜索设备
-onekey device firmware                       # 检查固件
+
+# Step 1：登录时选择硬件模式（--hardware 只在 auth login 上有）
+onekey auth login --hardware
+
+# Step 2：登录后的业务命令不需要再加 flag，自动走硬件钱包
+onekey balance --chain eth
+onekey device search
+onekey device firmware
+```
+
+如果要**只调硬件操作、不走 onekey 账户体系**（更轻、AI Agent 场景友好）：
+```bash
+npm install -g @onekeyfe/hardware-cli
+onekey-hw search
+onekey-hw get-address --chain evm --use-empty-passphrase
 ```
 
 ## 🤖 专业Agent
