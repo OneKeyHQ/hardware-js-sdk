@@ -4,242 +4,130 @@ title: AI Agent Integration
 
 # AI Agent Integration
 
-`@onekeyfe/hardware-cli` enables AI agents to interact with OneKey hardware wallets via USB.
+OneKey publishes a suite of **wallet skills** that let AI coding assistants (Claude Code, Cursor, Codex, OpenCode, OpenClaw, …) perform real wallet operations on your behalf — balance, transfer, swap, market research, token security audit — all backed by your choice of wallet, including a OneKey **hardware wallet**.
 
-Skills follow the [Agent Skills](https://agentskills.io) open standard, supported by 30+ tools including Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, and JetBrains.
+Skills and install flows live in the dedicated repo:
 
-## Install CLI
-
-```bash
-npm install -g @onekeyfe/hardware-cli
-```
-
-## Install Skills (Universal)
-
-Works with all Agent Skills compatible tools (30+):
-
-```bash
-npx skills add OneKeyHQ/hardware-js-sdk
-```
-
-This auto-detects your tool (Claude Code, Codex, Gemini, Cursor, etc.) and installs skills to the correct location.
-
-## Schema Discovery
-
-After installing the CLI, you can explore all available commands and their parameters using the built-in schema system:
-
-```bash
-# List all available commands with descriptions
-onekey-hw schema list
-
-# Show full schema for a specific command (parameters, types, examples)
-onekey-hw schema get-address
-onekey-hw schema sign-transaction
-```
-
-This is especially useful for AI agents to dynamically discover supported commands and construct valid invocations without hardcoded knowledge.
-
-## Claude Code
-
-```bash
-claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
-claude plugin install onekey-hardware@onekey-hardware-plugins
-```
-
-The CLI is installed automatically on first use via the skill's pre-flight check.
-
-## Other AI Assistants (skills only)
-
-The `skills/*/SKILL.md` files follow the universal skill format and work with any tool that reads it.
-
-| Tool | How to use | What works |
-|------|-----------|------------|
-| **Gemini CLI** | Copy skill folders to `~/.gemini/skills/` | Skills only |
-| **Codex CLI** | Copy skill folders to `~/.codex/skills/` | Skills only |
-| **Cursor** | Copy skill folders to `.cursor/skills/` | Skills only |
-| **OpenCode** | Copy skill folders to `.opencode/skills/` | Skills only |
-| **Kiro** | Copy skill folders to `.kiro/skills/` | Skills only |
-
-```bash
-# Clone skills only (sparse checkout)
-git clone --depth 1 --filter=blob:none --sparse https://github.com/OneKeyHQ/hardware-js-sdk.git /tmp/onekey-hw
-cd /tmp/onekey-hw && git sparse-checkout set packages/hd-cli/skills
-
-# Example: copy all skills for Codex CLI (global)
-for skill in packages/hd-cli/skills/*/; do
-  cp -r "$skill" ~/.codex/skills/ 2>/dev/null
-done
-
-# Example: copy all skills for Gemini CLI (global)
-for skill in packages/hd-cli/skills/*/; do
-  cp -r "$skill" ~/.gemini/skills/ 2>/dev/null
-done
-
-# Cleanup
-rm -rf /tmp/onekey-hw
-```
+👉 **[OneKeyHQ/onekey-wallet-skills](https://github.com/OneKeyHQ/onekey-wallet-skills)**
 
 ## Skills
 
-| Skill | Key Commands |
-|-------|--------------|
-| **Device** | `search`, `lock`, `device-verify`, `device-settings` |
-| **Signing** (27 chains) | `get-address`, `sign-transaction`, `sign-message`, `sign-typed-data`, `sign-psbt`, `batch-get-address` |
-| **Firmware** (read-only) | `firmware-check`, `firmware-check-all`, `bootloader-check` |
-| **Security** | `change-pin`, `toggle-passphrase`, `passphrase-state` |
+Four domain-scoped skills:
 
-## Usage
+| Skill | What it does |
+|---|---|
+| **onekey-wallet** | Balance, portfolio, transfer, history, import / logout |
+| **onekey-swap** | Swap quote, execution, cross-chain bridge, status |
+| **onekey-market** | Token prices, trending, K-line, liquidity, holders, research |
+| **onekey-security** | Token audit, honeypot check, transaction simulation |
 
-### Standard wallet (no passphrase)
+Every skill drives the `onekey` CLI (npm package [`@onekeyfe/cli`](https://www.npmjs.com/package/@onekeyfe/cli)). The skill auto-installs the CLI on first use (`npm install -g @onekeyfe/cli`) — you don't need to install it separately.
 
-Use `--use-empty-passphrase` on every command to target the standard wallet.
+## Installation
+
+### Claude Code
+
+Claude Code's plugin marketplace handles everything:
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Cursor
+
+Clone the repo and point Cursor at the plugin directory (`.cursor-plugin/plugin.json`):
 
 ```bash
-# Search for connected devices (auto-fetches device info)
-onekey-hw search
-
-# Get an Ethereum address
-onekey-hw get-address --chain evm --use-empty-passphrase
-
-# Get a Bitcoin address
-onekey-hw get-address --chain btc --use-empty-passphrase
-
-# Sign a message
-onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
-
-# Sign an EVM transaction
-onekey-hw sign-transaction --chain evm \
-  --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
-  --use-empty-passphrase
-
-# Check firmware
-onekey-hw firmware-check-all
+git clone https://github.com/OneKeyHQ/onekey-wallet-skills
 ```
 
-### Hidden wallet (passphrase-protected)
+### Codex CLI
 
-Omit `--use-empty-passphrase` to access a hidden wallet. The passphrase is entered via a native OS dialog (pinentry) or directly on the device screen — never read from stdin or shell history. Three workflows are supported:
+Tell Codex:
 
-**Option A: Cached session (recommended for repeat use)**
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
 
-`session connect` establishes the passphrase session and stores it encrypted in the OS keychain. Subsequent commands in any process auto-reuse the cached session with no further prompts.
+### OpenCode
+
+Tell OpenCode:
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.opencode/INSTALL.md
+```
+
+### OpenClaw
+
+Tell OpenClaw:
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.openclaw/INSTALL.md
+```
+
+See the [repo README](https://github.com/OneKeyHQ/onekey-wallet-skills) for the always-current install guide.
+
+## Using a OneKey hardware wallet
+
+At login, pick hardware as the wallet kind — this is the **only** place `--hardware` appears:
 
 ```bash
-# One-time: establish + cache session (pinentry prompts for passphrase)
-onekey-hw session connect
-
-# Subsequent commands skip the passphrase prompt entirely
-onekey-hw get-address --chain evm
-onekey-hw sign-transaction --chain evm --tx '...'
-
-# Drop the cached session when finished
-onekey-hw session disconnect
+onekey auth login --hardware
 ```
 
-**Option B: Explicit passphrase-state (recommended for AI agents)**
+The CLI walks you through device discovery, PIN entry (on device), and passphrase (if enabled). See [PIN Code](/en/hardware-sdk/concepts/pin) and [Passphrase](/en/hardware-sdk/concepts/passphrase) for those flows.
 
-Fetch the session token once, then pass it on every subsequent command. Nothing is written to disk.
+After `login`, **every** subsequent skill-driven command goes through the hardware wallet automatically. Don't pass `--hardware` on business commands — the flag lives only on `auth login`:
 
 ```bash
-# Step 1: Obtain session token (pinentry dialog prompts for passphrase)
-STATE=$(onekey-hw passphrase-state --connect-id <id> | jq -r .payload)
+# Once: login with hardware
+onekey auth login --hardware
 
-# Step 2: Pass --passphrase-state on each command
-onekey-hw get-address --chain evm --passphrase-state "$STATE" --connect-id <id>
-onekey-hw sign-transaction --chain evm --tx '...' --passphrase-state "$STATE" --connect-id <id>
+# Then: the skills call these directly; you don't pass --hardware again
+onekey balance --chain eth
+onekey transfer --chain eth --to 0x... --amount 0.01
+onekey swap --from eth --to usdc --amount 0.5
+onekey history --chain eth
 ```
 
-**Option C: Interactive wallet-type prompt**
+Log out when done:
 
-With no wallet flag, the CLI asks on stderr which wallet to use:
-
-```
-[onekey-hw] Select wallet type:
-  1. Standard wallet (no passphrase)
-  2. Hidden wallet — enter passphrase on this computer (pinentry)
-  3. Hidden wallet — enter passphrase on device screen
+```bash
+onekey auth logout
 ```
 
-Best for interactive terminal use; not useful for unattended agents.
+## Output format
 
-> **Note**: PIN is **always** entered on the device — the CLI never collects it from stdin.
-
-> **Error 112 (passphrase state mismatch)**: Cached session is stale (device was locked or rebooted). Run `onekey-hw session disconnect` then `onekey-hw session connect` again, or fetch a fresh `--passphrase-state`.
-
-> **Flag precedence**: `--passphrase-state` takes precedence over `--use-empty-passphrase` when both are supplied. For clarity, pass only one.
-
-Firmware updates must be done via the [OneKey App](https://onekey.so/download) or [firmware.onekey.so](https://firmware.onekey.so/).
-
-## Supported Chains
-
-| Category | Chains |
-|----------|--------|
-| **EVM** | Ethereum, BSC, Polygon, Arbitrum, Base, Optimism, Avalanche, and all EVM-compatible chains |
-| **Bitcoin & Forks** | Bitcoin (Legacy/SegWit/Taproot), Litecoin, Bitcoin Cash, and other BTC forks |
-| **Layer 1** | Solana, Cardano, Polkadot, Cosmos, Near, Aptos, Sui, TON, Stellar, XRP |
-| **Others** | Tron, Filecoin, Kaspa, Algorand, Conflux, Nervos, Nostr, and more |
-
-For chain-specific parameters, see the [Chain Methods](/en/hardware-sdk/chains) documentation.
-
-## Output Format
-
-All commands return structured JSON:
+Every skill command returns structured JSON suitable for programmatic consumption:
 
 ```json
 {
-  "success": true,
-  "payload": {
-    "address": "0x1234...",
-    "path": "m/44'/60'/0'/0/0"
-  }
+  "status": "success",
+  "api_version": "1",
+  "data": { "...command-specific..." },
+  "metadata": { "timestamp": "2026-04-19T..." }
 }
 ```
 
-## Programmatic Integration (HardwareSigner)
+On failure the envelope stays the same with `status: "error"` plus a typed error `code` and `message`.
 
-For TypeScript/JavaScript applications, you can use `createHardwareSigner` to interact with OneKey hardware wallets programmatically:
+## Hardware-only alternative
 
-```typescript
-import { createHardwareSigner } from '@onekeyfe/hardware-cli';
+For **hardware-only** workflows that skip the `onekey` account layer entirely — direct device management, raw signing from a CI pipeline, narrow agent skills focused on device protocol — the separate [`@onekeyfe/hardware-cli`](https://www.npmjs.com/package/@onekeyfe/hardware-cli) (`onekey-hw`) package stays available. It's narrower but requires no account login; just plug in the device and run `onekey-hw`.
 
-// Create signer (initializes SDK + USB transport)
-const signer = await createHardwareSigner({ useEmptyPassphrase: true });
-
-try {
-  // Get an Ethereum address
-  const { address, path } = await signer.getAddress('evm');
-  console.log(address); // 0x3611...
-
-  // Sign a transaction
-  const signed = await signer.signTransaction('evm', {
-    to: '0x1234...',
-    value: '0xf4240',
-    chainId: 1,
-    nonce: '0x0',
-    gasLimit: '0x5208',
-    gasPrice: '0xbebc200',
-  });
-
-  // Sign a message
-  const { signature } = await signer.signMessage('evm', 'hello');
-} finally {
-  // Always dispose to release USB connection
-  signer.dispose();
-}
+```bash
+npm install -g @onekeyfe/hardware-cli
+onekey-hw search
+onekey-hw get-address --chain evm --use-empty-passphrase
 ```
 
-`createHardwareSigner` wraps the CLI's transport and SDK layers, providing a typed async API suitable for agent frameworks, backend services, and automation scripts.
+Use `@onekeyfe/cli` + skills for end-user-style agent workflows; use `@onekeyfe/hardware-cli` when you only need the hardware protocol.
 
-## API Mapping
+## Learn more
 
-| CLI Command | SDK Method | Docs |
-|-------------|-----------|------|
-| `get-address --chain evm` | `evmGetAddress` | [evmGetAddress](/en/hardware-sdk/chains/ethereum-and-evm/evmgetaddress) |
-| `get-address --chain btc` | `btcGetAddress` | [btcGetAddress](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress) |
-| `get-address --chain sol` | `solGetAddress` | [solGetAddress](/en/hardware-sdk/chains/solana/solgetaddress) |
-| `sign-transaction --chain evm` | `evmSignTransaction` | [evmSignTransaction](/en/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) |
-| `sign-transaction --chain btc` | `btcSignTransaction` | [btcSignTransaction](/en/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) |
-| `sign-message --chain evm` | `evmSignMessage` | [evmSignMessage](/en/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) |
-| `firmware-check` | `checkFirmwareRelease` | [checkFirmwareRelease](/en/hardware-sdk/device-api/checkfirmwarerelease) |
-| `device-verify` | `deviceVerify` | [deviceVerify](/en/hardware-sdk/device-api/deviceverify) |
-| `change-pin` | `deviceChangePin` | [deviceChangePin](/en/hardware-sdk/device-api/devicechangepin) |
+- Skills repo: <https://github.com/OneKeyHQ/onekey-wallet-skills>
+- CLI package: [`@onekeyfe/cli`](https://www.npmjs.com/package/@onekeyfe/cli)
+- Hardware-only CLI: [`@onekeyfe/hardware-cli`](https://www.npmjs.com/package/@onekeyfe/hardware-cli)
+- Passphrase & PIN flows: [Passphrase](/en/hardware-sdk/concepts/passphrase) · [PIN Code](/en/hardware-sdk/concepts/pin)
+- Identifier reference: [Identifiers](/en/hardware-sdk/concepts/identifiers)

@@ -4,243 +4,130 @@ title: AI Agent 集成
 
 # AI Agent 集成
 
-`@onekeyfe/hardware-cli` 使 AI Agent 能够通过 USB 与 OneKey 硬件钱包交互。
+OneKey 提供一套**钱包 Skills**，让 AI 编程助手（Claude Code、Cursor、Codex、OpenCode、OpenClaw 等）代你执行真实的钱包操作 —— 余额查询、转账、兑换、行情研究、代币安全审计 —— 背后接的钱包可以是任意类型，**包括 OneKey 硬件钱包**。
 
-Skills 遵循 [Agent Skills](https://agentskills.io) 开放标准，已被 30+ 工具支持，包括 Claude Code、Codex、Gemini CLI、GitHub Copilot、Cursor、JetBrains 等。
+Skills 和各工具的安装流程都在专属仓库里维护：
 
-## 安装 CLI
+👉 **[OneKeyHQ/onekey-wallet-skills](https://github.com/OneKeyHQ/onekey-wallet-skills)**
+
+## Skills
+
+四个按领域划分的 skill：
+
+| Skill | 功能范围 |
+|---|---|
+| **onekey-wallet** | 余额、持仓、转账、历史记录、导入 / 登出 |
+| **onekey-swap** | Swap 报价、执行、跨链桥、状态查询 |
+| **onekey-market** | 代币价格、热度、K 线、流动性、持有人、研究 |
+| **onekey-security** | 代币审计、蜜罐检查、交易模拟 |
+
+每个 skill 都通过 `onekey` CLI（npm 包 [`@onekeyfe/cli`](https://www.npmjs.com/package/@onekeyfe/cli)）执行命令。首次使用时 skill 会自动 `npm install -g @onekeyfe/cli`，无需单独安装。
+
+## 安装
+
+### Claude Code
+
+Claude Code 插件市场一条龙：
+
+```text
+/plugin marketplace add OneKeyHQ/onekey-wallet-skills
+/plugin install onekey-wallet-skills
+```
+
+### Cursor
+
+克隆仓库，然后用 Cursor 指向插件目录（`.cursor-plugin/plugin.json`）：
 
 ```bash
-npm install -g @onekeyfe/hardware-cli
+git clone https://github.com/OneKeyHQ/onekey-wallet-skills
 ```
 
-## 安装 Skills（通用）
+### Codex CLI
 
-适用于所有 Agent Skills 兼容工具（30+）：
+对 Codex 说：
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.codex/INSTALL.md
+```
+
+### OpenCode
+
+对 OpenCode 说：
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.opencode/INSTALL.md
+```
+
+### OpenClaw
+
+对 OpenClaw 说：
+
+```text
+Fetch and follow instructions from https://raw.githubusercontent.com/OneKeyHQ/onekey-wallet-skills/main/.openclaw/INSTALL.md
+```
+
+最新版安装说明以 [仓库 README](https://github.com/OneKeyHQ/onekey-wallet-skills) 为准。
+
+## 用 OneKey 硬件钱包
+
+登录时选择硬件作为钱包类型 —— `--hardware` **只**出现在 `auth login` 这一条命令上：
 
 ```bash
-npx skills add OneKeyHQ/hardware-js-sdk
+onekey auth login --hardware
 ```
 
-自动检测你使用的工具（Claude Code、Codex、Gemini、Cursor 等），将 skills 安装到正确位置。
+CLI 会引导你完成设备发现、PIN 输入（在设备屏上）、以及 passphrase（如启用）。详见 [PIN 码](/zh/hardware-sdk/concepts/pin) 和 [Passphrase](/zh/hardware-sdk/concepts/passphrase)。
 
-## Schema 发现
-
-安装 CLI 后，可以使用内置的 schema 系统探索所有可用命令及其参数：
+登录完成后，**后续所有**由 skill 驱动的命令都自动走硬件钱包。业务命令上**不要**再传 `--hardware`，它只在 `auth login` 上生效：
 
 ```bash
-# 列出所有可用命令及描述
-onekey-hw schema list
+# 一次性：硬件登录
+onekey auth login --hardware
 
-# 查看特定命令的完整 schema（参数、类型、示例）
-onekey-hw schema get-address
-onekey-hw schema sign-transaction
-onekey-hw schema device-wipe
+# 之后：skills 会直接调这些命令，不用再传 --hardware
+onekey balance --chain eth
+onekey transfer --chain eth --to 0x... --amount 0.01
+onekey swap --from eth --to usdc --amount 0.5
+onekey history --chain eth
 ```
 
-这对 AI Agent 动态发现支持的命令并构造有效调用特别有用，无需硬编码知识。
-
-## Claude Code
+用完登出：
 
 ```bash
-claude plugin marketplace add OneKeyHQ/hardware-js-sdk --sparse .claude-plugin packages/hd-cli
-claude plugin install onekey-hardware@onekey-hardware-plugins
+onekey auth logout
 ```
-
-CLI 会在首次使用时通过 skill 的 pre-flight 自动安装。
-
-## 其他 AI 工具（仅 skills）
-
-`skills/*/SKILL.md` 文件遵循通用 skill 格式，所有支持该格式的工具均可读取。
-
-| 工具 | 使用方式 | 支持范围 |
-|------|---------|---------|
-| **Gemini CLI** | 复制 skill 文件夹到 `~/.gemini/skills/` | 仅 Skills |
-| **Codex CLI** | 复制 skill 文件夹到 `~/.codex/skills/` | 仅 Skills |
-| **Cursor** | 复制 skill 文件夹到 `.cursor/skills/` | 仅 Skills |
-| **OpenCode** | 复制 skill 文件夹到 `.opencode/skills/` | 仅 Skills |
-| **Kiro** | 复制 skill 文件夹到 `.kiro/skills/` | 仅 Skills |
-
-```bash
-# 仅克隆 skills（sparse checkout）
-git clone --depth 1 --filter=blob:none --sparse https://github.com/OneKeyHQ/hardware-js-sdk.git /tmp/onekey-hw
-cd /tmp/onekey-hw && git sparse-checkout set packages/hd-cli/skills
-
-# 示例：复制所有 skills 到 Codex CLI（全局）
-for skill in packages/hd-cli/skills/*/; do
-  cp -r "$skill" ~/.codex/skills/ 2>/dev/null
-done
-
-# 示例：复制所有 skills 到 Gemini CLI（全局）
-for skill in packages/hd-cli/skills/*/; do
-  cp -r "$skill" ~/.gemini/skills/ 2>/dev/null
-done
-
-# 清理
-rm -rf /tmp/onekey-hw
-```
-
-## 技能
-
-| 技能 | 关键命令 |
-|------|----------|
-| **设备** | `search`, `lock`, `device-verify`, `device-settings`, `device-wipe --confirm-wipe` |
-| **签名**（27 条链） | `get-address`, `sign-transaction`, `sign-message`, `sign-typed-data`, `sign-psbt`, `batch-get-address` |
-| **固件**（只读） | `firmware-check`, `firmware-check-all`, `bootloader-check` |
-| **安全** | `change-pin`, `toggle-passphrase`, `passphrase-state` |
-
-## 使用
-
-### 标准钱包（无密码短语）
-
-设备未开启密码短语时，所有命令加上 `--use-empty-passphrase` 即可跳过密码交互：
-
-```bash
-# 搜索已连接的设备（自动获取设备信息）
-onekey-hw search
-
-# 获取以太坊地址
-onekey-hw get-address --chain evm --use-empty-passphrase
-
-# 获取比特币地址
-onekey-hw get-address --chain btc --use-empty-passphrase
-
-# 签名消息
-onekey-hw sign-message --chain evm --message "hello" --use-empty-passphrase
-
-# 签名 EVM 交易
-onekey-hw sign-transaction --chain evm \
-  --tx '{"to":"0x...","value":"0xf4240","chainId":1,"nonce":"0x0","gasLimit":"0x5208","gasPrice":"0xbebc200"}' \
-  --use-empty-passphrase
-
-# 检查固件
-onekey-hw firmware-check-all
-```
-
-### 隐藏钱包（带密码短语）
-
-不传 `--use-empty-passphrase` 即访问隐藏钱包。密码短语通过系统原生弹窗（pinentry）或设备屏幕输入，**不会出现在终端或 shell history 里**。三种工作流：
-
-**方案 A：Session 缓存（推荐日常使用）**
-
-`session connect` 建立 session 并加密存入 OS keychain，之后所有命令自动复用缓存、无需再次输入：
-
-```bash
-# 首次建立 + 缓存 session（pinentry 提示输入密码短语）
-onekey-hw session connect
-
-# 后续命令直接复用 session
-onekey-hw get-address --chain evm
-onekey-hw sign-transaction --chain evm --tx '...'
-
-# 用完清除缓存
-onekey-hw session disconnect
-```
-
-**方案 B：显式 passphrase-state（推荐 AI Agent）**
-
-先取一次 session token，之后每条命令显式传入。不落盘：
-
-```bash
-# Step 1：获取 session token（pinentry 提示输入密码短语）
-STATE=$(onekey-hw passphrase-state --connect-id <id> | jq -r .payload)
-
-# Step 2：后续命令带上 --passphrase-state
-onekey-hw get-address --chain evm --passphrase-state "$STATE" --connect-id <id>
-onekey-hw sign-transaction --chain evm --tx '...' --passphrase-state "$STATE" --connect-id <id>
-```
-
-**方案 C：交互式选择钱包类型**
-
-不传任何钱包 flag 时，CLI 会在 stderr 询问：
-
-```
-[onekey-hw] Select wallet type:
-  1. Standard wallet (no passphrase)
-  2. Hidden wallet — enter passphrase on this computer (pinentry)
-  3. Hidden wallet — enter passphrase on device screen
-```
-
-适合人工在终端使用；不适合无人值守的 agent。
-
-> **说明**：PIN **始终在设备上输入**，CLI 不会从 stdin 读 PIN。
-
-> **错误 112（passphrase state 不匹配）**：缓存的 session 已失效（设备被锁或重启）。执行 `onekey-hw session disconnect` 再 `onekey-hw session connect` 重建；或重取 `--passphrase-state`。
-
-> **Flag 优先级**：同时传 `--use-empty-passphrase` 和 `--passphrase-state` 时，`--passphrase-state` 生效。建议只传一个。
-
-固件更新需通过 [OneKey App](https://onekey.so/download) 或 [firmware.onekey.so](https://firmware.onekey.so/)。
-
-## 支持的链
-
-| 类别 | 链 |
-|------|-----|
-| **EVM** | Ethereum, BSC, Polygon, Arbitrum, Base, Optimism, Avalanche 及所有 EVM 兼容链 |
-| **Bitcoin 系** | Bitcoin (Legacy/SegWit/Taproot), Litecoin, Bitcoin Cash 及其他 BTC 分叉 |
-| **Layer 1** | Solana, Cardano, Polkadot, Cosmos, Near, Aptos, Sui, TON, Stellar, XRP |
-| **其他** | Tron, Filecoin, Kaspa, Algorand, Conflux, Nervos, Nostr 等 |
-
-各链参数请参考[链方法文档](/zh/hardware-sdk/chains)。
 
 ## 输出格式
 
-所有命令返回结构化 JSON：
+每个 skill 命令都返回结构化 JSON，便于程序消费：
 
 ```json
 {
-  "success": true,
-  "payload": {
-    "address": "0x1234...",
-    "path": "m/44'/60'/0'/0/0"
-  }
+  "status": "success",
+  "api_version": "1",
+  "data": { "...各命令特定字段..." },
+  "metadata": { "timestamp": "2026-04-19T..." }
 }
 ```
 
-## 编程集成 (HardwareSigner)
+失败时外层结构不变，`status` 变成 `"error"`，再带上类型化 `code` + `message`。
 
-对于 TypeScript/JavaScript 应用，可以使用 `createHardwareSigner` 以编程方式与 OneKey 硬件钱包交互：
+## 仅硬件的轻量选择
 
-```typescript
-import { createHardwareSigner } from '@onekeyfe/hardware-cli';
+如果你的场景是**只做硬件操作**（设备管理、CI 流水线的原始签名、只关心设备协议的窄范围 agent）、不想走 `onekey` 账户层，可以用另一个独立 CLI：[`@onekeyfe/hardware-cli`](https://www.npmjs.com/package/@onekeyfe/hardware-cli)（命令 `onekey-hw`）。它功能窄一些，但**不需要账户登录**，插上设备就能跑。
 
-// 创建签名器（初始化 SDK + USB 传输）
-const signer = await createHardwareSigner({ useEmptyPassphrase: true });
-
-try {
-  // 获取以太坊地址
-  const { address, path } = await signer.getAddress('evm');
-  console.log(address); // 0x3611...
-
-  // 签名交易
-  const signed = await signer.signTransaction('evm', {
-    to: '0x1234...',
-    value: '0xf4240',
-    chainId: 1,
-    nonce: '0x0',
-    gasLimit: '0x5208',
-    gasPrice: '0xbebc200',
-  });
-
-  // 签名消息
-  const { signature } = await signer.signMessage('evm', 'hello');
-} finally {
-  // 始终释放 USB 连接
-  signer.dispose();
-}
+```bash
+npm install -g @onekeyfe/hardware-cli
+onekey-hw search
+onekey-hw get-address --chain evm --use-empty-passphrase
 ```
 
-`createHardwareSigner` 封装了 CLI 的传输和 SDK 层，提供类型化的异步 API，适用于 Agent 框架、后端服务和自动化脚本。
+做终端用户级别的 agent 工作流 → 用 `@onekeyfe/cli` + skills；只要硬件协议 → 用 `@onekeyfe/hardware-cli`。
 
-## API 映射
+## 相关资源
 
-| CLI 命令 | SDK 方法 | 文档 |
-|----------|---------|------|
-| `get-address --chain evm` | `evmGetAddress` | [evmGetAddress](/zh/hardware-sdk/chains/ethereum-and-evm/evmgetaddress) |
-| `get-address --chain btc` | `btcGetAddress` | [btcGetAddress](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcgetaddress) |
-| `get-address --chain sol` | `solGetAddress` | [solGetAddress](/zh/hardware-sdk/chains/solana/solgetaddress) |
-| `sign-transaction --chain evm` | `evmSignTransaction` | [evmSignTransaction](/zh/hardware-sdk/chains/ethereum-and-evm/evmsigntransaction) |
-| `sign-transaction --chain btc` | `btcSignTransaction` | [btcSignTransaction](/zh/hardware-sdk/chains/bitcoin-and-bitcoin-forks/btcsigntransaction) |
-| `sign-message --chain evm` | `evmSignMessage` | [evmSignMessage](/zh/hardware-sdk/chains/ethereum-and-evm/evmsignmessage) |
-| `firmware-check` | `checkFirmwareRelease` | [checkFirmwareRelease](/zh/hardware-sdk/device-api/checkfirmwarerelease) |
-| `device-verify` | `deviceVerify` | [deviceVerify](/zh/hardware-sdk/device-api/deviceverify) |
-| `change-pin` | `deviceChangePin` | [deviceChangePin](/zh/hardware-sdk/device-api/devicechangepin) |
+- Skills 仓库：<https://github.com/OneKeyHQ/onekey-wallet-skills>
+- CLI 包：[`@onekeyfe/cli`](https://www.npmjs.com/package/@onekeyfe/cli)
+- 仅硬件 CLI：[`@onekeyfe/hardware-cli`](https://www.npmjs.com/package/@onekeyfe/hardware-cli)
+- Passphrase 与 PIN 流程：[Passphrase](/zh/hardware-sdk/concepts/passphrase) · [PIN 码](/zh/hardware-sdk/concepts/pin)
+- 标识符参考：[Identifiers](/zh/hardware-sdk/concepts/identifiers)
