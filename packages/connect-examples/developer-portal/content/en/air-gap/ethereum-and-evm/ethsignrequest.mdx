@@ -27,7 +27,7 @@ enum DataType {
 | `signData` | `Buffer` | Data to be signed |
 | `dataType` | `DataType` | Type of signing data |
 | `chainId` | `number` | Chain ID (optional) |
-| `derivationPath` | [`CryptoKeypath`](../basic-api/cryptokeypath) | Derivation path |
+| `derivationPath` | [`CryptoKeypath`](/en/air-gap/basic-api/cryptokeypath) | Derivation path |
 | `address` | `Buffer` | Address for signing (optional) |
 | `origin` | `string` | Request source (optional) |
 
@@ -101,5 +101,5 @@ const ur = eth.generateSignRequest({
 
 ## Next Step
 
-After the device signs, decode the response using [EthSignature](./ethsignature).
+After the device signs, decode the response using [EthSignature](/en/air-gap/ethereum-and-evm/ethsignature).
 

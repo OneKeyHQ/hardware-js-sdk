@@ -10,7 +10,7 @@ responses. This page is the single reference for what each one means, when
 it changes, and how its shape varies by transport.
 
 > Looking for **call parameters** (`passphraseState`, `initSession`,
-> `useEmptyPassphrase`, …)? See [Common Params](../common-params).
+> `useEmptyPassphrase`, …)? See [Common Params](/en/hardware-sdk/common-params).
 
 ## Four layers of identifiers
 
@@ -23,6 +23,59 @@ tells you when to refresh or persist a value.
 | **Transport connection** | This connection | New `searchDevices()`; different transport | `connectId`, `path`, `name`, `deviceType` |
 | **Seed / wallet state** | Until reset/wipe/recovery | Factory reset, seed recovery, wipe | `device_id` / `deviceId`, `label` |
 | **Session** | Until device is locked | Device lock (auto-lock, manual, USB disconnect) | `session_id`, `passphraseState` |
+
+## Which IDs do you pass in?
+
+Only three of the identifiers here are **inputs** to SDK calls — the rest are fields you read out of responses.
+
+| ID | You pass in? | Where | Required? |
+| --- | --- | --- | --- |
+| `connectId` | ✅ | First positional arg on every method | **Always** |
+| `deviceId` | ✅ | Second positional arg on signing / address / encryption methods | Required for wallet-level ops; omit for device-management ops |
+| `passphraseState` | ✅ | Inside the `params` object | Only when accessing a hidden (passphrase-protected) wallet |
+| `uuid`, `onekey_serial`, `device_id`, `session_id`, `path`, `name`, `deviceType`, `label` | ❌ response-only | — | — |
+
+### Call-signature patterns
+
+```ts
+// Device-level — just connectId
+HardwareSDK.getFeatures(connectId);
+HardwareSDK.deviceLock(connectId, {});
+HardwareSDK.getPassphraseState(connectId, { initSession: true });
+
+// Wallet-level (standard wallet) — connectId + deviceId
+HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+
+// Wallet-level (hidden wallet) — connectId + deviceId + passphraseState
+HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: { /* ... */ },
+  passphraseState, // obtained once from getPassphraseState
+});
+```
+
+### Which methods need which IDs
+
+| Pattern | When | Example methods |
+| --- | --- | --- |
+| 🟡 `connectId` only | Device-level operations (don't touch wallet state) | `searchDevices` · `getFeatures` · `getPassphraseState` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
+| 🔵 `connectId` + `deviceId` | Wallet-level — address derivation / signing / encryption | `evmGetAddress` · `evmSignTransaction` · `evmSignMessage` · `btcGetAddress` · `btcSignTransaction` · `btcSignPsbt` · `solGetAddress` · `solSignMessage` · `nostrEncryptMessage` · `allNetworkGetAddress` · all other chain methods |
+| 🟣 `connectId` + `deviceId` + `passphraseState` | Same as 🔵, but against a passphrase-protected hidden wallet | All of 🔵 with a non-empty `passphraseState` in params |
+
+### What happens if you skip or mistype an ID?
+
+| What you skip / pass wrong | SDK response |
+| --- | --- |
+| `connectId` missing or unknown | `DeviceNotFound` — SDK has no idea which device to route to |
+| `deviceId` wrong (seed changed mid-flow) | `DeviceCheckDeviceIdError` — SDK refuses to sign on a different seed |
+| `passphraseState` missing on a hidden wallet | ⚠️ **Silent success on the standard wallet** — you get a different address back with no error |
+| `passphraseState` doesn't match the current session | Error 112 (passphrase state mismatch) — session expired or wrong hidden wallet |
+| `passphraseState` + `useEmptyPassphrase: true` combined | `passphraseState` takes precedence (hidden wallet) — the `useEmptyPassphrase` flag is ignored |
+
+> ⚠️ The silent-standard-wallet case is the sneakiest. If you forget `passphraseState` when querying a hidden wallet, you'll get the standard wallet's address back without any error. Always obtain `passphraseState` via `getPassphraseState` once and attach it to every subsequent wallet-level call — or pass `useEmptyPassphrase: true` explicitly if you intend the standard wallet.
 
 ## Physical hardware identifiers
 
@@ -210,8 +263,8 @@ Same value, different contexts:
 
 ## See also
 
-- [Common Params](../common-params) — parameters you pass **in** to SDK calls
-- [Passphrase](./passphrase) — hidden wallet flow
-- [PIN Code](./pin) — PIN entry flow
-- [Search Devices](../basic-api/search-devices) — returns `connectId`, `uuid`, `deviceType`, `deviceId`
-- [Get Features](../basic-api/get-features) — returns `device_id`, `session_id`, `onekey_serial`, …
+- [Common Params](/en/hardware-sdk/common-params) — parameters you pass **in** to SDK calls
+- [Passphrase](/en/hardware-sdk/concepts/passphrase) — hidden wallet flow
+- [PIN Code](/en/hardware-sdk/concepts/pin) — PIN entry flow
+- [Search Devices](/en/hardware-sdk/basic-api/search-devices) — returns `connectId`, `uuid`, `deviceType`, `deviceId`
+- [Get Features](/en/hardware-sdk/basic-api/get-features) — returns `device_id`, `session_id`, `onekey_serial`, …

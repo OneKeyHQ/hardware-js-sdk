@@ -9,7 +9,7 @@ title: 标识符（Identifiers）
 到底代表什么、何时变化、在不同传输方式下格式差异是什么。
 
 > 找的是**传入 SDK 的参数**（`passphraseState`、`initSession`、
-> `useEmptyPassphrase` 等）？请看 [通用参数](../common-params)。
+> `useEmptyPassphrase` 等）？请看 [通用参数](/zh/hardware-sdk/common-params)。
 
 ## 四层标识符
 
@@ -22,6 +22,59 @@ title: 标识符（Identifiers）
 | **传输连接** | 本次连接 | 重新 `searchDevices()`；换传输方式 | `connectId`、`path`、`name`、`deviceType` |
 | **种子 / 钱包状态** | 恢复出厂 / 擦除 / 恢复助记词之前 | 恢复出厂、重新导入助记词、擦除 | `device_id` / `deviceId`、`label` |
 | **会话** | 设备锁屏之前 | 自动锁屏、手动锁、USB 断开 | `session_id`、`passphraseState` |
+
+## 哪些 ID 需要你传进去？
+
+上面列的字段中只有 **3 个** 是你调用 SDK 时需要传进去的**入参**，其他全部只在响应里读。
+
+| ID | 需要传入？ | 传在哪里 | 什么时候必传？ |
+| --- | --- | --- | --- |
+| `connectId` | ✅ | 每个方法的第一个位置参数 | **总是必传** |
+| `deviceId` | ✅ | 签名 / 地址 / 加密类方法的第二个位置参数 | 钱包级操作必传；设备管理操作可省 |
+| `passphraseState` | ✅ | 在 `params` 对象里 | 只在访问隐藏钱包（带 passphrase）时传 |
+| `uuid`、`onekey_serial`、`device_id`、`session_id`、`path`、`name`、`deviceType`、`label` | ❌ 仅响应字段 | — | — |
+
+### 调用形态
+
+```ts
+// 设备级 —— 只要 connectId
+HardwareSDK.getFeatures(connectId);
+HardwareSDK.deviceLock(connectId, {});
+HardwareSDK.getPassphraseState(connectId, { initSession: true });
+
+// 钱包级（标准钱包）—— connectId + deviceId
+HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+
+// 钱包级（隐藏钱包）—— connectId + deviceId + passphraseState
+HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: { /* ... */ },
+  passphraseState, // 由 getPassphraseState 一次性获取
+});
+```
+
+### 各方法的 ID 要求
+
+| 类别 | 适用场景 | 代表方法 |
+| --- | --- | --- |
+| 🟡 仅 `connectId` | 设备级操作（不触碰钱包状态）| `searchDevices` · `getFeatures` · `getPassphraseState` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
+| 🔵 `connectId` + `deviceId` | 钱包级：地址派生 / 签名 / 加密 | `evmGetAddress` · `evmSignTransaction` · `evmSignMessage` · `btcGetAddress` · `btcSignTransaction` · `btcSignPsbt` · `solGetAddress` · `solSignMessage` · `nostrEncryptMessage` · `allNetworkGetAddress` · 所有其他链方法 |
+| 🟣 `connectId` + `deviceId` + `passphraseState` | 和 🔵 相同，但访问的是带 passphrase 的隐藏钱包 | 🔵 里所有方法，params 里带非空 `passphraseState` |
+
+### 漏传 / 传错的后果
+
+| 漏传 / 传错 | SDK 行为 |
+| --- | --- |
+| `connectId` 缺失或未知 | `DeviceNotFound` —— SDK 不知道要路由到哪台设备 |
+| `deviceId` 不对（中途换了种子）| `DeviceCheckDeviceIdError` —— SDK 拒绝在另一个种子上签名 |
+| 访问隐藏钱包漏传 `passphraseState` | ⚠️ **返回标准钱包的结果，无任何报错** —— 地址 / 签名都是另一个钱包的 |
+| `passphraseState` 不匹配当前 session | 错误码 112（passphrase state mismatch）—— session 过期或隐藏钱包变了 |
+| `passphraseState` 和 `useEmptyPassphrase: true` 同时传 | `passphraseState` 优先（走隐藏钱包）——`useEmptyPassphrase` 被忽略 |
+
+> ⚠️ 第三行是最坑的：隐藏钱包调用时漏传 `passphraseState`，拿到的是标准钱包的地址/签名，**完全没有报错**。所以隐藏钱包场景里，`getPassphraseState` 拿一次 `passphraseState` 之后必须挂到后续所有钱包级调用上；如果明确就是要走标准钱包，就显式传 `useEmptyPassphrase: true`，别把它留空。
 
 ## 物理硬件标识符
 
@@ -194,8 +247,8 @@ SDK 层暴露给应用用的稳定 ID。**路由始终用 `connectId`**；如果
 
 ## 参考
 
-- [通用参数](../common-params) —— 传**进** SDK 的参数
-- [Passphrase](./passphrase) —— 隐藏钱包流程
-- [PIN 码](./pin) —— PIN 输入流程
-- [Search Devices](../basic-api/search-devices) —— 返回 `connectId`、`uuid`、`deviceType`、`deviceId`
-- [Get Features](../basic-api/get-features) —— 返回 `device_id`、`session_id`、`onekey_serial` 等
+- [通用参数](/zh/hardware-sdk/common-params) —— 传**进** SDK 的参数
+- [Passphrase](/zh/hardware-sdk/concepts/passphrase) —— 隐藏钱包流程
+- [PIN 码](/zh/hardware-sdk/concepts/pin) —— PIN 输入流程
+- [Search Devices](/zh/hardware-sdk/basic-api/search-devices) —— 返回 `connectId`、`uuid`、`deviceType`、`deviceId`
+- [Get Features](/zh/hardware-sdk/basic-api/get-features) —— 返回 `device_id`、`session_id`、`onekey_serial` 等

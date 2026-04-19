@@ -27,7 +27,7 @@ enum DataType {
 | `signData` | `Buffer` | 待签名数据 |
 | `dataType` | `DataType` | 签名数据类型 |
 | `chainId` | `number` | 链 ID（可选） |
-| `derivationPath` | [`CryptoKeypath`](../basic-api/cryptokeypath) | 派生路径 |
+| `derivationPath` | [`CryptoKeypath`](/zh/air-gap/basic-api/cryptokeypath) | 派生路径 |
 | `address` | `Buffer` | 签名地址（可选） |
 | `origin` | `string` | 请求来源（可选） |
 
@@ -101,5 +101,5 @@ const ur = eth.generateSignRequest({
 
 ## 下一步
 
-设备签名后，使用 [EthSignature](./ethsignature) 解码响应。
+设备签名后，使用 [EthSignature](/zh/air-gap/ethereum-and-evm/ethsignature) 解码响应。
 
