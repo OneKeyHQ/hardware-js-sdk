@@ -4,7 +4,7 @@ title: 建立连接
 
 # 建立连接
 
-应用[检测到 Provider](../detecting-the-provider) 后，就可以请求连接到 OneKey。此连接请求将提示用户授权分享其公钥，表明他们愿意进一步交互。用户必须先批准连接请求，应用才能发出其他请求，如[签署消息](../signing-a-message)或[发送交易](../sending-a-transaction)。
+应用[检测到 Provider](./detecting-the-provider) 后，就可以请求连接到 OneKey。此连接请求将提示用户授权分享其公钥，表明他们愿意进一步交互。用户必须先批准连接请求，应用才能发出其他请求，如[签署消息](./signing-a-message)或[发送交易](./sending-a-transaction)。
 
 首次建立权限后，Web 应用的域名将被加入白名单，以便将来的连接请求。连接建立后，可以从应用端和用户端终止连接。
 
@@ -36,7 +36,7 @@ try {
 }
 ```
 
-`connect()` 调用将返回一个 [Promise](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise)，当用户接受连接请求时解析，当用户拒绝请求或关闭弹窗时拒绝（await 时抛出）。有关 OneKey 可能发出的错误消息的详细信息，请参阅[错误](../signing-a-message.md#errors)。
+`connect()` 调用将返回一个 [Promise](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise)，当用户接受连接请求时解析，当用户拒绝请求或关闭弹窗时拒绝（await 时抛出）。有关 OneKey 可能发出的错误消息的详细信息，请参阅[错误](./signing-a-message#errors)。
 
 当用户接受连接请求时，Provider 也会发出 `connect` 事件。
 
