@@ -656,16 +656,12 @@ sessionCmd
 
       // 2. Unlock if locked — getPassphraseState below talks to a live
       // device session, which a locked device will reject with an obscure
-      // error. Matches the unlock step in prepareSession.
+      // error. Uses the same PinInvalid retry policy as prepareSession.
       if (device.features?.unlocked === false) {
         process.stderr.write(
           '[onekey-hw] Device is locked. Unlocking (PIN required)...\n'
         );
-        const unlockResult = await sdk.deviceUnlock(connectId, {});
-        if (!unlockResult?.success) {
-          outputResult(globalOpts, unlockResult);
-          return;
-        }
+        await unlockWithRetry(sdk, connectId);
       }
 
       // 3. Get passphraseState (triggers 1/2/3 selection)
@@ -759,6 +755,62 @@ function getCommonParams(globalOpts: Record<string, any>) {
 }
 
 /**
+ * HardwareErrorCode.PinInvalid from @onekeyfe/hd-shared. Duplicated here
+ * to avoid pulling the shared package's runtime just for one enum value.
+ * (PinCancelled is 802 — we don't retry it, any non-PinInvalid failure
+ * falls through to the "bail out" branch below.)
+ */
+const HW_ERR_PIN_INVALID = 801;
+
+/**
+ * Unlock a locked device, retrying up to `maxAttempts` times on
+ * `PinInvalid`. On `PinCancelled` or any other failure, throws immediately
+ * so the structured error surfaces to the user via runCommand's catch.
+ *
+ * With `@@ONEKEY_INPUT_PIN_IN_DEVICE` semantics the device firmware
+ * normally loops PIN entry internally and only reports back on success
+ * or cancel. Retrying here is defensive: if the device ever surfaces
+ * `PinInvalid` directly (older firmware, specific models), give the
+ * user another chance without forcing a re-run of the whole command.
+ */
+async function unlockWithRetry(
+  sdk: typeof import('@onekeyfe/hd-common-connect-sdk').default,
+  connectId: string,
+  maxAttempts = 3
+): Promise<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload: any;
+}> {
+  let lastPayload: { error?: string; code?: number | string } = {};
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = await sdk.deviceUnlock(connectId, {});
+    if (result?.success && result.payload) {
+      return { payload: result.payload };
+    }
+    lastPayload = (result?.payload ?? {}) as {
+      error?: string;
+      code?: number | string;
+    };
+    const code = lastPayload.code;
+    const isPinInvalid = code === HW_ERR_PIN_INVALID;
+    if (isPinInvalid && attempt < maxAttempts) {
+      process.stderr.write(
+        `[onekey-hw] Invalid PIN. Retry on your device (attempt ${attempt + 1}/${maxAttempts}).\n`
+      );
+      continue;
+    }
+    // PinCancelled, other error, or PinInvalid on the last attempt — bail out
+    const err = new Error(
+      `Device unlock failed: ${lastPayload.error ?? 'unknown error'}`
+    );
+    (err as Error & { code?: number | string }).code = code ?? 'UNLOCK_FAILED';
+    throw err;
+  }
+  // Unreachable — the loop either returns or throws
+  throw new Error('Device unlock failed: retry loop exited without a result');
+}
+
+/**
  * Prepare passphrase session before SDK calls.
  *
  * 1. If --use-empty-passphrase or --passphrase-state provided → use as-is
@@ -831,18 +883,15 @@ async function prepareSession(
   // ── Step 3: Unlock if locked (matches app-monorepo ServiceHardware flow) ──
   // Track whether device was locked — locking invalidates passphrase sessions,
   // so keychain session reuse is only possible if device was already unlocked.
-  // Unlock failures (PIN cancelled, etc.) propagate — the user needs to see them.
+  // PinInvalid retries inside unlockWithRetry; PinCancelled/other failures
+  // throw and propagate to runCommand's catch for structured output.
   const wasLocked = unlocked === false;
   if (wasLocked) {
     process.stderr.write('[onekey-hw] Device is locked. Unlocking (PIN required)...\n');
-    const unlockResult = await sdk.deviceUnlock(connectId, {});
-    if (unlockResult?.success && unlockResult.payload) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const feat = unlockResult.payload as any;
-      deviceId = feat.device_id || deviceId;
-      unlocked = feat.unlocked;
-      passphraseProtection = feat.passphrase_protection;
-    }
+    const { payload: feat } = await unlockWithRetry(sdk, connectId);
+    deviceId = feat.device_id || deviceId;
+    unlocked = feat.unlocked;
+    passphraseProtection = feat.passphrase_protection;
   }
 
   if (!globalOpts.deviceId && deviceId) {
