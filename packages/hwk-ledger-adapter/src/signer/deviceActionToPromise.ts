@@ -1,4 +1,5 @@
 import { DeviceActionStatus } from '@ledgerhq/device-management-kit';
+
 import type { DeviceAction, DeviceActionState } from '../types';
 
 /** Default timeout for non-interactive operations (e.g. getAddress without showOnDevice). */

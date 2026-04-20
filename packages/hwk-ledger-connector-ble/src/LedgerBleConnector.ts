@@ -1,6 +1,7 @@
+import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
+
 import type { DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
-import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
 
 function extractBleHexId(name?: string): string | undefined {
   if (!name) return undefined;
@@ -16,8 +17,9 @@ export class LedgerBleConnector extends LedgerConnectorBase {
   constructor(options?: LedgerBleConnectorOptions) {
     super(
       async () => {
-        const { RNBleTransportFactory } =
-          await import('@ledgerhq/device-transport-kit-react-native-ble');
+        const { RNBleTransportFactory } = await import(
+          '@ledgerhq/device-transport-kit-react-native-ble'
+        );
         return RNBleTransportFactory;
       },
       { connectionType: 'ble', dmk: options?.dmk }

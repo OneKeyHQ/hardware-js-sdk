@@ -1,11 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
-import type {
-  IConnector,
-  ConnectorDevice,
-  ConnectorSession,
-} from '@onekeyfe/hwk-adapter-core';
+
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
+
+import type { ConnectorDevice, ConnectorSession, IConnector } from '@onekeyfe/hwk-adapter-core';
 
 function createMockConnector(): IConnector {
   const handlers = new Map<string, Set<(...args: unknown[]) => void>>();

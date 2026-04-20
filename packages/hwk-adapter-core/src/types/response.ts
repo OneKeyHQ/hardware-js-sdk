@@ -1,4 +1,4 @@
-import { HardwareErrorCode } from './errors';
+import type { HardwareErrorCode } from './errors';
 
 export interface Success<T> {
   success: true;

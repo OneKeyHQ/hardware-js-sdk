@@ -17,7 +17,9 @@ export class TypedEventEmitter<TMap extends Record<string, any> = Record<string,
   private readonly _listeners = new Map<string, Set<(event: any) => void>>();
 
   on<K extends keyof TMap & string>(event: K, listener: (event: TMap[K]) => void): void;
+
   on(event: string, listener: (event: any) => void): void;
+
   on(event: string, listener: (event: any) => void): void {
     let set = this._listeners.get(event);
     if (!set) {
@@ -28,7 +30,9 @@ export class TypedEventEmitter<TMap extends Record<string, any> = Record<string,
   }
 
   off<K extends keyof TMap & string>(event: K, listener: (event: TMap[K]) => void): void;
+
   off(event: string, listener: (event: any) => void): void;
+
   off(event: string, listener: (event: any) => void): void {
     const set = this._listeners.get(event);
     if (set) {
@@ -38,7 +42,9 @@ export class TypedEventEmitter<TMap extends Record<string, any> = Record<string,
   }
 
   emit<K extends keyof TMap & string>(event: K, data: TMap[K]): void;
+
   emit(event: string, data: unknown): void;
+
   emit(event: string, data: unknown): void {
     const set = this._listeners.get(event);
     if (set) {

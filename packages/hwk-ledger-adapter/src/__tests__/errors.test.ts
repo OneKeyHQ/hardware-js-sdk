@@ -1,11 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
+
 import {
+  isDeviceDisconnectedError,
   isDeviceLockedError,
+  isTimeoutError,
   isUserRejectedError,
   isWrongAppError,
-  isDeviceDisconnectedError,
-  isTimeoutError,
   mapLedgerError,
 } from '../errors';
 
@@ -204,7 +205,9 @@ describe('mapLedgerError', () => {
   });
 
   it('should map timeout to OperationTimeout', () => {
-    const result = mapLedgerError(Object.assign(new Error('APDU timeout'), { _tag: 'SendApduTimeoutError' }));
+    const result = mapLedgerError(
+      Object.assign(new Error('APDU timeout'), { _tag: 'SendApduTimeoutError' })
+    );
     expect(result.code).toBe(HardwareErrorCode.OperationTimeout);
   });
 

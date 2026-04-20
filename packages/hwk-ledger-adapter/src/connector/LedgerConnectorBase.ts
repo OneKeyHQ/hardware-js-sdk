@@ -1,54 +1,54 @@
-import type {
-  IConnector,
-  ConnectorDevice,
-  ConnectorSession,
-  ConnectorEventType,
-  ConnectorEventMap,
-  ConnectionType,
-  DeviceDescriptor,
-  UiResponseEvent,
-} from '@onekeyfe/hwk-adapter-core';
-import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
 import { SignerManager } from '../signer/SignerManager';
 import { mapLedgerError } from '../errors';
 import { debugLog } from '../utils/debugLog';
+import {
+  btcGetAddress,
+  btcGetMasterFingerprint,
+  btcGetPublicKey,
+  btcSignMessage,
+  btcSignPsbt,
+  btcSignTransaction,
+  evmGetAddress,
+  evmSignMessage,
+  evmSignTransaction,
+  evmSignTypedData,
+  solGetAddress,
+  solSignMessage,
+  solSignTransaction,
+  tronGetAddress,
+  tronSignMessage,
+  tronSignTransaction,
+} from './chains';
 
 import type { ConnectorContext } from './chains/types';
-import {
-  evmGetAddress,
-  evmSignTransaction,
-  evmSignMessage,
-  evmSignTypedData,
-  btcGetAddress,
-  btcGetPublicKey,
-  btcSignTransaction,
-  btcSignPsbt,
-  btcSignMessage,
-  btcGetMasterFingerprint,
-  solGetAddress,
-  solSignTransaction,
-  solSignMessage,
-  tronGetAddress,
-  tronSignTransaction,
-  tronSignMessage,
-} from './chains';
+import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type {
-  EvmGetAddressCallParams,
-  EvmSignTransactionCallParams,
-  EvmSignMessageCallParams,
-  EvmSignTypedDataCallParams,
+  ConnectionType,
+  ConnectorDevice,
+  ConnectorEventMap,
+  ConnectorEventType,
+  ConnectorSession,
+  DeviceDescriptor,
+  IConnector,
+  UiResponseEvent,
+} from '@onekeyfe/hwk-adapter-core';
+import type {
   BtcGetAddressCallParams,
   BtcGetPublicKeyCallParams,
-  BtcSignTransactionCallParams,
-  BtcSignPsbtCallParams,
   BtcSignMessageCallParams,
+  BtcSignPsbtCallParams,
+  BtcSignTransactionCallParams,
+  EvmGetAddressCallParams,
+  EvmSignMessageCallParams,
+  EvmSignTransactionCallParams,
+  EvmSignTypedDataCallParams,
   SolGetAddressCallParams,
-  SolSignTransactionCallParams,
   SolSignMessageCallParams,
+  SolSignTransactionCallParams,
   TronGetAddressCallParams,
-  TronSignTransactionCallParams,
   TronSignMessageCallParams,
+  TronSignTransactionCallParams,
 } from './chains';
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,9 @@ async function defaultLedgerKitImporter(pkg: string): Promise<any> {
  */
 export class LedgerConnectorBase implements IConnector {
   private _deviceManager: LedgerDeviceManager | null = null;
+
   private _signerManager: SignerManager | null = null;
+
   private _dmk: DeviceManagementKit | null = null;
 
   private readonly _eventHandlers = new Map<
@@ -130,7 +132,9 @@ export class LedgerConnectorBase implements IConnector {
   >();
 
   private readonly _providedDmk: DeviceManagementKit | undefined;
+
   private readonly _createTransport: TransportFactory;
+
   private readonly _connectionType: ConnectionType;
 
   // ---------------------------------------------------------------------------
@@ -141,6 +145,7 @@ export class LedgerConnectorBase implements IConnector {
   // This bidirectional map is the SINGLE SOURCE OF TRUTH for all connectId usage.
   // ---------------------------------------------------------------------------
   private _connectIdToPath = new Map<string, string>(); // "A58F" -> "D5:75:7D:4B:51:E8"
+
   private _pathToConnectId = new Map<string, string>(); // "D5:75:7D:4B:51:E8" -> "A58F"
 
   /** Register a connectId <-> path mapping from a device descriptor. */
@@ -268,7 +273,9 @@ export class LedgerConnectorBase implements IConnector {
       const descriptors = await dm.enumerate();
       if (descriptors.length === 0) {
         throw new Error(
-          `No Ledger device found. Make sure the device is connected${this._connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'} and unlocked.`
+          `No Ledger device found. Make sure the device is connected${
+            this._connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'
+          } and unlocked.`
         );
       }
       targetPath = descriptors[0].path;
@@ -316,7 +323,9 @@ export class LedgerConnectorBase implements IConnector {
         const descriptors = await dm2.enumerate();
         if (descriptors.length === 0) {
           throw new Error(
-            `No Ledger device found after retry. Make sure the device is connected${this._connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'} and unlocked.`
+            `No Ledger device found after retry. Make sure the device is connected${
+              this._connectionType === 'ble' ? ' nearby with Bluetooth enabled' : ' via USB'
+            } and unlocked.`
           );
         }
         return doConnect(descriptors[0].path);
@@ -430,7 +439,12 @@ export class LedgerConnectorBase implements IConnector {
    * Otherwise, one is created via the transport factory.
    */
   protected async _getOrCreateDmk(): Promise<DeviceManagementKit> {
-    debugLog('[DMK] _getOrCreateDmk called, _dmk exists:', !!this._dmk, '_providedDmk exists:', !!this._providedDmk);
+    debugLog(
+      '[DMK] _getOrCreateDmk called, _dmk exists:',
+      !!this._dmk,
+      '_providedDmk exists:',
+      !!this._providedDmk
+    );
     if (this._dmk) return this._dmk;
 
     if (this._providedDmk) {
@@ -445,7 +459,9 @@ export class LedgerConnectorBase implements IConnector {
 
     debugLog('[DMK] _getOrCreateDmk: transportFactory type:', typeof transportFactory);
 
-    const dmk: DeviceManagementKit = new DeviceManagementKitBuilder().addTransport(transportFactory).build();
+    const dmk: DeviceManagementKit = new DeviceManagementKitBuilder()
+      .addTransport(transportFactory)
+      .build();
     this._dmk = dmk;
 
     debugLog('[DMK] _getOrCreateDmk: DMK created');
@@ -497,9 +513,7 @@ export class LedgerConnectorBase implements IConnector {
     if (!dm) return;
 
     const oldDeviceId = dm.getDeviceId(oldSessionId);
-    const connectId = oldDeviceId
-      ? this._pathToConnectId.get(oldDeviceId)
-      : undefined;
+    const connectId = oldDeviceId ? this._pathToConnectId.get(oldDeviceId) : undefined;
 
     // Invalidate old signer cache
     this._signerManager?.invalidate(oldSessionId);

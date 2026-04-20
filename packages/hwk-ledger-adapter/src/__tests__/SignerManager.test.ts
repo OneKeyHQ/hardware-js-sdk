@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { SignerManager } from '../signer/SignerManager';
+
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 
 describe('SignerManager', () => {

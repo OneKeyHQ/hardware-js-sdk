@@ -1,6 +1,8 @@
 import { EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
+
 import { isWrongAppError } from '../../errors';
 import { AppManager } from '../../app/AppManager';
+
 import type { ConnectorContext } from './types';
 
 /**
@@ -51,7 +53,7 @@ export async function withLegacyAppRetry<T>(
   ctx: ConnectorContext,
   sessionId: string,
   appName: string,
-  action: (sid: string) => Promise<T>,
+  action: (sid: string) => Promise<T>
 ): Promise<T> {
   try {
     return await action(sessionId);

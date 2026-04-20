@@ -1,5 +1,6 @@
-import type { SignerSolana as ISdkSignerSol } from '@ledgerhq/device-signer-kit-solana';
 import { deviceActionToPromise } from './deviceActionToPromise';
+
+import type { SignerSolana as ISdkSignerSol } from '@ledgerhq/device-signer-kit-solana';
 
 // Extract parameter types from the real SignerSolana interface to avoid deep path imports.
 type SolTxOptions = Parameters<ISdkSignerSol['signTransaction']>[2];
@@ -15,6 +16,7 @@ type SolMsgOptions = Parameters<ISdkSignerSol['signMessage']>[2];
 export class SignerSol {
   onInteraction?: (interaction: string) => void;
 
+  // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _sdk: ISdkSignerSol) {}
 
   /**

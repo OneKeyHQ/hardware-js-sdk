@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "no-bitwise": "off",
+    "default-case": "off",
+    "no-promise-executor-return": "off",
+    "@typescript-eslint/require-await": "off",
+    "import/no-unresolved": ["error", { "ignore": ["^vitest"] }]
+  },
+  "ignorePatterns": ["tsup.config.ts"]
+}

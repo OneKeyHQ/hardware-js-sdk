@@ -1,4 +1,5 @@
 import Transport from '@ledgerhq/hw-transport';
+
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 
 /**
@@ -15,6 +16,7 @@ import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
  */
 export class DmkTransport extends Transport {
   private _dmk: DeviceManagementKit;
+
   private _sessionId: string;
 
   constructor(dmk: DeviceManagementKit, sessionId: string) {
@@ -30,11 +32,13 @@ export class DmkTransport extends Transport {
     });
 
     // Legacy format: data + statusCode (2 bytes) concatenated
-    const result = Buffer.alloc(response.data.length + 2);
-    if (response.data.length > 0) {
-      result.set(response.data, 0);
+    const data = response.data as Uint8Array;
+    const statusCode = response.statusCode as Uint8Array;
+    const result = Buffer.alloc(data.length + 2);
+    if (data.length > 0) {
+      result.set(data, 0);
     }
-    result.set(response.statusCode, response.data.length);
+    result.set(statusCode, data.length);
     return result;
   }
 

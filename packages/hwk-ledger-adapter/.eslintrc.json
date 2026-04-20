@@ -1,0 +1,14 @@
+{
+  "rules": {
+    "no-bitwise": "off",
+    "no-void": "off",
+    "no-param-reassign": "off",
+    "no-return-await": "off",
+    "no-promise-executor-return": "off",
+    "default-case": "off",
+    "@typescript-eslint/require-await": "off",
+    "@typescript-eslint/unbound-method": "off",
+    "import/no-unresolved": ["error", { "ignore": ["^@ledgerhq/", "^vitest"] }]
+  },
+  "ignorePatterns": ["tsup.config.ts"]
+}

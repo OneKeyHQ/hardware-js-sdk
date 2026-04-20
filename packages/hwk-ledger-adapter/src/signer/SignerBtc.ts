@@ -1,13 +1,14 @@
+import { deviceActionToPromise } from './deviceActionToPromise';
+import { debugError, debugLog } from '../utils/debugLog';
+
 import type { SignerBtc as ISdkSignerBtc } from '@ledgerhq/device-signer-kit-bitcoin';
+import type { SignerBtcAddress } from '../types';
 
 // Extract parameter types from the real SignerBtc interface to avoid deep path imports.
 type BtcWallet = Parameters<ISdkSignerBtc['getWalletAddress']>[0];
 type BtcPsbt = Parameters<ISdkSignerBtc['signPsbt']>[1];
 type BtcPsbtOptions = Parameters<ISdkSignerBtc['signPsbt']>[2];
 type BtcMessageOptions = Parameters<ISdkSignerBtc['signMessage']>[2];
-import type { SignerBtcAddress } from '../types';
-import { deviceActionToPromise } from './deviceActionToPromise';
-import { debugLog, debugError } from '../utils/debugLog';
 
 /** Decode hex string (with or without 0x prefix) to UTF-8 text. */
 function hexToUtf8(hex: string): string {
@@ -29,6 +30,7 @@ const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;
 export class SignerBtc {
   onInteraction?: (interaction: string) => void;
 
+  // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _sdk: ISdkSignerBtc) {}
 
   async getWalletAddress(
@@ -67,7 +69,7 @@ export class SignerBtc {
         typeof result,
         'value:',
         typeof result === 'string'
-          ? result.substring(0, 20) + '...'
+          ? `${result.substring(0, 20)}...`
           : JSON.stringify(result).substring(0, 50)
       );
       if (typeof result === 'string') return result;

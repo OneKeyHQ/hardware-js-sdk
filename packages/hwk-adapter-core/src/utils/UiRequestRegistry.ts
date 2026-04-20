@@ -31,19 +31,15 @@ type PendingEntry = {
 export class UiRequestRegistry {
   private pending = new Map<string, PendingEntry>();
 
-  wait<T = unknown>(
-    requestType: string,
-    options?: { timeoutMs?: number }
-  ): Promise<T> {
+  wait<T = unknown>(requestType: string, options?: { timeoutMs?: number }): Promise<T> {
     const existing = this.pending.get(requestType);
     if (existing) {
       clearTimeout(existing.timer);
       this.pending.delete(requestType);
       existing.reject(
-        Object.assign(
-          new Error(`UI request '${requestType}' was superseded by a new request`),
-          { _tag: UI_REQUEST_PREEMPTED_TAG }
-        )
+        Object.assign(new Error(`UI request '${requestType}' was superseded by a new request`), {
+          _tag: UI_REQUEST_PREEMPTED_TAG,
+        })
       );
     }
 
@@ -54,10 +50,9 @@ export class UiRequestRegistry {
         if (this.pending.get(requestType)?.timer === timer) {
           this.pending.delete(requestType);
           reject(
-            Object.assign(
-              new Error(`UI request '${requestType}' timed out after ${timeoutMs}ms`),
-              { _tag: UI_REQUEST_TIMEOUT_TAG }
-            )
+            Object.assign(new Error(`UI request '${requestType}' timed out after ${timeoutMs}ms`), {
+              _tag: UI_REQUEST_TIMEOUT_TAG,
+            })
           );
         }
       }, timeoutMs);

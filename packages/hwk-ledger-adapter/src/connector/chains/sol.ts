@@ -1,8 +1,11 @@
-import { hexToBytes, bytesToHex, EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
+import { bytesToHex, hexToBytes } from '@onekeyfe/hwk-adapter-core';
 import { SignerSolanaBuilder } from '@ledgerhq/device-signer-kit-solana';
 import { ContextModuleBuilder } from '@ledgerhq/context-module';
+
 import { normalizePath } from './utils';
 import { SignerSol } from '../../signer/SignerSol';
+
+import type { EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
 import type { ConnectorContext } from './types';
 
 // ---------------------------------------------------------------------------
@@ -94,7 +97,9 @@ export async function solSignMessage(
 async function _createSolSigner(ctx: ConnectorContext, sessionId: string): Promise<SignerSol> {
   const dmk = await ctx.getOrCreateDmk();
   const contextModule = new ContextModuleBuilder({}).removeDefaultLoaders().build();
-  const sdkSigner = new SignerSolanaBuilder({ dmk, sessionId }).withContextModule(contextModule).build();
+  const sdkSigner = new SignerSolanaBuilder({ dmk, sessionId })
+    .withContextModule(contextModule)
+    .build();
   const signer = new SignerSol(sdkSigner);
 
   // Wire up interaction events (verify-address, sign, etc.)

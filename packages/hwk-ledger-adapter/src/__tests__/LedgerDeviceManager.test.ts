@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DeviceModelId, type DeviceManagementKit } from '@ledgerhq/device-management-kit';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type DeviceManagementKit, DeviceModelId } from '@ledgerhq/device-management-kit';
+
 import { LedgerDeviceManager } from '../device/LedgerDeviceManager';
+
 import type { DmkDiscoveredDevice } from '../types';
 
 function createMockDmk(): DeviceManagementKit & {

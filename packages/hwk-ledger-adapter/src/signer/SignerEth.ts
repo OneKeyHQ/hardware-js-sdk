@@ -1,7 +1,8 @@
-import type { SignerEth as ISdkSignerEth, TypedData } from '@ledgerhq/device-signer-kit-ethereum';
-import type { SignerEvmAddress, SignerEvmSignature } from '../types';
 import { deviceActionToPromise } from './deviceActionToPromise';
 import { debugLog } from '../utils/debugLog';
+
+import type { SignerEth as ISdkSignerEth, TypedData } from '@ledgerhq/device-signer-kit-ethereum';
+import type { SignerEvmAddress, SignerEvmSignature } from '../types';
 
 /** Convert hex string (with or without 0x) to Uint8Array. */
 function hexToBytes(hex: string): Uint8Array {
@@ -23,6 +24,7 @@ const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;
 export class SignerEth {
   onInteraction?: (interaction: string) => void;
 
+  // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _sdk: ISdkSignerEth) {}
 
   async getAddress(

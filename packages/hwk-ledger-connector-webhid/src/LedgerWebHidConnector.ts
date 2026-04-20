@@ -1,6 +1,7 @@
+import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
+
 import type { DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
-import { LedgerConnectorBase } from '@onekeyfe/hwk-ledger-adapter';
 
 // ---------------------------------------------------------------------------
 // Utilities

@@ -1,9 +1,11 @@
-import type { SignerEth as ISdkSignerEth } from '@ledgerhq/device-signer-kit-ethereum';
 import { SignerEthBuilder } from '@ledgerhq/device-signer-kit-ethereum';
 import { ContextModuleBuilder } from '@ledgerhq/context-module';
-import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
+
 import { SignerEth } from './SignerEth';
 import { debugLog } from '../utils/debugLog';
+
+import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
+import type { SignerEth as ISdkSignerEth } from '@ledgerhq/device-signer-kit-ethereum';
 
 type SignerEthBuilderFn = (args: {
   dmk: DeviceManagementKit;
@@ -16,7 +18,9 @@ type SignerEthBuilderFn = (args: {
  */
 export class SignerManager {
   private readonly _cache = new Map<string, SignerEth>();
+
   private readonly _dmk: DeviceManagementKit;
+
   private readonly _builderFn: SignerEthBuilderFn;
 
   constructor(dmk: DeviceManagementKit, builderFn?: SignerEthBuilderFn) {
@@ -48,7 +52,7 @@ export class SignerManager {
   }
 
   private static _defaultBuilder(): SignerEthBuilderFn {
-    return (args) => {
+    return args => {
       const contextModule = new ContextModuleBuilder({}).removeDefaultLoaders().build();
       return new SignerEthBuilder(args).withContextModule(contextModule);
     };

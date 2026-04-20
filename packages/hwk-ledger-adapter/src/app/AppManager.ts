@@ -1,9 +1,9 @@
 import {
+  CloseAppCommand,
+  type DeviceManagementKit,
   GetAppAndVersionCommand,
   OpenAppCommand,
-  CloseAppCommand,
   isSuccessCommandResult,
-  type DeviceManagementKit,
 } from '@ledgerhq/device-management-kit';
 
 /**
@@ -35,7 +35,9 @@ interface AppManagerOptions {
  */
 export class AppManager {
   private readonly _dmk: DeviceManagementKit;
+
   private readonly _waitMs: number;
+
   private readonly _maxRetries: number;
 
   constructor(dmk: DeviceManagementKit, options?: AppManagerOptions) {
@@ -70,7 +72,7 @@ export class AppManager {
   async ensureAppOpen(
     sessionId: string,
     targetAppName: string,
-    onConfirmOnDevice?: () => void,
+    onConfirmOnDevice?: () => void
   ): Promise<void> {
     const currentApp = await this._getCurrentApp(sessionId);
 
@@ -116,11 +118,13 @@ export class AppManager {
       command: new OpenAppCommand({ appName }),
     });
     if (!isSuccessCommandResult(result)) {
-      const statusCode = (result as Record<string, unknown>).statusCode;
-      throw Object.assign(
-        new Error(`Failed to open "${appName}"`),
-        { _tag: 'OpenAppCommandError', errorCode: String(statusCode ?? ''), statusCode, appName },
-      );
+      const { statusCode } = result as Record<string, unknown>;
+      throw Object.assign(new Error(`Failed to open "${appName}"`), {
+        _tag: 'OpenAppCommandError',
+        errorCode: String(statusCode ?? ''),
+        statusCode,
+        appName,
+      });
     }
   }
 

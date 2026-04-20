@@ -1,0 +1,6 @@
+{
+  "rules": {
+    "import/no-unresolved": ["error", { "ignore": ["^@ledgerhq/"] }]
+  },
+  "ignorePatterns": ["tsup.config.ts"]
+}

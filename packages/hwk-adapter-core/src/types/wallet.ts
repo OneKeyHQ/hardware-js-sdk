@@ -7,9 +7,9 @@ import type { ITronMethods } from './chain-tron';
 import type { QrDisplayData, QrResponseData } from './qr';
 import type { ChainForFingerprint } from './fingerprint';
 import type { ActiveJobInfo, Interruptibility } from '../utils/DeviceJobQueue';
+import type { UiResponseEvent } from '../events/ui-request';
 import { DEVICE } from '../events/device';
 import { UI_REQUEST } from '../events/ui-request';
-import type { UiResponseEvent } from '../events/ui-request';
 import { SDK } from '../events/sdk';
 
 export type ChainCapability = 'evm' | 'btc' | 'sol' | 'tron';
@@ -180,7 +180,10 @@ export interface IUiHandler {
 }
 
 export interface IHardwareWallet<TConfig = unknown>
-  extends IEvmMethods, IBtcMethods, ISolMethods, ITronMethods {
+  extends IEvmMethods,
+    IBtcMethods,
+    ISolMethods,
+    ITronMethods {
   readonly vendor: string;
   readonly activeTransport: TransportType | null;
 

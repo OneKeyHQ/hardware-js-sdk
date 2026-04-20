@@ -1,7 +1,7 @@
+import { LedgerWebHidConnector } from './LedgerWebHidConnector';
+
 import type { IConnector } from '@onekeyfe/hwk-adapter-core';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
-
-import { LedgerWebHidConnector } from './LedgerWebHidConnector';
 import type { LedgerWebHidConnectorOptions } from './LedgerWebHidConnector';
 
 export { LedgerWebHidConnector };

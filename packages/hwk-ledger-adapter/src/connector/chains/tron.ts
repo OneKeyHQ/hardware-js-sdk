@@ -1,8 +1,10 @@
 import { EConnectorInteraction, HardwareErrorCode } from '@onekeyfe/hwk-adapter-core';
 import Trx from '@ledgerhq/hw-app-trx';
+
 import { normalizePath } from './utils';
 import { withLegacyAppRetry } from './legacyAppRetry';
 import { DmkTransport } from '../../transport/DmkTransport';
+
 import type { ConnectorContext } from './types';
 
 // ---------------------------------------------------------------------------
@@ -36,7 +38,7 @@ export async function tronGetAddress(
   params: TronGetAddressCallParams
 ): Promise<{ address: string; publicKey: string; path: string }> {
   const path = normalizePath(params.path);
-  return withLegacyAppRetry(ctx, sessionId, 'Tron', async (sid) => {
+  return withLegacyAppRetry(ctx, sessionId, 'Tron', async sid => {
     const trx = await _createTrx(ctx, sid);
     if (params.showOnDevice) {
       ctx.emit('ui-event', {
@@ -66,7 +68,7 @@ export async function tronSignTransaction(
   }
 
   const path = normalizePath(params.path);
-  return withLegacyAppRetry(ctx, sessionId, 'Tron', async (sid) => {
+  return withLegacyAppRetry(ctx, sessionId, 'Tron', async sid => {
     const trx = await _createTrx(ctx, sid);
     ctx.emit('ui-event', {
       type: EConnectorInteraction.ConfirmOnDevice,
@@ -87,7 +89,7 @@ export async function tronSignMessage(
   params: TronSignMessageCallParams
 ): Promise<{ signature: string }> {
   const path = normalizePath(params.path);
-  return withLegacyAppRetry(ctx, sessionId, 'Tron', async (sid) => {
+  return withLegacyAppRetry(ctx, sessionId, 'Tron', async sid => {
     const trx = await _createTrx(ctx, sid);
     ctx.emit('ui-event', {
       type: EConnectorInteraction.ConfirmOnDevice,

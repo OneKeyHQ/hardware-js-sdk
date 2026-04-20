@@ -1,13 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HardwareErrorCode, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hwk-adapter-core';
-import type {
-  IConnector,
-  ConnectorDevice,
-  ConnectorSession,
-  ConnectorEventType,
-  ConnectorEventMap,
-} from '@onekeyfe/hwk-adapter-core';
+
 import { LedgerAdapter } from '../adapter/LedgerAdapter';
+
+import type {
+  ConnectorDevice,
+  ConnectorEventMap,
+  ConnectorEventType,
+  ConnectorSession,
+  IConnector,
+} from '@onekeyfe/hwk-adapter-core';
 
 function createMockConnector(): IConnector & {
   _handlers: Map<string, Set<(...args: unknown[]) => void>>;
@@ -181,7 +183,7 @@ describe('LedgerAdapter', () => {
   describe('evmSignMessage', () => {
     it('should return signature on success', async () => {
       connector.call.mockResolvedValueOnce({
-        signature: '0x' + 'aabb'.padStart(64, '0') + 'ccdd'.padStart(64, '0') + '1c',
+        signature: `0x${'aabb'.padStart(64, '0')}${'ccdd'.padStart(64, '0')}1c`,
       });
 
       await adapter.connectDevice('dev-1');
@@ -199,7 +201,7 @@ describe('LedgerAdapter', () => {
   describe('evmSignTypedData', () => {
     it('should return signature on success with full mode', async () => {
       connector.call.mockResolvedValueOnce({
-        signature: '0x' + 'aabb'.padStart(64, '0') + 'ccdd'.padStart(64, '0') + '1c',
+        signature: `0x${'aabb'.padStart(64, '0')}${'ccdd'.padStart(64, '0')}1c`,
       });
 
       await adapter.connectDevice('dev-1');

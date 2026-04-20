@@ -1,7 +1,8 @@
-import type { DeviceDescriptor, DeviceChangeEvent } from '@onekeyfe/hwk-adapter-core';
+import { debugError, debugLog } from '../utils/debugLog';
+
+import type { DeviceChangeEvent, DeviceDescriptor } from '@onekeyfe/hwk-adapter-core';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type { DmkDiscoveredDevice } from '../types';
-import { debugLog, debugError } from '../utils/debugLog';
 
 /**
  * Manages device discovery, connection, and session tracking.
@@ -9,9 +10,13 @@ import { debugLog, debugError } from '../utils/debugLog';
  */
 export class LedgerDeviceManager {
   private readonly _dmk: DeviceManagementKit;
+
   private readonly _discovered = new Map<string, DmkDiscoveredDevice>();
+
   private readonly _sessions = new Map<string, string>(); // deviceId → sessionId
+
   private readonly _sessionToDevice = new Map<string, string>(); // sessionId → deviceId
+
   private _listenSub: { unsubscribe: () => void } | null = null;
 
   constructor(dmk: DeviceManagementKit) {

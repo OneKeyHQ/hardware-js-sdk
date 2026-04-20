@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { DEVICE_EVENT, DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE, SDK } from '../index';
+import { describe, expect, it } from 'vitest';
+
+import { DEVICE, DEVICE_EVENT, SDK, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '../index';
 
 describe('event constants', () => {
   it('should export DEVICE_EVENT string', () => {

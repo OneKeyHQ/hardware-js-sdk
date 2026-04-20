@@ -1,59 +1,68 @@
-import type {
-  IHardwareWallet,
-  IUiHandler,
-  IConnector,
-  ConnectorDevice,
-  DeviceInfo,
-  HardwareEvent,
-  HardwareEventMap,
-  DeviceEventListener,
-  TransportType,
-  ConnectionType,
-  Response,
-  ChainCapability,
-  ChainForFingerprint,
-  EvmGetAddressParams,
-  EvmAddress,
-  EvmSignTxParams,
-  EvmSignedTx,
-  EvmSignMsgParams,
-  EvmSignTypedDataParams,
-  EvmSignature,
-  ProgressCallback,
-  BtcGetAddressParams,
-  BtcAddress,
-  BtcGetPublicKeyParams,
-  BtcPublicKey,
-  BtcSignTxParams,
-  BtcSignedTx,
-  BtcSignPsbtParams,
-  BtcSignedPsbt,
-  BtcSignMsgParams,
-  BtcSignature,
-  SolGetAddressParams,
-  SolAddress,
-  SolSignTxParams,
-  SolSignedTx,
-  SolSignMsgParams,
-  SolSignature,
-  TronGetAddressParams,
-  TronAddress,
-  TronSignTxParams,
-  TronSignedTx,
-  TronSignMsgParams,
-  TronSignature,
-  UiResponseEvent,
-} from '@onekeyfe/hwk-adapter-core';
 import {
-  success,
-  failure,
+  CHAIN_FINGERPRINT_PATHS,
+  DEVICE,
   HardwareErrorCode,
   TypedEventEmitter,
-  UiRequestRegistry,
-  DEVICE,
   UI_REQUEST,
-  CHAIN_FINGERPRINT_PATHS,
+  UiRequestRegistry,
   deriveDeviceFingerprint,
+  failure,
+  success,
+} from '@onekeyfe/hwk-adapter-core';
+
+import {
+  isDeviceDisconnectedError,
+  isDeviceLockedError,
+  isTimeoutError,
+  mapLedgerError,
+} from '../errors';
+import { debugError, debugLog } from '../utils/debugLog';
+
+import type {
+  BtcAddress,
+  BtcGetAddressParams,
+  BtcGetPublicKeyParams,
+  BtcPublicKey,
+  BtcSignMsgParams,
+  BtcSignPsbtParams,
+  BtcSignTxParams,
+  BtcSignature,
+  BtcSignedPsbt,
+  BtcSignedTx,
+  ChainCapability,
+  ChainForFingerprint,
+  ConnectionType,
+  ConnectorDevice,
+  DeviceEventListener,
+  DeviceInfo,
+  EvmAddress,
+  EvmGetAddressParams,
+  EvmSignMsgParams,
+  EvmSignTxParams,
+  EvmSignTypedDataParams,
+  EvmSignature,
+  EvmSignedTx,
+  HardwareEvent,
+  HardwareEventMap,
+  IConnector,
+  IHardwareWallet,
+  IUiHandler,
+  ProgressCallback,
+  Response,
+  SolAddress,
+  SolGetAddressParams,
+  SolSignMsgParams,
+  SolSignTxParams,
+  SolSignature,
+  SolSignedTx,
+  TransportType,
+  TronAddress,
+  TronGetAddressParams,
+  TronSignMsgParams,
+  TronSignTxParams,
+  TronSignature,
+  TronSignedTx,
+  UiResponseEvent,
 } from '@onekeyfe/hwk-adapter-core';
 
 export interface LedgerAdapterOptions {
@@ -64,8 +73,6 @@ export interface LedgerAdapterOptions {
    */
   handleSelectDevice?: boolean;
 }
-import { mapLedgerError, isDeviceDisconnectedError, isDeviceLockedError, isTimeoutError } from '../errors';
-import { debugLog, debugError } from '../utils/debugLog';
 
 /**
  * Result of `_verifyDeviceFingerprint`.
@@ -101,6 +108,7 @@ export class LedgerAdapter implements IHardwareWallet {
   readonly vendor = 'ledger' as const;
 
   private readonly connector: IConnector;
+
   private readonly emitter = new TypedEventEmitter<HardwareEventMap>();
 
   private _uiHandler: Partial<IUiHandler> | null = null;
@@ -487,7 +495,9 @@ export class LedgerAdapter implements IHardwareWallet {
     event: K,
     listener: (event: HardwareEventMap[K]) => void
   ): void;
+
   on(event: string, listener: DeviceEventListener): void;
+
   on(event: string, listener: (event: HardwareEvent) => void): void {
     this.emitter.on(event, listener);
   }
@@ -496,7 +506,9 @@ export class LedgerAdapter implements IHardwareWallet {
     event: K,
     listener: (event: HardwareEventMap[K]) => void
   ): void;
+
   off(event: string, listener: DeviceEventListener): void;
+
   off(event: string, listener: (event: HardwareEvent) => void): void {
     this.emitter.off(event, listener);
   }
@@ -524,7 +536,9 @@ export class LedgerAdapter implements IHardwareWallet {
       this._sessions.size
     );
     await this._ensureDevicePermission(connectId, deviceId);
-    debugLog('[LedgerAdapter] getChainFingerprint permission ok, calling _deriveAddressForFingerprint');
+    debugLog(
+      '[LedgerAdapter] getChainFingerprint permission ok, calling _deriveAddressForFingerprint'
+    );
     try {
       const address = await this._deriveAddressForFingerprint(connectId, chain);
       debugLog('[LedgerAdapter] getChainFingerprint address:', address?.substring(0, 20));
@@ -565,43 +579,6 @@ export class LedgerAdapter implements IHardwareWallet {
       ) {
         return { success: true };
       }
-      throw err;
-    }
-  }
-
-  /**
-   * Verify that the connected device matches the expected fingerprint.
-   * Uses connectorCall internally — for public API (getChainFingerprint) only.
-   *
-   * - If deviceId is empty, verification is skipped (returns { success: true }).
-   * - deviceId is used here as the stored fingerprint to compare against.
-   * - On mismatch, returns both expected and actual fingerprints so the caller
-   *   can surface an informative error (e.g. for logs / bug reports).
-   */
-  private async _verifyDeviceFingerprint(
-    connectId: string,
-    deviceId: string,
-    chain: ChainForFingerprint
-  ): Promise<IFingerprintVerifyResult> {
-    if (!deviceId) return { success: true };
-
-    try {
-      const address = await this._deriveAddressForFingerprint(connectId, chain);
-      const fingerprint = deriveDeviceFingerprint(address);
-      if (fingerprint === deviceId) {
-        return { success: true };
-      }
-      return { success: false, expected: deviceId, actual: fingerprint };
-    } catch (err) {
-      // "App not open" or "wrong app" errors are expected — skip verification
-      const mapped = mapLedgerError(err);
-      if (
-        mapped.code === HardwareErrorCode.WrongApp ||
-        mapped.code === HardwareErrorCode.DeviceLocked
-      ) {
-        return { success: true };
-      }
-      // Transport/disconnect errors should propagate
       throw err;
     }
   }
@@ -744,7 +721,9 @@ export class LedgerAdapter implements IHardwareWallet {
 
     // 2. Any existing session (Ledger IDs are temporary, any session is fine)
     if (this._sessions.size > 0) {
-      return this._sessions.keys().next().value!;
+      // size > 0 guarantees .next().value is defined
+      const firstKey = this._sessions.keys().next().value as string;
+      return firstKey;
     }
 
     // 3. No session — use mutex to prevent concurrent connection attempts
@@ -785,9 +764,7 @@ export class LedgerAdapter implements IHardwareWallet {
 
   private async _connectFirstOrSelect(devices: DeviceInfo[]): Promise<string> {
     const chosenConnectId =
-      devices.length === 1
-        ? devices[0].connectId
-        : await this._chooseDeviceFromList(devices);
+      devices.length === 1 ? devices[0].connectId : await this._chooseDeviceFromList(devices);
 
     const result = await this.connectDevice(chosenConnectId);
     if (!result.success) {
@@ -818,9 +795,7 @@ export class LedgerAdapter implements IHardwareWallet {
     const chosen = devices.find(d => d.connectId === response?.sdkConnectId);
     if (!chosen) {
       throw Object.assign(
-        new Error(
-          `Selected sdkConnectId '${response?.sdkConnectId}' not in discovered list`
-        ),
+        new Error(`Selected sdkConnectId '${response?.sdkConnectId}' not in discovered list`),
         { _tag: 'DeviceNotRecognizedError' }
       );
     }
@@ -870,10 +845,9 @@ export class LedgerAdapter implements IHardwareWallet {
         fingerprint.chain
       );
       if (!fp.success) {
-        throw Object.assign(
-          new Error(formatDeviceMismatchError(fp.expected, fp.actual)),
-          { code: HardwareErrorCode.DeviceMismatch }
-        );
+        throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
+          code: HardwareErrorCode.DeviceMismatch,
+        });
       }
     }
 
@@ -912,7 +886,7 @@ export class LedgerAdapter implements IHardwareWallet {
     resolvedConnectId: string,
     method: string,
     params: unknown,
-    originalErr: unknown,
+    originalErr: unknown
   ): Promise<unknown> {
     this._sessions.delete(resolvedConnectId);
     const retryConnectId = await this.ensureConnected();
@@ -1071,11 +1045,11 @@ export class LedgerAdapter implements IHardwareWallet {
   private extractDeviceInfoFromPayload(payload: Record<string, unknown>): DeviceInfo {
     return {
       vendor: 'ledger',
-      model: (payload['model'] as string) ?? 'unknown',
+      model: (payload.model as string) ?? 'unknown',
       firmwareVersion: '',
-      deviceId: (payload['deviceId'] as string) ?? (payload['id'] as string) ?? '',
-      connectId: (payload['connectId'] as string) ?? (payload['path'] as string) ?? '',
-      label: payload['label'] as string,
+      deviceId: (payload.deviceId as string) ?? (payload.id as string) ?? '',
+      connectId: (payload.connectId as string) ?? (payload.path as string) ?? '',
+      label: payload.label as string,
       connectionType: 'usb' as ConnectionType,
     };
   }

@@ -1,4 +1,4 @@
-import type { ConnectorEventType, ConnectorEventMap } from '@onekeyfe/hwk-adapter-core';
+import type { ConnectorEventMap, ConnectorEventType } from '@onekeyfe/hwk-adapter-core';
 import type { DeviceManagementKit } from '@ledgerhq/device-management-kit';
 import type { SignerManager } from '../../signer/SignerManager';
 import type { LedgerDeviceManager } from '../../device/LedgerDeviceManager';

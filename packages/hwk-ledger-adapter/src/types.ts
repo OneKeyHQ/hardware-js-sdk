@@ -1,10 +1,13 @@
 import type {
   DeviceManagementKit,
   DiscoveredDevice,
-  ExecuteDeviceActionReturnType,
   DeviceActionState as DmkDeviceActionState,
+  ExecuteDeviceActionReturnType,
 } from '@ledgerhq/device-management-kit';
-import type { Address as EthAddress, Signature as EthSignature } from '@ledgerhq/device-signer-kit-ethereum';
+import type {
+  Address as EthAddress,
+  Signature as EthSignature,
+} from '@ledgerhq/device-signer-kit-ethereum';
 
 /**
  * Re-export DMK types under local aliases for backward compatibility.

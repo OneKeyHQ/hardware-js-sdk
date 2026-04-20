@@ -8,6 +8,7 @@
  */
 
 import { UI_REQUEST } from '../events/ui-request';
+
 import type { UiRequestRegistry } from './UiRequestRegistry';
 
 export type Interruptibility = 'none' | 'safe' | 'confirm';
@@ -46,7 +47,9 @@ export interface DeviceJobQueueDeps {
 
 export class DeviceJobQueue {
   private readonly _queues = new Map<string, Promise<unknown>>();
+
   private readonly _active = new Map<string, ActiveJob>();
+
   private readonly _deps: DeviceJobQueueDeps | null;
 
   constructor(deps?: DeviceJobQueueDeps) {

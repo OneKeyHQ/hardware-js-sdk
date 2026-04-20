@@ -1,9 +1,12 @@
-import { stripHex, padHex64, HardwareErrorCode, EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
-import type { TypedData } from '@ledgerhq/device-signer-kit-ethereum';
+import { HardwareErrorCode, padHex64, stripHex } from '@onekeyfe/hwk-adapter-core';
+
 import { normalizePath } from './utils';
+import { debugLog } from '../../utils/debugLog';
+
+import type { EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
+import type { TypedData } from '@ledgerhq/device-signer-kit-ethereum';
 import type { SignerEvmSignature } from '../../types';
 import type { ConnectorContext } from './types';
-import { debugLog } from '../../utils/debugLog';
 
 // ---------------------------------------------------------------------------
 // Call param types

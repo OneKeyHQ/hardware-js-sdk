@@ -1,14 +1,11 @@
-import {
-  stripHex,
-  hexToBytes,
-  bytesToHex,
-  HardwareErrorCode,
-  EConnectorInteraction,
-} from '@onekeyfe/hwk-adapter-core';
+import { HardwareErrorCode, bytesToHex, hexToBytes, stripHex } from '@onekeyfe/hwk-adapter-core';
+
 import { normalizePath } from './utils';
 import { SignerBtc } from '../../signer/SignerBtc';
+import { debugError, debugLog } from '../../utils/debugLog';
+
+import type { EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
 import type { ConnectorContext } from './types';
-import { debugLog, debugError } from '../../utils/debugLog';
 
 // ---------------------------------------------------------------------------
 // Call param types
@@ -113,7 +110,7 @@ export async function btcGetAddress(
     const { DefaultWallet, DefaultDescriptorTemplate } = await ctx.importLedgerKit(
       '@ledgerhq/device-signer-kit-bitcoin'
     );
-    const purpose = path.split('/')[0]?.replace("'", '');
+    const purpose = path.split('/')[0]?.replaceAll("'", '');
     let template = DefaultDescriptorTemplate.NATIVE_SEGWIT;
     if (purpose === '44') template = DefaultDescriptorTemplate.LEGACY;
     else if (purpose === '49') template = DefaultDescriptorTemplate.NESTED_SEGWIT;
@@ -153,7 +150,7 @@ export async function btcGetPublicKey(
     const xpub = await btcSigner.getExtendedPublicKey(path, {
       checkOnDevice: params.showOnDevice ?? false,
     });
-    debugLog('[LedgerConnector] btcGetPublicKey success, xpub:', xpub?.substring(0, 20) + '...');
+    debugLog('[LedgerConnector] btcGetPublicKey success, xpub:', `${xpub?.substring(0, 20)}...`);
     return { xpub, path: params.path };
   } catch (err) {
     debugError('[LedgerConnector] btcGetPublicKey error, path:', path, 'err:', err);
@@ -183,7 +180,7 @@ export async function btcSignTransaction(
 
     // Determine wallet template from the account-level derivation path
     const path = normalizePath(params.path || "84'/0'/0'");
-    const purpose = path.split('/')[0]?.replace("'", '');
+    const purpose = path.split('/')[0]?.replaceAll("'", '');
     let template = DefaultDescriptorTemplate.NATIVE_SEGWIT;
     if (purpose === '44') template = DefaultDescriptorTemplate.LEGACY;
     else if (purpose === '49') template = DefaultDescriptorTemplate.NESTED_SEGWIT;
@@ -193,7 +190,7 @@ export async function btcSignTransaction(
 
     // Enrich PSBT with Taproot fields if needed (Ledger BTC App requires
     // tapInternalKey + tapBip32Derivation for Taproot inputs).
-    let psbtToSign = params.psbt!;
+    let psbtToSign = params.psbt;
     if (purpose === '86' && params.inputDerivations?.length) {
       psbtToSign = await _enrichTaprootPsbt(btcSigner, psbtToSign, params.inputDerivations);
     }
@@ -214,10 +211,9 @@ export async function btcSignPsbt(
   params: BtcSignPsbtCallParams
 ): Promise<{ signedPsbt: string }> {
   if (!params.psbt) {
-    throw Object.assign(
-      new Error('btcSignPsbt requires params.psbt'),
-      { code: HardwareErrorCode.InvalidParams }
-    );
+    throw Object.assign(new Error('btcSignPsbt requires params.psbt'), {
+      code: HardwareErrorCode.InvalidParams,
+    });
   }
 
   const btcSigner = await _createBtcSigner(ctx, sessionId);
@@ -228,7 +224,7 @@ export async function btcSignPsbt(
     );
 
     const path = normalizePath(params.path || "84'/0'/0'");
-    const purpose = path.split('/')[0]?.replace("'", '');
+    const purpose = path.split('/')[0]?.replaceAll("'", '');
     let template = DefaultDescriptorTemplate.NATIVE_SEGWIT;
     if (purpose === '44') template = DefaultDescriptorTemplate.LEGACY;
     else if (purpose === '49') template = DefaultDescriptorTemplate.NESTED_SEGWIT;
@@ -236,7 +232,7 @@ export async function btcSignPsbt(
 
     const wallet = new DefaultWallet(path, template);
 
-    const signatures = await btcSigner.signPsbt(wallet, params.psbt) as Array<{
+    const signatures = (await btcSigner.signPsbt(wallet, params.psbt)) as Array<{
       inputIndex: number;
       pubkey: Uint8Array;
       signature: Uint8Array;

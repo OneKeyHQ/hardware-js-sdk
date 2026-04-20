@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { success, failure, HardwareErrorCode } from '../index';
+import { describe, expect, it } from 'vitest';
+
+import { HardwareErrorCode, failure, success } from '../index';
+
 import type { Response } from '../index';
 
 describe('response helpers', () => {

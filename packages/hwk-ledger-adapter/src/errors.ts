@@ -43,11 +43,11 @@ function getEthAppErrorCode(err: unknown): string | null {
   if (!err || typeof err !== 'object') return null;
   const e = err as Record<string, unknown>;
   if (e._tag === 'EthAppCommandError' && typeof e.errorCode === 'string') {
-    return (e.errorCode as string).toLowerCase();
+    return e.errorCode.toLowerCase();
   }
   const orig = e.originalError as Record<string, unknown> | undefined;
   if (orig?._tag === 'EthAppCommandError' && typeof orig.errorCode === 'string') {
-    return (orig.errorCode as string).toLowerCase();
+    return orig.errorCode.toLowerCase();
   }
   return null;
 }
@@ -57,10 +57,7 @@ function getEthAppErrorCode(err: unknown): string | null {
  * `lastStep` (attached by `deviceActionToPromise`) is used only to refine
  * ambiguous codes like 0x6a80.
  */
-function mapEthAppError(
-  ethCode: string,
-  lastStep: string | undefined
-): HardwareErrorCode | null {
+function mapEthAppError(ethCode: string, lastStep: string | undefined): HardwareErrorCode | null {
   switch (ethCode) {
     case '6a80':
       // "Invalid data". If DMK had just fallen back to blind signing, the
@@ -124,11 +121,11 @@ export function isWrongAppError(err: unknown): boolean {
   if (e._tag === 'WrongAppOpenedError' || e._tag === 'InvalidStatusWordError') {
     if (hasStatusCode(err, WRONG_APP_CODES)) return true;
   }
-  if (
-    typeof e.message === 'string' &&
-    /wrong app|open the .* app|CLA not supported/i.test(e.message)
-  )
-    return true;
+  if (typeof e.message === 'string') {
+    const msg = e.message.toLowerCase();
+    if (msg.includes('wrong app') || msg.includes('open the') || msg.includes('cla not supported'))
+      return true;
+  }
   if (hasStatusCode(err, WRONG_APP_CODES)) return true;
   return false;
 }
@@ -148,13 +145,16 @@ export function isDeviceDisconnectedError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as Record<string, unknown>;
   if (e._tag === 'DeviceNotRecognizedError' || e._tag === 'DeviceSessionNotFound') return true;
-  if (
-    typeof e.message === 'string' &&
-    /disconnected|not found|no device|unplugged|session.*not.*found|timed out.*locked/i.test(
-      e.message
+  if (typeof e.message === 'string') {
+    const msg = e.message.toLowerCase();
+    if (
+      msg.includes('disconnected') ||
+      msg.includes('not found') ||
+      msg.includes('no device') ||
+      msg.includes('unplugged')
     )
-  )
-    return true;
+      return true;
+  }
   return false;
 }
 
@@ -181,7 +181,11 @@ export function isTimeoutError(err: unknown): boolean {
  * Map a Ledger DMK error to a HardwareErrorCode and human-readable message
  * with actionable recovery information for the caller.
  */
-export function mapLedgerError(err: unknown): { code: HardwareErrorCode; message: string; appName?: string } {
+export function mapLedgerError(err: unknown): {
+  code: HardwareErrorCode;
+  message: string;
+  appName?: string;
+} {
   // Order matters: check more specific errors first
 
   // Extract the original message for fallback / enrichment
@@ -221,9 +225,10 @@ export function mapLedgerError(err: unknown): { code: HardwareErrorCode; message
     code = mapped ?? HardwareErrorCode.UnknownError;
   }
 
-  const appName = (err && typeof err === 'object')
-    ? (err as Record<string, unknown>).appName as string | undefined
-    : undefined;
+  const appName =
+    err && typeof err === 'object'
+      ? ((err as Record<string, unknown>).appName as string | undefined)
+      : undefined;
 
   return { code, message: enrichErrorMessage(code, originalMessage), appName };
 }

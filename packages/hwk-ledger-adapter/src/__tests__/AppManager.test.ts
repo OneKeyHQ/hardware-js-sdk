@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  GetAppAndVersionCommand,
-  OpenAppCommand,
   CloseAppCommand,
   CommandResultFactory,
+  GetAppAndVersionCommand,
+  OpenAppCommand,
 } from '@ledgerhq/device-management-kit';
+
 import { AppManager } from '../app/AppManager';
 
 function createMockDmk() {
@@ -77,7 +78,7 @@ describe('AppManager', () => {
 
   describe('ensureAppOpen', () => {
     it('returns immediately if correct app is already open', async () => {
-      (dmk.sendCommand as ReturnType<typeof vi.fn>).mockResolvedValue(appResult('Ethereum'));
+      dmk.sendCommand.mockResolvedValue(appResult('Ethereum'));
 
       await appManager.ensureAppOpen('session-1', 'Ethereum');
 
@@ -87,24 +88,22 @@ describe('AppManager', () => {
 
     it('opens the target app if a different app is running', async () => {
       let getAppCallCount = 0;
-      (dmk.sendCommand as ReturnType<typeof vi.fn>).mockImplementation(
-        async (params: { command: unknown }) => {
-          if (params.command instanceof GetAppAndVersionCommand) {
-            getAppCallCount++;
-            // First call: wrong app, second call: dashboard, third call: target app
-            if (getAppCallCount === 1) return appResult('Bitcoin');
-            if (getAppCallCount === 2) return appResult('BOLOS');
-            return appResult('Ethereum');
-          }
-          // close-app and open-app return void result
-          return voidResult();
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          getAppCallCount++;
+          // First call: wrong app, second call: dashboard, third call: target app
+          if (getAppCallCount === 1) return appResult('Bitcoin');
+          if (getAppCallCount === 2) return appResult('BOLOS');
+          return appResult('Ethereum');
         }
-      );
+        // close-app and open-app return void result
+        return voidResult();
+      });
 
       await appManager.ensureAppOpen('session-1', 'Ethereum');
 
       // Should have called: getCurrentApp, closeApp, getCurrentApp (dashboard), openApp, getCurrentApp (Ethereum)
-      const calls = (dmk.sendCommand as ReturnType<typeof vi.fn>).mock.calls;
+      const { calls } = dmk.sendCommand.mock;
       const closeAppCall = calls.find((call: any[]) => call[0].command instanceof CloseAppCommand);
       expect(closeAppCall).toBeDefined();
 
@@ -114,21 +113,19 @@ describe('AppManager', () => {
 
     it('opens the target app directly from dashboard', async () => {
       let getAppCallCount = 0;
-      (dmk.sendCommand as ReturnType<typeof vi.fn>).mockImplementation(
-        async (params: { command: unknown }) => {
-          if (params.command instanceof GetAppAndVersionCommand) {
-            getAppCallCount++;
-            if (getAppCallCount === 1) return appResult('BOLOS');
-            return appResult('Ethereum');
-          }
-          return voidResult();
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          getAppCallCount++;
+          if (getAppCallCount === 1) return appResult('BOLOS');
+          return appResult('Ethereum');
         }
-      );
+        return voidResult();
+      });
 
       await appManager.ensureAppOpen('session-1', 'Ethereum');
 
       // Should NOT have called close-app since we're on dashboard
-      const calls = (dmk.sendCommand as ReturnType<typeof vi.fn>).mock.calls;
+      const { calls } = dmk.sendCommand.mock;
       const closeAppCalls = calls.filter(
         (call: any[]) => call[0].command instanceof CloseAppCommand
       );
@@ -139,14 +136,12 @@ describe('AppManager', () => {
     });
 
     it('throws if the target app fails to open after max retries', async () => {
-      (dmk.sendCommand as ReturnType<typeof vi.fn>).mockImplementation(
-        async (params: { command: unknown }) => {
-          if (params.command instanceof GetAppAndVersionCommand) {
-            return appResult('BOLOS');
-          }
-          return voidResult();
+      dmk.sendCommand.mockImplementation(async (params: { command: unknown }) => {
+        if (params.command instanceof GetAppAndVersionCommand) {
+          return appResult('BOLOS');
         }
-      );
+        return voidResult();
+      });
 
       await expect(appManager.ensureAppOpen('session-1', 'Ethereum')).rejects.toThrow(
         /failed to open/i

@@ -119,10 +119,7 @@ export interface IHardwareBridge {
  * Use this anywhere the actual hardware lives behind a process / context boundary
  * (Electron main, extension background, native module, worker, iframe).
  */
-export function createBridgedConnector(
-  vendor: VendorType,
-  bridge: IHardwareBridge
-): IConnector {
+export function createBridgedConnector(vendor: VendorType, bridge: IHardwareBridge): IConnector {
   // Map from typed IConnector handlers to the bridge handler so we can
   // unregister them correctly via off().
   const handlerMap = new Map<
