@@ -31,6 +31,7 @@ import type {
   ConnectorSession,
   DeviceDescriptor,
   IConnector,
+  TronSignMsgParams,
   UiResponseEvent,
 } from '@onekeyfe/hwk-adapter-core';
 import type {
@@ -391,8 +392,17 @@ export class LedgerConnectorBase implements IConnector {
         return tronGetAddress(this._ctx, sessionId, params as TronGetAddressCallParams);
       case 'tronSignTransaction':
         return tronSignTransaction(this._ctx, sessionId, params as TronSignTransactionCallParams);
-      case 'tronSignMessage':
-        return tronSignMessage(this._ctx, sessionId, params as TronSignMessageCallParams);
+      case 'tronSignMessage': {
+        // Explicit public→internal mapping so a field-name drift fails at
+        // compile time, not silently at runtime (see bug: public `messageHex`
+        // vs internal `messageHex` field name enforcement).
+        const p = params as TronSignMsgParams;
+        const internalParams: TronSignMessageCallParams = {
+          path: p.path,
+          messageHex: p.messageHex,
+        };
+        return tronSignMessage(this._ctx, sessionId, internalParams);
+      }
       default:
         throw new Error(`LedgerConnector: unknown method "${method}"`);
     }

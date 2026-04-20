@@ -26,7 +26,7 @@ export interface TronSignedTx {
 export interface TronSignMsgParams {
   path: string;
   /** Message hex (no 0x prefix) */
-  message: string;
+  messageHex: string;
 }
 
 export interface TronSignature {
