@@ -1,10 +1,9 @@
 import { HardwareErrorCode, bytesToHex, hexToBytes, stripHex } from '@onekeyfe/hwk-adapter-core';
 
-import { normalizePath } from './utils';
+import { collapseSignerInteraction, normalizePath } from './utils';
 import { SignerBtc } from '../../signer/SignerBtc';
 import { debugError, debugLog } from '../../utils/debugLog';
 
-import type { EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
 import type { ConnectorContext } from './types';
 
 // ---------------------------------------------------------------------------
@@ -305,9 +304,11 @@ async function _createBtcSigner(ctx: ConnectorContext, sessionId: string): Promi
   const signer = new SignerBtc(sdkSigner);
 
   // Wire up interaction events (open-app, unlock, sign, etc.)
+  // DMK-specific values (sign-transaction, sign-personal-message,
+  // verify-address) collapse to ConfirmOnDevice via the helper.
   signer.onInteraction = (interaction: string) => {
     ctx.emit('ui-event', {
-      type: interaction as EConnectorInteraction,
+      type: collapseSignerInteraction(interaction),
       payload: { sessionId },
     });
   };

@@ -1,9 +1,8 @@
 import { HardwareErrorCode, padHex64, stripHex } from '@onekeyfe/hwk-adapter-core';
 
-import { normalizePath } from './utils';
+import { collapseSignerInteraction, normalizePath } from './utils';
 import { debugLog } from '../../utils/debugLog';
 
-import type { EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
 import type { TypedData } from '@ledgerhq/device-signer-kit-ethereum';
 import type { SignerEvmSignature } from '../../types';
 import type { ConnectorContext } from './types';
@@ -145,9 +144,11 @@ async function _getEthSigner(ctx: ConnectorContext, sessionId: string) {
   const signer = await signerManager.getOrCreate(sessionId);
 
   // Wire up interaction events (open-app, unlock, verify-address, sign, etc.)
+  // DMK-specific values (verify-address, sign-transaction, sign-typed-data,
+  // sign-personal-message) collapse to ConfirmOnDevice via the helper.
   signer.onInteraction = (interaction: string) => {
     ctx.emit('ui-event', {
-      type: interaction as EConnectorInteraction,
+      type: collapseSignerInteraction(interaction),
       payload: { sessionId },
     });
   };

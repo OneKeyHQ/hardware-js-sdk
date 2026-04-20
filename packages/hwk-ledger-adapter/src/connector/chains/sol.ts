@@ -2,10 +2,9 @@ import { bytesToHex, hexToBytes } from '@onekeyfe/hwk-adapter-core';
 import { SignerSolanaBuilder } from '@ledgerhq/device-signer-kit-solana';
 import { ContextModuleBuilder } from '@ledgerhq/context-module';
 
-import { normalizePath } from './utils';
+import { collapseSignerInteraction, normalizePath } from './utils';
 import { SignerSol } from '../../signer/SignerSol';
 
-import type { EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
 import type { ConnectorContext } from './types';
 
 // ---------------------------------------------------------------------------
@@ -103,9 +102,11 @@ async function _createSolSigner(ctx: ConnectorContext, sessionId: string): Promi
   const signer = new SignerSol(sdkSigner);
 
   // Wire up interaction events (verify-address, sign, etc.)
+  // DMK-specific values (verify-address, sign-transaction, sign-personal-message)
+  // collapse to ConfirmOnDevice via the helper.
   signer.onInteraction = (interaction: string) => {
     ctx.emit('ui-event', {
-      type: interaction as EConnectorInteraction,
+      type: collapseSignerInteraction(interaction),
       payload: { sessionId },
     });
   };
