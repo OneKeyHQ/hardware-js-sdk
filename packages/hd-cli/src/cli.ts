@@ -2,6 +2,11 @@ import { Command } from 'commander';
 
 import { createSDK, disposeSDK } from './sdk';
 import {
+  clearSessionFromKeychain,
+  preloadSessionFromKeychain,
+  saveSessionToKeychain,
+} from './session';
+import {
   resolveBatchGetAddress,
   resolveGetAddress,
   resolveGetPublicKey,
@@ -688,7 +693,6 @@ sessionCmd
 
       // 6. Save to keychain
       if (passphraseState && deviceId && sessionId) {
-        const { saveSessionToKeychain } = await import('./session');
         await saveSessionToKeychain(deviceId, passphraseState, sessionId);
       }
 
@@ -714,7 +718,6 @@ sessionCmd
         (searchResult?.payload as any)?.[0];
       const deviceId = device?.features?.device_id || device?.deviceId;
       if (deviceId) {
-        const { clearSessionFromKeychain } = await import('./session');
         await clearSessionFromKeychain(deviceId);
       }
       outputResult(globalOpts, {
@@ -900,7 +903,6 @@ async function prepareSession(
   // Only attempt if device was already unlocked — locking invalidates
   // all passphrase sessions, so cached session_id is useless after unlock.
   if (!wasLocked && deviceId) {
-    const { preloadSessionFromKeychain } = await import('./session');
     const cached = await preloadSessionFromKeychain(deviceId);
     if (cached) {
       globalOpts.passphraseState = cached;
@@ -925,7 +927,6 @@ async function prepareSession(
       const featAfter = await sdk.getFeatures(connectId);
       const sessionId = featAfter?.success ? featAfter.payload?.session_id : undefined;
       if (sessionId) {
-        const { saveSessionToKeychain, preloadSessionFromKeychain } = await import('./session');
         await saveSessionToKeychain(deviceId, passphraseState, sessionId);
         await preloadSessionFromKeychain(deviceId);
       }
