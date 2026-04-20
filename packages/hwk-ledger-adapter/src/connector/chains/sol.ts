@@ -1,0 +1,109 @@
+import { hexToBytes, bytesToHex, EConnectorInteraction } from '@onekeyfe/hwk-adapter-core';
+import { SignerSolanaBuilder } from '@ledgerhq/device-signer-kit-solana';
+import { ContextModuleBuilder } from '@ledgerhq/context-module';
+import { normalizePath } from './utils';
+import { SignerSol } from '../../signer/SignerSol';
+import type { ConnectorContext } from './types';
+
+// ---------------------------------------------------------------------------
+// Call param types
+// ---------------------------------------------------------------------------
+
+export interface SolGetAddressCallParams {
+  path: string;
+  showOnDevice?: boolean;
+}
+
+export interface SolSignTransactionCallParams {
+  path: string;
+  /** Hex-encoded serialized transaction bytes (no 0x prefix) */
+  serializedTx: string;
+}
+
+export interface SolSignMessageCallParams {
+  path: string;
+  /** Message bytes as hex string (no 0x prefix) */
+  message: string;
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+
+export async function solGetAddress(
+  ctx: ConnectorContext,
+  sessionId: string,
+  params: SolGetAddressCallParams
+): Promise<{ address: string; path: string }> {
+  const solSigner = await _createSolSigner(ctx, sessionId);
+  const path = normalizePath(params.path);
+
+  try {
+    // Ledger Solana signer returns a base58-encoded Ed25519 public key (= Solana address)
+    const publicKey = await solSigner.getAddress(path, {
+      checkOnDevice: params.showOnDevice ?? false,
+    });
+    return { address: publicKey, path: params.path };
+  } catch (err) {
+    ctx.invalidateSession(sessionId);
+    throw ctx.wrapError(err);
+  }
+}
+
+export async function solSignTransaction(
+  ctx: ConnectorContext,
+  sessionId: string,
+  params: SolSignTransactionCallParams
+): Promise<{ signature: string }> {
+  const solSigner = await _createSolSigner(ctx, sessionId);
+  const path = normalizePath(params.path);
+  const txBytes = hexToBytes(params.serializedTx);
+
+  try {
+    const result = await solSigner.signTransaction(path, txBytes);
+    return { signature: bytesToHex(result) };
+  } catch (err) {
+    ctx.invalidateSession(sessionId);
+    throw ctx.wrapError(err);
+  }
+}
+
+export async function solSignMessage(
+  ctx: ConnectorContext,
+  sessionId: string,
+  params: SolSignMessageCallParams
+): Promise<{ signature: string }> {
+  const solSigner = await _createSolSigner(ctx, sessionId);
+  const path = normalizePath(params.path);
+  const messageBytes = hexToBytes(params.message);
+
+  try {
+    // DMK signMessage returns { signature: string }, not raw Uint8Array
+    const result = await solSigner.signMessage(path, messageBytes);
+    return { signature: result.signature };
+  } catch (err) {
+    ctx.invalidateSession(sessionId);
+    throw ctx.wrapError(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Internal -- SOL signer creation
+// ---------------------------------------------------------------------------
+
+async function _createSolSigner(ctx: ConnectorContext, sessionId: string): Promise<SignerSol> {
+  const dmk = await ctx.getOrCreateDmk();
+  const contextModule = new ContextModuleBuilder({}).removeDefaultLoaders().build();
+  const sdkSigner = new SignerSolanaBuilder({ dmk, sessionId }).withContextModule(contextModule).build();
+  const signer = new SignerSol(sdkSigner);
+
+  // Wire up interaction events (verify-address, sign, etc.)
+  signer.onInteraction = (interaction: string) => {
+    ctx.emit('ui-event', {
+      type: interaction as EConnectorInteraction,
+      payload: { sessionId },
+    });
+  };
+
+  return signer;
+}

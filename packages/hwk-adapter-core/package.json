@@ -1,0 +1,50 @@
+{
+  "name": "@onekeyfe/hwk-adapter-core",
+  "version": "1.1.26-alpha.102",
+  "description": "Shared types and utilities for OneKey hardware wallet kit",
+  "author": "OneKey",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "test": "vitest run"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OneKeyHQ/hardware-wallet-kit.git",
+    "directory": "packages/hwk-adapter-core"
+  },
+  "keywords": [
+    "hardware-wallet",
+    "onekey",
+    "crypto",
+    "types"
+  ],
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}
