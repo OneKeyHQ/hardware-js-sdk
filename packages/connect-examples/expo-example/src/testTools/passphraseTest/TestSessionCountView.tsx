@@ -106,11 +106,10 @@ export default function TestSessionCountView() {
     }[]
   >([]);
 
-  const stopTest = useCallback(() => {
+  const stopTest = useCallback(async () => {
     if (hardwareUiEventListener) {
       SDK?.off(UI_EVENT, hardwareUiEventListener);
     }
-    SDK?.cancel();
 
     hasContinue.current = false;
     testResult.current = {
@@ -120,10 +119,20 @@ export default function TestSessionCountView() {
 
     pushRunnerLog([intl.formatMessage({ id: 'message__test_end' })]);
 
+    const connectId = selectedDevice?.connectId ?? '';
+    if (!SDK || !connectId) return;
+
+    // Mirror the recovery used in blindSignature/automationTest timeout
+    // handlers: cancel(connectId) rejects pending requests and fires
+    // interruptionFromUser; the awaited getFeatures with retryCount drains any
+    // leftover bytes so the transport returns to a known-clean frame boundary
+    // before the next test starts.
+    SDK.cancel(connectId);
     try {
-      SDK?.getFeatures(selectedDevice?.connectId ?? '');
-    } catch (e) {
-      // ignore
+      await SDK.getFeatures(connectId, { retryCount: 1 });
+    } catch {
+      // defensive: getFeatures normally resolves, but a transport race during
+      // cancel can occasionally surface as a throw
     }
   }, [SDK, intl, pushRunnerLog, selectedDevice?.connectId]);
 
@@ -137,8 +146,16 @@ export default function TestSessionCountView() {
       SDK.off(UI_EVENT, hardwareUiEventListener);
     }
 
+    // Defensive resync before each run: if a prior run (possibly on a
+    // different chain) was interrupted mid-exchange, the transport may still
+    // hold leftover bytes and the first getFeatures would decode a half-frame
+    // and throw "Didn't receive expected header signature.".
+    if (connectId) {
+      SDK.cancel(connectId);
+    }
+
     // refresh device
-    const featuresRes = await SDK.getFeatures(connectId);
+    const featuresRes = await SDK.getFeatures(connectId, { retryCount: 1 });
     if (!featuresRes.success) {
       pushRunnerLog([
         intl.formatMessage({ id: 'message__get_features_error' }),
@@ -163,7 +180,19 @@ export default function TestSessionCountView() {
       }
       if (message.type === UI_REQUEST.REQUEST_PASSPHRASE) {
         if (!allowInputPassphrase.current) {
+          // Device re-asking passphrase during verification = session slot
+          // evicted = expected end of round. Don't synchronously cancel
+          // here: the device is mid-exchange waiting for our reply, and
+          // racing cancel against that exchange is what leaves the
+          // transport dirty (root cause of the "Didn't receive expected
+          // header signature." error when switching chains). Reply with
+          // an empty passphrase so the device's current call completes
+          // cleanly; the outer loop drops out via hasContinue.
           hasContinue.current = false;
+          testResult.current = {
+            done: true,
+            payload: intl.formatMessage({ id: 'message__test_end' }),
+          };
 
           pushRunnerLog([
             intl.formatMessage({ id: 'message__test_result' }),
@@ -173,7 +202,13 @@ export default function TestSessionCountView() {
             }),
             passphraseStateList.current.length.toString(),
           ]);
-          stopTest();
+
+          setTimeout(() => {
+            SDK.uiResponse({
+              type: UI_RESPONSE.RECEIVE_PASSPHRASE,
+              payload: { value: '' },
+            });
+          }, 200);
           return;
         }
 
@@ -281,6 +316,8 @@ export default function TestSessionCountView() {
       // 查看一下之前的 passphraseState 是否还能用
       allowInputPassphrase.current = false;
       for (const item of [...passphraseStateList.current].reverse()) {
+        if (!hasContinue.current) break;
+
         pushRunnerLog([
           '    ',
           intl.formatMessage({ id: 'message__fetch' }),
@@ -296,6 +333,12 @@ export default function TestSessionCountView() {
           passphraseState: item.passphraseState,
           showOnOneKey,
         });
+
+        // Listener may have flipped hasContinue while this call was in
+        // flight (= session evicted mid-verification). The response came
+        // from an empty-passphrase reply, so it isn't meaningful — exit
+        // silently instead of misreporting address_not_match.
+        if (!hasContinue.current) break;
 
         if (!addressRes.success) {
           hasContinue.current = false;
@@ -342,6 +385,9 @@ export default function TestSessionCountView() {
         ]);
       }
 
+      // Don't record this wallet if the listener ended the test mid-round.
+      if (!hasContinue.current) break;
+
       passphraseStateList.current.push({
         walletName,
         passphraseState,
@@ -356,7 +402,6 @@ export default function TestSessionCountView() {
     pushRunnerLog,
     selectedDevice?.connectId,
     showOnOneKey,
-    stopTest,
     testChain,
   ]);
 
