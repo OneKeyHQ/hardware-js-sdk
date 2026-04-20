@@ -684,9 +684,20 @@ sessionCmd
         passphraseState,
       });
 
-      // 5. Fetch the now-active session_id via getFeatures (single
-      // round-trip to the known device, avoids re-running searchDevices).
-      const featResult = await sdk.getFeatures(connectId);
+      // 5. Fetch the now-active session_id via getFeatures.
+      //
+      // IMPORTANT: pass `passphraseState` here. Without it, the SDK's
+      // connectStateChange guard (core/index.ts) would see the payload's
+      // passphraseState flip from mnNy → undefined, clear the cached Device,
+      // and call Initialize again with no passphrase_state / no session_id.
+      // That Initialize resets the device to the standard wallet and returns
+      // a *standard-wallet* session_id — which we'd then save in the keychain
+      // paired with the hidden-wallet passphraseState. On the next CLI run
+      // the mismatch would trigger PassphraseRequest (1/2/3 again).
+      const featResult = await sdk.getFeatures(connectId, {
+        passphraseState,
+        skipPassphraseCheck: true,
+      });
       const featPayload = featResult?.success ? featResult.payload : undefined;
       const deviceId = featPayload?.device_id || device.deviceId || '';
       const sessionId = featPayload?.session_id || '';
@@ -921,10 +932,16 @@ async function prepareSession(
     globalOpts.passphraseState = passphraseState;
 
     // Save session to keychain for next invocation.
-    // Uses getFeatures (single round-trip to the known device) instead of
-    // re-running searchDevices (which would scan all USB buses).
+    //
+    // Pass passphraseState to keep connectStateChange=false — otherwise
+    // Initialize would be re-run without passphrase_state, resetting the
+    // device to the standard wallet and returning a mismatched session_id.
+    // See the matching comment in `session connect`.
     if (deviceId) {
-      const featAfter = await sdk.getFeatures(connectId);
+      const featAfter = await sdk.getFeatures(connectId, {
+        passphraseState,
+        skipPassphraseCheck: true,
+      });
       const sessionId = featAfter?.success ? featAfter.payload?.session_id : undefined;
       if (sessionId) {
         await saveSessionToKeychain(deviceId, passphraseState, sessionId);
