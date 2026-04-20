@@ -12,19 +12,24 @@
 import type { CoreApi } from '@onekeyfe/hd-core';
 
 /**
- * Extract common SDK params including passphrase-related fields.
- * Ensures skipPassphraseCheck is forwarded to SDK methods.
+ * Extract params shared by every SDK method. Forwarded unconditionally:
+ *
+ * - `passphraseState` / `useEmptyPassphrase` — wallet selection.
+ * - `skipPassphraseCheck` — tells the SDK to skip its own
+ *   `checkPassphraseStateSafety` + error-114 gate so our interactive
+ *   `REQUEST_PASSPHRASE` handler can own the passphrase prompt flow.
+ *   `runCommand` always sets this to `true` via `getCommonParams`.
+ *
+ * All three are forwarded even when falsy/undefined — SDK treats missing
+ * and undefined identically. This avoids silent losses when inner calls
+ * (e.g. `resolveBatchGetAddress`) reconstruct a params object manually.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractCommonParams(params: Record<string, any>): Record<string, unknown> {
-  const result: Record<string, unknown> = {
+function extractCommonParams(params: CommonCLIParams): Record<string, unknown> {
+  return {
     passphraseState: params.passphraseState,
     useEmptyPassphrase: params.useEmptyPassphrase,
+    skipPassphraseCheck: params.skipPassphraseCheck,
   };
-  if (params.skipPassphraseCheck) {
-    result.skipPassphraseCheck = true;
-  }
-  return result;
 }
 
 // Default BIP44 derivation paths per chain
@@ -99,12 +104,18 @@ function getDefaultPath(chain: string): string {
 /**
  * Common params passed to all SDK methods.
  * Reference: packages/core/src/types/api/export.ts (CommonParams)
+ *
+ * `skipPassphraseCheck` is CLI-internal plumbing — runCommand sets it to
+ * true so the interactive REQUEST_PASSPHRASE handler can own the prompt
+ * flow without the SDK rejecting with error 114 first. Exposed on the
+ * interface so inner helpers (batch flows, etc.) can forward it safely.
  */
 export interface CommonCLIParams {
   connectId?: string;
   deviceId?: string;
   passphraseState?: string;
   useEmptyPassphrase?: boolean;
+  skipPassphraseCheck?: boolean;
 }
 
 export interface GetAddressParams extends CommonCLIParams {
@@ -491,18 +502,19 @@ export interface BatchGetAddressParams extends CommonCLIParams {
 }
 
 export async function resolveBatchGetAddress(sdk: CoreApi, params: BatchGetAddressParams) {
-  // #13 FIX: Collect per-item results with error handling for partial failures
+  // Spread `common` so every CommonCLIParams field (including
+  // skipPassphraseCheck) propagates to each inner resolveGetAddress
+  // call. Enumerating fields manually used to drop skipPassphraseCheck
+  // and cause error 114 on hidden-wallet batch calls.
+  const { bundle, ...common } = params;
   const results: Array<Record<string, unknown>> = [];
-  for (const item of params.bundle) {
+  for (const item of bundle) {
     try {
       const result = await resolveGetAddress(sdk, {
+        ...common,
         chain: item.chain,
         path: item.path,
         showOnDevice: item.showOnDevice ?? false,
-        connectId: params.connectId,
-        deviceId: params.deviceId,
-        passphraseState: params.passphraseState,
-        useEmptyPassphrase: params.useEmptyPassphrase,
       });
       results.push(result);
     } catch (err) {
