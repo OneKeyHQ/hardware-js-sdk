@@ -81,7 +81,7 @@ program
   .action(() =>
     runCommand({}, async ({ sdk, globalOpts }) => {
       // Resolve connectId: explicit flag wins, else pick the first attached device
-      let connectId: string | undefined = globalOpts.connectId;
+      let { connectId } = globalOpts as { connectId?: string };
       if (!connectId) {
         const searchResult = await sdk.searchDevices();
         if (
@@ -95,8 +95,7 @@ program
           });
           return;
         }
-        connectId =
-          (searchResult.payload[0] as EnrichedSearchDevice).connectId ?? undefined;
+        connectId = (searchResult.payload[0] as EnrichedSearchDevice).connectId ?? undefined;
       }
       const result = await sdk.getFeatures(connectId || '');
       outputResult(globalOpts, result);
@@ -658,9 +657,7 @@ sessionCmd
       // device session, which a locked device will reject with an obscure
       // error. Uses the same PinInvalid retry policy as prepareSession.
       if (device.features?.unlocked === false) {
-        process.stderr.write(
-          '[onekey-hw] Device is locked. Unlocking (PIN required)...\n'
-        );
+        process.stderr.write('[onekey-hw] Device is locked. Unlocking (PIN required)...\n');
         await unlockWithRetry(sdk, connectId);
       }
 
@@ -790,20 +787,17 @@ async function unlockWithRetry(
       error?: string;
       code?: number | string;
     };
-    const code = lastPayload.code;
+    const { code } = lastPayload;
     const isPinInvalid = code === HW_ERR_PIN_INVALID;
-    if (isPinInvalid && attempt < maxAttempts) {
-      process.stderr.write(
-        `[onekey-hw] Invalid PIN. Retry on your device (attempt ${attempt + 1}/${maxAttempts}).\n`
-      );
-      continue;
+    if (!isPinInvalid || attempt >= maxAttempts) {
+      // PinCancelled, other error, or PinInvalid on the last attempt — bail out
+      const err = new Error(`Device unlock failed: ${lastPayload.error ?? 'unknown error'}`);
+      (err as Error & { code?: number | string }).code = code ?? 'UNLOCK_FAILED';
+      throw err;
     }
-    // PinCancelled, other error, or PinInvalid on the last attempt — bail out
-    const err = new Error(
-      `Device unlock failed: ${lastPayload.error ?? 'unknown error'}`
+    process.stderr.write(
+      `[onekey-hw] Invalid PIN. Retry on your device (attempt ${attempt + 1}/${maxAttempts}).\n`
     );
-    (err as Error & { code?: number | string }).code = code ?? 'UNLOCK_FAILED';
-    throw err;
   }
   // Unreachable — the loop either returns or throws
   throw new Error('Device unlock failed: retry loop exited without a result');
@@ -921,7 +915,7 @@ async function prepareSession(
   });
 
   if (psResult.success && psResult.payload) {
-    const passphraseState = psResult.payload as string;
+    const passphraseState = psResult.payload;
     globalOpts.passphraseState = passphraseState;
 
     // Save session to keychain for next invocation.
@@ -941,7 +935,6 @@ async function prepareSession(
   }
   return undefined;
 }
-
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function outputResult(_globalOpts: Record<string, any>, result: unknown): void {

@@ -27,7 +27,6 @@ import {
   getPassphraseStateWithRefreshDeviceInfo,
 } from '../utils/deviceFeaturesUtils';
 import { generateInstanceId } from '../utils/tracing';
-
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 import {

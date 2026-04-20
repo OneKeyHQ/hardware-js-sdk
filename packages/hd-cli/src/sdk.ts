@@ -10,9 +10,7 @@
  */
 
 import { execFile, execFileSync } from 'node:child_process';
-import * as readline from 'readline';
-
-// @ts-ignore - hd-common-connect-sdk may not have type declarations
+import * as readline from 'node:readline';
 import HardwareSDK from '@onekeyfe/hd-common-connect-sdk';
 import { DEVICE, UI_EVENT, UI_REQUEST, UI_RESPONSE } from '@onekeyfe/hd-core';
 
@@ -45,7 +43,6 @@ let currentOpts: SDKOptions = {};
  * re-init cleanly after an explicit tear-down.
  */
 let sdkReadyPromise: Promise<typeof HardwareSDK> | null = null;
-
 
 // ---------------------------------------------------------------------------
 // Pinentry — secure passphrase input via native OS dialog
@@ -187,7 +184,6 @@ function promptPassphraseMode(): Promise<{
     prompt();
   });
 }
-
 
 // ---------------------------------------------------------------------------
 // Event handlers
