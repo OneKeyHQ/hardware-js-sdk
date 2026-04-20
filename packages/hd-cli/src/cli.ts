@@ -241,6 +241,7 @@ program
             address: opts.address,
             messageHex: opts.message,
             signature: opts.signature,
+            ...params,
           });
           break;
         case 'btc':
@@ -250,6 +251,7 @@ program
             messageHex: opts.message,
             signature: opts.signature,
             coin: 'btc',
+            ...params,
           });
           break;
         case 'starcoin':
@@ -258,6 +260,7 @@ program
             publicKey: opts.address,
             messageHex: opts.message,
             signature: opts.signature,
+            ...params,
           });
           break;
         default:
@@ -304,6 +307,7 @@ program
         path: opts.path,
         domainHash: opts.domainHash,
         messageHash: opts.messageHash,
+        ...params,
       });
       outputResult(globalOpts, result);
     })
@@ -322,6 +326,7 @@ program
         {
           path: opts.path,
           messageHex: opts.messageHex,
+          ...params,
         }
       );
       outputResult(globalOpts, result);
@@ -342,6 +347,7 @@ program
         pubkey: opts.pubkey,
         plaintext: opts.plaintext,
         showOnOneKey: opts.showOnDevice === 'true',
+        ...params,
       });
       outputResult(globalOpts, result);
     })
@@ -361,6 +367,7 @@ program
         pubkey: opts.pubkey,
         ciphertext: opts.ciphertext,
         showOnOneKey: opts.showOnDevice === 'true',
+        ...params,
       });
       outputResult(globalOpts, result);
     })
@@ -376,6 +383,7 @@ program
       const result = await sdk.nostrSignSchnorr(params.connectId || '', params.deviceId || '', {
         path: opts.path,
         hash: opts.hash,
+        ...params,
       });
       outputResult(globalOpts, result);
     })
@@ -391,6 +399,7 @@ program
       const result = await sdk.lnurlAuth(params.connectId || '', params.deviceId || '', {
         domain: opts.domain,
         k1: opts.k1,
+        ...params,
       });
       outputResult(globalOpts, result);
     })
@@ -411,6 +420,7 @@ program
           path: opts.path,
           domainHash: opts.domainHash,
           messageHash: opts.messageHash,
+          ...params,
         }
       );
       outputResult(globalOpts, result);
@@ -427,6 +437,7 @@ program
       const result = await sdk.aptosSignInMessage(params.connectId || '', params.deviceId || '', {
         path: opts.path,
         payload: opts.payload,
+        ...params,
       });
       outputResult(globalOpts, result);
     })
@@ -446,6 +457,7 @@ program
         appdomain: opts.appdomain,
         expireAt: safeParseInt(opts.expireAt, '--expire-at'),
         ...(opts.comment ? { comment: opts.comment } : {}),
+        ...params,
       });
       outputResult(globalOpts, result);
     })
