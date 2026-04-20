@@ -5,13 +5,13 @@
 OneKey Hardware SDK 采用三层架构设计：
 
 ```
-应用层 (DApps)
+应用层 (DApps / CLI / Agent Tools)
     ↓
-SDK接口层 (@onekeyfe/core) 
+SDK接口层 (@onekeyfe/hd-core / @onekeyfe/hd-common-connect-sdk)
     ↓
 传输抽象层 (@onekeyfe/hd-transport)
     ↓
-平台适配层 (WebUSB/BLE/HTTP)
+平台适配层 (USB / Web Device / BLE / HTTP)
     ↓
 硬件设备层 (OneKey设备)
 ```
@@ -29,11 +29,35 @@ SDK接口层 (@onekeyfe/core)
 ### 平台SDK
 - **`@onekeyfe/hd-web-sdk`** - Web平台SDK
 - **`@onekeyfe/hd-ble-sdk`** - 移动端BLE SDK
+- **`@onekeyfe/hd-common-connect-sdk`** - Node/直连设备场景的通用 SDK 封装
+
+### CLI / Agent 集成层
+- **`@onekeyfe/hardware-cli`** - 面向 Claude Code、Cursor、Codex、Gemini 等工具的命令行入口
+- **`@onekeyfe/hd-transport-usb`** - CLI 当前使用的直连 USB 传输插件
 
 ### 示例应用
 - **`@onekeyfe/connect-examples`** - 集成示例
   - `expo-example` - Web集成示例
   - `expo-playground` - 开发测试平台
+
+## 🤖 AI Agent 集成入口
+
+仓库内已经提供了 AI agent 的一等入口，不需要额外包装服务：
+
+- CLI 文档：[`packages/hd-cli/README.md`](../packages/hd-cli/README.md)
+- Portal 工作流文档：[`agent-integration.mdx`](../packages/connect-examples/developer-portal/content/en/hardware-sdk/agent-integration.mdx)
+
+当前实现对应的源码入口：
+
+- 命令定义：`packages/hd-cli/src/cli.ts`
+- SDK 初始化与交互事件处理：`packages/hd-cli/src/sdk.ts`
+- 链路由与默认派生路径：`packages/hd-cli/src/chains.ts`
+
+这个入口的职责边界很明确：
+
+- stdout 始终输出结构化 JSON，方便 agent 直接解析结果。
+- PIN、Passphrase、按钮确认等交互通过 stderr/设备侧提示完成。
+- CLI 目前只支持固件检查，不支持固件升级；升级仍需 OneKey App 或 firmware.onekey.so。
 
 ## 🔄 API调用流程
 
@@ -46,6 +70,24 @@ BaseMethod.run()
 Device.call()
     ↓
 Transport.send()
+    ↓
+硬件设备响应
+```
+
+### CLI 调用链
+
+```typescript
+onekey-hw get-address --chain evm
+    ↓
+packages/hd-cli/src/cli.ts
+    ↓
+resolveGetAddress()
+    ↓
+@onekeyfe/hd-common-connect-sdk
+    ↓
+@onekeyfe/hd-core
+    ↓
+@onekeyfe/hd-transport-usb
     ↓
 硬件设备响应
 ```
@@ -92,19 +134,26 @@ switch(env) {
 }
 ```
 
+CLI 的当前实现固定走直连 USB：`packages/hd-cli/src/sdk.ts` 中通过 `UsbPlugin` 初始化，并把 `env` 设置为 `lowlevel`。
+
 ## 📦 依赖关系
 
 ```
 应用层
 ├── @onekeyfe/hd-web-sdk
 ├── @onekeyfe/hd-ble-sdk
-    │
-    ├── @onekeyfe/hd-core ←── 核心层
-    │   └── @onekeyfe/hd-transport
-    │
-    └── 传输层实现
-        ├── @onekeyfe/hd-transport-webusb
-        └── @onekeyfe/hd-transport-http
+├── @onekeyfe/hardware-cli
+│   └── @onekeyfe/hd-common-connect-sdk
+│       ├── @onekeyfe/hd-core ←── 核心层
+│       │   └── @onekeyfe/hd-transport
+│       └── 传输插件
+│           ├── @onekeyfe/hd-transport-usb
+│           ├── @onekeyfe/hd-transport-http
+│           ├── @onekeyfe/hd-transport-lowlevel
+│           └── @onekeyfe/hd-transport-web-device
+└── 平台传输实现
+    ├── @onekeyfe/hd-transport-http
+    └── 其他平台适配层
 ```
 
 ## 🔧 开发工具
