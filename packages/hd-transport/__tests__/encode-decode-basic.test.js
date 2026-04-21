@@ -232,6 +232,45 @@ describe('basic concepts', () => {
       });
     });
 
+    // Regression test for protobufjs 6 -> 7 upgrade: 7.x populates unset optional fields
+    // with proto defaults (false / 0 / first-enum-value). Our contract is to keep them as
+    // null so downstream "field was not set" checks (=== null, ??, destructuring defaults)
+    // keep working. decode.ts uses hasOwnProperty to distinguish wire-present vs default-filled.
+    test('optional fields not on the wire decode to null (not proto defaults)', () => {
+      const schema = {
+        nested: {
+          OptionalFields: {
+            fields: {
+              flag: { type: 'bool', id: 1 },
+              count: { type: 'uint32', id: 2 },
+              note: { type: 'string', id: 3 },
+              mode: { type: 'Mode', id: 4 },
+              big: { type: 'uint64', id: 5 },
+            },
+            nested: {
+              Mode: {
+                values: { MODE_A: 0, MODE_B: 1 },
+              },
+            },
+          },
+        },
+      };
+      const Root = ProtoBuf.Root.fromJSON(schema);
+      const Message = Root.lookupType('OptionalFields');
+
+      // encode with only one field set; everything else is "not on the wire"
+      const encoded = encode(Message, { count: 7 });
+      const decoded = decode(Message, encoded);
+
+      expect(decoded).toEqual({
+        flag: null,
+        count: 7,
+        note: null,
+        mode: null,
+        big: null,
+      });
+    });
+
     test('Different protobuf between receiving ends', () => {
       const messages = {
         nested: {

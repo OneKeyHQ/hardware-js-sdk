@@ -31,14 +31,20 @@ const transform = (field: Field, value: any) => {
 };
 
 function messageToJSON(Message: Message<Record<string, unknown>>, fields: Type['fields']) {
-  // get rid of Message.prototype references
-  const { ...message } = Message;
   const res: { [key: string]: any } = {};
 
   Object.keys(fields).forEach(key => {
     const field = fields[key];
+    // [compatibility for protobufjs 7+]: 7.x populates unset optional fields with proto
+    // defaults (false / 0 / first-enum-value) on the decoded Message via prototype. Use
+    // hasOwnProperty to distinguish "field was on the wire" from "filled by default" so
+    // we preserve the 6.x contract of returning null for unset optional fields.
+    if (field.optional && !Object.prototype.hasOwnProperty.call(Message, key)) {
+      res[key] = null;
+      return;
+    }
     // @ts-ignore
-    const value = message[key];
+    const value = Message[key];
 
     /* istanbul ignore else  */
     if (field.repeated) {
