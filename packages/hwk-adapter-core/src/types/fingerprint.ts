@@ -5,6 +5,8 @@
  * To verify that the same seed/device is connected, we derive an address
  * at a fixed path (account 0, index 0) and hash it into a stable "chain fingerprint".
  */
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
 
 /**
  * Fixed derivation paths used to generate chain fingerprints.
@@ -29,27 +31,9 @@ export type ChainForFingerprint = 'evm' | 'btc' | 'sol' | 'tron';
 /**
  * Hash an address string into a 16-character hex fingerprint.
  *
- * Uses a simple non-cryptographic hash (FNV-1a based) to avoid
- * pulling in a SHA-256 dependency. This is NOT used for security —
- * only for device identity matching.
+ * Uses the first 16 hex chars (64 bits) of SHA-256 — sufficient for
+ * device identity matching. Not used for security decisions.
  */
 export function deriveDeviceFingerprint(address: string): string {
-  // FNV-1a 64-bit constants (split into two 32-bit halves for JS)
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
-
-  for (let i = 0; i < address.length; i++) {
-    const c = address.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, h2);
-    h2 = Math.imul(h2 ^ (c >>> 4), 0x01000193);
-  }
-
-  // Mix the two halves for better distribution
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 0x45d9f3b);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 0x45d9f3b);
-
-  const hex1 = (h1 >>> 0).toString(16).padStart(8, '0');
-  const hex2 = (h2 >>> 0).toString(16).padStart(8, '0');
-
-  return `${hex1}${hex2}`;
+  return bytesToHex(sha256(utf8ToBytes(address))).slice(0, 16);
 }
