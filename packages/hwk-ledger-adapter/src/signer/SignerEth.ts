@@ -27,6 +27,13 @@ export class SignerEth {
   // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _sdk: ISdkSignerEth) {}
 
+  /**
+   * Optional callback registered per-call so the caller can obtain a canceller
+   * for the underlying DeviceAction. Caller can invoke it to release DMK's
+   * IntentQueue slot and unsubscribe from the action's observable.
+   */
+  onRegisterCanceller?: (cancel: () => void) => void;
+
   async getAddress(
     derivationPath: string,
     options?: { checkOnDevice?: boolean }
@@ -38,7 +45,12 @@ export class SignerEth {
     });
     // checkOnDevice needs user interaction → long timeout; otherwise default 30s
     const timeout = checkOnDevice ? INTERACTIVE_TIMEOUT_MS : undefined;
-    return deviceActionToPromise<SignerEvmAddress>(action, this.onInteraction, timeout);
+    return deviceActionToPromise<SignerEvmAddress>(
+      action,
+      this.onInteraction,
+      timeout,
+      this.onRegisterCanceller
+    );
   }
 
   async signTransaction(
@@ -49,7 +61,8 @@ export class SignerEth {
     return deviceActionToPromise<SignerEvmSignature>(
       action,
       this.onInteraction,
-      INTERACTIVE_TIMEOUT_MS
+      INTERACTIVE_TIMEOUT_MS,
+      this.onRegisterCanceller
     );
   }
 
@@ -61,7 +74,8 @@ export class SignerEth {
     return deviceActionToPromise<SignerEvmSignature>(
       action,
       this.onInteraction,
-      INTERACTIVE_TIMEOUT_MS
+      INTERACTIVE_TIMEOUT_MS,
+      this.onRegisterCanceller
     );
   }
 
@@ -70,7 +84,8 @@ export class SignerEth {
     return deviceActionToPromise<SignerEvmSignature>(
       action,
       this.onInteraction,
-      INTERACTIVE_TIMEOUT_MS
+      INTERACTIVE_TIMEOUT_MS,
+      this.onRegisterCanceller
     );
   }
 }

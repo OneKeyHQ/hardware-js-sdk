@@ -16,6 +16,8 @@ type SolMsgOptions = Parameters<ISdkSignerSol['signMessage']>[2];
 export class SignerSol {
   onInteraction?: (interaction: string) => void;
 
+  onRegisterCanceller?: (cancel: () => void) => void;
+
   // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _sdk: ISdkSignerSol) {}
 
@@ -26,7 +28,12 @@ export class SignerSol {
     const action = this._sdk.getAddress(derivationPath, {
       checkOnDevice: options?.checkOnDevice ?? false,
     });
-    return deviceActionToPromise<string>(action, this.onInteraction);
+    return deviceActionToPromise<string>(
+      action,
+      this.onInteraction,
+      undefined,
+      this.onRegisterCanceller
+    );
   }
 
   /**
@@ -38,7 +45,12 @@ export class SignerSol {
     options?: SolTxOptions
   ): Promise<Uint8Array> {
     const action = this._sdk.signTransaction(derivationPath, transaction, options);
-    return deviceActionToPromise<Uint8Array>(action, this.onInteraction);
+    return deviceActionToPromise<Uint8Array>(
+      action,
+      this.onInteraction,
+      undefined,
+      this.onRegisterCanceller
+    );
   }
 
   /**
@@ -51,6 +63,11 @@ export class SignerSol {
     options?: SolMsgOptions
   ): Promise<{ signature: string }> {
     const action = this._sdk.signMessage(derivationPath, message, options);
-    return deviceActionToPromise<{ signature: string }>(action, this.onInteraction);
+    return deviceActionToPromise<{ signature: string }>(
+      action,
+      this.onInteraction,
+      undefined,
+      this.onRegisterCanceller
+    );
   }
 }

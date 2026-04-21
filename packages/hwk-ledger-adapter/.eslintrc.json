@@ -8,6 +8,7 @@
     "default-case": "off",
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/unbound-method": "off",
+    "default-param-last": "off",
     "import/no-unresolved": ["error", { "ignore": ["^@ledgerhq/", "^vitest"] }]
   },
   "ignorePatterns": ["tsup.config.ts"]

@@ -1,6 +1,7 @@
 import {
   CHAIN_FINGERPRINT_PATHS,
   DEVICE,
+  DeviceJobQueue,
   HardwareErrorCode,
   TypedEventEmitter,
   UI_REQUEST,
@@ -47,6 +48,7 @@ import type {
   IConnector,
   IHardwareWallet,
   IUiHandler,
+  Interruptibility,
   ProgressCallback,
   Response,
   SolAddress,
@@ -123,10 +125,29 @@ export class LedgerAdapter implements IHardwareWallet {
 
   private readonly _uiRegistry = new UiRequestRegistry();
 
+  // Per-device serial job queue. Operations for the same device run sequentially;
+  // conflicting ops are dispatched per `interruptibility` (see _getInterruptibility).
+  private readonly _jobQueue: DeviceJobQueue;
+
   constructor(connector: IConnector, options?: LedgerAdapterOptions) {
     this.connector = connector;
     this._handleSelectDevice = options?.handleSelectDevice ?? false;
+    this._jobQueue = new DeviceJobQueue({
+      emit: (event, data) => this.emitter.emit(event, data),
+      uiRegistry: this._uiRegistry,
+    });
     this.registerEventListeners();
+  }
+
+  /**
+   * Classify a method's interruptibility.
+   * - Signing / typed data / transaction → 'confirm' (user may decide via preemption UI)
+   * - Read-only queries (getAddress / getPublicKey / getMasterFingerprint) → 'safe'
+   *   (auto-cancels any pending read for the same device)
+   */
+  private static _getInterruptibility(method: string): Interruptibility {
+    if (method.toLowerCase().includes('sign')) return 'confirm';
+    return 'safe';
   }
 
   // ---------------------------------------------------------------------------
@@ -175,10 +196,12 @@ export class LedgerAdapter implements IHardwareWallet {
     this._sessions.clear();
     this._connectingPromise = null;
     this._uiRegistry.reset();
+    this._jobQueue.clear();
   }
 
   async dispose(): Promise<void> {
     this._uiRegistry.reset();
+    this._jobQueue.clear();
     this.unregisterEventListeners();
     this.connector.reset();
     this._uiHandler = null;
@@ -515,6 +538,9 @@ export class LedgerAdapter implements IHardwareWallet {
 
   cancel(connectId: string): void {
     const sessionId = this._sessions.get(connectId) ?? connectId;
+    // Force-cancel the active job so in-flight signer work aborts even if it's
+    // marked non-interruptible; queue.clear would kill queued follow-ups too.
+    this._jobQueue.forceCancelActive(connectId || '__ledger_default__');
     void this.connector.cancel(sessionId);
   }
 
@@ -652,7 +678,14 @@ export class LedgerAdapter implements IHardwareWallet {
 
   // Ledger WebUSB won't expose a locked device, so we can't auto-detect unlock.
   // The user must press Confirm after unlocking, which triggers a search retry.
-  private async _waitForDeviceConnect(attempt: number): Promise<void> {
+  // If `signal` is provided, an abort cancels the pending UI request so the
+  // registry slot is released and a stale RECEIVE_DEVICE_CONNECT won't land in
+  // a future request.
+  private async _waitForDeviceConnect(attempt: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      LedgerAdapter._throwIfAborted(signal);
+    }
+
     this.emitter.emit(UI_REQUEST.REQUEST_DEVICE_CONNECT, {
       type: UI_REQUEST.REQUEST_DEVICE_CONNECT,
       payload: {
@@ -662,9 +695,24 @@ export class LedgerAdapter implements IHardwareWallet {
       },
     });
 
-    const payload = await this._uiRegistry.wait<{ confirmed: boolean }>(
+    const waitPromise = this._uiRegistry.wait<{ confirmed: boolean }>(
       UI_REQUEST.REQUEST_DEVICE_CONNECT
     );
+
+    let payload: { confirmed: boolean } | undefined;
+    if (signal) {
+      const onAbort = () => {
+        this._uiRegistry.cancel(UI_REQUEST.REQUEST_DEVICE_CONNECT);
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      try {
+        payload = await waitPromise;
+      } finally {
+        signal.removeEventListener('abort', onAbort);
+      }
+    } else {
+      payload = await waitPromise;
+    }
 
     if (!payload?.confirmed) {
       throw Object.assign(new Error('User cancelled Ledger connection'), {
@@ -781,7 +829,77 @@ export class LedgerAdapter implements IHardwareWallet {
     }
   ): Promise<unknown> {
     debugLog('[LedgerAdapter] connectorCall:', method, 'connectId:', connectId || '(empty)');
-    const resolvedConnectId = await this.ensureConnected(connectId);
+
+    // Queue key: prefer the supplied connectId; fall back to a shared bucket so that
+    // calls made before any session exists still serialize (Ledger only has one active device).
+    const queueKey = connectId || '__ledger_default__';
+    const interruptibility = LedgerAdapter._getInterruptibility(method);
+
+    return this._jobQueue.enqueue(
+      queueKey,
+      async signal => this._runConnectorCall(connectId, method, params, signal, fingerprint),
+      { interruptibility, label: method }
+    );
+  }
+
+  /**
+   * Race a promise against an abort signal. If the signal fires, rejects with the
+   * signal's reason (or a generic Error). The underlying connector.call() cannot
+   * actually be cancelled on Ledger DMK, but the caller gets the abort immediately.
+   */
+  private static _abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
+    if (signal.aborted) {
+      return Promise.reject(
+        (signal as AbortSignal & { reason?: unknown }).reason ?? new Error('Aborted')
+      );
+    }
+    return new Promise<T>((resolve, reject) => {
+      const onAbort = () => {
+        reject((signal as AbortSignal & { reason?: unknown }).reason ?? new Error('Aborted'));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      promise.then(
+        value => {
+          signal.removeEventListener('abort', onAbort);
+          resolve(value);
+        },
+        err => {
+          signal.removeEventListener('abort', onAbort);
+          reject(err);
+        }
+      );
+    });
+  }
+
+  /** Throw an AbortError if signal is already aborted. */
+  private static _throwIfAborted(signal: AbortSignal): void {
+    if (signal.aborted) {
+      throw (signal as AbortSignal & { reason?: unknown }).reason ?? new Error('Aborted');
+    }
+  }
+
+  /** Actual work done under the job queue — connection, fingerprint, call, and recovery. */
+  private async _runConnectorCall(
+    connectId: string,
+    method: string,
+    params: unknown,
+    signal: AbortSignal,
+    fingerprint?: {
+      chain: ChainForFingerprint;
+      deviceId: string;
+      skipFingerprint: boolean;
+    }
+  ): Promise<unknown> {
+    LedgerAdapter._throwIfAborted(signal);
+    // Wrap ensureConnected in _abortable so an abort during device discovery /
+    // user-connect UI wait rejects this caller immediately. The underlying
+    // _doConnect / _connectingPromise is shared across callers and continues
+    // running — other concurrent callers aren't affected.
+    const resolvedConnectId = await LedgerAdapter._abortable(
+      signal,
+      this.ensureConnected(connectId)
+    );
+    LedgerAdapter._throwIfAborted(signal);
     const sessionId = this._sessions.get(resolvedConnectId);
     debugLog(
       '[LedgerAdapter] connectorCall resolved:',
@@ -799,10 +917,9 @@ export class LedgerAdapter implements IHardwareWallet {
 
     // Fingerprint verification inside the session — atomic with the actual call
     if (fingerprint && !fingerprint.skipFingerprint && fingerprint.deviceId) {
-      const fp = await this._verifyDeviceFingerprintWithSession(
-        sessionId,
-        fingerprint.deviceId,
-        fingerprint.chain
+      const fp = await LedgerAdapter._abortable(
+        signal,
+        this._verifyDeviceFingerprintWithSession(sessionId, fingerprint.deviceId, fingerprint.chain)
       );
       if (!fp.success) {
         throw Object.assign(new Error(formatDeviceMismatchError(fp.expected, fp.actual)), {
@@ -812,8 +929,10 @@ export class LedgerAdapter implements IHardwareWallet {
     }
 
     try {
-      return await this.connector.call(sessionId, method, params);
+      return await LedgerAdapter._abortable(signal, this.connector.call(sessionId, method, params));
     } catch (err) {
+      // If the abort fired, surface it directly — skip recovery paths.
+      if (signal.aborted) throw err;
       const errObj = err as Record<string, unknown> | null | undefined;
       debugLog('[LedgerAdapter] connectorCall error:', method, {
         message: errObj?.message,
@@ -826,16 +945,17 @@ export class LedgerAdapter implements IHardwareWallet {
       if (isDeviceDisconnectedError(err)) {
         debugLog('[LedgerAdapter] disconnected, retrying with fresh connection...');
         this._discoveredDevices.clear();
-        return this._retryWithFreshConnection(resolvedConnectId, method, params, err);
+        return this._retryWithFreshConnection(resolvedConnectId, method, params, signal, err);
       }
       if (isDeviceLockedError(err)) {
-        await this._waitForDeviceConnect(0);
-        return this.connector.call(sessionId, method, params);
+        await this._waitForDeviceConnect(0, signal);
+        LedgerAdapter._throwIfAborted(signal);
+        return LedgerAdapter._abortable(signal, this.connector.call(sessionId, method, params));
       }
       if (isTimeoutError(err)) {
         debugLog('[LedgerAdapter] timeout, retrying with fresh connection...');
         this._discoveredDevices.delete(resolvedConnectId);
-        return this._retryWithFreshConnection(resolvedConnectId, method, params, err);
+        return this._retryWithFreshConnection(resolvedConnectId, method, params, signal, err);
       }
       throw err;
     }
@@ -846,15 +966,18 @@ export class LedgerAdapter implements IHardwareWallet {
     resolvedConnectId: string,
     method: string,
     params: unknown,
+    signal: AbortSignal,
     originalErr: unknown
   ): Promise<unknown> {
     this._sessions.delete(resolvedConnectId);
+    LedgerAdapter._throwIfAborted(signal);
     const retryConnectId = await this.ensureConnected();
+    LedgerAdapter._throwIfAborted(signal);
     const retrySessionId = this._sessions.get(retryConnectId);
     if (!retrySessionId) {
       throw originalErr;
     }
-    return this.connector.call(retrySessionId, method, params);
+    return LedgerAdapter._abortable(signal, this.connector.call(retrySessionId, method, params));
   }
 
   /**

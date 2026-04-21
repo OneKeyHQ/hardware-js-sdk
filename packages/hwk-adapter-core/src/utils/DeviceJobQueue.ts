@@ -105,6 +105,9 @@ export class DeviceJobQueue {
               );
             case 'wait':
               break;
+            default:
+              // Unknown decision value from UI — fall back to safest option: wait.
+              break;
           }
           break;
         }

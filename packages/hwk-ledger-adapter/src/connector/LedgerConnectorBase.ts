@@ -167,6 +167,16 @@ export class LedgerConnectorBase implements IConnector {
     return this._pathToConnectId.get(path) ?? path;
   }
 
+  // ---------------------------------------------------------------------------
+  // Per-session DeviceAction cancellers
+  //
+  // Each chain handler registers its active DeviceAction's canceller via
+  // ctx.registerCanceller(sessionId, cancel) and clears it on completion.
+  // IConnector.cancel(sessionId) invokes the registered canceller, which
+  // unsubscribes the observable and releases DMK's IntentQueue slot.
+  // ---------------------------------------------------------------------------
+  private readonly _cancellers = new Map<string, () => void>();
+
   /**
    * Resolves a Ledger signer kit module by package name.
    * Override via constructor to use CJS paths for Metro (React Native).
@@ -209,6 +219,8 @@ export class LedgerConnectorBase implements IConnector {
       getSignerManager: () => this._getSignerManager(),
       clearAllSigners: () => this._signerManager?.clearAll(),
       replaceSession: (oldSid, newSid) => this._replaceSession(oldSid, newSid),
+      registerCanceller: (sid, cancel) => this._cancellers.set(sid, cancel),
+      clearCanceller: sid => this._cancellers.delete(sid),
       importLedgerKit: this._importLedgerKit,
     };
   }
@@ -408,8 +420,23 @@ export class LedgerConnectorBase implements IConnector {
     }
   }
 
-  async cancel(_sessionId: string): Promise<void> {
-    // Ledger DMK doesn't expose a generic cancel mechanism
+  async cancel(sessionId: string): Promise<void> {
+    // Invoke the active DeviceAction canceller (registered by the chain handler).
+    // This unsubscribes the observable and releases DMK's IntentQueue slot so
+    // the next call on this session isn't blocked behind an orphaned intent.
+    //
+    // Note: Ledger devices have no hardware-level APDU abort. If the user has
+    // an on-device confirmation prompt pending, it will remain until the user
+    // presses Reject or the device times out.
+    const cancel = this._cancellers.get(sessionId);
+    if (cancel) {
+      this._cancellers.delete(sessionId);
+      try {
+        cancel();
+      } catch {
+        // canceller may have already been invoked; ignore
+      }
+    }
   }
 
   uiResponse(_response: UiResponseEvent): void {
@@ -553,6 +580,16 @@ export class LedgerConnectorBase implements IConnector {
 
   private _resetAll(): void {
     debugLog('[DMK] _resetAll called');
+    // Cancel any in-flight DeviceActions so their observables unsubscribe
+    // and DMK's intent queues don't keep orphaned slots alive.
+    for (const cancel of this._cancellers.values()) {
+      try {
+        cancel();
+      } catch {
+        // already cancelled / settled — ignore
+      }
+    }
+    this._cancellers.clear();
     this._signerManager?.clearAll();
     this._deviceManager?.dispose();
     this._deviceManager = null;

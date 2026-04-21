@@ -29,11 +29,16 @@ function debugLog(...args: unknown[]): void {
  *
  * @param timeoutMs  Timeout in ms. Resets each time the Observable emits (device is alive).
  *                   Pass 0 to disable. Default: 30s.
+ * @param onRegisterCanceller  Optional callback that receives a function which, when
+ *                             called, unsubscribes and cancels the underlying DeviceAction
+ *                             (releases DMK's IntentQueue slot). Caller is responsible
+ *                             for invoking the canceller on timeout/abort scenarios.
  */
 export function deviceActionToPromise<T>(
   action: DeviceAction<T>,
   onInteraction?: (interaction: string) => void,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  onRegisterCanceller?: (cancel: () => void) => void
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let settled = false;
@@ -42,13 +47,27 @@ export function deviceActionToPromise<T>(
     let sub: { unsubscribe: () => void };
     let timer: ReturnType<typeof setTimeout> | null = null;
 
+    /** Fully tear down this action: unsubscribe + release DMK intent queue slot. */
+    const cancelAction = () => {
+      try {
+        sub?.unsubscribe();
+      } catch {
+        // subscription may already be closed; ignore
+      }
+      try {
+        action.cancel();
+      } catch {
+        // DMK action may already be settled; ignore
+      }
+    };
+
     const resetTimer = () => {
       if (timer) clearTimeout(timer);
       if (timeoutMs > 0) {
         timer = setTimeout(() => {
           if (!settled) {
             settled = true;
-            sub?.unsubscribe();
+            cancelAction();
             reject(new Error('Device action timed out — device may be locked or disconnected'));
           }
         }, timeoutMs);
@@ -57,6 +76,17 @@ export function deviceActionToPromise<T>(
 
     // Start initial timer
     resetTimer();
+
+    // Expose a canceller for external abort (release DMK queue slot + unsubscribe).
+    if (onRegisterCanceller) {
+      onRegisterCanceller(() => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        cancelAction();
+        reject(new Error('Device action cancelled'));
+      });
+    }
 
     debugLog('[DMK-Observable] subscribing to action.observable...');
     sub = action.observable.subscribe({

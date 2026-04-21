@@ -20,6 +20,19 @@ export interface ConnectorContext {
    * Updates internal session tracking so subsequent calls use the new session.
    */
   replaceSession(oldSessionId: string, newSessionId: string): void;
+
+  /**
+   * Register a canceller function for the currently-in-flight DeviceAction on
+   * this session. The connector stores the latest canceller; a subsequent
+   * `IConnector.cancel(sessionId)` call invokes it to unsubscribe + release
+   * DMK's intent queue slot. Chain handlers should register immediately after
+   * creating a DeviceAction and clear in a `finally` block.
+   */
+  registerCanceller(sessionId: string, cancel: () => void): void;
+
+  /** Clear any canceller previously registered for this session. */
+  clearCanceller(sessionId: string): void;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic import returns any
   importLedgerKit: (pkg: string) => Promise<any>;
 }

@@ -49,6 +49,8 @@ export async function solGetAddress(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -67,6 +69,8 @@ export async function solSignTransaction(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -86,6 +90,8 @@ export async function solSignMessage(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -109,6 +115,10 @@ async function _createSolSigner(ctx: ConnectorContext, sessionId: string): Promi
       type: collapseSignerInteraction(interaction),
       payload: { sessionId },
     });
+  };
+
+  signer.onRegisterCanceller = (cancel: () => void) => {
+    ctx.registerCanceller(sessionId, cancel);
   };
 
   return signer;

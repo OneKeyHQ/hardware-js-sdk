@@ -53,6 +53,8 @@ export async function evmGetAddress(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -83,6 +85,8 @@ export async function evmSignTransaction(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -103,6 +107,8 @@ export async function evmSignMessage(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -132,6 +138,8 @@ export async function evmSignTypedData(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -151,6 +159,12 @@ async function _getEthSigner(ctx: ConnectorContext, sessionId: string) {
       type: collapseSignerInteraction(interaction),
       payload: { sessionId },
     });
+  };
+
+  // Expose DeviceAction canceller to the connector so that cancel(sessionId)
+  // can release DMK's intent queue slot and unsubscribe cleanly.
+  signer.onRegisterCanceller = (cancel: () => void) => {
+    ctx.registerCanceller(sessionId, cancel);
   };
 
   return signer;

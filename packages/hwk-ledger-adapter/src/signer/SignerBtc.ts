@@ -30,6 +30,8 @@ const INTERACTIVE_TIMEOUT_MS = 5 * 60_000;
 export class SignerBtc {
   onInteraction?: (interaction: string) => void;
 
+  onRegisterCanceller?: (cancel: () => void) => void;
+
   // eslint-disable-next-line no-useless-constructor, no-empty-function
   constructor(private readonly _sdk: ISdkSignerBtc) {}
 
@@ -42,7 +44,12 @@ export class SignerBtc {
       checkOnDevice: options?.checkOnDevice ?? false,
       change: options?.change ?? false,
     });
-    return deviceActionToPromise<SignerBtcAddress>(action, this.onInteraction);
+    return deviceActionToPromise<SignerBtcAddress>(
+      action,
+      this.onInteraction,
+      undefined,
+      this.onRegisterCanceller
+    );
   }
 
   async getExtendedPublicKey(
@@ -62,7 +69,9 @@ export class SignerBtc {
       // DMK returns { extendedPublicKey: string }, unwrap it
       const result = await deviceActionToPromise<string | { extendedPublicKey: string }>(
         action,
-        this.onInteraction
+        this.onInteraction,
+        undefined,
+        this.onRegisterCanceller
       );
       debugLog(
         '[SignerBtc] getExtendedPublicKey result type:',
@@ -84,7 +93,9 @@ export class SignerBtc {
     const action = this._sdk.getMasterFingerprint(options);
     const result = await deviceActionToPromise<{ masterFingerprint: Uint8Array }>(
       action,
-      this.onInteraction
+      this.onInteraction,
+      undefined,
+      this.onRegisterCanceller
     );
     return result.masterFingerprint;
   }
@@ -96,7 +107,12 @@ export class SignerBtc {
    */
   async signPsbt(wallet: BtcWallet, psbt: BtcPsbt, options?: BtcPsbtOptions): Promise<unknown[]> {
     const action = this._sdk.signPsbt(wallet, psbt, options);
-    return deviceActionToPromise<unknown[]>(action, this.onInteraction, INTERACTIVE_TIMEOUT_MS);
+    return deviceActionToPromise<unknown[]>(
+      action,
+      this.onInteraction,
+      INTERACTIVE_TIMEOUT_MS,
+      this.onRegisterCanceller
+    );
   }
 
   /**
@@ -109,7 +125,12 @@ export class SignerBtc {
     options?: BtcPsbtOptions
   ): Promise<string> {
     const action = this._sdk.signTransaction(wallet, psbt, options);
-    return deviceActionToPromise<string>(action, this.onInteraction, INTERACTIVE_TIMEOUT_MS);
+    return deviceActionToPromise<string>(
+      action,
+      this.onInteraction,
+      INTERACTIVE_TIMEOUT_MS,
+      this.onRegisterCanceller
+    );
   }
 
   /**
@@ -127,7 +148,8 @@ export class SignerBtc {
     return deviceActionToPromise<{ r: string; s: string; v: number }>(
       action,
       this.onInteraction,
-      INTERACTIVE_TIMEOUT_MS
+      INTERACTIVE_TIMEOUT_MS,
+      this.onRegisterCanceller
     );
   }
 }

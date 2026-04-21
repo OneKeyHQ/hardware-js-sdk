@@ -85,6 +85,8 @@ export async function btcGetAddress(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -107,6 +109,8 @@ export async function btcGetPublicKey(
     debugError('[LedgerConnector] btcGetPublicKey error, path:', path, 'err:', err);
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -146,6 +150,8 @@ export async function btcSignTransaction(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -188,6 +194,8 @@ export async function btcSignPsbt(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -213,6 +221,8 @@ export async function btcSignMessage(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -235,6 +245,8 @@ export async function btcGetMasterFingerprint(
   } catch (err) {
     ctx.invalidateSession(sessionId);
     throw ctx.wrapError(err);
+  } finally {
+    ctx.clearCanceller(sessionId);
   }
 }
 
@@ -256,6 +268,10 @@ async function _createBtcSigner(ctx: ConnectorContext, sessionId: string): Promi
       type: collapseSignerInteraction(interaction),
       payload: { sessionId },
     });
+  };
+
+  signer.onRegisterCanceller = (cancel: () => void) => {
+    ctx.registerCanceller(sessionId, cancel);
   };
 
   return signer;
