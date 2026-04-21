@@ -11,7 +11,8 @@ export type transportEnv =
   | 'desktop-webusb'
   | 'desktop-web-ble'
   | 'emulator'
-  | 'lowlevel';
+  | 'lowlevel'
+  | 'node-usb';
 export type ConnectSettings = {
   connectSrc?: string;
   debug?: boolean;

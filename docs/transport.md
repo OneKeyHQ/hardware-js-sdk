@@ -108,6 +108,29 @@ export default class HttpTransport {
 }
 ```
 
+### Node.js USB Transport (CLI)
+
+```typescript
+// packages/hd-transport-usb/src/index.ts
+export default class NodeUsbTransport {
+  async call(path: string, name: string, data: Record<string, unknown>) {
+    // Same protocol as WebUsbTransport, using libusb instead of browser WebUSB API
+    const encodeBuffers = buildEncodeBuffers(messages, name, data);
+
+    for (const buffer of encodeBuffers) {
+      const packet = new Uint8Array(64);
+      packet[0] = 0x3f; // '?' marker
+      packet.set(new Uint8Array(buffer), 1);
+      await transferOut(openDev.epOut, Buffer.from(packet)); // libusb endpoint
+    }
+
+    const resData = await this.receiveData(openDev);
+    const jsonData = receiveOne(messages, resData);
+    return check.call(jsonData);
+  }
+}
+```
+
 ### WebUSB Transport
 
 ```typescript

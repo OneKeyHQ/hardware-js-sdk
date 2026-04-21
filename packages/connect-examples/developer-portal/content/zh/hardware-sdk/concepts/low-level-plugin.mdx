@@ -6,6 +6,8 @@ title: 底层传输插件
 
 > 仅在 WebUSB / React Native BLE 无法满足需求时使用。你需要自管设备生命周期和消息帧处理，维护成本更高。
 
+> **注意：** `lowlevel` 环境和 `LowlevelTransportSharedPlugin` 仅用于 **BLE（蓝牙）** 通信。对于 Node.js/CLI 环境下的 **USB** 通信，请使用 `NodeUsbTransport`（env 为 `node-usb`）—— 它通过 libusb 直接处理协议编解码和 USB I/O，不需要插件。
+
 我们的蓝牙 SDK 基于 React Native。如果你使用 Swift/Kotlin/Flutter 等非 RN 技术栈，引入 RN 依赖可能不合适。可通过 LowlevelTransportSharedPlugin 自行适配底层传输，负责"连接/断开/收发数据"协议。
 
 ## 快速参考

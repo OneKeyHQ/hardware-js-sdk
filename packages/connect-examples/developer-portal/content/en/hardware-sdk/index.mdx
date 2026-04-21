@@ -6,7 +6,9 @@ import { ExternalLink, Play, Monitor } from 'lucide-react'
 
 # Introduction
 
-Developer-focused documentation for integrating OneKey hardware in Web and Native apps. This guide covers SDK installation, initialization, device discovery, UI prompts, and your first signing call.
+Developer-focused documentation for integrating OneKey hardware in Web and Native apps.
+
+This page is the **orientation layer** — pick the right SDK package for your platform and install it. For the end-to-end walkthrough (search → events → PIN/passphrase → first signing call) plus parameters, events, and error handling, see the [Core API Guide](/en/hardware-sdk/core-api-guide).
 
 ## Choose Your Transport
 
@@ -122,123 +124,15 @@ await HardwareSDK.init({
 });
 ```
 
-## Bind Events
+## Next steps
 
-Set up event listeners for device connection and UI prompts:
+After `HardwareSDK.init(...)` returns, the rest of the flow — device discovery, event wiring, PIN/passphrase handling, signing — is documented end-to-end in the [Core API Guide](/en/hardware-sdk/core-api-guide):
 
-```ts
-import { UI_EVENT, UI_REQUEST, DEVICE } from '@onekeyfe/hd-core';
-
-HardwareSDK.on(UI_EVENT, async (message) => {
-  switch (message.type) {
-    case UI_REQUEST.REQUEST_PIN:
-      // Handle PIN entry (see below)
-      break;
-    case UI_REQUEST.REQUEST_PASSPHRASE:
-      // Handle passphrase entry (see below)
-      break;
-  }
-});
-
-HardwareSDK.on(DEVICE.CONNECT, (payload) => console.log('Connected:', payload));
-HardwareSDK.on(DEVICE.DISCONNECT, (payload) => console.log('Disconnected:', payload));
-```
-
-## Discover Devices
-
-### WebUSB Authorization (Browser)
-
-```ts
-import { ONEKEY_WEBUSB_FILTER } from '@onekeyfe/hd-shared';
-
-// Trigger browser's device chooser
-await navigator.usb.requestDevice({ filters: ONEKEY_WEBUSB_FILTER });
-```
-
-### Search Devices
-
-```ts
-const result = await HardwareSDK.searchDevices();
-if (!result.success) throw new Error(result.payload.error);
-
-const devices = result.payload;
-// [{ connectId, deviceId?, name, deviceType, ... }]
-```
-
-### Get Device Features
-
-Resolve `device_id` from `connectId` (required for BLE connections):
-
-```ts
-const features = await HardwareSDK.getFeatures(connectId);
-if (!features.success) throw new Error(features.payload.error);
-
-const deviceId = features.payload.device_id;
-```
-
-> **Important:** `connectId` is stable for the same device (reset does not change it); `device_id` changes after reset/recovery and must be refreshed via `getFeatures`.
-
-## Handle PIN Entry
-
-When a protected call is made and the device is locked, handle `REQUEST_PIN`:
-
-```ts
-import { UI_RESPONSE } from '@onekeyfe/hd-core';
-
-// Option 1: Enter on device (recommended)
-await HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PIN,
-  payload: '@@ONEKEY_INPUT_PIN_IN_DEVICE'
-});
-
-// Option 2: Software blind PIN (not supported on Pro/Touch)
-await HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PIN,
-  payload: userInputPin  // e.g., '1234'
-});
-```
-
-> **Note:** OneKey Pro and Touch devices only support on-device PIN entry.
-
-## Handle Passphrase
-
-For hidden wallet access, handle `REQUEST_PASSPHRASE`:
-
-```ts
-// Option 1: Enter on device (most secure)
-await HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { passphraseOnDevice: true, value: '' }
-});
-
-// Option 2: Software input with optional session cache
-await HardwareSDK.uiResponse({
-  type: UI_RESPONSE.RECEIVE_PASSPHRASE,
-  payload: { value: userPassphrase, passphraseOnDevice: false, save: true }
-});
-```
-
-To force standard wallet (skip passphrase), add `useEmptyPassphrase: true` to any method call.
-
-## First Signing Call
-
-Example: Sign an EVM message (EIP-191 personal_sign):
-
-```ts
-const message = 'Hello OneKey';
-const messageHex = Buffer.from(message).toString('hex');
-
-const res = await HardwareSDK.evmSignMessage(connectId, deviceId, {
-  path: "m/44'/60'/0'",
-  messageHex,
-  chainId: 1,
-});
-
-if (!res.success) throw new Error(res.payload.error);
-
-console.log('Address:', res.payload.address);
-console.log('Signature:', res.payload.signature);
-```
+- Standard lifecycle (`init → search → getFeatures → subscribe → call + uiResponse → cleanup`): [Core API Guide → Standard lifecycle](/en/hardware-sdk/core-api-guide#standard-lifecycle)
+- Call parameters accepted by every method: [Common params](/en/hardware-sdk/core-api-guide#common-params)
+- Identifier reference (`connectId` / `deviceId` / `passphraseState` / …): [Identifiers](/en/hardware-sdk/concepts/identifiers)
+- PIN entry flow: [PIN Code](/en/hardware-sdk/concepts/pin)
+- Passphrase / hidden-wallet flow: [Passphrase](/en/hardware-sdk/concepts/passphrase)
 
 import { DeviceCompatibilityTable } from '../../../components/DeviceCompatibilityTable'
 
@@ -265,16 +159,11 @@ import { DeviceCompatibilityTable } from '../../../components/DeviceCompatibilit
 
 - Changelog: [releases](https://github.com/OneKeyHQ/hardware-js-sdk/releases)
 
-## API References
+## Further reading
 
-- Per-chain APIs: [Hardware SDK Core API Guide](/en/hardware-sdk/core-api-guide)
-- Events and UI responses: [Config Event](/en/hardware-sdk/core-api-guide#events-ui)
-- How to unlock the device: [PIN Code](/en/hardware-sdk/concepts/pin)
-- Need support for passphrases? [What is Passphrase](/en/hardware-sdk/concepts/passphrase)
-
-## Concepts and Advanced Topics
-
-- Message protocol (for debugging low-level transports): [Low-level transport plugin](/en/hardware-sdk/concepts/low-level-plugin#message-protocol)
+- Low-level transport & message protocol (for debugging or custom adapters): [Low-Level Transport Plugin](/en/hardware-sdk/concepts/low-level-plugin)
+- Migration from the legacy `hd-web-sdk` flow: [Migration Guide](/en/hardware-sdk/legacy-guides)
+- AI agent integration via OneKey skills: [AI Agent Integration](/en/hardware-sdk/agent-integration)
 
 ## Support
 

@@ -27,7 +27,6 @@ import {
   getPassphraseStateWithRefreshDeviceInfo,
 } from '../utils/deviceFeaturesUtils';
 import { generateInstanceId } from '../utils/tracing';
-
 // eslint-disable-next-line import/no-cycle
 import { DeviceCommands } from './DeviceCommands';
 import {
@@ -101,6 +100,27 @@ export interface Device {
 }
 
 const deviceSessionCache: Record<string, string> = {};
+
+/**
+ * Pre-populate the device session cache with a known session ID.
+ *
+ * This allows short-lived processes (e.g. CLI) to restore a previously
+ * obtained session, avoiding the need to re-enter passphrase on every
+ * invocation. The session must have been obtained from a prior
+ * getPassphraseState() call on the same device.
+ *
+ * @param deviceId - The device's device_id (from features)
+ * @param passphraseState - The passphrase state token
+ * @param sessionId - The session_id to cache (from features.session_id)
+ */
+export function preloadSessionCache(
+  deviceId: string,
+  passphraseState: string,
+  sessionId: string
+): void {
+  const key = `${deviceId}@${passphraseState}`;
+  deviceSessionCache[key] = sessionId;
+}
 
 export class Device extends EventEmitter {
   /**
@@ -357,6 +377,12 @@ export class Device extends EventEmitter {
 
     const deviceId = _deviceId || this.features?.device_id;
     if (!deviceId) return undefined;
+    // Security invariant: no passphraseState → no session lookup.
+    // A previous fallback that scanned `${deviceId}@*` keys could silently
+    // route a standard-wallet (useEmptyPassphrase) or multi-hidden-wallet
+    // caller onto the wrong cached session. CLI reuse is not affected:
+    // prepareSession writes passphraseState into globalOpts so every
+    // downstream call carries it and hits the primary lookup below.
     if (!this.passphraseState) return undefined;
 
     const usePassKey = this.generateStateKey(deviceId, this.passphraseState);
@@ -839,6 +865,7 @@ export class Device extends EventEmitter {
     skipPassphraseCheck?: boolean
   ) {
     if (!this.features) return false;
+
     const { passphraseState: newPassphraseState, unlockedAttachPin } =
       await getPassphraseStateWithRefreshDeviceInfo(this, {
         expectPassphraseState: passphraseState,

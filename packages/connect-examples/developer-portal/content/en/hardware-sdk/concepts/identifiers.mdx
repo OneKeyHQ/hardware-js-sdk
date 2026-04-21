@@ -1,0 +1,271 @@
+---
+title: Identifiers
+---
+
+# Identifiers
+
+OneKey hardware APIs return several identifier-looking fields across
+`searchDevices`, `getFeatures`, `getPassphraseState`, and chain method
+responses. This page is the single reference for what each one means, when
+it changes, and how its shape varies by transport.
+
+> Looking for **call parameters** (`passphraseState`, `initSession`,
+> `useEmptyPassphrase`, …)? See [Common Params](/en/hardware-sdk/core-api-guide#common-params).
+
+## Four layers of identifiers
+
+Each identifier belongs to one of four lifetime tiers. Knowing the tier
+tells you when to refresh or persist a value.
+
+| Layer | Lifetime | Changes on | Examples |
+| --- | --- | --- | --- |
+| **Physical hardware** | Forever (per physical unit) | Never | `uuid`, `onekey_serial`, `serial_no` |
+| **Transport connection** | This connection | New `searchDevices()`; different transport | `connectId`, `path`, `name`, `deviceType` |
+| **Seed / wallet state** | Until reset/wipe/recovery | Factory reset, seed recovery, wipe | `device_id` / `deviceId`, `label` |
+| **Session** | Until device is locked | Device lock (auto-lock, manual, USB disconnect) | `session_id`, `passphraseState` |
+
+## Which IDs do you pass in?
+
+Only three of the identifiers here are **inputs** to SDK calls — the rest are fields you read out of responses.
+
+| ID | You pass in? | Where | Required? |
+| --- | --- | --- | --- |
+| `connectId` | ✅ | First positional arg on every method | **Always** |
+| `deviceId` | ✅ | Second positional arg on signing / address / encryption methods | Required for wallet-level ops; omit for device-management ops |
+| `passphraseState` | ✅ | Inside the `params` object | Only when accessing a hidden (passphrase-protected) wallet |
+| `uuid`, `onekey_serial`, `device_id`, `session_id`, `path`, `name`, `deviceType`, `label` | ❌ response-only | — | — |
+
+### Call-signature patterns
+
+```ts
+// Device-level — just connectId
+HardwareSDK.getFeatures(connectId);
+HardwareSDK.deviceLock(connectId, {});
+HardwareSDK.getPassphraseState(connectId, { initSession: true });
+
+// Wallet-level (standard wallet) — connectId + deviceId
+HardwareSDK.evmGetAddress(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  useEmptyPassphrase: true,
+});
+
+// Wallet-level (hidden wallet) — connectId + deviceId + passphraseState
+HardwareSDK.evmSignTransaction(connectId, deviceId, {
+  path: "m/44'/60'/0'/0/0",
+  transaction: { /* ... */ },
+  passphraseState, // obtained once from getPassphraseState
+});
+```
+
+### Which methods need which IDs
+
+| Pattern | When | Example methods |
+| --- | --- | --- |
+| 🟡 `connectId` only | Device-level operations (don't touch wallet state) | `searchDevices` · `getFeatures` · `getPassphraseState` · `deviceLock` · `deviceUnlock` · `deviceWipe` · `deviceSettings` · `deviceVerify` · `cancel` · `checkFirmwareRelease` · `checkBootloaderRelease` |
+| 🔵 `connectId` + `deviceId` | Wallet-level — address derivation / signing / encryption | `evmGetAddress` · `evmSignTransaction` · `evmSignMessage` · `btcGetAddress` · `btcSignTransaction` · `btcSignPsbt` · `solGetAddress` · `solSignMessage` · `nostrEncryptMessage` · `allNetworkGetAddress` · all other chain methods |
+| 🟣 `connectId` + `deviceId` + `passphraseState` | Same as 🔵, but against a passphrase-protected hidden wallet | All of 🔵 with a non-empty `passphraseState` in params |
+
+### What happens if you skip or mistype an ID?
+
+| What you skip / pass wrong | SDK response |
+| --- | --- |
+| `connectId` missing or unknown | `DeviceNotFound` — SDK has no idea which device to route to |
+| `deviceId` wrong (seed changed mid-flow) | `DeviceCheckDeviceIdError` — SDK refuses to sign on a different seed |
+| `passphraseState` missing on a hidden wallet | ⚠️ **Silent success on the standard wallet** — you get a different address back with no error |
+| `passphraseState` doesn't match the current session | Error 112 (passphrase state mismatch) — session expired or wrong hidden wallet |
+| `passphraseState` + `useEmptyPassphrase: true` combined | `passphraseState` takes precedence (hidden wallet) — the `useEmptyPassphrase` flag is ignored |
+
+> ⚠️ The silent-standard-wallet case is the sneakiest. If you forget `passphraseState` when querying a hidden wallet, you'll get the standard wallet's address back without any error. Always obtain `passphraseState` via `getPassphraseState` once and attach it to every subsequent wallet-level call — or pass `useEmptyPassphrase: true` explicitly if you intend the standard wallet.
+
+## Physical hardware identifiers
+
+Immutable values that identify the physical unit. Survive resets, seed
+changes, and firmware updates.
+
+| Field | Where returned | Format | Notes |
+| --- | --- | --- | --- |
+| `uuid` | `searchDevices()[].uuid` | Transport-dependent (see below) | On USB transports equals `connectId`. On BLE may differ from the OS-level `connectId`. |
+| `onekey_serial` / `onekey_serial_no` | `getFeatures().payload` | `CLB21J0013` style | Factory-assigned; **printed on the box / device sticker**. |
+
+## Transport connection identifiers
+
+Identify a specific connection. **The same physical device has different
+`connectId` values on USB vs BLE** — these are not interchangeable.
+
+### `connectId` — the routing key
+<div id="connectid" />
+
+Every call to an SDK method takes `connectId` as the first argument. It
+tells the SDK which device/connection to route the request to. Stable across
+`searchDevices()` calls on the same transport.
+
+| Transport | `connectId` format | Example |
+| --- | --- | --- |
+| WebUSB | Device serial number | `PRC10J0017A` |
+| Bridge | Device serial number | `PRC10J0017A` |
+| node-usb (CLI) | Device serial number | `CLB21J0013` |
+| Android BLE | MAC address | `AA:BB:CC:DD:EE:FF` |
+| iOS BLE | CoreBluetooth UUID | `XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX` |
+| Desktop BLE (Electron/Noble, macOS) | 32-char lowercase hex UUID | `1f6dad0b8782aab31d2f7ae2b11e5b6c` |
+| Desktop BLE (Electron/Noble, Windows) | 12-char lowercase hex MAC, no colons | `e4e65539cf33` |
+| Desktop BLE (Electron/Noble, Linux) | MAC address | `AA:BB:CC:DD:EE:FF` |
+
+> ⚠️ If your app supports both USB and BLE for the same physical device,
+> cache `connectId` **separately per transport** and never cross-use them.
+
+### Other transport-level fields
+
+| Field | Purpose | Typical value | Notes |
+| --- | --- | --- | --- |
+| `path` | Low-level bus path | USB: device path or `device_id`; BLE: `undefined` | **Implementation detail** — do not route calls on this; always use `connectId`. |
+| `name` | Human label for display | USB: device `label`; BLE: advertised name | For UI; not for routing. |
+| `deviceType` | Device model | `classic` / `classic1s` / `classicpure` / `mini` / `touch` / `pro` | Use to branch on capability (e.g. PIN matrix support on button models). Values come from `EDeviceType`. |
+
+## Seed / wallet state identifier
+
+`deviceId` (in `searchDevices` payload) and `device_id` (in `getFeatures`
+payload) are the **same value** — they identify the currently-loaded seed
+on the device.
+
+| Changes `deviceId` | Leaves `deviceId` unchanged |
+| --- | --- |
+| Factory reset | Reboot |
+| Seed recovery (new seed loaded) | Lock / unlock |
+| "Wipe" and re-init | USB reconnect |
+| Switching between dev/prod seeds (dev builds) | Passphrase change |
+
+### Usage
+
+```ts
+const { payload: features } = await HardwareSDK.getFeatures(connectId);
+const deviceId = features.device_id;
+
+// Pass deviceId on every signing call — the SDK uses it to detect that
+// the seed didn't change mid-flow and aborts with `DeviceCheckDeviceIdError`
+// if it did.
+await HardwareSDK.evmSignTransaction(connectId, deviceId, { ... });
+```
+
+If you see `DeviceCheckDeviceIdError`, re-run `getFeatures(connectId)` and
+update your cached `deviceId`.
+
+## Session identifiers
+
+Two session-level identifiers that look similar but serve different
+purposes.
+
+### `session_id` — ephemeral session token
+
+Short-lived random token the device mints when a passphrase session is
+initialised. Returned in `features.session_id` after `getPassphraseState`
+or any call that initialises a session.
+
+- **Invalidated on lock** (auto-lock, manual lock, USB disconnect).
+- Used internally by the SDK to keep the device's cached passphrase alive.
+- Rarely surfaced to app code directly — most apps only need
+  `passphraseState`.
+
+### `passphraseState` — hidden wallet identifier
+
+Deterministic identifier for the hidden wallet bound to a specific
+passphrase. Returned by `getPassphraseState()`. **The same passphrase on
+the same seed always produces the same `passphraseState`**, so you can
+recognise "is this the same hidden wallet I saw last time?" without
+persisting the passphrase itself.
+
+- Pass as the `passphraseState` common-param on every SDK call that must
+  stay on the same hidden wallet.
+- Cache across processes by persisting
+  `(deviceId, passphraseState, session_id)` together and calling
+  `preloadSessionCache` on startup.
+- Clearing the cached `passphraseState` does **not** invalidate the hidden
+  wallet — the wallet is reproducible by re-entering the same passphrase.
+
+| | `session_id` | `passphraseState` |
+| --- | --- | --- |
+| Lifetime | Until device lock | Effectively forever (until passphrase changes) |
+| Determinism | Random per session | Deterministic per passphrase |
+| Role | Keeps device-side session alive | Identifies which hidden wallet to use |
+
+## Putting it together — real example
+
+`searchDevices()` for a Classic 1S connected via USB (node-usb transport)
+returns:
+
+```jsonc
+{
+  "connectId":  "CLB21J0013",                      // transport-level (on USB = device serial)
+  "uuid":       "CLB21J0013",                      // physical (on USB = connectId)
+  "deviceType": "classic1s",                       // transport-level
+  "deviceId":   "399A2470958EDB3D9F3826C2",        // seed state; changes on reset
+  "path":       "399A2470958EDB3D9F3826C2",        // transport internal; varies by transport
+  "name":       "OneKey Classic 1S"                // display label
+}
+```
+
+A subsequent `getFeatures(connectId)` adds:
+
+```jsonc
+{
+  "device_id":       "399A2470958EDB3D9F3826C2",   // same as deviceId above
+  "onekey_serial":   "CLB21J0013",                 // physical; same as connectId on USB
+  "session_id":      "80cb8aef933870e4…",          // ephemeral; resets on lock
+  "passphrase_protection": true,
+  "unlocked":        true,
+  "label":           "OneKey Classic 1S"
+}
+```
+
+After the user enters their passphrase, `getPassphraseState(connectId)`
+returns:
+
+```jsonc
+{
+  "success": true,
+  "payload": "abc123…"                             // passphraseState — pass to subsequent calls
+}
+```
+
+## Common confusions
+
+### `connectId` vs `uuid`
+
+On USB transports they happen to be the same string (the device serial).
+On BLE they may diverge: `connectId` is the OS-level connection handle
+(MAC / CoreBluetooth UUID / …) while `uuid` is whatever stable identifier
+the SDK surfaces for app use. **Always route calls via `connectId`** —
+treat `uuid` as a human-readable label only if you need a single stable
+ID across transports.
+
+### `deviceId` vs `uuid` / `onekey_serial`
+
+- `deviceId` — changes on reset / seed change. Use for *"is this the same
+  wallet?"*.
+- `uuid` / `onekey_serial` — never changes. Use for *"is this the same
+  physical device?"*.
+
+### `session_id` vs `passphraseState`
+
+- `session_id` expires when the device locks; `passphraseState` does not.
+- `passphraseState` identifies **which hidden wallet**; `session_id`
+  authenticates **this live session**.
+- Persist `(passphraseState, session_id)` together to reuse a session
+  across invocations; if the device locked between invocations, discard
+  the cached `session_id` and force a fresh unlock.
+
+### `device_id` (snake_case) vs `deviceId` (camelCase)
+
+Same value, different contexts:
+
+- `device_id` appears in `getFeatures().payload` (firmware-level,
+  snake_case).
+- `deviceId` appears in `searchDevices()[]` and as the second positional
+  argument to most SDK methods (JavaScript-level, camelCase).
+
+## See also
+
+- [Common Params](/en/hardware-sdk/core-api-guide#common-params) — parameters you pass **in** to SDK calls
+- [Passphrase](/en/hardware-sdk/concepts/passphrase) — hidden wallet flow
+- [PIN Code](/en/hardware-sdk/concepts/pin) — PIN entry flow
+- [Search Devices](/en/hardware-sdk/basic-api/search-devices) — returns `connectId`, `uuid`, `deviceType`, `deviceId`
+- [Get Features](/en/hardware-sdk/basic-api/get-features) — returns `device_id`, `session_id`, `onekey_serial`, …
