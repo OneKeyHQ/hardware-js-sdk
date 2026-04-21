@@ -1,5 +1,5 @@
 import * as protobuf from 'protobufjs/light';
-import * as Long from 'long';
+import Long from 'long';
 
 import {
   buildBuffers,

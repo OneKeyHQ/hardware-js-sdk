@@ -26,6 +26,14 @@ const json = {
         },
       },
     },
+    TxInput: {
+      fields: {
+        prev_hash: {
+          type: 'bytes',
+          id: 1,
+        },
+      },
+    },
     TxAckInput: {
       options: {
         '(wire_type)': 22,
