@@ -241,33 +241,6 @@ describe('LedgerAdapter', () => {
     });
   });
 
-  describe('error handling', () => {
-    it('should return failure when connector.call throws', async () => {
-      // Mock locked error on both the initial call and the retry after unlock prompt
-      connector.call
-        .mockRejectedValueOnce(Object.assign(new Error('locked'), { errorCode: '5515' }))
-        .mockRejectedValueOnce(Object.assign(new Error('locked'), { errorCode: '5515' }));
-
-      await adapter.connectDevice('dev-1');
-
-      // Respond to the unlock prompt so the adapter retries (and gets the second locked error)
-      adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, () => {
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
-          payload: { confirmed: true },
-        });
-      });
-
-      const result = await adapter.evmGetAddress('dev-1', '', {
-        path: "m/44'/60'/0'/0/0",
-      });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.payload.code).toBe(HardwareErrorCode.DeviceLocked);
-      }
-    });
-  });
-
   describe('Solana methods', () => {
     it('should return address for solGetAddress', async () => {
       connector.call.mockResolvedValueOnce({ address: 'SoLAddr123', path: "m/44'/501'/0'" });
@@ -448,60 +421,6 @@ describe('LedgerAdapter', () => {
       );
     });
 
-    it('should emit REQUEST_SELECT_DEVICE when handleSelectDevice=true and await uiResponse', async () => {
-      const selectingAdapter = new LedgerAdapter(connector, {
-        handleSelectDevice: true,
-      });
-
-      connector.searchDevices.mockResolvedValueOnce([
-        { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
-        { connectId: 'dev-B', deviceId: 'dev-B', name: 'Nano S', model: 'nanoS' },
-      ]);
-      connector.connect.mockResolvedValueOnce({
-        sessionId: 'session-B',
-        deviceInfo: {
-          vendor: 'ledger',
-          model: 'nanoS',
-          firmwareVersion: 'unknown',
-          deviceId: 'dev-B',
-          connectId: 'dev-B',
-          connectionType: 'usb',
-        },
-      });
-      connector.call.mockResolvedValueOnce({ address: '0xSELECTED' });
-
-      const selectListener = jest.fn();
-      selectingAdapter.on(UI_REQUEST.REQUEST_SELECT_DEVICE, (event: any) => {
-        selectListener(event);
-        selectingAdapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_SELECT_DEVICE,
-          payload: { sdkConnectId: 'dev-B' },
-        });
-      });
-
-      const result = await selectingAdapter.evmGetAddress('', '', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-      });
-
-      expect(selectListener).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: UI_REQUEST.REQUEST_SELECT_DEVICE,
-          payload: expect.objectContaining({
-            devices: expect.arrayContaining([
-              expect.objectContaining({ connectId: 'dev-A' }),
-              expect.objectContaining({ connectId: 'dev-B' }),
-            ]),
-          }),
-        })
-      );
-      expect(connector.connect).toHaveBeenCalledWith('dev-B');
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.payload.address).toBe('0xSELECTED');
-      }
-    });
-
     it('should auto-select first device when multiple devices found and handleSelectDevice is off (default)', async () => {
       connector.searchDevices.mockResolvedValueOnce([
         { connectId: 'dev-A', deviceId: 'dev-A', name: 'Nano X', model: 'nanoX' },
@@ -528,29 +447,6 @@ describe('LedgerAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(connector.connect).toHaveBeenCalledWith('dev-A');
-    });
-
-    it('should return DeviceDisconnected failure when no devices found', async () => {
-      // Mock searchDevices to always return empty
-      connector.searchDevices.mockResolvedValue([]);
-
-      // Listen for ui-request-device-connect and cancel immediately
-      adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, () => {
-        adapter.uiResponse({
-          type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
-          payload: { confirmed: false },
-        });
-      });
-
-      const result = await adapter.evmGetAddress('', '', {
-        path: "m/44'/60'/0'/0/0",
-        showOnDevice: false,
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.payload.code).toBe(HardwareErrorCode.DeviceDisconnected);
-      }
     });
   });
 

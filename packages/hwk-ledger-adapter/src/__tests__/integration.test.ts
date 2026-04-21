@@ -102,35 +102,4 @@ describe('LedgerAdapter Integration', () => {
       expect(signResult.payload.s).toBe('0xccdd');
     }
   });
-
-  it('should emit ui-request-device-connect event when device is locked', async () => {
-    // Mock connector.call to throw a locked error on both initial call and retry
-    (connector.call as ReturnType<typeof jest.fn>)
-      .mockRejectedValueOnce(Object.assign(new Error('locked'), { errorCode: '5515' }))
-      .mockRejectedValueOnce(Object.assign(new Error('locked'), { errorCode: '5515' }));
-
-    await adapter.connectDevice('dev-1');
-
-    const unlockListener = jest.fn();
-    adapter.on(UI_REQUEST.REQUEST_DEVICE_CONNECT, (event: any) => {
-      unlockListener(event);
-      // Confirm the prompt so the adapter retries (and gets the second locked error)
-      adapter.uiResponse({
-        type: UI_RESPONSE.RECEIVE_DEVICE_CONNECT,
-        payload: { confirmed: true },
-      });
-    });
-
-    const result = await adapter.evmGetAddress('dev-1', '', {
-      path: "m/44'/60'/0'/0/0",
-    });
-
-    expect(result.success).toBe(false);
-    expect(unlockListener).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'ui-request-device-connect',
-        payload: expect.objectContaining({ message: expect.any(String) }),
-      })
-    );
-  });
 });

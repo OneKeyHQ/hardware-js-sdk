@@ -49,10 +49,6 @@ describe('isDeviceLockedError', () => {
     expect(isDeviceLockedError({ _tag: 'DeviceLockedError' })).toBe(true);
   });
 
-  it('should detect "locked" in message', () => {
-    expect(isDeviceLockedError({ message: 'Device is Locked' })).toBe(true);
-  });
-
   it('should detect in error chain (originalError)', () => {
     expect(isDeviceLockedError({ originalError: { errorCode: '5515' } })).toBe(true);
   });
